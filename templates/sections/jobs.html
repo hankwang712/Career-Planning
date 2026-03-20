@@ -1,0 +1,352 @@
+        <section id="jobs" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden fade-in">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">💼 岗位探索中心</h2>
+                <p class="text-gray-500">浏览 100+ 热门岗位，了解行业趋势与技能要求，构建岗位画像</p>
+            </div>
+
+
+            <div class="jobs-geo-hub glass-surface">
+                <div class="jobs-geo-shell">
+                    <div class="jobs-geo-map-panel">
+                        <div class="jobs-geo-head">
+                            <div>
+                                <p class="jobs-geo-kicker">全国招聘版图</p>
+                                <h3 class="jobs-geo-title">点击省份，查看城市岗位画像</h3>
+                                <p class="jobs-geo-copy">基于 `boss_info` 真实岗位样本聚合。薪资已统一折算为月薪口径，日薪按 30 天，13/14/16 薪按年化折算。</p>
+                            </div>
+                            <div class="jobs-geo-legend">
+                                <span>平均折算月薪</span>
+                                <div class="jobs-geo-gradient"></div>
+                                <span>高</span>
+                            </div>
+                        </div>
+
+                        <div class="jobs-geo-meta">
+                            <div class="jobs-geo-meta-card">
+                                <span class="jobs-geo-meta-label">覆盖省份</span>
+                                <strong id="jobGeoProvinceCount">--</strong>
+                            </div>
+                            <div class="jobs-geo-meta-card">
+                                <span class="jobs-geo-meta-label">覆盖城市</span>
+                                <strong id="jobGeoCityCount">--</strong>
+                            </div>
+                            <div class="jobs-geo-meta-card">
+                                <span class="jobs-geo-meta-label">岗位样本</span>
+                                <strong id="jobGeoJobCount">--</strong>
+                            </div>
+                        </div>
+
+                        <div class="jobs-geo-stage">
+                            <div id="jobsChinaMap" class="jobs-geo-canvas"></div>
+                            <div class="jobs-geo-click-hint" id="jobsGeoHint">点击高亮省份查看城市数据</div>
+                        </div>
+                    </div>
+
+                    <aside class="jobs-geo-panel">
+                        <div class="jobs-geo-panel-head">
+                            <p id="jobGeoProvinceLabel" class="jobs-geo-province">
+                                <span class="jobs-geo-dot"></span>全国概览
+                            </p>
+                            <h3 id="jobGeoCityTitle" class="jobs-geo-city">等待选择</h3>
+                            <p id="jobGeoNarrative" class="jobs-geo-narrative">点击左侧省份后，这里会展示对应城市的薪资、学历、经验、技能和行业分布。</p>
+                        </div>
+
+                        <div id="jobGeoCityTabs" class="jobs-geo-city-tabs"></div>
+
+                        <div class="jobs-geo-stat-grid">
+                            <div class="jobs-geo-stat-card">
+                                <span class="jobs-geo-stat-label">岗位样本数</span>
+                                <strong id="jobGeoSampleCount">--</strong>
+                                <small id="jobGeoCoverageText">--</small>
+                            </div>
+                            <div class="jobs-geo-stat-card accent">
+                                <span class="jobs-geo-stat-label">平均折算月薪</span>
+                                <strong id="jobGeoAvgSalary">--</strong>
+                                <small id="jobGeoSalaryText">--</small>
+                                <div id="jobGeoAnnualTag" class="jobs-geo-annual-tag" style="display:none">
+                                    年薪约&nbsp;<strong id="jobGeoAnnualSalary">--</strong>
+                                </div>
+                            </div>
+                            <div class="jobs-geo-stat-card">
+                                <span class="jobs-geo-stat-label">实习/应届占比</span>
+                                <strong id="jobGeoCampusShare">--</strong>
+                                <small id="jobGeoCampusText">--</small>
+                            </div>
+                            <div class="jobs-geo-stat-card">
+                                <span class="jobs-geo-stat-label">本科及以上</span>
+                                <strong id="jobGeoDegreeShare">--</strong>
+                                <small id="jobGeoDegreeText">--</small>
+                            </div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>省内城市对比</h4>
+                                <span id="jobGeoCompareLabel">--</span>
+                            </div>
+                            <div id="jobGeoCompareList" class="jobs-geo-bar-list"></div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>经验要求分布</h4>
+                                <span id="jobGeoExpLabel">Top 4</span>
+                            </div>
+                            <div id="jobGeoExperienceList" class="jobs-geo-bar-list compact"></div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>热门技能</h4>
+                                <span id="jobGeoSkillLabel">Top 8</span>
+                            </div>
+                            <div id="jobGeoSkillTags" class="jobs-geo-tags"></div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>行业分布</h4>
+                                <span id="jobGeoIndustryLabel">Top 4</span>
+                            </div>
+                            <div id="jobGeoIndustryList" class="jobs-geo-bar-list compact"></div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>公司福利</h4>
+                                <span id="jobGeoBenefitLabel">热词</span>
+                            </div>
+                            <div class="jobs-geo-ticker-wrap">
+                                <div id="jobGeoBenefitTicker" class="jobs-geo-ticker-inner">
+                                    <span class="jobs-geo-benefit-chip normal">加载中…</span>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+
+
+            <!-- 搜索与筛选 -->
+            <div class="bg-white rounded-xl glass-surface p-6 shadow-sm mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">岗位搜索</label>
+                        <input type="text" id="jobSearch" placeholder="搜索岗位名称、技能关键词..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">行业分类</label>
+                        <select id="industryFilter" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="all">全部行业</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">城市</label>
+                        <select id="cityFilter" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="all">全部城市</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="filterJobs()" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-all font-medium">
+                            🔍 搜索
+                        </button>
+                    </div>
+                </div>
+                <p id="jobFilterSummary" class="mt-4 text-sm text-gray-500">当前显示 4 / 4 个岗位</p>
+            </div>
+
+            <!-- 岗位列表（动态渲染） -->
+            <!-- 加载中 -->
+            <div id="jobsLoading" class="py-16 text-center text-gray-400">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p>正在加载岗位数据...</p>
+            </div>
+
+            <!-- 动态卡片网格 -->
+            <div id="jobGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-6 hidden"></div>
+
+            <!-- 分页控制 -->
+            <div id="jobPagination" class="flex items-center justify-between mt-2 mb-8 hidden">
+                <button id="jobPrevBtn" onclick="jobChangePage(-1)"
+                    class="px-5 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                    &larr; 上一页
+                </button>
+                <span id="jobPageInfo" class="text-sm text-gray-500"></span>
+                <button id="jobNextBtn" onclick="jobChangePage(1)"
+                    class="px-5 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                    下一页 &rarr;
+                </button>
+            </div>
+
+            <!-- 岗位关联图谱 -->
+            <div class="bg-white rounded-xl glass-surface p-6 shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-xl font-semibold">🔗 岗位发展关联图谱</h3>
+                        <p class="text-gray-500 text-sm">基于 10000+ 岗位数据分析生成的职业发展路径</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="switchGraphType('vertical')" class="graph-type-btn active px-4 py-2 bg-purple-100 text-purple-600 rounded-lg text-sm font-medium">垂直晋升</button>
+                        <button onclick="switchGraphType('horizontal')" class="graph-type-btn px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium">换岗路径</button>
+                    </div>
+                </div>
+                <div class="relative h-96 bg-gradient-to-br from-gray-50 to-purple-50 rounded-xl overflow-hidden border border-gray-200">
+                    <svg class="w-full h-full" viewBox="0 0 800 350" id="careerGraph">
+                        <!-- 垂直晋升路径 -->
+                        <g id="verticalGraph">
+                            <defs>
+                                <linearGradient id="lineGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            
+                            <!-- 路径线 -->
+                            <line x1="400" y1="40" x2="400" y2="310" stroke="url(#lineGrad1)" stroke-width="4" stroke-dasharray="8,4" opacity="0.6"/>
+                            
+                            <!-- 节点 -->
+                            <g class="skill-node" onclick="showNodeDetail('初级工程师')">
+                                <circle cx="400" cy="40" r="45" fill="#667eea" class="hover:opacity-80 transition-all"/>
+                                <text x="400" y="35" text-anchor="middle" fill="white" font-size="13" font-weight="bold">初级</text>
+                                <text x="400" y="50" text-anchor="middle" fill="white" font-size="11">工程师</text>
+                                <text x="400" y="65" text-anchor="middle" fill="white" font-size="9">1-2 年</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('中级工程师')">
+                                <circle cx="400" cy="120" r="45" fill="#764ba2" class="hover:opacity-80 transition-all"/>
+                                <text x="400" y="115" text-anchor="middle" fill="white" font-size="13" font-weight="bold">中级</text>
+                                <text x="400" y="130" text-anchor="middle" fill="white" font-size="11">工程师</text>
+                                <text x="400" y="145" text-anchor="middle" fill="white" font-size="9">3-5 年</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('高级工程师')">
+                                <circle cx="400" cy="200" r="45" fill="#533483" class="hover:opacity-80 transition-all"/>
+                                <text x="400" y="195" text-anchor="middle" fill="white" font-size="13" font-weight="bold">高级</text>
+                                <text x="400" y="210" text-anchor="middle" fill="white" font-size="11">工程师</text>
+                                <text x="400" y="225" text-anchor="middle" fill="white" font-size="9">5-8 年</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('技术专家')">
+                                <circle cx="400" cy="280" r="40" fill="#4c1d95" class="hover:opacity-80 transition-all"/>
+                                <text x="400" y="275" text-anchor="middle" fill="white" font-size="12" font-weight="bold">技术专家</text>
+                                <text x="400" y="290" text-anchor="middle" fill="white" font-size="9">/ 架构师</text>
+                                <text x="400" y="305" text-anchor="middle" fill="white" font-size="8">8 年+</text>
+                            </g>
+                            
+                            <!-- 横向换岗路径 -->
+                            <line x1="250" y1="120" x2="345" y2="120" stroke="#10b981" stroke-width="2" stroke-dasharray="6,3" opacity="0.6"/>
+                            <line x1="455" y1="120" x2="550" y2="120" stroke="#10b981" stroke-width="2" stroke-dasharray="6,3" opacity="0.6"/>
+                            <line x1="250" y1="200" x2="345" y2="200" stroke="#10b981" stroke-width="2" stroke-dasharray="6,3" opacity="0.6"/>
+                            <line x1="455" y1="200" x2="550" y2="200" stroke="#10b981" stroke-width="2" stroke-dasharray="6,3" opacity="0.6"/>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('产品经理')">
+                                <circle cx="200" cy="120" r="35" fill="#10b981" class="hover:opacity-80 transition-all"/>
+                                <text x="200" y="115" text-anchor="middle" fill="white" font-size="10" font-weight="bold">产品</text>
+                                <text x="200" y="128" text-anchor="middle" fill="white" font-size="9">经理</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('数据分析师')">
+                                <circle cx="600" cy="120" r="35" fill="#10b981" class="hover:opacity-80 transition-all"/>
+                                <text x="600" y="115" text-anchor="middle" fill="white" font-size="10" font-weight="bold">数据</text>
+                                <text x="600" y="128" text-anchor="middle" fill="white" font-size="9">分析师</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('项目经理')">
+                                <circle cx="200" cy="200" r="35" fill="#10b981" class="hover:opacity-80 transition-all"/>
+                                <text x="200" y="195" text-anchor="middle" fill="white" font-size="10" font-weight="bold">项目</text>
+                                <text x="200" y="208" text-anchor="middle" fill="white" font-size="9">经理</text>
+                            </g>
+                            
+                            <g class="skill-node" onclick="showNodeDetail('技术顾问')">
+                                <circle cx="600" cy="200" r="35" fill="#10b981" class="hover:opacity-80 transition-all"/>
+                                <text x="600" y="195" text-anchor="middle" fill="white" font-size="10" font-weight="bold">技术</text>
+                                <text x="600" y="208" text-anchor="middle" fill="white" font-size="9">顾问</text>
+                            </g>
+                        </g>
+                        
+                        <!-- 换岗路径 (默认隐藏) -->
+                        <g id="horizontalGraph" style="display:none">
+                            <defs>
+                                <linearGradient id="hlineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#667eea;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <!-- 中心岗位 -->
+                            <g onclick="showNodeDetail('机器学习工程师')">
+                                <circle cx="400" cy="175" r="50" fill="#667eea" class="hover:opacity-80 transition-all"/>
+                                <text x="400" y="168" text-anchor="middle" fill="white" font-size="12" font-weight="bold">机器学习</text>
+                                <text x="400" y="183" text-anchor="middle" fill="white" font-size="11">工程师</text>
+                                <text x="400" y="198" text-anchor="middle" fill="white" font-size="9">当前目标</text>
+                            </g>
+                            <!-- 连接线 -->
+                            <line x1="130" y1="60" x2="350" y2="150" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <line x1="670" y1="60" x2="450" y2="150" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <line x1="130" y1="290" x2="350" y2="200" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <line x1="670" y1="290" x2="450" y2="200" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <line x1="130" y1="175" x2="350" y2="175" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <line x1="450" y1="175" x2="670" y2="175" stroke="url(#hlineGrad)" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>
+                            <!-- 可迁移岗位 -->
+                            <g onclick="showNodeDetail('AI产品经理')">
+                                <circle cx="100" cy="60" r="38" fill="#10b981" class="hover:opacity-80 transition-all"/>
+                                <text x="100" y="53" text-anchor="middle" fill="white" font-size="10" font-weight="bold">AI产品</text>
+                                <text x="100" y="67" text-anchor="middle" fill="white" font-size="9">经理</text>
+                                <text x="100" y="80" text-anchor="middle" fill="#d1fae5" font-size="8">重叠度 0.71</text>
+                            </g>
+                            <g onclick="showNodeDetail('算法研究员')">
+                                <circle cx="700" cy="60" r="38" fill="#8b5cf6" class="hover:opacity-80 transition-all"/>
+                                <text x="700" y="53" text-anchor="middle" fill="white" font-size="10" font-weight="bold">算法</text>
+                                <text x="700" y="67" text-anchor="middle" fill="white" font-size="9">研究员</text>
+                                <text x="700" y="80" text-anchor="middle" fill="#ede9fe" font-size="8">重叠度 0.82</text>
+                            </g>
+                            <g onclick="showNodeDetail('数据科学家')">
+                                <circle cx="100" cy="175" r="38" fill="#f59e0b" class="hover:opacity-80 transition-all"/>
+                                <text x="100" y="168" text-anchor="middle" fill="white" font-size="10" font-weight="bold">数据</text>
+                                <text x="100" y="182" text-anchor="middle" fill="white" font-size="9">科学家</text>
+                                <text x="100" y="195" text-anchor="middle" fill="#fef3c7" font-size="8">重叠度 0.78</text>
+                            </g>
+                            <g onclick="showNodeDetail('NLP工程师')">
+                                <circle cx="700" cy="175" r="38" fill="#ef4444" class="hover:opacity-80 transition-all"/>
+                                <text x="700" y="168" text-anchor="middle" fill="white" font-size="10" font-weight="bold">NLP</text>
+                                <text x="700" y="182" text-anchor="middle" fill="white" font-size="9">工程师</text>
+                                <text x="700" y="195" text-anchor="middle" fill="#fee2e2" font-size="8">重叠度 0.76</text>
+                            </g>
+                            <g onclick="showNodeDetail('技术顾问')">
+                                <circle cx="100" cy="290" r="38" fill="#06b6d4" class="hover:opacity-80 transition-all"/>
+                                <text x="100" y="283" text-anchor="middle" fill="white" font-size="10" font-weight="bold">技术</text>
+                                <text x="100" y="297" text-anchor="middle" fill="white" font-size="9">顾问</text>
+                                <text x="100" y="310" text-anchor="middle" fill="#cffafe" font-size="8">重叠度 0.65</text>
+                            </g>
+                            <g onclick="showNodeDetail('云计算工程师')">
+                                <circle cx="700" cy="290" r="38" fill="#84cc16" class="hover:opacity-80 transition-all"/>
+                                <text x="700" y="283" text-anchor="middle" fill="white" font-size="10" font-weight="bold">云计算</text>
+                                <text x="700" y="297" text-anchor="middle" fill="white" font-size="9">工程师</text>
+                                <text x="700" y="310" text-anchor="middle" fill="#f7fee7" font-size="8">重叠度 0.60</text>
+                            </g>
+                            <!-- 说明标注 -->
+                            <text x="400" y="330" text-anchor="middle" fill="#6b7280" font-size="11">PathScore = 技能重叠 + 经验迁移 + 学习成本倒数 + 市场机会</text>
+                        </g>
+                    </svg>
+                </div>
+                <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
+                    <div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <p class="font-semibold text-purple-600">垂直晋升</p>
+                        <p class="text-gray-500 text-xs mt-1">初级→中级→高级→专家</p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p class="font-semibold text-green-600">转产品</p>
+                        <p class="text-gray-500 text-xs mt-1">技术→产品经理</p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p class="font-semibold text-green-600">转数据</p>
+                        <p class="text-gray-500 text-xs mt-1">开发→数据分析</p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p class="font-semibold text-green-600">转管理</p>
+                        <p class="text-gray-500 text-xs mt-1">技术→项目管理</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 能力画像 -->

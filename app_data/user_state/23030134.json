@@ -1,0 +1,21 @@
+{
+  "assessment_hub": {
+    "mbti": {
+      "currentIndex": 0,
+      "answers": {},
+      "clarifier": {
+        "loading": false,
+        "summary": "",
+        "questions": [],
+        "currentIndex": 0,
+        "answers": {},
+        "applied": false,
+        "requestedSignature": ""
+      }
+    },
+    "holland": {
+      "currentIndex": 0,
+      "answers": {}
+    }
+  }
+}

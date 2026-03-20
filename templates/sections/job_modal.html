@@ -1,0 +1,90 @@
+    <div id="jobModal" class="fixed inset-0 z-[2000] hidden items-end sm:items-center justify-center"
+         style="background:rgba(15,23,42,0.6);backdrop-filter:blur(8px);"
+         onclick="if(event.target===this)closeJobModal()">
+
+        <div class="job-modal-panel bg-white w-full max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl relative flex flex-col"
+             style="max-height:92vh;" onclick="event.stopPropagation()">
+
+            <!-- ── 头部：渐变卡 ── -->
+            <div class="job-modal-header flex-shrink-0 rounded-t-2xl sm:rounded-t-2xl p-6 relative overflow-hidden"
+                 style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#9333ea 100%);">
+                <!-- 装饰圆 -->
+                <div class="absolute -right-8 -top-8 w-40 h-40 rounded-full opacity-10"
+                     style="background:rgba(255,255,255,0.4)"></div>
+                <div class="absolute -right-2 bottom-0 w-24 h-24 rounded-full opacity-10"
+                     style="background:rgba(255,255,255,0.3)"></div>
+
+                <!-- 关闭按钮 -->
+                <button onclick="closeJobModal()"
+                    class="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all text-base z-10">
+                    ✕
+                </button>
+
+                <!-- 公司头像 + 标题 -->
+                <div class="flex items-start gap-4 pr-10">
+                    <div id="jobModalAvatar"
+                         class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow-lg"
+                         style="background:rgba(255,255,255,0.25);backdrop-filter:blur(4px);">A</div>
+                    <div class="flex-1 min-w-0">
+                        <h2 id="jobModalTitle" class="text-xl font-bold text-white leading-tight truncate"></h2>
+                        <p id="jobModalCompany" class="text-white/70 mt-0.5 text-sm"></p>
+                    </div>
+                </div>
+
+                <!-- 薪资 + meta 行 -->
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <span id="jobModalSalary"
+                          class="px-3 py-1 rounded-full text-sm font-bold"
+                          style="background:rgba(253,224,71,0.2);color:#fde047;border:1px solid rgba(253,224,71,0.35)"></span>
+                    <div id="jobModalMeta" class="flex flex-wrap gap-1.5"></div>
+                </div>
+            </div>
+
+            <!-- ── 正文（可滚动） ── -->
+            <div class="overflow-y-auto flex-1 p-6 space-y-5">
+
+                <!-- 核心技能 -->
+                <div>
+                    <p class="job-modal-section-title">核心技能要求</p>
+                    <div id="jobModalSkills" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- 岗位描述 -->
+                <div>
+                    <p class="job-modal-section-title">岗位描述</p>
+                    <div id="jobModalDesc"
+                         class="mt-2 text-sm text-gray-700 leading-7 whitespace-pre-line
+                                bg-gray-50 rounded-xl px-4 py-3 border border-gray-100
+                                max-h-56 overflow-y-auto custom-scrollbar"></div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- 公司信息 -->
+                <div>
+                    <p class="job-modal-section-title">公司信息</p>
+                    <div id="jobModalCompanyInfo" class="mt-2 grid grid-cols-3 gap-3"></div>
+                    <p id="jobModalCompanyDesc" class="mt-3 text-xs text-gray-500 leading-relaxed line-clamp-4"></p>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- 工作地址 -->
+                <div class="flex items-start gap-2 text-sm text-gray-600">
+                    <span class="text-base flex-shrink-0 mt-0.5">📍</span>
+                    <span id="jobModalAddr"></span>
+                </div>
+
+                <!-- 公司福利 -->
+                <div>
+                    <p class="job-modal-section-title">公司福利</p>
+                    <div id="jobModalWelfare" class="mt-2 flex flex-wrap gap-2"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->

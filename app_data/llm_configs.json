@@ -1,0 +1,12 @@
+{
+  "career_interview": {
+    "base_url": "",
+    "api_key": "",
+    "model": "gpt-4o-mini"
+  },
+  "assessment_hub": {
+    "base_url": "https://api.deepseek.com/v1",
+    "api_key": "sk-fd9c3da478e94feabd119b37a1854572",
+    "model": "deepseek-chat"
+  }
+}

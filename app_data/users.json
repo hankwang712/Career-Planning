@@ -1,0 +1,32 @@
+[
+  {
+    "username": "system",
+    "password_hash": "scrypt:32768:8:1$acEVf5b6lBVqIY7w$92f454816cf19e6612fdec70c27b1c9e358a968fc1d692706939410a7577ef5d83f8ecb7f90dd08a62ec659454813d1f91fabc0a194d04e66e6f9623621e28ab",
+    "role": "super_admin",
+    "display_name": "System Admin"
+  },
+  {
+    "username": "23030134",
+    "password_hash": "scrypt:32768:8:1$jKn74vHSSMFAsWfr$c0c792f617ee1178bcb856117781ec6c33b5900b4f5617e78149dc25f4182ac382084ab2095f41408036b5107b2ce56920fdb8c7ea03693c7234b1690dcfa6bf",
+    "role": "user",
+    "display_name": "23030134"
+  },
+  {
+    "username": "24030115",
+    "password_hash": "scrypt:32768:8:1$cdDZ9J44U9Grer8C$4b58e3aeebf5b347a7e7f9cc4a3b2a0394009c441da4725adc9fac9acc0026a9f00ce8fe03ff385c2d03bb786895ea74b5a82b17bcb96da96d7072f181df4347",
+    "role": "user",
+    "display_name": "24030115"
+  },
+  {
+    "username": "24110403",
+    "password_hash": "scrypt:32768:8:1$G3ORA86HAXK9VxLE$6c486cb736697eb4b37d500ab0fb03ef26f9ff3ecf5b616c44e7c81cf62ca47068e41498f79e4a5c25441b20f35e586f2cfa704e33d78af9456ccd0d211efe70",
+    "role": "user",
+    "display_name": "24110403"
+  },
+  {
+    "username": "24151007",
+    "password_hash": "scrypt:32768:8:1$lBAW8zMCI4NKGQmx$5260fd38adfc5b74af703bcf7bee2214581875524f60b7a216a9716c62f62929543b0cdae172a8594be6670037de6779be532c76e0edb144f4cf257b5f0f4ae0",
+    "role": "user",
+    "display_name": "24151007"
+  }
+]
