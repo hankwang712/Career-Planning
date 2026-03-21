@@ -26,9 +26,12 @@ APP_DATA_DIR = os.path.join(BASE_DIR, "app_data")
 USER_STATE_DIR = os.path.join(APP_DATA_DIR, "user_state")
 USERS_FILE = os.path.join(APP_DATA_DIR, "users.json")
 LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "llm_configs.json")
+ASSESSMENT_DATA_FILE = os.path.join(BASE_DIR, "static", "assessment-data.json")
 JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
+ASSESSMENT_DATA_LOCK = threading.Lock()
 JOB_FILE_CACHE = {}
+ASSESSMENT_DATA_CACHE = {"signature": None, "payload": {}}
 JOB_CACHE_MAX_AGE_SECONDS = 900
 JOB_DETAIL_ONLY_FIELDS = {
     "岗位描述",
@@ -152,6 +155,27 @@ def _default_llm_configs():
 def _ensure_app_storage():
     os.makedirs(APP_DATA_DIR, exist_ok=True)
     os.makedirs(USER_STATE_DIR, exist_ok=True)
+
+
+def _load_assessment_knowledge():
+    if not os.path.exists(ASSESSMENT_DATA_FILE):
+        return {}
+
+    stat = os.stat(ASSESSMENT_DATA_FILE)
+    signature = (stat.st_mtime_ns, stat.st_size)
+    with ASSESSMENT_DATA_LOCK:
+        if ASSESSMENT_DATA_CACHE.get("signature") == signature:
+            return ASSESSMENT_DATA_CACHE.get("payload") or {}
+
+    with open(ASSESSMENT_DATA_FILE, "r", encoding="utf-8") as fp:
+        payload = json.load(fp)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    with ASSESSMENT_DATA_LOCK:
+        ASSESSMENT_DATA_CACHE["signature"] = signature
+        ASSESSMENT_DATA_CACHE["payload"] = payload
+    return payload
 
 
 def _read_json_file(path, fallback):
@@ -410,6 +434,172 @@ def _get_city_job_detail(city, index):
     return detail
 
 
+def _truncate_text(value, limit=140):
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if not text:
+        return ""
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _compact_list(items, limit=4, item_limit=60):
+    values = []
+    for item in items or []:
+        text = _truncate_text(item, item_limit)
+        if text and text not in values:
+            values.append(text)
+        if len(values) >= limit:
+            break
+    return values
+
+
+def _guess_mbti_type_from_scores(score_snapshot):
+    if not isinstance(score_snapshot, dict):
+        return ""
+    pairs = [("E", "I", "EI"), ("S", "N", "SN"), ("T", "F", "TF"), ("J", "P", "JP")]
+    decided = []
+    for left, right, pair_key in pairs:
+        left_score = float(score_snapshot.get(left) or 0)
+        right_score = float(score_snapshot.get(right) or 0)
+        if left_score > right_score:
+            decided.append(left)
+        elif right_score > left_score:
+            decided.append(right)
+        else:
+            decided.append({"EI": "I", "SN": "N", "TF": "F", "JP": "P"}[pair_key])
+    return "".join(decided)
+
+
+def _normalize_assessment_context(raw_context):
+    raw = raw_context if isinstance(raw_context, dict) else {}
+    mbti_raw = raw.get("mbti") if isinstance(raw.get("mbti"), dict) else {}
+    holland_raw = raw.get("holland") if isinstance(raw.get("holland"), dict) else {}
+    basics_raw = raw.get("basics") if isinstance(raw.get("basics"), dict) else {}
+    return {
+        "mbti": {
+            "raw_type": _truncate_text(mbti_raw.get("raw_type") or mbti_raw.get("rawType") or "", 16),
+            "final_type": _truncate_text(mbti_raw.get("final_type") or mbti_raw.get("finalType") or "", 16),
+            "summary": _truncate_text(mbti_raw.get("summary") or "", 160),
+            "top_strengths": _compact_list(mbti_raw.get("top_strengths") or mbti_raw.get("topStrengths"), limit=3, item_limit=40),
+            "top_risks": _compact_list(mbti_raw.get("top_risks") or mbti_raw.get("topRisks"), limit=3, item_limit=40),
+        },
+        "holland": {
+            "code": _truncate_text(holland_raw.get("code") or "", 12),
+            "top_codes": _compact_list(holland_raw.get("top_codes") or holland_raw.get("topCodes"), limit=3, item_limit=8),
+            "summary": _truncate_text(holland_raw.get("summary") or "", 160),
+            "interests": _compact_list(holland_raw.get("interests"), limit=4, item_limit=40),
+        },
+        "basics": {
+            "major": _truncate_text(basics_raw.get("major") or "", 40),
+            "grade": _truncate_text(basics_raw.get("grade") or "", 20),
+            "target_city": _truncate_text(basics_raw.get("target_city") or basics_raw.get("targetCity") or "", 20),
+            "target_direction": _truncate_text(basics_raw.get("target_direction") or basics_raw.get("targetDirection") or "", 30),
+        },
+    }
+
+
+def _build_mbti_clarifier_prompt(close_pairs, score_snapshot):
+    base_prompt = MBTI_CLARIFIER_SYSTEM_PROMPT
+    knowledge = _load_assessment_knowledge()
+    mbti_data = knowledge.get("mbti") if isinstance(knowledge.get("mbti"), dict) else {}
+    dimension_explanations = mbti_data.get("dimension_explanations") if isinstance(mbti_data.get("dimension_explanations"), dict) else {}
+    type_details = mbti_data.get("type_details") if isinstance(mbti_data.get("type_details"), dict) else {}
+
+    notes = []
+    for item in close_pairs[:4]:
+        if not isinstance(item, dict):
+            continue
+        pair = str(item.get("pair") or "").upper().replace("/", "").strip()
+        if pair not in {"EI", "SN", "TF", "JP"}:
+            continue
+        detail = dimension_explanations.get(pair) or {}
+        left_label = detail.get("left_label") or pair[0]
+        right_label = detail.get("right_label") or pair[1]
+        left_desc = _truncate_text(detail.get("left_desc"), 48)
+        right_desc = _truncate_text(detail.get("right_desc"), 48)
+        tip = _truncate_text(detail.get("development_tip"), 70)
+        diff = item.get("diff")
+        score_note = f"当前差值 {diff}" if diff is not None else "当前差值较小"
+        notes.append(
+            f"{pair}（{detail.get('title') or '临界维度'}，{score_note}）："
+            f"{left_label}={left_desc}；{right_label}={right_desc}；出题提示：{tip}"
+        )
+
+    guessed_type = _guess_mbti_type_from_scores(score_snapshot)
+    type_detail = type_details.get(guessed_type) if guessed_type else None
+    if isinstance(type_detail, dict):
+        strengths = "、".join(_compact_list(type_detail.get("strengths"), limit=3, item_limit=28))
+        risks = "、".join(_compact_list(type_detail.get("risks"), limit=2, item_limit=28))
+        notes.append(
+            f"当前主测倾向 {guessed_type}（{type_detail.get('nickname') or ''}）："
+            f"{_truncate_text(type_detail.get('summary'), 80)}"
+            f"{' 可能优势：' + strengths if strengths else ''}"
+            f"{'；提醒：' + risks if risks else ''}"
+        )
+
+    if not notes:
+        return base_prompt
+    return f"{base_prompt}\n\n补充知识（仅用于提高题目区分度，不要直接复述）：\n- " + "\n- ".join(notes)
+
+
+def _build_career_interview_prompt(assessment_context):
+    base_prompt = CAREER_INTERVIEW_SYSTEM_PROMPT
+    context = _normalize_assessment_context(assessment_context)
+    mbti = context["mbti"]
+    holland = context["holland"]
+    basics = context["basics"]
+
+    knowledge = _load_assessment_knowledge()
+    mbti_details = ((knowledge.get("mbti") or {}).get("type_details") or {}) if isinstance(knowledge.get("mbti"), dict) else {}
+    holland_details = ((knowledge.get("holland") or {}).get("type_details") or {}) if isinstance(knowledge.get("holland"), dict) else {}
+
+    notes = []
+    if basics["major"] or basics["grade"] or basics["target_city"] or basics["target_direction"]:
+        basics_text = "，".join(
+            part for part in [
+                f"专业 {basics['major']}" if basics["major"] else "",
+                f"年级 {basics['grade']}" if basics["grade"] else "",
+                f"目标城市 {basics['target_city']}" if basics["target_city"] else "",
+                f"目标方向 {basics['target_direction']}" if basics["target_direction"] else "",
+            ]
+            if part
+        )
+        notes.append(f"用户基础信息：{basics_text}")
+
+    mbti_type = mbti["final_type"] or mbti["raw_type"]
+    mbti_detail = mbti_details.get(mbti_type) if mbti_type else None
+    if isinstance(mbti_detail, dict):
+        strengths = "、".join(_compact_list(mbti_detail.get("strengths"), limit=3, item_limit=28))
+        risks = "、".join(_compact_list(mbti_detail.get("risks"), limit=2, item_limit=28))
+        notes.append(
+            f"MBTI 背景：{mbti_type}（{mbti_detail.get('nickname') or ''}），"
+            f"{_truncate_text(mbti_detail.get('summary') or mbti['summary'], 90)}"
+            f"{'；可能优势：' + strengths if strengths else ''}"
+            f"{'；可能盲区：' + risks if risks else ''}"
+        )
+    elif mbti_type or mbti["summary"]:
+        notes.append(f"MBTI 背景：{mbti_type or '已完成'}；{mbti['summary'] or '仅作辅助参考，不要机械贴标签。'}")
+
+    holland_primary = holland["top_codes"][0] if holland["top_codes"] else (holland["code"][:1] if holland["code"] else "")
+    holland_detail = holland_details.get(holland_primary) if holland_primary else None
+    if isinstance(holland_detail, dict):
+        environments = "、".join(_compact_list(holland_detail.get("typical_environment"), limit=3, item_limit=24))
+        notes.append(
+            f"Holland 背景：主导类型 {holland_primary}/{holland_detail.get('name') or ''}，"
+            f"{_truncate_text(holland_detail.get('summary') or holland['summary'], 90)}"
+            f"{'；偏好环境：' + environments if environments else ''}"
+        )
+    elif holland["code"] or holland["summary"]:
+        notes.append(f"Holland 背景：{holland['code'] or '已完成'}；{holland['summary'] or '仅作辅助参考。'}")
+
+    if not notes:
+        return base_prompt
+    return (
+        f"{base_prompt}\n\n"
+        "补充上下文（仅用于更快聚焦，不可替代真实追问，也不要把测评结果直接当作结论）：\n- "
+        + "\n- ".join(notes)
+    )
+
+
 def _safe_score(value, default=0):
     try:
         return max(0, min(100, int(value)))
@@ -557,13 +747,13 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
     return json.loads(_extract_json_object(content))
 
 
-def _call_openai_compatible_chat(base_url, api_key, model, messages):
+def _call_openai_compatible_chat(base_url, api_key, model, messages, system_prompt=None):
     parsed = _call_structured_chat(
         base_url,
         api_key,
         model,
         messages,
-        system_prompt=CAREER_INTERVIEW_SYSTEM_PROMPT,
+        system_prompt=system_prompt or CAREER_INTERVIEW_SYSTEM_PROMPT,
         max_tokens=480,
     )
     return _normalize_profile(parsed)
@@ -695,6 +885,87 @@ def api_update_llm_config(scope):
     return jsonify(_public_llm_config(normalized_scope, _current_user()))
 
 
+@app.route("/api/llm-config/model", methods=["PUT"])
+@_login_required
+def api_update_llm_model():
+    """任意已登录用户可更新所有 scope 的模型选择。"""
+    payload = request.get_json(silent=True) or {}
+    model = str(payload.get("model") or "").strip()
+    if not model:
+        return jsonify({"message": "请指定模型名称。"}), 400
+    configs = _load_llm_configs()
+    for scope in VALID_LLM_CONFIG_SCOPES:
+        configs[scope]["model"] = model
+    _save_llm_configs(configs)
+    return jsonify({"model": model, "message": "模型已更新。"})
+
+
+def _models_endpoint_url(base_url):
+    """从配置的 base_url 推断出 /models 接口地址。"""
+    cleaned = str(base_url or "").strip().rstrip("/")
+    parsed = urllib.parse.urlparse(cleaned)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError("base_url 必须是完整的 http(s) 地址")
+    if cleaned.endswith("/chat/completions"):
+        cleaned = cleaned[: -len("/chat/completions")]
+    if cleaned.endswith("/v1"):
+        return f"{cleaned}/models"
+    return f"{cleaned}/v1/models"
+
+
+def _do_fetch_models(base_url, api_key):
+    try:
+        models_url = _models_endpoint_url(base_url)
+    except ValueError as exc:
+        return jsonify({"models": [], "message": str(exc)}), 200
+
+    req = urllib.request.Request(
+        models_url,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = resp.read().decode("utf-8")
+        data = json.loads(body)
+        models = []
+        if isinstance(data, dict) and isinstance(data.get("data"), list):
+            models = [str(item["id"]) for item in data["data"] if isinstance(item, dict) and item.get("id")]
+        elif isinstance(data, list):
+            models = [str(item["id"]) if isinstance(item, dict) else str(item) for item in data]
+        return jsonify({"models": sorted(set(m for m in models if m))})
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")[:300]
+        return jsonify({"models": [], "message": f"HTTP {exc.code}: {detail}"}), 200
+    except Exception as exc:
+        return jsonify({"models": [], "message": f"获取模型列表失败: {str(exc)[:200]}"}), 200
+
+
+@app.route("/api/llm-models", methods=["GET"])
+@_login_required
+def api_llm_models():
+    """使用已保存的凭据获取可用模型列表（所有已登录用户可调用）。"""
+    configs = _load_llm_configs()
+    config = configs.get("career_interview") or {}
+    base_url = str(config.get("base_url") or "").strip()
+    api_key = str(config.get("api_key") or "").strip()
+    if not base_url or not api_key:
+        return jsonify({"models": [], "message": "API 尚未配置，请系统管理员先填写 Base URL 和 API Key。"}), 200
+    return _do_fetch_models(base_url, api_key)
+
+
+@app.route("/api/llm-models/preview", methods=["POST"])
+@_super_admin_required
+def api_llm_models_preview():
+    """管理员用临时凭据预览可用模型（不保存配置）。"""
+    payload = request.get_json(silent=True) or {}
+    base_url = str(payload.get("base_url") or "").strip()
+    api_key = str(payload.get("api_key") or "").strip()
+    if not base_url or not api_key:
+        return jsonify({"message": "请先填写 Base URL 和 API Key。"}), 400
+    return _do_fetch_models(base_url, api_key)
+
+
 # 鈹€鈹€ API锛氬煄甯傚垪琛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 @app.route("/api/cities")
 def api_cities():
@@ -754,6 +1025,7 @@ def api_job_detail():
 def api_career_interview():
     payload = request.get_json(silent=True) or {}
     messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
+    assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
     config = _load_llm_configs().get("career_interview") or {}
 
     base_url = str(config.get("base_url") or "").strip()
@@ -774,7 +1046,13 @@ def api_career_interview():
         normalized_messages.append({"role": role, "content": content[:1600]})
 
     try:
-        result = _call_openai_compatible_chat(base_url, api_key, model, normalized_messages)
+        result = _call_openai_compatible_chat(
+            base_url,
+            api_key,
+            model,
+            normalized_messages,
+            system_prompt=_build_career_interview_prompt(assessment_context),
+        )
         return jsonify(result)
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
@@ -818,7 +1096,7 @@ def api_mbti_clarifier():
             api_key,
             model,
             messages,
-            system_prompt=MBTI_CLARIFIER_SYSTEM_PROMPT,
+            system_prompt=_build_mbti_clarifier_prompt(close_pairs, score_snapshot),
             max_tokens=700,
         )
         result = _normalize_mbti_clarifier_payload(parsed)

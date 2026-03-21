@@ -2861,3 +2861,156 @@ body.auth-locked footer {
         min-width: auto;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   城市招聘全景分析仪表盘 (jobs-analytics)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tab 导航按钮 */
+.ac-tab {
+    padding: 0.5rem 1.1rem;
+    border-radius: 0.6rem 0.6rem 0 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    white-space: nowrap;
+}
+.ac-tab:hover { color: #4f46e5; background: #eef2ff; }
+.ac-tab.active {
+    color: #4f46e5;
+    background: #eef2ff;
+    border-bottom: 2px solid #6366f1;
+}
+
+/* 城市选择器 chip */
+.ac-city-chip {
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    background: #f3f4f6;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.ac-city-chip:hover { background: #e0e7ff; color: #4338ca; }
+.ac-city-chip.active {
+    background: #6366f1;
+    color: #fff;
+    border-color: #4f46e5;
+}
+
+/* 图表卡片网格 */
+.ac-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+@media (max-width: 900px) { .ac-grid-2 { grid-template-columns: 1fr; } }
+
+.ac-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.ac-card-full { grid-column: 1 / -1; }
+
+.ac-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.ac-card-head h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+.ac-hint {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+/* 图表画布容器 */
+.ac-canvas-wrap {
+    position: relative;
+    height: 280px;
+    width: 100%;
+}
+
+/* 词云 */
+.ac-cloud {
+    min-height: 200px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem 0.6rem;
+    padding: 0.5rem;
+    line-height: 1.6;
+}
+.ac-word {
+    cursor: default;
+    font-weight: 600;
+    transition: transform 0.15s;
+    display: inline-block;
+}
+.ac-word:hover { transform: scale(1.12); }
+
+/* 福利热图 */
+.ac-heatmap-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+.ac-heatmap {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.72rem;
+}
+.ac-heatmap th, .ac-heatmap td {
+    padding: 0.35rem 0.55rem;
+    text-align: center;
+    white-space: nowrap;
+}
+.ac-heatmap thead th {
+    background: #f9fafb;
+    color: #374151;
+    font-weight: 600;
+    border-bottom: 2px solid #e5e7eb;
+}
+.ac-hm-city, .ac-hm-city-cell {
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    background: #f9fafb;
+    border-right: 1px solid #e5e7eb;
+    min-width: 3rem;
+}
+.ac-hm-label { font-size: 0.7rem; }
+.ac-hm-val {
+    border-radius: 0.25rem;
+    font-weight: 500;
+    cursor: default;
+    transition: opacity 0.1s;
+}
+.ac-hm-val:hover { opacity: 0.85; }
+.ac-heatmap tbody tr:hover .ac-hm-city-cell { background: #ede9fe; }
+
+/* 空状态 */
+.ac-empty {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 2rem;
+}

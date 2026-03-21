@@ -2,7 +2,7 @@
   "career_interview": {
     "base_url": "",
     "api_key": "",
-    "model": "gpt-4o-mini"
+    "model": "deepseek-chat"
   },
   "assessment_hub": {
     "base_url": "https://api.deepseek.com/v1",

@@ -1,19 +1,22 @@
-﻿const appState = {
+const appState = {
   currentSection: "dashboard",
   selectedJobs: [],
-  profileComplete: true,
-  matchingComplete: true,
+  profileComplete: false,
+  matchingComplete: false,
   reportGenerated: false,
   notifications: 3,
-  baseExploredJobs: 12,
-  score: 87,
-  profileCompletion: 85,
+  baseExploredJobs: 0,
+  score: 0,
+  profileCompletion: 0,
   timersStarted: false,
   lastGreetingKey: "",
   lastJobFilterKey: "",
   dashboardRadarChart: null,
   profileRadarChart: null,
-  weights: { "基础要求": 25, "职业技能": 35, "职业素养": 20, "发展潜力": 20 }
+  derivedProfile: null,
+  matchingRoles: [],
+  focusedRoleId: "",
+  weights: { "特质匹配": 30, "能力匹配": 40, "专业匹配": 15, "意愿匹配": 15 }
 };
 
 // 岗位数据（从 /api/jobs 加载）
@@ -124,6 +127,155 @@ const CAREER_INTERVIEW_DIMENSION_PLAN = [
   }
 ];
 
+const PROFILE_BASIC_FIELDS = ["major", "grade", "target_city", "target_direction"];
+const PROFILE_BASIC_LABELS = {
+  major: "专业",
+  grade: "年级",
+  target_city: "目标城市",
+  target_direction: "目标方向"
+};
+const ROLE_LIBRARY = [
+  {
+    id: "java_backend",
+    name: "Java 后端开发",
+    category: "互联网/科技",
+    majors: ["计算机", "软件", "信息", "网络", "智能"],
+    requiredSkills: ["编程", "数据库", "Spring"],
+    certificates: ["软考"],
+    requirements: { professional: 85, innovation: 60, learning: 90, stress_tolerance: 80, communication: 50, internship: 80, execution: 85 },
+    recommendedHolland: ["I", "R", "C"],
+    recommendedMbti: ["ISTJ", "INTJ"],
+    workValues: ["稳定成长", "技术深耕"],
+    path: "后端开发 → 高级开发 → 架构师"
+  },
+  {
+    id: "product_manager",
+    name: "产品经理",
+    category: "互联网/科技",
+    majors: ["不限", "计算机", "智能", "管理"],
+    requiredSkills: ["需求分析", "原型设计", "数据分析"],
+    certificates: ["NPDP", "PMP"],
+    requirements: { professional: 75, innovation: 90, learning: 80, stress_tolerance: 90, communication: 90, internship: 85, execution: 80 },
+    recommendedHolland: ["E", "I", "S"],
+    recommendedMbti: ["ENTJ", "ENFP", "INTJ"],
+    workValues: ["成长空间", "影响力", "协作成就"],
+    path: "产品助理 → 产品经理 → 高级产品经理"
+  },
+  {
+    id: "data_analyst",
+    name: "数据分析师",
+    category: "数据与商业分析",
+    majors: ["统计", "计算机", "经管", "数学", "智能"],
+    requiredSkills: ["SQL", "Python", "BI"],
+    certificates: ["CDA"],
+    requirements: { professional: 80, innovation: 70, learning: 90, stress_tolerance: 70, communication: 60, internship: 65, execution: 75 },
+    recommendedHolland: ["I", "C", "S"],
+    recommendedMbti: ["INTJ", "ISTJ"],
+    workValues: ["问题解决", "稳定成长", "数据驱动"],
+    path: "数据分析师 → 高级分析师 → 数据策略"
+  },
+  {
+    id: "new_media_ops",
+    name: "新媒体运营",
+    category: "内容与增长",
+    majors: ["不限", "新闻", "传播", "中文", "设计"],
+    requiredSkills: ["内容策划", "剪辑", "运营分析"],
+    certificates: ["营销师"],
+    requirements: { professional: 65, innovation: 80, learning: 70, stress_tolerance: 60, communication: 80, internship: 60, execution: 70 },
+    recommendedHolland: ["A", "E", "S"],
+    recommendedMbti: ["ENFP", "ESFP"],
+    workValues: ["创造表达", "传播影响", "节奏灵活"],
+    path: "运营专员 → 内容负责人 → 增长运营"
+  },
+  {
+    id: "hr_specialist",
+    name: "人力资源专员",
+    category: "组织与服务",
+    majors: ["管理", "心理", "不限"],
+    requiredSkills: ["招聘", "沟通", "劳动法规"],
+    certificates: ["人力资源管理师"],
+    requirements: { professional: 65, innovation: 50, learning: 60, stress_tolerance: 70, communication: 95, internship: 65, execution: 72 },
+    recommendedHolland: ["S", "C", "E"],
+    recommendedMbti: ["ESFJ", "ENFJ"],
+    workValues: ["助人成长", "组织支持", "关系协作"],
+    path: "HR 助理 → HRBP/招聘专员 → 人力负责人"
+  },
+  {
+    id: "sales_trainee",
+    name: "销售管培生",
+    category: "商业拓展",
+    majors: ["不限"],
+    requiredSkills: ["谈判", "客户管理", "目标推进"],
+    certificates: [],
+    requirements: { professional: 55, innovation: 60, learning: 80, stress_tolerance: 95, communication: 95, internship: 80, execution: 82 },
+    recommendedHolland: ["E", "S", "A"],
+    recommendedMbti: ["ESTJ", "ENTJ"],
+    workValues: ["回报激励", "竞争成就", "成长速度"],
+    path: "管培生 → 销售经理 → 区域负责人"
+  },
+  {
+    id: "uiux_designer",
+    name: "UI/UX 设计师",
+    category: "设计与体验",
+    majors: ["设计", "计算机", "数字媒体", "不限"],
+    requiredSkills: ["界面设计", "交互设计", "用户研究"],
+    certificates: ["Adobe"],
+    requirements: { professional: 72, innovation: 95, learning: 80, stress_tolerance: 70, communication: 70, internship: 75, execution: 68 },
+    recommendedHolland: ["A", "I", "R"],
+    recommendedMbti: ["INFP", "ENFP"],
+    workValues: ["审美表达", "用户体验", "作品成就"],
+    path: "设计师 → 高级设计师 → 体验负责人"
+  },
+  {
+    id: "finance_audit",
+    name: "财务/审计助理",
+    category: "财务与风控",
+    majors: ["会计", "财务", "审计", "经济"],
+    requiredSkills: ["会计准则", "税务", "报表"],
+    certificates: ["初级会计", "CPA"],
+    requirements: { professional: 80, innovation: 40, learning: 70, stress_tolerance: 80, communication: 50, internship: 80, execution: 90 },
+    recommendedHolland: ["C", "I", "E"],
+    recommendedMbti: ["ISTJ", "ISFJ"],
+    workValues: ["稳定性", "规范流程", "准确性"],
+    path: "财务助理 → 审计/财务专员 → 财务经理"
+  },
+  {
+    id: "project_assistant",
+    name: "项目管理助理",
+    category: "组织与项目",
+    majors: ["不限", "管理", "工程", "计算机"],
+    requiredSkills: ["进度管理", "风险跟踪", "协调沟通"],
+    certificates: ["PMP"],
+    requirements: { professional: 68, innovation: 50, learning: 70, stress_tolerance: 80, communication: 90, internship: 65, execution: 88 },
+    recommendedHolland: ["E", "S", "C"],
+    recommendedMbti: ["ENTJ", "ESTJ"],
+    workValues: ["组织推进", "交付成果", "节奏掌控"],
+    path: "项目助理 → 项目经理 → PMO"
+  },
+  {
+    id: "content_editor",
+    name: "内容创作/编辑",
+    category: "内容与表达",
+    majors: ["文史", "新闻", "中文", "传播", "不限"],
+    requiredSkills: ["写作", "策划", "选题"],
+    certificates: ["出版资格"],
+    requirements: { professional: 68, innovation: 90, learning: 60, stress_tolerance: 60, communication: 60, internship: 60, execution: 70 },
+    recommendedHolland: ["A", "S", "I"],
+    recommendedMbti: ["INFP", "INFJ"],
+    workValues: ["表达自由", "内容影响", "持续创作"],
+    path: "编辑 → 内容策划 → 内容负责人"
+  }
+];
+
+function getDefaultProfileBasics() {
+  return {
+    major: "",
+    grade: "",
+    target_city: "",
+    target_direction: ""
+  };
+}
+
 const careerInterviewState = {
   started: false,
   loading: false,
@@ -131,7 +283,8 @@ const careerInterviewState = {
   messages: [],
   result: null,
   completionScore: 0,
-  focusDimension: "职业兴趣"
+  focusDimension: "职业兴趣",
+  profileBasics: getDefaultProfileBasics()
 };
 
 careerInterviewState.dimensionProgress = [];
@@ -412,6 +565,16 @@ function scheduleGeoInsightsInit(jobs) {
   window.setTimeout(runner, 16);
 }
 
+function scheduleAnalyticsInit(jobs) {
+  if (typeof window.initJobsAnalytics !== "function") return;
+  const runner = () => window.initJobsAnalytics(jobs);
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(runner, { timeout: 2000 });
+    return;
+  }
+  window.setTimeout(runner, 200);
+}
+
 async function getJobDetail(jobId) {
   return fetchJsonWithSessionCache(
     `/api/job-detail?id=${encodeURIComponent(jobId)}`,
@@ -536,24 +699,12 @@ function getStoredCareerInterviewConfig() {
 }
 
 function getCareerInterviewConfigFromForm() {
-  return {
-    base_url: (document.getElementById("careerApiBaseUrl")?.value || "").trim(),
-    api_key: (document.getElementById("careerApiKey")?.value || "").trim(),
-    model: (document.getElementById("careerModelName")?.value || "").trim() || "gpt-4o-mini"
-  };
+  // 配置输入已移至设置面板，直接返回内存中的配置
+  return getStoredCareerInterviewConfig();
 }
 
 function fillCareerInterviewConfigForm() {
-  const config = getStoredCareerInterviewConfig();
-  const baseUrlEl = document.getElementById("careerApiBaseUrl");
-  const apiKeyEl = document.getElementById("careerApiKey");
-  const modelEl = document.getElementById("careerModelName");
-  if (baseUrlEl) baseUrlEl.value = config.base_url;
-  if (apiKeyEl) apiKeyEl.value = config.api_key;
-  if (modelEl) modelEl.value = config.model;
-  [baseUrlEl, apiKeyEl, modelEl].forEach((el) => {
-    if (el) el.disabled = !config.editable;
-  });
+  // 配置表单已移至头像设置面板，此函数保留以兼容调用链
 }
 
 function maskApiKey(apiKey) {
@@ -582,13 +733,16 @@ function persistCareerInterviewSnapshot() {
     result: careerInterviewState.result,
     completionScore: careerInterviewState.completionScore,
     focusDimension: careerInterviewState.focusDimension,
-    dimensionProgress: careerInterviewState.dimensionProgress
+    dimensionProgress: careerInterviewState.dimensionProgress,
+    profileBasics: careerInterviewState.profileBasics
   };
   void saveScopedUserState("career_interview", snapshot).catch((error) => {
     console.error("save career interview snapshot failed", error);
   });
 }
-function resetCareerInterviewState() {
+function resetCareerInterviewState(options = {}) {
+  const preserveBasics = options.preserveBasics !== false;
+  const retainedBasics = preserveBasics ? normalizeProfileBasics(careerInterviewState.profileBasics) : getDefaultProfileBasics();
   careerInterviewState.started = false;
   careerInterviewState.loading = false;
   careerInterviewState.isComplete = false;
@@ -597,17 +751,11 @@ function resetCareerInterviewState() {
   careerInterviewState.completionScore = 0;
   careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
+  careerInterviewState.profileBasics = retainedBasics;
 }
 async function saveCareerInterviewConfig() {
-  if (!isSuperAdminUser()) {
-    showToast("权限不足", "普通用户只能使用系统管理员预设的模型配置。", "warning", 2000);
-    return;
-  }
-  const config = getCareerInterviewConfigFromForm();
-  await saveManagedLlmConfig("career_interview", config);
-  fillCareerInterviewConfigForm();
-  updateCareerInterviewConfigStatus();
-  showToast("模型配置已保存", `当前模型：${config.model}`, "success", 1600);
+  // 配置入口已迁移至头像设置面板
+  if (typeof openSettingsPanel === "function") openSettingsPanel();
 }
 
 async function loadCareerInterviewConfig(force = false) {
@@ -796,6 +944,7 @@ function renderCareerInterviewResult(result) {
     if (modalFocusEl) modalFocusEl.textContent = focusName;
     updateProfileRadarChart(null);
     renderCareerInterviewDimensionProgress();
+    refreshUnifiedExperience();
     return;
   }
 
@@ -815,6 +964,7 @@ function renderCareerInterviewResult(result) {
 
   renderCareerInterviewDimensionProgress();
   updateProfileRadarChart(result.profile);
+  refreshUnifiedExperience();
 }
 function updateProfileRadarChart(profile) {
   const chart = appState.profileRadarChart;
@@ -837,7 +987,7 @@ function updateProfileRadarChart(profile) {
 async function hydrateCareerInterviewState(force = false) {
   await loadCareerInterviewConfig(force);
   if (!isAuthenticatedUser()) {
-    resetCareerInterviewState();
+    resetCareerInterviewState({ preserveBasics: false });
     renderCareerInterviewMessages();
     renderCareerInterviewResult(null);
     return;
@@ -845,7 +995,7 @@ async function hydrateCareerInterviewState(force = false) {
 
   const snapshot = await fetchScopedUserState("career_interview", force);
   if (!snapshot) {
-    resetCareerInterviewState();
+    resetCareerInterviewState({ preserveBasics: false });
     renderCareerInterviewMessages();
     renderCareerInterviewResult(null);
     return;
@@ -858,11 +1008,13 @@ async function hydrateCareerInterviewState(force = false) {
   careerInterviewState.result = snapshot.result || null;
   careerInterviewState.completionScore = Number(snapshot.completionScore || 0);
   careerInterviewState.focusDimension = snapshot.focusDimension || CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
+  careerInterviewState.profileBasics = normalizeProfileBasics(snapshot.profileBasics);
   careerInterviewState.dimensionProgress = Array.isArray(snapshot.dimensionProgress) && snapshot.dimensionProgress.length > 0
     ? snapshot.dimensionProgress
     : createCareerInterviewDimensionProgress();
 
   syncCareerInterviewProgress(careerInterviewState.result);
+  syncProfileBasicsForm();
   renderCareerInterviewMessages();
   renderCareerInterviewResult(careerInterviewState.result);
 }
@@ -878,7 +1030,8 @@ function openCareerInterviewModal(mode = "chat") {
 
   window.setTimeout(() => {
     if (mode === "config") {
-      document.getElementById("careerApiBaseUrl")?.focus();
+      // 配置已迁移至头像设置面板
+      openSettingsPanel();
     } else if (careerInterviewState.started && !careerInterviewState.isComplete) {
       document.getElementById("careerInterviewInput")?.focus();
     } else {
@@ -900,10 +1053,8 @@ function handleCareerInterviewOverlayClick(event) {
 }
 
 function clearCareerInterviewSession() {
-  resetCareerInterviewState();
-  void saveScopedUserState("career_interview", null).catch((error) => {
-    console.error("clear career interview state failed", error);
-  });
+  resetCareerInterviewState({ preserveBasics: true });
+  persistCareerInterviewSnapshot();
   renderCareerInterviewMessages();
   renderCareerInterviewResult(null);
   showToast("访谈已清空", "你可以重新开始新的访谈。", "info", 1600);
@@ -926,7 +1077,8 @@ async function requestCareerInterview(messages) {
     body: {
       messages: messages.slice(-8),
       focus_dimension: careerInterviewState.focusDimension,
-      progress: careerInterviewState.dimensionProgress
+      progress: careerInterviewState.dimensionProgress,
+      assessment_context: buildAssessmentContextPayload()
     }
   });
 }
@@ -940,7 +1092,7 @@ async function startCareerInterview() {
     return;
   }
 
-  resetCareerInterviewState();
+  resetCareerInterviewState({ preserveBasics: true });
   careerInterviewState.started = true;
   careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
@@ -1041,6 +1193,831 @@ function addLiveActivity(message) {
   `;
   feed.insertBefore(li, feed.firstChild);
   while (feed.children.length > 6) feed.removeChild(feed.lastElementChild);
+}
+
+function clampPercent(value, fallback = 0) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(num)));
+}
+
+function averageValues(values) {
+  const list = Array.isArray(values) ? values.filter((value) => Number.isFinite(Number(value))) : [];
+  if (!list.length) return null;
+  return Math.round(list.reduce((sum, value) => sum + Number(value), 0) / list.length);
+}
+
+function uniqueValues(values, limit = 6) {
+  return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || "").trim()).filter(Boolean))].slice(0, limit);
+}
+
+function normalizeProfileBasics(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    major: String(source.major || "").trim(),
+    grade: String(source.grade || "").trim(),
+    target_city: String(source.target_city || source.targetCity || "").trim(),
+    target_direction: String(source.target_direction || source.targetDirection || "").trim()
+  };
+}
+
+function syncProfileBasicsForm() {
+  const basics = normalizeProfileBasics(careerInterviewState.profileBasics);
+  const fieldMap = {
+    profileMajorInput: basics.major,
+    profileGradeInput: basics.grade,
+    profileTargetCityInput: basics.target_city,
+    profileTargetDirectionInput: basics.target_direction
+  };
+  Object.entries(fieldMap).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  });
+  const missing = PROFILE_BASIC_FIELDS.filter((key) => !basics[key]);
+  const statusEl = document.getElementById("profileBasicsStatus");
+  if (statusEl) {
+    statusEl.textContent = missing.length
+      ? `待补充：${missing.map((key) => PROFILE_BASIC_LABELS[key]).join("、")}`
+      : "基础信息已同步到画像、匹配与报告。";
+  }
+}
+
+function collectProfileBasicsFromForm() {
+  return normalizeProfileBasics({
+    major: document.getElementById("profileMajorInput")?.value || "",
+    grade: document.getElementById("profileGradeInput")?.value || "",
+    target_city: document.getElementById("profileTargetCityInput")?.value || "",
+    target_direction: document.getElementById("profileTargetDirectionInput")?.value || ""
+  });
+}
+
+function saveProfileBasics() {
+  careerInterviewState.profileBasics = collectProfileBasicsFromForm();
+  persistCareerInterviewSnapshot();
+  syncProfileBasicsForm();
+  refreshUnifiedExperience();
+  showToast("基础信息已保存", "后续匹配与报告会直接引用这些字段。", "success", 1800);
+}
+
+function getAssessmentHubSnapshotSafe() {
+  try {
+    return typeof window.getAssessmentHubSnapshot === "function" ? window.getAssessmentHubSnapshot() : null;
+  } catch (error) {
+    console.error("read assessment snapshot failed", error);
+    return null;
+  }
+}
+
+function buildAssessmentContextPayload() {
+  const assessment = getAssessmentHubSnapshotSafe() || {};
+  return {
+    mbti: assessment.mbti || {},
+    holland: assessment.holland || {},
+    basics: normalizeProfileBasics(careerInterviewState.profileBasics)
+  };
+}
+
+function addCapabilitySignal(bag, key, value, source) {
+  if (!Object.prototype.hasOwnProperty.call(bag, key)) return;
+  const score = clampPercent(value, NaN);
+  if (!Number.isFinite(score)) return;
+  bag[key].push({ score, source });
+}
+
+function deriveCapabilityScores(assessment, interviewProfile, basics) {
+  const bag = {
+    professional: [],
+    learning: [],
+    communication: [],
+    innovation: [],
+    stress_tolerance: [],
+    internship: [],
+    execution: []
+  };
+
+  const mbtiType = assessment?.mbti?.completed
+    ? String(assessment.mbti.final_type || assessment.mbti.raw_type || "")
+    : "";
+  if (mbtiType.length === 4) {
+    const [ei, sn, tf, jp] = mbtiType.split("");
+    if (ei === "E") {
+      addCapabilitySignal(bag, "communication", 82, "MBTI");
+      addCapabilitySignal(bag, "internship", 72, "MBTI");
+    } else {
+      addCapabilitySignal(bag, "learning", 80, "MBTI");
+      addCapabilitySignal(bag, "professional", 72, "MBTI");
+    }
+    if (sn === "N") {
+      addCapabilitySignal(bag, "innovation", 88, "MBTI");
+      addCapabilitySignal(bag, "learning", 84, "MBTI");
+    } else {
+      addCapabilitySignal(bag, "execution", 78, "MBTI");
+      addCapabilitySignal(bag, "internship", 76, "MBTI");
+    }
+    if (tf === "T") {
+      addCapabilitySignal(bag, "professional", 78, "MBTI");
+      addCapabilitySignal(bag, "stress_tolerance", 74, "MBTI");
+    } else {
+      addCapabilitySignal(bag, "communication", 80, "MBTI");
+      addCapabilitySignal(bag, "innovation", 72, "MBTI");
+    }
+    if (jp === "J") {
+      addCapabilitySignal(bag, "execution", 86, "MBTI");
+      addCapabilitySignal(bag, "stress_tolerance", 78, "MBTI");
+    } else {
+      addCapabilitySignal(bag, "innovation", 84, "MBTI");
+      addCapabilitySignal(bag, "execution", 58, "MBTI");
+    }
+  }
+
+  const hollandCodes = Array.isArray(assessment?.holland?.top_codes) ? assessment.holland.top_codes : [];
+  hollandCodes.forEach((code) => {
+    if (code === "R") {
+      addCapabilitySignal(bag, "internship", 82, "Holland");
+      addCapabilitySignal(bag, "execution", 76, "Holland");
+    }
+    if (code === "I") {
+      addCapabilitySignal(bag, "learning", 88, "Holland");
+      addCapabilitySignal(bag, "professional", 82, "Holland");
+    }
+    if (code === "A") {
+      addCapabilitySignal(bag, "innovation", 92, "Holland");
+    }
+    if (code === "S") {
+      addCapabilitySignal(bag, "communication", 88, "Holland");
+      addCapabilitySignal(bag, "internship", 72, "Holland");
+    }
+    if (code === "E") {
+      addCapabilitySignal(bag, "communication", 90, "Holland");
+      addCapabilitySignal(bag, "execution", 78, "Holland");
+      addCapabilitySignal(bag, "stress_tolerance", 80, "Holland");
+    }
+    if (code === "C") {
+      addCapabilitySignal(bag, "execution", 86, "Holland");
+      addCapabilitySignal(bag, "professional", 78, "Holland");
+    }
+  });
+
+  if (basics.major) {
+    addCapabilitySignal(bag, "professional", 68, "基础信息");
+  }
+  if (basics.grade) {
+    const gradeText = basics.grade;
+    if (/大一|一年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 45, "基础信息");
+    else if (/大二|二年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 55, "基础信息");
+    else if (/大三|三年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 68, "基础信息");
+    else if (/大四|四年级|研/.test(gradeText)) addCapabilitySignal(bag, "internship", 78, "基础信息");
+    addCapabilitySignal(bag, "execution", /大三|大四|研/.test(gradeText) ? 72 : 60, "基础信息");
+  }
+
+  if (interviewProfile) {
+    const dimensions = Array.isArray(interviewProfile.dimensions) ? interviewProfile.dimensions : [];
+    const dimMap = {};
+    dimensions.forEach((item) => {
+      const name = String(item.name || "").trim();
+      if (name) dimMap[name] = clampPercent(item.score, 0);
+    });
+    if (dimMap["学习方式"] !== undefined) addCapabilitySignal(bag, "learning", dimMap["学习方式"], "访谈");
+    if (dimMap["沟通风格"] !== undefined) addCapabilitySignal(bag, "communication", dimMap["沟通风格"], "访谈");
+    if (dimMap["行动证据"] !== undefined) {
+      addCapabilitySignal(bag, "internship", dimMap["行动证据"], "访谈");
+      addCapabilitySignal(bag, "execution", dimMap["行动证据"], "访谈");
+    }
+    if (dimMap["职业成熟度"] !== undefined) {
+      addCapabilitySignal(bag, "stress_tolerance", dimMap["职业成熟度"], "访谈");
+      addCapabilitySignal(bag, "execution", dimMap["职业成熟度"], "访谈");
+    }
+    if (dimMap["职业兴趣"] !== undefined) addCapabilitySignal(bag, "innovation", dimMap["职业兴趣"], "访谈");
+    if (dimMap["工作价值观"] !== undefined) addCapabilitySignal(bag, "communication", dimMap["工作价值观"], "访谈");
+
+    const riasec = interviewProfile.riasec || {};
+    addCapabilitySignal(bag, "innovation", Math.max(Number(riasec.artistic || 0), Number(riasec.investigative || 0)), "访谈");
+    addCapabilitySignal(bag, "communication", Math.max(Number(riasec.social || 0), Number(riasec.enterprising || 0)), "访谈");
+  }
+
+  const capabilities = Object.fromEntries(Object.entries(bag).map(([key, items]) => {
+    const score = averageValues(items.map((item) => item.score));
+    return [key, {
+      score,
+      sources: uniqueValues(items.map((item) => item.source), 4),
+      inferred: Boolean(score !== null && !items.some((item) => item.source === "访谈" || item.source === "基础信息"))
+    }];
+  }));
+
+  const availableCount = Object.values(capabilities).filter((item) => item.score !== null).length;
+  return {
+    capabilities,
+    coverage: Math.round(availableCount / Object.keys(capabilities).length * 100)
+  };
+}
+
+function normalizeTextForMatch(value) {
+  return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function roleMatchesText(role, text) {
+  const target = normalizeTextForMatch(text);
+  if (!target) return false;
+  return [role.name, role.category, ...(role.requiredSkills || []), ...(role.workValues || [])]
+    .some((item) => {
+      const normalized = normalizeTextForMatch(item);
+      return normalized && (target.includes(normalized) || normalized.includes(target));
+    });
+}
+
+function deriveUnifiedProfile() {
+  const assessment = getAssessmentHubSnapshotSafe() || { mbti: { completed: false }, holland: { completed: false } };
+  const basics = normalizeProfileBasics(careerInterviewState.profileBasics);
+  const interviewProfile = careerInterviewState.result?.profile || null;
+  const capabilityModel = deriveCapabilityScores(assessment, interviewProfile, basics);
+  const missingItems = [];
+  if (!assessment?.mbti?.completed) missingItems.push("MBTI 测评待完成");
+  if (!assessment?.holland?.completed) missingItems.push("霍兰德测评待完成");
+  PROFILE_BASIC_FIELDS.forEach((key) => {
+    if (!basics[key]) missingItems.push(`${PROFILE_BASIC_LABELS[key]}待补充`);
+  });
+  if (!interviewProfile) missingItems.push("职业访谈待完成");
+
+  const summaryParts = [];
+  if (assessment?.mbti?.completed) summaryParts.push(`MBTI ${assessment.mbti.display_type || assessment.mbti.final_type}`);
+  if (assessment?.holland?.completed) summaryParts.push(`霍兰德 ${assessment.holland.code}`);
+  if (basics.major) summaryParts.push(`专业 ${basics.major}`);
+  if (basics.grade) summaryParts.push(`年级 ${basics.grade}`);
+  if (basics.target_direction) summaryParts.push(`目标方向 ${basics.target_direction}`);
+  const fallbackSummary = summaryParts.length
+    ? `${summaryParts.join("，")}。当前画像已可用于岗位初筛，缺失项会在匹配和报告中显式标记。`
+    : "画像基础信息仍较少，建议先完成双测评并补充基础信息。";
+
+  return {
+    assessment,
+    basics,
+    interview: {
+      started: careerInterviewState.started,
+      isComplete: careerInterviewState.isComplete,
+      completionScore: clampPercent(careerInterviewState.completionScore),
+      profile: interviewProfile
+    },
+    summary: interviewProfile?.summary || fallbackSummary,
+    workValues: uniqueValues(interviewProfile?.work_values || ["成长空间", "自主性", "匹配兴趣"], 4),
+    recommendedRoles: uniqueValues(interviewProfile?.recommended_roles || [], 6),
+    nextSteps: uniqueValues(interviewProfile?.next_steps || [], 6),
+    capabilities: capabilityModel.capabilities,
+    capabilityCoverage: capabilityModel.coverage,
+    missingItems
+  };
+}
+
+function computeTraitMatch(role, profile) {
+  const assessment = profile.assessment;
+  const scores = [];
+  const reasons = [];
+  const mbtiType = assessment?.mbti?.completed ? String(assessment.mbti.final_type || assessment.mbti.raw_type || "") : "";
+  if (mbtiType) {
+    if ((role.recommendedMbti || []).includes(mbtiType)) {
+      scores.push(95);
+      reasons.push(`MBTI ${mbtiType} 落在岗位推荐类型内`);
+    } else if ((role.recommendedMbti || []).some((code) => code.slice(1, 3) === mbtiType.slice(1, 3))) {
+      scores.push(80);
+      reasons.push("MBTI 与岗位推荐的核心偏好相近");
+    } else {
+      scores.push(58);
+      reasons.push("MBTI 与岗位偏好存在一定差距");
+    }
+  }
+  const hollandCodes = Array.isArray(assessment?.holland?.top_codes) ? assessment.holland.top_codes : [];
+  if (hollandCodes.length) {
+    const overlap = (role.recommendedHolland || []).filter((code) => hollandCodes.includes(code)).length;
+    if (overlap >= 3) {
+      scores.push(95);
+      reasons.push("霍兰德代码与岗位画像高度重合");
+    } else if (overlap === 2) {
+      scores.push(82);
+      reasons.push("霍兰德主导兴趣与岗位需求较一致");
+    } else if (overlap === 1) {
+      scores.push(66);
+      reasons.push("霍兰德兴趣部分覆盖岗位画像");
+    } else {
+      scores.push(45);
+      reasons.push("霍兰德兴趣与岗位画像重合度较低");
+    }
+  }
+  return {
+    score: averageValues(scores),
+    reason: reasons.join("；") || "等待测评结果。"
+  };
+}
+
+function computeAbilityMatch(role, profile) {
+  const capabilityConfig = [
+    { key: "professional", label: "专业技能", weight: 0.2 },
+    { key: "innovation", label: "创新能力", weight: 0.15 },
+    { key: "learning", label: "学习能力", weight: 0.15 },
+    { key: "stress_tolerance", label: "抗压能力", weight: 0.12 },
+    { key: "communication", label: "沟通能力", weight: 0.18 },
+    { key: "internship", label: "实习能力", weight: 0.1 },
+    { key: "execution", label: "执行能力", weight: 0.1 }
+  ];
+  const strengths = [];
+  const gaps = [];
+  const lines = [];
+  let weightedScore = 0;
+  let usedWeight = 0;
+  capabilityConfig.forEach((item) => {
+    const current = profile.capabilities[item.key]?.score;
+    const required = Number(role.requirements[item.key] || 0);
+    if (current === null || current === undefined || !required) return;
+    const fitScore = clampPercent(current / required * 100);
+    weightedScore += fitScore * item.weight;
+    usedWeight += item.weight;
+    lines.push(`${item.label} ${current}/${required}`);
+    if (current + 8 < required) gaps.push(`${item.label} ${current}/${required}`);
+    if (current >= required) strengths.push(`${item.label} ${current}/${required}`);
+  });
+  return {
+    score: usedWeight ? Math.round(weightedScore / usedWeight) : null,
+    coverageWeight: Math.round(usedWeight * 100),
+    reason: lines.length ? `已使用 ${lines.join("、")} 计算能力匹配。` : "职业访谈和基础信息尚不足以判断能力匹配。",
+    strengths: strengths.slice(0, 3),
+    gaps: gaps.slice(0, 4)
+  };
+}
+
+function computeMajorMatch(role, basics) {
+  const major = String(basics.major || "").trim();
+  if (!major) {
+    return { score: null, reason: "未填写专业，专业匹配待补充。" };
+  }
+  if ((role.majors || []).includes("不限")) {
+    return { score: 82, reason: "该岗位对专业限制较低，可通过能力与作品补足。" };
+  }
+  if ((role.majors || []).some((item) => major.includes(item) || item.includes(major))) {
+    return { score: 100, reason: `${major} 与岗位常见专业背景直接相关。` };
+  }
+  const relatedGroups = [
+    { keywords: ["计算机", "软件", "信息", "网络", "智能"], score: 80 },
+    { keywords: ["统计", "数学", "数据", "经管"], score: 78 },
+    { keywords: ["设计", "数字媒体", "美术"], score: 82 },
+    { keywords: ["新闻", "传播", "中文", "文史"], score: 80 },
+    { keywords: ["管理", "心理", "工商", "人力"], score: 76 },
+    { keywords: ["会计", "财务", "审计", "经济"], score: 86 }
+  ];
+  const matchedGroup = relatedGroups.find((group) => group.keywords.some((item) => major.includes(item)) && (role.majors || []).some((item) => group.keywords.includes(item)));
+  if (matchedGroup) {
+    return { score: matchedGroup.score, reason: `${major} 与岗位专业要求存在相关性，但仍需用课程或项目进一步证明。` };
+  }
+  return { score: 38, reason: `${major} 与岗位主流专业背景相关性较弱，需要额外的项目和技能证明。` };
+}
+
+function computeWillingnessMatch(role, profile) {
+  const signals = [];
+  const reasons = [];
+  if (profile.basics.target_direction) {
+    const matched = roleMatchesText(role, profile.basics.target_direction);
+    signals.push(matched ? 92 : 52);
+    reasons.push(matched ? "目标方向与岗位关键词一致" : "目标方向与岗位未形成明显重合");
+  }
+  const interviewProfile = profile.interview.profile;
+  const recommendedRoles = Array.isArray(interviewProfile?.recommended_roles) ? interviewProfile.recommended_roles : [];
+  if (recommendedRoles.length) {
+    const matched = recommendedRoles.some((item) => roleMatchesText(role, item));
+    signals.push(matched ? 95 : 58);
+    reasons.push(matched ? "访谈推荐岗位包含该方向" : "访谈推荐岗位更偏向其他方向");
+  }
+  const interests = Array.isArray(interviewProfile?.career_interests) ? interviewProfile.career_interests : [];
+  if (interests.length) {
+    const matched = interests.some((item) => roleMatchesText(role, item));
+    signals.push(matched ? 85 : 60);
+    reasons.push(matched ? "访谈兴趣点与岗位特征重合" : "兴趣点与岗位仅部分相关");
+  }
+  return {
+    score: averageValues(signals),
+    reason: reasons.join("；") || "尚未填写目标方向或完成访谈，意愿匹配待补充。"
+  };
+}
+
+function computeRoleMatches(profile) {
+  const hasSignal = Boolean(
+    profile.assessment?.mbti?.completed
+    || profile.assessment?.holland?.completed
+    || profile.basics.major
+    || profile.basics.target_direction
+    || profile.interview.profile
+  );
+  if (!hasSignal) return [];
+  return ROLE_LIBRARY.map((role) => {
+    const trait = computeTraitMatch(role, profile);
+    const ability = computeAbilityMatch(role, profile);
+    const major = computeMajorMatch(role, profile.basics);
+    const willingness = computeWillingnessMatch(role, profile);
+    const weightedParts = [
+      { weight: appState.weights["特质匹配"], result: trait },
+      { weight: appState.weights["能力匹配"], result: ability },
+      { weight: appState.weights["专业匹配"], result: major },
+      { weight: appState.weights["意愿匹配"], result: willingness }
+    ];
+    const coverageWeight = weightedParts.reduce((sum, item) => sum + (item.result.score === null ? 0 : item.weight), 0);
+    const weightedScore = weightedParts.reduce((sum, item) => sum + (item.result.score === null ? 0 : item.result.score * item.weight), 0);
+    const overallScore = coverageWeight ? Math.round(weightedScore / coverageWeight) : null;
+    const confidence = coverageWeight >= 85 ? "高" : coverageWeight >= 55 ? "中" : "低";
+    const nextActions = uniqueValues([
+      ...ability.gaps.map((item) => `补足 ${item}`),
+      major.score !== null && major.score < 60 ? `为 ${role.name} 准备跨专业证明材料` : "",
+      willingness.score === null ? "补充目标方向或完成访谈，提升意愿匹配精度" : "",
+      `围绕 ${role.name} 的 ${role.requiredSkills.slice(0, 2).join("、")} 产出作品或经历`
+    ], 4);
+    return {
+      ...role,
+      trait,
+      ability,
+      major,
+      willingness,
+      coverageWeight,
+      overallScore,
+      confidence,
+      summary: [trait.reason, ability.reason, major.reason, willingness.reason].filter(Boolean).slice(0, 2).join("；"),
+      nextActions
+    };
+  }).sort((a, b) => {
+    const scoreA = a.overallScore ?? a.trait.score ?? 0;
+    const scoreB = b.overallScore ?? b.trait.score ?? 0;
+    return scoreB - scoreA;
+  });
+}
+
+function buildAgentModuleStates(profile, roles) {
+  const basicsReady = PROFILE_BASIC_FIELDS.every((key) => Boolean(profile.basics[key]));
+  const staticMemoryReady = Boolean(profile.assessment?.mbti?.completed || profile.assessment?.holland?.completed || basicsReady);
+  const dynamicMemoryReady = Boolean(profile.interview.profile);
+  const planningReady = Boolean(roles[0]);
+  return [
+    {
+      title: "静态记忆",
+      status: staticMemoryReady ? "available" : "pending",
+      reason: staticMemoryReady ? "已记录测评结果与基础信息，可作为画像基底。" : "等待 MBTI / 霍兰德结果与基础信息补齐。",
+      action_label: staticMemoryReady ? "已同步" : "补充基础信息"
+    },
+    {
+      title: "动态记忆",
+      status: dynamicMemoryReady ? "available" : "pending",
+      reason: dynamicMemoryReady ? "访谈结果已进入动态画像，可追踪能力与行动证据。" : "接口已保留，等待访谈继续沉淀成长证据。",
+      action_label: dynamicMemoryReady ? "继续访谈" : "开始访谈"
+    },
+    {
+      title: "规划模块",
+      status: planningReady ? "available" : "pending",
+      reason: planningReady ? "已根据统一画像生成阶段性岗位方向与行动建议。" : "等待画像基础形成后生成阶段计划。",
+      action_label: planningReady ? "查看报告" : "先完成测评"
+    },
+    {
+      title: "工具模块",
+      status: "placeholder",
+      reason: "岗位查询已接入；资源推荐、进度追踪和模拟面试先保留规范接口。",
+      action_label: "待接入"
+    },
+    {
+      title: "反思模块",
+      status: "placeholder",
+      reason: "已保留状态字段与展示位，后续可接入月度复盘与推荐修正逻辑。",
+      action_label: "即将上线"
+    }
+  ];
+}
+
+function renderCapabilityList(profile) {
+  const labels = {
+    professional: "专业技能",
+    learning: "学习能力",
+    communication: "沟通能力",
+    innovation: "创新能力",
+    stress_tolerance: "抗压能力",
+    internship: "实践/实习能力",
+    execution: "执行能力"
+  };
+  return Object.entries(labels).map(([key, label]) => {
+    const item = profile.capabilities[key];
+    const score = item?.score;
+    const text = score === null ? "待补充" : `${score}%`;
+    const hint = score === null
+      ? "当前主要依赖测评与基础信息，后续用访谈/经历补强。"
+      : `${(item.sources || []).join(" / ")}${item.inferred ? " · 推断值" : " · 有实证输入"}`;
+    return `
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <span class="text-sm font-medium text-slate-700">${escHtml(label)}</span>
+          <span class="text-sm font-semibold ${score === null ? "text-slate-400" : "text-sky-700"}">${escHtml(text)}</span>
+        </div>
+        <div class="h-2 rounded-full bg-white overflow-hidden">
+          <div class="h-full rounded-full ${score === null ? "bg-slate-200" : "bg-gradient-to-r from-sky-500 to-cyan-400"}" style="width:${score === null ? 18 : score}%"></div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500 leading-5">${escHtml(hint)}</p>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderProfileWorkspace(profile, roles) {
+  syncProfileBasicsForm();
+  const topRoles = roles.slice(0, 3);
+  const readinessEl = document.getElementById("profileReadinessValue");
+  const summaryEl = document.getElementById("profileUnifiedSummary");
+  const assessmentEl = document.getElementById("profileAssessmentDigest");
+  const valuesEl = document.getElementById("profileWorkValueTags");
+  const topRoleEl = document.getElementById("profileTopRoleTags");
+  const nextStepEl = document.getElementById("profileNextStepList");
+  const missingEl = document.getElementById("profileMissingList");
+  const capabilityEl = document.getElementById("profileCapabilityList");
+  const modulesEl = document.getElementById("agentModuleGrid");
+  if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
+  if (summaryEl) summaryEl.textContent = profile.summary;
+  if (assessmentEl) {
+    const items = [];
+    if (profile.assessment?.mbti?.completed) items.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
+    if (profile.assessment?.holland?.completed) items.push(`霍兰德：${profile.assessment.holland.code}`);
+    if (profile.basics.major) items.push(`专业：${profile.basics.major}`);
+    if (profile.basics.grade) items.push(`年级：${profile.basics.grade}`);
+    assessmentEl.textContent = items.length ? items.join("｜") : "尚未形成足够的基础画像。";
+  }
+  if (valuesEl) valuesEl.innerHTML = careerTagHtml(profile.workValues, "待补充工作价值观", "soft");
+  if (topRoleEl) topRoleEl.innerHTML = careerTagHtml(uniqueValues([...profile.recommendedRoles, ...topRoles.map((item) => item.name)], 5), "待生成岗位方向", "accent");
+  if (nextStepEl) nextStepEl.innerHTML = careerListHtml(uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6), "等待画像完善后生成行动建议");
+  if (missingEl) missingEl.innerHTML = careerListHtml(profile.missingItems, "当前画像基础已满足本轮演示范围");
+  if (capabilityEl) capabilityEl.innerHTML = renderCapabilityList(profile);
+  if (modulesEl) {
+    modulesEl.innerHTML = buildAgentModuleStates(profile, roles).map((item) => {
+      const statusClass = item.status === "available"
+        ? "bg-emerald-100 text-emerald-700"
+        : item.status === "placeholder"
+          ? "bg-amber-100 text-amber-700"
+          : "bg-slate-200 text-slate-600";
+      return `
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <h4 class="text-base font-semibold text-slate-900">${escHtml(item.title)}</h4>
+            <span class="rounded-full px-3 py-1 text-xs font-medium ${statusClass}">${escHtml(item.action_label)}</span>
+          </div>
+          <p class="text-sm text-slate-600 leading-6">${escHtml(item.reason)}</p>
+        </div>
+      `;
+    }).join("");
+  }
+  updateProfileRadarChart({
+    dimensions: [
+      { name: "专业技能", score: profile.capabilities.professional.score || 0 },
+      { name: "学习能力", score: profile.capabilities.learning.score || 0 },
+      { name: "沟通能力", score: profile.capabilities.communication.score || 0 },
+      { name: "创新能力", score: profile.capabilities.innovation.score || 0 },
+      { name: "抗压能力", score: profile.capabilities.stress_tolerance.score || 0 },
+      { name: "实践能力", score: profile.capabilities.internship.score || 0 },
+      { name: "执行能力", score: profile.capabilities.execution.score || 0 }
+    ]
+  });
+}
+
+function renderMatchingWorkspace(profile, roles) {
+  const topRole = roles[0] || null;
+  const focused = roles.find((item) => item.id === appState.focusedRoleId) || topRole;
+  const overviewEl = document.getElementById("matchingOverviewCards");
+  const listEl = document.getElementById("matchingRoleList");
+  const detailEl = document.getElementById("matchingRoleDetail");
+  const moduleEl = document.getElementById("matchingPlaceholderModules");
+  const totalEl = document.getElementById("weightTotal");
+  if (totalEl) totalEl.textContent = `${Object.values(appState.weights).reduce((sum, value) => sum + Number(value || 0), 0)}%`;
+
+  if (overviewEl) {
+    const cards = [
+      { label: "当前 Top1", value: topRole?.overallScore !== null && topRole?.overallScore !== undefined ? `${topRole.overallScore}%` : "初步推荐", hint: topRole ? `${topRole.name} · 置信度${topRole.confidence}` : "等待画像输入" },
+      { label: "岗位覆盖", value: `${roles.length}`, hint: "基于 10 个岗位画像库自动初筛" },
+      { label: "关键差距", value: `${focused?.ability?.gaps?.length || 0}`, hint: focused ? `聚焦 ${focused.name}` : "等待选择岗位" },
+      { label: "状态提示", value: profile.missingItems.length ? "待补充" : "已就绪", hint: profile.missingItems.length ? profile.missingItems[0] : "可进入报告页查看行动计划" }
+    ];
+    overviewEl.innerHTML = cards.map((card) => `
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p class="text-sm text-slate-500">${escHtml(card.label)}</p>
+        <p class="mt-2 text-3xl font-bold text-slate-900">${escHtml(card.value)}</p>
+        <p class="mt-2 text-xs text-slate-500 leading-5">${escHtml(card.hint)}</p>
+      </div>
+    `).join("");
+  }
+
+  if (listEl) {
+    listEl.innerHTML = roles.map((role) => {
+      const active = role.id === focused?.id;
+      return `
+        <div class="rounded-2xl border ${active ? "border-sky-400 bg-sky-50/70" : "border-slate-200 bg-white"} p-5 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase">${escHtml(role.category)}</p>
+              <h4 class="mt-1 text-lg font-semibold text-slate-900">${escHtml(role.name)}</h4>
+              <p class="mt-2 text-sm text-slate-600 leading-6">${escHtml(role.summary || "等待更多输入提升解释性。")}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold text-sky-700">${role.overallScore === null ? "初筛" : `${role.overallScore}%`}</p>
+              <p class="text-xs text-slate-500">置信度 ${escHtml(role.confidence)}</p>
+            </div>
+          </div>
+          <div class="mt-4 grid gap-2 md:grid-cols-2">
+            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">特质匹配：${role.trait.score === null ? "待补充" : `${role.trait.score}%`}</div>
+            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">能力匹配：${role.ability.score === null ? "待补充" : `${role.ability.score}%`}</div>
+            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">专业匹配：${role.major.score === null ? "待补充" : `${role.major.score}%`}</div>
+            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">意愿匹配：${role.willingness.score === null ? "待补充" : `${role.willingness.score}%`}</div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <button type="button" onclick="focusMatchingRole('${role.id}')" class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">查看解释</button>
+            <button type="button" onclick="openMatchingRoleReport('${role.id}')" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 transition-all">写入报告</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  if (detailEl) {
+    detailEl.innerHTML = focused ? `
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase">Focused Role</p>
+            <h3 class="mt-1 text-xl font-semibold text-slate-900">${escHtml(focused.name)}</h3>
+            <p class="mt-2 text-sm text-slate-600 leading-6">${escHtml(focused.path)}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-3xl font-bold text-slate-900">${focused.overallScore === null ? "初筛" : `${focused.overallScore}%`}</p>
+            <p class="text-xs text-slate-500">覆盖权重 ${focused.coverageWeight}%</p>
+          </div>
+        </div>
+        <div class="mt-5 grid gap-5 lg:grid-cols-3">
+          <div>
+            <p class="text-sm font-semibold text-slate-800">匹配理由</p>
+            <div class="mt-3">${careerListHtml([focused.trait.reason, focused.major.reason, focused.willingness.reason], "等待更多解释")}</div>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-800">能力差距</p>
+            <div class="mt-3">${careerListHtml(focused.ability.gaps, "当前没有明显硬缺口，建议继续用经历加固。")}</div>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-800">建议动作</p>
+            <div class="mt-3">${careerListHtml(focused.nextActions, "等待生成行动建议")}</div>
+          </div>
+        </div>
+      </div>
+    ` : `
+      <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+        当前还没有可解释的岗位结果，请先完成测评并补充基础信息。
+      </div>
+    `;
+  }
+
+  if (moduleEl) {
+    const placeholders = [
+      { title: "资源推荐工具", reason: "课程/证书/模板推送接口已预留，后续接入真实资源库。", action: "待接入" },
+      { title: "趋势分析工具", reason: "行业趋势卡位已保留，后续接入实时岗位市场与更新频率。", action: "待接入" },
+      { title: "提醒追踪工具", reason: "行动提醒与任务进度字段已规范化，后续接入调度器。", action: "即将上线" }
+    ];
+    moduleEl.innerHTML = placeholders.map((item) => `
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <div class="flex items-center justify-between gap-3">
+          <h4 class="text-base font-semibold text-slate-900">${escHtml(item.title)}</h4>
+          <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">${escHtml(item.action)}</span>
+        </div>
+        <p class="mt-3 text-sm text-slate-600 leading-6">${escHtml(item.reason)}</p>
+      </div>
+    `).join("");
+  }
+}
+
+function renderReportWorkspace(profile, roles) {
+  const selected = roles.find((item) => item.id === appState.focusedRoleId) || roles[0] || null;
+  const bodyEl = document.getElementById("reportBody");
+  const headerName = document.getElementById("reportHeaderName");
+  const headerRole = document.getElementById("reportHeaderRole");
+  const headerScore = document.getElementById("reportHeaderScore");
+  const headerConfidence = document.getElementById("reportHeaderConfidence");
+  const statusTitle = document.getElementById("reportStatusTitle");
+  const statusHint = document.getElementById("reportStatusHint");
+  if (headerName) headerName.textContent = getCurrentUser()?.display_name || getCurrentUser()?.displayName || getCurrentUser()?.username || "当前用户";
+  if (headerRole) headerRole.textContent = selected?.name || "待确定岗位方向";
+  if (headerScore) headerScore.textContent = selected?.overallScore === null || selected?.overallScore === undefined ? "初筛" : `${selected.overallScore}%`;
+  if (headerConfidence) headerConfidence.textContent = selected ? `置信度 ${selected.confidence}` : "等待画像输入";
+  if (statusTitle) statusTitle.textContent = appState.reportGenerated ? "报告已按最新画像刷新" : "报告为可编辑草稿";
+  if (statusHint) statusHint.textContent = profile.missingItems.length
+    ? `仍有 ${profile.missingItems.length} 项待补充：${profile.missingItems[0]}`
+    : "关键输入已基本就绪，可直接使用这份报告作为行动底稿。";
+  if (!bodyEl) return;
+  if (!selected) {
+    bodyEl.innerHTML = `<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">当前还没有可生成的报告内容，请先完成测评和基础信息补充。</div>`;
+    return;
+  }
+  const topRoles = roles.slice(0, 3).map((item) => `${item.name}${item.overallScore === null ? "（初筛）" : `（${item.overallScore}%）`}`);
+  const stagePlan = [
+    `本周：围绕 ${selected.name} 复盘现有经历，并补齐 ${selected.requiredSkills.slice(0, 2).join("、")} 相关证据。`,
+    "本月：根据报告中的差距项完成一项作品、项目或课程证明。",
+    "本季度：针对 Top 岗位投递实习、竞赛或项目机会，形成新的动态记忆。"
+  ];
+  bodyEl.innerHTML = `
+    <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div class="space-y-6">
+        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <h4 class="text-lg font-semibold text-slate-900">测评结论</h4>
+          <p class="mt-3 text-sm leading-7 text-slate-600">${escHtml(profile.summary)}</p>
+          <div class="mt-4 grid gap-3 md:grid-cols-2">
+            <div class="rounded-xl bg-white p-4">
+              <p class="text-xs text-slate-500">MBTI</p>
+              <p class="mt-1 font-semibold text-slate-900">${escHtml(profile.assessment?.mbti?.completed ? (profile.assessment.mbti.display_type || profile.assessment.mbti.final_type) : "待完成")}</p>
+            </div>
+            <div class="rounded-xl bg-white p-4">
+              <p class="text-xs text-slate-500">霍兰德</p>
+              <p class="mt-1 font-semibold text-slate-900">${escHtml(profile.assessment?.holland?.completed ? profile.assessment.holland.code : "待完成")}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-6">
+          <h4 class="text-lg font-semibold text-slate-900">Top 岗位方向</h4>
+          <div class="mt-4">${careerListHtml(topRoles, "等待生成岗位方向")}</div>
+          <p class="mt-4 text-sm leading-7 text-slate-600">当前主推岗位为 ${escHtml(selected.name)}，路径建议：${escHtml(selected.path)}。</p>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-6">
+          <h4 class="text-lg font-semibold text-slate-900">差距驱动行动计划</h4>
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <p class="text-sm font-semibold text-slate-800">重点缺口</p>
+              <div class="mt-3">${careerListHtml(selected.ability.gaps, "当前没有明显高优先级缺口，可直接强化项目证据。")}</div>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-slate-800">建议动作</p>
+              <div class="mt-3">${careerListHtml(selected.nextActions, "等待生成动作建议")}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="space-y-6">
+        <section class="rounded-2xl border border-slate-200 bg-white p-6">
+          <h4 class="text-lg font-semibold text-slate-900">阶段性职业规划</h4>
+          <div class="mt-4">${careerListHtml(stagePlan, "等待生成阶段计划")}</div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <h4 class="text-lg font-semibold text-slate-900">工作价值观与偏好</h4>
+          <div class="mt-4">${careerTagHtml(profile.workValues, "待补充价值观", "soft")}</div>
+          <p class="mt-4 text-sm text-slate-600 leading-6">专业：${escHtml(profile.basics.major || "待补充")}｜年级：${escHtml(profile.basics.grade || "待补充")}｜目标城市：${escHtml(profile.basics.target_city || "待补充")}</p>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-6">
+          <h4 class="text-lg font-semibold text-slate-900">待接入模块</h4>
+          <div class="mt-4 space-y-3 text-sm text-slate-600">
+            <div class="rounded-xl border border-dashed border-slate-300 p-4">资源推荐：已保留接口，后续对接课程、证书和模板库。</div>
+            <div class="rounded-xl border border-dashed border-slate-300 p-4">趋势分析：已保留接口，后续接入岗位市场趋势。</div>
+            <div class="rounded-xl border border-dashed border-slate-300 p-4">提醒追踪：已保留接口，后续接入任务提醒与复盘节奏。</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+  updateReportDates(new Date());
+}
+
+function refreshUnifiedExperience() {
+  const profile = deriveUnifiedProfile();
+  const roles = computeRoleMatches(profile);
+  profile.recommendedRoles = uniqueValues([...profile.recommendedRoles, ...roles.slice(0, 3).map((item) => item.name)], 6);
+  profile.nextSteps = uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6);
+  profile.moduleStates = buildAgentModuleStates(profile, roles);
+
+  appState.derivedProfile = profile;
+  appState.matchingRoles = roles;
+  if (!roles.some((item) => item.id === appState.focusedRoleId)) {
+    appState.focusedRoleId = roles[0]?.id || "";
+  }
+  appState.profileCompletion = Math.round(
+    (profile.assessment?.mbti?.completed ? 15 : 0)
+    + (profile.assessment?.holland?.completed ? 15 : 0)
+    + (PROFILE_BASIC_FIELDS.filter((key) => profile.basics[key]).length / PROFILE_BASIC_FIELDS.length) * 30
+    + clampPercent(profile.interview.completionScore) * 0.4
+  );
+  appState.profileComplete = Boolean(
+    profile.assessment?.mbti?.completed
+    && profile.assessment?.holland?.completed
+    && PROFILE_BASIC_FIELDS.every((key) => profile.basics[key])
+  );
+  appState.matchingComplete = roles.length > 0 && Boolean(profile.assessment?.mbti?.completed || profile.assessment?.holland?.completed);
+  appState.score = roles[0]?.overallScore || roles[0]?.trait?.score || appState.profileCompletion;
+
+  renderProfileWorkspace(profile, roles);
+  renderMatchingWorkspace(profile, roles);
+  renderReportWorkspace(profile, roles);
+  updateDashboardMetrics();
+}
+
+function focusMatchingRole(roleId) {
+  appState.focusedRoleId = String(roleId || "");
+  renderMatchingWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+}
+
+function openMatchingRoleReport(roleId) {
+  focusMatchingRole(roleId);
+  showSection("report");
 }
 
 function animateCounter(el, target, suffix = "", duration = 500) {
@@ -1214,14 +2191,15 @@ function updateLiveClock() {
   appState.lastGreetingKey = greetingKey;
   const title = document.getElementById("welcomeTitle");
   const subtitle = document.getElementById("welcomeSubtitle");
+  const displayName = getCurrentUser()?.display_name || getCurrentUser()?.displayName || getCurrentUser()?.username || "同学";
   const h = now.getHours();
   let greeting = "晚上好";
-  let icon = "馃寵";
+  let icon = "☾";
   if (h >= 6 && h < 12) { greeting = "早上好"; icon = "☀"; }
   if (h >= 12 && h < 18) { greeting = "下午好"; icon = "🌤"; }
   const dayIndex = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
-  if (title) title.textContent = `${greeting}，张明同学！${icon}`;
-  if (subtitle) subtitle.textContent = `今天是 ${formatDateCN(now)}，年度第 ${dayIndex} 天，系统正在同步你的最新进度。`;
+  if (title) title.textContent = `${greeting}，${displayName}${icon}`;
+  if (subtitle) subtitle.textContent = `今天是 ${formatDateCN(now)}，年度第 ${dayIndex} 天，系统正在用最新测评、访谈和基础信息更新你的职业画像。`;
 }
 
 function updateTaskPanels(explored) {
@@ -1231,10 +2209,12 @@ function updateTaskPanels(explored) {
   const matchingTag = document.getElementById("taskMatchingTag");
   const progressHint = document.getElementById("taskProgressHint");
   const reportBtn = document.getElementById("generateReportBtn");
-  const exploredDone = explored >= 10;
-  if (exploreStatus) exploreStatus.textContent = `已探索 ${explored} 个岗位`;
+  const exploredDone = explored >= 3;
+  if (exploreStatus) exploreStatus.textContent = `已形成 ${explored} 个初步岗位方向`;
   setTagState(exploreTag, exploredDone ? "done" : "processing");
-  if (matchingStatus) matchingStatus.textContent = `已分析 ${Math.max(5, appState.selectedJobs.length + 4)} 个目标岗位`;
+  if (matchingStatus) matchingStatus.textContent = appState.matchingRoles.length
+    ? `已生成 ${appState.matchingRoles.length} 个岗位匹配结果`
+    : "等待画像输入生成匹配";
   setTagState(matchingTag, appState.matchingComplete ? "done" : "processing");
   const doneCount = [appState.profileComplete, exploredDone, appState.matchingComplete, appState.reportGenerated].filter(Boolean).length;
   if (progressHint) progressHint.textContent = `已完成 ${doneCount}/4 个关键任务`;
@@ -1244,7 +2224,7 @@ function updateTaskPanels(explored) {
       reportBtn.classList.add("bg-green-600", "hover:bg-green-700");
       reportBtn.classList.remove("bg-purple-600", "hover:bg-purple-700");
     } else {
-      reportBtn.textContent = "绔嬪嵆鐢熸垚";
+      reportBtn.textContent = "生成当前报告";
       reportBtn.classList.add("bg-purple-600", "hover:bg-purple-700");
       reportBtn.classList.remove("bg-green-600", "hover:bg-green-700");
     }
@@ -1252,11 +2232,13 @@ function updateTaskPanels(explored) {
 }
 
 function updateDashboardMetrics() {
-  const explored = appState.baseExploredJobs + appState.selectedJobs.length;
-  const code = appState.selectedJobs[appState.selectedJobs.length - 1] || "ml";
-  const topRate = jobRateMap[code] || 94;
-  const topJob = jobNameMap[code] || "Machine Learning Engineer";
-  const pending = [!appState.profileComplete, explored < 10, !appState.matchingComplete, !appState.reportGenerated].filter(Boolean).length;
+  const roles = Array.isArray(appState.matchingRoles) ? appState.matchingRoles : [];
+  const profile = appState.derivedProfile;
+  const topRoleData = roles[0];
+  const explored = roles.slice(0, 3).length;
+  const topRate = topRoleData?.overallScore || topRoleData?.trait?.score || 0;
+  const topJob = topRoleData?.name || "等待岗位方向";
+  const pending = profile ? profile.missingItems.length + (appState.reportGenerated ? 0 : 1) : 4;
   animateCounter(document.getElementById("exploredJobsCount"), explored);
   animateCounter(document.getElementById("profileCompletionRate"), appState.profileCompletion, "%");
   animateCounter(document.getElementById("topMatchRate"), topRate, "%");
@@ -1267,19 +2249,21 @@ function updateDashboardMetrics() {
   const profileHint = document.getElementById("profileCompletionHint");
   const pendingHint = document.getElementById("pendingTaskHint");
   if (topRole) topRole.textContent = topJob;
-  if (scoreTrend) scoreTrend.textContent = `较基线 ${appState.score - 82 >= 0 ? "+" : ""}${appState.score - 82}%`;
-  if (profileHint) profileHint.textContent = appState.profileCompletion >= 90 ? "评估表现优秀" : `剩余 ${Math.max(0, Math.ceil((100 - appState.profileCompletion) / 5))} 项`;
-  if (pendingHint) pendingHint.textContent = pending === 0 ? "全部完成" : "点击查看";
+  if (scoreTrend) scoreTrend.textContent = topRoleData ? `Top1 置信度 ${topRoleData.confidence}` : "等待画像输入";
+  if (profileHint) profileHint.textContent = profile?.missingItems?.length ? `待补充 ${profile.missingItems.length} 项` : "画像基础已就绪";
+  if (pendingHint) pendingHint.textContent = pending === 0 ? "全部完成" : "优先补基础信息和访谈";
   updateTaskPanels(explored);
 }
 
-function markReportGenerated() {
+function markReportGenerated(source = "view") {
   if (!appState.reportGenerated) {
     appState.reportGenerated = true;
     updateReportDates(new Date());
-    addLiveActivity("Report regenerated with latest data");
-    showToast("Report updated", "Latest jobs and profile data were merged.", "success", 2000);
+    if (source !== "view") {
+      addLiveActivity("Report regenerated with latest profile data");
+    }
   }
+  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
   updateDashboardMetrics();
 }
 
@@ -1308,14 +2292,13 @@ function showSection(sectionId) {
 }
 
 function checkReportReadiness() {
-  const explored = appState.baseExploredJobs + appState.selectedJobs.length;
-  if (appState.profileComplete && explored >= 10 && appState.matchingComplete) {
-    showToast("Ready", "All conditions are satisfied for report generation.", "success", 1800);
-    addLiveActivity("Report readiness check passed");
-    showSection("report");
+  const profile = appState.derivedProfile || deriveUnifiedProfile();
+  if (profile.missingItems.length) {
+    showToast("可生成初步报告", `当前仍有待补充项：${profile.missingItems.slice(0, 2).join("、")}`, "warning", 2400);
   } else {
-    showToast("Not ready", "Please finish remaining tasks first.", "warning", 2200);
+    showToast("报告就绪", "统一画像与岗位匹配已同步完成。", "success", 1800);
   }
+  showSection("report");
 }
 
 function selectTargetJob(jobType) {
@@ -1387,48 +2370,30 @@ function switchGraphType(type) {
 function updateWeight(slider, dimension) {
   const value = Number(slider.value);
   appState.weights[dimension] = value;
-  const card = slider.closest(".text-center");
-  if (card) {
-    const circles = card.querySelectorAll("svg circle");
-    const text = card.querySelector("svg text");
-    if (text) text.textContent = `${value}%`;
-    if (circles.length > 1) {
-      const c = 251.2;
-      circles[1].setAttribute("stroke-dasharray", String(c));
-      circles[1].setAttribute("stroke-dashoffset", String((1 - value / 100) * c));
-    }
-  }
+  const valueLabel = slider.closest(".matching-weight-card")?.querySelector(".matching-weight-value");
+  if (valueLabel) valueLabel.textContent = `${value}%`;
   const sliders = Array.from(document.querySelectorAll("input[type='range'][onchange*='updateWeight']"));
   const total = sliders.reduce((sum, item) => sum + Number(item.value || 0), 0);
   const totalEl = document.getElementById("weightTotal");
   if (totalEl) {
     totalEl.textContent = `${total}%`;
     totalEl.classList.toggle("text-orange-600", total !== 100);
-    totalEl.classList.toggle("text-purple-600", total === 100);
+    totalEl.classList.toggle("text-sky-600", total === 100);
   }
 }
 
 function recalculateMatching() {
   const total = Object.values(appState.weights).reduce((sum, n) => sum + n, 0);
-  if (total !== 100) return showToast("Invalid weight total", "Weight sum must equal 100%.", "warning", 2200);
-  showToast("Recalculating", "Applying latest weight strategy...", "info", 1000);
-  setTimeout(() => {
-    appState.score = Math.min(99, Math.max(70, appState.score + Math.round(Math.random() * 4 - 1)));
-    updateDashboardMetrics();
-    addLiveActivity("Matching engine recalculated by new weights");
-    showToast("Done", "Matching ranking has been updated.", "success", 1800);
-  }, 850);
+  if (total !== 100) return showToast("权重总和不正确", "四个分项权重之和必须等于 100%。", "warning", 2200);
+  refreshUnifiedExperience();
+  addLiveActivity("Matching strategy refreshed with new weight settings");
+  showToast("匹配结果已刷新", "系统已按最新权重重新排序岗位结果。", "success", 1800);
 }
 
 function recalculateProfile() {
-  showToast("Re-evaluating", "Refreshing capability profile...", "info", 1000);
-  setTimeout(() => {
-    appState.profileCompletion = Math.min(98, Math.max(70, appState.profileCompletion + Math.round(Math.random() * 5 - 2)));
-    appState.score = Math.min(99, Math.max(72, appState.score + Math.round(Math.random() * 3 - 1)));
-    updateDashboardMetrics();
-    addLiveActivity("Capability profile updated");
-    showToast("Updated", "Profile changes synced to matching module.", "success", 1800);
-  }, 820);
+  refreshUnifiedExperience();
+  addLiveActivity("Profile synthesis refreshed from latest assessment and interview state");
+  showToast("画像已重算", "测评、访谈和基础信息已经重新同步。", "success", 1800);
 }
 
 function triggerFileUpload() {
@@ -1449,14 +2414,14 @@ function handleFileUpload(event) {
 }
 
 function showManualInput() { showToast("Coming soon", "Manual profile input will be enabled soon.", "info", 1700); }
-function editReport() { showToast("Edit mode", "Report editing is enabled.", "success", 1500); }
-function saveReport() { showToast("Saved", "Report draft saved in this session.", "success", 1500); addLiveActivity("Report draft saved by user"); }
+function editReport() { showToast("报告说明", "当前报告由统一画像实时生成，暂不提供段落级手改。", "info", 1800); }
+function saveReport() { markReportGenerated("save"); showToast("报告已保存", "当前草稿状态已刷新到本地会话。", "success", 1500); addLiveActivity("Report draft saved by user"); }
 
 function exportReport() {
-  showToast("Exporting", "Generating PDF report...", "info", 1000);
+  showToast("正在导出", "系统正在准备当前报告内容。", "info", 1000);
   setTimeout(() => {
-    markReportGenerated();
-    showToast("Export complete", "PDF report generated.", "success", 1800);
+    markReportGenerated("export");
+    showToast("导出完成", "报告内容已整理完成，可继续扩展 PDF 流程。", "success", 1800);
     addLiveActivity("PDF export completed");
   }, 1200);
 }
@@ -1513,6 +2478,7 @@ async function loadJobs() {
     if (loading) loading.classList.add("hidden");
     filterJobs(true);
     geoAssetsPromise.then(() => scheduleGeoInsightsInit(allJobsData));
+    scheduleAnalyticsInit(allJobsData);
 
     const summary = document.getElementById("jobFilterSummary");
     if (summary) summary.textContent = `已加载 ${allJobsData.length} 个岗位摘要`;
@@ -1780,6 +2746,8 @@ function initCharts() {
   const radarCanvas = document.getElementById("radarChart");
   const profileRadarCanvas = document.getElementById("profileRadarChart");
   if (radarCanvas && window.Chart) {
+    // 防止重复创建（canvas 已被 Chart.js 占用时先销毁旧实例）
+    if (appState.dashboardRadarChart) { appState.dashboardRadarChart.destroy(); appState.dashboardRadarChart = null; }
     appState.dashboardRadarChart = new Chart(radarCanvas.getContext("2d"), {
       type: "radar",
       data: {
@@ -1793,6 +2761,7 @@ function initCharts() {
     });
   }
   if (profileRadarCanvas && window.Chart) {
+    if (appState.profileRadarChart) { appState.profileRadarChart.destroy(); appState.profileRadarChart = null; }
     appState.profileRadarChart = new Chart(profileRadarCanvas.getContext("2d"), {
       type: "radar",
       data: { labels: ["专业技能", "证书资质", "沟通能力", "学习能力", "抗压能力", "创新能力", "实习经历", "项目经验"], datasets: [{ label: "能力评分", data: [75, 60, 82, 88, 70, 65, 60, 55], backgroundColor: "rgba(102,126,234,0.3)", borderColor: "rgba(102,126,234,1)", borderWidth: 2, pointBackgroundColor: "rgba(102,126,234,1)", pointRadius: 4 }] },
@@ -1882,12 +2851,17 @@ document.addEventListener("DOMContentLoaded", function () {
   startRealtimeEngine();
   updateReportDates(new Date());
   updateNotificationCount();
-  updateDashboardMetrics();
+  syncProfileBasicsForm();
+  refreshUnifiedExperience();
   addLiveActivity("System initialized. Dynamic monitoring is active.");
+  window.addEventListener("assessment-hub:updated", () => {
+    refreshUnifiedExperience();
+  });
   Promise.resolve(authReady).finally(() => {
     updateCareerInterviewConfigStatus();
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
+    refreshUnifiedExperience();
   });
 });
 
@@ -1929,3 +2903,222 @@ function expandQA(el) {
   }
 }
 
+// ── 设置面板（头像点击） ────────────────────────────────────────────────────────
+
+let _settingsPanelOpen = false;
+let _settingsOutsideListener = null;
+let _cachedAvailableModels = [];   // 全局缓存：拉取到的模型列表，切换板块后不需重新获取
+
+function toggleSettingsPanel(event) {
+  if (event) event.stopPropagation();
+  if (_settingsPanelOpen) {
+    closeSettingsPanel();
+  } else {
+    openSettingsPanel();
+  }
+}
+
+function openSettingsPanel() {
+  const panel = document.getElementById("settingsPanel");
+  if (!panel) return;
+  panel.classList.remove("hidden");
+  _settingsPanelOpen = true;
+  loadSettingsPanelData();
+  setTimeout(() => {
+    _settingsOutsideListener = (e) => {
+      if (!panel.contains(e.target)) closeSettingsPanel();
+    };
+    document.addEventListener("click", _settingsOutsideListener);
+  }, 30);
+}
+
+function closeSettingsPanel() {
+  const panel = document.getElementById("settingsPanel");
+  if (panel) panel.classList.add("hidden");
+  _settingsPanelOpen = false;
+  if (_settingsOutsideListener) {
+    document.removeEventListener("click", _settingsOutsideListener);
+    _settingsOutsideListener = null;
+  }
+}
+
+function _setSettingsStatus(text, state) {
+  const dot = document.getElementById("settingsStatusDot");
+  const textEl = document.getElementById("settingsStatusText");
+  const colorMap = { ok: "bg-green-400", warn: "bg-amber-400", error: "bg-red-400", loading: "bg-gray-300" };
+  if (dot) dot.className = `w-2 h-2 rounded-full flex-shrink-0 ${colorMap[state] || colorMap.loading}`;
+  if (textEl) textEl.textContent = text;
+}
+
+function _populateModelDropdown(models, currentModel) {
+  const select = document.getElementById("settingsModelSelect");
+  if (!select) return;
+  const prev = currentModel || select.value;
+  select.innerHTML = `<option value="">-- 选择模型 --</option>`;
+  models.forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    if (m === prev) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+async function loadSettingsPanelData() {
+  _setSettingsStatus("正在加载配置…", "loading");
+  const user = getCurrentUser();
+  if (!user) {
+    _setSettingsStatus("请先登录", "warn");
+    return;
+  }
+  const labelEl = document.getElementById("settingsPanelUserLabel");
+  if (labelEl) {
+    labelEl.textContent = `${user.display_name || user.username}  ·  ${user.role === "super_admin" ? "系统管理员" : "普通用户"}`;
+  }
+
+  const isAdmin = isSuperAdminUser();
+  const adminSection = document.getElementById("settingsAdminSection");
+  if (adminSection) adminSection.classList.toggle("hidden", !isAdmin);
+
+  try {
+    const config = await fetchManagedLlmConfig("career_interview", true);
+    if (isAdmin) {
+      const bu = document.getElementById("settingsBaseUrl");
+      const ak = document.getElementById("settingsApiKey");
+      if (bu) bu.value = config.base_url || "";
+      if (ak) ak.value = config.api_key || "";
+    }
+    if (config.configured) {
+      _setSettingsStatus(`已配置  ·  当前模型：${config.model}`, "ok");
+      if (_cachedAvailableModels.length > 0) {
+        // 已有缓存，直接渲染，不发起网络请求
+        _populateModelDropdown(_cachedAvailableModels, config.model);
+        const btn = document.getElementById("settingsFetchModelsBtn");
+        if (btn) btn.textContent = `✓ ${_cachedAvailableModels.length} 个模型`;
+      } else {
+        await fetchSettingsModels();
+      }
+    } else {
+      _setSettingsStatus(
+        isAdmin ? "尚未配置，请填写 Base URL 和 API Key" : "等待系统管理员配置",
+        "warn"
+      );
+      if (_cachedAvailableModels.length > 0) {
+        _populateModelDropdown(_cachedAvailableModels, config.model);
+        const btn = document.getElementById("settingsFetchModelsBtn");
+        if (btn) btn.textContent = `✓ ${_cachedAvailableModels.length} 个模型`;
+      } else if (config.model) {
+        const select = document.getElementById("settingsModelSelect");
+        if (select) {
+          select.innerHTML = `<option value="${escHtml(config.model)}" selected>${escHtml(config.model)}</option>`;
+        }
+      }
+    }
+  } catch (err) {
+    _setSettingsStatus("加载失败：" + err.message, "error");
+  }
+}
+
+async function fetchSettingsModels() {
+  const btn = document.getElementById("settingsFetchModelsBtn");
+  if (btn) btn.textContent = "⏳ 获取中…";
+
+  try {
+    let url = "/api/llm-models";
+    let options = { credentials: "same-origin" };
+
+    if (isSuperAdminUser()) {
+      const baseUrl = (document.getElementById("settingsBaseUrl")?.value || "").trim();
+      const apiKey = (document.getElementById("settingsApiKey")?.value || "").trim();
+      if (baseUrl && apiKey) {
+        url = "/api/llm-models/preview";
+        options = {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base_url: baseUrl, api_key: apiKey })
+        };
+      }
+    }
+
+    const res = await fetch(url, options);
+    const data = await res.json();
+    if (data.models && data.models.length > 0) {
+      _cachedAvailableModels = data.models;   // 写入全局缓存
+      const currentModel = getStoredCareerInterviewConfig().model;
+      _populateModelDropdown(data.models, currentModel);
+      if (btn) btn.textContent = `✓ ${data.models.length} 个模型`;
+    } else {
+      showToast("获取模型", data.message || "未获取到模型列表，请检查配置", "warning", 2400);
+      if (btn) btn.textContent = "🔄 获取列表";
+    }
+  } catch (err) {
+    showToast("获取模型失败", err.message, "error", 2400);
+    if (btn) btn.textContent = "🔄 获取列表";
+  }
+}
+
+async function saveSettingsAdmin() {
+  if (!isSuperAdminUser()) return;
+  const baseUrl = (document.getElementById("settingsBaseUrl")?.value || "").trim();
+  const apiKey = (document.getElementById("settingsApiKey")?.value || "").trim();
+  const model = (document.getElementById("settingsModelSelect")?.value || "").trim();
+
+  if (!baseUrl || !apiKey) {
+    showToast("配置不完整", "请填写 Base URL 和 API Key", "warning", 2000);
+    return;
+  }
+  if (!model) {
+    showToast("请选择模型", "请先点击「获取列表」，再选择一个模型", "warning", 2000);
+    return;
+  }
+
+  try {
+    await saveManagedLlmConfig("career_interview", { base_url: baseUrl, api_key: apiKey, model });
+    await saveManagedLlmConfig("assessment_hub", { base_url: baseUrl, api_key: apiKey, model });
+    userWorkspaceState.llmConfigs.career_interview = null;
+    userWorkspaceState.llmConfigs.assessment_hub = null;
+    _cachedAvailableModels = [];   // 换了 API，清除旧模型缓存
+    _setSettingsStatus(`已保存  ·  ${model}`, "ok");
+    showToast("系统配置已保存", `模型：${model}`, "success", 1600);
+    updateCareerInterviewConfigStatus();
+    if (typeof window.assessmentHubUpdateConfigStatus === "function") {
+      window.assessmentHubUpdateConfigStatus();
+    }
+    await fetchSettingsModels();   // 用新凭据重新拉一次，填充缓存
+  } catch (err) {
+    showToast("保存失败", err.message, "error", 2400);
+  }
+}
+
+async function saveSettingsModel() {
+  const model = (document.getElementById("settingsModelSelect")?.value || "").trim();
+  if (!model) {
+    showToast("请选择模型", "请先从列表中选择一个模型", "warning", 2000);
+    return;
+  }
+  try {
+    const res = await fetch("/api/llm-config/model", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "更新失败");
+    if (userWorkspaceState.llmConfigs.career_interview) {
+      userWorkspaceState.llmConfigs.career_interview.model = model;
+    }
+    if (userWorkspaceState.llmConfigs.assessment_hub) {
+      userWorkspaceState.llmConfigs.assessment_hub.model = model;
+    }
+    _setSettingsStatus(`模型已选：${model}`, "ok");
+    showToast("模型已更新", `当前模型：${model}`, "success", 1600);
+    updateCareerInterviewConfigStatus();
+    if (typeof window.assessmentHubUpdateConfigStatus === "function") {
+      window.assessmentHubUpdateConfigStatus();
+    }
+  } catch (err) {
+    showToast("更新模型失败", err.message, "error", 2400);
+  }
+}

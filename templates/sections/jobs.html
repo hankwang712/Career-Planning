@@ -63,9 +63,6 @@
                                 <span class="jobs-geo-stat-label">平均折算月薪</span>
                                 <strong id="jobGeoAvgSalary">--</strong>
                                 <small id="jobGeoSalaryText">--</small>
-                                <div id="jobGeoAnnualTag" class="jobs-geo-annual-tag" style="display:none">
-                                    年薪约&nbsp;<strong id="jobGeoAnnualSalary">--</strong>
-                                </div>
                             </div>
                             <div class="jobs-geo-stat-card">
                                 <span class="jobs-geo-stat-label">实习/应届占比</span>
@@ -126,6 +123,33 @@
                 </div>
             </div>
 
+
+            <!-- 城市招聘全景分析仪表盘 -->
+            <div id="jobsAnalyticsHub" class="glass-surface rounded-2xl p-6 mb-6 hidden">
+                <!-- 标题栏 -->
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">🔬 城市招聘全景分析</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">基于真实岗位样本，多维度解读各城市招聘生态</p>
+                    </div>
+                    <span id="analyticsJobCount" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-medium"></span>
+                </div>
+
+                <!-- 城市选择器 -->
+                <div id="analyticsCityChips" class="flex flex-wrap gap-2 mb-5"></div>
+
+                <!-- Tab 导航：使用 onclick 绑定，避免 addEventListener 在重复渲染时累积 -->
+                <div class="flex flex-wrap gap-1 border-b border-gray-200 mb-5">
+                    <button class="ac-tab active" data-tab="salary"    onclick="analyticsSelectTab('salary')">💰 薪资对比</button>
+                    <button class="ac-tab" data-tab="industry"   onclick="analyticsSelectTab('industry')">🏭 产业生态</button>
+                    <button class="ac-tab" data-tab="skills"     onclick="analyticsSelectTab('skills')">🔧 技能图谱</button>
+                    <button class="ac-tab" data-tab="threshold"  onclick="analyticsSelectTab('threshold')">🎓 人才门槛</button>
+                    <button class="ac-tab" data-tab="welfare"    onclick="analyticsSelectTab('welfare')">🎁 福利竞争力</button>
+                </div>
+
+                <!-- 图表内容区（由 JS 动态渲染） -->
+                <div id="analyticsPanel"></div>
+            </div>
 
             <!-- 搜索与筛选 -->
             <div class="bg-white rounded-xl glass-surface p-6 shadow-sm mb-6">

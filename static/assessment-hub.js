@@ -1,5 +1,5 @@
 (function () {
-  const DATA_URL = "/static/assessment-data.json?v=20260320-assessment-hub-1";
+  const DATA_URL = "/static/assessment-data.json?v=20260321-route-align-v2";
   const MBTI_SCALE = [
     { key: "a_strong", label: "非常偏向 A", a: 2, b: 0 },
     { key: "a_lean", label: "比较偏向 A", a: 1, b: 0 },
@@ -68,16 +68,7 @@
   }
 
   function fillConfigForm() {
-    const config = getConfig();
-    const base = document.getElementById("assessmentApiBaseUrl");
-    const key = document.getElementById("assessmentApiKey");
-    const model = document.getElementById("assessmentModelName");
-    if (base) base.value = config.base_url;
-    if (key) key.value = config.api_key;
-    if (model) model.value = config.model;
-    [base, key, model].forEach((el) => {
-      if (el) el.disabled = !config.editable;
-    });
+    // 配置表单已移至头像设置面板，此函数保留但不再操作已移除的元素
   }
 
   function maskKey(apiKey) {
@@ -99,24 +90,8 @@
   }
 
   async function saveAssessmentConfig() {
-    if (!getConfig().editable) {
-      notify("权限不足", "普通用户只能使用系统管理员预设的 AI 配置。", "warning", 2200);
-      return;
-    }
-    const payload = {
-      base_url: (document.getElementById("assessmentApiBaseUrl")?.value || "").trim(),
-      api_key: (document.getElementById("assessmentApiKey")?.value || "").trim(),
-      model: (document.getElementById("assessmentModelName")?.value || "").trim() || "gpt-4o-mini"
-    };
-    try {
-      state.config = await window.saveManagedLlmConfig("assessment_hub", payload);
-      fillConfigForm();
-      updateConfigStatus();
-      notify("AI 配置已保存", `当前模型：${payload.model}`, "success", 1600);
-      maybeAutoRunMbtiClarifier();
-    } catch (error) {
-      notify("保存 AI 配置失败", error.message, "error", 2400);
-    }
+    // 配置入口已移至头像设置面板，此函数仅作兼容保留
+    notify("提示", "请点击右上角头像图标打开模型设置。", "info", 2000);
   }
 
   function persistState() {
@@ -214,6 +189,16 @@
     return map;
   }
 
+  function getMbtiTypeDetail(type) {
+    const typeCode = String(type || "").trim().toUpperCase();
+    return state.data?.mbti?.type_details?.[typeCode] || null;
+  }
+
+  function getHollandTypeDetail(code) {
+    const typeCode = String(code || "").trim().toUpperCase();
+    return state.data?.holland?.type_details?.[typeCode] || null;
+  }
+
   function getMbtiScale(key) {
     return MBTI_SCALE.find((item) => item.key === key) || MBTI_SCALE[0];
   }
@@ -294,6 +279,7 @@
 
     const rawType = rawPairResults.map((item) => item.selected).join("");
     const finalType = finalPairResults.map((item) => item.finalSelected).join("");
+    const detail = getMbtiTypeDetail(finalType) || getMbtiTypeDetail(rawType);
     return {
       completed: answered >= mbtiQuestions().length,
       answeredCount: answered,
@@ -308,6 +294,7 @@
       resolvedClosePairs: finalPairResults.filter((item) => item.close && item.clarified),
       confidence: Math.round(rawPairResults.reduce((sum, item) => sum + (item.total ? item.diff / item.total : 0), 0) / rawPairResults.length * 100),
       overview: state.data.mbti.type_overviews?.[finalType] || "结果已生成。",
+      detail,
       careers: (state.data.mbti.career_examples?.[finalType] || []).slice(0, 8),
       clarifierApplied: Boolean(state.mbti.clarifier.applied && finalPairResults.some((item) => item.clarified))
     };
@@ -333,6 +320,7 @@
     top3.forEach((item) => (item.meta.careers || []).forEach((career) => {
       if (career && !careers.includes(career) && careers.length < 10) careers.push(career);
     }));
+    const primaryDetail = top3[0] ? getHollandTypeDetail(top3[0].code) : null;
     return {
       completed: answered >= hollandQuestions().length,
       answeredCount: answered,
@@ -342,6 +330,7 @@
       top3,
       code: top3.map((item) => item.code).join(""),
       primary: top3[0],
+      primaryDetail,
       careers,
       summary: top3[0]
         ? `你的兴趣结构当前以${top3[0].meta.name || top3[0].code}为主，其次是${top3.slice(1).map((item) => item.meta.name || item.code).join("、")}。${top3[0].meta.description || ""}`
@@ -425,6 +414,63 @@
     return list.map((item) => `<span class="assessment-tag ${variant}">${esc(item)}</span>`).join("");
   }
 
+  function setHtml(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = value;
+  }
+
+  function buildAssessmentHubSnapshot() {
+    if (!state.data) return null;
+    const mbti = state.mbti.result;
+    const holland = state.holland.result;
+    return {
+      generated_at: new Date().toISOString(),
+      knowledge_version: state.data.knowledge_version || "",
+      mbti: mbti?.completed ? {
+        completed: true,
+        raw_type: mbti.rawType,
+        final_type: mbti.finalType,
+        display_type: getMbtiDisplayType(mbti),
+        summary: getMbtiSummaryText(mbti),
+        confidence: mbti.confidence,
+        scores: { ...mbti.scores },
+        close_pairs: (mbti.closePairs || []).map((item) => ({
+          pair: item.pair,
+          diff: item.diff,
+          left: item.left,
+          right: item.right,
+          clarified: Boolean(item.clarified),
+          selected: item.finalSelected
+        })),
+        detail: mbti.detail || null,
+        careers: (mbti.careers || []).slice(0, 6)
+      } : { completed: false },
+      holland: holland?.completed ? {
+        completed: true,
+        code: holland.code,
+        summary: holland.summary,
+        scores: { ...holland.scores },
+        top_codes: (holland.top3 || []).map((item) => item.code),
+        primary: holland.primary ? {
+          code: holland.primary.code,
+          name: holland.primary.meta?.name || holland.primary.code,
+          score: holland.primary.score
+        } : null,
+        detail: holland.primaryDetail || null,
+        careers: (holland.careers || []).slice(0, 6)
+      } : { completed: false },
+      combined_summary: mbti?.completed && holland?.completed
+        ? `MBTI 倾向 ${getMbtiDisplayType(mbti)}，兴趣代码 ${holland.code}，当前更适合结合人格偏好与职业兴趣做岗位初筛。`
+        : ""
+    };
+  }
+
+  function publishAssessmentSnapshot() {
+    const snapshot = buildAssessmentHubSnapshot();
+    window.getAssessmentHubSnapshot = function () { return snapshot; };
+    window.dispatchEvent(new CustomEvent("assessment-hub:updated", { detail: snapshot }));
+  }
+
   function updateMbtiCard() {
     const empty = document.getElementById("mbtiResultEmpty");
     const content = document.getElementById("mbtiResultContent");
@@ -450,6 +496,11 @@
     document.getElementById("mbtiResultSummary").textContent = getMbtiSummaryText(result);
     document.getElementById("mbtiDimensionList").innerHTML = renderMbtiDims(result);
     document.getElementById("mbtiCareerTags").innerHTML = tags(result.careers.slice(0, 6), "accent");
+    document.getElementById("mbtiResultNickname") && (document.getElementById("mbtiResultNickname").textContent = result.detail?.nickname || "--");
+    setHtml("mbtiStrengthTags", tags(result.detail?.strengths || [], "warm"));
+    setHtml("mbtiRiskTags", tags(result.detail?.risks || [], ""));
+    setHtml("mbtiAdviceTags", tags(result.detail?.career_advice || [], "accent"));
+    setHtml("mbtiWorkStyleTags", tags(result.detail?.work_style || [], ""));
     const decisionBlock = document.getElementById("mbtiDecisionBlock");
     const decisionHint = document.getElementById("mbtiDecisionHint");
     const decisionTags = document.getElementById("mbtiDecisionTags");
@@ -498,6 +549,10 @@
     document.getElementById("hollandResultSummary").textContent = result.summary;
     document.getElementById("hollandTopTags").innerHTML = result.top3.map((item, index) => `<span class="assessment-tag ${index === 0 ? "warm" : index === 1 ? "accent" : ""}">${esc((item.meta.name || item.code) + " " + item.score + "/15")}</span>`).join("");
     document.getElementById("hollandCareerTags").innerHTML = tags(result.careers, "accent");
+    setHtml("hollandTraitTags", tags(result.primaryDetail?.traits || [], "warm"));
+    setHtml("hollandEnvironmentTags", tags(result.primaryDetail?.typical_environment || [], ""));
+    setHtml("hollandRiskTags", tags(result.primaryDetail?.risks || [], ""));
+    setHtml("hollandAdviceTags", tags(result.primaryDetail?.development_advice || [], "accent"));
     updateRadar(result);
   }
 
@@ -512,7 +567,7 @@
       return;
     }
     const mbtiLabel = mbti.unresolvedClosePairs.length ? `${mbti.rawType}（最终待 AI 确认）` : mbti.finalType;
-    text.textContent = `当前综合画像更接近 ${mbtiLabel} 风格，职业兴趣集中在 ${holland.top3.map((item) => item.meta.name || item.code).join("、")}。这意味着你在性格偏好上更适合 ${mbti.overview.replace(/。?$/, "")} 的环境，而在职业方向上更容易被 ${holland.primary?.meta?.description || "当前主导兴趣类型"} 吸引。`;
+    text.textContent = `当前综合画像更接近 ${mbtiLabel} 风格，职业兴趣集中在 ${holland.top3.map((item) => item.meta.name || item.code).join("、")}。这意味着你在性格偏好上更适合 ${(mbti.detail?.summary || mbti.overview).replace(/。?$/, "")} 的环境，而在职业方向上更容易被 ${holland.primaryDetail?.summary || holland.primary?.meta?.description || "当前主导兴趣类型"} 吸引。`;
     card.classList.remove("hidden");
   }
 
@@ -547,6 +602,7 @@
     updateMbtiCard();
     updateHollandCard();
     updateCombinedCard();
+    publishAssessmentSnapshot();
     if (state.modalOpen) renderModal();
   }
 
@@ -885,10 +941,10 @@
   }
 
   function toggleAssessmentConfigPanel(force) {
-    state.configOpen = typeof force === "boolean" ? force : !state.configOpen;
-    fillConfigForm();
-    updateConfigStatus();
-    renderModal();
+    // 配置入口已迁移至头像设置面板
+    if (typeof window.openSettingsPanel === "function") {
+      window.openSettingsPanel();
+    }
   }
 
   function restartAssessmentFlow() {
@@ -1050,6 +1106,7 @@
       answers: {},
       result: null
     };
+    publishAssessmentSnapshot();
   }
 
   async function syncWorkspace(force = false) {
@@ -1095,6 +1152,8 @@
   window.submitClarifierChoice = submitClarifierChoice;
   window.goToPreviousClarifierQuestion = goToPreviousClarifierQuestion;
   window.renderAssessmentModal = renderModal;
+  window.getAssessmentHubSnapshot = function () { return buildAssessmentHubSnapshot(); };
+  window.assessmentHubUpdateConfigStatus = updateConfigStatus;
 
   document.addEventListener("DOMContentLoaded", init);
 })();

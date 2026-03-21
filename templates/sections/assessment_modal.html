@@ -7,7 +7,7 @@
                 <p id="assessmentModalSubtitle" class="assessment-modal-subtitle">任选一个测评开始，系统会自动记录进度并同步结果卡片。</p>
             </div>
             <div class="assessment-modal-toolbar">
-                <button type="button" class="assessment-toolbar-btn" onclick="toggleAssessmentConfigPanel()">系统 AI 配置</button>
+                <button type="button" class="assessment-toolbar-btn" onclick="closeAssessmentModal(); openSettingsPanel()">⚙️ 模型设置</button>
                 <button type="button" class="assessment-toolbar-btn" onclick="restartAssessmentFlow()">重新开始</button>
                 <button type="button" class="assessment-toolbar-btn danger" onclick="closeAssessmentModal()">关闭</button>
             </div>
@@ -29,15 +29,9 @@
                 <div id="assessmentConfigPanel" class="assessment-config-panel hidden">
                     <div class="assessment-side-card">
                         <p class="assessment-mini-label">AI 澄清配置</p>
-                        <p class="assessment-config-copy">仅用于 MBTI 临界维度追加题。普通用户只读，系统管理员可统一维护。</p>
-                        <label class="assessment-config-label" for="assessmentApiBaseUrl">Base URL</label>
-                        <input id="assessmentApiBaseUrl" class="assessment-config-input" type="text" placeholder="https://api.openai.com/v1">
-                        <label class="assessment-config-label" for="assessmentApiKey">API Key</label>
-                        <input id="assessmentApiKey" class="assessment-config-input" type="password" placeholder="sk-...">
-                        <label class="assessment-config-label" for="assessmentModelName">Model</label>
-                        <input id="assessmentModelName" class="assessment-config-input" type="text" placeholder="gpt-4o-mini">
-                        <button type="button" class="assessment-save-btn" onclick="saveAssessmentConfig()">保存配置</button>
+                        <p class="assessment-config-copy">点击右上角头像打开模型设置面板进行配置。</p>
                         <p id="assessmentConfigPanelStatus" class="assessment-config-status">未配置</p>
+                        <button type="button" class="assessment-save-btn" onclick="closeAssessmentModal(); openSettingsPanel()">打开模型设置</button>
                     </div>
                 </div>
             </aside>
