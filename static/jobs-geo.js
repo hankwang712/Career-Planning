@@ -477,7 +477,6 @@
       });
     }
 
-    if (city._rawJobs) renderBenefitTicker(city._rawJobs);
   }
 
   function bindResize() {
@@ -673,13 +672,13 @@
             brushType: "stroke",
             scale: 4.5,
             period: 2.2,
-            color: "rgba(34, 211, 238, 0.6)"
+            color: "rgba(255, 60, 60, 0.65)"
           },
           label: { show: false },
           itemStyle: {
-            color: "#22d3ee",
-            shadowBlur: 12,
-            shadowColor: "rgba(34, 211, 238, 0.8)"
+            color: "#ff3c3c",
+            shadowBlur: 14,
+            shadowColor: "rgba(255, 60, 60, 0.9)"
           }
         }
       ]

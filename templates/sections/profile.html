@@ -1,4 +1,4 @@
-<section id="profile" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden fade-in">
+<section id="profile" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
     <div class="mb-6">
         <h2 class="text-2xl font-bold mb-2">能力画像构建中心</h2>
         <p class="text-gray-500">双测评、基础信息、职业访谈共用一份画像状态，直接联动到匹配与报告。</p>
@@ -205,7 +205,7 @@
                 </p>
                 <div class="mt-5 flex flex-wrap gap-3">
                     <button onclick="openCareerInterviewModal()" class="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-cyan-50 transition-all">开始职业访谈</button>
-                    <button onclick="openCareerInterviewModal('config')" class="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/15 transition-all">查看模型配置</button>
+                    <button onclick="openModelPicker()" class="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/15 transition-all">🤖 选择模型</button>
                 </div>
                 <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">访谈完成后会自动更新下方画像摘要、工作价值观和推荐方向。</p>
             </div>
@@ -239,6 +239,7 @@
                     <p id="careerInterviewResultProgress" class="text-2xl font-bold text-sky-700">0%</p>
                 </div>
                 <button onclick="openCareerInterviewModal()" class="career-inline-btn">继续访谈</button>
+                <button onclick="openModelPicker()" class="career-inline-btn" style="margin-left:6px">🤖 选择模型</button>
             </div>
         </div>
 
@@ -441,10 +442,15 @@
                             </div>
                             <span id="careerInterviewConfigStatus" class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">未配置</span>
                         </div>
-                        <p class="text-sm text-slate-500 mb-4">点击右上角头像图标可打开模型设置，管理员可配置 API Key 和 Base URL，所有用户均可选择使用的模型。</p>
-                        <button onclick="openSettingsPanel()" class="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-all">
-                            ⚙️ 打开模型设置
-                        </button>
+                        <p class="text-sm text-slate-500 mb-4">管理员可点击右上角头像在「API 配置」中添加多个 API；用户可在此选择使用哪个 API 和哪个模型。</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="openModelPicker()" class="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-all">
+                                🤖 选择 API 和模型
+                            </button>
+                            <button onclick="openSettingsPanel()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
+                                ⚙️ API 配置
+                            </button>
+                        </div>
                     </div>
 
                     <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-5">

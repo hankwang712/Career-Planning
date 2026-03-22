@@ -23,7 +23,7 @@ const appState = {
 let allJobsData = [];
 let filteredJobsData = [];
 let jobCurrentPage = 1;
-const JOB_PAGE_SIZE  = 18;
+const JOB_PAGE_SIZE  = 12;
 let fuseIndex = null;
 
 let jobsGeoAssetsPromise = null;
@@ -2587,9 +2587,9 @@ function renderJobCards() {
         <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full whitespace-nowrap">${escHtml(job["经验要求"] || "")}</span>
         <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full whitespace-nowrap">馃帗 ${escHtml(job["学历要求"] || "")}</span>
       </div>
-      <!-- 鎶€鑳芥爣绛?-->
+      <!-- 技能标签 -->
       <div class="flex flex-wrap gap-1 mb-4">${skillTags}</div>
-      <!-- 搴曢儴锛氬叕鍙镐俊鎭?-->
+      <!-- 底部：公司信息 -->
       <div class="flex justify-between items-center pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span class="truncate">${escHtml(job["公司规模"] || "")} 路 ${escHtml(job["公司行业"] || "")}</span>
         <span class="px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${fundingCls}">${escHtml(job["融资阶段"] || "")}</span>
@@ -2626,7 +2626,7 @@ function escHtml(s) {
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 //  寮圭獥锛氭墦寮€ / 鍏抽棴
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 绂忓埄鍏抽敭璇?鈫?emoji 鏄犲皠
+// 福利关键词 → emoji 映射
 const welfareIcons = {
   "年终奖": "★",
   "五险一金": "保",
@@ -2909,13 +2909,13 @@ let _settingsPanelOpen = false;
 let _settingsOutsideListener = null;
 let _cachedAvailableModels = [];   // 全局缓存：拉取到的模型列表，切换板块后不需重新获取
 
+// ══════════════════════════════════════════════════════════════════════════
+//  设置面板 — 多 Provider 管理
+// ══════════════════════════════════════════════════════════════════════════
+
 function toggleSettingsPanel(event) {
   if (event) event.stopPropagation();
-  if (_settingsPanelOpen) {
-    closeSettingsPanel();
-  } else {
-    openSettingsPanel();
-  }
+  if (_settingsPanelOpen) { closeSettingsPanel(); } else { openSettingsPanel(); }
 }
 
 function openSettingsPanel() {
@@ -2925,9 +2925,7 @@ function openSettingsPanel() {
   _settingsPanelOpen = true;
   loadSettingsPanelData();
   setTimeout(() => {
-    _settingsOutsideListener = (e) => {
-      if (!panel.contains(e.target)) closeSettingsPanel();
-    };
+    _settingsOutsideListener = (e) => { if (!panel.contains(e.target)) closeSettingsPanel(); };
     document.addEventListener("click", _settingsOutsideListener);
   }, 30);
 }
@@ -2936,189 +2934,207 @@ function closeSettingsPanel() {
   const panel = document.getElementById("settingsPanel");
   if (panel) panel.classList.add("hidden");
   _settingsPanelOpen = false;
+  closeAddProviderForm();
   if (_settingsOutsideListener) {
     document.removeEventListener("click", _settingsOutsideListener);
     _settingsOutsideListener = null;
   }
 }
 
-function _setSettingsStatus(text, state) {
-  const dot = document.getElementById("settingsStatusDot");
-  const textEl = document.getElementById("settingsStatusText");
-  const colorMap = { ok: "bg-green-400", warn: "bg-amber-400", error: "bg-red-400", loading: "bg-gray-300" };
-  if (dot) dot.className = `w-2 h-2 rounded-full flex-shrink-0 ${colorMap[state] || colorMap.loading}`;
-  if (textEl) textEl.textContent = text;
-}
-
-function _populateModelDropdown(models, currentModel) {
-  const select = document.getElementById("settingsModelSelect");
-  if (!select) return;
-  const prev = currentModel || select.value;
-  select.innerHTML = `<option value="">-- 选择模型 --</option>`;
-  models.forEach((m) => {
-    const opt = document.createElement("option");
-    opt.value = m;
-    opt.textContent = m;
-    if (m === prev) opt.selected = true;
-    select.appendChild(opt);
-  });
-}
-
 async function loadSettingsPanelData() {
-  _setSettingsStatus("正在加载配置…", "loading");
   const user = getCurrentUser();
-  if (!user) {
-    _setSettingsStatus("请先登录", "warn");
-    return;
-  }
   const labelEl = document.getElementById("settingsPanelUserLabel");
-  if (labelEl) {
+  if (labelEl && user) {
     labelEl.textContent = `${user.display_name || user.username}  ·  ${user.role === "super_admin" ? "系统管理员" : "普通用户"}`;
   }
 
   const isAdmin = isSuperAdminUser();
-  const adminSection = document.getElementById("settingsAdminSection");
-  if (adminSection) adminSection.classList.toggle("hidden", !isAdmin);
+  const addBtn = document.getElementById("settingsAdminAddBtn");
+  if (addBtn) addBtn.classList.toggle("hidden", !isAdmin);
+
+  const listEl = document.getElementById("settingsProviderList");
+  if (listEl) listEl.innerHTML = `<p class="text-xs text-gray-400 text-center py-3">正在加载…</p>`;
 
   try {
-    const config = await fetchManagedLlmConfig("career_interview", true);
-    if (isAdmin) {
-      const bu = document.getElementById("settingsBaseUrl");
-      const ak = document.getElementById("settingsApiKey");
-      if (bu) bu.value = config.base_url || "";
-      if (ak) ak.value = config.api_key || "";
-    }
-    if (config.configured) {
-      _setSettingsStatus(`已配置  ·  当前模型：${config.model}`, "ok");
-      if (_cachedAvailableModels.length > 0) {
-        // 已有缓存，直接渲染，不发起网络请求
-        _populateModelDropdown(_cachedAvailableModels, config.model);
-        const btn = document.getElementById("settingsFetchModelsBtn");
-        if (btn) btn.textContent = `✓ ${_cachedAvailableModels.length} 个模型`;
-      } else {
-        await fetchSettingsModels();
-      }
-    } else {
-      _setSettingsStatus(
-        isAdmin ? "尚未配置，请填写 Base URL 和 API Key" : "等待系统管理员配置",
-        "warn"
-      );
-      if (_cachedAvailableModels.length > 0) {
-        _populateModelDropdown(_cachedAvailableModels, config.model);
-        const btn = document.getElementById("settingsFetchModelsBtn");
-        if (btn) btn.textContent = `✓ ${_cachedAvailableModels.length} 个模型`;
-      } else if (config.model) {
-        const select = document.getElementById("settingsModelSelect");
-        if (select) {
-          select.innerHTML = `<option value="${escHtml(config.model)}" selected>${escHtml(config.model)}</option>`;
-        }
-      }
-    }
+    const data = await requestJson("/api/llm-providers");
+    const providers = data.providers || [];
+    const selection = data.selection || {};
+    _renderProviderList(providers, selection, isAdmin);
   } catch (err) {
-    _setSettingsStatus("加载失败：" + err.message, "error");
+    if (listEl) listEl.innerHTML = `<p class="text-xs text-red-400 text-center py-3">加载失败：${escHtml(err.message)}</p>`;
   }
 }
 
-async function fetchSettingsModels() {
-  const btn = document.getElementById("settingsFetchModelsBtn");
-  if (btn) btn.textContent = "⏳ 获取中…";
+function _renderProviderList(providers, selection, isAdmin) {
+  const listEl = document.getElementById("settingsProviderList");
+  if (!listEl) return;
+  if (!providers.length) {
+    listEl.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">${isAdmin ? "尚未添加任何 API，点击右上角＋添加" : "系统管理员尚未配置 API"}</p>`;
+    return;
+  }
+  listEl.innerHTML = providers.map(p => {
+    const isSel = selection.provider_id === p.id;
+    const badgeCls = isSel ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500";
+    const badge = isSel ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full ${badgeCls}">✓ 已选</span>` : "";
+    const deleteBtn = isAdmin ? `<button onclick="deleteProvider('${escHtml(p.id)}')" class="text-[10px] text-red-400 hover:text-red-600 transition-all ml-1" title="删除">✕</button>` : "";
+    return `
+      <div class="flex items-center gap-2 p-2.5 rounded-xl border ${isSel ? "border-green-200 bg-green-50" : "border-gray-100 bg-gray-50"} transition-all">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-xs font-semibold text-gray-800 truncate">${escHtml(p.name)}</span>
+            ${badge}
+          </div>
+          <p class="text-[10px] text-gray-400 truncate mt-0.5">${escHtml(p.base_url)}</p>
+          <p class="text-[10px] text-gray-400">${escHtml(p.api_key_masked || "未配置")}</p>
+        </div>
+        <div class="flex-shrink-0">${deleteBtn}</div>
+      </div>`;
+  }).join("");
+}
+
+function openAddProviderForm() {
+  const form = document.getElementById("settingsAddProviderForm");
+  if (form) { form.classList.remove("hidden"); document.getElementById("spfName")?.focus(); }
+}
+function closeAddProviderForm() {
+  const form = document.getElementById("settingsAddProviderForm");
+  if (form) {
+    form.classList.add("hidden");
+    ["spfName","spfBaseUrl","spfApiKey"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  }
+}
+
+async function submitAddProvider() {
+  const name = (document.getElementById("spfName")?.value || "").trim();
+  const base_url = (document.getElementById("spfBaseUrl")?.value || "").trim();
+  const api_key = (document.getElementById("spfApiKey")?.value || "").trim();
+  if (!base_url || !api_key) { showToast("填写不完整", "请填写 Base URL 和 API Key", "warning", 2000); return; }
+  try {
+    await requestJson("/api/llm-providers", { method: "POST", body: { name: name || "未命名", base_url, api_key } });
+    showToast("API 已添加", name || "未命名", "success", 1600);
+    closeAddProviderForm();
+    await loadSettingsPanelData();
+  } catch (err) { showToast("添加失败", err.message, "error", 2400); }
+}
+
+async function deleteProvider(providerId) {
+  if (!confirm("确认删除此 API 配置？")) return;
+  try {
+    await requestJson(`/api/llm-providers/${providerId}`, { method: "DELETE" });
+    showToast("已删除", "", "success", 1400);
+    await loadSettingsPanelData();
+  } catch (err) { showToast("删除失败", err.message, "error", 2400); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  模型选择器弹窗（使用点触发）
+// ══════════════════════════════════════════════════════════════════════════
+
+let _mpCallback = null;   // 确认后回调
+
+async function openModelPicker(onConfirm) {
+  _mpCallback = onConfirm || null;
+  const overlay = document.getElementById("modelPickerOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("hidden");
+
+  // 初始化 Provider 下拉
+  const provSel = document.getElementById("mpProviderSelect");
+  const modelSel = document.getElementById("mpModelSelect");
+  const hintEl = document.getElementById("mpCurrentHint");
+  if (provSel) provSel.innerHTML = `<option value="">加载中…</option>`;
+  if (modelSel) modelSel.innerHTML = `<option value="">-- 请先选择 API --</option>`;
 
   try {
-    let url = "/api/llm-models";
-    let options = { credentials: "same-origin" };
+    const data = await requestJson("/api/llm-selection");
+    const providers = data.providers || [];
+    const selection = data.selection || {};
 
-    if (isSuperAdminUser()) {
-      const baseUrl = (document.getElementById("settingsBaseUrl")?.value || "").trim();
-      const apiKey = (document.getElementById("settingsApiKey")?.value || "").trim();
-      if (baseUrl && apiKey) {
-        url = "/api/llm-models/preview";
-        options = {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base_url: baseUrl, api_key: apiKey })
-        };
-      }
+    if (!providers.length) {
+      if (provSel) provSel.innerHTML = `<option value="">-- 系统管理员尚未配置 API --</option>`;
+      if (hintEl) hintEl.textContent = "请让系统管理员先在「API 配置」中添加 API";
+      return;
     }
 
-    const res = await fetch(url, options);
-    const data = await res.json();
-    if (data.models && data.models.length > 0) {
-      _cachedAvailableModels = data.models;   // 写入全局缓存
-      const currentModel = getStoredCareerInterviewConfig().model;
-      _populateModelDropdown(data.models, currentModel);
-      if (btn) btn.textContent = `✓ ${data.models.length} 个模型`;
+    if (provSel) {
+      provSel.innerHTML = providers.map(p =>
+        `<option value="${escHtml(p.id)}" ${p.id === selection.provider_id ? "selected" : ""}>${escHtml(p.name)} — ${escHtml(p.base_url)}</option>`
+      ).join("");
+    }
+
+    if (hintEl && selection.provider_id) {
+      const prov = providers.find(p => p.id === selection.provider_id);
+      hintEl.textContent = prov ? `当前：${prov.name} · ${selection.model || "未选模型"}` : "";
+    }
+
+    // 若已有已选 provider，自动加载其模型
+    if (selection.provider_id) {
+      await fetchPickerModels(selection.model);
+    }
+  } catch (err) {
+    if (provSel) provSel.innerHTML = `<option value="">加载失败：${escHtml(err.message)}</option>`;
+  }
+}
+
+function closeModelPicker() {
+  const overlay = document.getElementById("modelPickerOverlay");
+  if (overlay) overlay.classList.add("hidden");
+  _mpCallback = null;
+}
+
+async function onPickerProviderChange() {
+  const modelSel = document.getElementById("mpModelSelect");
+  if (modelSel) modelSel.innerHTML = `<option value="">-- 点击「获取列表」加载模型 --</option>`;
+}
+
+async function fetchPickerModels(preselect) {
+  const provSel = document.getElementById("mpProviderSelect");
+  const modelSel = document.getElementById("mpModelSelect");
+  const btn = document.getElementById("mpFetchBtn");
+  const providerId = provSel?.value;
+  if (!providerId) { showToast("请先选择 API", "", "warning", 1800); return; }
+  if (btn) btn.textContent = "⏳ 获取中…";
+  try {
+    const data = await requestJson(`/api/llm-providers/${providerId}/models`);
+    const models = data.models || [];
+    if (models.length) {
+      if (modelSel) {
+        modelSel.innerHTML = models.map(m =>
+          `<option value="${escHtml(m)}" ${m === preselect ? "selected" : ""}>${escHtml(m)}</option>`
+        ).join("");
+      }
+      if (btn) btn.textContent = `✓ ${models.length} 个`;
     } else {
-      showToast("获取模型", data.message || "未获取到模型列表，请检查配置", "warning", 2400);
+      showToast("获取模型", data.message || "未获取到模型列表", "warning", 2400);
       if (btn) btn.textContent = "🔄 获取列表";
     }
   } catch (err) {
-    showToast("获取模型失败", err.message, "error", 2400);
+    showToast("获取失败", err.message, "error", 2400);
     if (btn) btn.textContent = "🔄 获取列表";
   }
 }
 
-async function saveSettingsAdmin() {
-  if (!isSuperAdminUser()) return;
-  const baseUrl = (document.getElementById("settingsBaseUrl")?.value || "").trim();
-  const apiKey = (document.getElementById("settingsApiKey")?.value || "").trim();
-  const model = (document.getElementById("settingsModelSelect")?.value || "").trim();
-
-  if (!baseUrl || !apiKey) {
-    showToast("配置不完整", "请填写 Base URL 和 API Key", "warning", 2000);
-    return;
-  }
-  if (!model) {
-    showToast("请选择模型", "请先点击「获取列表」，再选择一个模型", "warning", 2000);
-    return;
-  }
-
+async function confirmModelPicker() {
+  const provSel = document.getElementById("mpProviderSelect");
+  const modelSel = document.getElementById("mpModelSelect");
+  const providerId = (provSel?.value || "").trim();
+  const model = (modelSel?.value || "").trim();
+  if (!providerId) { showToast("请选择 API", "", "warning", 1800); return; }
+  if (!model) { showToast("请选择模型", "先点击「获取列表」再选择", "warning", 2000); return; }
   try {
-    await saveManagedLlmConfig("career_interview", { base_url: baseUrl, api_key: apiKey, model });
-    await saveManagedLlmConfig("assessment_hub", { base_url: baseUrl, api_key: apiKey, model });
-    userWorkspaceState.llmConfigs.career_interview = null;
-    userWorkspaceState.llmConfigs.assessment_hub = null;
-    _cachedAvailableModels = [];   // 换了 API，清除旧模型缓存
-    _setSettingsStatus(`已保存  ·  ${model}`, "ok");
-    showToast("系统配置已保存", `模型：${model}`, "success", 1600);
-    updateCareerInterviewConfigStatus();
-    if (typeof window.assessmentHubUpdateConfigStatus === "function") {
-      window.assessmentHubUpdateConfigStatus();
-    }
-    await fetchSettingsModels();   // 用新凭据重新拉一次，填充缓存
-  } catch (err) {
-    showToast("保存失败", err.message, "error", 2400);
-  }
-}
-
-async function saveSettingsModel() {
-  const model = (document.getElementById("settingsModelSelect")?.value || "").trim();
-  if (!model) {
-    showToast("请选择模型", "请先从列表中选择一个模型", "warning", 2000);
-    return;
-  }
-  try {
-    const res = await fetch("/api/llm-config/model", {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model })
+    const data = await requestJson("/api/llm-selection", {
+      method: "PUT", body: { provider_id: providerId, model }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "更新失败");
-    if (userWorkspaceState.llmConfigs.career_interview) {
-      userWorkspaceState.llmConfigs.career_interview.model = model;
-    }
-    if (userWorkspaceState.llmConfigs.assessment_hub) {
-      userWorkspaceState.llmConfigs.assessment_hub.model = model;
-    }
-    _setSettingsStatus(`模型已选：${model}`, "ok");
-    showToast("模型已更新", `当前模型：${model}`, "success", 1600);
+    showToast("已选择", data.message || `${model}`, "success", 1600);
+    closeModelPicker();
+    if (typeof _mpCallback === "function") _mpCallback({ provider_id: providerId, model });
+    _cachedAvailableModels = [];
     updateCareerInterviewConfigStatus();
-    if (typeof window.assessmentHubUpdateConfigStatus === "function") {
-      window.assessmentHubUpdateConfigStatus();
-    }
-  } catch (err) {
-    showToast("更新模型失败", err.message, "error", 2400);
-  }
+    if (typeof window.assessmentHubUpdateConfigStatus === "function") window.assessmentHubUpdateConfigStatus();
+  } catch (err) { showToast("保存失败", err.message, "error", 2400); }
 }
+
+// 兼容旧代码调用
+function saveSettingsAdmin() { openAddProviderForm(); }
+function saveSettingsModel() { openModelPicker(); }
+function fetchSettingsModels() { fetchPickerModels(); }

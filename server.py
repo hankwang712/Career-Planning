@@ -12,6 +12,7 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import webbrowser
 from datetime import timedelta
 from functools import wraps
@@ -152,6 +153,94 @@ def _default_llm_configs():
     }
 
 
+# ── 新的多 Provider 数据层 ────────────────────────────────────────────────────
+
+def _normalized_provider(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    return {
+        "id": str(raw.get("id") or "").strip(),
+        "name": str(raw.get("name") or "未命名").strip() or "未命名",
+        "base_url": str(raw.get("base_url") or raw.get("baseUrl") or "").strip(),
+        "api_key": str(raw.get("api_key") or raw.get("apiKey") or "").strip(),
+    }
+
+
+def _public_provider(provider, is_admin=False):
+    api_key = str(provider.get("api_key") or "")
+    masked = (api_key[:4] + "****" + api_key[-4:]) if len(api_key) > 8 else ("已配置" if api_key else "")
+    result = {
+        "id": provider.get("id"),
+        "name": provider.get("name"),
+        "base_url": provider.get("base_url"),
+        "api_key_masked": masked,
+        "configured": bool(provider.get("base_url") and api_key),
+    }
+    if is_admin:
+        result["api_key"] = api_key
+    return result
+
+
+def _load_providers():
+    """加载 API 提供商列表，自动迁移旧格式。"""
+    _ensure_app_storage()
+    with APP_DATA_LOCK:
+        stored = _read_json_file(LLM_CONFIG_FILE, {})
+
+    if not isinstance(stored, dict):
+        return []
+
+    # 旧格式迁移：有 career_interview 键说明是旧数据
+    if "career_interview" in stored or "assessment_hub" in stored:
+        ref = stored.get("career_interview") or stored.get("assessment_hub") or {}
+        base_url = str(ref.get("base_url") or "").strip()
+        api_key = str(ref.get("api_key") or "").strip()
+        providers = []
+        if base_url and api_key:
+            providers.append({
+                "id": str(uuid.uuid4())[:8],
+                "name": "默认 API",
+                "base_url": base_url,
+                "api_key": api_key,
+            })
+        with APP_DATA_LOCK:
+            _write_json_file(LLM_CONFIG_FILE, {"providers": providers})
+        return providers
+
+    raw_list = stored.get("providers") or []
+    if not isinstance(raw_list, list):
+        return []
+    return [_normalized_provider(p) for p in raw_list if isinstance(p, dict) and p.get("id")]
+
+
+def _save_providers(providers):
+    normalized = [_normalized_provider(p) for p in providers if isinstance(p, dict) and p.get("id")]
+    with APP_DATA_LOCK:
+        _write_json_file(LLM_CONFIG_FILE, {"providers": normalized})
+    return normalized
+
+
+def _get_active_provider_and_model():
+    """从 session 获取用户选择的 provider + model，fallback 到第一个可用 provider。"""
+    selection = session.get("llm_selection") or {}
+    provider_id = str(selection.get("provider_id") or "").strip()
+    model = str(selection.get("model") or "").strip()
+
+    providers = _load_providers()
+    provider = None
+    if provider_id:
+        provider = next((p for p in providers if p.get("id") == provider_id), None)
+    if not provider:
+        provider = next((p for p in providers if p.get("base_url") and p.get("api_key")), None)
+    if not provider:
+        return None, None, None
+
+    base_url = str(provider.get("base_url") or "").strip()
+    api_key = str(provider.get("api_key") or "").strip()
+    if not model:
+        model = "deepseek-chat" if "deepseek" in base_url.lower() else "gpt-4o-mini"
+    return base_url, api_key, model
+
+
 def _ensure_app_storage():
     os.makedirs(APP_DATA_DIR, exist_ok=True)
     os.makedirs(USER_STATE_DIR, exist_ok=True)
@@ -212,6 +301,25 @@ def _load_llm_configs():
         if isinstance(stored, dict):
             for scope in VALID_LLM_CONFIG_SCOPES:
                 configs[scope] = _normalized_llm_config(stored.get(scope))
+
+        # 兼容旧数据：若某个 scope 已配置而另一个为空，自动同步，保持一致
+        reference = next(
+            (c for c in configs.values() if c.get("base_url") and c.get("api_key")),
+            None,
+        )
+        if reference:
+            changed = False
+            for scope in VALID_LLM_CONFIG_SCOPES:
+                c = configs[scope]
+                if not (c.get("base_url") and c.get("api_key")):
+                    c["base_url"] = reference["base_url"]
+                    c["api_key"] = reference["api_key"]
+                    if not c.get("model") or c["model"] in ("gpt-4o-mini",):
+                        c["model"] = reference["model"]
+                    changed = True
+            if changed:
+                _write_json_file(LLM_CONFIG_FILE, configs)
+
         if stored != configs:
             _write_json_file(LLM_CONFIG_FILE, configs)
         return configs
@@ -624,7 +732,7 @@ def _extract_json_object(text):
         raise ValueError("妯″瀷娌℃湁杩斿洖鍐呭")
     match = re.search(r"\{[\s\S]*\}", text)
     if not match:
-        raise ValueError("妯″瀷杩斿洖涓病鏈夊彲瑙ｆ瀽鐨?JSON 瀵硅薄")
+        raise ValueError("模型返回中没有可解析的JSON对象")
     return match.group(0)
 
 
@@ -966,13 +1074,120 @@ def api_llm_models_preview():
     return _do_fetch_models(base_url, api_key)
 
 
-# 鈹€鈹€ API锛氬煄甯傚垪琛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# ── API：多 Provider 管理 ──────────────────────────────────────────────────
+
+@app.route("/api/llm-providers", methods=["GET"])
+@_login_required
+def api_list_providers():
+    providers = _load_providers()
+    is_admin = (_current_user() or {}).get("role") == "super_admin"
+    return jsonify({
+        "providers": [_public_provider(p, is_admin) for p in providers],
+        "selection": session.get("llm_selection") or {}
+    })
+
+
+@app.route("/api/llm-providers", methods=["POST"])
+@_super_admin_required
+def api_add_provider():
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get("name") or "未命名").strip() or "未命名"
+    base_url = str(payload.get("base_url") or "").strip()
+    api_key = str(payload.get("api_key") or "").strip()
+    if not base_url or not api_key:
+        return jsonify({"message": "请填写 Base URL 和 API Key。"}), 400
+    providers = _load_providers()
+    new_p = {"id": str(uuid.uuid4())[:8], "name": name, "base_url": base_url, "api_key": api_key}
+    providers.append(new_p)
+    _save_providers(providers)
+    is_admin = (_current_user() or {}).get("role") == "super_admin"
+    return jsonify({"provider": _public_provider(new_p, is_admin), "message": "API 已添加。"})
+
+
+@app.route("/api/llm-providers/<provider_id>", methods=["PUT"])
+@_super_admin_required
+def api_update_provider(provider_id):
+    payload = request.get_json(silent=True) or {}
+    providers = _load_providers()
+    idx = next((i for i, p in enumerate(providers) if p.get("id") == provider_id), None)
+    if idx is None:
+        return jsonify({"message": "未找到该 API 配置。"}), 404
+    p = dict(providers[idx])
+    for key in ("name", "base_url", "api_key"):
+        if payload.get(key):
+            p[key] = str(payload[key]).strip()
+    providers[idx] = p
+    _save_providers(providers)
+    is_admin = (_current_user() or {}).get("role") == "super_admin"
+    return jsonify({"provider": _public_provider(p, is_admin), "message": "API 已更新。"})
+
+
+@app.route("/api/llm-providers/<provider_id>", methods=["DELETE"])
+@_super_admin_required
+def api_delete_provider(provider_id):
+    providers = _load_providers()
+    providers = [p for p in providers if p.get("id") != provider_id]
+    _save_providers(providers)
+    return jsonify({"message": "API 已删除。"})
+
+
+@app.route("/api/llm-providers/<provider_id>/models", methods=["GET"])
+@_login_required
+def api_provider_models(provider_id):
+    providers = _load_providers()
+    provider = next((p for p in providers if p.get("id") == provider_id), None)
+    if not provider:
+        return jsonify({"models": [], "message": "未找到该 API 配置。"}), 404
+    base_url = str(provider.get("base_url") or "").strip()
+    api_key = str(provider.get("api_key") or "").strip()
+    if not base_url or not api_key:
+        return jsonify({"models": [], "message": "该 API 配置不完整。"}), 200
+    return _do_fetch_models(base_url, api_key)
+
+
+@app.route("/api/llm-selection", methods=["GET"])
+@_login_required
+def api_get_llm_selection():
+    providers = _load_providers()
+    is_admin = (_current_user() or {}).get("role") == "super_admin"
+    selection = session.get("llm_selection") or {}
+    if selection.get("provider_id"):
+        if not any(p.get("id") == selection["provider_id"] for p in providers):
+            selection = {}
+    return jsonify({
+        "selection": selection,
+        "providers": [_public_provider(p, is_admin) for p in providers]
+    })
+
+
+@app.route("/api/llm-selection", methods=["PUT"])
+@_login_required
+def api_set_llm_selection():
+    payload = request.get_json(silent=True) or {}
+    provider_id = str(payload.get("provider_id") or "").strip()
+    model = str(payload.get("model") or "").strip()
+    if not provider_id or not model:
+        return jsonify({"message": "请指定 provider_id 和 model。"}), 400
+    providers = _load_providers()
+    provider = next((p for p in providers if p.get("id") == provider_id), None)
+    if not provider:
+        return jsonify({"message": "未找到该 API 配置。"}), 404
+    session["llm_selection"] = {"provider_id": provider_id, "model": model}
+    session.modified = True
+    return jsonify({
+        "selection": session["llm_selection"],
+        "provider_name": provider.get("name"),
+        "message": f"已选择：{provider.get('name')} · {model}"
+    })
+
+
+# ── API：城市列表鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 @app.route("/api/cities")
 def api_cities():
     cities = [fname[:-5] for fname in _list_city_files()]
     return _cache_json_response(cities, max_age=3600)
 
-# 鈹€鈹€ API锛氬矖浣嶆暟鎹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# ── API：岗位数据 ─────────────────────────────────────────────────────────────────────
 @app.route("/api/jobs")
 def api_jobs():
     city = str(request.args.get("city", "all") or "all").strip() or "all"
@@ -997,7 +1212,7 @@ def api_jobs():
         except FileNotFoundError:
             continue
         except Exception as exc:
-            app.logger.warning("璇诲彇 %s 澶辫触锛?%s", city_name, exc)
+            app.logger.warning("读取 %s 失败：%s", city_name, exc)
 
     return _cache_json_response(jobs)
 
@@ -1006,7 +1221,7 @@ def api_jobs():
 def api_job_detail():
     raw_job_id = str(request.args.get("id", "") or "").strip()
     if ":" not in raw_job_id:
-        return _cache_json_response({"message": "job id 缂哄け鎴栨牸寮忛敊璇?"}, status=400)
+        return _cache_json_response({"message": "job id 缺失或格式错误"}, status=400)
 
     city_name, index_text = raw_job_id.split(":", 1)
     try:
@@ -1026,14 +1241,10 @@ def api_career_interview():
     payload = request.get_json(silent=True) or {}
     messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
     assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
-    config = _load_llm_configs().get("career_interview") or {}
-
-    base_url = str(config.get("base_url") or "").strip()
-    api_key = str(config.get("api_key") or "").strip()
-    model = str(config.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini"
+    base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
-        return jsonify({"message": "职业访谈模型尚未由系统管理员配置。"}), 400
+        return jsonify({"message": "请先点击「选择模型」选择要使用的 API 和模型。"}), 400
 
     normalized_messages = []
     for item in messages[-10:]:
@@ -1065,14 +1276,10 @@ def api_career_interview():
 @_login_required
 def api_mbti_clarifier():
     payload = request.get_json(silent=True) or {}
-    config = _load_llm_configs().get("assessment_hub") or {}
-
-    base_url = str(config.get("base_url") or "").strip()
-    api_key = str(config.get("api_key") or "").strip()
-    model = str(config.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini"
+    base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
-        return jsonify({"message": "MBTI 澄清模型尚未由系统管理员配置。"}), 400
+        return jsonify({"message": "请先点击「选择模型」选择要使用的 API 和模型。"}), 400
 
     close_pairs = payload.get("close_pairs") if isinstance(payload.get("close_pairs"), list) else []
     score_snapshot = payload.get("score_snapshot") if isinstance(payload.get("score_snapshot"), dict) else {}
@@ -1115,7 +1322,7 @@ def open_browser():
 
 _ensure_app_storage()
 _load_users()
-_save_llm_configs(_load_llm_configs())
+_load_providers()   # 触发旧格式迁移
 
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"

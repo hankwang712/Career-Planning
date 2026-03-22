@@ -1,4 +1,4 @@
-        <section id="dashboard" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 fade-in">
+        <section id="dashboard" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 fade-in">
             <!-- 欢迎横幅 -->
             <div class="gradient-bg rounded-2xl p-8 mb-8 text-white shadow-xl">
                 <div class="flex justify-between items-center">
@@ -50,7 +50,7 @@
                 </div>
             </div>
 
-            <!-- 系统架构说明卡 -->
+            <!-- 系统架构说明 -->
             <div class="bg-white rounded-xl glass-surface p-6 shadow-sm mb-8 border border-purple-100">
                 <div class="flex items-center justify-between mb-4">
                     <div>
@@ -75,7 +75,7 @@
                             <span class="text-white text-sm font-bold">2</span>
                         </div>
                         <p class="text-xs font-bold text-indigo-700">知识建模层</p>
-                        <p class="text-xs text-gray-500 mt-1">岗位画像库 · 能力画像库 · 关系图谱</p>
+                        <p class="text-xs text-gray-500 mt-1">岗位画像层 · 能力画像层 · 关系图谱</p>
                     </div>
                     <div class="text-center p-3 bg-gradient-to-b from-purple-50 to-purple-100 rounded-xl border border-purple-200 hover:shadow-md transition-all">
                         <div class="w-9 h-9 bg-purple-500 rounded-lg flex items-center justify-center mx-auto mb-2">
@@ -108,7 +108,7 @@
                 </div>
                 <div class="mt-4 flex items-center justify-center">
                     <div class="flex items-center space-x-2 text-xs text-gray-500">
-                        <span class="w-2 h-2 bg-blue-400 rounded-full"></span><span>数据流</span>
+                        <span class="w-2 h-2 bg-blue-400 rounded-full"></span><span>数据层</span>
                         <span class="mx-2">→</span>
                         <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded font-medium">岗位知识图谱</span>
                         <span class="mx-1">+</span>
@@ -184,7 +184,7 @@
                             <span style="font-size:0.7rem;padding:2px 8px;border-radius:999px;border:1px solid rgba(167,139,250,0.4);color:#c4b5fd;background:rgba(167,139,250,0.12);">差距驱动规划</span>
                         </div>
                         <h3 style="color:white;font-size:1.2rem;font-weight:700;line-height:1.3;">智能人岗双图谱匹配引擎</h3>
-                        <p style="color:#94a3b8;font-size:0.82rem;margin-top:0.5rem;line-height:1.6;">岗位知识图谱 × 学生能力图谱 — 两张图相交的缺口，就是你的成长空间</p>
+                        <p style="color:#94a3b8;font-size:0.82rem;margin-top:0.5rem;line-height:1.6;">岗位知识图谱 × 学生能力图谱 → 两张图相交的缺口，就是你的成长空间</p>
                     </div>
                 </div>
 
@@ -211,7 +211,7 @@
                             <p style="margin-left:auto;font-size:0.65rem;color:#6ee7b7;align-self:center;">AI岗位市场热度 ↑</p>
                         </div>
                     </div>
-                    <!-- 卡片2：架构层数 -->
+                    <!-- 卡片2：架构层次 -->
                     <div class="product-gallery-card" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 80%, #3730a3 100%);">
                         <div style="display:flex;align-items:center;gap:1rem;padding:1.1rem 1.25rem;flex:1;">
                             <div style="width:3rem;height:3rem;background:rgba(255,255,255,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;border:1px solid rgba(255,255,255,0.2);">🧠</div>
@@ -239,7 +239,7 @@
                     <span class="text-2xl">💡</span>
                     <div>
                         <p class="font-semibold text-blue-800">报告生成提示</p>
-                        <p class="text-sm text-blue-600">规划报告需要整合【岗位探索】+【能力画像】+【人岗匹配】三个模块的数据，请确保各模块已完成评估</p>
+                        <p class="text-sm text-blue-600">规划报告需要整合【岗位探索】【能力画像】【人岗匹配】三个模块的数据，请确保各模块已完成评估</p>
                     </div>
                 </div>
                 <button onclick="checkReportReadiness()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm font-medium">
@@ -269,7 +269,7 @@
                             <rect x="28" y="49" width="64" height="5" rx="2.5" fill="#bfdbfe"/>
                             <rect x="28" y="60" width="48" height="5" rx="2.5" fill="#dbeafe"/>
                             <rect x="28" y="77" width="32" height="16" rx="5" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-                            <text x="44" y="89" text-anchor="middle" fill="#2563eb" font-size="7" font-family="sans-serif" font-weight="600">探索→</text>
+                            <text x="44" y="89" text-anchor="middle" fill="#2563eb" font-size="7" font-family="sans-serif" font-weight="600">探索 →</text>
                             <!-- 匹配分数气泡 -->
                             <circle cx="118" cy="24" r="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
                             <text x="118" y="28" text-anchor="middle" fill="#16a34a" font-size="8" font-weight="bold" font-family="sans-serif">94%</text>
@@ -292,7 +292,7 @@
                     <p class="text-gray-500 text-sm mb-4">浏览 100+ 热门岗位，了解行业趋势与技能要求，构建岗位画像</p>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center text-blue-600 text-sm font-medium">
-                            立即探索 <span class="ml-1">→</span>
+                            立即探索 <span class="ml-1">?/span>
                         </div>
                         <span class="text-xs text-gray-400">数据联动：岗位画像</span>
                     </div>
@@ -305,10 +305,10 @@
                         </div>
                         <span class="text-orange-500 text-sm font-medium flex items-center">
                             <span class="w-2 h-2 bg-orange-500 rounded-full mr-1"></span>
-                            待完善
+                            待完成
                         </span>
                     </div>
-                    <!-- 能力画像 SVG 雷达图插画 -->
+                    <!-- 能力画像 SVG 雷达图插图 -->
                     <div class="feature-media" style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);">
                         <svg viewBox="0 0 300 120" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                             <!-- 居中偏左的雷达图 -->
@@ -333,12 +333,12 @@
                                 <!-- 标签 -->
                                 <text x="0" y="-52" text-anchor="middle" fill="#7c3aed" font-size="6.5" font-family="sans-serif">专业技能</text>
                                 <text x="52" y="-18" fill="#7c3aed" font-size="6" font-family="sans-serif">学习力</text>
-                                <text x="46" y="28" fill="#7c3aed" font-size="6" font-family="sans-serif">沟通</text>
+                                <text x="46" y="28" fill="#7c3aed" font-size="6" font-family="sans-serif">沟通力</text>
                                 <text x="-58" y="-18" fill="#7c3aed" font-size="6" font-family="sans-serif">领导力</text>
                                 <text x="-54" y="28" fill="#7c3aed" font-size="6" font-family="sans-serif">执行力</text>
                                 <text x="-8" y="58" fill="#7c3aed" font-size="6.5" font-family="sans-serif">创新</text>
                             </g>
-                            <!-- 右侧能力评分条 -->
+                            <!-- 右侧能力评分列 -->
                             <g transform="translate(210, 18)">
                                 <text x="0" y="0" fill="#6d28d9" font-size="7" font-weight="600" font-family="sans-serif">能力评分</text>
                                 <rect x="0" y="8" width="72" height="6" rx="3" fill="#ede9fe"/>
@@ -353,7 +353,7 @@
                                 <rect x="0" y="44" width="72" height="6" rx="3" fill="#ede9fe"/>
                                 <rect x="0" y="44" width="54" height="6" rx="3" fill="#a78bfa"/>
                                 <text x="74" y="50" fill="#7c3aed" font-size="6" font-family="sans-serif">75%</text>
-                                <!-- 综合分 -->
+                                <!-- 综合评分 -->
                                 <circle cx="36" cy="80" r="22" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1.5"/>
                                 <text x="36" y="76" text-anchor="middle" fill="#6d28d9" font-size="7" font-family="sans-serif">综合</text>
                                 <text x="36" y="88" text-anchor="middle" fill="#7c3aed" font-size="11" font-weight="bold" font-family="sans-serif">87</text>
@@ -422,7 +422,7 @@
                     <p class="text-gray-500 text-sm mb-4">AI 智能分析四维能力，找到最适合您的职业发展方向</p>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center text-green-600 text-sm font-medium">
-                            查看匹配 <span class="ml-1">→</span>
+                            查看匹配 <span class="ml-1">?/span>
                         </div>
                         <span class="text-xs text-gray-400">数据联动：匹配分析</span>
                     </div>
@@ -437,7 +437,7 @@
                         <p class="text-gray-500 text-sm">基于 10000+ 岗位数据分析生成的个性化发展路线</p>
                     </div>
                     <button class="text-blue-600 text-sm font-medium hover:underline flex items-center">
-                        查看完整图谱 <span class="ml-1">→</span>
+                        查看完整图谱 <span class="ml-1">?/span>
                     </button>
                 </div>
                 <div class="relative">
@@ -491,7 +491,7 @@
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p class="font-medium text-gray-700">大模型应用开发</p>
-                        <p class="text-xs text-gray-400 mt-1">待开始</p>
+                        <p class="text-xs text-gray-400 mt-1">待开启</p>
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p class="font-medium text-gray-700">算法工程师</p>
@@ -575,7 +575,7 @@
                                     <div class="mt-2 flex flex-wrap gap-1">
                                         <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded">产品思维</span>
                                         <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded">AI 伦理</span>
-                                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded">跨团队协同</span>
+                                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded">跨团队协作</span>
                                     </div>
                                 </div>
                                 <div class="text-right">
@@ -597,17 +597,17 @@
                 <div class="space-y-4">
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
                             <div>
                                 <p class="font-medium text-gray-800">完成能力画像评估</p>
-                                <p class="text-sm text-gray-500">包含 8 个维度能力评分</p>
+                                <p class="text-sm text-gray-500">包含 8 个维度能力评估</p>
                             </div>
                         </div>
                         <span class="text-green-600 font-medium">已完成</span>
                     </div>
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
                             <div>
                                 <p class="font-medium text-gray-800">浏览不少于 10 个岗位</p>
                                 <p id="taskJobExploreStatus" class="text-sm text-gray-500">已探索 12 个岗位</p>
@@ -617,7 +617,7 @@
                     </div>
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
                             <div>
                                 <p class="font-medium text-gray-800">完成人岗匹配分析</p>
                                 <p id="taskMatchingStatus" class="text-sm text-gray-500">已分析 5 个目标岗位</p>
@@ -642,8 +642,8 @@
 
             <div class="bg-white rounded-xl glass-surface p-6 shadow-sm mt-8">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">⚡ 实时系统动态</h3>
-                    <span id="liveActivityBadge" class="live-badge">实时刷新中</span>
+                    <h3 class="text-xl font-semibold">📡 实时系统动态</h3>
+                    <span id="liveActivityBadge" class="live-badge">实时刷新</span>
                 </div>
                 <ul id="liveActivityFeed" class="space-y-3">
                     <li class="live-feed-item">

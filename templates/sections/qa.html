@@ -1,7 +1,7 @@
-        <section id="qa" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden fade-in">
+        <section id="qa" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
             <div class="mb-6">
                 <h2 class="text-2xl font-bold mb-2">🔍 职业问答知识库</h2>
-                <p class="text-gray-500">不只是"问什么答什么"——职业认知纠偏 · 岗位对比决策 · 换岗路径说明，三类深度问答</p>
+                <p class="text-gray-500">不只是问什么答什么——职业认知纠偏 · 岗位对比决策 · 换岗路径说明，三类深度问答</p>
             </div>
 
             <!-- RAG引擎说明 -->
@@ -23,17 +23,17 @@
                 </div>
                 <div class="mt-4 grid grid-cols-3 gap-3">
                     <div class="bg-white/15 rounded-lg p-3 text-center">
-                        <p class="text-xs text-indigo-200">知识库1</p>
+                        <p class="text-xs text-indigo-200">知识库</p>
                         <p class="text-sm font-medium">岗位知识库</p>
                         <p class="text-xs text-indigo-300 mt-1">10+ 岗位画像 · 职责定义</p>
                     </div>
                     <div class="bg-white/15 rounded-lg p-3 text-center">
-                        <p class="text-xs text-indigo-200">知识库2</p>
+                        <p class="text-xs text-indigo-200">知识库</p>
                         <p class="text-sm font-medium">路径案例库</p>
                         <p class="text-xs text-indigo-300 mt-1">真实换岗案例 · 迁移路径</p>
                     </div>
                     <div class="bg-white/15 rounded-lg p-3 text-center">
-                        <p class="text-xs text-indigo-200">知识库3</p>
+                        <p class="text-xs text-indigo-200">知识库</p>
                         <p class="text-sm font-medium">常见误区库</p>
                         <p class="text-xs text-indigo-300 mt-1">职业认知纠偏 · 误区解析</p>
                     </div>
@@ -47,7 +47,7 @@
                     提出你的职业问题
                 </h3>
                 <div class="flex space-x-3 mb-3">
-                    <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-medium hover:bg-red-200 transition-all" onclick="fillQAQuestion('数据分析师是不是只会SQL就行？')">认知纠偏</button>
+                    <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-medium hover:bg-red-200 transition-all" onclick="fillQAQuestion('数据分析师是不是只会SQL就行？)">认知纠偏</button>
                     <button class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition-all" onclick="fillQAQuestion('算法工程师和AI产品经理的区别是什么？')">比较决策</button>
                     <button class="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-all" onclick="fillQAQuestion('我现在学前端，想转产品经理，现实吗？')">路径说明</button>
                 </div>
@@ -57,17 +57,17 @@
                         提问
                     </button>
                 </div>
-                <p class="text-xs text-gray-400 mt-2">💡 点击上方标签快速填入示例问题 · RAG引擎对接后将返回带证据来源的结构化回答</p>
+                <p class="text-xs text-gray-400 mt-2">💡 点击上方标签快速填入示例问答 · RAG引擎对接后将返回带证据来源的结构化回答</p>
             </div>
 
             <!-- 三类问答示例 -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <!-- 认知纠偏类 -->
+                <!-- 认知纠偏卡 -->
                 <div class="bg-white rounded-xl glass-surface p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800 flex items-center">
                             <span class="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center mr-2 text-red-600 text-sm">🔍</span>
-                            认知纠偏类
+                            认知纠偏卡
                         </h3>
                         <span class="text-xs text-gray-400">纠正常见误区</span>
                     </div>
@@ -77,27 +77,27 @@
                             <div class="space-y-2 text-xs">
                                 <div class="bg-white rounded-lg p-2 border border-red-100">
                                     <p class="text-red-700 font-medium">简要回答</p>
-                                    <p class="text-gray-600 mt-1">不行。SQL 只是入门工具，实际岗位要求远超于此。</p>
+                                    <p class="text-gray-600 mt-1">不行。SQL 只是入门工具，实际岗位要求远超于此</p>
                                 </div>
                                 <div class="bg-white rounded-lg p-2 border border-red-100">
                                     <p class="text-red-700 font-medium">容易忽略的点</p>
-                                    <p class="text-gray-600 mt-1">数据分析师还需要：业务理解、统计建模、可视化表达、向上沟通、方案落地能力。纯 SQL 者往往只能做报表，无法驱动决策。</p>
+                                    <p class="text-gray-600 mt-1">数据分析师还需要：业务理解、统计建模、可视化表达、向上沟通、方案落地能力。纯 SQL 者往往只能做报表，无法驱动决策</p>
                                 </div>
                                 <div class="bg-white rounded-lg p-2 border border-red-100">
                                     <p class="text-red-700 font-medium">证据来源</p>
-                                    <p class="text-gray-600 mt-1">基于岗位画像库 10+ 数据分析师职位描述综合提取</p>
+                                    <p class="text-gray-600 mt-1">基于岗位画像，10+ 数据分析师职位描述综合提炼</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 比较决策类 -->
+                <!-- 比较决策卡 -->
                 <div class="bg-white rounded-xl glass-surface p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800 flex items-center">
                             <span class="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center mr-2 text-blue-600 text-sm">⚖️</span>
-                            比较决策类
+                            比较决策卡
                         </h3>
                         <span class="text-xs text-gray-400">岗位差异对比</span>
                     </div>
@@ -127,7 +127,7 @@
                                         <tr class="border-t border-blue-100">
                                             <td class="p-2 font-medium">发展路径</td>
                                             <td class="p-2">→ 技术专家/研究员</td>
-                                            <td class="p-2">→ 产品总监/创业</td>
+                                            <td class="p-2">?产品总监/创业</td>
                                         </tr>
                                         <tr class="border-t border-blue-100">
                                             <td class="p-2 font-medium">适合人群</td>
@@ -139,18 +139,18 @@
                             </div>
                             <div class="mt-3 bg-white rounded-lg p-2 border border-blue-100">
                                 <p class="text-blue-700 font-medium text-xs">下一步建议</p>
-                                <p class="text-gray-600 text-xs mt-1">如果你更喜欢做决策而非写代码，且有技术背景，AI产品经理可能更适合你。建议先做1-2年算法方向实习再转岗。</p>
+                                <p class="text-gray-600 text-xs mt-1">如果你更喜欢做决策而非写代码，且有技术背景，AI产品经理可能更适合你。建议先做1-2年算法方向实习再转岗</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 路径说明类 -->
+                <!-- 路径说明卡 -->
                 <div class="bg-white rounded-xl glass-surface p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800 flex items-center">
                             <span class="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center mr-2 text-green-600 text-sm">🗺</span>
-                            路径说明类
+                            路径说明卡
                         </h3>
                         <span class="text-xs text-gray-400">换岗可行性分析</span>
                     </div>
@@ -160,19 +160,19 @@
                             <div class="space-y-2 text-xs">
                                 <div class="bg-white rounded-lg p-2 border border-green-100">
                                     <p class="text-green-700 font-medium">迁移路径</p>
-                                    <p class="text-gray-600 mt-1">前端工程师 → （1年实践）→ 前端技术PM → （转岗）→ 产品经理</p>
+                                    <p class="text-gray-600 mt-1">前端工程师（3～5年实践）→ 前端技术PM →（转岗）→ 产品经理</p>
                                 </div>
                                 <div class="bg-white rounded-lg p-2 border border-green-100">
-                                    <p class="text-green-700 font-medium">差距项</p>
+                                    <p class="text-green-700 font-medium">差距分析</p>
                                     <ul class="text-gray-600 mt-1 space-y-0.5">
-                                        <li>• 需补：产品思维、Axure、用户访谈</li>
-                                        <li>• 需补：需求文档撰写、跨团队协调</li>
-                                        <li>• 优势：理解技术实现，沟通开发更顺畅</li>
+                                        <li>✗ 需补：产品思维、Axure、用户访谈</li>
+                                        <li>✗ 需补：需求文档撰写、跨团队协调</li>
+                                        <li>✓ 优势：理解技术实现，沟通开发更顺畅</li>
                                     </ul>
                                 </div>
                                 <div class="bg-white rounded-lg p-2 border border-green-100">
-                                    <p class="text-green-700 font-medium">可行度 & 建议</p>
-                                    <p class="text-gray-600 mt-1">可行度 0.72 · 建议先在现岗位参与产品讨论，积累需求分析经验，再寻找 ToB 初创公司的技术PM岗位作为跳板</p>
+                                    <p class="text-green-700 font-medium">可行性 & 建议</p>
+                                    <p class="text-gray-600 mt-1">可行性 0.72 · 建议先在现岗位参与产品讨论，积累需求分析经验，再寻找 ToB 初创公司的技术PM岗位作为跳板</p>
                                 </div>
                             </div>
                         </div>
@@ -193,9 +193,9 @@
                             <span class="text-gray-400 text-sm">▾</span>
                         </div>
                         <div class="hidden mt-3 text-xs text-gray-600 space-y-2">
-                            <p><strong class="text-blue-700">简要回答：</strong>有难度，但可操作，关键在于项目作品集的质量。</p>
-                            <p><strong class="text-orange-700">容易忽略的点：</strong>应届生缺乏的不是学历，而是可验证的项目经验。推荐先通过 Kaggle 竞赛建立可信度，再投初创公司入门岗。</p>
-                            <p><strong class="text-green-700">下一步建议：</strong>优先准备3个完整ML项目 + GitHub主页 + 吴恩达系列证书，再大规模投递。</p>
+                            <p><strong class="text-blue-700">简要回答：</strong>有难度，但可操作，关键在于项目作品集的质量</p>
+                            <p><strong class="text-orange-700">容易忽略的点：</strong>应届生缺乏的不是学历，而是可验证的项目经验。推荐先通过 Kaggle 竞赛建立可信度，再投初创公司入门岗位</p>
+                            <p><strong class="text-green-700">下一步建议：</strong>优先准备3个完整ML项目 + GitHub主页 + 吴恩达系列证书，再大规模投递</p>
                         </div>
                     </div>
                     <div class="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer" onclick="expandQA(this)">
@@ -204,9 +204,9 @@
                             <span class="text-gray-400 text-sm">▾</span>
                         </div>
                         <div class="hidden mt-3 text-xs text-gray-600 space-y-2">
-                            <p><strong class="text-blue-700">简要回答：</strong>NLP是ML的子领域专精方向，主要聚焦文本/语言理解。</p>
-                            <p><strong class="text-orange-700">容易忽略的点：</strong>ML工程师偏通用建模，NLP工程师需要深入理解语言学 + 大模型架构（BERT/GPT），当前大模型火爆使NLP岗位待遇大幅提升。</p>
-                            <p><strong class="text-green-700">下一步建议：</strong>若对语言感兴趣，优先学习Transformer + HuggingFace，实践大模型微调项目。</p>
+                            <p><strong class="text-blue-700">简要回答：</strong>NLP是ML的子领域专精方向，主要聚焦文本语言理解</p>
+                            <p><strong class="text-orange-700">容易忽略的点：</strong>ML工程师偏通用建模，NLP工程师需要深入理解语言学 + 大模型架构（BERT/GPT），当前大模型火爆使NLP岗位待遇大幅提升</p>
+                            <p><strong class="text-green-700">下一步建议：</strong>若对语言感兴趣，优先学习Transformer + HuggingFace，实践大模型微调项目</p>
                         </div>
                     </div>
                     <div class="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer" onclick="expandQA(this)">
@@ -215,9 +215,9 @@
                             <span class="text-gray-400 text-sm">▾</span>
                         </div>
                         <div class="hidden mt-3 text-xs text-gray-600 space-y-2">
-                            <p><strong class="text-blue-700">简要回答：</strong>数据工程师薪资普遍高于数据分析师，尤其是大厂。</p>
-                            <p><strong class="text-orange-700">容易忽略的点：</strong>数据工程师更偏基础设施和管道搭建，技术门槛更高（Spark/Kafka/数仓）；分析师更贴近业务决策，但天花板相对较低。</p>
-                            <p><strong class="text-green-700">下一步建议：</strong>若编程能力强且喜欢系统层，可考虑数据工程师方向，长期回报更高。</p>
+                            <p><strong class="text-blue-700">简要回答：</strong>数据工程师薪资普遍高于数据分析师，尤其是大厂</p>
+                            <p><strong class="text-orange-700">容易忽略的点：</strong>数据工程师更偏基础设施和管道搭建，技术门槛更高（Spark/Kafka/数仓）；分析师更贴近业务决策，但天花板相对较低</p>
+                            <p><strong class="text-green-700">下一步建议：</strong>若编程能力强且喜欢系统层，可考虑数据工程师方向，长期回报更高</p>
                         </div>
                     </div>
                     <div class="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer" onclick="expandQA(this)">
@@ -226,15 +226,15 @@
                             <span class="text-gray-400 text-sm">▾</span>
                         </div>
                         <div class="hidden mt-3 text-xs text-gray-600 space-y-2">
-                            <p><strong class="text-blue-700">简要回答：</strong>前景乐观，国产云厂商扩张加上AI基础设施需求爆发，云工程师持续紧缺。</p>
-                            <p><strong class="text-orange-700">容易忽略的点：</strong>云原生（K8s/容器/Service Mesh）比传统运维更受欢迎，建议重点学习云原生技术栈而非传统IDC运维。</p>
-                            <p><strong class="text-green-700">下一步建议：</strong>考取华为云/阿里云认证，学习Kubernetes实战，目标成为云原生工程师而非普通云运维。</p>
+                            <p><strong class="text-blue-700">简要回答：</strong>前景乐观，国产云厂商扩张加上AI基础设施需求爆发，云工程师持续紧缺</p>
+                            <p><strong class="text-orange-700">容易忽略的点：</strong>云原生（K8s/容器/Service Mesh）比传统运维更受欢迎，建议重点学习云原生技术栈而非传统IDC运维</p>
+                            <p><strong class="text-green-700">下一步建议：</strong>考取华为云/阿里云认证，学习Kubernetes实战，目标成为云原生工程师而非普通云运维</p>
                         </div>
                     </div>
                 </div>
                 <div class="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-700 flex items-center space-x-2">
                     <span>🔮</span>
-                    <p>RAG 引擎接入后，系统将从岗位知识库、路径案例库、误区库中检索最相关证据，生成带来源标注的结构化回答，比普通搜索更准确、更职业化。</p>
+                    <p>RAG 引擎接入后，系统将从岗位知识库、路径案例库、误区库中检索最相关证据，生成带来源标注的结构化回答，比普通搜索更准确、更职业化</p>
                 </div>
             </div>
         </section>

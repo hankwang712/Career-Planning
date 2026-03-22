@@ -135,7 +135,7 @@
     {% include "sections/assessment_modal.html" %}
 
     <footer class="bg-gray-800 text-white py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div>
                     <div class="flex items-center space-x-3 mb-4">
@@ -296,74 +296,110 @@
 
 
     <!-- 头像设置面板 -->
-    <div id="settingsPanel" class="hidden fixed top-14 right-2 z-[200] w-[22rem] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden" onclick="event.stopPropagation()">
+    <!-- ══ 模型设置面板 ══ -->
+    <div id="settingsPanel" class="hidden fixed top-14 right-2 z-[200] w-[24rem] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden" onclick="event.stopPropagation()">
         <!-- 标题栏 -->
         <div class="gradient-bg px-5 py-4 text-white">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-base">⚙️</span>
-                    <h3 class="font-bold text-sm">模型设置</h3>
+                    <h3 class="font-bold text-sm">API 配置</h3>
                 </div>
                 <button onclick="closeSettingsPanel()" class="text-white/60 hover:text-white text-xl leading-none">&times;</button>
             </div>
             <p id="settingsPanelUserLabel" class="text-xs text-purple-200 mt-1">未登录</p>
         </div>
 
-        <div class="p-4 space-y-4 max-h-[82vh] overflow-y-auto">
-            <!-- 配置状态栏 -->
-            <div id="settingsStatusBar" class="rounded-xl p-3 bg-gray-50 text-xs flex items-center gap-2">
-                <span id="settingsStatusDot" class="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
-                <span id="settingsStatusText" class="text-gray-600">正在加载...</span>
+        <div class="p-4 space-y-3 max-h-[85vh] overflow-y-auto">
+
+            <!-- 已配置的 Provider 列表 -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-widest">已配置的 API</span>
+                    <span id="settingsAdminAddBtn" class="hidden">
+                        <button onclick="openAddProviderForm()"
+                                class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
+                            ＋ 添加
+                        </button>
+                    </span>
+                </div>
+                <div id="settingsProviderList" class="space-y-2">
+                    <p class="text-xs text-gray-400 text-center py-3">正在加载...</p>
+                </div>
             </div>
 
-            <!-- 管理员专属：Base URL + API Key -->
-            <div id="settingsAdminSection" class="hidden space-y-3">
-                <div class="flex items-center gap-2">
-                    <div class="h-px flex-1 bg-gray-100"></div>
-                    <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">系统配置（仅管理员）</span>
-                    <div class="h-px flex-1 bg-gray-100"></div>
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-600 block mb-1">Base URL</label>
-                    <input id="settingsBaseUrl" type="text"
-                           class="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300"
-                           placeholder="https://api.deepseek.com  /  https://openrouter.ai/api">
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-600 block mb-1">API Key</label>
-                    <input id="settingsApiKey" type="password"
-                           class="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300"
-                           placeholder="sk-...">
-                </div>
-                <button onclick="saveSettingsAdmin()"
-                        class="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold py-2 hover:opacity-90 transition-all">
-                    保存系统配置
-                </button>
-            </div>
-
-            <!-- 模型选择（所有用户可见）-->
-            <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                    <div class="h-px flex-1 bg-gray-100"></div>
-                    <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">模型选择</span>
-                    <div class="h-px flex-1 bg-gray-100"></div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-medium text-gray-600">可用模型</label>
-                    <button id="settingsFetchModelsBtn" onclick="fetchSettingsModels()"
-                            class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
-                        🔄 获取列表
+            <!-- 管理员：添加新 Provider 表单（默认隐藏） -->
+            <div id="settingsAddProviderForm" class="hidden space-y-2 border border-purple-100 rounded-xl p-3 bg-purple-50">
+                <p class="text-xs font-semibold text-purple-700">添加新 API</p>
+                <input id="spfName" type="text" placeholder="名称（如：DeepSeek / OpenRouter）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <input id="spfBaseUrl" type="text" placeholder="Base URL（如：https://api.deepseek.com/v1）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <input id="spfApiKey" type="password" placeholder="API Key（sk-...）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <div class="flex gap-2">
+                    <button onclick="submitAddProvider()"
+                            class="flex-1 rounded-lg bg-purple-600 text-white text-xs font-semibold py-1.5 hover:bg-purple-700 transition-all">
+                        确认添加
+                    </button>
+                    <button onclick="closeAddProviderForm()"
+                            class="flex-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold py-1.5 hover:bg-gray-200 transition-all">
+                        取消
                     </button>
                 </div>
-                <select id="settingsModelSelect"
-                        class="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
-                    <option value="">-- 点击「获取列表」加载可用模型 --</option>
-                </select>
-                <p class="text-[10px] text-gray-400">职业访谈和 MBTI 澄清均使用所选模型</p>
-                <button onclick="saveSettingsModel()"
-                        class="w-full rounded-xl bg-gray-900 text-white text-xs font-semibold py-2 hover:bg-gray-800 transition-all">
-                    确认模型选择
-                </button>
+            </div>
+
+            <!-- 提示语 -->
+            <p class="text-[10px] text-gray-400 text-center pt-1">
+                在各功能界面点击「选择模型」按钮选择使用哪个 API 和哪个模型
+            </p>
+        </div>
+    </div>
+
+    <!-- ══ 模型选择器弹窗（使用点触发）══ -->
+    <div id="modelPickerOverlay" class="hidden fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onclick="closeModelPicker()">
+        <div class="bg-white rounded-2xl shadow-2xl w-[26rem] max-w-[95vw] overflow-hidden" onclick="event.stopPropagation()">
+            <div class="gradient-bg px-5 py-4 text-white">
+                <h3 class="font-bold text-sm">选择 API 和模型</h3>
+                <p class="text-xs text-purple-200 mt-0.5">选择后保存在本次会话中，切换页面不丢失</p>
+            </div>
+            <div class="p-4 space-y-3">
+                <!-- Provider 选择 -->
+                <div>
+                    <label class="text-xs font-medium text-gray-600 block mb-1">API 提供商</label>
+                    <select id="mpProviderSelect"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+                            onchange="onPickerProviderChange()">
+                        <option value="">-- 请先配置 API --</option>
+                    </select>
+                </div>
+                <!-- 模型选择 -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs font-medium text-gray-600">模型</label>
+                        <button id="mpFetchBtn" onclick="fetchPickerModels()"
+                                class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
+                            🔄 获取列表
+                        </button>
+                    </div>
+                    <select id="mpModelSelect"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
+                        <option value="">-- 点击「获取列表」--</option>
+                    </select>
+                </div>
+                <!-- 当前选择提示 -->
+                <p id="mpCurrentHint" class="text-[10px] text-gray-400"></p>
+                <!-- 确认按钮 -->
+                <div class="flex gap-2 pt-1">
+                    <button onclick="confirmModelPicker()"
+                            class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold py-2.5 hover:opacity-90 transition-all">
+                        确认使用
+                    </button>
+                    <button onclick="closeModelPicker()"
+                            class="flex-1 rounded-xl bg-gray-100 text-gray-600 text-sm font-semibold py-2.5 hover:bg-gray-200 transition-all">
+                        取消
+                    </button>
+                </div>
             </div>
         </div>
     </div>

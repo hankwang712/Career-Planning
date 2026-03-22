@@ -417,10 +417,11 @@ footer {
 
 .jobs-geo-gradient {
     width: 110px;
-    height: 8px;
+    height: 9px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #0f3a5b, #0ea5e9, #67e8f9);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(90deg, #1e3a5f 0%, #0369a1 30%, #0ea5e9 65%, #38bdf8 85%, #7dd3fc 100%);
+    border: 1px solid rgba(125, 211, 252, 0.35);
+    box-shadow: 0 0 8px rgba(14, 165, 233, 0.55), 0 0 2px rgba(125, 211, 252, 0.4);
 }
 
 .jobs-geo-meta {
@@ -2960,6 +2961,16 @@ body.auth-locked footer {
     padding: 0.5rem;
     line-height: 1.6;
 }
+/* 全宽紧凑词云：高度收缩，词语更密集 */
+.ac-cloud-compact {
+    min-height: 110px;
+    max-height: 160px;
+    overflow: hidden;
+    gap: 0.25rem 0.55rem;
+    padding: 0.5rem 0.75rem;
+    line-height: 1.5;
+    align-content: center;
+}
 .ac-word {
     cursor: default;
     font-weight: 600;
@@ -2970,6 +2981,11 @@ body.auth-locked footer {
 
 /* 福利热图 */
 .ac-heatmap-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+/* 技能热图：绿色系，全宽显示，不限高度 */
+.ac-skill-heatmap-wrap {
     overflow-x: auto;
     overflow-y: visible;
 }

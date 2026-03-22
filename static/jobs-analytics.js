@@ -106,26 +106,42 @@
   // ══════════════════════════════════════════════════════════════════════════
   function renderSalaryTab() {
     destroyAllCharts();   // ① 先销毁
+    const cities = getCities(S.jobs);
+    // 高度按城市数量动态计算，避免 canvas 截断
+    const srH = Math.max(320, cities.length * 36);
+    const sdH = Math.max(280, cities.length * 28);
     setPanel(grid2(      // ② 再替换 HTML
-      cardHead("城市薪资区间对比", "橙线 = 中位月薪，蓝色 = 均值范围") + canvasWrap("acSR"),
-      cardHead("薪资段分布", "各薪资区间岗位占比 %") + canvasWrap("acSD")
+      cardHead("城市薪资区间对比", "橙线 = 中位月薪，蓝色 = P25-P75 区间") + `<div class="ac-canvas-wrap" style="height:${srH}px"><canvas id="acSR"></canvas></div>`,
+      cardHead("薪资段分布", "各薪资区间岗位占比 %") + `<div class="ac-canvas-wrap" style="height:${sdH}px"><canvas id="acSD"></canvas></div>`
     ));
-    _salaryRange();      // ③ 最后创建新图
-    _salaryDist();
+    _salaryRange(cities);      // ③ 最后创建新图
+    _salaryDist(cities);
   }
 
-  function _salaryRange() {
-    const cities = getCities(S.jobs);
+  function _pct(arr, p) {
+    // 返回已排序数组 arr 的第 p 百分位值（0-100）
+    if (!arr.length) return 0;
+    const idx = (p / 100) * (arr.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    return +(arr[lo] + (arr[hi] - arr[lo]) * (idx - lo)).toFixed(1);
+  }
+
+  function _salaryRange(cities) {
     const labels = [], ranges = [], medians = [];
     cities.forEach(city => {
-      const sals = byCity(S.jobs, city).map(j => parseSalary(j["薪资"])).filter(Boolean);
-      if (!sals.length) return;
-      const avgLo = sals.reduce((a, s) => a + s.lo, 0) / sals.length;
-      const avgHi = sals.reduce((a, s) => a + s.hi, 0) / sals.length;
-      const mids = sals.map(s => (s.lo + s.hi) / 2).sort((a, b) => a - b);
+      const mids = byCity(S.jobs, city)
+        .map(j => parseSalary(j["薪资"]))
+        .filter(Boolean)
+        .map(s => (s.lo + s.hi) / 2)
+        .sort((a, b) => a - b);
+      if (!mids.length) return;
+      // P25-P75 区间：中位线必然在柱内
+      const p25 = _pct(mids, 25);
+      const p50 = _pct(mids, 50);
+      const p75 = _pct(mids, 75);
       labels.push(city);
-      ranges.push([+avgLo.toFixed(1), +avgHi.toFixed(1)]);
-      medians.push(+mids[Math.floor(mids.length / 2)].toFixed(1));
+      ranges.push([p25, p75]);
+      medians.push(p50);
     });
     const ctx = document.getElementById("acSR");
     if (!ctx) return;
@@ -134,24 +150,51 @@
       data: {
         labels,
         datasets: [
-          { label: "薪资区间（均值）", data: ranges, backgroundColor: "rgba(99,102,241,0.35)", borderColor: "#6366f1", borderWidth: 1, borderSkipped: false },
-          { type: "line", label: "中位月薪", data: medians, borderColor: "#f97316", backgroundColor: "#f97316", pointRadius: 5, borderWidth: 2, fill: false }
+          {
+            label: "P25-P75 薪资区间",
+            data: ranges,
+            backgroundColor: "rgba(99,102,241,0.30)",
+            borderColor: "#6366f1",
+            borderWidth: 1.5,
+            borderSkipped: false
+          },
+          {
+            type: "line",
+            label: "中位月薪 (P50)",
+            data: medians,
+            borderColor: "#f97316",
+            backgroundColor: "#f97316",
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            borderWidth: 2,
+            fill: false,
+            tension: 0
+          }
         ]
       },
       options: baseOpts({
         indexAxis: "y",
         plugins: {
           legend: LEGEND_OPTS,
-          tooltip: { callbacks: { label: c => c.dataset.label === "中位月薪" ? `中位：${c.parsed.x}K` : `区间：${Array.isArray(c.raw) ? c.raw[0] + "K - " + c.raw[1] + "K" : c.parsed.x + "K"}` } }
+          tooltip: {
+            callbacks: {
+              label: c => c.dataset.label.startsWith("中位")
+                ? `中位薪资：${c.parsed.x}K`
+                : `P25-P75 区间：${Array.isArray(c.raw) ? c.raw[0] + "K ~ " + c.raw[1] + "K" : c.parsed.x + "K"}`
+            }
+          }
         },
-        scales: { x: { title: { display: true, text: "月薪 (K)", font: { size: 10 } }, min: 0 }, y: { ticks: { font: { size: 11 } } } }
+        scales: {
+          x: { title: { display: true, text: "月薪 (K)", font: { size: 10 } }, min: 0 },
+          y: { ticks: { font: { size: 11 } } }
+        }
       })
     });
   }
 
-  function _salaryDist() {
+  function _salaryDist(cities) {
+    cities = cities || getCities(S.jobs);
     const brackets = ["<5K", "5-8K", "8-12K", "12-20K", ">20K"];
-    const cities = getCities(S.jobs);
     const datasets = brackets.map((lb, i) => ({
       label: lb,
       data: cities.map(city => {
@@ -209,12 +252,19 @@
   function renderSkillsTab() {
     destroyAllCharts();
     const cityLabel = S.city === "all" ? "全国" : S.city;
-    setPanel(grid2(
-      cardHead(cityLabel + " 技能词云", "字号 ∝ 出现频次") + `<div id="acCloud" class="ac-cloud"></div>`,
-      cardHead("城市核心技能需求雷达", "Top 6 技能 · 各城市频率对比") + canvasWrap("acRadar")
-    ));
+    // 上下布局：词云全宽置顶（高度紧凑），热图全宽在下（更宽更清晰）
+    setPanel(`
+      <div class="ac-card" style="margin-bottom:12px;">
+        ${cardHead(cityLabel + " 技能词云", "字号 ∝ 出现频次")}
+        <div id="acCloud" class="ac-cloud ac-cloud-compact"></div>
+      </div>
+      <div class="ac-card">
+        ${cardHead("各城市技能需求热图", "Top 15 技能 · 颜色深 = 出现率高")}
+        <div id="acSkillHeatmap" class="ac-skill-heatmap-wrap"></div>
+      </div>
+    `);
     _skillCloud();
-    _skillRadar();
+    _skillHeatmap();
   }
 
   function _skillCloud() {
@@ -232,121 +282,134 @@
     }).join(" ");
   }
 
-  function _skillRadar() {
-    const cities = getCities(S.jobs).slice(0, 9);
-    const topSkills = topN(getSkillMap(S.jobs), 6).map(([k]) => k);
-    const ctx = document.getElementById("acRadar");
-    if (!ctx || !topSkills.length) return;
-    S.charts.radar = new Chart(ctx, {
-      type: "radar",
-      data: {
-        labels: topSkills,
-        datasets: cities.map((city, i) => {
-          const sm = getSkillMap(byCity(S.jobs, city));
-          const total = byCity(S.jobs, city).length || 1;
-          return { label: city, data: topSkills.map(sk => +((sm[sk] || 0) / total * 100).toFixed(1)), backgroundColor: PAL[i % PAL.length] + "22", borderColor: PAL[i % PAL.length], borderWidth: 1.5, pointRadius: 3 };
-        })
-      },
-      options: baseOpts({
-        plugins: { legend: { position: "right", labels: { font: { size: 9 }, boxWidth: 10 } } },
-        scales: { r: { ticks: { font: { size: 9 }, callback: v => v + "%" }, pointLabels: { font: { size: 10 } } } }
-      })
-    });
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Tab 4 — 人才门槛
-  // ══════════════════════════════════════════════════════════════════════════
-  function renderThresholdTab() {
-    destroyAllCharts();
-    setPanel(grid2(
-      cardHead("学历要求分布", "各城市岗位学历门槛占比") + canvasWrap("acEdu"),
-      cardHead("实习期要求分布", "实习周期偏好对比") + canvasWrap("acDur")
-    ));
-    _education();
-    _internDuration();
-  }
-
-  function _education() {
-    const cities = getCities(S.jobs);
-    const levels = ["大专", "本科", "硕士", "博士"];
-    const eduOf = j => { const e = (j["学历要求"] || "").trim(); return levels.includes(e) ? e : "不限"; };
-    const datasets = [...levels, "不限"].map((lv, i) => ({
-      label: lv,
-      data: cities.map(city => { const cj = byCity(S.jobs, city); return cj.length ? +((cj.filter(j => eduOf(j) === lv).length / cj.length * 100).toFixed(1)) : 0; }),
-      backgroundColor: PAL[i * 2 % PAL.length], borderWidth: 0
-    }));
-    const ctx = document.getElementById("acEdu");
-    if (!ctx) return;
-    S.charts.edu = new Chart(ctx, { type: "bar", data: { labels: cities, datasets }, options: stackedOpts() });
-  }
-
-  function _internDuration() {
-    const cities = getCities(S.jobs);
-    const parseDur = exp => {
-      const s = String(exp || "");
-      const m = s.match(/(\d+)个月/);
-      if (m) { const n = +m[1]; return n <= 3 ? "≤3个月" : n <= 6 ? "4-6个月" : ">6个月"; }
-      return (s.includes("应届") || s.includes("在校")) ? "应届生" : "其他";
-    };
-    const durLabels = ["应届生", "≤3个月", "4-6个月", ">6个月", "其他"];
-    const datasets = durLabels.map((lb, i) => ({
-      label: lb,
-      data: cities.map(city => { const cj = byCity(S.jobs, city); return cj.length ? +((cj.filter(j => parseDur(j["经验要求"]) === lb).length / cj.length * 100).toFixed(1)) : 0; }),
-      backgroundColor: PAL[(i * 3) % PAL.length], borderWidth: 0
-    }));
-    const ctx = document.getElementById("acDur");
-    if (!ctx) return;
-    S.charts.dur = new Chart(ctx, { type: "bar", data: { labels: cities, datasets }, options: stackedOpts() });
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Tab 5 — 福利竞争力
-  // ══════════════════════════════════════════════════════════════════════════
-  function renderWelfareTab() {
-    destroyAllCharts();
-    setPanel(`<div class="ac-card ac-card-full">${cardHead("城市福利竞争力热图", "颜色深浅 = 该福利出现率 %，越深越普遍")}<div id="acHeatmap" class="ac-heatmap-wrap"></div></div>`);
-    _welfareHeatmap();
-  }
-
-  function _welfareHeatmap() {
-    const el = document.getElementById("acHeatmap");
+  // 用热图替换雷达图，多城市对比时清晰度远胜雷达
+  function _skillHeatmap() {
+    const el = document.getElementById("acSkillHeatmap");
     if (!el) return;
     const cities = getCities(S.jobs);
-    const wmap = {};
-    S.jobs.forEach(j => {
-      String(j["公司福利"] || "").split(/[,，、]+/).forEach(w => {
-        w = w.trim();
-        if (w && w.length >= 2 && w.length <= 10) wmap[w] = (wmap[w] || 0) + 1;
-      });
-    });
-    const topW = topN(wmap, 15).map(([k]) => k);
-    if (!topW.length) { el.innerHTML = '<p class="ac-empty">暂无福利数据</p>'; return; }
+    const topSkills = topN(getSkillMap(S.jobs), 15).map(([k]) => k);
+    if (!topSkills.length) { el.innerHTML = '<p class="ac-empty">暂无技能数据</p>'; return; }
 
+    // 计算每个城市每个技能的出现率（%）
     const matrix = {};
     cities.forEach(city => {
       const cj = byCity(S.jobs, city);
+      const sm = getSkillMap(cj);
+      const total = cj.length || 1;
       matrix[city] = {};
-      topW.forEach(w => { matrix[city][w] = cj.length ? Math.round(cj.filter(j => String(j["公司福利"] || "").includes(w)).length / cj.length * 100) : 0; });
+      topSkills.forEach(sk => { matrix[city][sk] = +((sm[sk] || 0) / total * 100).toFixed(1); });
     });
-    const maxVal = Math.max(...cities.flatMap(c => topW.map(w => matrix[c][w])), 1);
+    const maxVal = Math.max(...cities.flatMap(c => topSkills.map(sk => matrix[c][sk])), 1);
 
     el.innerHTML = `
       <table class="ac-heatmap">
-        <thead><tr><th class="ac-hm-city">城市</th>${topW.map(w => `<th class="ac-hm-label">${esc(w)}</th>`).join("")}</tr></thead>
-        <tbody>${cities.map(city => `
+        <thead>
           <tr>
-            <td class="ac-hm-city-cell">${esc(city)}</td>
-            ${topW.map(w => {
-              const v = matrix[city][w];
-              const r = v / maxVal;
-              const alpha = (0.08 + r * 0.82).toFixed(2);
-              const fg = r > 0.55 ? "#fff" : "#374151";
-              return `<td class="ac-hm-val" style="background:rgba(99,102,241,${alpha});color:${fg}" title="${esc(city)} · ${esc(w)}: ${v}%">${v}%</td>`;
-            }).join("")}
-          </tr>`).join("")}
+            <th class="ac-hm-city">城市</th>
+            ${topSkills.map(sk => `<th class="ac-hm-label" title="${esc(sk)}">${esc(sk)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${cities.map(city => `
+            <tr>
+              <td class="ac-hm-city-cell">${esc(city)}</td>
+              ${topSkills.map(sk => {
+                const v = matrix[city][sk];
+                const r = v / maxVal;
+                const alpha = r < 0.01 ? 0 : +(0.08 + r * 0.82).toFixed(2);
+                const fg = r > 0.55 ? "#fff" : "#374151";
+                return `<td class="ac-hm-val" style="background:rgba(16,185,129,${alpha});color:${fg}" title="${esc(city)} · ${esc(sk)}: ${v}%">${v > 0 ? v + "%" : ""}</td>`;
+              }).join("")}
+            </tr>`).join("")}
         </tbody>
       </table>`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Tab 4 — 实习画像（数据全部为应届/实习岗，学历分布无意义，改为出勤 & 岗位类型）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // 从"5天/周 3个月"格式提取每周天数标签
+  function _parseDaysPerWeek(exp) {
+    const s = String(exp || "");
+    const m = s.match(/(\d+)天\/周/);
+    if (m) return m[1] + "天/周";
+    return (s.includes("应届") || s.includes("在校")) ? "灵活" : "其他";
+  }
+
+  // 从"5天/周 3个月"格式提取实习时长标签
+  function _parseDuration(exp) {
+    const s = String(exp || "");
+    const m = s.match(/(\d+)个月/);
+    if (!m) return (s.includes("应届") || s.includes("在校")) ? "不限" : "其他";
+    const n = +m[1];
+    return n <= 2 ? "≤2个月" : n === 3 ? "3个月" : n <= 5 ? "4-5个月" : "6个月+";
+  }
+
+  function renderThresholdTab() {
+    destroyAllCharts();
+    const cities = getCities(S.jobs);
+    const h = Math.max(280, cities.length * 26);
+    const cityLabel = S.city === "all" ? "全国" : S.city;
+    setPanel(grid2(
+      cardHead("各城市每周出勤要求", "灵活 = 在校/应届不限时；按城市对比") +
+        `<div class="ac-canvas-wrap" style="height:${h}px"><canvas id="acDays"></canvas></div>`,
+      cardHead(cityLabel + " 热门岗位类型 Top 10", "基于职位类别字段统计") +
+        `<div class="ac-canvas-wrap" style="height:${h}px"><canvas id="acJobType"></canvas></div>`
+    ));
+    _daysPerWeekChart(cities);
+    _jobTypeChart(cityLabel);
+  }
+
+  function _daysPerWeekChart(cities) {
+    const dayLabels = ["灵活", "3天/周", "4天/周", "5天/周", "6天/周", "其他"];
+    const colors = ["#10b981", "#06b6d4", "#6366f1", "#f97316", "#ef4444", "#94a3b8"];
+    const datasets = dayLabels.map((lb, i) => ({
+      label: lb,
+      data: cities.map(city => {
+        const cj = byCity(S.jobs, city);
+        return cj.length ? +((cj.filter(j => _parseDaysPerWeek(j["经验要求"]) === lb).length / cj.length * 100).toFixed(1)) : 0;
+      }),
+      backgroundColor: colors[i],
+      borderWidth: 0
+    }));
+    const ctx = document.getElementById("acDays");
+    if (!ctx) return;
+    S.charts.days = new Chart(ctx, { type: "bar", data: { labels: cities, datasets }, options: stackedOpts() });
+  }
+
+  function _jobTypeChart() {
+    const jobs = byCity(S.jobs, S.city);
+    const typeMap = countBy(jobs, j => (j["职位类别"] || "").trim() || null);
+    const top10 = topN(typeMap, 10);
+    if (!top10.length) return;
+    const labels = top10.map(([k]) => k).reverse();
+    const values = top10.map(([, v]) => v).reverse();
+    const ctx = document.getElementById("acJobType");
+    if (!ctx) return;
+    S.charts.jobType = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label: "岗位数",
+          data: values,
+          backgroundColor: labels.map((_, i) => PAL[i % PAL.length] + "cc"),
+          borderWidth: 0
+        }]
+      },
+      options: baseOpts({
+        indexAxis: "y",
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${c.parsed.x} 个岗位` } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 10 } }, title: { display: true, text: "岗位数量", font: { size: 10 } } },
+          y: { ticks: { font: { size: 11 } } }
+        }
+      })
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -373,7 +436,6 @@
       case "industry":  renderIndustryTab();  break;
       case "skills":    renderSkillsTab();    break;
       case "threshold": renderThresholdTab(); break;
-      case "welfare":   renderWelfareTab();   break;
     }
   }
 
