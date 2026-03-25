@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""
+导出静态站点产物，供 Nginx 直接从磁盘提供 HTML/CSS/JS。
+
+用法：
+  python scripts/export_static_site.py
+  python scripts/export_static_site.py --watch
+
+说明：
+  - 测评进度（MBTI/霍兰德）在浏览器端会写入 localStorage 备份，并在登录时与服务端
+    /api/user-state/assessment_hub 合并，避免切换导航或同步竞态导致「做完又变未做」。
+  - 静态部署仍需可访问同源或配置好的 API（见 FRONTEND_ORIGIN / __API_BASE__），否则服务端备份不可用，
+    但本地备份仍可保留访客进度。
+"""
+
+import argparse
+import hashlib
+import shutil
+import sys
+import time
+from pathlib import Path
+
+from flask import render_template
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+import server  # noqa: E402
+
+
+WATCH_EXTENSIONS = {".html", ".css", ".js", ".json"}
+
+
+def export_once() -> None:
+    base_dir = Path(server.BASE_DIR)
+    out_dir = base_dir / "deploy" / "static-site"
+    static_src = base_dir / "static"
+    main_html_src = base_dir / "main.html"
+
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1) 渲染当前模板为静态 index.html
+    with server.app.app_context():
+        with server.app.test_request_context("/"):
+            html = render_template("base.html")
+    (out_dir / "index.html").write_text(html, encoding="utf-8")
+
+    # 2) 复制 static 目录
+    if static_src.exists():
+        shutil.copytree(static_src, out_dir / "static")
+
+    # 3) 兼容保留 main.html（可选）
+    if main_html_src.exists():
+        shutil.copy2(main_html_src, out_dir / "main.html")
+
+    print(f"[ok] static site exported to: {out_dir}")
+    print("[tip] place this folder behind Nginx root.")
+
+
+def _iter_watch_files(base_dir: Path):
+    roots = [
+        base_dir / "templates",
+        base_dir / "static",
+        base_dir / "main.html",
+        base_dir / "server.py",
+    ]
+    for root in roots:
+        if root.is_file():
+            yield root
+            continue
+        if root.is_dir():
+            for p in root.rglob("*"):
+                if p.is_file() and p.suffix.lower() in WATCH_EXTENSIONS:
+                    yield p
+
+
+def _snapshot(base_dir: Path) -> str:
+    hasher = hashlib.sha256()
+    for p in sorted(_iter_watch_files(base_dir)):
+        try:
+            stat = p.stat()
+        except OSError:
+            continue
+        rel = p.relative_to(base_dir).as_posix()
+        hasher.update(rel.encode("utf-8"))
+        hasher.update(str(stat.st_mtime_ns).encode("utf-8"))
+        hasher.update(str(stat.st_size).encode("utf-8"))
+    return hasher.hexdigest()
+
+
+def watch_mode(interval: float = 1.0) -> None:
+    base_dir = Path(server.BASE_DIR)
+    print("[watch] start watching templates/static/main.html/server.py ...")
+    export_once()
+    last_sig = _snapshot(base_dir)
+    while True:
+        time.sleep(interval)
+        curr_sig = _snapshot(base_dir)
+        if curr_sig != last_sig:
+            print("[watch] change detected, re-exporting ...")
+            export_once()
+            last_sig = curr_sig
+
+
+def main():
+    parser = argparse.ArgumentParser(description="导出静态站点")
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="监听前端文件改动并自动重新导出",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=1.0,
+        help="watch 模式轮询间隔（秒），默认 1.0",
+    )
+    args = parser.parse_args()
+
+    if args.watch:
+        watch_mode(interval=max(0.2, args.interval))
+    else:
+        export_once()
+
+
+if __name__ == "__main__":
+    main()
+

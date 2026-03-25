@@ -43,6 +43,21 @@ const authConfig = {
   }
 };
 
+function getApiBase() {
+  const raw = String(window.__API_BASE__ || "").trim();
+  return raw.replace(/\/+$/, "");
+}
+
+function resolveApiUrl(path) {
+  const target = String(path || "").trim();
+  if (!target) return target;
+  if (/^https?:\/\//i.test(target)) return target;
+  const base = getApiBase();
+  if (!base) return target;
+  if (target.startsWith("/")) return `${base}${target}`;
+  return `${base}/${target}`;
+}
+
 const userWorkspaceState = {
   currentUser: null,
   authReadyPromise: null,
@@ -52,9 +67,16 @@ const userWorkspaceState = {
   },
   scopedData: {
     career_interview: null,
-    assessment_hub: null
+    assessment_hub: null,
+    resume_profile: null
+  },
+  scopedDataLoaded: {
+    career_interview: false,
+    assessment_hub: false,
+    resume_profile: false
   }
 };
+const inFlightGetRequests = new Map();
 
 const jobNameMap = { ml: "Machine Learning Engineer", da: "Data Analyst", pm: "AI Product Manager", fe: "Frontend Engineer" };
 const jobRateMap = { ml: 94, da: 91, pm: 87, fe: 86 };
@@ -130,9 +152,16 @@ const CAREER_INTERVIEW_DIMENSION_PLAN = [
 const PROFILE_BASIC_FIELDS = ["major", "grade", "target_city", "target_direction"];
 const PROFILE_BASIC_LABELS = {
   major: "专业",
-  grade: "年级",
+  grade: "学历",
   target_city: "目标城市",
   target_direction: "目标方向"
+};
+const PROFILE_FLOW_STEPS = [1, 2, 3, 4];
+const profileFlowState = {
+  currentStep: 1,
+  skippedSteps: [],
+  completedSteps: [],
+  touched: false
 };
 const ROLE_LIBRARY = [
   {
@@ -411,34 +440,55 @@ function emitAuthStateChange() {
 }
 
 async function requestJson(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
   const headers = { ...(options.headers || {}) };
   let body = options.body;
   if (body && typeof body !== "string") {
     headers["Content-Type"] = headers["Content-Type"] || "application/json";
     body = JSON.stringify(body);
   }
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    body,
-    credentials: "same-origin"
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 401) {
-      userWorkspaceState.currentUser = null;
-      userWorkspaceState.scopedData.career_interview = null;
-      userWorkspaceState.scopedData.assessment_hub = null;
-      if (typeof lockApp === "function") lockApp();
-      emitAuthStateChange();
-    }
-    const error = new Error(payload.message || `请求失败：${response.status}`);
-    error.status = response.status;
-    throw error;
+  const isGetWithoutBody = method === "GET" && !body;
+  const dedupeKey = isGetWithoutBody ? `${method}::${url}::${JSON.stringify(headers)}` : "";
+  if (isGetWithoutBody && inFlightGetRequests.has(dedupeKey)) {
+    return inFlightGetRequests.get(dedupeKey);
   }
-  return payload;
+
+  const runner = (async () => {
+    const response = await fetch(resolveApiUrl(url), {
+      ...options,
+      method,
+      headers,
+      body,
+      credentials: "same-origin"
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) {
+        userWorkspaceState.currentUser = null;
+        userWorkspaceState.scopedData.career_interview = null;
+        userWorkspaceState.scopedData.assessment_hub = null;
+        userWorkspaceState.scopedData.resume_profile = null;
+        userWorkspaceState.scopedDataLoaded.career_interview = false;
+        userWorkspaceState.scopedDataLoaded.assessment_hub = false;
+        userWorkspaceState.scopedDataLoaded.resume_profile = false;
+        if (typeof lockApp === "function") lockApp();
+        emitAuthStateChange();
+      }
+      const error = new Error(payload.message || `请求失败：${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  })();
+
+  if (isGetWithoutBody) {
+    inFlightGetRequests.set(dedupeKey, runner);
+    runner.finally(() => {
+      inFlightGetRequests.delete(dedupeKey);
+    });
+  }
+  return runner;
 }
 
 function getDefaultScopedData(scope) {
@@ -446,12 +496,15 @@ function getDefaultScopedData(scope) {
 }
 
 async function fetchScopedUserState(scope, force = false) {
-  if (!force && Object.prototype.hasOwnProperty.call(userWorkspaceState.scopedData, scope) && userWorkspaceState.scopedData[scope] !== null) {
+  if (!force && userWorkspaceState.scopedDataLoaded?.[scope]) {
     return userWorkspaceState.scopedData[scope];
   }
   if (!isAuthenticatedUser()) return getDefaultScopedData(scope);
   const payload = await requestJson(`/api/user-state/${scope}`);
   userWorkspaceState.scopedData[scope] = payload.data ?? null;
+  if (userWorkspaceState.scopedDataLoaded && Object.prototype.hasOwnProperty.call(userWorkspaceState.scopedDataLoaded, scope)) {
+    userWorkspaceState.scopedDataLoaded[scope] = true;
+  }
   return userWorkspaceState.scopedData[scope];
 }
 
@@ -462,7 +515,423 @@ async function saveScopedUserState(scope, data) {
     body: { data }
   });
   userWorkspaceState.scopedData[scope] = data ?? null;
+  if (userWorkspaceState.scopedDataLoaded && Object.prototype.hasOwnProperty.call(userWorkspaceState.scopedDataLoaded, scope)) {
+    userWorkspaceState.scopedDataLoaded[scope] = true;
+  }
   return userWorkspaceState.scopedData[scope];
+}
+
+async function requestFormData(url, formData, options = {}) {
+  const response = await fetch(resolveApiUrl(url), {
+    method: options.method || "POST",
+    body: formData,
+    credentials: "same-origin"
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || `请求失败：${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+function formatUnixTime(ts) {
+  if (!ts) return "--";
+  try {
+    return new Date(Number(ts) * 1000).toLocaleString("zh-CN", { hour12: false });
+  } catch (_) {
+    return "--";
+  }
+}
+
+function emptyResumeProfile() {
+  return {
+    status: "empty",
+    profile: null,
+    file_name: "",
+    file_size: 0,
+    uploaded_at: null,
+    analyzed_at: null,
+    analysis_meta: {},
+    error_message: ""
+  };
+}
+
+const resumeTaskState = {
+  uploadInFlight: false,
+  analyzeInFlight: false,
+  analyzeTimer: null,
+  analyzeFrameIndex: 0,
+  analyzeStartedAt: 0
+};
+
+function setResumeProgress(kind, percent, label = "", active = false) {
+  const wrap = document.getElementById(kind === "upload" ? "resumeUploadProgressWrap" : "resumeAnalyzeProgressWrap");
+  const bar = document.getElementById(kind === "upload" ? "resumeUploadProgressBar" : "resumeAnalyzeProgressBar");
+  const text = document.getElementById(kind === "upload" ? "resumeUploadProgressText" : "resumeAnalyzeProgressText");
+  if (!wrap || !bar || !text) return;
+  const safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
+  wrap.classList.remove("hidden");
+  bar.style.width = `${safePercent}%`;
+  text.textContent = label || `${Math.round(safePercent)}%`;
+  if (active) {
+    bar.classList.add("animate-pulse");
+  } else {
+    bar.classList.remove("animate-pulse");
+  }
+}
+
+function updateResumeActionButtons() {
+  const uploadBtn = document.getElementById("resumeUploadBtn");
+  const analyzeBtn = document.getElementById("resumeAnalyzeBtn");
+  const deleteBtn = document.getElementById("resumeDeleteBtn");
+  const busy = resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight;
+  if (uploadBtn) uploadBtn.disabled = busy;
+  if (analyzeBtn) analyzeBtn.disabled = busy;
+  if (deleteBtn) deleteBtn.disabled = busy;
+}
+
+function startAnalyzeProgressTicker() {
+  stopAnalyzeProgressTicker();
+  resumeTaskState.analyzeStartedAt = Date.now();
+  resumeTaskState.analyzeFrameIndex = 0;
+  setResumeProgress("analyze", 100, "🔄 正在启动分析任务 · 0s", true);
+  const stages = [
+    "抽取文本",
+    "OCR 回退检测",
+    "结构化提炼",
+    "证据约束校验",
+    "生成画像结果"
+  ];
+  const icons = ["🔄", "⏳", "⌛", "🔁"];
+  resumeTaskState.analyzeTimer = setInterval(() => {
+    if (!resumeTaskState.analyzeInFlight) return;
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - resumeTaskState.analyzeStartedAt) / 1000));
+    resumeTaskState.analyzeFrameIndex += 1;
+    const stage = stages[resumeTaskState.analyzeFrameIndex % stages.length];
+    const icon = icons[resumeTaskState.analyzeFrameIndex % icons.length];
+    setResumeProgress("analyze", 100, `${icon} ${stage} · 运行 ${elapsedSec}s`, true);
+  }, 900);
+}
+
+function stopAnalyzeProgressTicker() {
+  if (resumeTaskState.analyzeTimer) {
+    clearInterval(resumeTaskState.analyzeTimer);
+    resumeTaskState.analyzeTimer = null;
+  }
+}
+
+function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function applyResumeAnalyzeRuntimeStatus(job, elapsedSec) {
+  const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
+  const analyzeMeta = document.getElementById("resumeAnalyzeMeta");
+  const stage = String(job?.stage || "").trim();
+  const detail = String(job?.stage_detail || "").trim();
+  const stageLabelMap = {
+    queued: "任务排队中",
+    extract_text: "提取 PDF 文本",
+    ocr_fallback: "OCR 回退",
+    llm_call: "调用模型提炼",
+    normalize: "结果校验",
+    done: "分析完成",
+    failed: "分析失败"
+  };
+  const stageLabel = detail || stageLabelMap[stage] || "分析中";
+  if (analyzeStatus) analyzeStatus.textContent = stage === "queued" ? "排队中" : "解析中";
+  if (analyzeMeta) analyzeMeta.textContent = `${stageLabel} · 已运行 ${elapsedSec}s`;
+  setResumeProgress("analyze", 100, `🔄 ${stageLabel} · ${elapsedSec}s`, true);
+}
+
+function getResumeProfileFromCache() {
+  return userWorkspaceState.scopedData.resume_profile || emptyResumeProfile();
+}
+
+async function loadResumeProfile(force = false) {
+  if (!isAuthenticatedUser()) return emptyResumeProfile();
+  if (!force && userWorkspaceState.scopedDataLoaded.resume_profile) {
+    return userWorkspaceState.scopedData.resume_profile || emptyResumeProfile();
+  }
+  const payload = await requestJson("/api/resume/profile");
+  const data = payload.data || emptyResumeProfile();
+  userWorkspaceState.scopedData.resume_profile = data;
+  userWorkspaceState.scopedDataLoaded.resume_profile = true;
+  return data;
+}
+
+function renderResumeProfileSection(data) {
+  const state = data || emptyResumeProfile();
+  const uploadStatus = document.getElementById("resumeUploadStatus");
+  const uploadMeta = document.getElementById("resumeUploadMeta");
+  const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
+  const analyzeMeta = document.getElementById("resumeAnalyzeMeta");
+  const confidence = document.getElementById("resumeConfidence");
+  const modelHint = document.getElementById("resumeModelHint");
+  const summary = document.getElementById("resumeCandidateSummary");
+  const roleTags = document.getElementById("resumeRoleTags");
+  const competitionList = document.getElementById("resumeCompetitionList");
+  const leadershipTags = document.getElementById("resumeLeadershipTags");
+  const projectList = document.getElementById("resumeProjectList");
+  const evidenceList = document.getElementById("resumeEvidenceList");
+  if (uploadStatus) uploadStatus.textContent = state.file_name ? "已上传" : "未上传";
+  if (uploadMeta) {
+    uploadMeta.textContent = state.file_name
+      ? `${state.file_name} · ${(Number(state.file_size || 0) / 1024).toFixed(1)}KB · ${formatUnixTime(state.uploaded_at)}`
+      : "请先上传 PDF 简历";
+  }
+  if (analyzeStatus) {
+    if (state.status === "analyzed") analyzeStatus.textContent = "已完成";
+    else if (state.status === "failed") analyzeStatus.textContent = "失败";
+    else if (state.status === "analyzing") analyzeStatus.textContent = "解析中";
+    else analyzeStatus.textContent = "待解析";
+  }
+  if (analyzeMeta) {
+    const meta = state.analysis_meta || {};
+    const extra = state.status === "analyzed"
+      ? `页数 ${meta.page_count || 0} · 字符 ${meta.char_count || 0}${meta.ocr_used ? " · OCR已启用" : ""}`
+      : (state.status === "analyzing"
+        ? `${meta.stage_detail || "正在分析中..."}`
+        : (state.error_message || "支持扫描件 OCR 回退"));
+    analyzeMeta.textContent = extra;
+  }
+
+  const profile = state.profile || null;
+  if (confidence) confidence.textContent = profile ? `${Math.round(Number(profile.confidence || 0) * 100)}%` : "--";
+  if (summary) summary.textContent = profile?.candidate_summary || "暂无简历解析结果。";
+  if (modelHint) modelHint.textContent = profile ? `最近解析：${formatUnixTime(state.analyzed_at)}` : "简历专用模型";
+
+  // 非执行态下，同步进度条展示，便于用户感知流程状态。
+  if (!resumeTaskState.uploadInFlight) {
+    if (state.file_name) {
+      setResumeProgress("upload", 100, "已上传 100%", false);
+    } else {
+      setResumeProgress("upload", 0, "0%", false);
+    }
+  }
+  if (!resumeTaskState.analyzeInFlight) {
+    if (state.status === "analyzed") {
+      setResumeProgress("analyze", 100, "已完成 100%", false);
+    } else if (state.status === "failed") {
+      setResumeProgress("analyze", 0, "失败", false);
+    } else if (state.status === "analyzing") {
+      const label = (state.analysis_meta && state.analysis_meta.stage_detail) ? String(state.analysis_meta.stage_detail) : "解析中";
+      setResumeProgress("analyze", 100, `🔄 ${label}`, true);
+    } else if (state.status === "uploaded") {
+      setResumeProgress("analyze", 0, "等待开始", false);
+    } else {
+      setResumeProgress("analyze", 0, "0%", false);
+    }
+  }
+
+  if (roleTags) {
+    const roles = uniqueValues([
+      ...(profile?.roles_detected || []).map((item) => item.role),
+      ...(profile?.capability_layer || []).map((item) => item.dimension),
+    ], 8);
+    roleTags.innerHTML = careerTagHtml(roles, "等待识别角色", "accent");
+  }
+  if (competitionList) {
+    const records = (profile?.competition_records || []).slice(0, 3).map((item) => {
+      const title = [item.name, item.level].filter(Boolean).join(" · ") || "未知竞赛";
+      const rank = [item.ranking, item.percentile].filter(Boolean).join(" / ");
+      return `${title}${rank ? `（${rank}）` : ""}`;
+    });
+    const factItems = (profile?.fact_layer || [])
+      .filter((item) => ["award", "certificate", "research", "internship"].includes(String(item.category || "").toLowerCase()))
+      .slice(0, 3)
+      .map((item) => {
+        const fact = String(item.fact || "").trim();
+        const evidence = String(item.evidence || "").trim();
+        return [fact, evidence ? `证据：${evidence}` : ""].filter(Boolean).join("｜");
+      });
+    competitionList.innerHTML = careerListHtml([...records, ...factItems], "暂无竞赛记录");
+  }
+  if (leadershipTags) {
+    const items = uniqueValues([
+      ...(profile?.leadership_signals || []).map((item) => item.signal),
+      ...(profile?.style_layer || []).map((item) => item.style),
+    ], 8);
+    leadershipTags.innerHTML = careerTagHtml(items, "暂无领导力信号", "soft");
+  }
+  if (projectList) {
+    const projects = (profile?.project_highlights || []).slice(0, 4).map((item) => {
+      const p = item.project || "项目";
+      const role = item.role ? `角色：${item.role}` : "";
+      const impact = item.impact ? `结果：${item.impact}` : "";
+      return [p, role, impact].filter(Boolean).join("｜");
+    });
+    const capabilityItems = (profile?.capability_layer || []).slice(0, 3).map((item) => {
+      const dim = String(item.dimension || "").trim();
+      const conclusion = String(item.conclusion || "").trim();
+      const confidence = Number(item.confidence || 0);
+      const confText = confidence > 0 ? `置信度 ${Math.round(confidence * 100)}%` : "";
+      return [dim, conclusion, confText].filter(Boolean).join("｜");
+    });
+    projectList.innerHTML = careerListHtml([...projects, ...capabilityItems], "暂无项目贡献信息");
+  }
+  if (evidenceList) {
+    const evidences = (profile?.evidence_spans || []).slice(0, 6);
+    const uncertainty = (profile?.uncertainty_layer || []).slice(0, 3);
+    const evidenceHtml = evidences.map((item) => `<p>第${Number(item.page_no || 1)}页：${escHtml(item.quote || "")}</p>`).join("");
+    const uncertaintyHtml = uncertainty.map((item) => {
+      const line = [item.item, item.reason, item.needed_evidence ? `需补：${item.needed_evidence}` : ""].filter(Boolean).join("｜");
+      return `<p class="text-amber-700">待确认：${escHtml(line)}</p>`;
+    }).join("");
+    evidenceList.innerHTML = (evidenceHtml + uncertaintyHtml) || `<p>暂无证据片段</p>`;
+  }
+}
+
+async function refreshResumeProfile(force = false) {
+  try {
+    const data = await loadResumeProfile(force);
+    renderResumeProfileSection(data);
+    refreshUnifiedExperience();
+  } catch (error) {
+    showToast("简历状态加载失败", error.message, "error", 2000);
+  }
+}
+
+function pickResumePdf() {
+  const input = document.getElementById("resumePdfInput");
+  if (input) input.click();
+}
+
+async function onResumePdfSelected(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  if (!String(file.name || "").toLowerCase().endsWith(".pdf")) {
+    showToast("仅支持 PDF", "请上传 .pdf 文件", "warning", 2000);
+    return;
+  }
+  if (resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight) {
+    showToast("请稍候", "当前有任务正在执行中。", "warning", 1800);
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  resumeTaskState.uploadInFlight = true;
+  updateResumeActionButtons();
+  const uploadStatus = document.getElementById("resumeUploadStatus");
+  const uploadMeta = document.getElementById("resumeUploadMeta");
+  if (uploadStatus) uploadStatus.textContent = "上传中";
+  if (uploadMeta) uploadMeta.textContent = `正在上传：${file.name}`;
+  setResumeProgress("upload", 0, "上传中 0%", true);
+  try {
+    const payload = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", resolveApiUrl("/api/resume/upload"), true);
+      xhr.withCredentials = true;
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const percent = Math.min(99, (e.loaded / e.total) * 100);
+        setResumeProgress("upload", percent, `上传中 ${Math.round(percent)}%`, true);
+      };
+      xhr.onload = () => {
+        let data = {};
+        try {
+          data = JSON.parse(xhr.responseText || "{}");
+        } catch (_) {
+          data = {};
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data);
+        } else {
+          const error = new Error(data.message || `请求失败：${xhr.status}`);
+          error.status = xhr.status;
+          reject(error);
+        }
+      };
+      xhr.onerror = () => reject(new Error("网络错误，上传失败"));
+      xhr.send(formData);
+    });
+    userWorkspaceState.scopedData.resume_profile = payload.data || emptyResumeProfile();
+    userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
+    setResumeProgress("upload", 100, "已上传 100%", false);
+    showToast("上传成功", "已保存简历文件。", "success", 1600);
+    refreshUnifiedExperience();
+  } catch (error) {
+    setResumeProgress("upload", 0, "上传失败", false);
+    showToast("上传失败", error.message, "error", 2200);
+  } finally {
+    resumeTaskState.uploadInFlight = false;
+    updateResumeActionButtons();
+    if (event?.target) event.target.value = "";
+  }
+}
+
+async function analyzeResumePdf() {
+  if (resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight) {
+    showToast("请稍候", "当前有任务正在执行中。", "warning", 1800);
+    return;
+  }
+  resumeTaskState.analyzeInFlight = true;
+  updateResumeActionButtons();
+  const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
+  const analyzeMeta = document.getElementById("resumeAnalyzeMeta");
+  if (analyzeStatus) analyzeStatus.textContent = "排队中";
+  if (analyzeMeta) analyzeMeta.textContent = "正在创建分析任务...";
+  try {
+    const startPayload = await requestJson("/api/resume/analyze/start", { method: "POST" });
+    const jobId = String(startPayload.job_id || "").trim();
+    if (!jobId) {
+      throw new Error("分析任务创建失败：缺少任务 ID");
+    }
+
+    const startedAt = Date.now();
+    let statusPayload = null;
+    for (let round = 0; round < 240; round += 1) {
+      statusPayload = await requestJson(`/api/resume/analyze/status?job_id=${encodeURIComponent(jobId)}`);
+      const job = statusPayload?.job || {};
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const status = String(job.status || "").trim();
+      if (status === "success") {
+        break;
+      }
+      if (status === "failed") {
+        const resumeError = String(statusPayload?.resume?.error_message || "").trim();
+        throw new Error(String(job.message || resumeError || "简历分析失败"));
+      }
+      applyResumeAnalyzeRuntimeStatus(job, elapsedSec);
+      await sleepMs(900);
+    }
+
+    const resumeData = statusPayload?.resume || null;
+    if (!resumeData || String(statusPayload?.job?.status || "").trim() !== "success") {
+      throw new Error("分析超时，请稍后在简历状态中查看结果。");
+    }
+
+    userWorkspaceState.scopedData.resume_profile = resumeData;
+    userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
+    setResumeProgress("analyze", 100, "✅ 分析完成", false);
+    showToast("解析完成", "简历画像已更新。", "success", 1800);
+    refreshUnifiedExperience();
+  } catch (error) {
+    setResumeProgress("analyze", 0, "❌ 解析失败", false);
+    showToast("解析失败", error.message, "error", 2600);
+  } finally {
+    resumeTaskState.analyzeInFlight = false;
+    stopAnalyzeProgressTicker();
+    updateResumeActionButtons();
+  }
+}
+
+async function deleteResumeProfile() {
+  if (!confirm("确认删除当前简历与解析结果？")) return;
+  try {
+    await requestJson("/api/resume/profile", { method: "DELETE" });
+    userWorkspaceState.scopedData.resume_profile = null;
+    userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    renderResumeProfileSection(emptyResumeProfile());
+    showToast("已删除", "简历与解析结果已清空。", "success", 1600);
+    refreshUnifiedExperience();
+  } catch (error) {
+    showToast("删除失败", error.message, "error", 2200);
+  }
 }
 
 async function fetchManagedLlmConfig(scope, force = false) {
@@ -480,6 +949,35 @@ async function fetchManagedLlmConfig(scope, force = false) {
     api_key_masked: String(payload.api_key_masked || "")
   };
   userWorkspaceState.llmConfigs[scope] = config;
+  return config;
+}
+
+async function fetchActiveLlmRuntimeConfig(force = false) {
+  if (!isAuthenticatedUser()) return getDefaultCareerInterviewConfig();
+  if (!force && userWorkspaceState.llmConfigs.career_interview) {
+    const cached = userWorkspaceState.llmConfigs.career_interview;
+    if (cached && (cached.configured || cached.base_url || cached.api_key)) return cached;
+  }
+  const data = await requestJson("/api/llm-selection");
+  const providers = Array.isArray(data.providers) ? data.providers : [];
+  const selection = (data && typeof data.selection === "object" && data.selection) ? data.selection : {};
+  const selectedProvider = providers.find((p) => p.id === selection.provider_id && p.configured);
+  const fallbackProvider = providers.find((p) => p.configured);
+  const active = selectedProvider || fallbackProvider || null;
+  let model = String(selection.model || "").trim();
+  if (!model && active?.base_url) {
+    model = String(active.base_url).toLowerCase().includes("deepseek") ? "deepseek-chat" : "gpt-4o-mini";
+  }
+  const config = {
+    base_url: String(active?.base_url || "").trim(),
+    api_key: "",
+    model: model || "gpt-4o-mini",
+    configured: Boolean(active && model),
+    editable: isSuperAdminUser(),
+    api_key_masked: String(active?.api_key_masked || "")
+  };
+  userWorkspaceState.llmConfigs.career_interview = config;
+  userWorkspaceState.llmConfigs.assessment_hub = config;
   return config;
 }
 
@@ -505,30 +1003,89 @@ window.isSuperAdminUser = isSuperAdminUser;
 window.fetchScopedUserState = fetchScopedUserState;
 window.saveScopedUserState = saveScopedUserState;
 window.fetchManagedLlmConfig = fetchManagedLlmConfig;
+window.fetchActiveLlmRuntimeConfig = fetchActiveLlmRuntimeConfig;
 window.saveManagedLlmConfig = saveManagedLlmConfig;
 window.userWorkspaceState = userWorkspaceState;
+window.resolveApiUrl = resolveApiUrl;
 
 function readSessionCache(key) {
-  const payload = safeJsonParse(sessionStorage.getItem(key), null);
+  let raw = null;
+  try {
+    raw = sessionStorage.getItem(key);
+  } catch (error) {
+    console.warn("sessionStorage read failed", error);
+    return null;
+  }
+  const payload = safeJsonParse(raw, null);
   if (!payload || typeof payload !== "object") return null;
   if (Number(payload.expiresAt || 0) < Date.now()) {
-    sessionStorage.removeItem(key);
+    try {
+      sessionStorage.removeItem(key);
+    } catch (error) {
+      console.warn("sessionStorage remove failed", error);
+    }
     return null;
   }
   return payload.data ?? null;
 }
 
+function isStorageQuotaExceeded(error) {
+  if (!error) return false;
+  const name = String(error.name || "");
+  const code = Number(error.code || 0);
+  if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED") return true;
+  if (code === 22 || code === 1014) return true;
+  return /quota/i.test(String(error.message || ""));
+}
+
+function clearSessionCacheEntries(keysOrPrefixes = []) {
+  if (!Array.isArray(keysOrPrefixes) || keysOrPrefixes.length === 0) return;
+  const markers = keysOrPrefixes.map((item) => String(item || "")).filter(Boolean);
+  if (markers.length === 0) return;
+  const targets = [];
+  for (let i = 0; i < sessionStorage.length; i += 1) {
+    const key = sessionStorage.key(i);
+    if (!key) continue;
+    if (markers.some((marker) => key === marker || key.startsWith(marker))) {
+      targets.push(key);
+    }
+  }
+  targets.forEach((key) => {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (error) {
+      console.warn("sessionStorage cleanup failed", error);
+    }
+  });
+}
+
 function writeSessionCache(key, data, ttlMs = JOBS_CACHE_TTL_MS) {
-  sessionStorage.setItem(key, JSON.stringify({
+  const payload = JSON.stringify({
     expiresAt: Date.now() + ttlMs,
     data
-  }));
+  });
+  try {
+    sessionStorage.setItem(key, payload);
+    return;
+  } catch (error) {
+    if (!isStorageQuotaExceeded(error)) {
+      console.warn("sessionStorage write failed", error);
+      return;
+    }
+  }
+
+  clearSessionCacheEntries([JOBS_LIST_CACHE_PREFIX, JOBS_DETAIL_CACHE_PREFIX, JOBS_CITIES_CACHE_KEY]);
+  try {
+    sessionStorage.setItem(key, payload);
+  } catch (error) {
+    console.warn("sessionStorage quota exceeded, skip cache", error);
+  }
 }
 
 async function fetchJsonWithSessionCache(url, cacheKey, ttlMs = JOBS_CACHE_TTL_MS) {
   const cached = readSessionCache(cacheKey);
   if (cached) return cached;
-  const response = await fetch(url);
+  const response = await fetch(resolveApiUrl(url));
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.message || `Request failed: ${response.status}`);
@@ -716,12 +1273,54 @@ function maskApiKey(apiKey) {
 function updateCareerInterviewConfigStatus() {
   const config = getStoredCareerInterviewConfig();
   const statusEl = document.getElementById("careerInterviewConfigStatus");
+  const notConfiguredText = isSuperAdminUser() ? "未配置" : "等待系统管理员配置";
+
   if (!statusEl) return;
   if (!config.configured) {
-    statusEl.textContent = isSuperAdminUser() ? "未配置" : "等待系统管理员配置";
+    statusEl.textContent = notConfiguredText;
     return;
   }
   statusEl.textContent = `${config.model} / ${config.api_key_masked || maskApiKey(config.api_key)}`;
+}
+
+async function updateProfileFlowModelStatus(force = false) {
+  const statusEl = document.getElementById("profileFlowModelStatus");
+  if (!statusEl) return;
+
+  if (!isAuthenticatedUser()) {
+    statusEl.textContent = "模型：未登录";
+    statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
+    statusEl.classList.add("bg-slate-100", "text-slate-600");
+    return;
+  }
+
+  try {
+    const data = await requestJson("/api/llm-selection");
+    const providers = Array.isArray(data.providers) ? data.providers : [];
+    const selection = (data && typeof data.selection === "object" && data.selection) ? data.selection : {};
+    const selectedProvider = providers.find((p) => p.id === selection.provider_id && p.configured);
+    const fallbackProvider = providers.find((p) => p.configured);
+    const activeProvider = selectedProvider || fallbackProvider || null;
+    const model = String(selection.model || "").trim();
+
+    if (!activeProvider || !model) {
+      statusEl.textContent = "模型：未选择";
+      statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
+      statusEl.classList.add("bg-slate-100", "text-slate-600");
+      return;
+    }
+
+    const brand = getProviderBrandMeta(activeProvider);
+    statusEl.textContent = `模型：${brand.icon} ${activeProvider.name} · ${model}`;
+    statusEl.classList.remove("bg-slate-100", "text-slate-600");
+    statusEl.classList.add("bg-emerald-100", "text-emerald-700");
+  } catch (error) {
+    if (!force) {
+      statusEl.textContent = "模型：读取失败";
+      statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
+      statusEl.classList.add("bg-slate-100", "text-slate-600");
+    }
+  }
 }
 
 function persistCareerInterviewSnapshot() {
@@ -766,7 +1365,8 @@ async function loadCareerInterviewConfig(force = false) {
     return userWorkspaceState.llmConfigs.career_interview;
   }
   try {
-    await fetchManagedLlmConfig("career_interview", force);
+    // 访谈实际走“当前选择的 API+模型”，优先读取运行时选择而非管理员静态配置。
+    await fetchActiveLlmRuntimeConfig(force);
   } catch (error) {
     console.error("load career interview config failed", error);
   }
@@ -1083,34 +1683,47 @@ async function requestCareerInterview(messages) {
   });
 }
 async function startCareerInterview() {
-  if (careerInterviewState.loading) return;
-
-  const config = getStoredCareerInterviewConfig();
-  if (!config.configured) {
-    showToast("缺少模型配置", isSuperAdminUser() ? "请先保存系统模型配置。" : "当前模型由系统管理员统一配置，请联系管理员。", "warning", 2200);
-    openCareerInterviewModal("config");
+  if (careerInterviewState.loading) {
+    showToast("访谈正在处理中", "请稍候，当前请求尚未完成。", "info", 1600);
     return;
   }
 
-  resetCareerInterviewState({ preserveBasics: true });
-  careerInterviewState.started = true;
-  careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
-  careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
-  careerInterviewState.result = {
-    is_complete: false,
-    completion_score: 0,
-    focus_dimension: careerInterviewState.focusDimension,
-    profile: null
-  };
-  careerInterviewState.messages.push({
-    role: "assistant",
-    content: getCareerDimensionPrompt(careerInterviewState.focusDimension)
-  });
-  syncCareerInterviewProgress(careerInterviewState.result);
-  persistCareerInterviewSnapshot();
-  renderCareerInterviewMessages();
-  renderCareerInterviewResult(careerInterviewState.result);
-  document.getElementById("careerInterviewInput")?.focus();
+  try {
+    await loadCareerInterviewConfig(true);
+    const config = getStoredCareerInterviewConfig();
+    if (!config.configured) {
+      showToast("缺少模型配置", isSuperAdminUser() ? "请先保存系统模型配置。" : "当前模型由系统管理员统一配置，请联系管理员。", "warning", 2200);
+      if (typeof openModelPicker === "function") {
+        openModelPicker();
+      } else {
+        openCareerInterviewModal("config");
+      }
+      return;
+    }
+
+    resetCareerInterviewState({ preserveBasics: true });
+    careerInterviewState.started = true;
+    careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
+    careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
+    careerInterviewState.result = {
+      is_complete: false,
+      completion_score: 0,
+      focus_dimension: careerInterviewState.focusDimension,
+      profile: null
+    };
+    careerInterviewState.messages.push({
+      role: "assistant",
+      content: getCareerDimensionPrompt(careerInterviewState.focusDimension)
+    });
+    syncCareerInterviewProgress(careerInterviewState.result);
+    persistCareerInterviewSnapshot();
+    renderCareerInterviewMessages();
+    renderCareerInterviewResult(careerInterviewState.result);
+    showToast("访谈已启动", "请先回答第一轮问题。", "success", 1200);
+    document.getElementById("careerInterviewInput")?.focus();
+  } catch (error) {
+    showToast("启动访谈失败", error?.message || "请稍后重试。", "error", 2200);
+  }
 }
 async function submitCareerInterviewAnswer() {
   if (careerInterviewState.loading || !careerInterviewState.started || careerInterviewState.isComplete) return;
@@ -1195,6 +1808,132 @@ function addLiveActivity(message) {
   while (feed.children.length > 6) feed.removeChild(feed.lastElementChild);
 }
 
+const careerNewsState = {
+  initialized: false,
+  expanded: false,
+  filter: "all",
+  sort: "newest",
+  displayLimit: 10,
+  items: []
+};
+
+function _careerNewsPublishedTs(el) {
+  if (!el) return 0;
+  const raw = String(el.dataset.published || "").trim();
+  const ts = raw ? Date.parse(raw) : NaN;
+  if (Number.isFinite(ts)) return ts;
+  const label = String(el.querySelector(".career-news-time")?.textContent || "").trim();
+  const guess = Date.parse(label);
+  return Number.isFinite(guess) ? guess : 0;
+}
+
+function _careerNewsScore(el) {
+  const num = Number(el?.dataset?.score || 0);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function _updateCareerNewsFilterBtnState() {
+  const bar = document.getElementById("careerNewsFilterBar");
+  if (!bar) return;
+  bar.querySelectorAll(".career-news-filter-btn").forEach((btn) => {
+    const on = String(btn.dataset.filter || "") === careerNewsState.filter;
+    btn.classList.toggle("bg-sky-50", on);
+    btn.classList.toggle("border-sky-200", on);
+    btn.classList.toggle("text-sky-700", on);
+    btn.classList.toggle("bg-white", !on);
+    btn.classList.toggle("border-slate-200", !on);
+    btn.classList.toggle("text-slate-600", !on);
+    btn.classList.toggle("font-semibold", on);
+    btn.classList.toggle("font-medium", !on);
+  });
+}
+
+function _applyCareerNewsBoard() {
+  const board = document.getElementById("careerNewsBoard");
+  const grid = document.getElementById("careerNewsGrid");
+  const more = document.getElementById("careerNewsMore");
+  const btn = document.getElementById("careerNewsMoreBtn");
+  if (!board || !grid || !more) return;
+
+  let working = [...careerNewsState.items];
+  if (careerNewsState.filter !== "all") {
+    working = working.filter((el) => String(el.dataset.group || "all") === careerNewsState.filter);
+  }
+
+  working.sort((a, b) => {
+    if (careerNewsState.sort === "relevance") {
+      const scoreDiff = _careerNewsScore(b) - _careerNewsScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      return _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a);
+    }
+    return _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a);
+  });
+
+  grid.innerHTML = "";
+  more.innerHTML = "";
+  working.forEach((el, idx) => {
+    const rank = el.querySelector(".career-news-rank");
+    if (rank) rank.textContent = String(idx + 1);
+    if (idx < careerNewsState.displayLimit) {
+      grid.appendChild(el);
+    } else {
+      more.appendChild(el);
+    }
+  });
+
+  const hiddenCount = Math.max(0, working.length - careerNewsState.displayLimit);
+  const showingCount = Math.min(careerNewsState.displayLimit + (careerNewsState.expanded ? hiddenCount : 0), working.length);
+  const countEl = document.getElementById("careerNewsShowingCount");
+  if (countEl) countEl.textContent = `当前展示 ${showingCount} / ${working.length} 条`;
+
+  more.classList.toggle("hidden", !careerNewsState.expanded || hiddenCount === 0);
+  if (btn) {
+    const expandText = hiddenCount > 0 ? `查看更多 +${hiddenCount}` : "暂无更多";
+    btn.dataset.expandText = expandText;
+    btn.textContent = (careerNewsState.expanded && hiddenCount > 0)
+      ? (btn.dataset.collapseText || "收起")
+      : expandText;
+    btn.classList.toggle("hidden", hiddenCount === 0);
+  }
+}
+
+function initCareerNewsBoard() {
+  const board = document.getElementById("careerNewsBoard");
+  if (!board || careerNewsState.initialized) return;
+  careerNewsState.initialized = true;
+  careerNewsState.displayLimit = Math.max(1, Number(board.dataset.displayLimit || 10));
+  careerNewsState.items = [...board.querySelectorAll(".career-news-item")];
+
+  const bar = document.getElementById("careerNewsFilterBar");
+  if (bar) {
+    bar.addEventListener("click", (event) => {
+      const btn = event.target.closest(".career-news-filter-btn");
+      if (!btn) return;
+      careerNewsState.filter = String(btn.dataset.filter || "all");
+      careerNewsState.expanded = false;
+      _updateCareerNewsFilterBtnState();
+      _applyCareerNewsBoard();
+    });
+  }
+
+  const sortSelect = document.getElementById("careerNewsSortSelect");
+  if (sortSelect) {
+    sortSelect.addEventListener("change", () => {
+      careerNewsState.sort = String(sortSelect.value || "newest");
+      _applyCareerNewsBoard();
+    });
+  }
+
+  _updateCareerNewsFilterBtnState();
+  _applyCareerNewsBoard();
+}
+
+function toggleCareerNewsMore() {
+  if (!careerNewsState.initialized) initCareerNewsBoard();
+  careerNewsState.expanded = !careerNewsState.expanded;
+  _applyCareerNewsBoard();
+}
+
 function clampPercent(value, fallback = 0) {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
@@ -1215,14 +1954,53 @@ function normalizeProfileBasics(raw) {
   const source = raw && typeof raw === "object" ? raw : {};
   return {
     major: String(source.major || "").trim(),
-    grade: String(source.grade || "").trim(),
+    grade: String(source.grade || source.education_level || source.educationLevel || "").trim(),
     target_city: String(source.target_city || source.targetCity || "").trim(),
     target_direction: String(source.target_direction || source.targetDirection || "").trim()
   };
 }
 
+function normalizeResumeBasicValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const normalized = text.toLowerCase();
+  if (["unknown", "n/a", "na", "暂无", "未知", "未提供", "无"].includes(normalized)) return "";
+  return text;
+}
+
+function extractProfileBasicsFromResume(resumeProfile) {
+  const basics = resumeProfile?.basics && typeof resumeProfile.basics === "object" ? resumeProfile.basics : {};
+  return normalizeProfileBasics({
+    major: normalizeResumeBasicValue(basics.major),
+    grade: normalizeResumeBasicValue(basics.education_level || basics.grade),
+    target_city: normalizeResumeBasicValue(basics.target_city || basics.targetCity),
+    target_direction: normalizeResumeBasicValue(basics.target_direction || basics.targetDirection)
+  });
+}
+
+function mergeProfileBasicsWithResume(profileBasics, resumeProfile) {
+  const manual = normalizeProfileBasics(profileBasics);
+  const fromResume = extractProfileBasicsFromResume(resumeProfile);
+  const manualLooksLikeYear = /大一|大二|大三|大四|一年级|二年级|三年级|四年级|研一|研二|研三/i.test(manual.grade || "");
+  const gradeValue = fromResume.grade && (!manual.grade || manualLooksLikeYear)
+    ? fromResume.grade
+    : (manual.grade || fromResume.grade);
+  return normalizeProfileBasics({
+    major: manual.major || fromResume.major,
+    grade: gradeValue,
+    target_city: manual.target_city || fromResume.target_city,
+    target_direction: manual.target_direction || fromResume.target_direction
+  });
+}
+
+function getEffectiveProfileBasics(resumeState = userWorkspaceState.scopedData.resume_profile || null) {
+  return mergeProfileBasicsWithResume(careerInterviewState.profileBasics, resumeState?.profile || null);
+}
+
 function syncProfileBasicsForm() {
-  const basics = normalizeProfileBasics(careerInterviewState.profileBasics);
+  const manualBasics = normalizeProfileBasics(careerInterviewState.profileBasics);
+  const resumeBasics = extractProfileBasicsFromResume(userWorkspaceState.scopedData.resume_profile?.profile || null);
+  const basics = getEffectiveProfileBasics();
   const fieldMap = {
     profileMajorInput: basics.major,
     profileGradeInput: basics.grade,
@@ -1234,11 +2012,20 @@ function syncProfileBasicsForm() {
     if (el) el.value = value;
   });
   const missing = PROFILE_BASIC_FIELDS.filter((key) => !basics[key]);
+  const autoFilledKeys = PROFILE_BASIC_FIELDS.filter((key) => !manualBasics[key] && resumeBasics[key] && basics[key]);
   const statusEl = document.getElementById("profileBasicsStatus");
   if (statusEl) {
-    statusEl.textContent = missing.length
-      ? `待补充：${missing.map((key) => PROFILE_BASIC_LABELS[key]).join("、")}`
-      : "基础信息已同步到画像、匹配与报告。";
+    if (missing.length) {
+      if (autoFilledKeys.length) {
+        statusEl.textContent = `已从简历回填：${autoFilledKeys.map((key) => PROFILE_BASIC_LABELS[key]).join("、")}；待补充：${missing.map((key) => PROFILE_BASIC_LABELS[key]).join("、")}`;
+      } else {
+        statusEl.textContent = `待补充：${missing.map((key) => PROFILE_BASIC_LABELS[key]).join("、")}`;
+      }
+    } else if (autoFilledKeys.length) {
+      statusEl.textContent = `基础信息已从简历自动回填，可手动修改后保存。`;
+    } else {
+      statusEl.textContent = "基础信息已同步到画像、匹配与报告。";
+    }
   }
 }
 
@@ -1259,6 +2046,110 @@ function saveProfileBasics() {
   showToast("基础信息已保存", "后续匹配与报告会直接引用这些字段。", "success", 1800);
 }
 
+function getProfileFlowCompletion(profile) {
+  const p = profile || deriveUnifiedProfile();
+  const basicsReady = PROFILE_BASIC_FIELDS.every((key) => p?.basics?.[key]);
+  const step1Complete = Boolean(p?.assessment?.mbti?.completed && p?.assessment?.holland?.completed);
+  const step2Complete = String(p?.resume?.status || "") === "analyzed";
+  const step3Complete = Boolean((p?.interview?.isComplete || Number(p?.interview?.completionScore || 0) >= 70) && basicsReady);
+  return {
+    1: step1Complete,
+    2: step2Complete,
+    3: step3Complete,
+    4: step1Complete || step2Complete || step3Complete
+  };
+}
+
+function getRecommendedProfileStep(completion) {
+  const done = completion || getProfileFlowCompletion();
+  for (const step of [1, 2, 3]) {
+    if (!done[step] && !profileFlowState.skippedSteps.includes(step)) return step;
+  }
+  return 4;
+}
+
+function normalizeProfileFlowState(profile) {
+  const completion = getProfileFlowCompletion(profile);
+  profileFlowState.completedSteps = PROFILE_FLOW_STEPS.filter((step) => Boolean(completion[step]));
+  profileFlowState.skippedSteps = profileFlowState.skippedSteps
+    .filter((step) => PROFILE_FLOW_STEPS.includes(step) && step < 4 && !profileFlowState.completedSteps.includes(step));
+  if (!PROFILE_FLOW_STEPS.includes(profileFlowState.currentStep)) profileFlowState.currentStep = 1;
+  if (!profileFlowState.touched) profileFlowState.currentStep = getRecommendedProfileStep(completion);
+}
+
+function initProfileFlow(force = false) {
+  if (force) {
+    profileFlowState.currentStep = 1;
+    profileFlowState.skippedSteps = [];
+    profileFlowState.completedSteps = [];
+    profileFlowState.touched = false;
+  }
+  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
+}
+
+function renderProfileFlow(profile) {
+  const p = profile || appState.derivedProfile || deriveUnifiedProfile();
+  normalizeProfileFlowState(p);
+  const progressText = document.getElementById("profileFlowProgressText");
+  if (progressText) {
+    progressText.textContent = `当前步骤：${profileFlowState.currentStep} / 4`;
+  }
+
+  PROFILE_FLOW_STEPS.forEach((step) => {
+    const panel = document.getElementById(`profileFlowStep${step}`);
+    if (panel) panel.classList.toggle("hidden", step !== profileFlowState.currentStep);
+    const navBtn = document.querySelector(`.profile-flow-step[data-step="${step}"]`);
+    const statusEl = document.getElementById(`profileFlowStepStatus${step}`);
+    const isDone = profileFlowState.completedSteps.includes(step);
+    const isSkipped = profileFlowState.skippedSteps.includes(step);
+    const isActive = step === profileFlowState.currentStep;
+    if (navBtn) {
+      navBtn.classList.toggle("is-active", isActive);
+      navBtn.classList.toggle("is-done", isDone);
+      navBtn.classList.toggle("is-skipped", isSkipped);
+    }
+    if (statusEl) {
+      if (step === 4) {
+        statusEl.textContent = "总览";
+      } else if (isDone) {
+        statusEl.textContent = "已完成";
+      } else if (isSkipped) {
+        statusEl.textContent = "已跳过";
+      } else if (isActive) {
+        statusEl.textContent = "进行中";
+      } else {
+        statusEl.textContent = "待开始";
+      }
+    }
+  });
+}
+
+function goProfileStep(step) {
+  const target = Number(step || 1);
+  if (!PROFILE_FLOW_STEPS.includes(target)) return;
+  profileFlowState.currentStep = target;
+  profileFlowState.touched = true;
+  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
+}
+
+function skipProfileStep(step) {
+  const target = Number(step || profileFlowState.currentStep || 1);
+  if (!PROFILE_FLOW_STEPS.includes(target) || target === 4) return;
+  if (!profileFlowState.completedSteps.includes(target) && !profileFlowState.skippedSteps.includes(target)) {
+    profileFlowState.skippedSteps.push(target);
+  }
+  profileFlowState.currentStep = Math.min(4, target + 1);
+  profileFlowState.touched = true;
+  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
+  showToast("已跳过当前步骤", "你可以随时返回补充，结果页会保留缺失提示。", "info", 1500);
+}
+
+function nextProfileStep() {
+  profileFlowState.currentStep = Math.min(4, Number(profileFlowState.currentStep || 1) + 1);
+  profileFlowState.touched = true;
+  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
+}
+
 function getAssessmentHubSnapshotSafe() {
   try {
     return typeof window.getAssessmentHubSnapshot === "function" ? window.getAssessmentHubSnapshot() : null;
@@ -1273,7 +2164,7 @@ function buildAssessmentContextPayload() {
   return {
     mbti: assessment.mbti || {},
     holland: assessment.holland || {},
-    basics: normalizeProfileBasics(careerInterviewState.profileBasics)
+    basics: getEffectiveProfileBasics()
   };
 }
 
@@ -1284,7 +2175,7 @@ function addCapabilitySignal(bag, key, value, source) {
   bag[key].push({ score, source });
 }
 
-function deriveCapabilityScores(assessment, interviewProfile, basics) {
+function deriveCapabilityScores(assessment, interviewProfile, basics, resumeProfile = null) {
   const bag = {
     professional: [],
     learning: [],
@@ -1363,11 +2254,22 @@ function deriveCapabilityScores(assessment, interviewProfile, basics) {
   }
   if (basics.grade) {
     const gradeText = basics.grade;
-    if (/大一|一年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 45, "基础信息");
-    else if (/大二|二年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 55, "基础信息");
-    else if (/大三|三年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 68, "基础信息");
-    else if (/大四|四年级|研/.test(gradeText)) addCapabilitySignal(bag, "internship", 78, "基础信息");
-    addCapabilitySignal(bag, "execution", /大三|大四|研/.test(gradeText) ? 72 : 60, "基础信息");
+    if (/博士|phd/i.test(gradeText)) {
+      addCapabilitySignal(bag, "internship", 82, "基础信息");
+      addCapabilitySignal(bag, "execution", 78, "基础信息");
+    } else if (/硕士|研究生|master/i.test(gradeText)) {
+      addCapabilitySignal(bag, "internship", 76, "基础信息");
+      addCapabilitySignal(bag, "execution", 72, "基础信息");
+    } else if (/本科|学士|bachelor/i.test(gradeText)) {
+      addCapabilitySignal(bag, "internship", 62, "基础信息");
+      addCapabilitySignal(bag, "execution", 66, "基础信息");
+    } else {
+      if (/大一|一年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 45, "基础信息");
+      else if (/大二|二年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 55, "基础信息");
+      else if (/大三|三年级/.test(gradeText)) addCapabilitySignal(bag, "internship", 68, "基础信息");
+      else if (/大四|四年级|研/.test(gradeText)) addCapabilitySignal(bag, "internship", 78, "基础信息");
+      addCapabilitySignal(bag, "execution", /大三|大四|研/.test(gradeText) ? 72 : 60, "基础信息");
+    }
   }
 
   if (interviewProfile) {
@@ -1393,6 +2295,16 @@ function deriveCapabilityScores(assessment, interviewProfile, basics) {
     const riasec = interviewProfile.riasec || {};
     addCapabilitySignal(bag, "innovation", Math.max(Number(riasec.artistic || 0), Number(riasec.investigative || 0)), "访谈");
     addCapabilitySignal(bag, "communication", Math.max(Number(riasec.social || 0), Number(riasec.enterprising || 0)), "访谈");
+  }
+
+  if (resumeProfile) {
+    const cap = resumeProfile.capability_scores || {};
+    addCapabilitySignal(bag, "communication", Number(cap.communication || 0), "简历");
+    addCapabilitySignal(bag, "execution", Number(cap.execution || 0), "简历");
+    addCapabilitySignal(bag, "stress_tolerance", Number(cap.stress_resilience || 0), "简历");
+    addCapabilitySignal(bag, "innovation", Number(cap.innovation || 0), "简历");
+    addCapabilitySignal(bag, "professional", Number(cap.collaboration || 0), "简历");
+    addCapabilitySignal(bag, "internship", Number(cap.leadership || 0), "简历");
   }
 
   const capabilities = Object.fromEntries(Object.entries(bag).map(([key, items]) => {
@@ -1427,9 +2339,11 @@ function roleMatchesText(role, text) {
 
 function deriveUnifiedProfile() {
   const assessment = getAssessmentHubSnapshotSafe() || { mbti: { completed: false }, holland: { completed: false } };
-  const basics = normalizeProfileBasics(careerInterviewState.profileBasics);
   const interviewProfile = careerInterviewState.result?.profile || null;
-  const capabilityModel = deriveCapabilityScores(assessment, interviewProfile, basics);
+  const resumeState = userWorkspaceState.scopedData.resume_profile || null;
+  const resumeProfile = resumeState?.profile || null;
+  const basics = mergeProfileBasicsWithResume(careerInterviewState.profileBasics, resumeProfile);
+  const capabilityModel = deriveCapabilityScores(assessment, interviewProfile, basics, resumeProfile);
   const missingItems = [];
   if (!assessment?.mbti?.completed) missingItems.push("MBTI 测评待完成");
   if (!assessment?.holland?.completed) missingItems.push("霍兰德测评待完成");
@@ -1437,13 +2351,16 @@ function deriveUnifiedProfile() {
     if (!basics[key]) missingItems.push(`${PROFILE_BASIC_LABELS[key]}待补充`);
   });
   if (!interviewProfile) missingItems.push("职业访谈待完成");
+  if (!resumeState?.file_name) missingItems.push("简历待上传");
+  else if (resumeState?.status !== "analyzed") missingItems.push("简历待解析");
 
   const summaryParts = [];
   if (assessment?.mbti?.completed) summaryParts.push(`MBTI ${assessment.mbti.display_type || assessment.mbti.final_type}`);
   if (assessment?.holland?.completed) summaryParts.push(`霍兰德 ${assessment.holland.code}`);
   if (basics.major) summaryParts.push(`专业 ${basics.major}`);
-  if (basics.grade) summaryParts.push(`年级 ${basics.grade}`);
+  if (basics.grade) summaryParts.push(`学历 ${basics.grade}`);
   if (basics.target_direction) summaryParts.push(`目标方向 ${basics.target_direction}`);
+  if (resumeProfile?.candidate_summary && resumeProfile?.candidate_summary !== "unknown") summaryParts.push(`简历画像 ${resumeProfile.candidate_summary}`);
   const fallbackSummary = summaryParts.length
     ? `${summaryParts.join("，")}。当前画像已可用于岗位初筛，缺失项会在匹配和报告中显式标记。`
     : "画像基础信息仍较少，建议先完成双测评并补充基础信息。";
@@ -1457,9 +2374,18 @@ function deriveUnifiedProfile() {
       completionScore: clampPercent(careerInterviewState.completionScore),
       profile: interviewProfile
     },
+    resume: {
+      status: resumeState?.status || "empty",
+      uploadedAt: resumeState?.uploaded_at || null,
+      analyzedAt: resumeState?.analyzed_at || null,
+      profile: resumeProfile
+    },
     summary: interviewProfile?.summary || fallbackSummary,
-    workValues: uniqueValues(interviewProfile?.work_values || ["成长空间", "自主性", "匹配兴趣"], 4),
-    recommendedRoles: uniqueValues(interviewProfile?.recommended_roles || [], 6),
+    workValues: uniqueValues(
+      [...(interviewProfile?.work_values || []), ...(resumeProfile?.leadership_signals || []).map((item) => item.signal || "")],
+      4
+    ),
+    recommendedRoles: uniqueValues([...(interviewProfile?.recommended_roles || []), ...(resumeProfile?.roles_detected || []).map((item) => item.role || "")], 6),
     nextSteps: uniqueValues(interviewProfile?.next_steps || [], 6),
     capabilities: capabilityModel.capabilities,
     capabilityCoverage: capabilityModel.coverage,
@@ -1715,6 +2641,140 @@ function renderCapabilityList(profile) {
   }).join("");
 }
 
+function renderCapabilityCorrelation(profile, roles) {
+  const keyToLabel = {
+    professional: "专业技能",
+    learning: "学习能力",
+    communication: "沟通能力",
+    innovation: "创新能力",
+    stress_tolerance: "抗压能力",
+    internship: "实践/实习能力",
+    execution: "执行能力"
+  };
+  const labelToKey = Object.fromEntries(Object.entries(keyToLabel).map(([k, v]) => [v, k]));
+  const scoreOf = (key) => profile.capabilities?.[key]?.score;
+  const topRole = roles?.[0] || null;
+  const relationItems = [];
+
+  const rules = [
+    {
+      primary: "professional",
+      secondary: "communication",
+      minPrimary: 72,
+      maxSecondary: 64,
+      risk: "技术能力已具备，但沟通偏弱会影响需求澄清与跨团队协作。",
+      action: "补齐表达与协作证据：需求复盘、方案评审纪要、跨团队协作案例。"
+    },
+    {
+      primary: "innovation",
+      secondary: "execution",
+      minPrimary: 72,
+      maxSecondary: 64,
+      risk: "创意和想法较强，但执行与落地不足会导致成果转化率低。",
+      action: "强化落地闭环：设置里程碑、输出可验证成果（Demo/上线记录/指标）。"
+    },
+    {
+      primary: "execution",
+      secondary: "stress_tolerance",
+      minPrimary: 70,
+      maxSecondary: 62,
+      risk: "执行意愿较好，但高压情境下稳定性不足，容易在关键节点失速。",
+      action: "通过高压场景练习与节奏管理补齐：周计划、复盘和风险预案。"
+    },
+    {
+      primary: "learning",
+      secondary: "internship",
+      minPrimary: 74,
+      maxSecondary: 60,
+      risk: "学习吸收快，但实践转化不足，面试时难以证明业务产出。",
+      action: "把学习成果转成项目证据：实习经历、竞赛记录、可量化结果。"
+    }
+  ];
+
+  rules.forEach((rule) => {
+    const p = scoreOf(rule.primary);
+    const s = scoreOf(rule.secondary);
+    if (p === null || p === undefined || s === null || s === undefined) return;
+    if (p >= rule.minPrimary && s <= rule.maxSecondary) {
+      relationItems.push({
+        type: "risk",
+        title: `${keyToLabel[rule.primary]}（${p}%）→ ${keyToLabel[rule.secondary]}（${s}%）`,
+        risk: rule.risk,
+        action: rule.action
+      });
+    }
+  });
+
+  const synergyPairs = [
+    ["professional", "learning"],
+    ["communication", "execution"],
+    ["innovation", "learning"]
+  ];
+  synergyPairs.forEach(([a, b]) => {
+    const sa = scoreOf(a);
+    const sb = scoreOf(b);
+    if (sa === null || sa === undefined || sb === null || sb === undefined) return;
+    if (sa >= 75 && sb >= 72) {
+      relationItems.push({
+        type: "advantage",
+        title: `${keyToLabel[a]}（${sa}%）+ ${keyToLabel[b]}（${sb}%）`,
+        risk: "这组能力具备协同优势，可直接作为岗位竞争亮点。",
+        action: "在简历与面试中用“场景-动作-结果”呈现这组能力的联合作用。"
+      });
+    }
+  });
+
+  if (topRole?.ability?.gaps?.length) {
+    const complementMap = {
+      "专业技能": ["学习能力", "沟通能力"],
+      "学习能力": ["执行能力", "实践/实习能力"],
+      "沟通能力": ["执行能力", "抗压能力"],
+      "创新能力": ["执行能力", "专业技能"],
+      "执行能力": ["抗压能力", "沟通能力"],
+      "实践/实习能力": ["执行能力", "专业技能"],
+      "抗压能力": ["执行能力", "沟通能力"]
+    };
+    topRole.ability.gaps.slice(0, 2).forEach((gapText) => {
+      const label = String(gapText || "").split(" ")[0].trim();
+      const linked = complementMap[label] || [];
+      const linkedState = linked.map((name) => {
+        const key = labelToKey[name];
+        const score = key ? scoreOf(key) : null;
+        return `${name}${score === null || score === undefined ? "" : ` ${score}%`}`;
+      });
+      relationItems.push({
+        type: "focus",
+        title: `岗位「${topRole.name}」关键缺口：${label}`,
+        risk: linked.length ? `该缺口通常受 ${linked.join("、")} 联动影响。` : "该缺口需要结合上下游能力一起补齐。",
+        action: linkedState.length ? `建议并行提升：${linkedState.join("、")}。` : "建议结合目标岗位要求补充一项可量化成果。"
+      });
+    });
+  }
+
+  if (!relationItems.length) {
+    return `
+      <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+        暂未识别到明显的“强项-短板”联动关系。继续补充简历、访谈与测评后，这里会显示更明确的能力耦合分析。
+      </div>
+    `;
+  }
+
+  return relationItems.slice(0, 6).map((item) => {
+    const cls = item.type === "risk"
+      ? "border-amber-200 bg-amber-50"
+      : item.type === "advantage"
+        ? "border-emerald-200 bg-emerald-50"
+        : "border-sky-200 bg-sky-50";
+    return `
+      <div class="rounded-xl border ${cls} p-4">
+        <p class="text-sm font-semibold text-slate-800">${escHtml(item.title)}</p>
+        <p class="mt-2 text-xs text-slate-600 leading-6">${escHtml(item.risk)}</p>
+        <p class="mt-2 text-xs font-medium text-slate-700">建议：${escHtml(item.action)}</p>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderProfileWorkspace(profile, roles) {
   syncProfileBasicsForm();
   const topRoles = roles.slice(0, 3);
@@ -1726,6 +2786,7 @@ function renderProfileWorkspace(profile, roles) {
   const nextStepEl = document.getElementById("profileNextStepList");
   const missingEl = document.getElementById("profileMissingList");
   const capabilityEl = document.getElementById("profileCapabilityList");
+  const correlationEl = document.getElementById("profileCapabilityCorrelation");
   const modulesEl = document.getElementById("agentModuleGrid");
   if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
   if (summaryEl) summaryEl.textContent = profile.summary;
@@ -1734,7 +2795,9 @@ function renderProfileWorkspace(profile, roles) {
     if (profile.assessment?.mbti?.completed) items.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
     if (profile.assessment?.holland?.completed) items.push(`霍兰德：${profile.assessment.holland.code}`);
     if (profile.basics.major) items.push(`专业：${profile.basics.major}`);
-    if (profile.basics.grade) items.push(`年级：${profile.basics.grade}`);
+    if (profile.basics.grade) items.push(`学历：${profile.basics.grade}`);
+    if (profile.resume?.status === "analyzed") items.push("简历：已解析");
+    else if (profile.resume?.status === "uploaded") items.push("简历：待解析");
     assessmentEl.textContent = items.length ? items.join("｜") : "尚未形成足够的基础画像。";
   }
   if (valuesEl) valuesEl.innerHTML = careerTagHtml(profile.workValues, "待补充工作价值观", "soft");
@@ -1742,6 +2805,7 @@ function renderProfileWorkspace(profile, roles) {
   if (nextStepEl) nextStepEl.innerHTML = careerListHtml(uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6), "等待画像完善后生成行动建议");
   if (missingEl) missingEl.innerHTML = careerListHtml(profile.missingItems, "当前画像基础已满足本轮演示范围");
   if (capabilityEl) capabilityEl.innerHTML = renderCapabilityList(profile);
+  if (correlationEl) correlationEl.innerHTML = renderCapabilityCorrelation(profile, roles);
   if (modulesEl) {
     modulesEl.innerHTML = buildAgentModuleStates(profile, roles).map((item) => {
       const statusClass = item.status === "available"
@@ -1771,6 +2835,8 @@ function renderProfileWorkspace(profile, roles) {
       { name: "执行能力", score: profile.capabilities.execution.score || 0 }
     ]
   });
+  renderResumeProfileSection(getResumeProfileFromCache());
+  renderProfileFlow(profile);
 }
 
 function renderMatchingWorkspace(profile, roles) {
@@ -1960,7 +3026,7 @@ function renderReportWorkspace(profile, roles) {
         <section class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
           <h4 class="text-lg font-semibold text-slate-900">工作价值观与偏好</h4>
           <div class="mt-4">${careerTagHtml(profile.workValues, "待补充价值观", "soft")}</div>
-          <p class="mt-4 text-sm text-slate-600 leading-6">专业：${escHtml(profile.basics.major || "待补充")}｜年级：${escHtml(profile.basics.grade || "待补充")}｜目标城市：${escHtml(profile.basics.target_city || "待补充")}</p>
+          <p class="mt-4 text-sm text-slate-600 leading-6">专业：${escHtml(profile.basics.major || "待补充")}｜学历：${escHtml(profile.basics.grade || "待补充")}｜目标城市：${escHtml(profile.basics.target_city || "待补充")}</p>
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6">
@@ -1977,7 +3043,38 @@ function renderReportWorkspace(profile, roles) {
   updateReportDates(new Date());
 }
 
+let unifiedRefreshScheduled = false;
+let unifiedRefreshRunning = false;
+let unifiedRefreshPending = false;
+
 function refreshUnifiedExperience() {
+  if (unifiedRefreshRunning) {
+    unifiedRefreshPending = true;
+    return;
+  }
+  if (unifiedRefreshScheduled) return;
+  unifiedRefreshScheduled = true;
+  const runner = () => {
+    unifiedRefreshScheduled = false;
+    unifiedRefreshRunning = true;
+    try {
+      refreshUnifiedExperienceNow();
+    } finally {
+      unifiedRefreshRunning = false;
+      if (unifiedRefreshPending) {
+        unifiedRefreshPending = false;
+        refreshUnifiedExperience();
+      }
+    }
+  };
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(runner);
+  } else {
+    setTimeout(runner, 0);
+  }
+}
+
+function refreshUnifiedExperienceNow() {
   const profile = deriveUnifiedProfile();
   const roles = computeRoleMatches(profile);
   profile.recommendedRoles = uniqueValues([...profile.recommendedRoles, ...roles.slice(0, 3).map((item) => item.name)], 6);
@@ -1993,7 +3090,8 @@ function refreshUnifiedExperience() {
     (profile.assessment?.mbti?.completed ? 15 : 0)
     + (profile.assessment?.holland?.completed ? 15 : 0)
     + (PROFILE_BASIC_FIELDS.filter((key) => profile.basics[key]).length / PROFILE_BASIC_FIELDS.length) * 30
-    + clampPercent(profile.interview.completionScore) * 0.4
+    + clampPercent(profile.interview.completionScore) * 0.3
+    + (profile.resume?.status === "analyzed" ? 10 : 0)
   );
   appState.profileComplete = Boolean(
     profile.assessment?.mbti?.completed
@@ -2133,12 +3231,44 @@ async function initAuth() {
   if (userWorkspaceState.authReadyPromise) return userWorkspaceState.authReadyPromise;
   userWorkspaceState.authReadyPromise = (async () => {
     try {
-      const payload = await requestJson("/api/auth/status");
+      let payload = null;
+      try {
+        payload = await requestJson("/api/auth/status?bootstrap=1");
+      } catch (bootstrapError) {
+        console.warn("bootstrap endpoint unavailable, fallback to auth/status", bootstrapError);
+        payload = await requestJson("/api/auth/status");
+      }
       if (payload.authenticated && payload.user) {
         unlockAppForUser(payload.user);
+        const llm = payload.llm || {};
+        const scoped = payload.scoped_data || {};
+        const ciConfig = llm.configs?.career_interview;
+        if (ciConfig && typeof ciConfig === "object") {
+          userWorkspaceState.llmConfigs.career_interview = {
+            base_url: String(ciConfig.base_url || "").trim(),
+            api_key: String(ciConfig.api_key || "").trim(),
+            model: String(ciConfig.model || "gpt-4o-mini").trim() || "gpt-4o-mini",
+            configured: Boolean(ciConfig.configured),
+            editable: Boolean(ciConfig.editable),
+            api_key_masked: String(ciConfig.api_key_masked || "")
+          };
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "career_interview")) {
+          userWorkspaceState.scopedData.career_interview = scoped.career_interview ?? null;
+          userWorkspaceState.scopedDataLoaded.career_interview = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "assessment_hub")) {
+          userWorkspaceState.scopedData.assessment_hub = scoped.assessment_hub ?? null;
+          userWorkspaceState.scopedDataLoaded.assessment_hub = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "resume_profile")) {
+          userWorkspaceState.scopedData.resume_profile = scoped.resume_profile || emptyResumeProfile();
+          userWorkspaceState.scopedDataLoaded.resume_profile = true;
+        }
         await Promise.allSettled([
-          loadCareerInterviewConfig(true),
-          hydrateCareerInterviewState(true)
+          loadCareerInterviewConfig(false),
+          hydrateCareerInterviewState(false),
+          refreshResumeProfile(false)
         ]);
         return payload.user;
       }
@@ -2288,6 +3418,10 @@ function showSection(sectionId) {
   appState.currentSection = sectionId;
   if (sectionId === "report") markReportGenerated();
   if (sectionId === "jobs" && allJobsData.length === 0) loadJobs();
+  if (sectionId === "profile") {
+    initProfileFlow();
+    void refreshResumeProfile(true);
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -2446,7 +3580,25 @@ async function loadJobs() {
       console.warn("jobs geo assets failed to load", error);
       return null;
     });
-    const cities = await fetchJsonWithSessionCache("/api/cities", JOBS_CITIES_CACHE_KEY, 60 * 60 * 1000);
+    let jobsBootstrap = null;
+    try {
+      jobsBootstrap = await fetchJsonWithSessionCache("/api/jobs?view=bootstrap&city=all", `${JOBS_LIST_CACHE_PREFIX}bootstrap`);
+    } catch (bootstrapError) {
+      console.warn("jobs bootstrap endpoint unavailable, fallback to legacy requests", bootstrapError);
+    }
+    let cities = [];
+    let jobs = [];
+    if (Array.isArray(jobsBootstrap?.cities) && Array.isArray(jobsBootstrap?.jobs)) {
+      cities = jobsBootstrap.cities;
+      jobs = jobsBootstrap.jobs;
+    } else {
+      const [citiesData, jobsData] = await Promise.all([
+        fetchJsonWithSessionCache("/api/cities", JOBS_CITIES_CACHE_KEY, 60 * 60 * 1000),
+        fetchJsonWithSessionCache("/api/jobs?city=all&view=summary", `${JOBS_LIST_CACHE_PREFIX}all`)
+      ]);
+      cities = Array.isArray(citiesData) ? citiesData : [];
+      jobs = Array.isArray(jobsData) ? jobsData : [];
+    }
     const citySelect = document.getElementById("cityFilter");
     if (citySelect) {
       citySelect.innerHTML = '<option value="all">全部城市</option>';
@@ -2458,7 +3610,7 @@ async function loadJobs() {
       });
     }
 
-    allJobsData = await fetchJsonWithSessionCache("/api/jobs?city=all&view=summary", `${JOBS_LIST_CACHE_PREFIX}all`);
+    allJobsData = jobs;
     filteredJobsData = [...allJobsData];
     fuseIndex = null;
     appState.lastJobFilterKey = "";
@@ -2828,6 +3980,16 @@ function bindGlobalEvents() {
   if (cityFilter) {
     cityFilter.addEventListener("change", () => filterJobs());
   }
+
+  const profileFlowModelStatus = document.getElementById("profileFlowModelStatus");
+  if (profileFlowModelStatus && !profileFlowModelStatus.dataset.boundClick) {
+    profileFlowModelStatus.addEventListener("click", () => {
+      openModelPicker(() => {
+        void updateProfileFlowModelStatus(true);
+      });
+    });
+    profileFlowModelStatus.dataset.boundClick = "1";
+  }
 }
 
 function startRealtimeEngine() {
@@ -2848,6 +4010,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initCharts();
   initAnimations();
   bindGlobalEvents();
+  initCareerNewsBoard();
   startRealtimeEngine();
   updateReportDates(new Date());
   updateNotificationCount();
@@ -2859,10 +4022,18 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   Promise.resolve(authReady).finally(() => {
     updateCareerInterviewConfigStatus();
+    void updateProfileFlowModelStatus(true);
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
     refreshUnifiedExperience();
   });
+
+  // 双保险绑定，避免仅依赖内联 onclick 在部分环境失效。
+  const startBtn = document.getElementById("careerInterviewStartBtn");
+  if (startBtn && !startBtn.dataset.boundClick) {
+    startBtn.addEventListener("click", () => { void startCareerInterview(); });
+    startBtn.dataset.boundClick = "1";
+  }
 });
 
 // 鑱屼笟闂瓟妯″潡
@@ -2908,6 +4079,21 @@ function expandQA(el) {
 let _settingsPanelOpen = false;
 let _settingsOutsideListener = null;
 let _cachedAvailableModels = [];   // 全局缓存：拉取到的模型列表，切换板块后不需重新获取
+let _pickerModelsCache = {};        // provider_id -> { models: [], ts: number }
+
+function getProviderBrandMeta(provider) {
+  const text = `${provider?.name || ""} ${provider?.base_url || ""}`.toLowerCase();
+  if (text.includes("deepseek")) return { icon: "🐋", company: "DeepSeek" };
+  if (text.includes("openrouter")) return { icon: "🧭", company: "OpenRouter" };
+  if (text.includes("openai")) return { icon: "🌀", company: "OpenAI" };
+  if (text.includes("anthropic") || text.includes("claude")) return { icon: "🧠", company: "Anthropic" };
+  if (text.includes("google") || text.includes("gemini")) return { icon: "🔷", company: "Google" };
+  if (text.includes("qwen") || text.includes("dashscope") || text.includes("aliyun") || text.includes("alibaba")) return { icon: "☁️", company: "Qwen" };
+  if (text.includes("zhipu") || text.includes("glm")) return { icon: "🟣", company: "智谱" };
+  if (text.includes("moonshot") || text.includes("kimi")) return { icon: "🌙", company: "Moonshot" };
+  if (text.includes("groq")) return { icon: "⚡", company: "Groq" };
+  return { icon: "🔌", company: "API" };
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  设置面板 — 多 Provider 管理
@@ -2919,6 +4105,10 @@ function toggleSettingsPanel(event) {
 }
 
 function openSettingsPanel() {
+  if (!isSuperAdminUser()) {
+    showToast("已使用管理员配置", "普通用户无需配置 API，可直接在功能区选择模型。", "info", 1800);
+    return;
+  }
   const panel = document.getElementById("settingsPanel");
   if (!panel) return;
   panel.classList.remove("hidden");
@@ -2973,6 +4163,7 @@ function _renderProviderList(providers, selection, isAdmin) {
     return;
   }
   listEl.innerHTML = providers.map(p => {
+    const brand = getProviderBrandMeta(p);
     const isSel = selection.provider_id === p.id;
     const badgeCls = isSel ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500";
     const badge = isSel ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full ${badgeCls}">✓ 已选</span>` : "";
@@ -2981,7 +4172,8 @@ function _renderProviderList(providers, selection, isAdmin) {
       <div class="flex items-center gap-2 p-2.5 rounded-xl border ${isSel ? "border-green-200 bg-green-50" : "border-gray-100 bg-gray-50"} transition-all">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-semibold text-gray-800 truncate">${escHtml(p.name)}</span>
+            <span class="text-xs font-semibold text-gray-800 truncate">${escHtml(brand.icon)} ${escHtml(p.name)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">${escHtml(brand.company)}</span>
             ${badge}
           </div>
           <p class="text-[10px] text-gray-400 truncate mt-0.5">${escHtml(p.base_url)}</p>
@@ -3011,6 +4203,7 @@ async function submitAddProvider() {
   if (!base_url || !api_key) { showToast("填写不完整", "请填写 Base URL 和 API Key", "warning", 2000); return; }
   try {
     await requestJson("/api/llm-providers", { method: "POST", body: { name: name || "未命名", base_url, api_key } });
+    _pickerModelsCache = {};
     showToast("API 已添加", name || "未命名", "success", 1600);
     closeAddProviderForm();
     await loadSettingsPanelData();
@@ -3021,6 +4214,7 @@ async function deleteProvider(providerId) {
   if (!confirm("确认删除此 API 配置？")) return;
   try {
     await requestJson(`/api/llm-providers/${providerId}`, { method: "DELETE" });
+    _pickerModelsCache = {};
     showToast("已删除", "", "success", 1400);
     await loadSettingsPanelData();
   } catch (err) { showToast("删除失败", err.message, "error", 2400); }
@@ -3046,7 +4240,8 @@ async function openModelPicker(onConfirm) {
   if (modelSel) modelSel.innerHTML = `<option value="">-- 请先选择 API --</option>`;
 
   try {
-    const data = await requestJson("/api/llm-selection");
+    // 使用更轻量的 providers 接口，避免在高频状态写入时被用户态读取拖慢。
+    const data = await requestJson("/api/llm-providers");
     const providers = data.providers || [];
     const selection = data.selection || {};
 
@@ -3057,19 +4252,25 @@ async function openModelPicker(onConfirm) {
     }
 
     if (provSel) {
-      provSel.innerHTML = providers.map(p =>
-        `<option value="${escHtml(p.id)}" ${p.id === selection.provider_id ? "selected" : ""}>${escHtml(p.name)} — ${escHtml(p.base_url)}</option>`
-      ).join("");
+      provSel.innerHTML = providers.map(p => {
+        const brand = getProviderBrandMeta(p);
+        return `<option value="${escHtml(p.id)}" ${p.id === selection.provider_id ? "selected" : ""}>${escHtml(brand.icon)} ${escHtml(p.name)} (${escHtml(brand.company)})</option>`;
+      }).join("");
     }
 
     if (hintEl && selection.provider_id) {
       const prov = providers.find(p => p.id === selection.provider_id);
-      hintEl.textContent = prov ? `当前：${prov.name} · ${selection.model || "未选模型"}` : "";
+      if (prov) {
+        const brand = getProviderBrandMeta(prov);
+        hintEl.textContent = `当前：${brand.icon} ${prov.name} · ${selection.model || "未选模型"}`;
+      } else {
+        hintEl.textContent = "";
+      }
     }
 
     // 若已有已选 provider，自动加载其模型
     if (selection.provider_id) {
-      await fetchPickerModels(selection.model);
+      await fetchPickerModels(selection.model, false);
     }
   } catch (err) {
     if (provSel) provSel.innerHTML = `<option value="">加载失败：${escHtml(err.message)}</option>`;
@@ -3083,21 +4284,43 @@ function closeModelPicker() {
 }
 
 async function onPickerProviderChange() {
+  const provSel = document.getElementById("mpProviderSelect");
   const modelSel = document.getElementById("mpModelSelect");
+  const providerId = (provSel?.value || "").trim();
+  if (providerId && _pickerModelsCache[providerId]?.models?.length) {
+    const models = _pickerModelsCache[providerId].models;
+    if (modelSel) {
+      modelSel.innerHTML = models.map((m) => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join("");
+    }
+    const btn = document.getElementById("mpFetchBtn");
+    if (btn) btn.textContent = `✓ 缓存 ${models.length} 个`;
+    return;
+  }
   if (modelSel) modelSel.innerHTML = `<option value="">-- 点击「获取列表」加载模型 --</option>`;
 }
 
-async function fetchPickerModels(preselect) {
+async function fetchPickerModels(preselect, forceRefresh = false) {
   const provSel = document.getElementById("mpProviderSelect");
   const modelSel = document.getElementById("mpModelSelect");
   const btn = document.getElementById("mpFetchBtn");
   const providerId = provSel?.value;
   if (!providerId) { showToast("请先选择 API", "", "warning", 1800); return; }
+  if (!forceRefresh && _pickerModelsCache[providerId]?.models?.length) {
+    const models = _pickerModelsCache[providerId].models;
+    if (modelSel) {
+      modelSel.innerHTML = models.map(m =>
+        `<option value="${escHtml(m)}" ${m === preselect ? "selected" : ""}>${escHtml(m)}</option>`
+      ).join("");
+    }
+    if (btn) btn.textContent = `✓ 缓存 ${models.length} 个`;
+    return;
+  }
   if (btn) btn.textContent = "⏳ 获取中…";
   try {
     const data = await requestJson(`/api/llm-providers/${providerId}/models`);
     const models = data.models || [];
     if (models.length) {
+      _pickerModelsCache[providerId] = { models: [...models], ts: Date.now() };
       if (modelSel) {
         modelSel.innerHTML = models.map(m =>
           `<option value="${escHtml(m)}" ${m === preselect ? "selected" : ""}>${escHtml(m)}</option>`
@@ -3125,11 +4348,13 @@ async function confirmModelPicker() {
     const data = await requestJson("/api/llm-selection", {
       method: "PUT", body: { provider_id: providerId, model }
     });
+    await fetchActiveLlmRuntimeConfig(true);
     showToast("已选择", data.message || `${model}`, "success", 1600);
     closeModelPicker();
     if (typeof _mpCallback === "function") _mpCallback({ provider_id: providerId, model });
     _cachedAvailableModels = [];
     updateCareerInterviewConfigStatus();
+    void updateProfileFlowModelStatus(true);
     if (typeof window.assessmentHubUpdateConfigStatus === "function") window.assessmentHubUpdateConfigStatus();
   } catch (err) { showToast("保存失败", err.message, "error", 2400); }
 }
@@ -3137,4 +4362,4 @@ async function confirmModelPicker() {
 // 兼容旧代码调用
 function saveSettingsAdmin() { openAddProviderForm(); }
 function saveSettingsModel() { openModelPicker(); }
-function fetchSettingsModels() { fetchPickerModels(); }
+function fetchSettingsModels() { fetchPickerModels(undefined, true); }

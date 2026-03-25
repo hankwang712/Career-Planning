@@ -4,6 +4,45 @@
         <p class="text-gray-500">双测评、基础信息、职业访谈共用一份画像状态，直接联动到匹配与报告。</p>
     </div>
 
+    <div class="profile-flow-wrap mb-6">
+        <div class="profile-flow-head">
+            <div>
+                <p class="profile-flow-kicker">Profile Flow</p>
+                <h3 class="profile-flow-title">流程导航：可按步骤完成，也可跳过后直接查看结果</h3>
+                <p id="profileFlowProgressText" class="profile-flow-hint">当前步骤：1 / 4</p>
+            </div>
+            <button
+                id="profileFlowModelStatus"
+                type="button"
+                class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+                title="点击选择模型"
+            >模型：未选择</button>
+        </div>
+        <div class="profile-flow-nav" id="profileFlowNav">
+            <button type="button" class="profile-flow-step" data-step="1" onclick="goProfileStep(1)">
+                <span class="profile-flow-step-index">1</span>
+                <span class="profile-flow-step-text">测评输入</span>
+                <span class="profile-flow-step-status" id="profileFlowStepStatus1">待开始</span>
+            </button>
+            <button type="button" class="profile-flow-step" data-step="2" onclick="goProfileStep(2)">
+                <span class="profile-flow-step-index">2</span>
+                <span class="profile-flow-step-text">简历输入</span>
+                <span class="profile-flow-step-status" id="profileFlowStepStatus2">待开始</span>
+            </button>
+            <button type="button" class="profile-flow-step" data-step="3" onclick="goProfileStep(3)">
+                <span class="profile-flow-step-index">3</span>
+                <span class="profile-flow-step-text">访谈补充</span>
+                <span class="profile-flow-step-status" id="profileFlowStepStatus3">待开始</span>
+            </button>
+            <button type="button" class="profile-flow-step" data-step="4" onclick="goProfileStep(4)">
+                <span class="profile-flow-step-index">4</span>
+                <span class="profile-flow-step-text">统一画像结果</span>
+                <span class="profile-flow-step-status" id="profileFlowStepStatus4">总览</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="profileFlowStep1" class="profile-flow-panel">
     <div class="assessment-hub-shell mb-6">
         <div class="assessment-hub-hero">
             <div class="assessment-hero-copy">
@@ -16,7 +55,6 @@
                     <button type="button" class="assessment-hero-btn primary" onclick="openAssessmentModal('mbti')">开始 MBTI 测评</button>
                     <button type="button" class="assessment-hero-btn secondary" onclick="openAssessmentModal('holland')">开始霍兰德测评</button>
                     <button type="button" class="assessment-hero-btn ghost" onclick="openAssessmentModal()">打开测评中心</button>
-                    <button type="button" class="assessment-hero-btn ghost" onclick="openSettingsPanel()">⚙️ 模型设置</button>
                 </div>
             </div>
             <div class="assessment-hero-side">
@@ -191,7 +229,101 @@
             </p>
         </div>
     </div>
+    <div class="profile-flow-actions mb-6">
+        <button type="button" class="profile-flow-btn ghost" onclick="skipProfileStep(1)">跳过本步</button>
+        <button type="button" class="profile-flow-btn primary" onclick="nextProfileStep()">下一步：简历输入</button>
+    </div>
+    </div>
 
+    <div id="profileFlowStep2" class="profile-flow-panel hidden">
+    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+                <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase">Resume Input Mode</p>
+                <h3 class="text-xl font-semibold text-slate-900">简历输入模式（PDF）</h3>
+                <p class="text-sm text-slate-500 mt-1">支持文本型与扫描型 PDF，自动提取角色定位、竞赛排名、领导力与项目贡献。</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button id="resumeUploadBtn" type="button" onclick="pickResumePdf()" class="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-all disabled:cursor-not-allowed disabled:opacity-60">上传 PDF</button>
+                <button id="resumeAnalyzeBtn" type="button" onclick="analyzeResumePdf()" class="rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-medium text-sky-700 hover:bg-sky-100 transition-all disabled:cursor-not-allowed disabled:opacity-60">开始分析</button>
+                <button id="resumeDeleteBtn" type="button" onclick="deleteResumeProfile()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all disabled:cursor-not-allowed disabled:opacity-60">删除简历</button>
+            </div>
+        </div>
+        <input id="resumePdfInput" type="file" accept=".pdf,application/pdf" class="hidden" onchange="onResumePdfSelected(event)">
+
+        <div class="grid gap-4 md:grid-cols-3 mb-4">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs text-slate-500">上传状态</p>
+                <p id="resumeUploadStatus" class="mt-1 text-sm font-semibold text-slate-800">未上传</p>
+                <p id="resumeUploadMeta" class="mt-1 text-xs text-slate-500">请先上传 PDF 简历</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs text-slate-500">解析状态</p>
+                <p id="resumeAnalyzeStatus" class="mt-1 text-sm font-semibold text-slate-800">待解析</p>
+                <p id="resumeAnalyzeMeta" class="mt-1 text-xs text-slate-500">支持扫描件 OCR 回退</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs text-slate-500">置信度</p>
+                <p id="resumeConfidence" class="mt-1 text-sm font-semibold text-slate-800">--</p>
+                <p id="resumeModelHint" class="mt-1 text-xs text-slate-500">简历专用模型</p>
+            </div>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2 mb-4">
+            <div id="resumeUploadProgressWrap" class="hidden rounded-xl border border-sky-100 bg-sky-50 px-4 py-3">
+                <div class="mb-1.5 flex items-center justify-between text-xs text-sky-700">
+                    <span>文件上传进度</span>
+                    <span id="resumeUploadProgressText">0%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-sky-100">
+                    <div id="resumeUploadProgressBar" class="h-full rounded-full bg-sky-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="resumeAnalyzeProgressWrap" class="hidden rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3">
+                <div class="mb-1.5 flex items-center justify-between text-xs text-emerald-700">
+                    <span>内容分析状态</span>
+                    <span id="resumeAnalyzeProgressText">0%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-emerald-100 ring-1 ring-emerald-200/60">
+                    <div id="resumeAnalyzeProgressBar" class="h-full rounded-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+                <p class="text-sm font-semibold text-slate-800">候选人画像摘要</p>
+                <p id="resumeCandidateSummary" class="mt-2 text-sm text-slate-600 leading-6">暂无简历解析结果。</p>
+                <div class="mt-3">
+                    <p class="text-xs font-medium text-slate-500 mb-1">角色识别</p>
+                    <div id="resumeRoleTags" class="assessment-tag-row"></div>
+                </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+                <p class="text-sm font-semibold text-slate-800">竞赛与领导力信号</p>
+                <div id="resumeCompetitionList" class="mt-2"></div>
+                <div class="mt-3">
+                    <p class="text-xs font-medium text-slate-500 mb-1">领导力信号</p>
+                    <div id="resumeLeadershipTags" class="assessment-tag-row"></div>
+                </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+                <p class="text-sm font-semibold text-slate-800">项目贡献与证据片段</p>
+                <div id="resumeProjectList" class="mt-2"></div>
+                <div class="mt-3">
+                    <p class="text-xs font-medium text-slate-500 mb-1">证据片段（页码）</p>
+                    <div id="resumeEvidenceList" class="text-xs text-slate-500 space-y-1"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="profile-flow-actions mb-6">
+        <button type="button" class="profile-flow-btn ghost" onclick="skipProfileStep(2)">跳过本步</button>
+        <button type="button" class="profile-flow-btn primary" onclick="nextProfileStep()">下一步：访谈补充</button>
+    </div>
+    </div>
+
+    <div id="profileFlowStep3" class="profile-flow-panel hidden">
     <div class="rounded-3xl bg-gradient-to-r from-sky-700 via-cyan-700 to-slate-800 p-6 text-white shadow-lg mb-6 overflow-hidden relative">
         <div class="absolute top-4 right-4">
             <span id="careerInterviewHeroStatus" class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">等待系统模型配置</span>
@@ -205,7 +337,6 @@
                 </p>
                 <div class="mt-5 flex flex-wrap gap-3">
                     <button onclick="openCareerInterviewModal()" class="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-cyan-50 transition-all">开始职业访谈</button>
-                    <button onclick="openModelPicker()" class="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/15 transition-all">🤖 选择模型</button>
                 </div>
                 <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">访谈完成后会自动更新下方画像摘要、工作价值观和推荐方向。</p>
             </div>
@@ -239,7 +370,6 @@
                     <p id="careerInterviewResultProgress" class="text-2xl font-bold text-sky-700">0%</p>
                 </div>
                 <button onclick="openCareerInterviewModal()" class="career-inline-btn">继续访谈</button>
-                <button onclick="openModelPicker()" class="career-inline-btn" style="margin-left:6px">🤖 选择模型</button>
             </div>
         </div>
 
@@ -297,7 +427,13 @@
             </div>
         </div>
     </div>
+    <div class="profile-flow-actions mb-6">
+        <button type="button" class="profile-flow-btn ghost" onclick="skipProfileStep(3)">跳过本步</button>
+        <button type="button" class="profile-flow-btn primary" onclick="nextProfileStep()">下一步：查看统一画像</button>
+    </div>
+    </div>
 
+    <div id="profileFlowStep4" class="profile-flow-panel hidden">
     <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] mb-6">
         <div class="space-y-6">
             <div class="rounded-2xl bg-white p-6 shadow-sm">
@@ -305,7 +441,7 @@
                     <div>
                         <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Static Memory</p>
                         <h3 class="text-xl font-semibold text-slate-900 mt-1">基础信息入口</h3>
-                        <p class="text-sm text-slate-500 mt-1">专业、年级、目标城市和方向会进入统一画像，不新增新的持久化 scope。</p>
+                        <p class="text-sm text-slate-500 mt-1">专业、学历、目标城市和方向会进入统一画像；简历解析后会自动回填，未提供简历时可手动补充。</p>
                     </div>
                     <span id="profileBasicsStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">待补充</span>
                 </div>
@@ -315,8 +451,8 @@
                         <input id="profileMajorInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：智能科学与技术">
                     </label>
                     <label class="block">
-                        <span class="text-sm text-slate-600">年级</span>
-                        <input id="profileGradeInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：大三">
+                        <span class="text-sm text-slate-600">学历</span>
+                        <input id="profileGradeInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：本科 / 硕士">
                     </label>
                     <label class="block">
                         <span class="text-sm text-slate-600">目标城市</span>
@@ -381,6 +517,15 @@
 
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="mb-4">
+                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Capability Link</p>
+                    <h3 class="text-xl font-semibold text-slate-900 mt-1">优势与不足联动分析</h3>
+                    <p class="text-sm text-slate-500 mt-1">展示“已有能力”与“配套能力缺口”的关联，避免单点能力导致岗位推进卡住。</p>
+                </div>
+                <div id="profileCapabilityCorrelation" class="grid gap-3"></div>
+            </div>
+
+            <div class="rounded-2xl bg-white p-6 shadow-sm">
+                <div class="mb-4">
                     <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Agent Core</p>
                     <h3 class="text-xl font-semibold text-slate-900 mt-1">记忆 / 规划 / 工具 / 反思状态</h3>
                     <p class="text-sm text-slate-500 mt-1">未实现模块统一标记为 `待接入 / 即将上线`，保留规范接口字段。</p>
@@ -388,6 +533,7 @@
                 <div id="agentModuleGrid" class="grid gap-4 md:grid-cols-2"></div>
             </div>
         </div>
+    </div>
     </div>
 
     <div id="careerInterviewModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/55 p-4" onclick="handleCareerInterviewOverlayClick(event)">
@@ -442,11 +588,8 @@
                             </div>
                             <span id="careerInterviewConfigStatus" class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">未配置</span>
                         </div>
-                        <p class="text-sm text-slate-500 mb-4">管理员可点击右上角头像在「API 配置」中添加多个 API；用户可在此选择使用哪个 API 和哪个模型。</p>
+                        <p class="text-sm text-slate-500 mb-4">管理员可点击右上角头像在「API 配置」中添加多个 API；当前用户侧按系统默认模型执行。</p>
                         <div class="flex flex-wrap gap-2">
-                            <button onclick="openModelPicker()" class="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-all">
-                                🤖 选择 API 和模型
-                            </button>
                             <button onclick="openSettingsPanel()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
                                 ⚙️ API 配置
                             </button>

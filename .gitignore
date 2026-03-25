@@ -1,3 +1,5 @@
 *.doc
 *.md
 __pycache__/
+newsnow/
+*.ipynb

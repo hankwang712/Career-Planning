@@ -405,8 +405,11 @@
     </div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260321-route-align-v2"></script>
-    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260321-route-align-v2"></script>
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260322-top-model-status-v1"></script>
+    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260322-top-model-status-v1"></script>
     <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260321-analytics-v1"></script>
 </body>
 </html>

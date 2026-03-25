@@ -1,0 +1,128 @@
+{% set news = career_news or {} %}
+{% set visible_items = news.get("visible_items", []) %}
+{% set hidden_items = news.get("hidden_items", []) %}
+{% set all_items = visible_items + hidden_items %}
+
+<div id="careerNewsBoard" data-display-limit="{{ news.get('display_limit', 10) }}" class="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm mb-8">
+    <div class="mb-5 rounded-3xl border border-sky-100 bg-gradient-to-r from-sky-50 via-cyan-50 to-indigo-50 p-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <div class="flex items-center gap-2 flex-wrap mb-2">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/80 text-sky-700 border border-sky-200">
+                    每日职业资讯
+                </span>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
+                    {{ news.get("refresh_rule", "每日 09:00 更新") }}
+                </span>
+                {% if news.get("is_stale") %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    沿用上一份快照
+                </span>
+                {% endif %}
+                </div>
+                <h3 class="text-2xl font-bold text-slate-800">职业规划与计算机行业快报</h3>
+                <p class="text-sm text-slate-500 mt-1">
+                    聚焦就业趋势、校招实习、程序员岗位、AI 与软件工程方向，只保留和你当前系统场景相关的内容。
+                </p>
+                {% if news.get("stale_reason") %}
+                <p class="text-xs text-amber-600 mt-2">{{ news.get("stale_reason") }}</p>
+                {% endif %}
+            </div>
+            <div class="rounded-2xl bg-white/85 border border-slate-200 px-4 py-3 min-w-[230px] shadow-sm">
+                <p class="text-xs text-slate-500">当前快照</p>
+                <p class="text-sm font-semibold text-slate-800 mt-1">{{ news.get("snapshot_label", "--") }}</p>
+                <p class="text-xs text-slate-400 mt-2">下一次更新：{{ news.get("next_refresh_label", "--") }}</p>
+                <p class="text-xs text-slate-400 mt-1">共 {{ news.get("total", 0) }} 条</p>
+                <p id="careerNewsShowingCount" class="text-xs text-sky-600 mt-1">当前展示 {{ visible_items|length }} 条</p>
+            </div>
+        </div>
+    </div>
+
+    {% if all_items %}
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div id="careerNewsFilterBar" class="flex flex-wrap items-center gap-2">
+            <button type="button" data-filter="all" class="career-news-filter-btn inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">全部</button>
+            <button type="button" data-filter="ai_tech" class="career-news-filter-btn inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">AI/计算机</button>
+            <button type="button" data-filter="campus" class="career-news-filter-btn inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">校招/实习</button>
+            <button type="button" data-filter="job" class="career-news-filter-btn inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">求职/就业</button>
+            <button type="button" data-filter="industry" class="career-news-filter-btn inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">行业变化</button>
+        </div>
+        <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-500">排序</label>
+            <select id="careerNewsSortSelect" class="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-200">
+                <option value="newest">最新优先</option>
+                <option value="relevance">相关度优先</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="careerNewsGrid" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {% for item in all_items %}
+        {% set raw = (item.topic ~ ' ' ~ item.title ~ ' ' ~ item.source)|lower %}
+        {% set group = 'all' %}
+        {% if ('程序员' in raw) or ('ai' in raw) or ('计算机' in raw) or ('软件' in raw) or ('开发' in raw) %}
+            {% set group = 'ai_tech' %}
+        {% elif ('校招' in raw) or ('实习' in raw) or ('毕业生' in raw) or ('秋招' in raw) or ('春招' in raw) %}
+            {% set group = 'campus' %}
+        {% elif ('求职' in raw) or ('就业' in raw) or ('职业规划' in raw) or ('面试' in raw) or ('简历' in raw) %}
+            {% set group = 'job' %}
+        {% elif ('裁员' in raw) or ('扩招' in raw) or ('科技行业' in raw) or ('行业变化' in raw) %}
+            {% set group = 'industry' %}
+        {% endif %}
+        <a
+            href="{{ item.url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="career-news-item group rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-4 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md transition-all"
+            data-group="{{ group }}"
+            data-published="{{ item.published_at }}"
+            data-score="{{ item.relevance_score|default(0) }}"
+        >
+            <div class="flex items-start gap-3">
+                <div class="career-news-rank w-9 h-9 rounded-xl bg-gradient-to-br from-sky-100 to-indigo-100 text-sky-700 font-bold text-sm flex items-center justify-center flex-shrink-0">
+                    {{ loop.index0 + 1 }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-800 leading-6 group-hover:text-sky-700 transition-colors">
+                        {{ item.title }}
+                    </p>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 mt-2 flex-wrap">
+                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5">{{ item.source }}</span>
+                        <span class="text-slate-300">/</span>
+                        <span>{{ item.published_label }}</span>
+                        {% if item.topic %}
+                        <span class="text-slate-300">/</span>
+                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-sky-600">{{ item.topic }}</span>
+                        {% endif %}
+                    </div>
+                    {% if item.summary %}
+                    <p class="text-sm text-slate-500 mt-3 leading-6" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                        {{ item.summary }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div id="careerNewsMore" class="hidden mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+
+    <div class="mt-5 flex justify-center">
+        <button
+            id="careerNewsMoreBtn"
+            type="button"
+            data-expand-text="查看更多"
+            data-collapse-text="收起"
+            onclick="toggleCareerNewsMore()"
+            class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-all"
+        >
+            查看更多
+        </button>
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+        {{ news.get("empty_reason", "当前快照暂时没有抓到职业规划或计算机行业相关的新闻，系统会继续在下一次刷新窗口重试。") }}
+    </div>
+    {% endif %}
+</div>

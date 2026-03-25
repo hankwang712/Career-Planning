@@ -1,5 +1,6 @@
 {
   "assessment_hub": {
+    "savedAt": 1774414436885,
     "mbti": {
       "currentIndex": 0,
       "answers": {},
@@ -16,6 +17,155 @@
     "holland": {
       "currentIndex": 0,
       "answers": {}
+    },
+    "knowledge_version": "20260321-route-align-v2"
+  },
+  "llm_selection": {
+    "provider_id": "4dcf5be0",
+    "model": "deepseek-chat"
+  },
+  "career_interview": {
+    "started": true,
+    "loading": false,
+    "isComplete": false,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "如果不考虑专业限制，你最想长期投入哪类工作或行业？为什么？"
+      },
+      {
+        "role": "user",
+        "content": "6"
+      },
+      {
+        "role": "assistant",
+        "content": "最近一次让你很投入、甚至停不下来的任务是什么？你最享受哪一部分？"
+      },
+      {
+        "role": "user",
+        "content": "6"
+      },
+      {
+        "role": "assistant",
+        "content": "你在选职业时最看重哪三件事？比如成长、收入、稳定、影响力或自由度。"
+      }
+    ],
+    "result": {
+      "assistant_reply": "你提到享受“把事情理顺”的过程，能具体分享一个你成功理顺复杂事务的例子吗？比如，你是如何入手、又解决了哪些关键问题的？",
+      "completion_score": 17,
+      "focus_dimension": "工作价值观",
+      "is_complete": false,
+      "next_question": "你提到享受“把事情理顺”的过程，能具体分享一个你成功理顺复杂事务的例子吗？比如，你是如何入手、又解决了哪些关键问题的？",
+      "profile": {
+        "career_interests": [
+          "组织与协调",
+          "系统化处理"
+        ],
+        "dimensions": [
+          {
+            "evidence": "享受将混乱事务理顺的过程，对组织协调类活动有潜在兴趣。",
+            "name": "职业兴趣",
+            "score": 1
+          },
+          {
+            "evidence": "",
+            "name": "工作价值观",
+            "score": 0
+          },
+          {
+            "evidence": "",
+            "name": "学习方式",
+            "score": 0
+          },
+          {
+            "evidence": "",
+            "name": "沟通风格",
+            "score": 0
+          },
+          {
+            "evidence": "",
+            "name": "行动证据",
+            "score": 0
+          },
+          {
+            "evidence": "",
+            "name": "职业成熟度",
+            "score": 0
+          }
+        ],
+        "evidence_highlights": [
+          "享受理顺事务的过程"
+        ],
+        "next_steps": [],
+        "recommended_roles": [],
+        "riasec": {
+          "artistic": 0,
+          "conventional": 1,
+          "enterprising": 0,
+          "investigative": 0,
+          "realistic": 0,
+          "social": 0
+        },
+        "summary": "用户对需要逻辑梳理和系统化处理的事务表现出兴趣，享受将混乱变为有序的过程。初步显示出对事务性、组织性工作的偏好。",
+        "work_values": []
+      }
+    },
+    "completionScore": 17,
+    "focusDimension": "工作价值观",
+    "dimensionProgress": [
+      {
+        "name": "职业兴趣",
+        "target": 2,
+        "answered": 2
+      },
+      {
+        "name": "工作价值观",
+        "target": 2,
+        "answered": 0
+      },
+      {
+        "name": "学习方式",
+        "target": 2,
+        "answered": 0
+      },
+      {
+        "name": "沟通风格",
+        "target": 2,
+        "answered": 0
+      },
+      {
+        "name": "行动证据",
+        "target": 2,
+        "answered": 0
+      },
+      {
+        "name": "职业成熟度",
+        "target": 2,
+        "answered": 0
+      }
+    ],
+    "profileBasics": {
+      "major": "",
+      "grade": "",
+      "target_city": "",
+      "target_direction": ""
     }
+  },
+  "resume_profile": {
+    "file_name": "1774414340_pdf.pdf",
+    "file_size": 268297,
+    "storage_path": "C:\\Users\\rog\\Desktop\\web\\app_data\\user_uploads\\system\\1774414340_pdf.pdf",
+    "uploaded_at": 1774414340,
+    "analyzed_at": null,
+    "status": "failed",
+    "analysis_meta": {
+      "running": false,
+      "job_id": "0046a84dda5f4fe8a7a0b569dd762caa",
+      "stage": "failed",
+      "stage_detail": "简历分析失败：简历结构化提炼失败：Expecting ',' delimiter: line 156 column 10 (char 6053)",
+      "stage_updated_at": 1774414514
+    },
+    "profile": null,
+    "error_message": "简历分析失败：简历结构化提炼失败：Expecting ',' delimiter: line 156 column 10 (char 6053)"
   }
 }

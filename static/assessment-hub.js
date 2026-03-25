@@ -1,5 +1,7 @@
 (function () {
   const DATA_URL = "/static/assessment-data.json?v=20260321-route-align-v2";
+  /** 浏览器本地备份（登录用户按用户名分桶，未登录为 guest），避免仅内存态在同步/刷新后丢失 */
+  const LOCAL_PROGRESS_PREFIX = "ms_assessment_hub_progress_v2_";
   const MBTI_SCALE = [
     { key: "a_strong", label: "非常偏向 A", a: 2, b: 0 },
     { key: "a_lean", label: "比较偏向 A", a: 1, b: 0 },
@@ -15,6 +17,10 @@
   const HOLLAND_ORDER = ["R", "I", "A", "S", "E", "C"];
 
   let hollandChart = null;
+  let persistTimer = null;
+  let persistSaving = false;
+  let persistDirty = false;
+  let workspaceSyncChain = Promise.resolve();
 
   const state = {
     data: null,
@@ -94,35 +100,92 @@
     notify("提示", "请点击右上角头像图标打开模型设置。", "info", 2000);
   }
 
-  function persistState() {
-    const snapshot = {
+  function getProgressStorageKey() {
+    let userKey = "guest";
+    try {
+      if (typeof window.getCurrentUser === "function") {
+        const u = window.getCurrentUser();
+        if (u && u.username) userKey = String(u.username);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return `${LOCAL_PROGRESS_PREFIX}${userKey}`;
+  }
+
+  function buildPersistPayload() {
+    return {
+      savedAt: Date.now(),
       mbti: {
         currentIndex: state.mbti.currentIndex,
         answers: state.mbti.answers,
-        clarifier: state.mbti.clarifier
+        clarifier: {
+          loading: false,
+          summary: String(state.mbti.clarifier?.summary || ""),
+          questions: Array.isArray(state.mbti.clarifier?.questions) ? state.mbti.clarifier.questions : [],
+          currentIndex: Number(state.mbti.clarifier?.currentIndex || 0),
+          answers: state.mbti.clarifier?.answers || {},
+          applied: Boolean(state.mbti.clarifier?.applied),
+          requestedSignature: String(state.mbti.clarifier?.requestedSignature || "")
+        }
       },
       holland: {
         currentIndex: state.holland.currentIndex,
         answers: state.holland.answers
-      }
+      },
+      knowledge_version: state.data?.knowledge_version || ""
     };
-    if (typeof window.saveScopedUserState === "function" && typeof window.isAuthenticatedUser === "function" && window.isAuthenticatedUser()) {
-      void window.saveScopedUserState("assessment_hub", snapshot).catch((error) => {
-        console.error("save assessment state failed", error);
-      });
+  }
+
+  function readLocalProgressSnapshot() {
+    try {
+      const raw = localStorage.getItem(getProgressStorageKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      console.warn("read local assessment progress failed", error);
+      return null;
     }
   }
 
-  async function hydrateState(force = false) {
-    if (typeof window.fetchScopedUserState !== "function" || typeof window.isAuthenticatedUser !== "function" || !window.isAuthenticatedUser()) {
-      state.hydrated = true;
-      return;
+  function writeLocalProgressSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return;
+    try {
+      localStorage.setItem(getProgressStorageKey(), JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn("write local assessment progress failed", error);
     }
-    const snapshot = await window.fetchScopedUserState("assessment_hub", force);
-    if (!snapshot) {
-      state.hydrated = true;
-      return;
-    }
+  }
+
+  function snapshotProgressScore(s) {
+    if (!s || typeof s !== "object") return -1;
+    const m = Object.keys(s.mbti?.answers || {}).length;
+    const h = Object.keys(s.holland?.answers || {}).length;
+    const t = Number(s.savedAt || 0);
+    return m * 500 + h * 2 + Math.min(t / 1e12, 1);
+  }
+
+  function mergeRemoteAndLocalProgress(serverSnap, localSnap) {
+    if (!localSnap) return serverSnap || null;
+    if (!serverSnap) return localSnap;
+    const sl = snapshotProgressScore(localSnap);
+    const ss = snapshotProgressScore(serverSnap);
+    if (sl > ss) return localSnap;
+    if (ss > sl) return serverSnap;
+    return Number(localSnap.savedAt || 0) >= Number(serverSnap.savedAt || 0) ? localSnap : serverSnap;
+  }
+
+  function shouldRepushMergedToServer(serverSnap, merged) {
+    if (!merged) return false;
+    if (typeof window.isAuthenticatedUser !== "function" || !window.isAuthenticatedUser()) return false;
+    if (!serverSnap) return snapshotProgressScore(merged) > 0;
+    return snapshotProgressScore(merged) > snapshotProgressScore(serverSnap)
+      || (snapshotProgressScore(merged) === snapshotProgressScore(serverSnap)
+        && Number(merged.savedAt || 0) > Number(serverSnap.savedAt || 0));
+  }
+
+  function applyProgressSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return;
     if (snapshot.mbti) {
       state.mbti.currentIndex = Number(snapshot.mbti.currentIndex || 0);
       state.mbti.answers = snapshot.mbti.answers || {};
@@ -132,7 +195,70 @@
       state.holland.currentIndex = Number(snapshot.holland.currentIndex || 0);
       state.holland.answers = snapshot.holland.answers || {};
     }
+  }
+
+  function persistLocalImmediate() {
+    try {
+      writeLocalProgressSnapshot(buildPersistPayload());
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function persistState() {
+    persistDirty = true;
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      void flushPersistState();
+    }, 450);
+  }
+
+  async function flushPersistState() {
+    if (persistSaving || !persistDirty) return;
+    persistSaving = true;
+    persistDirty = false;
+    const snapshot = buildPersistPayload();
+    writeLocalProgressSnapshot(snapshot);
+    const authed = typeof window.isAuthenticatedUser === "function" && window.isAuthenticatedUser()
+      && typeof window.saveScopedUserState === "function";
+    try {
+      if (authed) {
+        await window.saveScopedUserState("assessment_hub", snapshot);
+      }
+    } catch (error) {
+      console.error("save assessment state failed", error);
+    } finally {
+      persistSaving = false;
+      if (persistDirty) {
+        if (persistTimer) clearTimeout(persistTimer);
+        persistTimer = setTimeout(() => {
+          persistTimer = null;
+          void flushPersistState();
+        }, 200);
+      }
+    }
+  }
+
+  async function hydrateState(force = false) {
+    const authed = typeof window.fetchScopedUserState === "function"
+      && typeof window.isAuthenticatedUser === "function"
+      && window.isAuthenticatedUser();
+    const localSnap = readLocalProgressSnapshot();
+    let serverSnap = null;
+    if (authed) {
+      serverSnap = await window.fetchScopedUserState("assessment_hub", force);
+    }
+    const merged = mergeRemoteAndLocalProgress(serverSnap, localSnap);
+    if (merged) applyProgressSnapshot(merged);
     state.hydrated = true;
+    if (authed && shouldRepushMergedToServer(serverSnap, merged)) {
+      try {
+        await window.saveScopedUserState("assessment_hub", merged);
+      } catch (error) {
+        console.warn("reconcile assessment state to server failed", error);
+      }
+    }
   }
 
   async function loadConfig(force = false) {
@@ -150,7 +276,11 @@
       return state.config;
     }
     try {
-      state.config = await window.fetchManagedLlmConfig("assessment_hub", force);
+      if (typeof window.fetchActiveLlmRuntimeConfig === "function") {
+        state.config = await window.fetchActiveLlmRuntimeConfig(force);
+      } else {
+        state.config = await window.fetchManagedLlmConfig("assessment_hub", force);
+      }
     } catch (error) {
       console.error("load assessment config failed", error);
     }
@@ -365,9 +495,9 @@
 
   function getMbtiStatusValue(result = state.mbti.result) {
     if (!result?.completed) return "未开始";
-    if (result.unresolvedClosePairs.length) return hasMbtiConfig() ? `待澄清 ${result.unresolvedClosePairs.length} 个` : `待配置 ${result.unresolvedClosePairs.length} 个`;
-    if (result.resolvedClosePairs.length) return `已澄清 ${result.resolvedClosePairs.length} 个`;
-    return "无需澄清";
+    if (result.unresolvedClosePairs.length) return hasMbtiConfig() ? `待辅助 ${result.unresolvedClosePairs.length} 个` : `待辅助 ${result.unresolvedClosePairs.length} 个`;
+    if (result.resolvedClosePairs.length) return `已辅助 ${result.resolvedClosePairs.length} 个`;
+    return "无需辅助";
   }
 
   function getMbtiSummaryText(result = state.mbti.result) {
@@ -375,7 +505,7 @@
     if (result.unresolvedClosePairs.length) {
       return `主测先给出 ${result.rawType} 倾向，但 ${getMbtiPendingPairsLabel(result)} 仍在 5 分以内，最终类型会在 AI 二选一后确认。原始主测分布保持不变。`;
     }
-    return `原始类型 ${result.rawType}，最终类型 ${result.finalType}。${result.overview}${result.clarifierApplied ? " 临界维度已由 AI 澄清单独确认，原始分布不变。" : ""}`;
+    return `原始类型 ${result.rawType}，最终类型 ${result.finalType}。${result.overview}${result.clarifierApplied ? " 临界维度已由 AI 辅助单独确认，原始分布不变。" : ""}`;
   }
 
   function maybeAutoRunMbtiClarifier() {
@@ -400,7 +530,7 @@
             <span>${esc(item.meta.title || item.pair)}</span>
             <span>${item.left} ${item.leftScore} : ${item.rightScore} ${item.right}</span>
           </div>
-          <div class="assessment-dimension-sub">${item.close ? (item.clarified ? `AI 最终判定：${finalText}` : "临界维度，等待 AI 澄清") : `原始判定：${rawText}`}</div>
+          <div class="assessment-dimension-sub">${item.close ? (item.clarified ? `AI 最终判定：${finalText}` : "临界维度，等待 AI 辅助") : `原始判定：${rawText}`}</div>
           <div class="assessment-dimension-track"><div class="assessment-dimension-fill" style="width:${Math.max(leftPercent, rightPercent)}%"></div></div>
           <div class="assessment-dimension-sub">${esc(item.meta.left_label || item.left)} ${leftPercent}% / ${esc(item.meta.right_label || item.right)} ${rightPercent}%</div>
         </div>
@@ -507,7 +637,7 @@
     if (decisionBlock) decisionBlock.classList.toggle("hidden", result.resolvedClosePairs.length === 0);
     if (decisionHint) decisionHint.textContent = result.resolvedClosePairs.length
       ? "以下维度由 AI 追加题单独做最终二选一，不会修改原始主测分布。"
-      : "当前还没有 AI 澄清结论。";
+      : "当前还没有 AI 辅助结论。";
     if (decisionTags) {
       decisionTags.innerHTML = result.resolvedClosePairs.map((item) => {
         const decided = item.finalSelected === item.left ? item.meta.left_label || item.left : item.meta.right_label || item.right;
@@ -520,8 +650,8 @@
     if (clarifierBlock) clarifierBlock.classList.toggle("hidden", !need);
     if (clarifierHint) clarifierHint.textContent = need
       ? (hasMbtiConfig()
-        ? `当前最接近的维度：${getMbtiPendingPairsLabel(result)}。系统会自动生成 AI 澄清题；如果没有拉起，可以手动重试。`
-        : `当前最接近的维度：${getMbtiPendingPairsLabel(result)}。配置接口后会自动生成 AI 澄清题。`)
+        ? `当前最接近的维度：${getMbtiPendingPairsLabel(result)}。系统会自动生成 AI 辅助题；如果没有拉起，可以手动重试。`
+        : `当前最接近的维度：${getMbtiPendingPairsLabel(result)}。请先在顶部选择模型后再开始 AI 辅助。`)
       : "当前四个维度差异已经足够明显。";
   }
 
@@ -634,13 +764,13 @@
       items = [
         { title: "主测 93 题", meta: `${activeAnsweredCount("mbti")}/${mbtiQuestions().length || 93}`, cls: state.mbti.result?.completed ? "done" : "active" },
         {
-          title: "AI 澄清",
+          title: "AI 辅助",
           meta: state.mbti.clarifier.loading
             ? "自动生成中"
             : state.mbti.clarifier.questions.length
               ? `${Object.keys(state.mbti.clarifier.answers).length}/${state.mbti.clarifier.questions.length}`
               : state.mbti.result?.unresolvedClosePairs.length
-                ? (hasMbtiConfig() ? "待生成" : "待配置接口")
+                ? "待生成"
                 : "无需介入",
           cls: state.mbti.clarifier.applied ? "done" : (state.mbti.clarifier.loading || state.mbti.clarifier.questions.length ? "active" : "")
         },
@@ -780,7 +910,7 @@
     );
     return `
       <div class="assessment-ai-card">
-        <span class="assessment-mini-label">AI 澄清题 · ${left}/${right}</span>
+        <span class="assessment-mini-label">AI 辅助题 · ${left}/${right}</span>
         <h4 class="assessment-question-title" style="margin-top:0.35rem;">${esc(q.question)}</h4>
         <p class="assessment-summary-text">${esc(state.mbti.clarifier.summary || "本轮仅用于确认接近维度。")}</p>
         ${renderPoleStrip(left, q.option_a, right, q.option_b)}
@@ -795,10 +925,8 @@
     const pendingPairs = getMbtiPendingPairsLabel(result);
     const resolvedPairs = result.resolvedClosePairs.map((item) => `${item.left}/${item.right}`).join("、");
     const aiAction = !result.unresolvedClosePairs.length
-      ? `<button type="button" class="assessment-nav-btn primary" disabled>无需 AI 澄清</button>`
-      : hasMbtiConfig()
-        ? `<button type="button" class="assessment-nav-btn primary" onclick="runMbtiClarifier({ force: true })">${result.resolvedClosePairs.length ? "重新生成 AI 追问" : "立即生成 AI 追问"}</button>`
-        : `<button type="button" class="assessment-nav-btn primary" onclick="toggleAssessmentConfigPanel(true)">配置 AI 接口</button>`;
+      ? `<button type="button" class="assessment-nav-btn primary" disabled>无需 AI 辅助</button>`
+      : `<button type="button" class="assessment-nav-btn primary" onclick="runMbtiClarifier({ force: true })">${result.resolvedClosePairs.length ? "重新开始 AI 辅助" : "开始 AI 辅助"}</button>`;
     return `
       <div class="assessment-result-panel">
         <div class="assessment-type-row">
@@ -819,21 +947,21 @@
         </div>
         <p class="assessment-summary-text">${esc(getMbtiSummaryText(result))}</p>
         <div class="assessment-dimension-list">${renderMbtiDims(result)}</div>
-        ${result.resolvedClosePairs.length ? `<div class="assessment-decision-block"><div><span class="assessment-mini-label">AI 澄清结论</span><p class="assessment-summary-text">以下维度由 AI 追加题单独完成最终二选一，不会改动原始主测分布。</p></div><div class="assessment-tag-row">${result.resolvedClosePairs.map((item) => {
+        ${result.resolvedClosePairs.length ? `<div class="assessment-decision-block"><div><span class="assessment-mini-label">AI 辅助结论</span><p class="assessment-summary-text">以下维度由 AI 追加题单独完成最终二选一，不会改动原始主测分布。</p></div><div class="assessment-tag-row">${result.resolvedClosePairs.map((item) => {
           const decided = item.finalSelected === item.left ? item.meta.left_label || item.left : item.meta.right_label || item.right;
           return `<span class="assessment-tag warm">${esc(item.meta.title || item.pair)} → ${esc(decided)}</span>`;
         }).join("")}</div></div>` : ""}
         <div><span class="assessment-mini-label">${result.unresolvedClosePairs.length ? "当前参考职业" : "职业示例"}</span><div class="assessment-tag-row">${tags(result.careers, "accent")}</div></div>
         <div class="assessment-ai-card">
-          <span class="assessment-mini-label">AI 澄清状态</span>
+          <span class="assessment-mini-label">AI 辅助状态</span>
           <p class="assessment-summary-text">${
             !result.closePairs.length
               ? "四个维度差异已足够明显，最终类型无需 AI 补判。"
               : result.unresolvedClosePairs.length
                 ? (hasMbtiConfig()
-                  ? `检测到 ${pendingPairs} 落在 5 分以内，系统会自动生成 AI 二选一澄清题；原始主测分布保持不变。`
-                  : `检测到 ${pendingPairs} 落在 5 分以内。补充配置接口后会自动生成 AI 二选一澄清题；当前先保留主测类型 ${result.rawType}。`)
-                : `AI 已对 ${resolvedPairs} 完成二选一确认。原始主测分布保持不变，最终类型按澄清结论输出。`
+                  ? `检测到 ${pendingPairs} 落在 5 分以内，系统会自动生成 AI 二选一辅助题；原始主测分布保持不变。`
+                  : `检测到 ${pendingPairs} 落在 5 分以内。请先在顶部选择模型，再开始 AI 辅助；当前先保留主测类型 ${result.rawType}。`)
+                : `AI 已对 ${resolvedPairs} 完成二选一确认。原始主测分布保持不变，最终类型按辅助结论输出。`
           }</p>
           <div class="assessment-question-actions"><button type="button" class="assessment-nav-btn" onclick="showAssessmentHome()">返回测评首页</button>${aiAction}</div>
         </div>
@@ -872,12 +1000,12 @@
     }
     if (state.activeTest === "mbti") {
       if (state.mbti.clarifier.loading) {
-        setModalHeader("MBTI 性格倾向测评", "正在根据临界维度生成追加澄清题。", "AI 生成中", "请稍候");
-        content.innerHTML = `<div class="assessment-ai-card" style="display:grid;justify-items:start;"><div class="assessment-loader"></div><h4 class="assessment-question-title">正在生成 MBTI 澄清题</h4><p class="assessment-summary-text">请稍候，系统正在准备当前内容。</p></div>`;
+        setModalHeader("MBTI 性格倾向测评", "正在根据临界维度生成追加辅助题。", "AI 生成中", "请稍候");
+        content.innerHTML = `<div class="assessment-ai-card" style="display:grid;justify-items:start;"><div class="assessment-loader"></div><h4 class="assessment-question-title">正在生成 MBTI 辅助题</h4><p class="assessment-summary-text">请稍候，系统正在准备当前内容。</p></div>`;
         return;
       }
       if (state.mbti.clarifier.questions.length && !state.mbti.clarifier.applied && Object.keys(state.mbti.clarifier.answers).length < state.mbti.clarifier.questions.length) {
-        setModalHeader("MBTI 性格倾向测评", "本轮仅用于确认分数最接近的维度。", "AI 澄清中", `${state.mbti.clarifier.currentIndex + 1} / ${state.mbti.clarifier.questions.length}`);
+        setModalHeader("MBTI 性格倾向测评", "本轮仅用于确认分数最接近的维度。", "AI 辅助中", `${state.mbti.clarifier.currentIndex + 1} / ${state.mbti.clarifier.questions.length}`);
         content.innerHTML = renderClarifierQuestion();
         return;
       }
@@ -888,7 +1016,7 @@
           : result.unresolvedClosePairs.length
             ? (hasMbtiConfig()
               ? "主测已完成，临界维度会自动触发 AI 二选一。"
-              : "主测已完成，补充接口配置后会自动触发 AI 二选一。")
+              : "主测已完成，请先在顶部选择模型后触发 AI 二选一。")
             : "主测已完成，可查看原始分布与 AI 最终判定。";
         setModalHeader("MBTI 性格倾向测评", subtitle, "结果已生成", `${result.answeredCount} / ${result.totalQuestions}`);
         content.innerHTML = renderMbtiResult();
@@ -954,6 +1082,11 @@
     if (!state.activeTest || state.activeTest === "holland") {
       state.holland = { currentIndex: 0, answers: {}, result: null };
     }
+    try {
+      localStorage.removeItem(getProgressStorageKey());
+    } catch (_) {
+      /* ignore */
+    }
     recomputeAll();
     renderAll();
     notify("测评进度已重置", state.activeTest ? `已清空 ${state.activeTest.toUpperCase()} 当前进度` : "已清空双测评进度", "info", 1800);
@@ -1007,7 +1140,8 @@
     const auto = Boolean(options.auto);
     const result = state.mbti.result;
     if (!result?.completed) {
-      notify("请先完成 MBTI 主测", "完成 93 道主测题后才会判断是否需要追加澄清题。", "warning", 2200);
+      if (!auto && typeof openAssessmentModal === "function") openAssessmentModal("mbti");
+      notify("请先完成 MBTI 主测", "完成 93 道主测题后才会判断是否需要追加辅助题。", "warning", 2200);
       return;
     }
     if (!result.closePairs.length) {
@@ -1015,20 +1149,37 @@
       return;
     }
     if (result.clarifierApplied && !force) {
-      notify("AI 澄清已完成", "最终二选一已经确认，原始主测分布保持不变。", "info", 1800);
+      notify("AI 辅助已完成", "最终二选一已经确认，原始主测分布保持不变。", "info", 1800);
       return;
     }
     const signature = getMbtiResultSignature(result);
-    if (!signature) return;
-    if (!force && state.mbti.clarifier.requestedSignature === signature && (state.mbti.clarifier.loading || state.mbti.clarifier.questions.length)) {
+    if (!signature) {
+      if (!auto) notify("暂未生成可用签名", "请稍后重试，或先返回 MBTI 结果页。", "warning", 1800);
       return;
     }
+    if (!force && state.mbti.clarifier.requestedSignature === signature && (state.mbti.clarifier.loading || state.mbti.clarifier.questions.length)) {
+      if (!auto) {
+        if (typeof openAssessmentModal === "function") openAssessmentModal("mbti");
+        notify(
+          state.mbti.clarifier.loading ? "AI 辅助题生成中" : "AI 辅助题已就绪",
+          state.mbti.clarifier.loading ? "请稍候，生成完成后自动可答题。" : "已为你打开 MBTI 页面，请继续完成辅助题。",
+          "info",
+          1800
+        );
+      }
+      return;
+    }
+    await loadConfig(true);
     const config = getConfig();
     if (!hasMbtiConfig()) {
       if (!auto) {
-        state.configOpen = true;
-        renderModal();
-        notify("AI 配置未就绪", config.editable ? "请先保存系统 AI 配置。" : "当前配置由系统管理员统一维护，请联系管理员。", "warning", 2600);
+        if (typeof window.openModelPicker === "function") {
+          window.openModelPicker();
+        } else {
+          state.configOpen = true;
+          if (typeof openAssessmentModal === "function") openAssessmentModal("mbti");
+        }
+        notify("模型未就绪", "请先点击顶部“模型选择”完成配置后再开始 AI 辅助。", "warning", 2600);
       }
       return;
     }
@@ -1036,7 +1187,10 @@
     persistState();
     renderModal();
     try {
-      const response = await fetch("/api/mbti-clarifier", {
+      const apiTarget = typeof window.resolveApiUrl === "function"
+        ? window.resolveApiUrl("/api/mbti-clarifier")
+        : "/api/mbti-clarifier";
+      const response = await fetch(apiTarget, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1047,7 +1201,7 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || `请求失败：${response.status}`);
-      if (!Array.isArray(payload.questions) || !payload.questions.length) throw new Error("AI 未返回可用的澄清题");
+      if (!Array.isArray(payload.questions) || !payload.questions.length) throw new Error("AI 未返回可用的辅助题");
       state.mbti.clarifier = {
         ...createEmptyClarifier(),
         requestedSignature: signature,
@@ -1056,12 +1210,12 @@
       };
       persistState();
       renderAll();
-      notify(auto ? "AI 已自动介入" : "AI 澄清题已生成", `共 ${state.mbti.clarifier.questions.length} 题`, "success", 1800);
+      notify(auto ? "AI 已自动介入" : "AI 辅助题已生成", `共 ${state.mbti.clarifier.questions.length} 题`, "success", 1800);
     } catch (error) {
       state.mbti.clarifier = { ...createEmptyClarifier(), requestedSignature: signature };
       persistState();
       renderAll();
-      notify("生成澄清题失败", auto ? `${error.message}，可稍后手动重试。` : error.message, "error", 2600);
+      notify("生成辅助题失败", auto ? `${error.message}，可稍后手动重试。` : error.message, "error", 2600);
     }
   }
 
@@ -1072,7 +1226,7 @@
     state.mbti.clarifier.currentIndex = idx >= 0 ? Math.min(idx + 1, list.length - 1) : state.mbti.clarifier.currentIndex;
     if (Object.keys(state.mbti.clarifier.answers).length >= list.length) {
       state.mbti.clarifier.applied = true;
-      notify("MBTI 澄清完成", "最终二选一已确认，原始主测分布保持不变。", "success", 1800);
+      notify("MBTI 辅助完成", "最终二选一已确认，原始主测分布保持不变。", "success", 1800);
     }
     recomputeAll();
     renderAll();
@@ -1109,14 +1263,7 @@
     publishAssessmentSnapshot();
   }
 
-  async function syncWorkspace(force = false) {
-    if (typeof window.isAuthenticatedUser !== "function" || !window.isAuthenticatedUser()) {
-      resetWorkspaceState();
-      fillConfigForm();
-      updateConfigStatus();
-      renderAll();
-      return;
-    }
+  async function syncWorkspaceInternal(force = false) {
     resetWorkspaceState();
     await loadConfig(force);
     await hydrateState(force);
@@ -1125,16 +1272,36 @@
     maybeAutoRunMbtiClarifier();
   }
 
+  function syncWorkspace(force = false) {
+    workspaceSyncChain = workspaceSyncChain
+      .then(() => syncWorkspaceInternal(force))
+      .catch((err) => console.error("assessment workspace sync failed", err));
+    return workspaceSyncChain;
+  }
+
   function init() {
     ensureData().catch((error) => console.error("assessment data load failed", error));
     const authReady = window.userWorkspaceState?.authReadyPromise;
     if (authReady && typeof authReady.finally === "function") {
-      authReady.finally(() => { void syncWorkspace(true); });
+      authReady.finally(() => { syncWorkspace(true); });
     } else {
-      void syncWorkspace(true);
+      syncWorkspace(true);
     }
     window.addEventListener("app:auth-changed", () => {
-      void syncWorkspace(true);
+      syncWorkspace(true);
+    });
+    window.addEventListener("beforeunload", () => {
+      try {
+        if (persistTimer) clearTimeout(persistTimer);
+        persistLocalImmediate();
+      } catch (_) {
+        /* ignore */
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        persistLocalImmediate();
+      }
     });
   }
 
@@ -1153,7 +1320,9 @@
   window.goToPreviousClarifierQuestion = goToPreviousClarifierQuestion;
   window.renderAssessmentModal = renderModal;
   window.getAssessmentHubSnapshot = function () { return buildAssessmentHubSnapshot(); };
-  window.assessmentHubUpdateConfigStatus = updateConfigStatus;
+  window.assessmentHubUpdateConfigStatus = function () {
+    void loadConfig(true);
+  };
 
   document.addEventListener("DOMContentLoaded", init);
 })();

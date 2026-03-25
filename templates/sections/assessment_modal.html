@@ -7,7 +7,6 @@
                 <p id="assessmentModalSubtitle" class="assessment-modal-subtitle">任选一个测评开始，系统会自动记录进度并同步结果卡片。</p>
             </div>
             <div class="assessment-modal-toolbar">
-                <button type="button" class="assessment-toolbar-btn" onclick="closeAssessmentModal(); openSettingsPanel()">⚙️ 模型设置</button>
                 <button type="button" class="assessment-toolbar-btn" onclick="restartAssessmentFlow()">重新开始</button>
                 <button type="button" class="assessment-toolbar-btn danger" onclick="closeAssessmentModal()">关闭</button>
             </div>
@@ -26,14 +25,7 @@
                     <div id="assessmentModalProgressRail" class="assessment-progress-rail"></div>
                 </div>
 
-                <div id="assessmentConfigPanel" class="assessment-config-panel hidden">
-                    <div class="assessment-side-card">
-                        <p class="assessment-mini-label">AI 澄清配置</p>
-                        <p class="assessment-config-copy">点击右上角头像打开模型设置面板进行配置。</p>
-                        <p id="assessmentConfigPanelStatus" class="assessment-config-status">未配置</p>
-                        <button type="button" class="assessment-save-btn" onclick="closeAssessmentModal(); openSettingsPanel()">打开模型设置</button>
-                    </div>
-                </div>
+                <div id="assessmentConfigPanel" class="assessment-config-panel hidden"></div>
             </aside>
 
             <section class="assessment-modal-main">
