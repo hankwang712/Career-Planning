@@ -23,19 +23,20 @@ from html import unescape
 from urllib.error import HTTPError, URLError
 from zoneinfo import ZoneInfo
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 APP_DATA_DIR = os.path.join(BASE_DIR, "app_data")
 CAREER_NEWS_CACHE_FILE = os.path.join(APP_DATA_DIR, "career_news_snapshot.json")
 CAREER_NEWS_LOCK = threading.Lock()
 
 CAREER_NEWS_TIMEZONE = ZoneInfo("Asia/Shanghai")
-CAREER_NEWS_REFRESH_HOUR = 9
+CAREER_NEWS_REFRESH_HOUR = 12
 CAREER_NEWS_DISPLAY_LIMIT = 10
 CAREER_NEWS_FETCH_LIMIT = 180
-CAREER_NEWS_MAX_ITEMS = 100
+CAREER_NEWS_MAX_ITEMS = 50
 CAREER_NEWS_TIMEOUT_SECONDS = 8
 CAREER_NEWS_EMPTY_RETRY_MINUTES = 20
 CAREER_NEWS_MAX_AGE_DAYS = 45
+CAREER_NEWS_DIRECT_MIN_TECH_HITS = 2
 CAREER_NEWS_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -82,6 +83,18 @@ CAREER_NEWS_KEYWORDS = [
     "resume",
     "upskill",
     "reskill",
+    "employee",
+    "employees",
+    "worker",
+    "workers",
+    "unemployment",
+    "labor",
+    "labour",
+    "workplace",
+    "失业",
+    "员工",
+    "就业市场",
+    "招聘市场",
 ]
 
 TECH_NEWS_KEYWORDS = [
@@ -123,6 +136,32 @@ TECH_NEWS_KEYWORDS = [
     "cybersecurity",
     "cloud",
     "product manager",
+    "ai",
+    "agent",
+    "agents",
+    "智能体",
+    "llm",
+    "llms",
+    "model",
+    "models",
+    "openai",
+    "claude",
+    "copilot",
+    "code",
+    "coding",
+    "open source",
+    "开源",
+    "database",
+    "node.js",
+    "startup",
+    "ipo",
+    "chip",
+    "chips",
+    "semiconductor",
+    "robotics",
+    "data center",
+    "datacenter",
+    "数据中心",
 ]
 
 IRRELEVANT_KEYWORDS = [
@@ -344,7 +383,10 @@ def _score_relevance(source: dict, title: str, summary: str) -> dict:
         return {"accepted": False, "score": score, "labels": []}
 
     if source.get("kind") == "direct":
-        accepted = bool(career_hits) and bool(tech_hits)
+        accepted = (
+            (bool(career_hits) and bool(tech_hits))
+            or len(tech_hits) >= CAREER_NEWS_DIRECT_MIN_TECH_HITS
+        )
     else:
         accepted = bool(career_hits) and score >= 3
 
@@ -486,21 +528,57 @@ def _dedupe_and_rank(items: list[dict], limit: int = CAREER_NEWS_FETCH_LIMIT) ->
     return ranked
 
 
+def _clean_cached_item(item: dict) -> dict:
+    clean_item = dict(item)
+    clean_item.pop("_published_sort", None)
+    clean_item.pop("rank_score", None)
+    return clean_item
+
+
+def _item_timestamp(item: dict) -> float:
+    dt = _parse_pub_date(item.get("published_at"))
+    return dt.timestamp() if dt else 0.0
+
+
+def _item_sort_key(item: dict) -> tuple[float, float, str]:
+    return (
+        _item_timestamp(item),
+        float(item.get("relevance_score") or 0),
+        _normalize_text(item.get("title") or ""),
+    )
+
+
+def _merge_and_trim_items(
+    fetched_items: list[dict],
+    cached_items: list[dict],
+    max_items: int = CAREER_NEWS_MAX_ITEMS,
+) -> list[dict]:
+    merged_by_key = {}
+    for item in list(fetched_items or []) + list(cached_items or []):
+        if not isinstance(item, dict):
+            continue
+        key = _dedupe_key(item)
+        if not key:
+            continue
+        candidate = _clean_cached_item(item)
+        existing = merged_by_key.get(key)
+        if existing is None or _item_sort_key(candidate) > _item_sort_key(existing):
+            merged_by_key[key] = candidate
+
+    merged_items = list(merged_by_key.values())
+    merged_items.sort(key=_item_sort_key, reverse=True)
+    if max_items > 0:
+        merged_items = merged_items[:max_items]
+    return merged_items
+
+
 def _sort_and_trim_items_by_time(items: list[dict], max_items: int = CAREER_NEWS_MAX_ITEMS) -> list[dict]:
     if not isinstance(items, list):
         return []
-    normalized = [dict(item) for item in items if isinstance(item, dict)]
+    normalized = [_clean_cached_item(item) for item in items if isinstance(item, dict)]
     if not normalized:
         return []
-
-    def _item_ts(item: dict) -> float:
-        dt = _parse_pub_date(item.get("published_at"))
-        if dt:
-            return dt.timestamp()
-        # 无法解析发布时间时，默认视作最旧，避免长期占用列表。
-        return 0.0
-
-    normalized.sort(key=lambda item: _item_ts(item), reverse=True)
+    normalized.sort(key=_item_sort_key, reverse=True)
     if max_items > 0:
         normalized = normalized[:max_items]
     return normalized
@@ -614,10 +692,15 @@ def _should_reuse_cached_snapshot(
     return False
 
 
-def _build_ready_payload(window: dict, items: list[dict], source_stats: list[dict]) -> dict:
+def _build_ready_payload(
+    window: dict,
+    items: list[dict],
+    source_stats: list[dict],
+    previous_items: list[dict] | None = None,
+) -> dict:
     generated_at = datetime.now(CAREER_NEWS_TIMEZONE).strftime("%Y-%m-%d %H:%M")
     has_errors = any(stat.get("status") == "error" for stat in source_stats)
-    cleaned_items = _sort_and_trim_items_by_time(items)
+    cleaned_items = _merge_and_trim_items(items, previous_items or [])
     payload = {
         **_payload_base(window),
         "snapshot_key": window["snapshot_key"],
@@ -677,35 +760,11 @@ def _build_empty_payload(window: dict, source_stats: list[dict]) -> dict:
 
 
 def _split_visible_items(items: list[dict], display_limit: int) -> tuple[list[dict], list[dict]]:
-    indexed_items = list(enumerate(items))
-    topic_order = []
-    topic_buckets = {}
-
-    for index, item in indexed_items:
-        topic = str(item.get("topic") or "")
-        if topic not in topic_buckets:
-            topic_buckets[topic] = []
-            topic_order.append(topic)
-        topic_buckets[topic].append((index, item))
-
-    visible_indices = set()
-    visible_items = []
-
-    while len(visible_items) < display_limit:
-        added_in_round = False
-        for topic in topic_order:
-            bucket = topic_buckets.get(topic) or []
-            if not bucket or len(visible_items) >= display_limit:
-                continue
-            index, item = bucket.pop(0)
-            visible_indices.add(index)
-            visible_items.append(item)
-            added_in_round = True
-        if not added_in_round:
-            break
-
-    hidden_items = [item for index, item in indexed_items if index not in visible_indices]
-    return visible_items, hidden_items
+    ordered_items = _sort_and_trim_items_by_time(items, max_items=0)
+    limit = max(0, int(display_limit or 0))
+    if limit == 0:
+        return [], ordered_items
+    return ordered_items[:limit], ordered_items[limit:]
 
 
 def get_career_news_payload(
@@ -716,25 +775,26 @@ def get_career_news_payload(
 
     with CAREER_NEWS_LOCK:
         cached = _read_cached_snapshot()
+        cached_items = list(cached.get("items") or []) if cached and isinstance(cached.get("items"), list) else []
         if _should_reuse_cached_snapshot(cached, window, force_refresh):
             payload = dict(cached)
         else:
             items, source_stats = _fetch_latest_career_news()
             if items:
-                payload = _build_ready_payload(window, items, source_stats)
+                payload = _build_ready_payload(window, items, source_stats, cached_items)
             elif cached and isinstance(cached.get("items"), list) and cached.get("items"):
                 payload = _build_stale_payload(window, cached, source_stats)
             else:
                 payload = _build_empty_payload(window, source_stats)
 
-        # 动态清理：总量最多 100 条，按发布时间保留最新内容。
+        # 动态清理：总量最多 50 条，按发布时间倒序保留最新内容。
         current_items = payload.get("items") if isinstance(payload.get("items"), list) else []
-        trimmed_items = _sort_and_trim_items_by_time(current_items)
-        if len(trimmed_items) != len(current_items):
+        trimmed_items = _sort_and_trim_items_by_time(current_items, max_items=CAREER_NEWS_MAX_ITEMS)
+        if trimmed_items != current_items:
             payload["items"] = trimmed_items
             _write_cached_snapshot(payload)
 
-    items = payload.get("items") if isinstance(payload.get("items"), list) else []
+    items = _sort_and_trim_items_by_time(payload.get("items") if isinstance(payload.get("items"), list) else [])
     visible_items, hidden_items = _split_visible_items(items, display_limit)
 
     payload["items"] = items

@@ -12,7 +12,7 @@
                     每日职业资讯
                 </span>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
-                    {{ news.get("refresh_rule", "每日 09:00 更新") }}
+                    {{ news.get("refresh_rule", "每日 12:00 更新") }}
                 </span>
                 {% if news.get("is_stale") %}
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
@@ -27,13 +27,6 @@
                 {% if news.get("stale_reason") %}
                 <p class="text-xs text-amber-600 mt-2">{{ news.get("stale_reason") }}</p>
                 {% endif %}
-            </div>
-            <div class="rounded-2xl bg-white/85 border border-slate-200 px-4 py-3 min-w-[230px] shadow-sm">
-                <p class="text-xs text-slate-500">当前快照</p>
-                <p class="text-sm font-semibold text-slate-800 mt-1">{{ news.get("snapshot_label", "--") }}</p>
-                <p class="text-xs text-slate-400 mt-2">下一次更新：{{ news.get("next_refresh_label", "--") }}</p>
-                <p class="text-xs text-slate-400 mt-1">共 {{ news.get("total", 0) }} 条</p>
-                <p id="careerNewsShowingCount" class="text-xs text-sky-600 mt-1">当前展示 {{ visible_items|length }} 条</p>
             </div>
         </div>
     </div>

@@ -2325,6 +2325,418 @@ body.auth-locked footer {
     border: 1px solid rgba(245, 158, 11, 0.22);
 }
 
+.resume-summary-panel {
+    background:
+        radial-gradient(circle at top right, rgba(125, 211, 252, 0.26), transparent 34%),
+        linear-gradient(145deg, rgba(248, 250, 252, 0.98), rgba(239, 246, 255, 0.95));
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.resume-summary-kicker,
+.resume-analysis-kicker,
+.resume-section-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #64748b;
+}
+
+.resume-summary-text {
+    color: #334155;
+    font-size: 0.95rem;
+    line-height: 1.85;
+}
+
+.resume-quick-board,
+.resume-overview-grid,
+.resume-score-grid,
+.resume-insight-grid,
+.resume-project-grid,
+.resume-evidence-grid {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.resume-quick-board,
+.resume-overview-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.resume-quick-card,
+.resume-meta-card,
+.resume-score-card,
+.resume-insight-card,
+.resume-project-card,
+.resume-evidence-card {
+    border-radius: 1.1rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.resume-quick-card,
+.resume-meta-card {
+    padding: 0.9rem 0.95rem;
+}
+
+.resume-quick-label,
+.resume-meta-label,
+.resume-score-label,
+.resume-evidence-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #94a3b8;
+}
+
+.resume-quick-value,
+.resume-meta-value {
+    margin-top: 0.35rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.resume-quick-note,
+.resume-meta-note {
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.55;
+}
+
+.resume-analysis-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.resume-analysis-hero {
+    padding: 1.15rem;
+    border-radius: 1.4rem;
+    border: 1px solid rgba(125, 211, 252, 0.26);
+    background:
+        radial-gradient(circle at top left, rgba(186, 230, 253, 0.75), transparent 28%),
+        linear-gradient(155deg, rgba(241, 245, 249, 0.94), rgba(236, 254, 255, 0.96));
+}
+
+.resume-analysis-hero-top,
+.resume-section-head,
+.resume-project-head,
+.resume-score-head,
+.resume-insight-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.9rem;
+    align-items: flex-start;
+}
+
+.resume-analysis-title,
+.resume-section-title {
+    margin-top: 0.18rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.resume-analysis-copy {
+    margin-top: 0.38rem;
+    font-size: 0.86rem;
+    line-height: 1.65;
+    color: #475569;
+    max-width: 44rem;
+}
+
+.resume-analysis-confidence {
+    min-width: 104px;
+    padding: 0.78rem 0.85rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    text-align: right;
+}
+
+.resume-analysis-confidence span {
+    display: block;
+    font-size: 0.74rem;
+    color: #64748b;
+}
+
+.resume-analysis-confidence strong {
+    display: block;
+    margin-top: 0.18rem;
+    font-size: 1.55rem;
+    line-height: 1;
+    color: #0369a1;
+}
+
+.resume-analysis-tag-row,
+.resume-project-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.resume-analysis-tag,
+.resume-project-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.42rem 0.72rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #0f766e;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1px solid rgba(94, 234, 212, 0.22);
+}
+
+.resume-score-grid {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    margin-top: 0.95rem;
+}
+
+.resume-score-card {
+    padding: 0.9rem 0.9rem 0.8rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.resume-score-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    border-radius: 999px;
+    background: #0ea5e9;
+}
+
+.resume-score-card.emerald::before { background: #10b981; }
+.resume-score-card.amber::before { background: #f59e0b; }
+.resume-score-card.indigo::before { background: #6366f1; }
+.resume-score-card.rose::before { background: #f43f5e; }
+
+.resume-score-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+}
+
+.resume-score-track {
+    width: 100%;
+    height: 0.42rem;
+    margin-top: 0.72rem;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.95);
+    overflow: hidden;
+}
+
+.resume-score-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+}
+
+.resume-score-card.emerald .resume-score-fill { background: linear-gradient(90deg, #34d399, #10b981); }
+.resume-score-card.amber .resume-score-fill { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.resume-score-card.indigo .resume-score-fill { background: linear-gradient(90deg, #818cf8, #6366f1); }
+.resume-score-card.rose .resume-score-fill { background: linear-gradient(90deg, #fb7185, #f43f5e); }
+
+.resume-score-note {
+    margin-top: 0.55rem;
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.resume-analysis-section {
+    border-radius: 1.25rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: #ffffff;
+    padding: 1rem;
+}
+
+.resume-insight-grid,
+.resume-evidence-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.resume-insight-card {
+    padding: 1rem;
+}
+
+.resume-insight-card.focus {
+    background: linear-gradient(160deg, rgba(239, 246, 255, 0.96), rgba(224, 242, 254, 0.82));
+}
+
+.resume-insight-card.calm {
+    background: linear-gradient(160deg, rgba(240, 253, 250, 0.96), rgba(207, 250, 254, 0.82));
+}
+
+.resume-insight-card.warm {
+    background: linear-gradient(160deg, rgba(255, 251, 235, 0.96), rgba(254, 243, 199, 0.88));
+}
+
+.resume-insight-confidence,
+.resume-project-role {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.58rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.resume-insight-title,
+.resume-project-title,
+.resume-evidence-title {
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.55;
+    color: #0f172a;
+}
+
+.resume-insight-copy,
+.resume-project-copy,
+.resume-evidence-copy {
+    margin-top: 0.45rem;
+    font-size: 0.84rem;
+    line-height: 1.7;
+    color: #475569;
+}
+
+.resume-insight-note {
+    margin-top: 0.55rem;
+    font-size: 0.76rem;
+    line-height: 1.55;
+    color: #64748b;
+}
+
+.resume-project-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin-top: 0.95rem;
+}
+
+.resume-project-card,
+.resume-evidence-card {
+    padding: 1rem;
+}
+
+.resume-evidence-card.evidence {
+    background: linear-gradient(150deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.92));
+}
+
+.resume-evidence-card.signal {
+    background: linear-gradient(150deg, rgba(236, 253, 245, 0.96), rgba(204, 251, 241, 0.86));
+}
+
+.resume-evidence-card.risk {
+    background: linear-gradient(150deg, rgba(255, 247, 237, 0.98), rgba(254, 242, 242, 0.92));
+}
+
+.resume-analysis-details {
+    border-radius: 1.25rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: rgba(248, 250, 252, 0.92);
+    padding: 0.2rem 1rem 1rem;
+}
+
+.resume-analysis-details summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 0 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.resume-analysis-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.resume-analysis-details summary::after {
+    content: "展开";
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.resume-analysis-details[open] summary::after {
+    content: "收起";
+}
+
+.resume-analysis-prose {
+    padding-top: 0.35rem;
+}
+
+.resume-analysis-prose h2,
+.resume-analysis-prose h3,
+.resume-analysis-prose h4 {
+    margin: 1rem 0 0.45rem;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.resume-analysis-prose h2 {
+    font-size: 1rem;
+}
+
+.resume-analysis-prose h3 {
+    font-size: 0.94rem;
+}
+
+.resume-analysis-prose h4 {
+    font-size: 0.88rem;
+}
+
+.resume-analysis-prose p,
+.resume-analysis-prose li {
+    font-size: 0.85rem;
+    line-height: 1.78;
+    color: #334155;
+}
+
+.resume-analysis-prose ul {
+    margin: 0.45rem 0 0.7rem;
+    padding-left: 1.1rem;
+}
+
+.resume-analysis-prose pre {
+    margin-top: 0.8rem;
+    padding: 0.9rem 1rem;
+    border-radius: 1rem;
+    background: #0f172a;
+    color: #e2e8f0;
+    overflow: auto;
+}
+
+.resume-analysis-prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 900px) {
+    .resume-analysis-hero-top,
+    .resume-section-head,
+    .resume-project-head,
+    .resume-score-head,
+    .resume-insight-head {
+        flex-direction: column;
+    }
+
+    .resume-analysis-confidence {
+        width: 100%;
+        text-align: left;
+    }
+}
+
 .assessment-decision-block {
     display: grid;
     gap: 0.7rem;
@@ -3181,4 +3593,3137 @@ body.auth-locked footer {
     border: 1px solid #0ea5e9;
     background: #0ea5e9;
     color: #ffffff;
+}
+
+.resume-workbench {
+    display: grid;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid #e5e7eb;
+    background: #f7f8fa;
+}
+
+.resume-workbench-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+.resume-header-kicker,
+.resume-toolbar-badge,
+.resume-sidebar-kicker,
+.resume-panel-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #98a2b3;
+}
+
+.resume-header-title {
+    margin-top: 0.2rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-header-copy {
+    max-width: 44rem;
+    margin-top: 0.45rem;
+    font-size: 0.9rem;
+    line-height: 1.6rem;
+    color: #667085;
+}
+
+.resume-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.resume-toolbar-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    letter-spacing: 0.08em;
+    color: #175cd3;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+.resume-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.resume-toolbar-btn {
+    border-radius: 0.75rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.resume-toolbar-btn.primary {
+    border: 1px solid #1677ff;
+    background: #1677ff;
+    color: #ffffff;
+}
+
+.resume-toolbar-btn.primary:hover {
+    background: #175cd3;
+    border-color: #175cd3;
+}
+
+.resume-toolbar-btn.secondary {
+    border: 1px solid #bfd7ff;
+    background: #ffffff;
+    color: #175cd3;
+}
+
+.resume-toolbar-btn.secondary:hover {
+    background: #eff6ff;
+}
+
+.resume-toolbar-btn.ghost {
+    border: 1px solid #d0d5dd;
+    background: #ffffff;
+    color: #475467;
+}
+
+.resume-toolbar-btn.ghost:hover {
+    background: #f9fafb;
+}
+
+.resume-status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.resume-status-card {
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 1.1rem 1.15rem;
+}
+
+.resume-status-card.emphasis {
+    border-color: #bfdbfe;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.resume-status-label,
+.resume-block-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #98a2b3;
+}
+
+.resume-status-value {
+    margin-top: 0.32rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-status-score {
+    margin-top: 0.15rem;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #175cd3;
+}
+
+.resume-status-meta,
+.resume-panel-meta {
+    margin-top: 0.35rem;
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+    color: #667085;
+}
+
+.resume-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.resume-sidebar {
+    position: sticky;
+    top: 5.8rem;
+}
+
+.resume-sidebar-stack,
+.resume-main-flow {
+    display: grid;
+    gap: 1rem;
+}
+
+.resume-sidebar-card,
+.resume-surface-panel {
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 1.25rem;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.resume-sidebar-card.primary {
+    border-color: #d0d5dd;
+}
+
+.resume-sidebar-card.primary::before,
+.resume-surface-panel::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 3px;
+    margin: -1.25rem -1.25rem 1rem;
+    width: calc(100% + 2.5rem);
+    border-radius: 1rem 1rem 0 0;
+    background: #1677ff;
+}
+
+.resume-sidebar-card:not(.primary)::before {
+    content: none;
+}
+
+.resume-sidebar-card-head,
+.resume-panel-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.resume-sidebar-title,
+.resume-panel-title {
+    margin-top: 0.2rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-summary-text {
+    margin-top: 0.2rem;
+    font-size: 0.9rem;
+    line-height: 1.65rem;
+    color: #344054;
+}
+
+.resume-quick-board,
+.resume-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.resume-quick-card,
+.resume-meta-card {
+    border-radius: 0.9rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 0.85rem 0.9rem;
+}
+
+.resume-quick-label,
+.resume-meta-label,
+.resume-score-label,
+.resume-evidence-group-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #98a2b3;
+}
+
+.resume-quick-value,
+.resume-meta-value {
+    margin-top: 0.35rem;
+    font-size: 0.95rem;
+    line-height: 1.4rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-quick-note,
+.resume-meta-note {
+    margin-top: 0.28rem;
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+    color: #667085;
+}
+
+.resume-keyword-group + .resume-keyword-group {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #f2f4f7;
+}
+
+.resume-panel-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.resume-local-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.36rem 0.65rem;
+    border-radius: 999px;
+    background: #f2f4f7;
+    color: #667085;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.resume-link-btn {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: #175cd3;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.resume-job-input {
+    width: 100%;
+    min-height: 11rem;
+    resize: vertical;
+    border-radius: 0.9rem;
+    border: 1px solid #d0d5dd;
+    background: #ffffff;
+    padding: 1rem 1rem 0.95rem;
+    font-size: 0.9rem;
+    line-height: 1.65rem;
+    color: #111827;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resume-job-input:focus {
+    outline: none;
+    border-color: #1677ff;
+    box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.08);
+}
+
+.resume-job-input.expanded {
+    min-height: 17rem;
+}
+
+.resume-panel-help {
+    margin-top: 0.6rem;
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+    color: #667085;
+}
+
+.resume-progress-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.resume-progress-card {
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 1rem 1rem 0.95rem;
+}
+
+.resume-progress-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #667085;
+}
+
+.resume-progress-track {
+    width: 100%;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #f2f4f7;
+    overflow: hidden;
+}
+
+.resume-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #98a2b3, #667085);
+}
+
+.resume-progress-fill.brand {
+    background: linear-gradient(90deg, #60a5fa, #1677ff);
+}
+
+.resume-workbench .assessment-tag-row {
+    gap: 0.5rem;
+}
+
+.resume-workbench .career-empty-inline,
+.resume-workbench .career-list-empty {
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+    color: #98a2b3;
+}
+
+.resume-workbench .career-tag,
+.resume-workbench .assessment-tag {
+    border: 1px solid #e4e7ec;
+    background: #f8fafc;
+    color: #475467;
+    padding: 0.38rem 0.68rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.resume-workbench .career-tag-primary,
+.resume-workbench .assessment-tag.accent {
+    border-color: #d0e2ff;
+    background: #eff6ff;
+    color: #175cd3;
+}
+
+.resume-workbench .career-tag-soft {
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #b54708;
+}
+
+.resume-workbench .career-tag-accent {
+    border-color: #d0d5dd;
+    background: #f9fafb;
+    color: #344054;
+}
+
+.resume-analysis-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.resume-analysis-hero,
+.resume-analysis-section,
+.resume-analysis-details {
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 1.25rem;
+}
+
+.resume-analysis-hero {
+    display: grid;
+    gap: 1rem;
+}
+
+.resume-analysis-hero-top,
+.resume-section-head,
+.resume-score-head,
+.resume-insight-head,
+.resume-project-head,
+.resume-evidence-group-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.resume-analysis-title,
+.resume-section-title {
+    margin-top: 0.18rem;
+    font-size: 1.05rem;
+    line-height: 1.55rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-analysis-copy {
+    margin-top: 0.35rem;
+    max-width: 40rem;
+    font-size: 0.86rem;
+    line-height: 1.55rem;
+    color: #667085;
+}
+
+.resume-analysis-confidence {
+    min-width: 130px;
+    padding: 0.9rem 1rem;
+    border-radius: 0.9rem;
+    border: 1px solid #d0e2ff;
+    background: #f8fbff;
+    text-align: right;
+}
+
+.resume-analysis-confidence span {
+    display: block;
+    font-size: 0.72rem;
+    color: #667085;
+}
+
+.resume-analysis-confidence strong {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #175cd3;
+}
+
+.resume-analysis-tag-row,
+.resume-project-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.resume-hero-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.resume-hero-fact {
+    border-radius: 0.9rem;
+    border: 1px solid #eaecf0;
+    background: #fcfcfd;
+    padding: 0.8rem 0.9rem;
+}
+
+.resume-hero-fact-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #98a2b3;
+}
+
+.resume-hero-fact-value {
+    display: block;
+    margin-top: 0.32rem;
+    font-size: 0.9rem;
+    line-height: 1.4rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-analysis-tag,
+.resume-project-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.68rem;
+    border-radius: 999px;
+    border: 1px solid #d0e2ff;
+    background: #eff6ff;
+    color: #175cd3;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.resume-score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.resume-score-card {
+    padding: 1rem;
+    border-radius: 0.95rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    box-shadow: none;
+}
+
+.resume-score-card::before {
+    content: none;
+}
+
+.resume-score-value {
+    font-size: 1.45rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-score-track {
+    width: 100%;
+    height: 0.42rem;
+    margin-top: 0.7rem;
+    border-radius: 999px;
+    background: #f2f4f7;
+    overflow: hidden;
+}
+
+.resume-score-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #60a5fa, #1677ff);
+}
+
+.resume-score-note {
+    margin-top: 0.55rem;
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+    color: #667085;
+}
+
+.resume-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.resume-insight-card {
+    border-radius: 0.95rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 1rem;
+    box-shadow: none;
+}
+
+.resume-insight-card.focus,
+.resume-insight-card.calm,
+.resume-insight-card.warm {
+    background: #ffffff;
+}
+
+.resume-insight-card.focus { border-left: 4px solid #1677ff; }
+.resume-insight-card.calm { border-left: 4px solid #98a2b3; }
+.resume-insight-card.warm { border-left: 4px solid #f59e0b; }
+
+.resume-insight-confidence,
+.resume-project-role,
+.resume-evidence-group-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: #f2f4f7;
+    color: #475467;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.resume-insight-title,
+.resume-project-title,
+.resume-evidence-title {
+    margin-top: 0.5rem;
+    font-size: 0.92rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-insight-copy,
+.resume-project-copy,
+.resume-evidence-copy {
+    margin-top: 0.4rem;
+    font-size: 0.83rem;
+    line-height: 1.5rem;
+    color: #475467;
+}
+
+.resume-insight-note {
+    margin-top: 0.5rem;
+    font-size: 0.76rem;
+    line-height: 1.35rem;
+    color: #667085;
+}
+
+.resume-project-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    margin-top: 1rem;
+}
+
+.resume-project-card {
+    border-radius: 0.95rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 1rem;
+    box-shadow: none;
+}
+
+.resume-evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.resume-evidence-group {
+    border-radius: 0.95rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 1rem;
+}
+
+.resume-evidence-group.brand { border-top: 3px solid #1677ff; }
+.resume-evidence-group.warning { border-top: 3px solid #f59e0b; }
+.resume-evidence-group.neutral { border-top: 3px solid #98a2b3; }
+
+.resume-evidence-group-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.9rem;
+}
+
+.resume-evidence-entry {
+    padding-top: 0.75rem;
+    border-top: 1px solid #f2f4f7;
+}
+
+.resume-evidence-entry:first-child {
+    padding-top: 0;
+    border-top: none;
+}
+
+.resume-analysis-details {
+    padding: 0.2rem 1.25rem 1rem;
+    background: #fcfcfd;
+}
+
+.resume-analysis-details summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.95rem 0 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.resume-analysis-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.resume-analysis-details summary::after {
+    content: "展开";
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #667085;
+}
+
+.resume-analysis-details[open] summary::after {
+    content: "收起";
+}
+
+.resume-analysis-prose {
+    padding-top: 0.2rem;
+}
+
+.resume-analysis-prose h2,
+.resume-analysis-prose h3,
+.resume-analysis-prose h4 {
+    margin: 1rem 0 0.45rem;
+    color: #111827;
+    line-height: 1.45;
+}
+
+.resume-analysis-prose h2 {
+    font-size: 1rem;
+}
+
+.resume-analysis-prose h3 {
+    font-size: 0.94rem;
+}
+
+.resume-analysis-prose h4 {
+    font-size: 0.88rem;
+}
+
+.resume-analysis-prose p,
+.resume-analysis-prose li {
+    font-size: 0.84rem;
+    line-height: 1.7rem;
+    color: #344054;
+}
+
+.resume-analysis-prose ul {
+    margin: 0.45rem 0 0.7rem;
+    padding-left: 1.15rem;
+}
+
+.resume-analysis-prose pre {
+    margin-top: 0.8rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.9rem;
+    background: #111827;
+    color: #e5e7eb;
+    overflow: auto;
+}
+
+@media (max-width: 1200px) {
+    .resume-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-sidebar {
+        position: static;
+    }
+
+    .resume-score-grid,
+    .resume-evidence-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .resume-workbench-header,
+    .resume-analysis-hero-top,
+    .resume-section-head,
+    .resume-panel-head {
+        flex-direction: column;
+    }
+
+    .resume-toolbar {
+        align-items: flex-start;
+    }
+
+    .resume-status-grid,
+    .resume-progress-grid,
+    .resume-score-grid,
+    .resume-insight-grid,
+    .resume-evidence-grid,
+    .resume-hero-facts,
+    .resume-quick-board,
+    .resume-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-analysis-confidence {
+        width: 100%;
+        text-align: left;
+    }
+}
+
+#profile {
+    --resume-bg: #f8fafc;
+    --resume-card: #ffffff;
+    --resume-muted-surface: #f3f5fb;
+    --resume-border: #e5e7eb;
+    --resume-text: #1f2937;
+    --resume-muted: #6b7280;
+    --resume-soft: #9ca3af;
+    --resume-brand: #4f46e5;
+    --resume-brand-deep: #4338ca;
+    --resume-brand-soft: #eef2ff;
+    --resume-success: #10b981;
+    --resume-warning: #f59e0b;
+    --resume-danger: #ef4444;
+}
+
+.profile-flow-wrap {
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid var(--resume-border);
+    background: linear-gradient(180deg, #ffffff 0%, var(--resume-bg) 100%);
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.05);
+}
+
+.profile-flow-head {
+    margin-bottom: 1rem;
+}
+
+.profile-flow-kicker {
+    color: var(--resume-soft);
+}
+
+.profile-flow-title {
+    font-size: 1.125rem;
+    line-height: 1.55rem;
+    color: var(--resume-text);
+}
+
+.profile-flow-hint {
+    color: var(--resume-muted);
+}
+
+#profileFlowModelStatus {
+    border: 1px solid #dbe1f1;
+    background: #ffffff;
+    color: var(--resume-muted);
+    border-radius: 999px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.profile-flow-nav {
+    gap: 1rem;
+}
+
+.profile-flow-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    grid-template-areas:
+        "index text"
+        "index status";
+    gap: 0.3rem 0.85rem;
+    min-height: 5.2rem;
+    padding: 1rem 1.1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--resume-border);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.profile-flow-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.profile-flow-step-index {
+    grid-area: index;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.82rem;
+    background: #eef2f7;
+    color: var(--resume-muted);
+}
+
+.profile-flow-step-text {
+    grid-area: text;
+    align-self: end;
+    font-size: 0.92rem;
+    color: var(--resume-text);
+}
+
+.profile-flow-step-status {
+    grid-area: status;
+    align-self: start;
+    font-size: 0.76rem;
+    color: var(--resume-muted);
+}
+
+.profile-flow-step.is-active {
+    border-color: rgba(79, 70, 229, 0.18);
+    background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);
+    box-shadow: 0 18px 36px rgba(79, 70, 229, 0.12);
+}
+
+.profile-flow-step.is-active .profile-flow-step-index {
+    background: var(--resume-brand);
+    color: #ffffff;
+    box-shadow: 0 10px 22px rgba(79, 70, 229, 0.28);
+}
+
+.profile-flow-step.is-done {
+    border-color: rgba(16, 185, 129, 0.24);
+    background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+}
+
+.profile-flow-step.is-done .profile-flow-step-index {
+    background: var(--resume-success);
+    color: #ffffff;
+}
+
+.profile-flow-step.is-skipped {
+    border-color: #e4e7ec;
+    background: #fafbfc;
+}
+
+.profile-flow-step.is-skipped .profile-flow-step-index {
+    background: #e5e7eb;
+    color: #667085;
+}
+
+.profile-flow-btn {
+    border-radius: 0.9rem;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.86rem;
+}
+
+.profile-flow-btn.ghost {
+    border-color: #d0d5dd;
+    color: #475467;
+}
+
+.profile-flow-btn.primary {
+    border-color: var(--resume-brand);
+    background: var(--resume-brand);
+    box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.resume-workbench {
+    gap: 1.5rem;
+    padding: 2rem;
+    border-radius: 1.75rem;
+    border: 1px solid var(--resume-border);
+    background: linear-gradient(180deg, #ffffff 0%, var(--resume-bg) 100%);
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.07);
+}
+
+.resume-workbench-header {
+    gap: 1.5rem;
+}
+
+.resume-header-kicker,
+.resume-toolbar-badge,
+.resume-sidebar-kicker,
+.resume-panel-kicker,
+.resume-analysis-kicker,
+.resume-section-kicker,
+.resume-bento-kicker {
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--resume-soft);
+}
+
+.resume-header-title {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+    font-weight: 700;
+    color: var(--resume-text);
+}
+
+.resume-header-copy {
+    max-width: 48rem;
+    font-size: 0.92rem;
+    line-height: 1.7rem;
+    color: var(--resume-muted);
+}
+
+.resume-toolbar-badge {
+    padding: 0.48rem 0.85rem;
+    color: var(--resume-brand);
+    background: var(--resume-brand-soft);
+    border: 1px solid #c7d2fe;
+}
+
+.resume-toolbar-actions {
+    gap: 0.8rem;
+}
+
+.resume-toolbar-btn {
+    border-radius: 0.95rem;
+    padding: 0.78rem 1.15rem;
+    font-size: 0.88rem;
+}
+
+.resume-toolbar-btn.primary {
+    border-color: var(--resume-brand);
+    background: var(--resume-brand);
+    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.22);
+}
+
+.resume-toolbar-btn.primary:hover {
+    background: var(--resume-brand-deep);
+    border-color: var(--resume-brand-deep);
+}
+
+.resume-toolbar-btn.secondary {
+    border-color: #c7d2fe;
+    color: var(--resume-brand);
+}
+
+.resume-toolbar-btn.secondary:hover {
+    background: var(--resume-brand-soft);
+}
+
+.resume-toolbar-btn.ghost:hover {
+    background: #f9fafb;
+}
+
+.resume-status-grid,
+.resume-progress-grid,
+.resume-sidebar-stack,
+.resume-main-flow {
+    gap: 1.5rem;
+}
+
+.resume-status-card,
+.resume-sidebar-card,
+.resume-surface-panel,
+.resume-progress-card,
+.resume-evidence-group,
+.resume-quick-card,
+.resume-meta-card,
+.resume-score-card,
+.resume-insight-card,
+.resume-project-card {
+    border-radius: 1.25rem;
+    border: 1px solid var(--resume-border);
+    background: var(--resume-card);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+}
+
+.resume-status-card {
+    padding: 1.25rem 1.3rem;
+}
+
+.resume-status-card.emphasis {
+    border-color: #c7d2fe;
+    background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+}
+
+.resume-status-label,
+.resume-block-label,
+.resume-status-meta,
+.resume-panel-meta,
+.resume-quick-label,
+.resume-meta-label,
+.resume-hero-fact-label,
+.resume-gauge-metric span,
+.resume-story-stat span {
+    color: var(--resume-soft);
+}
+
+.resume-status-value,
+.resume-sidebar-title,
+.resume-panel-title,
+.resume-meta-value,
+.resume-quick-value,
+.resume-hero-fact-value,
+.resume-section-title,
+.resume-bento-title {
+    color: var(--resume-text);
+}
+
+.resume-status-score {
+    font-size: 2.2rem;
+    color: var(--resume-brand);
+}
+
+.resume-status-meta,
+.resume-panel-meta,
+.resume-panel-help,
+.resume-quick-note,
+.resume-meta-note,
+.resume-score-note,
+.resume-insight-copy,
+.resume-insight-note,
+.resume-project-copy,
+.resume-evidence-copy,
+.resume-gap-copy,
+.resume-action-copy,
+.resume-analysis-copy,
+.resume-story-copy,
+.resume-gauge-caption {
+    color: var(--resume-muted);
+}
+
+.resume-layout {
+    gap: 1.5rem;
+}
+
+.resume-sidebar {
+    top: 6rem;
+}
+
+.resume-studio-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.1rem;
+    align-items: start;
+}
+
+.resume-grid-span-4 {
+    grid-column: span 1;
+}
+
+.resume-grid-span-8 {
+    grid-column: span 1;
+}
+
+.resume-grid-span-12 {
+    grid-column: span 1;
+}
+
+.resume-grid-row-span-2 {
+    grid-row: auto;
+}
+
+.resume-sidebar-card,
+.resume-surface-panel {
+    padding: 1.5rem;
+}
+
+.resume-sidebar-card.primary::before,
+.resume-surface-panel::before {
+    height: 4px;
+    margin: -1.5rem -1.5rem 1.2rem;
+    width: calc(100% + 3rem);
+    background: linear-gradient(90deg, var(--resume-brand) 0%, #818cf8 100%);
+}
+
+.resume-summary-text {
+    font-size: 0.94rem;
+    line-height: 1.72rem;
+    color: #344054;
+}
+
+.resume-local-badge {
+    background: #ecfdf3;
+    color: #027a48;
+}
+
+.resume-link-btn {
+    color: var(--resume-brand);
+    font-size: 0.82rem;
+}
+
+.resume-job-input {
+    min-height: 12rem;
+    border-radius: 1rem;
+    border-color: #d0d5dd;
+    background: #ffffff;
+    padding: 1.05rem 1.05rem 1rem;
+    font-size: 0.92rem;
+    line-height: 1.72rem;
+}
+
+.resume-job-input:focus {
+    border-color: var(--resume-brand);
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+}
+
+.resume-job-input.expanded {
+    min-height: 18rem;
+}
+
+.resume-job-assist {
+    margin-top: 1rem;
+}
+
+.resume-job-assist-panel {
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+    padding: 1rem;
+}
+
+.resume-job-assist-panel.empty {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, #ffffff 48%, rgba(99, 102, 241, 0.03) 100%);
+}
+
+.resume-job-assist-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.resume-job-assist-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--resume-soft);
+}
+
+.resume-job-assist-title {
+    margin-top: 0.2rem;
+    font-size: 0.95rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: var(--resume-text);
+}
+
+.resume-job-assist-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-top: 1rem;
+}
+
+.resume-job-assist-card {
+    padding: 0.95rem;
+    border-radius: 1rem;
+    border: 1px solid #e4e7ec;
+    background: rgba(255, 255, 255, 0.86);
+    display: grid;
+    gap: 0.55rem;
+}
+
+.resume-job-assist-tag {
+    display: inline-flex;
+    width: fit-content;
+    padding: 0.32rem 0.65rem;
+    border-radius: 999px;
+    background: var(--resume-brand-soft);
+    color: var(--resume-brand);
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.resume-job-assist-card-title {
+    font-size: 0.9rem;
+    line-height: 1.45rem;
+    font-weight: 600;
+    color: var(--resume-text);
+}
+
+.resume-job-assist-copy {
+    font-size: 0.8rem;
+    line-height: 1.5rem;
+    color: var(--resume-muted);
+}
+
+.resume-job-assist-action,
+.resume-job-assist-hint {
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.resume-job-assist-action {
+    width: fit-content;
+    border: none;
+    background: transparent;
+    color: var(--resume-brand);
+    padding: 0;
+}
+
+.resume-job-assist-hint {
+    color: #667085;
+}
+
+.resume-stack-details {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.95rem;
+    background: #fcfcff;
+    padding: 0.75rem 0.8rem;
+}
+
+.resume-stack-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #344054;
+}
+
+.resume-stack-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.resume-stack-details summary::after {
+    content: "展开";
+    margin-left: 0.45rem;
+    font-size: 0.74rem;
+    color: #667085;
+}
+
+.resume-stack-details[open] summary::after {
+    content: "收起";
+}
+
+.resume-stack-content {
+    margin-top: 0.65rem;
+}
+
+.resume-progress-card {
+    padding: 1.1rem 1.15rem 1rem;
+}
+
+.resume-progress-head {
+    margin-bottom: 0.8rem;
+    font-size: 0.8rem;
+    color: var(--resume-muted);
+}
+
+.resume-progress-track,
+.resume-score-track {
+    background: #ebeef5;
+}
+
+.resume-progress-fill {
+    background: linear-gradient(90deg, #c0c7d4 0%, #98a2b3 100%);
+}
+
+.resume-progress-fill.brand {
+    background: linear-gradient(90deg, var(--resume-brand) 0%, #818cf8 100%);
+}
+
+.resume-workbench .career-tag,
+.resume-workbench .assessment-tag,
+.resume-analysis-tag,
+.resume-project-tag,
+.resume-radar-pill,
+.resume-action-tag,
+.resume-score-chip {
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.resume-workbench .career-tag,
+.resume-workbench .assessment-tag {
+    border-color: #e4e7ec;
+    background: #f8fafc;
+    color: #475467;
+}
+
+.resume-workbench .career-tag-primary,
+.resume-workbench .assessment-tag.accent {
+    border-color: #c7d2fe;
+    background: var(--resume-brand-soft);
+    color: var(--resume-brand);
+}
+
+.resume-workbench .career-tag-soft {
+    border-color: #fde68a;
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.resume-analysis-shell {
+    display: grid;
+    gap: 0.95rem;
+}
+
+.resume-analysis-banner {
+    padding: 1.35rem 1.5rem;
+    border-radius: 1.25rem;
+    border: 1px solid #c7d2fe;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%);
+}
+
+.resume-analysis-title {
+    margin-top: 0.25rem;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+}
+
+.resume-bento-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.95rem;
+}
+
+.resume-bento-card {
+    position: relative;
+    min-width: 0;
+    padding: 1.15rem;
+    border-radius: 1.25rem;
+    border: 1px solid var(--resume-border);
+    background: var(--resume-card);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.resume-bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.resume-bento-card.is-placeholder,
+.resume-analysis-banner.is-placeholder,
+.resume-evidence-group.is-placeholder,
+.resume-score-card.is-placeholder,
+.resume-insight-card.is-placeholder {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+
+.resume-bento-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(79, 70, 229, 0.22), rgba(129, 140, 248, 0));
+}
+
+.resume-bento-span-4 {
+    grid-column: span 1;
+}
+
+.resume-bento-span-8 {
+    grid-column: span 1;
+}
+
+.resume-bento-span-12 {
+    grid-column: span 1;
+}
+
+.resume-bento-head,
+.resume-section-head,
+.resume-score-head,
+.resume-insight-head,
+.resume-project-head,
+.resume-evidence-group-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.resume-score-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.72rem;
+    border: 1px solid transparent;
+}
+
+.resume-score-chip.brand,
+.resume-score-card.brand,
+.resume-gauge-ring.brand {
+    --resume-accent: var(--resume-brand);
+}
+
+.resume-score-chip.success,
+.resume-score-card.success,
+.resume-gauge-ring.success {
+    --resume-accent: var(--resume-success);
+}
+
+.resume-score-chip.warning,
+.resume-score-card.warning,
+.resume-gauge-ring.warning {
+    --resume-accent: var(--resume-warning);
+}
+
+.resume-score-chip.danger,
+.resume-score-card.danger,
+.resume-gauge-ring.danger {
+    --resume-accent: var(--resume-danger);
+}
+
+.resume-score-card.muted {
+    --resume-accent: #64748b;
+}
+
+.resume-score-chip {
+    color: var(--resume-accent);
+}
+
+.resume-score-chip.brand {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+}
+
+.resume-score-chip.success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.resume-score-chip.warning {
+    background: #fffbeb;
+    border-color: #fcd34d;
+}
+
+.resume-score-chip.danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.resume-score-chip.muted {
+    background: #f3f4f6;
+    border-color: #d0d5dd;
+}
+
+.resume-gauge-ring.muted {
+    --resume-accent: #98a2b3;
+}
+
+.resume-gauge-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fafaff 100%);
+}
+
+.resume-gauge-shell {
+    display: flex;
+    justify-content: center;
+    padding: 0.6rem 0 0.2rem;
+}
+
+.resume-gauge-ring {
+    width: 12rem;
+    height: 12rem;
+    display: grid;
+    place-items: center;
+    position: relative;
+    border-radius: 999px;
+    background: conic-gradient(from -90deg, var(--resume-accent) 0deg var(--score-angle), #e7eaf3 var(--score-angle) 360deg);
+    transition: transform 0.2s ease;
+}
+
+.resume-gauge-card:hover .resume-gauge-ring {
+    transform: scale(1.02);
+}
+
+.resume-gauge-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0.9rem;
+    border-radius: inherit;
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px #edf1f7;
+}
+
+.resume-gauge-core {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.resume-gauge-core strong {
+    display: block;
+    font-size: 3rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--resume-accent);
+}
+
+.resume-gauge-core span {
+    display: block;
+    margin-top: 0.45rem;
+    font-size: 0.82rem;
+    color: var(--resume-muted);
+}
+
+.resume-gauge-caption {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    line-height: 1.55rem;
+}
+
+.resume-gauge-metrics,
+.resume-gap-list,
+.resume-action-list {
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.resume-gauge-metric,
+.resume-story-stat,
+.resume-gap-item,
+.resume-action-item {
+    border-radius: 1rem;
+    border: 1px solid #eaecf0;
+    background: #fcfcfd;
+    padding: 0.9rem 0.95rem;
+}
+
+.resume-gauge-metric strong,
+.resume-story-stat strong,
+.resume-gap-title,
+.resume-action-title {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+    line-height: 1.45rem;
+    font-weight: 600;
+    color: var(--resume-text);
+}
+
+.resume-target-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+}
+
+.resume-target-copy {
+    margin-top: 0.9rem;
+    font-size: 0.87rem;
+    line-height: 1.65rem;
+    color: var(--resume-muted);
+}
+
+.resume-target-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.95rem;
+}
+
+.resume-target-stat {
+    border: 1px solid #e4e7ec;
+    border-radius: 0.95rem;
+    background: #ffffff;
+    padding: 0.75rem 0.85rem;
+}
+
+.resume-target-stat span,
+.resume-target-label {
+    display: block;
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--resume-soft);
+}
+
+.resume-target-stat strong {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.88rem;
+    line-height: 1.4rem;
+    font-weight: 600;
+    color: var(--resume-text);
+}
+
+.resume-target-group + .resume-target-group {
+    margin-top: 0.8rem;
+}
+
+.resume-target-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.55rem;
+}
+
+.resume-target-details {
+    margin-top: 0.85rem;
+    border-top: 1px dashed #e4e7ec;
+    padding-top: 0.8rem;
+}
+
+.resume-target-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #475467;
+}
+
+.resume-target-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.resume-target-details summary::after {
+    content: "展开";
+    margin-left: 0.5rem;
+    color: #667085;
+    font-size: 0.76rem;
+}
+
+.resume-target-details[open] summary::after {
+    content: "收起";
+}
+
+.resume-target-detail-content {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.resume-target-detail-content.stacked {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.resume-analysis-tag-row,
+.resume-project-tags,
+.resume-radar-insights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1rem;
+}
+
+.resume-analysis-tag,
+.resume-project-tag {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #c7d2fe;
+    background: var(--resume-brand-soft);
+    color: var(--resume-brand);
+}
+
+.resume-radar-pill {
+    padding: 0.36rem 0.72rem;
+    border: 1px solid #e4e7ec;
+    background: #f8fafc;
+    color: #475467;
+}
+
+.resume-radar-pill.positive {
+    border-color: rgba(16, 185, 129, 0.2);
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.resume-radar-pill.warning {
+    border-color: rgba(245, 158, 11, 0.2);
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.resume-score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.resume-score-card {
+    padding: 1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+}
+
+.resume-score-card::before {
+    content: none;
+}
+
+.resume-score-card {
+    border-top: 3px solid var(--resume-accent);
+}
+
+.resume-score-value {
+    font-size: 1.7rem;
+    color: var(--resume-accent);
+}
+
+.resume-score-fill {
+    background: var(--resume-accent);
+}
+
+.resume-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.resume-insight-card {
+    padding: 1rem;
+    background: #ffffff;
+}
+
+.resume-insight-card.focus {
+    border-left-color: var(--resume-brand);
+}
+
+.resume-insight-card.calm {
+    border-left-color: #64748b;
+}
+
+.resume-insight-card.warm {
+    border-left-color: var(--resume-warning);
+}
+
+.resume-insight-confidence,
+.resume-project-role,
+.resume-evidence-group-count {
+    background: #eef2f7;
+    color: #475467;
+}
+
+.resume-gap-item {
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+    align-items: flex-start;
+    gap: 0.8rem;
+}
+
+.resume-gap-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: var(--resume-warning);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.resume-gap-copy,
+.resume-action-copy {
+    margin-top: 0.35rem;
+    font-size: 0.82rem;
+    line-height: 1.5rem;
+}
+
+.resume-gap-title,
+.resume-action-title {
+    color: var(--resume-text);
+}
+
+.resume-action-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #f7f8ff 100%);
+}
+
+.resume-action-tag {
+    display: inline-flex;
+    width: fit-content;
+    padding: 0.34rem 0.68rem;
+    border: 1px solid #c7d2fe;
+    background: var(--resume-brand-soft);
+    color: var(--resume-brand);
+}
+
+.resume-action-item {
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.resume-stack-deck {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 1rem;
+}
+
+.resume-stack-stage {
+    position: relative;
+    min-height: 18.75rem;
+    isolation: isolate;
+}
+
+.resume-stack-deck.compact .resume-stack-stage {
+    min-height: 16.5rem;
+}
+
+.resume-stack-card {
+    --stack-accent: var(--resume-brand);
+    --stack-soft: rgba(37, 99, 235, 0.12);
+    position: absolute;
+    inset: 0;
+    padding: 1.05rem 1.05rem 1rem;
+    border-radius: 1.2rem;
+    border: 1px solid rgba(203, 213, 225, 0.92);
+    background: linear-gradient(145deg, var(--stack-soft) 0%, #ffffff 34%, #ffffff 100%);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.28s ease, opacity 0.28s ease, filter 0.28s ease, box-shadow 0.28s ease;
+}
+
+.resume-stack-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--stack-accent), rgba(255, 255, 255, 0));
+}
+
+.resume-stack-card::after {
+    content: "";
+    position: absolute;
+    right: -2.5rem;
+    bottom: -2.5rem;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 999px;
+    background: radial-gradient(circle, var(--stack-soft) 0%, rgba(255, 255, 255, 0) 72%);
+    pointer-events: none;
+}
+
+.resume-stack-card[data-position="active"] {
+    opacity: 1;
+    filter: none;
+    transform: translate3d(0, 0, 0) scale(1);
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.12);
+    z-index: 4;
+}
+
+.resume-stack-card[data-position="next"] {
+    opacity: 0.44;
+    filter: blur(4px) saturate(0.74);
+    transform: translate3d(1.1rem, 1rem, 0) scale(0.968);
+    z-index: 3;
+    pointer-events: none;
+}
+
+.resume-stack-card[data-position="later"] {
+    opacity: 0.16;
+    filter: blur(8px) saturate(0.65);
+    transform: translate3d(2.15rem, 2.05rem, 0) scale(0.938);
+    z-index: 2;
+    pointer-events: none;
+}
+
+.resume-stack-card[data-position="hidden"] {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translate3d(2.7rem, 2.85rem, 0) scale(0.91);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.resume-stack-deck:hover .resume-stack-card[data-position="active"] {
+    transform: translate3d(0, -0.45rem, 0) scale(1.016);
+    box-shadow: 0 28px 58px rgba(15, 23, 42, 0.16);
+}
+
+.resume-stack-deck:hover .resume-stack-card[data-position="next"],
+.resume-stack-deck:hover .resume-stack-card[data-position="later"] {
+    filter: blur(10px) saturate(0.64);
+}
+
+.resume-stack-deck:hover .resume-stack-card[data-position="next"] {
+    opacity: 0.28;
+}
+
+.resume-stack-deck:hover .resume-stack-card[data-position="later"] {
+    opacity: 0.08;
+}
+
+.resume-stack-card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 24px 54px rgba(15, 23, 42, 0.14);
+}
+
+.resume-stack-card.tone-brand {
+    --stack-accent: #2563eb;
+    --stack-soft: rgba(37, 99, 235, 0.12);
+}
+
+.resume-stack-card.tone-calm {
+    --stack-accent: #64748b;
+    --stack-soft: rgba(100, 116, 139, 0.14);
+}
+
+.resume-stack-card.tone-warm {
+    --stack-accent: #f59e0b;
+    --stack-soft: rgba(245, 158, 11, 0.14);
+}
+
+.resume-stack-card.tone-rose {
+    --stack-accent: #ef4444;
+    --stack-soft: rgba(239, 68, 68, 0.12);
+}
+
+.resume-stack-card.tone-mint {
+    --stack-accent: #0f766e;
+    --stack-soft: rgba(15, 118, 110, 0.12);
+}
+
+.resume-stack-card-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.resume-stack-order,
+.resume-stack-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    min-height: 2rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.resume-stack-order {
+    min-width: 2rem;
+    padding: 0 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--stack-accent);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.resume-stack-badge {
+    padding: 0 0.7rem;
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--stack-accent);
+}
+
+.resume-stack-label {
+    position: relative;
+    z-index: 1;
+    margin-top: 0.9rem;
+    font-size: 0.74rem;
+    line-height: 1.2rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #667085;
+}
+
+.resume-stack-title {
+    position: relative;
+    z-index: 1;
+    margin-top: 0.35rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-stack-copy {
+    position: relative;
+    z-index: 1;
+    margin-top: 0.6rem;
+    font-size: 0.88rem;
+    line-height: 1.7rem;
+    color: #475467;
+}
+
+.resume-stack-note {
+    position: relative;
+    z-index: 1;
+    margin-top: 0.85rem;
+    padding-top: 0.8rem;
+    border-top: 1px dashed rgba(148, 163, 184, 0.36);
+    font-size: 0.78rem;
+    line-height: 1.5rem;
+    color: #667085;
+}
+
+.resume-stack-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 6;
+    width: 2.35rem;
+    height: 2.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    color: #334155;
+    font-size: 1.3rem;
+    line-height: 1;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+    transform: translateY(-50%);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.resume-stack-arrow.prev {
+    left: -0.35rem;
+}
+
+.resume-stack-arrow.next {
+    right: -0.35rem;
+}
+
+.resume-stack-arrow:hover {
+    color: var(--resume-brand);
+    transform: translateY(-50%) scale(1.06);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.resume-stack-arrow:active {
+    transform: translateY(-50%) scale(0.98);
+}
+
+.resume-stack-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.resume-stack-footer.single {
+    justify-content: center;
+}
+
+.resume-stack-dots {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.resume-stack-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border: none;
+    border-radius: 999px;
+    background: #d0d5dd;
+    padding: 0;
+    transition: width 0.24s ease, background 0.24s ease, transform 0.24s ease;
+}
+
+.resume-stack-dot:hover {
+    transform: scale(1.08);
+    background: #98a2b3;
+}
+
+.resume-stack-dot.active {
+    width: 1.55rem;
+    background: #98a2b3;
+}
+
+.resume-stack-progress {
+    font-size: 0.78rem;
+    color: #98a2b3;
+}
+
+.resume-report-entry {
+    background: linear-gradient(135deg, #ffffff 0%, #fbfcff 48%, #f8fafc 100%);
+}
+
+.resume-report-open-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.65rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid #c7d2fe;
+    background: linear-gradient(135deg, #eff4ff 0%, #ffffff 100%);
+    color: #3156d3;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.resume-report-open-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(49, 86, 211, 0.14);
+    border-color: #9db4ff;
+}
+
+.resume-report-open-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.resume-report-entry-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.resume-report-entry-summary,
+.resume-report-entry-outline {
+    border-radius: 1rem;
+    border: 1px solid #e6eaf2;
+    background: rgba(255, 255, 255, 0.84);
+    padding: 1rem 1.05rem;
+}
+
+.resume-report-entry-copy {
+    font-size: 0.9rem;
+    line-height: 1.76rem;
+    color: #475467;
+}
+
+.resume-report-entry-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: 0.95rem;
+}
+
+.resume-report-entry-metric {
+    border-radius: 0.95rem;
+    border: 1px solid #edf0f6;
+    background: #fcfcfd;
+    padding: 0.82rem 0.9rem;
+}
+
+.resume-report-entry-metric span {
+    display: block;
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #98a2b3;
+}
+
+.resume-report-entry-metric strong {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+    line-height: 1.4rem;
+    color: #111827;
+}
+
+.resume-report-entry-label {
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #98a2b3;
+}
+
+.resume-report-entry-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 0.8rem;
+}
+
+.resume-report-entry-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.58rem 0.78rem;
+    border-radius: 999px;
+    border: 1px solid #e7ebf3;
+    background: #ffffff;
+    color: #475467;
+    font-size: 0.82rem;
+    line-height: 1.2rem;
+}
+
+.resume-report-entry-tag b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3156d3;
+    font-size: 0.72rem;
+}
+
+.resume-report-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    padding: 0.9rem;
+    background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), rgba(255, 255, 255, 0) 32%),
+        radial-gradient(circle at top right, rgba(147, 51, 234, 0.16), rgba(255, 255, 255, 0) 28%),
+        rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(18px);
+}
+
+.resume-report-modal:not(.hidden) {
+    display: grid;
+    place-items: center;
+}
+
+.resume-report-modal-shell {
+    width: min(96vw, 1520px);
+    height: min(94vh, 1080px);
+    margin: 0 auto;
+    border-radius: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 11%, #ffffff 24%, #ffffff 100%);
+    box-shadow: 0 32px 90px rgba(15, 23, 42, 0.26);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr;
+}
+
+.resume-report-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem 1.2rem;
+    border-bottom: 1px solid rgba(224, 231, 255, 0.9);
+    background:
+        linear-gradient(90deg, rgba(15, 76, 176, 1) 0%, rgba(67, 56, 202, 1) 52%, rgba(147, 51, 234, 0.98) 100%);
+}
+
+.resume-report-modal-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(219, 234, 254, 0.92);
+}
+
+.resume-report-modal-title {
+    margin-top: 0.4rem;
+    font-size: 1.8rem;
+    line-height: 2.2rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.resume-report-modal-subtitle {
+    margin-top: 0.45rem;
+    font-size: 0.92rem;
+    line-height: 1.6rem;
+    color: rgba(239, 246, 255, 0.86);
+}
+
+.resume-report-modal-close {
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 2rem;
+    line-height: 1;
+    transition: transform 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resume-report-modal-close:hover {
+    color: #ffffff;
+    transform: rotate(90deg);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.resume-report-modal-body {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 1rem;
+    min-height: 0;
+    padding: 1rem;
+    background:
+        linear-gradient(180deg, rgba(239, 246, 255, 0.72) 0%, rgba(255, 255, 255, 0) 16%),
+        linear-gradient(90deg, rgba(239, 246, 255, 0.65) 0%, rgba(255, 255, 255, 0) 18%);
+}
+
+.resume-report-modal-side {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.25rem 0.2rem 0.25rem 0.05rem;
+    display: grid;
+    align-content: start;
+    gap: 0.95rem;
+}
+
+.resume-report-side-card {
+    position: relative;
+    border-radius: 1.35rem;
+    border: 1px solid rgba(227, 233, 245, 0.95);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(251, 252, 255, 0.96) 100%);
+    padding: 1rem 1.05rem;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+.resume-report-side-card.primary {
+    background: linear-gradient(145deg, rgba(37, 99, 235, 0.12) 0%, rgba(255, 255, 255, 0.96) 40%, rgba(248, 250, 252, 0.98) 100%);
+    border-color: #cddafe;
+}
+
+.resume-report-side-card.muted {
+    background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+}
+
+.resume-report-side-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #98a2b3;
+}
+
+.resume-report-side-title {
+    margin-top: 0.45rem;
+    font-size: 0.96rem;
+    line-height: 1.65rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-report-side-copy {
+    margin-top: 0.55rem;
+    font-size: 0.84rem;
+    line-height: 1.6rem;
+    color: #667085;
+}
+
+.resume-report-side-metrics {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 0.9rem;
+}
+
+.resume-report-side-metrics article {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px dashed #e4e7ec;
+}
+
+.resume-report-side-metrics article:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.resume-report-side-metrics span {
+    font-size: 0.8rem;
+    color: #98a2b3;
+}
+
+.resume-report-side-metrics strong {
+    font-size: 0.84rem;
+    line-height: 1.4rem;
+    color: #111827;
+    text-align: right;
+}
+
+.resume-report-outline {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 0.8rem;
+}
+
+.resume-report-outline-btn {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.82rem 0.85rem;
+    border-radius: 1.05rem;
+    border: 1px solid #e7ebf3;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    text-align: left;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resume-report-outline-btn:hover {
+    transform: translateX(2px);
+    border-color: #c7d2fe;
+    box-shadow: 0 10px 22px rgba(49, 86, 211, 0.08);
+}
+
+.resume-report-outline-btn.active {
+    border-color: #98b4ff;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, #ffffff 55%, #f9fbff 100%);
+    box-shadow: 0 14px 28px rgba(49, 86, 211, 0.12);
+}
+
+.resume-report-outline-btn span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3156d3;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.resume-report-outline-btn strong {
+    font-size: 0.84rem;
+    line-height: 1.45rem;
+    color: #344054;
+}
+
+.resume-report-side-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.85rem;
+}
+
+.resume-report-side-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.36rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #475467;
+    font-size: 0.78rem;
+}
+
+.resume-report-side-tag.accent {
+    border-color: #c7d2fe;
+    background: #eef2ff;
+    color: #3156d3;
+}
+
+.resume-report-modal-main {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.25rem 0.15rem 0.25rem 0.1rem;
+}
+
+.resume-report-modal-empty {
+    display: grid;
+    place-items: center;
+    min-height: 100%;
+    border-radius: 1.35rem;
+    border: 1px dashed #d0d5dd;
+    background: rgba(255, 255, 255, 0.82);
+    color: #98a2b3;
+    font-size: 0.95rem;
+}
+
+.resume-report-reading-canvas {
+    padding: 0.05rem;
+}
+
+.resume-report-modal-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: start;
+    padding: 1.2rem 1.25rem;
+    border-radius: 1.45rem;
+    border: 1px solid rgba(180, 198, 255, 0.92);
+    background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.09) 0%, rgba(255, 255, 255, 0.98) 46%, rgba(147, 51, 234, 0.08) 100%);
+    box-shadow: 0 18px 36px rgba(37, 99, 235, 0.08);
+}
+
+.resume-report-modal-hero-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7491d7;
+}
+
+.resume-report-modal-hero-title {
+    margin-top: 0.5rem;
+    font-size: 1.35rem;
+    line-height: 1.85rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-report-modal-hero-copy {
+    margin-top: 0.6rem;
+    max-width: 62rem;
+    font-size: 0.93rem;
+    line-height: 1.72rem;
+    color: #475467;
+}
+
+.resume-report-modal-hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    justify-content: flex-end;
+    align-content: flex-start;
+}
+
+.resume-report-modal-reader {
+    margin-top: 1rem;
+}
+
+.resume-report-modal-reader .resume-report-doc {
+    gap: 1.2rem;
+}
+
+.resume-report-modal-reader .resume-report-section {
+    padding: 1.25rem 1.3rem;
+    border-radius: 1.45rem;
+    border-color: rgba(203, 213, 225, 0.78);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+}
+
+.resume-report-modal-reader .resume-report-section.primary {
+    border-color: rgba(167, 180, 255, 0.88);
+    box-shadow: 0 24px 44px rgba(67, 56, 202, 0.1);
+}
+
+.resume-report-modal-reader .resume-report-step {
+    width: 2.7rem;
+    min-width: 2.7rem;
+    height: 2.7rem;
+    background: linear-gradient(135deg, #3156d3 0%, #6d4df0 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 22px rgba(49, 86, 211, 0.16);
+}
+
+.resume-report-modal-reader .resume-report-head {
+    padding-bottom: 1rem;
+}
+
+.resume-report-modal-reader .resume-report-subcard {
+    border-radius: 1.1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcff 100%);
+    box-shadow: inset 0 0 0 1px rgba(231, 235, 243, 0.9);
+}
+
+.resume-report-modal-reader .resume-report-list-card {
+    border-radius: 1.05rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+}
+
+.resume-report-modal-reader .resume-report-list-badge {
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.resume-report-modal-main::-webkit-scrollbar,
+.resume-report-modal-side::-webkit-scrollbar {
+    width: 10px;
+}
+
+.resume-report-modal-main::-webkit-scrollbar-thumb,
+.resume-report-modal-side::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.78), rgba(99, 102, 241, 0.62));
+    border: 2px solid rgba(255, 255, 255, 0.92);
+}
+
+.resume-report-modal-main::-webkit-scrollbar-track,
+.resume-report-modal-side::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.resume-project-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.resume-evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+}
+
+.resume-evidence-group {
+    padding: 1.15rem;
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%);
+}
+
+.resume-evidence-group.brand {
+    border-top: 4px solid var(--resume-brand);
+}
+
+.resume-evidence-group.warning {
+    border-top: 4px solid var(--resume-warning);
+}
+
+.resume-evidence-group.neutral {
+    border-top: 4px solid #94a3b8;
+}
+
+.resume-evidence-group-list {
+    margin-top: 0.9rem;
+}
+
+.resume-details-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+}
+
+.resume-analysis-details {
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.resume-analysis-details summary {
+    padding: 0;
+    font-size: 0.92rem;
+    color: var(--resume-text);
+}
+
+.resume-analysis-details summary::after {
+    content: "展开";
+    font-size: 0.8rem;
+    color: var(--resume-muted);
+}
+
+.resume-analysis-details[open] summary::after {
+    content: "收起";
+}
+
+.resume-analysis-prose {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.resume-analysis-prose.visible {
+    margin-top: 1.1rem;
+    padding-top: 0;
+    border-top: none;
+}
+
+.resume-report-doc {
+    display: grid;
+    gap: 1rem;
+}
+
+.resume-report-section {
+    border-radius: 1.2rem;
+    border: 1px solid #e6eaf2;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    padding: 1.1rem 1.15rem;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
+}
+
+.resume-report-section.primary {
+    border-color: #c7d2fe;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(255, 255, 255, 1) 42%, rgba(248, 250, 252, 1) 100%);
+}
+
+.resume-report-head {
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid #eef1f5;
+}
+
+.resume-report-head-main {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: flex-start;
+    gap: 0.9rem;
+}
+
+.resume-report-step {
+    min-width: 2.4rem;
+    height: 2.4rem;
+    padding: 0 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--resume-brand);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.resume-report-title {
+    font-size: 1.05rem;
+    line-height: 1.6rem;
+    font-weight: 700;
+    color: #101828;
+}
+
+.resume-report-intro {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+    line-height: 1.7rem;
+    color: var(--resume-muted);
+}
+
+.resume-report-body {
+    padding-top: 1rem;
+    display: grid;
+    gap: 0.95rem;
+}
+
+.resume-report-lead {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.resume-report-subgrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.95rem;
+}
+
+.resume-report-subcard {
+    border-radius: 1rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 0.95rem 1rem;
+}
+
+.resume-report-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.45rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-report-subcontent {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.resume-report-paragraph {
+    font-size: 0.9rem;
+    line-height: 1.78rem;
+    color: #475467;
+}
+
+.resume-report-list-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.resume-report-list-card {
+    border-radius: 0.95rem;
+    border: 1px solid #e7eaf0;
+    background: #f8fafc;
+    padding: 0.85rem 0.9rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.resume-report-list-badge {
+    min-width: 1.8rem;
+    height: 1.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #e9eefb;
+    color: #42526b;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.resume-report-list-grid.ordered .resume-report-list-badge {
+    background: #eef2ff;
+    color: var(--resume-brand);
+}
+
+.resume-report-list-copy {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.68rem;
+    color: #344054;
+}
+
+.resume-report-divider {
+    height: 1px;
+    margin: 0.1rem 0;
+    background: #eef1f5;
+}
+
+.resume-report-html-fallback {
+    border-radius: 1rem;
+    border: 1px solid #eaecf0;
+    background: #ffffff;
+    padding: 1rem;
+}
+
+.resume-report-doc code {
+    display: inline-block;
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.35rem;
+    background: #f3f4f6;
+    color: #111827;
+    font-size: 0.8em;
+}
+
+.resume-analysis-prose h2,
+.resume-analysis-prose h3,
+.resume-analysis-prose h4 {
+    color: var(--resume-text);
+}
+
+.resume-analysis-prose p,
+.resume-analysis-prose li {
+    font-size: 0.88rem;
+    line-height: 1.8rem;
+    color: #475467;
+}
+
+@media (max-width: 900px) {
+    .resume-report-subgrid,
+    .resume-report-list-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (min-width: 900px) {
+    .profile-flow-step:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -1rem;
+        width: 1rem;
+        height: 1px;
+        background: #d0d5dd;
+        transform: translateY(-50%);
+    }
+}
+
+@media (max-width: 1360px) {
+    .resume-grid-span-4 {
+        grid-column: span 1;
+    }
+
+    .resume-grid-span-8,
+    .resume-grid-span-12 {
+        grid-column: span 1;
+    }
+
+    .resume-grid-row-span-2 {
+        grid-row: auto;
+    }
+
+    .resume-bento-span-4 {
+        grid-column: span 1;
+    }
+
+    .resume-bento-span-8,
+    .resume-bento-span-12 {
+        grid-column: span 1;
+    }
+
+    .resume-score-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1100px) {
+    .resume-studio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-grid-span-4,
+    .resume-grid-span-8,
+    .resume-grid-span-12 {
+        grid-column: span 1;
+    }
+}
+
+@media (max-width: 900px) {
+    .profile-flow-wrap,
+    .resume-workbench {
+        padding: 1.25rem;
+    }
+
+    .resume-workbench-header,
+    .resume-panel-head,
+    .resume-bento-head {
+        flex-direction: column;
+    }
+
+    .resume-toolbar {
+        align-items: flex-start;
+    }
+
+    .resume-bento-span-4,
+    .resume-bento-span-8,
+    .resume-bento-span-12 {
+        grid-column: span 1;
+    }
+
+    .resume-status-grid,
+    .resume-progress-grid,
+    .resume-score-grid,
+    .resume-insight-grid,
+    .resume-evidence-grid,
+    .resume-job-assist-grid,
+    .resume-target-stats,
+    .resume-quick-board,
+    .resume-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-report-entry-grid,
+    .resume-report-modal-body,
+    .resume-report-modal-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-report-modal-shell {
+        width: min(98vw, 1520px);
+        height: min(96vh, 1080px);
+    }
+
+    .resume-report-modal-side {
+        max-height: 22rem;
+    }
+
+    .resume-stack-stage {
+        min-height: 17rem;
+    }
+
+    .resume-stack-deck.compact .resume-stack-stage {
+        min-height: 15.25rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .resume-header-title {
+        font-size: 1.45rem;
+        line-height: 2rem;
+    }
+
+    .resume-studio-grid {
+        gap: 1rem;
+    }
+
+    .resume-bento-card,
+    .resume-sidebar-card,
+    .resume-surface-panel,
+    .resume-status-card {
+        padding: 1.2rem;
+    }
+
+    .resume-gauge-ring {
+        width: 10.5rem;
+        height: 10.5rem;
+    }
+
+    .resume-gauge-core strong {
+        font-size: 2.4rem;
+    }
+
+    .resume-stack-stage {
+        min-height: 17.25rem;
+    }
+
+    .resume-stack-deck.compact .resume-stack-stage {
+        min-height: 15.5rem;
+    }
+
+    .resume-stack-card {
+        padding: 0.95rem;
+    }
+
+    .resume-stack-arrow {
+        top: auto;
+        bottom: -0.2rem;
+        transform: none;
+        width: 2.15rem;
+        height: 2.15rem;
+    }
+
+    .resume-stack-arrow.prev {
+        left: 0.1rem;
+    }
+
+    .resume-stack-arrow.next {
+        right: 0.1rem;
+    }
+
+    .resume-stack-arrow:hover,
+    .resume-stack-arrow:active {
+        transform: none;
+    }
+
+    .resume-stack-footer {
+        justify-content: center;
+        padding-bottom: 0.15rem;
+    }
+
+    .resume-stack-progress {
+        display: none;
+    }
+
+    .resume-report-modal {
+        padding: 0.65rem;
+    }
+
+    .resume-report-modal-header {
+        padding: 1rem 1rem 0.95rem;
+    }
+
+    .resume-report-modal-title {
+        font-size: 1.45rem;
+        line-height: 1.95rem;
+    }
+
+    .resume-report-modal-body {
+        padding: 0.75rem;
+    }
+
+    .resume-report-side-card,
+    .resume-report-modal-hero,
+    .resume-report-modal-reader .resume-report-section {
+        padding: 0.95rem;
+    }
+
+    .resume-report-entry-metrics {
+        grid-template-columns: 1fr;
+    }
 }

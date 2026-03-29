@@ -1,219 +1,506 @@
 {
-  "window_snapshot_key": "2026-03-25",
-  "window_snapshot_label": "2026-03-25 09:00",
-  "next_refresh_label": "2026-03-26 09:00",
-  "refresh_rule": "每日 09:00 更新",
-  "snapshot_key": "2026-03-25",
-  "snapshot_label": "2026-03-25 09:00",
-  "generated_at": "2026-03-25 12:33",
+  "window_snapshot_key": "2026-03-28",
+  "window_snapshot_label": "2026-03-28 12:00",
+  "next_refresh_label": "2026-03-29 12:00",
+  "refresh_rule": "每日 12:00 更新",
+  "snapshot_key": "2026-03-28",
+  "snapshot_label": "2026-03-28 12:00",
+  "generated_at": "2026-03-28 12:50",
   "items": [
     {
-      "title": "阿里巴巴启动2027届实习生全球招聘 AI岗位占比超八成 - 观点网",
-      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE9lbjl0TmUtRXNScUc1THFULUM2XzBHcFJ6d3hRdGgzZi0wZUR1dFNRQmFWcGZxT3pYZEJ2NUtLMEJYVnZ0bXF5MjgwVDJiUQ?oc=5",
-      "summary": "阿里巴巴启动2027届实习生全球招聘 AI岗位占比超八成 观点网",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-19T07:42:39+08:00",
-      "published_label": "03-19 07:42",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 7,
+      "title": "IntelliJ IDEA 2026.1 发布：首发支持 Java 26 与 Kotlin 2.3.20，新增 Codex、Cursor 等多款 AI 智能体",
+      "url": "https://www.ithome.com/0/933/569.htm",
+      "summary": "IT之家 3 月 28 日消息，IntelliJ IDEA 2026.1 已于 3 月 26 日正式发布，带来一系列新功能与增强。 有需要的用户可从官网下载最新版本，或通过 IDE 内直接更…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T11:20:55+08:00",
+      "published_label": "03-28 11:20",
+      "topic": "科技行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "曝特斯拉马斯克曾邀请扎克伯格竞购 OpenAI 知识产权",
+      "url": "https://www.ithome.com/0/933/567.htm",
+      "summary": "IT之家 3 月 28 日消息，据《商业内幕》今天报道，最新解封的法庭文件显示，特斯拉 CEO 马斯克曾在去年 2 月提出 OpenAI 收购邀约之前， 向 Meta CEO 马克 · 扎克…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T11:02:57+08:00",
+      "published_label": "03-28 11:02",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "华硕发布 ExpertCenter P600 AiO 一体机：最高搭载 AMD 锐龙 AI 7 处理器，主打 Copilot+ AI 办公",
+      "url": "https://www.ithome.com/0/933/556.htm",
+      "summary": "IT之家 3 月 28 日消息，华硕昨日发布了两款全新的 ExpertCenter P600 AiO 一体机，分别为 27 英寸的 PM640GA 和 24 英寸级的 PM670GA。 该系…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T10:19:14+08:00",
+      "published_label": "03-28 10:19",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "【视频】大学生毕业实习，母亲特意过来给他买车... - 汽车之家",
+      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTFA0dm5Fak9QaldmOHBneWJYekdFSUoyUWdpV3VYdURfdzh2N0FFTXdFTVF1TE9rZWpqWlNvcWdzSzdsNFRxZ0NKc1pxaUg3WFd4dVdDVTRJU25XQQ?oc=5",
+      "summary": "【视频】大学生毕业实习，母亲特意过来给他买车... 汽车之家",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-28T09:39:06+08:00",
+      "published_label": "03-28 09:39",
+      "topic": "求职就业",
+      "relevance_score": 3,
       "match_tags": [
         "career"
       ]
     },
     {
-      "title": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位-品玩 - 品玩",
-      "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE9oT3ZHQzQ4Y0ktMXMxekdPVTd6N2ppenpVUEJtbkppX2RyTmdMTkV1eUNYWHdHTUVjSXpha3Zzd2RrcHNCMmxWcw?oc=5",
-      "summary": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位-品玩 品玩",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T21:58:45+08:00",
-      "published_label": "03-18 21:58",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 7,
+      "title": "你也能成为专业唱作人：AI 音乐模型 Suno v5.5 上线，写歌能模仿你的声音和风格",
+      "url": "https://www.ithome.com/0/933/546.htm",
+      "summary": "IT之家 3 月 28 日消息，AI 音乐公司 Suno 发布 v5.5 音乐生成大模型，官方称这是迄今为止表现力最强的版本。新版本全面聚焦个性化定制， 重磅推出“声音”、“自定义模型”与“…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T09:20:48+08:00",
+      "published_label": "03-28 09:20",
+      "topic": "科技行业",
+      "relevance_score": 2,
       "match_tags": [
-        "career"
+        "tech"
       ]
     },
     {
-      "title": "阿里2027届实习生招聘今日启动 AI相关岗位占比超80% - 凤凰网",
-      "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE5fdFVibTFsMzhzSlAzMGpUVjJYWGxJNVNxZ1VWNEI1clY2Y2xqeUIwNEM1VWRETGFvdGtDdEM2S2hCUm9mTURBWg?oc=5",
-      "summary": "阿里2027届实习生招聘今日启动 AI相关岗位占比超80% 凤凰网",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T18:07:43+08:00",
-      "published_label": "03-18 18:07",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 7,
+      "title": "Meta 开源全新 AI 模型 TRIBE v2，精准预测人类大脑多模态反应",
+      "url": "https://www.ithome.com/0/933/545.htm",
+      "summary": "IT之家 3 月 28 日消息，科技媒体 The Decoder 昨日（3 月 27 日）发布博文，报道称 Meta 基础人工智能研究团队（FAIR）开源全新 AI 模型 TRIBE v2，…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T09:13:57+08:00",
+      "published_label": "03-28 09:13",
+      "topic": "科技行业",
+      "relevance_score": 4,
       "match_tags": [
-        "career"
+        "tech"
       ]
     },
     {
-      "title": "阿里启动2027届实习生全球招聘 AI相关岗位占比超八成 - AASTOCKS.com",
-      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTE52b0R5UzlWYTVCR2hNOVlmZkhPWFRNNnEzT3BLUnpWVHdFdE1ycUFTZGV3TTh2MVI4eUx5ZEQtWk9oNURjRlAtYldOSDV5MnhHWVl5NlVCU0VkOHdDQkJ2WEhJVnR3Z0NTeEtHYnJ3aw?oc=5",
-      "summary": "阿里启动2027届实习生全球招聘 AI相关岗位占比超八成 AASTOCKS.com",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T15:17:00+08:00",
-      "published_label": "03-18 15:17",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 7,
+      "title": "Anthropic 史上最强 AI 模型 Claude Mythos 曝光，美国网安概念股全线暴跌",
+      "url": "https://www.ithome.com/0/933/541.htm",
+      "summary": "IT之家 3 月 28 日消息，科技媒体 decrypt 昨日（3 月 27 日）发布博文，报道称 AI 企业 Anthropic 的未公开博客草稿在网上泄露， 意外曝光了其正在研发的新 A…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T08:53:30+08:00",
+      "published_label": "03-28 08:53",
+      "topic": "科技行业",
+      "relevance_score": 2,
       "match_tags": [
-        "career"
+        "tech"
       ]
     },
     {
-      "title": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位 - 封面新闻",
-      "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTFBUTmxwOUlxNUxoRmlTUmJxdVpmVzNqaDY2cXBKTlFqWldYNHRNYVdPMUc0MlV5QjVPaXVMWWd5U19qNU42RGh5T2d2TFR3cFRMcU5uSXRZZ3NyMDNGZkhpZ2xZSzhEV1VkUnRUOUh6aENidnNTNWFZ?oc=5",
-      "summary": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位 封面新闻",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T03:56:00+08:00",
-      "published_label": "03-18 03:56",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 7,
+      "title": "警惕 AI 偷窥：Surfshark 报告 35 项数据指标，主流 AI 应用平均采集 14 项",
+      "url": "https://www.ithome.com/0/933/533.htm",
+      "summary": "IT之家 3 月 28 日消息，网络安全公司 Surfshark 最新报告显示，主流 AI 聊天机器人正大肆收集用户联系方式与浏览记录。 目前高达 70% 的 AI 应用会获取用户位置信息，…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T08:10:29+08:00",
+      "published_label": "03-28 08:10",
+      "topic": "科技行业",
+      "relevance_score": 2,
       "match_tags": [
-        "career"
+        "tech"
       ]
     },
     {
-      "title": "美团启动2026年春季校招：大模型等AI技术人才招聘成焦点 首招“食杂零售管培生” - 东方财富",
-      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE1vM2ZOYzVtS3RsTWl6WTkxLVhEN3JnZHJqTVliT1o4dVcwUDF5OFc3N2lFM1FRZ09ReFR1UnlrbVU2TEdEa1dRN1JrQTR3Y0hwVkhUX24xZlVheGJyeElhLQ?oc=5",
-      "summary": "美团启动2026年春季校招：大模型等AI技术人才招聘成焦点 首招“食杂零售管培生” 东方财富",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-04T16:00:00+08:00",
-      "published_label": "03-04 16:00",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 6,
+      "title": "为 Siri 变革铺路，苹果挖角谷歌高管 Lilian Rincon 执掌 AI 营销战略",
+      "url": "https://www.ithome.com/0/933/520.htm",
+      "summary": "IT之家 3 月 28 日消息，当地时间周五，苹果公司宣布已聘请前谷歌购物产品副总裁 Lilian Rincon 负责 AI 产品营销工作，目前该公司正在为 Siri 大改版做准备。 Lil…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-28T06:41:03+08:00",
+      "published_label": "03-28 06:41",
+      "topic": "科技行业",
+      "relevance_score": 3,
       "match_tags": [
         "career",
         "tech"
       ]
     },
     {
-      "title": "美国招聘岗位与软件工程师需求变化_新浪新闻 - 新浪网",
-      "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE1MdWdkMXJsaGViQnVPTVp5ZlVPNExFYUk5dzBRNlhYclJmWE5waXhQSnN2SHNBOTdyRkQyUktvcmttdGZKRUYtajc4TzJqU3J0eGFJWVhXMDJDTXItU3IzWllidw?oc=5",
-      "summary": "美国招聘岗位与软件工程师需求变化_新浪新闻 新浪网",
-      "source": "Google News / 程序员就业",
-      "published_at": "2026-02-25T16:00:00+08:00",
-      "published_label": "02-25 16:00",
-      "topic": "程序员就业",
-      "relevance_score": 6,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "大模型三箭齐发、芯片岗位低调招聘 字节跳动不只想赢下AI“春节档” - 东方财富",
-      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE1LN1c4cElsOTl2NjJaTzJLMXlyVUV1b19GNDFlTjIyekwwbE9jRU5WLVpuSWN0YzNyaHN1T1EwTC1lUGd6dVBNcEJ1Vi12cTZvcGp3YUdfekllejZnQVBwQ1hyUFljQQ?oc=5",
-      "summary": "大模型三箭齐发、芯片岗位低调招聘 字节跳动不只想赢下AI“春节档” 东方财富",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-02-15T16:00:00+08:00",
-      "published_label": "02-15 16:00",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 6,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "AI相关岗位占比超80%、新增七类AI岗位，阿里巴巴启动全球校招 - 中国江苏网",
-      "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQUkNCbXdGMlZEUzE2WFdlbElRZ3RRVUp0YXlvSmsyZHNZdGk5WEM5RTBBUEZoWU1LeHZWZW1KRVJDODdJOFZka1Z6NFg5SF8wVnRCWXpqbW5hWkcwM1o3bEhqcmFxSVBrRllFd3BPQ0c5VVpvTEg0eGFUUlZSWVFwbS1RR0dRYi1JaDB3?oc=5",
-      "summary": "AI相关岗位占比超80%、新增七类AI岗位，阿里巴巴启动全球校招 中国江苏网",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T18:45:00+08:00",
-      "published_label": "03-18 18:45",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "黄仁勋建议将AI Token纳入工程师薪资结构，成为硅谷新招聘条件 - Binance",
-      "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxNbWxfZnNFc0RTTHJ5NGVLMF8zNWdERG92eDRoa3F0aTVEaGM5bHpRa0hXbUpLQ2ZpQTQ4MFYyeG0wbUt6ZGZmXzZCR05uaThUbjE4b2ZJSmFLZzRTUjRJYTJicFlEYkpwZURRUDlfdGRSZ2poMHRkdkR5bGUzNFFxQUd6RQ?oc=5",
-      "summary": "黄仁勋建议将AI Token纳入工程师薪资结构，成为硅谷新招聘条件 Binance",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-18T17:55:23+08:00",
-      "published_label": "03-18 17:55",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "人工智能相关职业急缺人AI工程师平均招聘月薪超20000元 - 富途牛牛",
-      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTFBlamw3cTQ0cnd6V1lsbVVTMHVNeDV3Z3RqZnRUTkNoWmlqeUdZc0dNenhYVDVkZHhtMGFyUWdrWk9wQWg0dDB1YkdZcXEwdw?oc=5",
-      "summary": "人工智能相关职业急缺人AI工程师平均招聘月薪超20000元 富途牛牛",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-14T21:05:00+08:00",
-      "published_label": "03-14 21:05",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 5,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "薪资、社保、职业发展是咨询热点 这场招聘会104人现场达成就业意向 - 华龙网",
-      "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE8ySnVtdFNlOUV1OFRqM0QxZUpJaVBncVNzclozcDBWOExVS28wWk5WazJoWFhOdGgyUGxRcFJkUGgzWFNEZmxmUUZLbGJHS0F2WS1YWGtJSTAzWXB0SVYxRG85MkRWMl9Za21B?oc=5",
-      "summary": "薪资、社保、职业发展是咨询热点 这场招聘会104人现场达成就业意向 华龙网",
+      "title": "大学职业规划课，如何成为就业“指南针” - 中青在线",
+      "url": "https://news.google.com/rss/articles/CBMickFVX3lxTE55akR5VE9jWFpYU1VBWDZQTi1qaDBicFpYYS1MMGFINVpTd0pSQWFyRmxQRjZnOC1oVzN0eWRJaFV3eHZLM1MxZmpfN3hqU21sY1dNa25BV3psMEJWeVpHZElpdDkzX2w0aEtzMTJ3NFk1UQ?oc=5",
+      "summary": "大学职业规划课，如何成为就业“指南针” 中青在线",
       "source": "Google News / 职业规划",
-      "published_at": "2026-03-11T15:00:00+08:00",
-      "published_label": "03-11 15:00",
+      "published_at": "2026-03-28T06:38:00+08:00",
+      "published_label": "03-28 06:38",
       "topic": "职业规划",
-      "relevance_score": 9,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "新加坡AI岗位薪资排行：现状、趋势与展望 - QQ News",
-      "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFBrc1lIUXBsR3N3cU5lYmpGQnRYRk9fdk40d05sUkxVUDNvUlVUUjB5WVZMMnYwUXJaVVBIcFc3LUJ5Y3FtNFhfby1rMl9oNzg3bExZV0pB?oc=5",
-      "summary": "新加坡AI岗位薪资排行：现状、趋势与展望 QQ News",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-11T15:00:00+08:00",
-      "published_label": "03-11 15:00",
-      "topic": "AI 与计算机岗位",
       "relevance_score": 5,
       "match_tags": [
         "career"
       ]
     },
     {
-      "title": "四大保险集团“春招”开启，AI及科技类岗位成亮点 - 雪球",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE83VjFhQWVLUm9pNTA1d3lZUzF5aWFtSDgzcFVPZHdVcTdRM2FJWURWNXhSNTJOaFVTT01RdzJVV3BFOFluaDFmVTVaTkN1MWdI?oc=5",
-      "summary": "四大保险集团“春招”开启，AI及科技类岗位成亮点 雪球",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-08T16:00:00+08:00",
-      "published_label": "03-08 16:00",
-      "topic": "AI 与计算机岗位",
+      "title": "With new plugins feature, OpenAI officially takes Codex beyond coding",
+      "url": "https://arstechnica.com/ai/2026/03/openai-brings-plugins-to-codex-closing-some-of-the-gap-with-claude-code/",
+      "summary": "Things are moving fast, and competitors have offered something similar for a while.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-03-28T05:53:45+08:00",
+      "published_label": "03-28 05:53",
+      "topic": "开发与行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Why SoftBank’s new $40B loan points to a 2026 OpenAI IPO",
+      "url": "https://techcrunch.com/2026/03/27/why-softbanks-new-40b-loan-points-to-a-2026-openai-ipo/",
+      "summary": "Wall Street giants JPMorgan and Goldman Sachs are extending a 12-month, unsecured loan to the J…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-03-28T05:44:45+08:00",
+      "published_label": "03-28 05:44",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "10 Things You Can Do While Waiting in the TSA Line",
+      "url": "https://www.wired.com/story/10-things-you-can-do-while-waiting-in-the-tsa-line/",
+      "summary": "As Washington wrangles over the future of federal employees’ pay, here are some ideas for passi…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-03-28T04:44:00+08:00",
+      "published_label": "03-28 04:44",
+      "topic": "AI 与工作",
+      "relevance_score": 5,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "Memory chip giant SK hynix could help end ‘RAMmageddon’ with blockbuster US IPO",
+      "url": "https://techcrunch.com/2026/03/27/memory-chip-giant-sk-hynix-could-help-end-rammageddon-with-blockbuster-us-ipo/",
+      "summary": "SK hynix’s potential U.S. listing could raise $10-$14 billion to help it build more capacity, e…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-03-28T03:11:28+08:00",
+      "published_label": "03-28 03:11",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "非营利组织上线首个“AI 失业补助”：每月发 1000 美元，持续 1 年",
+      "url": "https://www.infoq.cn/article/cuHaMeYSqw3dOYHW1P8A?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-28T02:52:19+08:00",
+      "published_label": "03-28 02:52",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "The latest in data centers, AI, and energy",
+      "url": "https://www.theverge.com/ai-artificial-intelligence/902546/data-centers-ai-energy-power-grids-controversy",
+      "summary": "Massive new data centers are the physical foundation for tech companies’ hopes and dreams for A…",
+      "source": "The Verge / 科技职场",
+      "published_at": "2026-03-28T02:35:53+08:00",
+      "published_label": "03-28 02:35",
+      "topic": "科技职场",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "1.9 万行 Claude 写的代码进入 Node.js 核心库！社区当场吵翻天，反对者呼吁封杀AI代码",
+      "url": "https://www.infoq.cn/article/WryxXgBQWKB29rkoxuLo?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-28T02:30:30+08:00",
+      "published_label": "03-28 02:30",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "AI 已能写 80% 代码，但 Agent 也有致命短板！OpenAI Codex 技术总监：问错了，比不会写更麻烦",
+      "url": "https://www.infoq.cn/article/bycqtv38Ng71KoUjC0bH?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-28T00:37:20+08:00",
+      "published_label": "03-28 00:37",
+      "topic": "技术趋势",
+      "relevance_score": 4,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "AI 正在毁掉开源：从“协作圣地”到“垃圾洪水”，维护者士气跌至谷底，开始集体掀桌",
+      "url": "https://www.infoq.cn/article/xic3EKabhq6RYYa9mNIP?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-28T00:20:05+08:00",
+      "published_label": "03-28 00:20",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "当数据库的主要用户不再是人类：我们在 AI Agent 场景下的架构实践与思考",
+      "url": "https://www.infoq.cn/article/9OKvpT7uHXxYJBkKYyrf?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-28T00:14:09+08:00",
+      "published_label": "03-28 00:14",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "ICE Agents Frustrate Airport Workers as Shutdown Drags On",
+      "url": "https://www.wired.com/story/ice-agents-frustrate-airport-employees-as-shutdown-drags-on/",
+      "summary": "“ICE are here and they’re doing literally nothing to help,” said an airline worker in New York.",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-03-27T23:18:19+08:00",
+      "published_label": "03-27 23:18",
+      "topic": "AI 与工作",
+      "relevance_score": 7,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "谷歌员工喜提全新智能体“Smith”：与《黑客帝国》反派同名，火到官方限制访问",
+      "url": "https://www.ithome.com/0/933/513.htm",
+      "summary": "IT之家 3 月 27 日消息，据《商业内幕》今晚报道，多位知情人士透露，谷歌员工正在使用一款名为“Agent Smith”的内部 AI 工具，该工具可以自动处理包括编程在内的多项任务。由于…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-03-27T23:02:17+08:00",
+      "published_label": "03-27 23:02",
+      "topic": "科技行业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "就业指导进校园 护航女大学生高质量就业路 - 湖南红网",
+      "url": "https://news.google.com/rss/articles/CBMiYkFVX3lxTE11d2prelloMHF3Y29OUngwTlUyQWlxMmRWVzlZbVRMNkVrWHRleXZ3WkdVNS1KUlllVy0wR0VWWG96cjc3THVBQV83TkRTUjlVNF9wT2xtNWt4aTRXcElrMjZR?oc=5",
+      "summary": "就业指导进校园 护航女大学生高质量就业路 湖南红网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-27T21:48:13+08:00",
+      "published_label": "03-27 21:48",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "OpenAI shuts down Sora while Meta gets shut out in court",
+      "url": "https://techcrunch.com/video/openai-shuts-down-sora-while-meta-gets-shut-out-in-court/",
+      "summary": "When an 82-year-old Kentucky woman was offered $26 million from an AI company that wanted to bu…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-03-27T21:30:00+08:00",
+      "published_label": "03-27 21:30",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "国央企成为就业新蓝海：2026国央企招聘趋势洞察 - 新浪网",
+      "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOTkxrTFUyUjU5TktZTUJNeG8xdnp5bXBKZnZqTDdnbWFheTR4YzB6bDhWRkQ0bWlIT0x4UHZISXBCLTE3NnJzZFo2dnJyYzdQb2EzekphejVFREFGeGNMSXdaS0x5U1BfaEY2NkhZcDAtdldWb0JXeFAwbGJlOTdxYW9pa2pWd1FOM1JnQ3RrRXVyVTNoUzFGeW1BYWFJXzRnSW11SUFrSVVtbFMyTURj?oc=5",
+      "summary": "国央企成为就业新蓝海：2026国央企招聘趋势洞察 新浪网",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-27T20:57:26+08:00",
+      "published_label": "03-27 20:57",
+      "topic": "职业规划",
       "relevance_score": 5,
       "match_tags": [
         "career"
       ]
     },
     {
-      "title": "中国春季招聘活跃 AI技能跻身职场“硬通货” - Sohu",
-      "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQYkQyOVZlaG11Y3lEYzFoYnFlRFdIR0g0dDdZd2s0ZU42WnRZQU94Q3NPZllpS3hjTXZDVGNLbjNmSXVSTlFDNXJaNzMxSXRfSFd0dWo5S0tXcGE3azUwSk15ZndrZmV6UW85OWIzcHdTX2Z4clhzQVY5QWt0TlY2MG9pZ251VFU?oc=5",
-      "summary": "中国春季招聘活跃 AI技能跻身职场“硬通货” Sohu",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-03-07T22:00:23+08:00",
-      "published_label": "03-07 22:00",
-      "topic": "AI 与计算机岗位",
-      "relevance_score": 5,
+      "title": "甘肃兰州：春季双选会助力大学生就业 - 新华网",
+      "url": "https://news.google.com/rss/articles/CBMiggFBVV95cUxNMENLM21LNklVS2dHSllKVXMxc2gtbWpJWlJMbllydjA0QkdqZmNVMGlLeVpXY2lQRVJYQXVSU2pPZ3NlT1M5U1RvOWZYTV9nU2xVZTVsM2ZPRy1aTVhZOVBqWmZjUFVTYVUwVmVyM2poaEVfMDhjN1Y2aEVIdzN6eVdB?oc=5",
+      "summary": "甘肃兰州：春季双选会助力大学生就业 新华网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-27T20:17:55+08:00",
+      "published_label": "03-27 20:17",
+      "topic": "求职就业",
+      "relevance_score": 3,
       "match_tags": [
         "career"
       ]
     },
     {
-      "title": "春招四大风口行业：AI领域新发岗位量同比增长14倍，多个岗位年薪突破百万 - 紫牛新闻",
-      "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE9BUFB3bHdtYUJPWEdjZUZjN1RCU1Y3T0o1V0tlamJHdE5CM0F1M0IyUVd3T1dJQzJHVjRFaXZhS0ZsZ1VYN3FNVG1OVHZxYldSLWl0NU5vSmtqT1JiQzVrbVc4YzIyb2dG?oc=5",
-      "summary": "春招四大风口行业：AI领域新发岗位量同比增长14倍，多个岗位年薪突破百万 紫牛新闻",
-      "source": "Google News / AI 与计算机岗位",
-      "published_at": "2026-02-24T16:00:00+08:00",
-      "published_label": "02-24 16:00",
-      "topic": "AI 与计算机岗位",
+      "title": "aiXcoder全新推出代码变更应用模型aiX-apply-4B，效果比肩DeepSeek-V3.2，推理效率提升15倍",
+      "url": "https://www.infoq.cn/article/aFl3mHPMjIGb6mZX5Dv1?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-03-27T18:51:09+08:00",
+      "published_label": "03-27 18:51",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "I Asked ChatGPT 500 Questions. Here Are the Ads I Saw Most Often",
+      "url": "https://www.wired.com/story/i-asked-chatgpt-500-questions-here-are-the-ads-i-saw-most-often/",
+      "summary": "Ads are rolling out across the US on ChatGPT’s free tier. I asked OpenAI's bot 500 questions to…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-03-27T18:30:00+08:00",
+      "published_label": "03-27 18:30",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "融产教 聚合力 促就业 兴文旅 龙江冰雪文旅产教融合再谱新篇 - 经济参考报",
+      "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxNeUlodlp5ZC1WM2FabGxIYTd3ekZwQlkzZDltWUJ2TzdLQUlnSHBtalJhbjRSMC1pUllld1kxQWhnM1ZTSWk5WnFqVC1KX2I0STRod1RFTlVWSVVkWmdhLVAyYkVEVDhRaDVFa0VuZGtDeDJEMEpQR2N3dnoyME1oYQ?oc=5",
+      "summary": "融产教 聚合力 促就业 兴文旅 龙江冰雪文旅产教融合再谱新篇 经济参考报",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-27T15:08:31+08:00",
+      "published_label": "03-27 15:08",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "关注大学生就业｜用一千个日夜，换一份“命中注定”的offer - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE80X1NsVUFlNTlVX2p6eGNrMG1qbl9TTHh6Y3BLT3pzdG1rUm1xb0ZEejNzamY2SVNSLUJhNlp6N2xVT3h1Rkg5WEdiN21Rb0FSZXVfUlFPZS02OEVDM0tCdV9fTGExTkswM1MyTGFTMnEwaEFxMncydg?oc=5",
+      "summary": "关注大学生就业｜用一千个日夜，换一份“命中注定”的offer 新浪财经",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-27T12:02:00+08:00",
+      "published_label": "03-27 12:02",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "16 of the most interesting startups from YC W26 Demo Day",
+      "url": "https://techcrunch.com/2026/03/26/16-of-the-most-interesting-startups-from-yc-w26-demo-day/",
+      "summary": "From redirecting doomscrolling to training humanoid robots, these 16 startups stood out as the…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-03-27T03:30:00+08:00",
+      "published_label": "03-27 03:30",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "OpenAI abandons yet another side quest: ChatGPT’s erotic mode",
+      "url": "https://techcrunch.com/2026/03/26/openai-abandons-yet-another-side-quest-chatgpts-erotic-mode/",
+      "summary": "It's only the latest of several side projects that the AI startup has ditched over the past wee…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-03-27T02:34:02+08:00",
+      "published_label": "03-27 02:34",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Meet the Tech Reporters Using AI to Help Write and Edit Their Stories",
+      "url": "https://www.wired.com/story/tech-reporters-using-ai-write-edit-stories/",
+      "summary": "Independent writers are using AI agents all throughout their reporting process. What’s the valu…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-03-27T02:00:00+08:00",
+      "published_label": "03-27 02:00",
+      "topic": "AI 与工作",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "破解就业信息壁垒 助力学子精准突围 ——职点迷津“大学生高品质就业交流会”圆满落幕 - 中华网生活",
+      "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE1rMmEzR2o2QjBPQkZwVEZtSFYyc2F1cEdvYXIzNVdFeUZiYVVCbm1LNjA0bjNIWDhXRFRia2hFalVFWXdVOWhsQWttMXJwdUlzMUhPMUQxU3lqUUpSM2EtcXlEcw?oc=5",
+      "summary": "破解就业信息壁垒 助力学子精准突围 ——职点迷津“大学生高品质就业交流会”圆满落幕 中华网生活",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-26T16:28:06+08:00",
+      "published_label": "03-26 16:28",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "Hulu Promo Codes & Discounts: 20% Off in March",
+      "url": "https://www.wired.com/story/hulu-promo-code/",
+      "summary": "Students can get a Hulu plan for $1.99 per month. Get more details on this and other great deal…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-03-26T13:00:00+08:00",
+      "published_label": "03-26 13:00",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "抓住“金三银四”求职窗口期 - 中国经济网",
+      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE8ta3JqNDRqYnNYeE9rdWpfa1NEY3FaLXNfZ2lfU1dYZjZKOU8tR25KTlJycmV2S1dJRTd3TG1DWGRaWmxGa0NfWnlzX2dMS2xiWkNSUXBpa01ncUxfQktF?oc=5",
+      "summary": "抓住“金三银四”求职窗口期 中国经济网",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-26T06:56:00+08:00",
+      "published_label": "03-26 06:56",
+      "topic": "职业规划",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "春风行动 巾帼送岗 | 这场高校里的招聘会，为女大学生“职”引未来 - 华人头条",
+      "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxNWDBjdzRGQUU1WXAtS2RGVFVvUUc2Q2lEaTBodHdVenhtUTdQUmdvaHRGMndqaGNleVBCS0ZmRmlXU0ZYMHc0ZTJScmt6Vng3ZU5ncVZsRWxHN1FNRjVyQXpjdHRYU2JlZ0lGblQ0VTFOZzBXRmdHc2EyajBDVGgxR0NXRGZjN0k?oc=5",
+      "summary": "春风行动 巾帼送岗 | 这场高校里的招聘会，为女大学生“职”引未来 华人头条",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-25T16:21:52+08:00",
+      "published_label": "03-25 16:21",
+      "topic": "职业规划",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "超5000个优质岗位虚位以待哈尔滨新区专场招聘会广揽英才_全媒体报道_HRB蓝网 - hrbtv.net",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBGSHFodDlELTVMdGJhSnEzMHNIQ2FDOWotUmhJcTh6QnVZUUwwMUh6SVBzaGpLdlUzT0hSR0FiVEszMkVGZjdNNHpFWnpyVmttaU1Vd21ST2lrWmhCenFEeTctWDhidw?oc=5",
+      "summary": "超5000个优质岗位虚位以待哈尔滨新区专场招聘会广揽英才_全媒体报道_HRB蓝网 hrbtv.net",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-24T15:33:42+08:00",
+      "published_label": "03-24 15:33",
+      "topic": "职业规划",
       "relevance_score": 5,
       "match_tags": [
         "career"
@@ -227,52 +514,88 @@
       "published_at": "2026-03-24T08:43:00+08:00",
       "published_label": "03-24 08:43",
       "topic": "程序员就业",
-      "relevance_score": 4,
+      "relevance_score": 5,
       "match_tags": [
         "career",
         "tech"
       ]
     },
     {
-      "title": "科技行业裁员潮持续：2026年初已超4.5万人失业 - Sohu",
-      "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxNZzFxSkdhd3BWcEcxZ19LcUxSWkVVdTd0RlNhR2o1YTYxb28yRFUtYVVLNUk1aUxib0RETkdSVGdtUElFMVNFNE9IaC1JdE40NE9xUWZlSzBoUGY5cXJDVTNfREZFOUNsOUlYVXMtMjBsbHJTdnJDNmJ1dVc0QlhoZzZhVllTRzd5RXc?oc=5",
-      "summary": "科技行业裁员潮持续：2026年初已超4.5万人失业 Sohu",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-03-12T22:08:36+08:00",
-      "published_label": "03-12 22:08",
-      "topic": "科技行业变化",
-      "relevance_score": 4,
+      "title": "2026湖南省直工会“春送岗位”就业服务活动在中南大学举行 - icswb.com",
+      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE9SVC1hNUpXLTMyZWpBRE9uRFFVd0lFTW05Q2xGRmduTWRpenoxM1NXaFh0dktZb2lmSDBwWUpHeHpmOFJVN3prZVZRaFZMZ0JzM01IZkJ3bEVkWlZo?oc=5",
+      "summary": "2026湖南省直工会“春送岗位”就业服务活动在中南大学举行 icswb.com",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-23T21:50:00+08:00",
+      "published_label": "03-23 21:50",
+      "topic": "职业规划",
+      "relevance_score": 5,
       "match_tags": [
-        "career",
-        "tech"
+        "career"
       ]
     },
     {
-      "title": "韩国软件业人士：AI难撼软件市场，开发者岗位承压 - 디지털투데이",
-      "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQWmRVMmJ1SkVKdThkR2pRdGdLM00xYUxHYnAwVUNzenMxM3U0dFdJWE1jLS1vcFp3RE5ySXpyNGMxWEVubDA1cHhmdllIOHVLa0hkNVRKQzd5UTV3TXlyeFd2NTRCLXhYRDZDOU9TQzg2c1FGenhqdmxMeW5lX2cxNFdScEtEZHhVWnBGMmtCaGhtZ05zRGtMSDVVQ2swRzVkWHVMQnlTUHduc0xTbUtV?oc=5",
-      "summary": "韩国软件业人士：AI难撼软件市场，开发者岗位承压 디지털투데이",
-      "source": "Google News / 程序员就业",
-      "published_at": "2026-02-27T16:00:00+08:00",
-      "published_label": "02-27 16:00",
-      "topic": "程序员就业",
-      "relevance_score": 4,
+      "title": "一大波岗位来了！本周19场大学生就业创业活动来了→ - 新浪网",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE1uRUdDRHRFSXM4ODQxQUFkekpVcF8ta0xqSk5hdVZpODdGRG8zd3pBOU5FMUJzOVlwZkVsNGtLN1Y1c0o3d2lOUk45QUk0c1NYR3BTbnhFYUZOZzVoMDZlQk5sd0hVeEd2UUhYVFNtQUdlb0JyM3NJYg?oc=5",
+      "summary": "一大波岗位来了！本周19场大学生就业创业活动来了→ 新浪网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-23T19:28:04+08:00",
+      "published_label": "03-23 19:28",
+      "topic": "求职就业",
+      "relevance_score": 5,
       "match_tags": [
-        "career",
-        "tech"
+        "career"
       ]
     },
     {
-      "title": "亚马逊在科技行业重组浪潮中完成大规模企业裁员 - ekhbary.com",
-      "url": "https://news.google.com/rss/articles/CBMi1AJBVV95cUxQa2VuUGdNLW9OME91ZG5DY0h6MEhsRTE4LU12TUJrM3FrYzRWcHFISmExSWxyVDdxREo4ckU0UHVEYWxRVVV4TU42endTbEdjeGlGR1B2WnJueVp0TFgwanByS2tqeHFUcll2WWZtMDlMcUZScjVXaWtsd0otWU8taUJsbERrbnEwTXZlSEktOXBVRWhFMWU2Z25TVGdVUnlOQ2J5SF83Uy1HZzBnLTF1QUYySGZPVzFhQkU5NFg1eVR2MmFvUGVkeE1GQ2pnbGdJS3c5X0U3OE5aNVZ5X0NyOThabjNyT2RGdUhQR3BhYjNWWE1ITXl2dldZMVdabWF5UXF6LWNCV2tLQXFubFJWaFVheGRVQ1l6ejRmS3dqeXFEaEpZRExiRjZnVFRtNUI0d001NlpsNzh2TjlHYnBua0xlRzdOc1czcVhPbnluMDZKQ1V5?oc=5",
-      "summary": "亚马逊在科技行业重组浪潮中完成大规模企业裁员 ekhbary.com",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-02-09T16:20:13+08:00",
-      "published_label": "02-09 16:20",
-      "topic": "科技行业变化",
-      "relevance_score": 4,
+      "title": "山东青岛：双选会助力大学生就业 - 人民网-图片频道",
+      "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTFBGaWFzY2t3cjJhMGRHWjUyRzJyaTJNY09jWk5uSzBJTFVkMVMycFFTMkZwdzYxQzMxdGlWZ2h4MGZiSTJOaFNHRVd0NGtpaHRjQ3lIYjItZDBpMGt2dW9FYVdhaVpaaWk4?oc=5",
+      "summary": "山东青岛：双选会助力大学生就业 人民网-图片频道",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-23T15:07:00+08:00",
+      "published_label": "03-23 15:07",
+      "topic": "求职就业",
+      "relevance_score": 3,
       "match_tags": [
-        "career",
-        "tech"
+        "career"
+      ]
+    },
+    {
+      "title": "职聚南湖・才启新程南湖街道招聘活动圆满落幕 - 中华网生活",
+      "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTFBfTnJBSU5fX1lpOUptUGZuM0pWZUtlR3ZudjVTUEJmWm9tdXFxUkYzZ2ZVZlJ5X2NUaWR6S0pjNzV3bGs5U29fenBZM1JXeEtlZUlGRnd1S2RWWGdaSk9adzVPVQ?oc=5",
+      "summary": "职聚南湖・才启新程南湖街道招聘活动圆满落幕 中华网生活",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-03-23T11:52:47+08:00",
+      "published_label": "03-23 11:52",
+      "topic": "职业规划",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "重庆大学生就业创业活动周攻略_新浪新闻 - 手机新浪网",
+      "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE41YmtUWXJEQkJLcV9YUzFZRjBhTWhmdGU0RXB5ZmQ1dEw1Ulh1Qk5aQXFVd3JreW1ZTG9wZnJNdlQxdUc4MmRXenNGLWk0TjdHeGlGeGFpLTFaLUVROFJUek54bw?oc=5",
+      "summary": "重庆大学生就业创业活动周攻略_新浪新闻 手机新浪网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-23T09:18:00+08:00",
+      "published_label": "03-23 09:18",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "青岛：双选会助力大学生就业 VR技术赋能精准对接 - 中青在线",
+      "url": "https://news.google.com/rss/articles/CBMickFVX3lxTE81VjN5NEZkRnFoamh6d3JhT0tVOHgtRWNQdXJxbVRqVTIwaUlOaXpqemxib0NIeWh3cGRhZE5sSjVKRFlWdGV5VmxBQUxYQkh2VlBuNDlhQW51Z25tWnc3aElzbEwwQ185MWh4bHEybm1QZw?oc=5",
+      "summary": "青岛：双选会助力大学生就业 VR技术赋能精准对接 中青在线",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-21T16:12:00+08:00",
+      "published_label": "03-21 16:12",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
       ]
     },
     {
@@ -284,6 +607,32 @@
       "published_label": "03-21 07:07",
       "topic": "求职就业",
       "relevance_score": 7,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "云南省2026届高校女大学生就业创业帮扶行动暨“女科技工作者、女企业家进校园”首场活动举行 - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxPUDNYM3M5LXpZVlNCbmdTSjNESWRSYlg2aG5uSzFfNWpqcFFGYmJoUzVtTmF6a0RuaVNDUHBzd1RqZURIZEROa19RSlhadG9veWVCSGhHNlRPc3Vsd3ZFLXNKQ1pOODJwcjI3d0ZwTGEyWXROTjZRbUZ5UndyNEctVk1ydFc4QU0?oc=5",
+      "summary": "云南省2026届高校女大学生就业创业帮扶行动暨“女科技工作者、女企业家进校园”首场活动举行 新浪财经",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-20T16:25:00+08:00",
+      "published_label": "03-20 16:25",
+      "topic": "求职就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "2026届高校毕业生“春季促就业攻坚行动”启动 - jyb.cn",
+      "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE5YVzVDS3U1a0hQd0ZGVnhlU1BLZ1pvQmpzTm1mTDJJalBjQzdlTWFPM1ltMWFmUnpTUkx5QmdQOVZuU2tVeHI5VXJEQUg5anhmWTFUYW9Bc25TbjZtdW9XYzkycXRoVTdvUFEw?oc=5",
+      "summary": "2026届高校毕业生“春季促就业攻坚行动”启动 jyb.cn",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-20T10:12:41+08:00",
+      "published_label": "03-20 10:12",
+      "topic": "求职就业",
+      "relevance_score": 5,
       "match_tags": [
         "career"
       ]
@@ -302,27 +651,14 @@
       ]
     },
     {
-      "title": "JobKorea将举办免费线上的职业发展分享会 聚焦求职与跳槽技巧 - 디지털투데이",
-      "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxQU3o2ajVvWTdvam4wZlIzMnc1ZFhIdkVXSzFFVkZsUkJIOTNiRUZuR0tGTVRQSXJKWkl0S3JRUW1rTzNzenp2MzRFNWQ4czduSUJRUV9hQ3BSNjZ1ZFI4Y2ozanFSaFQ2cGFLTkZhbFc1eVE0b1N1M0ZvS2FYOWtNaGtnek9sUjBGelIySE40TkFBQXBic2Y1ZTdKdlJOWHZGMTdsMDViNGI5b1c5TUR6aF9HdW94dTZsU2FEb09xelI2VF9K?oc=5",
-      "summary": "JobKorea将举办免费线上的职业发展分享会 聚焦求职与跳槽技巧 디지털투데이",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-03-13T15:00:00+08:00",
-      "published_label": "03-13 15:00",
-      "topic": "职业规划",
+      "title": "南京财经大学：春招火热，近300家企业进校招聘 - 新浪网",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE5ET2t4NjlkSlNDY0s2cHBzUFBOQi11VFFGdDRNVERCdG5LRzc2cXh4MWI2WkRHTGZnMDdjNmFYR29QQkxjRWFzUFV5RF9GTXpobk1sM0N0WGFlTEhnMG5RaVRrNDZ3ZEpodkNtWE00aWd6S0xMV0hTcg?oc=5",
+      "summary": "南京财经大学：春招火热，近300家企业进校招聘 新浪网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-03-19T15:00:00+08:00",
+      "published_label": "03-19 15:00",
+      "topic": "求职就业",
       "relevance_score": 7,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "受 AI 及裁员等因素影响，2 月美国科技从业者信心再度下滑 - 新浪网",
-      "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE9MV19hUlhKNjR1b2JPRjJwaVBmaTdQR1BQdTNtN2ZhMUJ5M0JNbmJjeHp4TlQ0M0NNV19ZMGhWMURVRmQ0OC1hZTV4WVU1M1VZUUNpSWpLSDhVcG1yTnQzZTZJek5HbDNlQnV4QWZjdS14TUdBOC1PVVpkQmJlcm8?oc=5",
-      "summary": "受 AI 及裁员等因素影响，2 月美国科技从业者信心再度下滑 新浪网",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-03-11T15:00:00+08:00",
-      "published_label": "03-11 15:00",
-      "topic": "科技行业变化",
-      "relevance_score": 3,
       "match_tags": [
         "career"
       ]
@@ -338,8 +674,8 @@
       "topic": "职业规划",
       "kind": "search",
       "status": "ok",
-      "raw_count": 55,
-      "kept_count": 23,
+      "raw_count": 47,
+      "kept_count": 19,
       "error": ""
     },
     {
@@ -348,7 +684,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 24,
+      "kept_count": 30,
       "error": ""
     },
     {
@@ -356,8 +692,8 @@
       "topic": "程序员就业",
       "kind": "search",
       "status": "ok",
-      "raw_count": 61,
-      "kept_count": 3,
+      "raw_count": 71,
+      "kept_count": 5,
       "error": ""
     },
     {
@@ -366,7 +702,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 22,
+      "kept_count": 20,
       "error": ""
     },
     {
@@ -374,62 +710,62 @@
       "topic": "科技行业变化",
       "kind": "search",
       "status": "ok",
-      "raw_count": 87,
-      "kept_count": 6,
+      "raw_count": 85,
+      "kept_count": 5,
       "error": ""
     },
     {
       "source": "InfoQ",
       "topic": "技术趋势",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 20,
-      "kept_count": 0,
+      "kept_count": 6,
       "error": ""
     },
     {
       "source": "IT之家",
       "topic": "科技行业",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 60,
-      "kept_count": 0,
+      "kept_count": 8,
       "error": ""
     },
     {
       "source": "TechCrunch",
       "topic": "全球科技",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 20,
-      "kept_count": 0,
+      "kept_count": 5,
       "error": ""
     },
     {
       "source": "Wired",
       "topic": "AI 与工作",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 50,
-      "kept_count": 0,
+      "kept_count": 5,
       "error": ""
     },
     {
       "source": "Ars Technica",
       "topic": "开发与行业",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 20,
-      "kept_count": 0,
+      "kept_count": 1,
       "error": ""
     },
     {
       "source": "The Verge",
       "topic": "科技职场",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 10,
-      "kept_count": 0,
+      "kept_count": 1,
       "error": ""
     }
   ]

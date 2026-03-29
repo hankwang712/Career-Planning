@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 职业规划智能体 Flask 服务。
 运行方式：python server.py
@@ -13,16 +13,25 @@ import time
 import urllib.parse
 import uuid
 import webbrowser
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, jsonify, render_template, request, session
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from career_news import get_career_news_payload
+from services.news import get_career_news_payload
+from services.resume import (
+    FLEXIBLE_MATCH_ANALYSIS_PROMPT,
+    RESUME_REVIEW_PROMPT,
+    STRUCTURED_RESUME_PROMPT,
+    STRUCTURED_RESUME_SCHEMA,
+    build_matcher_state,
+    build_job_payload_from_text,
+    build_resume_text_payload,
+)
 
-# 鈹€鈹€ 璺緞閰嶇疆 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# 路径配置
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 BOSS_INFO_DIR = os.path.join(BASE_DIR, "boss_info")
 APP_DATA_DIR = os.path.join(BASE_DIR, "app_data")
@@ -108,18 +117,14 @@ def _inject_api_cors_headers(response):
     return response
 
 CAREER_INTERVIEW_SYSTEM_PROMPT = """
-你是一名中文职业兴趣访谈代理，需要结合 `career_explorer` 项目中的职业兴趣访谈框架来逐轮提问。
-请优先覆盖以下六个维度：职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度。
-
-请严格遵守下面的规则：
+你是一名中文职业兴趣访谈助手，需要围绕职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度六个维度进行追问。
+规则：
 - 全程使用自然、简洁的中文。
-- 每次只提一个问题，优先追问当前最缺的信息。
-- 允许结合 RIASEC 视角理解用户，但不要机械解释理论。
-- 至少完成 6 轮有效问答，最多不超过 10 个问题。
+- 每次只提一个问题，优先追问当前最缺失的信息。
+- 至少完成 6 轮有效问答，最多不超过 10 轮。
 - 如果用户回答比较空泛，继续追问真实经历或具体例子。
 - 不要输出 Markdown，不要输出额外说明，只输出 JSON。
-
-JSON 结构必须严格如下：
+JSON 结构必须如下：
 {
   "next_question": "下一轮问题，若已完成可为空字符串",
   "focus_dimension": "当前追问维度",
@@ -153,19 +158,15 @@ JSON 结构必须严格如下：
 """
 
 MBTI_CLARIFIER_SYSTEM_PROMPT = """
-你是一名中文 MBTI 澄清测评助手。你的任务是根据用户已经完成的 MBTI 主测结果，
-针对分数最接近、最不确定的维度，生成少量高区分度的补充题，帮助最终确认 MBTI。
-
-请严格遵守以下规则：
-- 全程只使用简洁自然的中文。
-- 只针对给定的 close_pairs 生成问题，不要扩展到无关维度。
-- 每道题必须只对应一个维度对：EI、SN、TF、JP 之一。
-- 问题要贴近日常学习、社交、任务推进和决策场景，避免空泛理论表述。
-- 每道题都必须提供鲜明对立的 A / B 两端表述，便于前端渲染 5 档倾向选项。
-- 一次返回 2-6 题；如果 close_pairs 只有 1 个，优先返回 2-3 题；如果有多个维度接近，均匀覆盖。
-- 不要输出 Markdown，不要输出解释，不要输出代码块，只输出 JSON。
-
-JSON 结构必须严格如下：
+你是一名中文 MBTI 澄清测评助手。请根据用户主测结果中的 close_pairs 生成少量高区分度补充题，帮助确认临界维度。
+规则：
+- 只使用简洁自然的中文。
+- 每道题只对应 EI、SN、TF、JP 之一。
+- 题目贴近日常学习、社交、任务推进和决策场景。
+- 每道题都要提供鲜明对立的 option_a / option_b。
+- 一次返回 2-6 题。
+- 只输出 JSON。
+JSON 结构必须如下：
 {
   "summary": "本轮主要澄清的维度说明",
   "questions": [
@@ -254,12 +255,12 @@ def _public_resume_llm_config(user):
 
 
 def _get_resume_provider_and_model():
-    # 优先复用全局“API+模型选择”（头像/模型选择器），保证与其它模块一致
+    # 优先复用全局“API + 模型选择”，保证与其它模块一致。
     base_url, api_key, model = _get_active_provider_and_model()
     if base_url and api_key and model:
         return base_url, api_key, model
 
-    # 兼容旧版独立简历配置（迁移兜底）
+    # 兼容旧版独立简历配置，作为迁移兜底。
     config = _load_resume_llm_config()
     base_url = str(config.get("base_url") or "").strip()
     api_key = str(config.get("api_key") or "").strip()
@@ -267,7 +268,7 @@ def _get_resume_provider_and_model():
     return base_url, api_key, model
 
 
-# ── 新的多 Provider 数据层 ────────────────────────────────────────────────────
+# 新的多 Provider 数据层
 
 def _normalized_provider(raw):
     raw = raw if isinstance(raw, dict) else {}
@@ -295,19 +296,19 @@ def _public_provider(provider, is_admin=False):
 
 
 def _load_providers():
-    """加载 API 提供商列表，自动迁移旧格式。"""
+    """Load provider configs and transparently migrate legacy storage."""
     _ensure_app_storage()
     with APP_DATA_LOCK:
-        # 优先读取独立 providers 文件
+        # 优先读取独立 providers 文件。
         stored = _read_json_file(LLM_PROVIDERS_FILE, None)
         if stored is None:
-            # 兼容旧文件：可能存的是 {"providers": [...]} 或旧 scope 结构
+            # 兼容旧文件：可能存的是 {"providers": [...]} 或旧 scope 结构。
             stored = _read_json_file(LLM_CONFIG_FILE, {})
 
     if not isinstance(stored, dict):
         return []
 
-    # 旧格式迁移：有 career_interview 键说明是旧数据
+    # 旧格式迁移：如果有 career_interview 键，说明是旧数据。
     if "career_interview" in stored or "assessment_hub" in stored:
         ref = stored.get("career_interview") or stored.get("assessment_hub") or {}
         base_url = str(ref.get("base_url") or "").strip()
@@ -335,10 +336,8 @@ def _save_providers(providers):
     with APP_DATA_LOCK:
         _write_json_file(LLM_PROVIDERS_FILE, {"providers": normalized})
     return normalized
-
-
 def _get_active_provider_and_model():
-    """从 session 获取用户选择的 provider + model，fallback 到第一个可用 provider。"""
+    """Read provider/model from session and fall back to the first configured provider."""
     selection = session.get("llm_selection") or {}
     provider_id = str(selection.get("provider_id") or "").strip()
     model = str(selection.get("model") or "").strip()
@@ -421,7 +420,7 @@ def _load_llm_configs():
             for scope in VALID_LLM_CONFIG_SCOPES:
                 configs[scope] = _normalized_llm_config(stored.get(scope))
 
-        # 兼容旧数据：若某个 scope 已配置而另一个为空，自动同步，保持一致
+        # If one scope is configured and the other is empty, keep them aligned.
         reference = next(
             (c for c in configs.values() if c.get("base_url") and c.get("api_key")),
             None,
@@ -484,7 +483,7 @@ def _load_users():
         for spec in DEFAULT_USER_SPECS:
             existing = merged.get(spec["username"]) or {}
             password_hash = str(existing.get("password_hash") or "").strip()
-            # 避免每次请求都做哈希校验，显著降低认证接口延迟。
+            # Avoid recomputing password hashes on every request.
             if not password_hash:
                 password_hash = generate_password_hash(spec["password"])
             merged[spec["username"]] = {
@@ -588,6 +587,49 @@ def _allowed_pdf(file_storage):
     return bool(head.startswith(b"%PDF"))
 
 
+def _allowed_resume_upload(file_storage):
+    filename = str(getattr(file_storage, "filename", "") or "")
+    suffix = os.path.splitext(filename)[1].lower()
+    if suffix not in {".pdf", ".docx"}:
+        return False
+    stream = getattr(file_storage, "stream", None)
+    if stream is None:
+        return False
+    current = stream.tell()
+    head = stream.read(8)
+    stream.seek(current)
+    if suffix == ".pdf":
+        return bool(head.startswith(b"%PDF"))
+    return bool(head.startswith(b"PK"))
+
+
+def _save_resume_upload(file_storage, username):
+    if not _allowed_resume_upload(file_storage):
+        raise ValueError("仅支持 PDF 或 DOCX 简历文件上传。")
+
+    file_storage.stream.seek(0, os.SEEK_END)
+    size = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+    if size <= 0:
+        raise ValueError("上传文件为空。")
+    if size > RESUME_MAX_FILE_SIZE:
+        raise ValueError(f"简历文件过大，请控制在 {RESUME_MAX_FILE_SIZE // (1024 * 1024)}MB 内。")
+
+    target_dir = _user_upload_dir(username)
+    os.makedirs(target_dir, exist_ok=True)
+    original_name = file_storage.filename or "resume.pdf"
+    safe = secure_filename(original_name) or "resume.pdf"
+    suffix = os.path.splitext(safe)[1].lower() or os.path.splitext(original_name)[1].lower()
+    if suffix not in {".pdf", ".docx"}:
+        raise ValueError("仅支持 PDF 或 DOCX 简历文件上传。")
+    if not safe.lower().endswith(suffix):
+        safe += suffix
+    saved_name = f"{int(time.time())}_{safe}"
+    target_path = os.path.join(target_dir, saved_name)
+    file_storage.save(target_path)
+    return target_path, saved_name, size, suffix.lstrip(".")
+
+
 def _save_resume_pdf(file_storage, username):
     if not _allowed_pdf(file_storage):
         raise ValueError("仅支持 PDF 文件上传。")
@@ -598,7 +640,7 @@ def _save_resume_pdf(file_storage, username):
     if size <= 0:
         raise ValueError("上传文件为空。")
     if size > RESUME_MAX_FILE_SIZE:
-        raise ValueError(f"PDF 过大，请控制在 {RESUME_MAX_FILE_SIZE // (1024 * 1024)}MB 内。")
+        raise ValueError(f"PDF 文件过大，请控制在 {RESUME_MAX_FILE_SIZE // (1024 * 1024)}MB 内。")
 
     target_dir = _user_upload_dir(username)
     os.makedirs(target_dir, exist_ok=True)
@@ -639,10 +681,16 @@ def _extract_pdf_text_pages(pdf_path):
     return pages
 
 
-def _should_fallback_ocr(text_pages):
+def _should_fallback_ocr(text_pages, *_):
     if not text_pages:
         return True
-    total_chars = sum(len(item.get("text", "")) for item in text_pages)
+    total_chars = 0
+    for item in text_pages:
+        if isinstance(item, dict):
+            text = item.get("text") or item.get("content") or item.get("markdown") or ""
+        else:
+            text = item
+        total_chars += len(str(text or ""))
     return total_chars < 240
 
 
@@ -680,29 +728,13 @@ def _resume_text_bundle(text_pages):
 
 
 def _infer_resume_basics_from_text(text):
-    raw = str(text or "")
-    compact = re.sub(r"\s+", " ", raw)
-
-    def _clean(value):
-        return str(value or "").strip().strip("，,。；;:：")
-
+    compact = re.sub(r"\s+", " ", str(text or ""))
     basics = {
         "major": "",
         "education_level": "",
         "target_city": "",
         "target_direction": "",
     }
-
-    # 专业
-    m = re.search(r"(?:专业|主修)\s*[:：]?\s*([^\n，。；;]{2,30})", compact, re.IGNORECASE)
-    if m:
-        basics["major"] = _clean(m.group(1).replace("专业", ""))
-    if not basics["major"]:
-        m2 = re.search(r"(?:大学|学院)[^。;\n]{0,24}?([^\s，,。；;]{2,20})专业", compact)
-        if m2:
-            basics["major"] = _clean(m2.group(1))
-
-    # 学历
     if re.search(r"博士|phd", compact, re.IGNORECASE):
         basics["education_level"] = "博士"
     elif re.search(r"硕士|研究生|master", compact, re.IGNORECASE):
@@ -712,277 +744,68 @@ def _infer_resume_basics_from_text(text):
     elif re.search(r"大专|专科|college diploma", compact, re.IGNORECASE):
         basics["education_level"] = "大专"
 
-    # 目标城市
-    m3 = re.search(r"(?:意向城市|求职意向|期望城市)\s*[:：]?\s*([^\n。；;]{2,40})", compact, re.IGNORECASE)
-    if m3:
-        basics["target_city"] = _clean(m3.group(1))
+    major_match = re.search(r"(?:专业|主修)\s*[:：]?\s*([^\n，。；;]{2,30})", compact, re.IGNORECASE)
+    if major_match:
+        basics["major"] = str(major_match.group(1) or "").strip()
 
-    # 目标方向
-    m4 = re.search(r"(?:目标方向|意向岗位|求职方向|目标岗位)\s*[:：]?\s*([^\n。；;]{2,40})", compact, re.IGNORECASE)
-    if m4:
-        basics["target_direction"] = _clean(m4.group(1))
+    city_match = re.search(r"(?:意向城市|求职意向|期望城市)\s*[:：]?\s*([^\n。；;]{2,40})", compact, re.IGNORECASE)
+    if city_match:
+        basics["target_city"] = str(city_match.group(1) or "").strip()
 
+    direction_match = re.search(r"(?:目标方向|意向岗位|求职方向|目标岗位)\s*[:：]?\s*([^\n。；;]{2,40})", compact, re.IGNORECASE)
+    if direction_match:
+        basics["target_direction"] = str(direction_match.group(1) or "").strip()
     return basics
 
 
 def _build_resume_extract_prompt():
-    return """
-你是“中文简历证据约束画像助手”。
-输入是候选人的简历全文（可能来自 OCR），你的目标不是只总结“做过什么”，而是基于证据重建：
-1) 他是什么样的人（能力结构）
-2) 他做事方式（行为风格）
-3) 强项与短板（含边界）
-4) 每条结论证据
-5) 哪些是推断、哪些待确认
-
-输出必须是 JSON 对象，不要输出任何额外说明。
-结构必须包含（兼容字段也必须保留）：
-{
-  "candidate_summary": "一句话总结（不空泛）",
-  "basics": {
-    "major": "",
-    "education_level": "",
-    "target_city": "",
-    "target_direction": ""
-  },
-  "fact_layer": [
-    {"fact": "", "category": "education/project/internship/award/certificate/research/organization/other", "evidence": "", "page_no": 1, "source": "text/ocr"}
-  ],
-  "capability_layer": [
-    {
-      "dimension": "学习成长/执行落地/责任层级/沟通协同/组织领导/成果影响/行为风格/发展潜力",
-      "conclusion": "",
-      "reasoning": "",
-      "evidence": "",
-      "confidence": 0.0,
-      "evidence_strength": "high/medium/low",
-      "boundary": "事实 or 推断边界"
-    }
-  ],
-  "style_layer": [
-    {"style": "", "conclusion": "", "evidence": "", "confidence": 0.0, "boundary": ""}
-  ],
-  "potential_layer": [
-    {"direction": "", "conclusion": "", "evidence": "", "confidence": 0.0, "boundary": "", "suggest_roles": []}
-  ],
-  "uncertainty_layer": [
-    {"item": "", "reason": "", "needed_evidence": "", "confidence": 0.0}
-  ],
-  "capability_matrix": {
-    "learning_growth": 0,
-    "execution_delivery": 0,
-    "responsibility_scope": 0,
-    "communication_coordination": 0,
-    "leadership_influence": 0,
-    "achievement_impact": 0,
-    "behavior_consistency": 0,
-    "development_potential": 0
-  },
-  "roles_detected": [{"role": "负责人/核心成员/成员", "project": "", "evidence": "", "page_no": 1}],
-  "leadership_signals": [{"signal": "", "level": "high/medium/low", "evidence": "", "page_no": 1}],
-  "competition_records": [{"name": "", "level": "", "ranking": "", "percentile": "", "role": "", "evidence": "", "page_no": 1}],
-  "project_highlights": [{"project": "", "goal": "", "contribution": "", "impact": "", "role": "", "evidence": "", "page_no": 1}],
-  "skills": [{"name": "", "proficiency": "high/medium/low", "evidence": "", "page_no": 1}],
-  "capability_scores": {
-    "communication": 0,
-    "execution": 0,
-    "stress_resilience": 0,
-    "innovation": 0,
-    "collaboration": 0,
-    "leadership": 0
-  },
-  "evidence_spans": [{"quote": "", "page_no": 1, "source": "text/ocr"}],
-  "confidence": 0
-}
-
-规则：
-1) 严禁编造；缺失字段填 "unknown" 或空数组。
-2) 每个结论都要证据绑定；没有证据不得高置信度。
-3) 明确区分“事实”和“推断”，并在 boundary 写清楚结论边界。
-4) 避免空泛词（如“综合素质高”），改为可验证表述。
-5) capability_scores 与 capability_matrix 范围均为 0-100。
-6) capability_scores 需保留兼容键：communication/execution/stress_resilience/innovation/collaboration/leadership。
-7) 若证据不足，写入 uncertainty_layer，不要过度推断。
-""".strip()
+    return "\n".join(
+        [
+            "你是中文简历结构化助手。请严格基于输入简历输出 JSON，不要输出任何额外说明。",
+            "输出结构需包含 candidate_summary、basics、roles_detected、leadership_signals、project_highlights、skills、capability_scores、evidence_spans、confidence。",
+            "- 严禁编造。",
+            "- 缺失字段使用 unknown、空字符串或空数组。",
+            "- 所有分数范围为 0-100，confidence 范围为 0-1。",
+            "- 输出必须是 JSON 对象本身。",
+        ]
+    )
 
 
 def _normalize_resume_profile(raw_payload):
     payload = raw_payload if isinstance(raw_payload, dict) else {}
-
-    def _norm_basic_value(value):
-        text = str(value or "").strip()
-        if text.lower() in {"unknown", "n/a", "na", "暂无", "未知", "未提供", "无"}:
-            return ""
-        return text
-
-    def _norm_items(items, keys):
-        result = []
-        for item in items or []:
-            if not isinstance(item, dict):
-                continue
-            row = {}
-            for key in keys:
-                value = item.get(key)
-                if key == "page_no":
-                    try:
-                        row[key] = max(1, int(value))
-                    except (TypeError, ValueError):
-                        row[key] = 1
-                else:
-                    row[key] = str(value or "").strip()
-            result.append(row)
-        return result[:20]
-
-    def _norm_confidence(value):
-        try:
-            conf = float(value)
-        except (TypeError, ValueError):
-            return 0.0
-        if conf > 1:
-            conf = conf / 100.0
-        return max(0.0, min(1.0, conf))
-
-    def _norm_score(value):
-        try:
-            return max(0, min(100, int(float(value))))
-        except (TypeError, ValueError):
-            return 0
-
-    def _pick_score(mapping, *keys):
-        for key in keys:
-            if key in mapping and str(mapping.get(key) or "").strip() != "":
-                return _norm_score(mapping.get(key))
-        return 0
-
-    cap = payload.get("capability_scores") if isinstance(payload.get("capability_scores"), dict) else {}
-    matrix_payload = payload.get("capability_matrix") if isinstance(payload.get("capability_matrix"), dict) else {}
-    cap_merge = {**matrix_payload, **cap}
-    capabilities = {}
-    capabilities["communication"] = _pick_score(cap_merge, "communication", "communication_coordination")
-    capabilities["execution"] = _pick_score(cap_merge, "execution", "execution_delivery")
-    capabilities["stress_resilience"] = _pick_score(cap_merge, "stress_resilience", "behavior_consistency")
-    capabilities["innovation"] = _pick_score(cap_merge, "innovation", "achievement_impact", "development_potential")
-    capabilities["collaboration"] = _pick_score(cap_merge, "collaboration", "communication_coordination")
-    capabilities["leadership"] = _pick_score(cap_merge, "leadership", "leadership_influence", "responsibility_scope")
-
-    capability_matrix = {
-        "learning_growth": _pick_score(cap_merge, "learning_growth"),
-        "execution_delivery": _pick_score(cap_merge, "execution_delivery", "execution"),
-        "responsibility_scope": _pick_score(cap_merge, "responsibility_scope", "leadership"),
-        "communication_coordination": _pick_score(cap_merge, "communication_coordination", "communication", "collaboration"),
-        "leadership_influence": _pick_score(cap_merge, "leadership_influence", "leadership"),
-        "achievement_impact": _pick_score(cap_merge, "achievement_impact", "innovation"),
-        "behavior_consistency": _pick_score(cap_merge, "behavior_consistency", "stress_resilience"),
-        "development_potential": _pick_score(cap_merge, "development_potential", "innovation"),
-    }
-
-    try:
-        confidence = float(payload.get("confidence") or 0)
-    except (TypeError, ValueError):
-        confidence = 0
-
-    basics_payload = payload.get("basics") if isinstance(payload.get("basics"), dict) else {}
-    basics = {
-        "major": _norm_basic_value(basics_payload.get("major")),
-        "education_level": _norm_basic_value(basics_payload.get("education_level") or basics_payload.get("grade")),
-        "target_city": _norm_basic_value(basics_payload.get("target_city") or basics_payload.get("targetCity")),
-        "target_direction": _norm_basic_value(basics_payload.get("target_direction") or basics_payload.get("targetDirection")),
-    }
-
-    fact_layer = _norm_items(
-        payload.get("fact_layer") or payload.get("facts"),
-        ("fact", "category", "evidence", "page_no", "source"),
-    )
-    capability_layer_raw = payload.get("capability_layer") or payload.get("capability_dimensions")
-    style_layer_raw = payload.get("style_layer") or payload.get("behavior_style_layer") or payload.get("behavior_styles")
-    potential_layer_raw = payload.get("potential_layer") or payload.get("development_potential_layer")
-    uncertainty_layer_raw = payload.get("uncertainty_layer") or payload.get("uncertainty_flags") or payload.get("pending_verification")
-
-    capability_layer = []
-    for item in capability_layer_raw or []:
-        if not isinstance(item, dict):
-            continue
-        capability_layer.append(
-            {
-                "dimension": str(item.get("dimension") or item.get("name") or "").strip(),
-                "conclusion": str(item.get("conclusion") or "").strip(),
-                "reasoning": str(item.get("reasoning") or item.get("rationale") or "").strip(),
-                "evidence": str(item.get("evidence") or "").strip(),
-                "confidence": _norm_confidence(item.get("confidence")),
-                "evidence_strength": str(item.get("evidence_strength") or item.get("strength") or "").strip(),
-                "boundary": str(item.get("boundary") or "").strip(),
-            }
-        )
-    capability_layer = capability_layer[:16]
-
-    style_layer = []
-    for item in style_layer_raw or []:
-        if not isinstance(item, dict):
-            continue
-        style_layer.append(
-            {
-                "style": str(item.get("style") or item.get("name") or "").strip(),
-                "conclusion": str(item.get("conclusion") or "").strip(),
-                "evidence": str(item.get("evidence") or "").strip(),
-                "confidence": _norm_confidence(item.get("confidence")),
-                "boundary": str(item.get("boundary") or "").strip(),
-            }
-        )
-    style_layer = style_layer[:12]
-
-    potential_layer = []
-    for item in potential_layer_raw or []:
-        if not isinstance(item, dict):
-            continue
-        roles = item.get("suggest_roles")
-        roles_list = [str(r).strip() for r in (roles if isinstance(roles, list) else []) if str(r).strip()][:6]
-        potential_layer.append(
-            {
-                "direction": str(item.get("direction") or "").strip(),
-                "conclusion": str(item.get("conclusion") or "").strip(),
-                "evidence": str(item.get("evidence") or "").strip(),
-                "confidence": _norm_confidence(item.get("confidence")),
-                "boundary": str(item.get("boundary") or "").strip(),
-                "suggest_roles": roles_list,
-            }
-        )
-    potential_layer = potential_layer[:10]
-
-    uncertainty_layer = []
-    for item in uncertainty_layer_raw or []:
-        if not isinstance(item, dict):
-            continue
-        uncertainty_layer.append(
-            {
-                "item": str(item.get("item") or item.get("name") or "").strip(),
-                "reason": str(item.get("reason") or "").strip(),
-                "needed_evidence": str(item.get("needed_evidence") or item.get("next_evidence") or "").strip(),
-                "confidence": _norm_confidence(item.get("confidence")),
-            }
-        )
-    uncertainty_layer = uncertainty_layer[:12]
-
+    basics = payload.get("basics") if isinstance(payload.get("basics"), dict) else {}
+    capability_scores = payload.get("capability_scores") if isinstance(payload.get("capability_scores"), dict) else {}
     return {
         "candidate_summary": str(payload.get("candidate_summary") or "unknown").strip() or "unknown",
-        "basics": basics,
-        "fact_layer": fact_layer,
-        "capability_layer": capability_layer,
-        "style_layer": style_layer,
-        "potential_layer": potential_layer,
-        "uncertainty_layer": uncertainty_layer,
-        "capability_matrix": capability_matrix,
-        "roles_detected": _norm_items(payload.get("roles_detected"), ("role", "project", "evidence", "page_no")),
-        "leadership_signals": _norm_items(payload.get("leadership_signals"), ("signal", "level", "evidence", "page_no")),
-        "competition_records": _norm_items(payload.get("competition_records"), ("name", "level", "ranking", "percentile", "role", "evidence", "page_no")),
-        "project_highlights": _norm_items(payload.get("project_highlights"), ("project", "goal", "contribution", "impact", "role", "evidence", "page_no")),
-        "skills": _norm_items(payload.get("skills"), ("name", "proficiency", "evidence", "page_no")),
-        "capability_scores": capabilities,
-        "evidence_spans": _norm_items(payload.get("evidence_spans"), ("quote", "page_no", "source")),
-        "confidence": max(0.0, min(1.0, confidence)),
+        "basics": {
+            "major": str(basics.get("major") or "").strip(),
+            "education_level": str(basics.get("education_level") or basics.get("grade") or "").strip(),
+            "target_city": str(basics.get("target_city") or basics.get("targetCity") or "").strip(),
+            "target_direction": str(basics.get("target_direction") or basics.get("targetDirection") or "").strip(),
+        },
+        "roles_detected": payload.get("roles_detected") if isinstance(payload.get("roles_detected"), list) else [],
+        "leadership_signals": payload.get("leadership_signals") if isinstance(payload.get("leadership_signals"), list) else [],
+        "competition_records": payload.get("competition_records") if isinstance(payload.get("competition_records"), list) else [],
+        "project_highlights": payload.get("project_highlights") if isinstance(payload.get("project_highlights"), list) else [],
+        "skills": payload.get("skills") if isinstance(payload.get("skills"), list) else [],
+        "evidence_spans": payload.get("evidence_spans") if isinstance(payload.get("evidence_spans"), list) else [],
+        "capability_scores": {
+            "communication": int(float(capability_scores.get("communication") or 0)),
+            "execution": int(float(capability_scores.get("execution") or 0)),
+            "stress_resilience": int(float(capability_scores.get("stress_resilience") or 0)),
+            "innovation": int(float(capability_scores.get("innovation") or 0)),
+            "collaboration": int(float(capability_scores.get("collaboration") or 0)),
+            "leadership": int(float(capability_scores.get("leadership") or 0)),
+        },
+        "confidence": max(0.0, min(1.0, float(payload.get("confidence") or 0))),
     }
 
 
 def _extract_resume_profile(pdf_path, progress_callback=None, runtime_llm=None):
+    raise RuntimeError("Legacy resume profile extractor is disabled. Use matcher pipeline instead.")
+
+
+def _analyze_resume_matcher(storage_path, job_description, progress_callback=None, runtime_llm=None):
     def _report(stage, detail):
         if callable(progress_callback):
             try:
@@ -990,63 +813,93 @@ def _extract_resume_profile(pdf_path, progress_callback=None, runtime_llm=None):
             except Exception:
                 pass
 
-    _report("extract_text", "正在提取 PDF 文本")
-    text_pages = _extract_pdf_text_pages(pdf_path)
-    ocr_used = False
-    if _should_fallback_ocr(text_pages):
-        _report("ocr_fallback", "文本不足，尝试 OCR 回退")
-        ocr_pages = _ocr_pdf_pages(pdf_path)
-        if ocr_pages:
-            text_pages = ocr_pages
-            ocr_used = True
+    job_text = str(job_description or "").strip()
+    analysis_mode = "job_match" if job_text else "resume_review"
 
-    plain_text = _resume_text_bundle(text_pages)
-    if not plain_text:
-        raise ValueError("未能从 PDF 中提取到有效文本，请检查文件是否损坏或尝试更清晰的扫描件。")
+    _report("extract_resume", "正在提取简历文本")
+    text_payload = build_resume_text_payload(
+        storage_path,
+        extract_pdf_text_pages=_extract_pdf_text_pages,
+        should_fallback_ocr=_should_fallback_ocr,
+        ocr_pdf_pages=_ocr_pdf_pages,
+        max_pages=RESUME_MAX_PAGES,
+        max_chars=RESUME_MAX_TEXT_CHARS,
+    )
+    resume_text = str(text_payload.get("plain_text") or "").strip()
+    if not resume_text:
+        raise ValueError("未能从简历中提取到有效文本，请检查文件内容。")
 
-    if (
-        isinstance(runtime_llm, (tuple, list))
-        and len(runtime_llm) >= 3
-    ):
+    if isinstance(runtime_llm, (tuple, list)) and len(runtime_llm) >= 3:
         base_url = str(runtime_llm[0] or "").strip()
         api_key = str(runtime_llm[1] or "").strip()
         model = str(runtime_llm[2] or "").strip()
     else:
         base_url, api_key, model = _get_resume_provider_and_model()
     if not base_url or not api_key:
-        raise ValueError("模型尚未就绪，请先在顶部完成模型选择，或联系管理员检查 API 配置。")
+        raise ValueError("模型尚未就绪，请先完成接口配置和模型选择。")
     if not model:
         model = "gpt-4o-mini"
 
-    _report("llm_call", "正在调用模型进行结构化提炼")
-    messages = [{"role": "user", "content": plain_text}]
-    try:
-        parsed = _call_structured_chat(
+    _report("structured_resume", "正在提取结构化简历")
+    resume_schema_json = json.dumps(STRUCTURED_RESUME_SCHEMA, ensure_ascii=False, indent=2)
+    structured_resume = _call_structured_chat(
+        base_url,
+        api_key,
+        model,
+        [{"role": "user", "content": "请仅输出符合 schema 的 JSON。"}],
+        system_prompt=STRUCTURED_RESUME_PROMPT.format(resume_schema_json, resume_text),
+        max_tokens=2600,
+    )
+
+    structured_job = {}
+    if analysis_mode == "job_match":
+        _report("job_context", "正在理解岗位文本")
+        structured_job = build_job_payload_from_text(job_text)
+        _report("hr_judge", "正在生成岗位匹配分析")
+        analysis_markdown = _call_markdown_chat(
             base_url,
             api_key,
             model,
-            messages,
-            system_prompt=_build_resume_extract_prompt(),
-            max_tokens=2200,
+            [{"role": "user", "content": "请输出最终 Markdown 分析报告。"}],
+            system_prompt=FLEXIBLE_MATCH_ANALYSIS_PROMPT.format(
+                datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                job_description=job_text,
+                raw_resume=resume_text,
+            ),
+            max_tokens=3600,
         )
-    except ValueError as exc:
-        # 结构化输出/模型调用异常属于服务端依赖问题，不应归类为用户请求参数错误。
-        raise RuntimeError(f"简历结构化提炼失败：{exc}") from exc
-    _report("normalize", "正在校验与归一化分析结果")
-    profile = _normalize_resume_profile(parsed)
-    inferred = _infer_resume_basics_from_text(plain_text)
-    basics = profile.get("basics") if isinstance(profile.get("basics"), dict) else {}
-    for key in ("major", "education_level", "target_city", "target_direction"):
-        if not str(basics.get(key) or "").strip() and str(inferred.get(key) or "").strip():
-            basics[key] = str(inferred[key]).strip()
-    profile["basics"] = basics
+    else:
+        _report("resume_review", "正在生成简历诊断")
+        analysis_markdown = _call_markdown_chat(
+            base_url,
+            api_key,
+            model,
+            [{"role": "user", "content": "请输出最终 Markdown 分析报告。"}],
+            system_prompt=RESUME_REVIEW_PROMPT.format(
+                datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                raw_resume=resume_text,
+            ),
+            max_tokens=3200,
+        )
 
-    return profile, {
-        "ocr_used": ocr_used,
-        "page_count": len(text_pages),
-        "char_count": len(plain_text),
-        "parsed_at": int(time.time()),
-    }
+    matcher_state = build_matcher_state(
+        structured_resume=structured_resume,
+        structured_job=structured_job,
+        analysis_markdown=analysis_markdown,
+        job_description=job_text,
+    )
+    analysis_meta = dict(text_payload.get("analysis_meta") or {})
+    analysis_meta.update(
+        {
+            "parsed_at": int(time.time()),
+            "job_description_length": len(job_text),
+            "analysis_mode": analysis_mode,
+            "model": model,
+            "resume_keyword_count": len((matcher_state.get("matcher") or {}).get("resume_keywords") or []),
+            "job_keyword_count": len((matcher_state.get("matcher") or {}).get("job_keywords") or []),
+        }
+    )
+    return matcher_state, analysis_meta
 
 
 def _public_resume_state(raw_state):
@@ -1054,11 +907,18 @@ def _public_resume_state(raw_state):
     return {
         "file_name": state.get("file_name") or "",
         "file_size": state.get("file_size") or 0,
+        "file_type": state.get("file_type") or "",
         "uploaded_at": state.get("uploaded_at"),
         "analyzed_at": state.get("analyzed_at"),
         "status": state.get("status") or "empty",
         "analysis_meta": state.get("analysis_meta") or {},
         "profile": state.get("profile") if isinstance(state.get("profile"), dict) else None,
+        "analysis_result": state.get("analysis_result") or "",
+        "analysis_html": state.get("analysis_html") or "",
+        "job_description": state.get("job_description") or "",
+        "matcher": state.get("matcher") if isinstance(state.get("matcher"), dict) else {},
+        "structured_resume": state.get("structured_resume") if isinstance(state.get("structured_resume"), dict) else None,
+        "structured_job": state.get("structured_job") if isinstance(state.get("structured_job"), dict) else None,
         "error_message": state.get("error_message") or "",
     }
 
@@ -1118,13 +978,13 @@ def _save_resume_job_progress(username, job_id, stage, detail):
     _save_user_state(username, state)
 
 
-def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm):
+def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_description):
     _update_resume_job(
         job_id,
         status="running",
         started_at=int(time.time()),
-        stage="extract_text",
-        stage_detail="正在提取 PDF 文本",
+        stage="extract_resume",
+        stage_detail="正在提取简历文本",
         message="",
     )
 
@@ -1133,8 +993,9 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm):
         _save_resume_job_progress(username, job_id, stage, detail)
 
     try:
-        profile, analysis_meta = _extract_resume_profile(
+        matcher_state, analysis_meta = _analyze_resume_matcher(
             storage_path,
+            job_description,
             progress_callback=_on_progress,
             runtime_llm=runtime_llm,
         )
@@ -1150,12 +1011,18 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm):
                 "running": False,
                 "job_id": job_id,
                 "stage": "done",
-                "stage_detail": "分析完成",
+                "stage_detail": "简历分析完成",
                 "stage_updated_at": int(time.time()),
             }
         )
         resume_state["analysis_meta"] = merged_meta
-        resume_state["profile"] = profile
+        resume_state["profile"] = matcher_state.get("profile") if isinstance(matcher_state.get("profile"), dict) else None
+        resume_state["analysis_result"] = matcher_state.get("analysis_result") or ""
+        resume_state["analysis_html"] = matcher_state.get("analysis_html") or ""
+        resume_state["job_description"] = matcher_state.get("job_description") or str(job_description or "").strip()
+        resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
+        resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
+        resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
         resume_state["error_message"] = ""
         state["resume_profile"] = resume_state
         _save_user_state(username, state)
@@ -1163,8 +1030,8 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm):
             job_id,
             status="success",
             stage="done",
-            stage_detail="分析完成",
-            message="简历分析完成。",
+            stage_detail="简历分析完成",
+            message="简历分析已完成。",
             finished_at=int(time.time()),
         )
     except ValueError as exc:
@@ -1195,7 +1062,7 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm):
         )
     except Exception as exc:
         app.logger.exception("resume async analyze failed")
-        msg = f"简历分析失败：{exc}"
+        msg = f"简历匹配分析失败：{exc}"
         state = _load_user_state(username)
         resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
         resume_state["status"] = "failed"
@@ -1384,46 +1251,22 @@ def _normalize_assessment_context(raw_context):
 
 def _build_mbti_clarifier_prompt(close_pairs, score_snapshot):
     base_prompt = MBTI_CLARIFIER_SYSTEM_PROMPT
-    knowledge = _load_assessment_knowledge()
-    mbti_data = knowledge.get("mbti") if isinstance(knowledge.get("mbti"), dict) else {}
-    dimension_explanations = mbti_data.get("dimension_explanations") if isinstance(mbti_data.get("dimension_explanations"), dict) else {}
-    type_details = mbti_data.get("type_details") if isinstance(mbti_data.get("type_details"), dict) else {}
-
+    pairs = close_pairs if isinstance(close_pairs, list) else []
     notes = []
-    for item in close_pairs[:4]:
+    for item in pairs[:4]:
         if not isinstance(item, dict):
             continue
-        pair = str(item.get("pair") or "").upper().replace("/", "").strip()
-        if pair not in {"EI", "SN", "TF", "JP"}:
-            continue
-        detail = dimension_explanations.get(pair) or {}
-        left_label = detail.get("left_label") or pair[0]
-        right_label = detail.get("right_label") or pair[1]
-        left_desc = _truncate_text(detail.get("left_desc"), 48)
-        right_desc = _truncate_text(detail.get("right_desc"), 48)
-        tip = _truncate_text(detail.get("development_tip"), 70)
+        pair = str(item.get("pair") or "").upper().strip()
         diff = item.get("diff")
-        score_note = f"当前差值 {diff}" if diff is not None else "当前差值较小"
-        notes.append(
-            f"{pair}（{detail.get('title') or '临界维度'}，{score_note}）："
-            f"{left_label}={left_desc}；{right_label}={right_desc}；出题提示：{tip}"
-        )
-
-    guessed_type = _guess_mbti_type_from_scores(score_snapshot)
-    type_detail = type_details.get(guessed_type) if guessed_type else None
-    if isinstance(type_detail, dict):
-        strengths = "、".join(_compact_list(type_detail.get("strengths"), limit=3, item_limit=28))
-        risks = "、".join(_compact_list(type_detail.get("risks"), limit=2, item_limit=28))
-        notes.append(
-            f"当前主测倾向 {guessed_type}（{type_detail.get('nickname') or ''}）："
-            f"{_truncate_text(type_detail.get('summary'), 80)}"
-            f"{' 可能优势：' + strengths if strengths else ''}"
-            f"{'；提醒：' + risks if risks else ''}"
-        )
-
+        if not pair:
+            continue
+        if diff is None:
+            notes.append(f"临界维度：{pair}")
+        else:
+            notes.append(f"临界维度：{pair}，当前差值 {diff}")
     if not notes:
         return base_prompt
-    return f"{base_prompt}\n\n补充知识（仅用于提高题目区分度，不要直接复述）：\n- " + "\n- ".join(notes)
+    return f"{base_prompt}\n\n补充上下文：\n- " + "\n- ".join(notes)
 
 
 def _build_career_interview_prompt(assessment_context):
@@ -1432,57 +1275,33 @@ def _build_career_interview_prompt(assessment_context):
     mbti = context["mbti"]
     holland = context["holland"]
     basics = context["basics"]
-
-    knowledge = _load_assessment_knowledge()
-    mbti_details = ((knowledge.get("mbti") or {}).get("type_details") or {}) if isinstance(knowledge.get("mbti"), dict) else {}
-    holland_details = ((knowledge.get("holland") or {}).get("type_details") or {}) if isinstance(knowledge.get("holland"), dict) else {}
-
     notes = []
-    if basics["major"] or basics["grade"] or basics["target_city"] or basics["target_direction"]:
-        basics_text = "，".join(
-            part for part in [
-                f"专业 {basics['major']}" if basics["major"] else "",
-                f"学历 {basics['grade']}" if basics["grade"] else "",
-                f"目标城市 {basics['target_city']}" if basics["target_city"] else "",
-                f"目标方向 {basics['target_direction']}" if basics["target_direction"] else "",
-            ]
-            if part
-        )
-        notes.append(f"用户基础信息：{basics_text}")
+
+    basics_parts = [
+        f"专业 {basics['major']}" if basics["major"] else "",
+        f"学历 {basics['grade']}" if basics["grade"] else "",
+        f"目标城市 {basics['target_city']}" if basics["target_city"] else "",
+        f"目标方向 {basics['target_direction']}" if basics["target_direction"] else "",
+    ]
+    basics_parts = [part for part in basics_parts if part]
+    if basics_parts:
+        notes.append("基础信息：" + "，".join(basics_parts))
 
     mbti_type = mbti["final_type"] or mbti["raw_type"]
-    mbti_detail = mbti_details.get(mbti_type) if mbti_type else None
-    if isinstance(mbti_detail, dict):
-        strengths = "、".join(_compact_list(mbti_detail.get("strengths"), limit=3, item_limit=28))
-        risks = "、".join(_compact_list(mbti_detail.get("risks"), limit=2, item_limit=28))
-        notes.append(
-            f"MBTI 背景：{mbti_type}（{mbti_detail.get('nickname') or ''}），"
-            f"{_truncate_text(mbti_detail.get('summary') or mbti['summary'], 90)}"
-            f"{'；可能优势：' + strengths if strengths else ''}"
-            f"{'；可能盲区：' + risks if risks else ''}"
-        )
-    elif mbti_type or mbti["summary"]:
-        notes.append(f"MBTI 背景：{mbti_type or '已完成'}；{mbti['summary'] or '仅作辅助参考，不要机械贴标签。'}")
+    if mbti_type:
+        notes.append(f"MBTI：{mbti_type}")
+    if mbti.get("summary"):
+        notes.append(f"MBTI 摘要：{_truncate_text(mbti.get('summary'), 80)}")
 
-    holland_primary = holland["top_codes"][0] if holland["top_codes"] else (holland["code"][:1] if holland["code"] else "")
-    holland_detail = holland_details.get(holland_primary) if holland_primary else None
-    if isinstance(holland_detail, dict):
-        environments = "、".join(_compact_list(holland_detail.get("typical_environment"), limit=3, item_limit=24))
-        notes.append(
-            f"Holland 背景：主导类型 {holland_primary}/{holland_detail.get('name') or ''}，"
-            f"{_truncate_text(holland_detail.get('summary') or holland['summary'], 90)}"
-            f"{'；偏好环境：' + environments if environments else ''}"
-        )
-    elif holland["code"] or holland["summary"]:
-        notes.append(f"Holland 背景：{holland['code'] or '已完成'}；{holland['summary'] or '仅作辅助参考。'}")
+    holland_code = holland["code"] or ("".join(holland["top_codes"]) if holland["top_codes"] else "")
+    if holland_code:
+        notes.append(f"Holland：{holland_code}")
+    if holland.get("summary"):
+        notes.append(f"Holland 摘要：{_truncate_text(holland.get('summary'), 80)}")
 
     if not notes:
         return base_prompt
-    return (
-        f"{base_prompt}\n\n"
-        "补充上下文（仅用于更快聚焦，不可替代真实追问，也不要把测评结果直接当作结论）：\n- "
-        + "\n- ".join(notes)
-    )
+    return f"{base_prompt}\n\n补充上下文：\n- " + "\n- ".join(notes)
 
 
 def _safe_score(value, default=0):
@@ -1506,15 +1325,15 @@ def _normalize_sdk_base_url(base_url):
 
 def _extract_json_object(text):
     if not text:
-        raise ValueError("妯″瀷娌℃湁杩斿洖鍐呭")
+        raise ValueError("模型没有返回可解析内容。")
     cleaned = str(text).strip()
-    # 兼容 ```json ... ``` 包裹输出
+    # 兼容 ```json ... ``` 包裹输出。
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned, flags=re.IGNORECASE)
     if fence:
         cleaned = fence.group(1).strip()
     match = re.search(r"\{[\s\S]*\}", cleaned)
     if not match:
-        raise ValueError("模型返回中没有可解析的JSON对象")
+        raise ValueError("模型返回中没有可解析的 JSON 对象。")
     return match.group(0)
 
 
@@ -1522,17 +1341,17 @@ def _parse_structured_json(content):
     raw = str(content or "").strip()
     if not raw:
         raise ValueError("模型没有返回可解析内容。")
-    # 1) 直接按 JSON 解析
+    # 1) 直接按 JSON 解析。
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
-    # 2) 提取 JSON 对象后解析
+    # 2) 提取 JSON 对象后再解析。
     extracted = _extract_json_object(raw)
     try:
         return json.loads(extracted)
     except json.JSONDecodeError:
-        # 3) 本地轻度修复：去除对象/数组尾逗号后再试
+        # 3) 本地轻度修复：去掉对象/数组尾逗号后再试。
         repaired = re.sub(r",(\s*[}\]])", r"\1", extracted)
         return json.loads(repaired)
 
@@ -1549,7 +1368,7 @@ def _safe_create_chat_completion(client, model, messages, temperature, max_token
     try:
         return client.chat.completions.create(**kwargs)
     except Exception as exc:
-        # 兼容不支持 response_format 的 OpenAI-compatible 服务
+        # 兼容不支持 response_format 的 OpenAI-compatible 服务。
         if force_json:
             message = str(exc).lower()
             if "response_format" in message or "json_object" in message:
@@ -1650,9 +1469,9 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
     try:
         return _parse_structured_json(content)
     except Exception:
-        # 第一次失败：让模型只做 JSON 修复，不做新推理
+        # 第一次失败：让模型只做 JSON 修复，不做新推理。
         repair_prompt = (
-            "你是JSON修复器。请将下面文本修复为严格合法的 JSON 对象。"
+            "你是 JSON 修复器。请把下面的文本修复为严格合法的 JSON 对象。"
             "只能输出 JSON 对象本身，不要解释，不要 Markdown。"
         )
         repair_messages = [
@@ -1673,11 +1492,11 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
         except Exception:
             pass
 
-        # 第二次失败：重新生成，附加强约束并增加 token 上限
+        # 第二次失败：重新生成，并附加强约束和更高 token 上限。
         strict_system = (
             system_prompt
-            + "\n\n严格要求：必须返回合法JSON对象；"
-            + "不得出现注释、代码块、尾逗号、未转义换行。"
+            + "\n\n严格要求：必须返回合法 JSON 对象。"
+            + "不要输出注释、代码块、尾逗号或未转义换行。"
         )
         retry_messages = [{"role": "system", "content": strict_system}] + messages
         try:
@@ -1692,7 +1511,31 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
             retry_content = str((retry_resp.choices[0].message.content or "") if retry_resp.choices else "").strip()
             return _parse_structured_json(retry_content)
         except Exception as exc:
-            raise ValueError(f"结构化JSON解析失败: {str(exc)[:280]}") from exc
+            raise ValueError(f"结构化 JSON 解析失败: {str(exc)[:280]}") from exc
+
+
+def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, max_tokens=3200):
+    base = _normalize_sdk_base_url(base_url)
+    client = OpenAI(api_key=api_key, base_url=base)
+    merged_messages = list(messages or [])
+    if system_prompt:
+        merged_messages = [{"role": "system", "content": system_prompt}] + merged_messages
+    try:
+        resp = _safe_create_chat_completion(
+            client=client,
+            model=model,
+            messages=merged_messages,
+            temperature=0.2,
+            max_tokens=max_tokens,
+            force_json=False,
+        )
+    except Exception as exc:
+        raise ValueError(f"LLM 接口调用失败: {str(exc)[:300]}") from exc
+
+    content = str((resp.choices[0].message.content or "") if resp.choices else "").strip()
+    if not content:
+        raise ValueError("模型没有返回可解析内容。")
+    return content
 
 
 def _call_openai_compatible_chat(base_url, api_key, model, messages, system_prompt=None):
@@ -1743,7 +1586,7 @@ def _normalize_mbti_clarifier_payload(raw_payload):
         "questions": questions[:6],
     }
 
-# 鈹€鈹€ 椤甸潰璺敱 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# 页面与认证接口
 @app.route("/")
 @app.route("/main.html")
 def index():
@@ -1790,10 +1633,7 @@ def api_auth_status():
 
 @app.route("/api/bootstrap")
 def api_bootstrap():
-    """
-    前端首屏聚合接口：减少初始化阶段多次 HTTP 往返。
-    未登录时仅返回 authenticated=False，避免 401 打断初始化流程。
-    """
+    """Bootstrap current user, providers, and cached scoped data for the frontend."""
     user = _current_user()
     if not user:
         return jsonify({"authenticated": False, "user": None})
@@ -1915,7 +1755,7 @@ def api_update_llm_config(scope):
 @app.route("/api/llm-config/model", methods=["PUT"])
 @_login_required
 def api_update_llm_model():
-    """任意已登录用户可更新所有 scope 的模型选择。"""
+    """Update the selected model for all editable LLM config scopes."""
     payload = request.get_json(silent=True) or {}
     model = str(payload.get("model") or "").strip()
     if not model:
@@ -1945,20 +1785,20 @@ def _do_fetch_models(base_url, api_key):
 @app.route("/api/llm-models", methods=["GET"])
 @_login_required
 def api_llm_models():
-    """使用已保存的凭据获取可用模型列表（所有已登录用户可调用）。"""
+    """Fetch models using the currently stored provider credentials."""
     configs = _load_llm_configs()
     config = configs.get("career_interview") or {}
     base_url = str(config.get("base_url") or "").strip()
     api_key = str(config.get("api_key") or "").strip()
     if not base_url or not api_key:
-        return jsonify({"models": [], "message": "API 尚未配置，请系统管理员先填写 Base URL 和 API Key。"}), 200
+        return jsonify({"models": [], "message": "API 尚未配置，请先填写 Base URL 和 API Key。"}), 200
     return _do_fetch_models(base_url, api_key)
 
 
 @app.route("/api/llm-models/preview", methods=["POST"])
 @_super_admin_required
 def api_llm_models_preview():
-    """管理员用临时凭据预览可用模型（不保存配置）。"""
+    """Preview models for a temporary provider config without saving it."""
     payload = request.get_json(silent=True) or {}
     base_url = str(payload.get("base_url") or "").strip()
     api_key = str(payload.get("api_key") or "").strip()
@@ -1967,7 +1807,7 @@ def api_llm_models_preview():
     return _do_fetch_models(base_url, api_key)
 
 
-# ── API：多 Provider 管理 ──────────────────────────────────────────────────
+# API：Provider 管理
 
 @app.route("/api/llm-providers", methods=["GET"])
 @_login_required
@@ -1988,7 +1828,7 @@ def api_add_provider():
     base_url = str(payload.get("base_url") or "").strip()
     api_key = str(payload.get("api_key") or "").strip()
     if not base_url or not api_key:
-        return jsonify({"message": "请填写 Base URL 和 API Key。"}), 400
+        return jsonify({"message": "请先填写 Base URL 和 API Key。"}), 400
     providers = _load_providers()
     new_p = {"id": str(uuid.uuid4())[:8], "name": name, "base_url": base_url, "api_key": api_key}
     providers.append(new_p)
@@ -2052,7 +1892,7 @@ def api_get_llm_selection():
     if selection.get("provider_id"):
         if not any(p.get("id") == selection["provider_id"] for p in providers):
             selection = {}
-    # 回写 session，保证后续请求一致
+    # 回写 session，保证后续请求一致。
     session["llm_selection"] = selection
     session.modified = True
     return jsonify({
@@ -2100,7 +1940,7 @@ def api_resume_llm_config():
     current["api_key"] = str(payload.get("api_key") or current.get("api_key") or "").strip()
     current["model"] = str(payload.get("model") or current.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini"
     if not current["base_url"] or not current["api_key"]:
-        return jsonify({"message": "请填写 base_url 与 api_key。"}), 400
+        return jsonify({"message": "请填写 base_url 和 api_key。"}), 400
     _save_resume_llm_config(current)
     return jsonify(_public_resume_llm_config(_current_user()))
 
@@ -2112,7 +1952,7 @@ def api_resume_llm_models():
     base_url = str(config.get("base_url") or "").strip()
     api_key = str(config.get("api_key") or "").strip()
     if not base_url or not api_key:
-        return jsonify({"models": [], "message": "请先配置简历模型 base_url 与 api_key。"}), 200
+        return jsonify({"models": [], "message": "请先配置简历模型的 base_url 和 api_key。"}), 200
     return _do_fetch_models(base_url, api_key)
 
 
@@ -2122,10 +1962,10 @@ def api_resume_upload():
     user = _current_user()
     file_storage = request.files.get("file")
     if file_storage is None:
-        return jsonify({"message": "请上传 PDF 文件（file 字段）。"}), 400
+        return jsonify({"message": "请上传 PDF 或 DOCX 简历文件（file 字段）。"}), 400
 
     try:
-        saved_path, saved_name, file_size = _save_resume_pdf(file_storage, user["username"])
+        saved_path, saved_name, file_size, file_type = _save_resume_upload(file_storage, user["username"])
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
 
@@ -2141,12 +1981,19 @@ def api_resume_upload():
     state["resume_profile"] = {
         "file_name": saved_name,
         "file_size": file_size,
+        "file_type": file_type,
         "storage_path": saved_path,
         "uploaded_at": int(time.time()),
         "analyzed_at": None,
         "status": "uploaded",
         "analysis_meta": {},
         "profile": None,
+        "analysis_result": "",
+        "analysis_html": "",
+        "job_description": str(prev.get("job_description") or "").strip(),
+        "matcher": {},
+        "structured_resume": None,
+        "structured_job": None,
         "error_message": "",
     }
     _save_user_state(user["username"], state)
@@ -2157,39 +2004,45 @@ def api_resume_upload():
 @_login_required
 def api_resume_analyze():
     user = _current_user()
+    payload = request.get_json(silent=True) or {}
     state = _load_user_state(user["username"])
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
     storage_path = str(resume_state.get("storage_path") or "").strip()
+    if "job_description" in payload:
+        job_description = str(payload.get("job_description") or "").strip()
+    else:
+        job_description = str(resume_state.get("job_description") or "").strip()
     if not storage_path or not os.path.exists(storage_path):
-        return jsonify({"message": "未找到已上传简历，请先上传 PDF。"}), 400
+        return jsonify({"message": "未找到已上传简历，请先上传 PDF 或 DOCX。"}), 400
 
     try:
-        profile, analysis_meta = _extract_resume_profile(storage_path)
+        matcher_state, analysis_meta = _analyze_resume_matcher(storage_path, job_description)
     except ValueError as exc:
         resume_state["status"] = "failed"
         resume_state["error_message"] = str(exc)
+        resume_state["job_description"] = job_description
         state["resume_profile"] = resume_state
         _save_user_state(user["username"], state)
         return jsonify({"message": str(exc)}), 400
-    except RuntimeError as exc:
-        app.logger.exception("resume structured extraction failed")
-        resume_state["status"] = "failed"
-        resume_state["error_message"] = str(exc)
-        state["resume_profile"] = resume_state
-        _save_user_state(user["username"], state)
-        return jsonify({"message": "简历分析失败：模型响应格式异常或服务暂时不可用，请稍后重试。"}), 502
     except Exception as exc:
-        app.logger.exception("resume analyze failed")
+        app.logger.exception("resume matcher analyze failed")
         resume_state["status"] = "failed"
-        resume_state["error_message"] = f"简历分析失败：{exc}"
+        resume_state["error_message"] = f"简历匹配分析失败：{exc}"
+        resume_state["job_description"] = job_description
         state["resume_profile"] = resume_state
         _save_user_state(user["username"], state)
-        return jsonify({"message": "简历分析失败，请稍后重试。"}), 502
+        return jsonify({"message": "简历匹配分析失败，请稍后重试。"}), 502
 
     resume_state["status"] = "analyzed"
     resume_state["analyzed_at"] = int(time.time())
     resume_state["analysis_meta"] = analysis_meta
-    resume_state["profile"] = profile
+    resume_state["profile"] = matcher_state.get("profile") if isinstance(matcher_state.get("profile"), dict) else None
+    resume_state["analysis_result"] = matcher_state.get("analysis_result") or ""
+    resume_state["analysis_html"] = matcher_state.get("analysis_html") or ""
+    resume_state["job_description"] = matcher_state.get("job_description") or job_description
+    resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
+    resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
+    resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
     resume_state["error_message"] = ""
     state["resume_profile"] = resume_state
     _save_user_state(user["username"], state)
@@ -2201,23 +2054,27 @@ def api_resume_analyze():
 def api_resume_analyze_start():
     user = _current_user()
     username = user["username"]
+    payload = request.get_json(silent=True) or {}
     state = _load_user_state(username)
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
     storage_path = str(resume_state.get("storage_path") or "").strip()
+    if "job_description" in payload:
+        job_description = str(payload.get("job_description") or "").strip()
+    else:
+        job_description = str(resume_state.get("job_description") or "").strip()
     if not storage_path or not os.path.exists(storage_path):
-        return jsonify({"message": "未找到已上传简历，请先上传 PDF。"}), 400
+        return jsonify({"message": "未找到已上传简历，请先上传 PDF 或 DOCX。"}), 400
 
-    # 先在请求上下文中解析一次模型配置，避免后台线程访问 session。
     base_url, api_key, model = _get_resume_provider_and_model()
     if not base_url or not api_key:
-        return jsonify({"message": "模型尚未就绪，请先在顶部完成模型选择，或联系管理员检查 API 配置。"}), 400
+        return jsonify({"message": "模型尚未就绪，请先完成接口配置和模型选择。"}), 400
     runtime_llm = (base_url, api_key, model or "gpt-4o-mini")
 
     running = _find_running_resume_job(username)
     if running:
         return jsonify(
             {
-                "message": "已有分析任务在运行中。",
+                "message": "已有简历分析任务正在运行中。",
                 "job_id": str(running.get("job_id") or ""),
                 "already_running": True,
             }
@@ -2239,6 +2096,13 @@ def api_resume_analyze_start():
         RESUME_ANALYSIS_JOBS[job_id] = job
 
     resume_state["status"] = "analyzing"
+    resume_state["profile"] = None
+    resume_state["analysis_result"] = ""
+    resume_state["analysis_html"] = ""
+    resume_state["matcher"] = {}
+    resume_state["structured_resume"] = None
+    resume_state["structured_job"] = None
+    resume_state["job_description"] = job_description
     meta = resume_state.get("analysis_meta") if isinstance(resume_state.get("analysis_meta"), dict) else {}
     meta.update(
         {
@@ -2256,7 +2120,7 @@ def api_resume_analyze_start():
 
     thread = threading.Thread(
         target=_run_resume_analysis_job,
-        args=(username, storage_path, job_id, runtime_llm),
+        args=(username, storage_path, job_id, runtime_llm, job_description),
         daemon=True,
         name=f"resume-analyze-{job_id[:8]}",
     )
@@ -2311,10 +2175,9 @@ def api_resume_profile():
             pass
     state.pop("resume_profile", None)
     _save_user_state(user["username"], state)
-    return jsonify({"message": "简历与解析结果已删除。"})
+    return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
-# ── API：城市列表鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 @app.route("/api/cities")
 def api_cities():
     cities = [fname[:-5] for fname in _list_city_files()]
@@ -2323,9 +2186,7 @@ def api_cities():
 
 @app.route("/api/jobs/bootstrap")
 def api_jobs_bootstrap():
-    """
-    岗位页聚合接口：一次返回城市列表 + 全量岗位摘要，减少并发请求排队。
-    """
+    """Return cities and job summaries in one payload for bootstrap usage."""
     cities = [fname[:-5] for fname in _list_city_files()]
     jobs = []
     for city_name in cities:
@@ -2338,7 +2199,7 @@ def api_jobs_bootstrap():
     return _cache_json_response({"cities": cities, "jobs": jobs})
 
 
-# ── API：岗位数据 ─────────────────────────────────────────────────────────────────────
+# API：岗位数据
 @app.route("/api/jobs")
 def api_jobs():
     city = str(request.args.get("city", "all") or "all").strip() or "all"
@@ -2389,11 +2250,11 @@ def api_job_detail():
     try:
         detail = _get_city_job_detail(city_name, int(index_text))
     except (TypeError, ValueError):
-        return _cache_json_response({"message": "job id 鏍煎紡閿欒"}, status=400)
+        return _cache_json_response({"message": "job id 参数格式错误"}, status=400)
     except FileNotFoundError:
-        return _cache_json_response({"message": "鏈壘鍒板搴旂殑鍩庡競鏁版嵁"}, status=404)
+        return _cache_json_response({"message": "未找到对应城市数据"}, status=404)
     except IndexError:
-        return _cache_json_response({"message": "鏈壘鍒板搴旂殑宀椾綅"}, status=404)
+        return _cache_json_response({"message": "未找到对应岗位记录"}, status=404)
 
     return _cache_json_response(detail)
 
@@ -2406,7 +2267,7 @@ def api_career_interview():
     base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
-        return jsonify({"message": "请先点击「选择模型」选择要使用的 API 和模型。"}), 400
+        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
 
     normalized_messages = []
     for item in messages[-10:]:
@@ -2431,7 +2292,7 @@ def api_career_interview():
         return jsonify({"message": str(exc)}), 400
     except Exception as exc:
         app.logger.exception("career interview failed")
-        return jsonify({"message": f"鑱屼笟鍏磋叮璁胯皥璋冪敤澶辫触: {exc}"}), 502
+        return jsonify({"message": f"职业访谈生成失败: {exc}"}), 502
 
 
 @app.route("/api/mbti-clarifier", methods=["POST"])
@@ -2441,7 +2302,7 @@ def api_mbti_clarifier():
     base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
-        return jsonify({"message": "请先点击「选择模型」选择要使用的 API 和模型。"}), 400
+        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
 
     close_pairs = payload.get("close_pairs") if isinstance(payload.get("close_pairs"), list) else []
     score_snapshot = payload.get("score_snapshot") if isinstance(payload.get("score_snapshot"), dict) else {}
@@ -2476,7 +2337,7 @@ def api_mbti_clarifier():
         app.logger.exception("mbti clarifier failed")
         return jsonify({"message": f"MBTI 澄清题生成失败: {exc}"}), 502
 
-# 鈹€鈹€ 鍚姩 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# 启动入口
 def open_browser():
     import time
     time.sleep(1.0)
@@ -2484,8 +2345,7 @@ def open_browser():
 
 _ensure_app_storage()
 _load_users()
-_load_providers()   # 触发旧格式迁移
-
+_load_providers()   # 触发旧格式迁移。
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
     port = int(os.environ.get("PORT", "8080"))
@@ -2502,3 +2362,9 @@ if __name__ == "__main__":
         threading.Thread(target=open_browser, daemon=True).start()
 
     app.run(host=host, port=port, debug=False, threaded=True)
+
+
+
+
+
+
