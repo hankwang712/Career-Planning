@@ -690,7 +690,8 @@
       const parts = label.split(/\s+/);
       let animalName = String(parts[parts.length - 1] || "").toLowerCase();
       if (animalName === "dolphin") animalName = "dophin";
-      if (animalName) return `${TYT_ASSET_BASE}/animals/${animalName}.jpg`;
+      // Only use extracted name if it's a valid ASCII animal name (not Chinese text)
+      if (animalName && /^[a-z]+$/.test(animalName)) return `${TYT_ASSET_BASE}/animals/${animalName}.jpg`;
     }
     return getSpiritAnimalImage(type);
   }

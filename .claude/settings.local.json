@@ -44,7 +44,13 @@
       "Bash(grep -r \"nanobanana\\\\|nano.banana\\\\|规划任务进度\\\\|任务画像\" C:/Users/rog/Desktop/web --include=*.html --include=*.js --include=*.py -l)",
       "Bash(grep -r \"nanobanana\\\\|规划任务进度\\\\|任务画像\" C:/Users/rog/Desktop/github_code/trueyouteller --include=*.html --include=*.js --include=*.jsx --include=*.ts -l)",
       "Bash(grep -rn nanobanana C:/Users/rog/Desktop/web/.claude/worktrees/ --include=*.html --include=*.js)",
-      "Bash(grep -rn nanobanana C:/Users/rog/Desktop/web/deploy/ --include=*.html --include=*.js)"
+      "Bash(grep -rn nanobanana C:/Users/rog/Desktop/web/deploy/ --include=*.html --include=*.js)",
+      "Bash(dir \"C:\\\\Users\\\\rog\\\\Desktop\\\\github_code\\\\trueyouteller\\\\src\\\\assets\\\\animals\")",
+      "Bash(findstr /i \"jpg\")",
+      "Bash(grep -E \"\\\\.py$|^d\")",
+      "Bash(grep -r \"startCareerReportGeneration\" /c/Users/rog/Desktop/web/static/*.js)",
+      "Bash(grep -E \"\\\\.\\(py|md\\)$\")",
+      "Bash(find /c/Users/rog/Desktop/web/services/onet -type f -name *.py)"
     ],
     "defaultMode": "bypassPermissions"
   }
