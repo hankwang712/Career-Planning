@@ -200,14 +200,14 @@
             </div>
 
             <div class="uc-sidebar-footer">
-                <a class="uc-footer-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                <a class="uc-footer-link" href="/" onclick="event.preventDefault();ucGoBack()">← 返回上一界面</a>
             </div>
         </aside>
 
         <div class="uc-main">
             <header class="uc-topbar">
                 <div class="uc-topbar-left">
-                    <a class="uc-back-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                    <a class="uc-back-link" href="/" onclick="event.preventDefault();ucGoBack()">← 返回上一界面</a>
                     <div>
                         <p class="uc-topbar-kicker">User Center</p>
                         <h1>个人中心与工作台</h1>
@@ -353,7 +353,197 @@
                 </section>
 
                 <section id="plan-workspace" class="uc-section">
-                    <div class="uc-section-shell">
+                    <div class="uc-section-shell lp-shell-fusion">
+                        <div id="lpFusionRoot">
+                            <section class="uc-surface lp-overview-surface">
+                                <div class="lp-overview-copy">
+                                    <p class="uc-section-kicker">Learning Path</p>
+                                    <h2 class="uc-section-title">学习路径</h2>
+                                    <p class="uc-section-copy">把参考稿里的成长面板、任务板和当前白色工作台融合到一起。这里会同时承接报告阶段任务、手动新建计划和连续打卡记录。</p>
+                                    <div class="lp-overview-badges">
+                                        <span class="lp-overview-badge">白色工作台</span>
+                                        <span class="lp-overview-badge">报告联动</span>
+                                        <span class="lp-overview-badge">后端同步</span>
+                                    </div>
+                                </div>
+                                <div class="lp-overview-hero-card">
+                                    <div class="lp-overview-hero-top">
+                                        <span class="lp-overview-hero-kicker">Career Tracker</span>
+                                        <span id="lpFusionSyncStatus" class="lp-overview-sync-pill">等待同步</span>
+                                    </div>
+                                    <h3 id="lpFusionReportTitle">学习路径总览</h3>
+                                    <p id="lpFusionReportSummary">报告阶段、手动计划与成长记录会在这里汇总为一块可执行的任务板。</p>
+                                    <div class="lp-overview-hero-meta">
+                                        <article>
+                                            <span>当前目标岗位</span>
+                                            <strong id="lpFusionFocusRole">待识别</strong>
+                                        </article>
+                                        <article>
+                                            <span>下一步重点</span>
+                                            <strong id="lpFusionNextFocus">先补关键证据</strong>
+                                        </article>
+                                        <article>
+                                            <span>报告时间</span>
+                                            <strong id="lpFusionGeneratedAt">--</strong>
+                                        </article>
+                                    </div>
+                                </div>
+                                <div class="lp-overview-stats">
+                                    <article>
+                                        <span>连续打卡</span>
+                                        <strong id="lpFusionStatStreak">0 天</strong>
+                                    </article>
+                                    <article>
+                                        <span>累计经验值</span>
+                                        <strong id="lpFusionStatXP">0 XP</strong>
+                                    </article>
+                                    <article>
+                                        <span>完成任务</span>
+                                        <strong id="lpFusionStatDone">0</strong>
+                                    </article>
+                                    <article>
+                                        <span>解锁徽章</span>
+                                        <strong id="lpFusionStatBadges">0</strong>
+                                    </article>
+                                </div>
+                            </section>
+
+                            <div class="lp-grid lp-grid--fusion">
+                                <aside class="uc-surface lp-left-panel lp-left-panel--fusion">
+                                    <section class="lp-level-card">
+                                        <div class="lp-level-card-top">
+                                            <div class="lp-level-card-badge" id="lpFusionStreakIcon">🔥</div>
+                                            <div>
+                                                <p class="lp-level-card-kicker">Growth Meter</p>
+                                                <div class="lp-streak-num" id="lpFusionStreakCount">0</div>
+                                                <div class="lp-streak-label">连续打卡天数</div>
+                                            </div>
+                                        </div>
+                                        <div class="lp-streak-best">历史最佳 <strong id="lpFusionStreakBest">0</strong> 天</div>
+
+                                        <div class="lp-level-row">
+                                            <span class="lp-level-tag" id="lpFusionLevel">Lv.1</span>
+                                            <div class="lp-xp-bar">
+                                                <div class="lp-xp-numbers"><span id="lpFusionXP">0</span> / <span id="lpFusionXPNext">100</span> XP</div>
+                                                <div class="lp-xp-track"><div class="lp-xp-fill" id="lpFusionXPFill" style="width:0%"></div></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="lp-growth-copy">
+                                            <span id="lpFusionXpSummary">当前经验值 0 XP</span>
+                                            <span id="lpFusionTaskXpSummary">完成任务会继续累积成长值</span>
+                                        </div>
+
+                                        <button id="lpFusionCheckinBtn" class="lp-checkin-btn" type="button" onclick="doCheckin()">今日打卡 +10 XP</button>
+                                        <p class="lp-checkin-sub" id="lpFusionCheckinHint">每天打卡会累计连续记录，完成任务还会带来额外经验值。</p>
+                                    </section>
+
+                                    <section class="lp-mini-panel">
+                                        <div class="lp-mini-panel-head">
+                                            <p class="lp-section-label">本周连续节奏</p>
+                                            <span class="lp-mini-panel-note">7 天视图</span>
+                                        </div>
+                                        <div class="lp-week-grid" id="lpFusionWeekStrip"></div>
+                                    </section>
+
+                                    <section class="lp-mini-panel">
+                                        <div class="lp-mini-panel-head">
+                                            <p class="lp-section-label">最近 4 周活跃度</p>
+                                            <span class="lp-mini-panel-note">热力图</span>
+                                        </div>
+                                        <div class="lp-heatmap" id="lpFusionHeatmap"></div>
+                                    </section>
+
+                                    <section class="lp-mini-panel">
+                                        <div class="lp-mini-panel-head">
+                                            <p class="lp-section-label">成长徽章</p>
+                                            <span class="lp-mini-panel-note">阶段解锁</span>
+                                        </div>
+                                        <div class="lp-badge-grid" id="lpFusionBadgeGrid"></div>
+                                    </section>
+                                </aside>
+
+                                <section class="uc-surface lp-plan-board lp-plan-board--fusion">
+                                    <div id="lpFusionListView">
+                                        <div class="lp-board-head">
+                                            <div>
+                                                <p class="uc-section-kicker">Plan Workspace</p>
+                                                <h3 class="up-section-title">学习计划任务板</h3>
+                                                <p class="uc-block-copy">右侧优先展示报告接入的阶段任务，同时保留你手动创建的学习路径。</p>
+                                            </div>
+                                            <div class="lp-board-actions">
+                                                <div id="lpFusionFilterBar" class="lp-plan-filter-bar"></div>
+                                                <button class="up-new-btn" type="button" onclick="createNewPlan()">
+                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                                    新建计划
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div id="lpFusionComposer" class="lp-plan-composer hidden">
+                                            <div class="lp-plan-composer-grid">
+                                                <label>
+                                                    <span>计划名称</span>
+                                                    <input id="lpFusionNewPlanName" type="text" placeholder="例如：内容编辑作品集冲刺">
+                                                </label>
+                                                <label>
+                                                    <span>计划类型</span>
+                                                    <select id="lpFusionNewPlanType">
+                                                        <option value="short">短期计划</option>
+                                                        <option value="mid">中期计划</option>
+                                                        <option value="long">长期计划</option>
+                                                        <option value="custom">自定义</option>
+                                                    </select>
+                                                </label>
+                                                <label>
+                                                    <span>目标岗位</span>
+                                                    <input id="lpFusionNewPlanRole" type="text" placeholder="例如：内容创作 / 编辑">
+                                                </label>
+                                                <label class="is-wide">
+                                                    <span>计划说明</span>
+                                                    <textarea id="lpFusionNewPlanSummary" rows="3" placeholder="写下这个计划想解决的目标和阶段结果。"></textarea>
+                                                </label>
+                                            </div>
+                                            <div class="lp-plan-composer-actions">
+                                                <button type="button" class="career-report-secondary-btn" onclick="cancelCareerPlanDraft()">取消</button>
+                                                <button type="button" class="career-report-primary-btn" onclick="submitCareerPlanDraft()">保存计划</button>
+                                            </div>
+                                        </div>
+
+                                        <div id="lpFusionPlanList" class="lp-plan-stack"></div>
+                                    </div>
+
+                                    <div id="lpFusionDetailView" class="hidden lp-board-detail">
+                                        <div class="lp-detail-head">
+                                            <div class="lp-detail-head-main">
+                                                <button class="up-back-btn" type="button" onclick="showPlanList()">
+                                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                </button>
+                                                <div>
+                                                    <div id="lpFusionDetailMeta" class="lp-detail-meta"></div>
+                                                    <h4 class="up-detail-title" id="lpFusionDetailTitle">计划详情</h4>
+                                                    <p id="lpFusionDetailSummary" class="lp-detail-summary">这里会展示当前计划的完整任务拆解。</p>
+                                                </div>
+                                            </div>
+                                            <span class="up-detail-pct" id="lpFusionDetailPct">0%</span>
+                                        </div>
+                                        <div class="up-detail-prog-row">
+                                            <div class="up-detail-prog-track">
+                                                <div class="up-detail-prog-fill" id="lpFusionDetailProgFill" style="width:0%"></div>
+                                            </div>
+                                            <span class="up-detail-prog-txt" id="lpFusionDetailProgTxt">0 / 0 项完成</span>
+                                        </div>
+                                        <div id="lpFusionDetailTimeline" class="lp-detail-timeline"></div>
+                                        <div id="lpFusionDetailItems" class="lp-task-list-rich"></div>
+                                        <div id="lpFusionDetailAddRow" class="up-add-row">
+                                            <input id="lpFusionNewItemInput" class="up-add-input" type="text" placeholder="添加一条新的学习任务..." onkeydown="if(event.key==='Enter') addPlanItem()">
+                                            <button class="up-add-btn" type="button" onclick="addPlanItem()">添加</button>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                        <div class="lp-legacy-shell" aria-hidden="true">
                         <section class="uc-surface">
                             <div class="uc-section-head">
                                 <div>
@@ -450,6 +640,7 @@
                                     </div>
                                 </div>
                             </section>
+                        </div>
                         </div>
                     </div>
                 </section>
@@ -631,6 +822,7 @@
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20260401-app-hotfix-v2"></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260402-restoration-v1"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}?v=20260401-user-center-v3"></script>
+    <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20260402-learning-path-fusion-v1"></script>
     <style>
       /* ── 报告列表视图 ── */
       .uc-rpt-card-grid {
@@ -937,8 +1129,1210 @@
         padding: 16px 0;
         margin: 0;
       }
+
+      .lp-legacy-shell {
+        display: none;
+      }
+
+      .lp-shell-fusion {
+        display: grid;
+        gap: 20px;
+      }
+
+      .lp-overview-surface {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.95fr) minmax(240px, 0.8fr);
+        gap: 18px;
+        align-items: stretch;
+        padding: 24px;
+      }
+
+      .lp-overview-copy {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+        padding-right: 8px;
+      }
+
+      .lp-overview-copy .uc-section-title {
+        margin-bottom: 0;
+      }
+
+      .lp-overview-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .lp-overview-badge {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.08);
+        border: 1px solid rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .lp-overview-hero-card {
+        padding: 22px;
+        border-radius: 24px;
+        background:
+          radial-gradient(circle at top right, rgba(93, 135, 255, 0.18), transparent 40%),
+          linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+        border: 1px solid rgba(147, 197, 253, 0.4);
+        box-shadow: 0 18px 45px rgba(148, 163, 184, 0.16);
+        display: grid;
+        gap: 16px;
+      }
+
+      .lp-overview-hero-top,
+      .lp-overview-hero-meta,
+      .lp-board-head,
+      .lp-mini-panel-head,
+      .lp-plan-topline,
+      .lp-plan-progress-strip,
+      .lp-detail-head,
+      .lp-detail-head-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .lp-overview-hero-kicker,
+      .lp-level-card-kicker,
+      .lp-mini-panel-note {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .lp-overview-sync-pill {
+        padding: 7px 12px;
+        border-radius: 999px;
+        background: rgba(100, 116, 139, 0.12);
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+        transition: background 0.2s, color 0.2s, opacity 0.2s;
+        user-select: none;
+      }
+      .lp-overview-sync-pill.is-synced {
+        background: rgba(16, 185, 129, 0.12);
+        color: #047857;
+      }
+      .lp-overview-sync-pill:hover {
+        background: rgba(99, 102, 241, 0.13);
+        color: #4338ca;
+      }
+
+      .lp-overview-hero-card h3 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.15;
+        color: #0f172a;
+      }
+
+      .lp-overview-hero-card p {
+        margin: 0;
+        color: #475569;
+        line-height: 1.7;
+      }
+
+      .lp-overview-hero-meta {
+        align-items: stretch;
+      }
+
+      .lp-overview-hero-meta article,
+      .lp-overview-stats article {
+        flex: 1;
+        min-width: 0;
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .lp-overview-hero-meta span,
+      .lp-overview-stats span {
+        display: block;
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 6px;
+      }
+
+      .lp-overview-hero-meta strong,
+      .lp-overview-stats strong {
+        display: block;
+        color: #0f172a;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .lp-overview-stats {
+        display: grid;
+        gap: 12px;
+      }
+
+      .lp-grid--fusion {
+        display: grid;
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .lp-left-panel--fusion,
+      .lp-plan-board--fusion {
+        display: grid;
+        gap: 16px;
+        padding: 22px;
+      }
+
+      .lp-level-card,
+      .lp-mini-panel,
+      .lp-plan-card,
+      .lp-plan-composer,
+      .lp-board-detail {
+        border-radius: 24px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 18px 38px rgba(148, 163, 184, 0.12);
+      }
+
+      .lp-level-card,
+      .lp-mini-panel,
+      .lp-board-detail {
+        padding: 20px;
+      }
+
+      .lp-level-card {
+        display: grid;
+        gap: 16px;
+      }
+
+      .lp-level-card-top {
+        display: flex;
+        align-items: start;
+        gap: 14px;
+      }
+
+      .lp-level-card-badge {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #ecfeff 0%, #dbeafe 100%);
+        color: #2563eb;
+        font-size: 30px;
+      }
+
+      .lp-streak-num {
+        font-size: 56px;
+        line-height: 0.95;
+        font-weight: 800;
+        color: #0f172a;
+      }
+
+      .lp-streak-label,
+      .lp-streak-best,
+      .lp-checkin-sub,
+      .lp-growth-copy,
+      .lp-task-note,
+      .lp-detail-summary,
+      .lp-plan-card-summary {
+        color: #64748b;
+      }
+
+      .lp-growth-copy {
+        display: grid;
+        gap: 4px;
+        font-size: 13px;
+      }
+
+      .lp-level-row {
+        display: grid;
+        gap: 12px;
+      }
+
+      .lp-level-tag {
+        width: fit-content;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%);
+        color: #4338ca;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .lp-xp-numbers {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 8px;
+      }
+
+      .lp-xp-track,
+      .up-detail-prog-track,
+      .lp-plan-progress-track {
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
+        overflow: hidden;
+      }
+
+      .lp-xp-fill,
+      .up-detail-prog-fill,
+      .lp-plan-progress-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #2563eb 0%, #22c55e 100%);
+      }
+
+      .lp-checkin-btn {
+        width: 100%;
+        border: none;
+        border-radius: 18px;
+        padding: 15px 16px;
+        background: linear-gradient(135deg, #10b981 0%, #2563eb 100%);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+        box-shadow: 0 14px 34px rgba(37, 99, 235, 0.22);
+      }
+
+      .lp-checkin-btn.checked,
+      .lp-checkin-btn:disabled {
+        background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+        color: #334155;
+        box-shadow: none;
+      }
+
+      .lp-week-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .lp-fusion-week-day {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+      }
+
+      .lp-fusion-week-name {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+
+      .lp-fusion-week-dot {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px dashed rgba(37, 99, 235, 0.28);
+        background: #fff;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+      }
+
+      .lp-fusion-week-dot.is-today {
+        border-style: solid;
+        border-color: #2563eb;
+        color: #2563eb;
+      }
+
+      .lp-fusion-week-dot.is-checked {
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .lp-heatmap {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+      }
+
+      .lp-fusion-heat-cell {
+        aspect-ratio: 1;
+        border-radius: 6px;
+        background: #edf2f7;
+      }
+
+      .lp-fusion-heat-cell.l1 { background: #dbeafe; }
+      .lp-fusion-heat-cell.l2 { background: #93c5fd; }
+      .lp-fusion-heat-cell.l3 { background: #60a5fa; }
+      .lp-fusion-heat-cell.l4 { background: #2563eb; }
+
+      .lp-badge-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .lp-fusion-badge {
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: #f8fafc;
+        display: grid;
+        gap: 4px;
+      }
+
+      .lp-fusion-badge.is-unlocked {
+        background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+        border-color: rgba(37, 99, 235, 0.22);
+      }
+
+      .lp-fusion-badge strong {
+        color: #0f172a;
+        font-size: 13px;
+      }
+
+      .lp-fusion-badge span {
+        font-size: 12px;
+        color: #64748b;
+      }
+
+      .lp-plan-board--fusion {
+        gap: 18px;
+      }
+
+      .lp-board-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .lp-plan-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .lp-plan-filter-btn {
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: #fff;
+        color: #475569;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .lp-plan-filter-btn.active {
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        color: #1d4ed8;
+        border-color: rgba(37, 99, 235, 0.25);
+      }
+
+      .lp-plan-filter-btn:hover:not(.active) {
+        background: #f8fafc;
+        color: #1e293b;
+        border-color: rgba(148, 163, 184, 0.4);
+      }
+
+      .lp-tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 5px;
+        padding: 1px 6px;
+        background: rgba(99, 102, 241, 0.1);
+        color: #4338ca;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 16px;
+      }
+      .lp-plan-filter-btn.active .lp-tab-count {
+        background: rgba(37, 99, 235, 0.15);
+        color: #1d4ed8;
+      }
+
+      .lp-plan-composer {
+        padding: 18px;
+      }
+
+      .lp-plan-composer-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .lp-plan-composer-grid label {
+        display: grid;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+      }
+
+      .lp-plan-composer-grid label.is-wide {
+        grid-column: 1 / -1;
+      }
+
+      .lp-plan-composer-grid input,
+      .lp-plan-composer-grid select,
+      .lp-plan-composer-grid textarea {
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: #fff;
+        padding: 12px 14px;
+        font-size: 14px;
+        color: #0f172a;
+        resize: vertical;
+      }
+
+      .lp-plan-composer-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .lp-plan-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .lp-plan-card {
+        padding: 20px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .lp-plan-title-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .lp-plan-card-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 22px;
+        line-height: 1.25;
+      }
+
+      .lp-plan-type-chip,
+      .lp-plan-source-chip,
+      .lp-detail-meta-chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .lp-plan-type-chip.short { background: #dbeafe; color: #1d4ed8; }
+      .lp-plan-type-chip.mid { background: #ede9fe; color: #6d28d9; }
+      .lp-plan-type-chip.long { background: #fef3c7; color: #b45309; }
+      .lp-plan-type-chip.review { background: #dcfce7; color: #047857; }
+      .lp-plan-type-chip.custom { background: #e2e8f0; color: #334155; }
+      .lp-plan-source-chip.report { background: #ecfeff; color: #0f766e; }
+      .lp-plan-source-chip.manual { background: #f8fafc; color: #475569; }
+
+      .lp-plan-open-btn {
+        border: 1px solid rgba(37, 99, 235, 0.16);
+        background: #fff;
+        color: #2563eb;
+        border-radius: 14px;
+        padding: 9px 14px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .lp-plan-progress-strip {
+        font-size: 13px;
+        color: #64748b;
+      }
+
+      .lp-plan-progress-track {
+        flex: 1;
+      }
+
+      .lp-plan-phase-line,
+      .lp-detail-timeline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .lp-phase-node {
+        padding: 8px 12px;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        font-size: 12px;
+        color: #475569;
+      }
+
+      .lp-task-list-rich {
+        display: grid;
+        gap: 10px;
+      }
+
+      .lp-task-row-rich {
+        display: flex;
+        align-items: start;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: #fff;
+      }
+
+      .lp-task-row-rich.is-done {
+        background: #f8fafc;
+      }
+
+      .lp-task-checkbox {
+        margin-top: 3px;
+      }
+
+      .lp-task-body {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 6px;
+      }
+
+      .lp-task-title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .lp-task-title-row strong {
+        color: #0f172a;
+      }
+
+      .lp-task-tag,
+      .lp-task-xp {
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 4px 8px;
+      }
+
+      .lp-task-tag {
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+
+      .lp-task-xp {
+        background: #ecfdf5;
+        color: #047857;
+      }
+
+      .lp-board-detail {
+        display: grid;
+        gap: 16px;
+      }
+
+      .lp-detail-head {
+        align-items: start;
+      }
+
+      .lp-detail-head-main {
+        justify-content: flex-start;
+        align-items: start;
+      }
+
+      .lp-detail-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .lp-detail-summary {
+        margin: 8px 0 0;
+        line-height: 1.7;
+      }
+
+      .lp-plan-empty {
+        padding: 32px;
+        border-radius: 24px;
+        border: 1px dashed rgba(148, 163, 184, 0.28);
+        text-align: center;
+        color: #64748b;
+        background: #fff;
+      }
+
+      @media (max-width: 1240px) {
+        .lp-overview-surface,
+        .lp-grid--fusion,
+        .lp-plan-composer-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .lp-overview-hero-meta,
+        .lp-board-head,
+        .lp-detail-head,
+        .lp-detail-head-main {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .lp-board-actions {
+          justify-content: flex-start;
+        }
+
+        .lp-badge-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <style>
+      #plan-workspace {
+        --lp-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(242, 247, 255, 0.94) 100%);
+        --lp-surface-strong: linear-gradient(180deg, rgba(241, 246, 255, 0.98) 0%, rgba(230, 238, 252, 0.98) 100%);
+        --lp-surface-hero: linear-gradient(180deg, #31497e 0%, #25375f 100%);
+        --lp-line: rgba(111, 136, 182, 0.18);
+        --lp-line-strong: rgba(111, 136, 182, 0.28);
+        --lp-shadow: 0 18px 40px rgba(105, 132, 176, 0.14);
+        --lp-ink: #182437;
+        --lp-muted: #6b7b96;
+        --lp-soft: #95a4bf;
+        --lp-panel: #f5f8ff;
+        --lp-panel-2: #eef3fc;
+        --lp-track: #dfe8f7;
+      }
+
+      #plan-workspace .lp-shell-fusion {
+        gap: 18px;
+      }
+
+      #plan-workspace .lp-overview-surface {
+        padding: 0;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        display: block;
+      }
+
+      #plan-workspace .lp-overview-copy,
+      #plan-workspace .lp-overview-hero-card,
+      #plan-workspace #lpFusionDetailView,
+      #plan-workspace #lpFusionFilterBar {
+        display: none !important;
+      }
+
+      #plan-workspace .lp-overview-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      #plan-workspace .lp-overview-stats article {
+        padding: 20px 22px;
+        border-radius: 18px;
+        background: var(--lp-surface);
+        border: 1px solid var(--lp-line);
+        box-shadow: var(--lp-shadow);
+        position: relative;
+        overflow: hidden;
+      }
+
+      #plan-workspace .lp-overview-stats span {
+        color: var(--lp-muted);
+        font-size: 12px;
+      }
+
+      #plan-workspace .lp-overview-stats strong {
+        color: var(--lp-ink);
+        font-size: 34px;
+        line-height: 1;
+        font-weight: 800;
+        margin-top: 4px;
+      }
+
+      #plan-workspace .lp-grid--fusion {
+        grid-template-columns: 240px minmax(0, 1fr);
+        gap: 16px;
+      }
+
+      #plan-workspace .lp-left-panel--fusion,
+      #plan-workspace .lp-plan-board--fusion {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        gap: 14px;
+      }
+
+      #plan-workspace .lp-level-card,
+      #plan-workspace .lp-mini-panel,
+      #plan-workspace .lp-plan-composer {
+        background: var(--lp-surface);
+        border: 1px solid var(--lp-line);
+        box-shadow: var(--lp-shadow);
+      }
+
+      #plan-workspace .lp-level-card {
+        background: var(--lp-surface-hero);
+        border-color: rgba(121, 154, 214, 0.22);
+        box-shadow: 0 22px 44px rgba(37, 55, 95, 0.22);
+      }
+
+      #plan-workspace .lp-level-card-badge {
+        background: rgba(255, 183, 77, 0.18);
+        color: #ffd27a;
+      }
+
+      #plan-workspace .lp-streak-num,
+      #plan-workspace .lp-plan-card-title,
+      #plan-workspace .lp-stage-title {
+        color: var(--lp-ink);
+      }
+
+      #plan-workspace .lp-level-card .lp-streak-num,
+      #plan-workspace .lp-level-card .lp-streak-label,
+      #plan-workspace .lp-level-card .lp-streak-best,
+      #plan-workspace .lp-level-card .lp-growth-copy,
+      #plan-workspace .lp-level-card .lp-checkin-sub,
+      #plan-workspace .lp-level-card .lp-xp-numbers,
+      #plan-workspace .lp-level-card .lp-level-card-kicker {
+        color: rgba(235, 243, 255, 0.92);
+      }
+
+      #plan-workspace .lp-streak-label,
+      #plan-workspace .lp-streak-best,
+      #plan-workspace .lp-growth-copy,
+      #plan-workspace .lp-checkin-sub,
+      #plan-workspace .lp-mini-panel-note,
+      #plan-workspace .lp-stage-subtitle,
+      #plan-workspace .lp-stage-task-note {
+        color: var(--lp-muted);
+      }
+
+      #plan-workspace .lp-level-tag {
+        background: linear-gradient(135deg, #9b8cff 0%, #6c7fff 100%);
+        color: #fff;
+      }
+
+      #plan-workspace .lp-xp-track,
+      #plan-workspace .lp-stage-progress-bar {
+        background: var(--lp-track);
+      }
+
+      #plan-workspace .lp-xp-fill {
+        background: linear-gradient(90deg, #8f7bff 0%, #5d91ff 100%);
+      }
+
+      #plan-workspace .lp-checkin-btn {
+        background: linear-gradient(135deg, #1fbf8f 0%, #12a06d 100%);
+        box-shadow: 0 16px 28px rgba(18, 160, 109, 0.22);
+      }
+
+      #plan-workspace .lp-checkin-btn.checked,
+      #plan-workspace .lp-checkin-btn:disabled {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.12) 100%);
+        color: #fff;
+      }
+
+      #plan-workspace .lp-fusion-week-dot {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
+        color: rgba(233, 241, 255, 0.84);
+      }
+
+      #plan-workspace .lp-fusion-week-dot.is-checked {
+        background: #2bc38b;
+      }
+
+      #plan-workspace .lp-fusion-week-dot.is-today {
+        border-color: #90b4ff;
+        color: #dbe8ff;
+      }
+
+      #plan-workspace .lp-fusion-week-dot.is-today.is-checked {
+        color: #fff;
+      }
+
+      #plan-workspace .lp-fusion-heat-cell {
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      #plan-workspace .lp-fusion-badge {
+        background: var(--lp-panel);
+        border: 1px solid var(--lp-line);
+        text-align: center;
+      }
+
+      #plan-workspace .lp-fusion-badge.is-unlocked {
+        background: linear-gradient(180deg, rgba(239, 244, 255, 0.98) 0%, rgba(230, 238, 255, 0.98) 100%);
+        border-color: rgba(120, 132, 255, 0.26);
+      }
+
+      #plan-workspace .lp-fusion-badge strong {
+        color: var(--lp-ink);
+      }
+
+      #plan-workspace .lp-fusion-badge span {
+        color: var(--lp-muted);
+      }
+
+      #plan-workspace .lp-fusion-badge-icon {
+        display: block;
+        font-size: 20px;
+        margin-bottom: 6px;
+      }
+
+      #plan-workspace .lp-board-head {
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      #plan-workspace .lp-board-head .uc-section-kicker {
+        color: var(--lp-soft);
+      }
+
+      #plan-workspace .lp-board-head .up-section-title {
+        color: var(--lp-ink);
+      }
+
+      #plan-workspace .lp-board-head .uc-block-copy {
+        color: var(--lp-muted);
+      }
+
+      #plan-workspace .up-new-btn {
+        border: none;
+        background: linear-gradient(135deg, #4f7df6 0%, #6366f1 100%);
+        color: #fff;
+        border-radius: 12px;
+        padding: 10px 14px;
+      }
+
+      #plan-workspace .lp-plan-composer-grid input,
+      #plan-workspace .lp-plan-composer-grid select,
+      #plan-workspace .lp-plan-composer-grid textarea {
+        background: rgba(255, 255, 255, 0.88);
+        border-color: var(--lp-line);
+        color: var(--lp-ink);
+      }
+
+      #plan-workspace .lp-stage-section {
+        background: var(--lp-surface);
+        border: 1px solid var(--lp-line);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--lp-shadow);
+        position: relative;
+      }
+
+      #plan-workspace .lp-stage-section::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: linear-gradient(180deg, rgba(88, 128, 255, 0.9) 0%, rgba(86, 186, 255, 0.65) 100%);
+      }
+
+      #plan-workspace .lp-stage-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(111, 136, 182, 0.12);
+      }
+
+      #plan-workspace .lp-stage-header-left,
+      #plan-workspace .lp-stage-header-right,
+      #plan-workspace .lp-stage-task-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      #plan-workspace .lp-stage-badge {
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+
+      #plan-workspace .lp-stage-badge.short { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+      #plan-workspace .lp-stage-badge.mid { background: rgba(126, 105, 255, 0.16); color: #6f63ff; }
+      #plan-workspace .lp-stage-badge.long { background: rgba(255, 177, 72, 0.18); color: #c98512; }
+
+      #plan-workspace .lp-stage-progress-text {
+        color: #159b68;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      #plan-workspace .lp-stage-progress-bar {
+        width: 100px;
+        height: 6px;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      #plan-workspace .lp-stage-progress-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      #plan-workspace .lp-stage-progress-fill.short { background: #3b82f6; }
+      #plan-workspace .lp-stage-progress-fill.mid { background: #7869ff; }
+      #plan-workspace .lp-stage-progress-fill.long { background: #f3a53a; }
+
+      #plan-workspace .lp-stage-timeline {
+        position: relative;
+        display: flex;
+        padding: 20px 24px;
+      }
+
+      #plan-workspace .lp-stage-timeline::before {
+        content: "";
+        position: absolute;
+        top: 40px;
+        left: 40px;
+        right: 40px;
+        height: 2px;
+        background: rgba(111, 136, 182, 0.18);
+      }
+
+      #plan-workspace .lp-stage-milestone {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      #plan-workspace .lp-stage-milestone-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        margin: 0 auto 10px;
+        background: #f8fbff;
+        border: 3px solid rgba(150, 167, 199, 0.34);
+      }
+
+      #plan-workspace .lp-stage-milestone.completed .lp-stage-milestone-dot {
+        background: #10b981;
+        border-color: #10b981;
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+      }
+
+      #plan-workspace .lp-stage-milestone.current .lp-stage-milestone-dot {
+        background: #3b82f6;
+        border-color: #3b82f6;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+      }
+
+      #plan-workspace .lp-stage-milestone-label {
+        color: var(--lp-muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      #plan-workspace .lp-stage-milestone.completed .lp-stage-milestone-label {
+        color: #22c55e;
+      }
+
+      #plan-workspace .lp-stage-milestone-date {
+        color: var(--lp-soft);
+        font-size: 10px;
+        margin-top: 4px;
+      }
+
+      #plan-workspace .lp-stage-task-list {
+        padding: 8px;
+      }
+
+      #plan-workspace .lp-stage-task {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        background: rgba(247, 250, 255, 0.72);
+      }
+
+      #plan-workspace .lp-stage-task:hover {
+        background: rgba(235, 242, 255, 0.9);
+        border-color: rgba(111, 136, 182, 0.14);
+      }
+
+      #plan-workspace .lp-stage-task.is-done {
+        opacity: 1;
+        background: linear-gradient(90deg, rgba(34, 197, 94, 0.08) 0%, rgba(255, 255, 255, 0.82) 100%);
+      }
+
+      #plan-workspace .lp-stage-task-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #plan-workspace .lp-stage-task-check {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+        border-radius: 6px;
+        border: 2px solid rgba(111, 136, 182, 0.22);
+        background: rgba(255, 255, 255, 0.88);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #plan-workspace .lp-stage-task-check span {
+        display: none;
+        color: #fff;
+        font-size: 12px;
+      }
+
+      #plan-workspace .lp-stage-task.is-done .lp-stage-task-check {
+        background: #10b981;
+        border-color: #10b981;
+      }
+
+      #plan-workspace .lp-stage-task.is-done .lp-stage-task-check span {
+        display: block;
+      }
+
+      #plan-workspace .lp-stage-task-body {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 4px;
+      }
+
+      #plan-workspace .lp-stage-task-title {
+        color: var(--lp-ink);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      #plan-workspace .lp-stage-task.is-done .lp-stage-task-title {
+        text-decoration: line-through;
+        color: var(--lp-soft);
+      }
+
+      #plan-workspace .lp-stage-task-meta {
+        flex-wrap: wrap;
+        color: var(--lp-soft);
+        font-size: 11px;
+      }
+
+      #plan-workspace .lp-stage-task-tag {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 700;
+      }
+
+      #plan-workspace .lp-stage-task-tag.skill { background: rgba(59, 130, 246, 0.16); color: #60a5fa; }
+      #plan-workspace .lp-stage-task-tag.practice { background: rgba(139, 92, 246, 0.16); color: #a78bfa; }
+      #plan-workspace .lp-stage-task-tag.evidence { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+      #plan-workspace .lp-stage-task-tag.interview { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+
+      #plan-workspace .lp-stage-task-xp {
+        flex-shrink: 0;
+        background: rgba(118, 105, 255, 0.12);
+        color: #6c63ff;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      #plan-workspace .lp-stage-empty {
+        color: var(--lp-muted);
+        padding: 18px 20px 24px;
+      }
+
+      .lp-achievement-popup {
+        position: fixed;
+        top: 86px;
+        right: 24px;
+        z-index: 1400;
+        min-width: 250px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(242, 247, 255, 0.96) 100%);
+        border: 1px solid rgba(118, 105, 255, 0.24);
+        box-shadow: 0 20px 44px rgba(105, 132, 176, 0.18);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--lp-ink);
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+        pointer-events: none;
+        transition: opacity 0.22s ease, transform 0.22s ease;
+      }
+
+      .lp-achievement-popup.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .lp-achievement-icon {
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .lp-achievement-copy h4,
+      .lp-achievement-copy p {
+        margin: 0;
+      }
+
+      .lp-achievement-copy h4 {
+        font-size: 14px;
+      }
+
+      .lp-achievement-copy p {
+        margin-top: 4px;
+        color: var(--lp-muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 1100px) {
+        #plan-workspace .lp-overview-stats,
+        #plan-workspace .lp-grid--fusion {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
     <script>
+    /* ═══════════════════════════════════
+       返回上一界面（优先 history.back，回退到 sessionStorage 栈）
+       ═══════════════════════════════════ */
+    function ucGoBack() {
+      // history.back() 可直接恢复上一页的 JS 状态（BFCache），无需重新走启动流程。
+      // 仅当浏览器历史为空时才退回 sessionStorage 导航栈或根路径兜底。
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      if (typeof window.goBackToLastInterface === 'function') {
+        window.goBackToLastInterface('/');
+      } else {
+        window.location.href = '/';
+      }
+    }
+
     /* ═══════════════════════════════════
        Fix2: 报告列表 / 详情视图切换
        ═══════════════════════════════════ */

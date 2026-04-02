@@ -1,6 +1,6 @@
 {
   "assessment_hub": {
-    "savedAt": 1775130052151,
+    "savedAt": 1775145961010,
     "mbti": {
       "currentIndex": 92,
       "answers": {
@@ -1377,22 +1377,358 @@
     }
   },
   "career_plans": {
+    "version": 3,
     "plans": [
+      {
+        "id": "report_short-early",
+        "title": "先补核心能力证据",
+        "summary": "围绕 内容创作/编辑 先建立一轮可被证明的能力证据。",
+        "phase_key": "short",
+        "source": "report",
+        "role": "内容创作/编辑",
+        "timeline": "短期 · 起步期",
+        "report_id": "report-a347cbeb7a73",
+        "created_at": "2026-04-02T16:06:32.400Z",
+        "updated_at": "2026-04-02 03:03:16",
+        "items": [
+          {
+            "id": "short-early_objective",
+            "title": "围绕 内容创作/编辑 先建立一轮可被证明的能力证据。",
+            "note": "",
+            "tag": "阶段目标",
+            "deadline": "",
+            "xp": 40,
+            "done": false
+          },
+          {
+            "id": "short-early_focus_0",
+            "title": "推进 专业技能",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-early_focus_1",
+            "title": "推进 学习能力",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-early_focus_2",
+            "title": "推进 沟通协作",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-early_signal_0",
+            "title": "优先解决低置信与待补证判断",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          },
+          {
+            "id": "short-early_signal_1",
+            "title": "建立第一轮职业定位依据",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          }
+        ]
+      },
+      {
+        "id": "report_short-advance",
+        "title": "收束主线并稳定目标方向",
+        "summary": "让目标岗位从兴趣判断，逐步转为有证据支撑的方向判断。",
+        "phase_key": "mid",
+        "source": "report",
+        "role": "内容创作/编辑",
+        "timeline": "短期 · 进阶期",
+        "report_id": "report-a347cbeb7a73",
+        "created_at": "2026-04-02T16:06:32.400Z",
+        "updated_at": "2026-04-02 03:03:16",
+        "items": [
+          {
+            "id": "short-advance_objective",
+            "title": "让目标岗位从兴趣判断，逐步转为有证据支撑的方向判断。",
+            "note": "",
+            "tag": "阶段目标",
+            "deadline": "",
+            "xp": 40,
+            "done": true
+          },
+          {
+            "id": "short-advance_focus_0",
+            "title": "推进 内容创作/编辑",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-advance_focus_1",
+            "title": "推进 写作",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-advance_focus_2",
+            "title": "推进 策划",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-advance_signal_0",
+            "title": "减少定位摇摆",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          },
+          {
+            "id": "short-advance_signal_1",
+            "title": "增强岗位适配度稳定性",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          }
+        ]
+      },
+      {
+        "id": "report_long-early",
+        "title": "从岗位适配走向路径适配",
+        "summary": "不只判断是否能进入目标岗位，还要判断长期是否适合沿这条路径发展。",
+        "phase_key": "long",
+        "source": "report",
+        "role": "内容创作/编辑",
+        "timeline": "长期 · 初期阶段",
+        "report_id": "report-a347cbeb7a73",
+        "created_at": "2026-04-02T16:06:32.400Z",
+        "updated_at": "2026-04-02 03:03:16",
+        "items": [
+          {
+            "id": "long-early_objective",
+            "title": "不只判断是否能进入目标岗位，还要判断长期是否适合沿这条路径发展。",
+            "note": "",
+            "tag": "阶段目标",
+            "deadline": "",
+            "xp": 40,
+            "done": false
+          },
+          {
+            "id": "long-early_focus_0",
+            "title": "推进 表达自由",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "long-early_focus_1",
+            "title": "推进 内容影响",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": true
+          },
+          {
+            "id": "long-early_focus_2",
+            "title": "推进 职业环境匹配",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": true
+          },
+          {
+            "id": "long-early_signal_0",
+            "title": "稳定输出",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": true
+          },
+          {
+            "id": "long-early_signal_1",
+            "title": "工作价值观与环境更一致",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": true
+          }
+        ]
+      },
+      {
+        "id": "report_long-late",
+        "title": "建立动态复盘机制",
+        "summary": "随着画像、岗位需求与行业趋势变化，周期性复查职业路径是否仍然成立。",
+        "phase_key": "long",
+        "source": "report",
+        "role": "内容创作/编辑",
+        "timeline": "长期 · 进阶阶段",
+        "report_id": "report-a347cbeb7a73",
+        "created_at": "2026-04-02T16:06:32.400Z",
+        "updated_at": "2026-04-02 03:03:16",
+        "items": [
+          {
+            "id": "long-late_objective",
+            "title": "随着画像、岗位需求与行业趋势变化，周期性复查职业路径是否仍然成立。",
+            "note": "",
+            "tag": "阶段目标",
+            "deadline": "",
+            "xp": 40,
+            "done": true
+          },
+          {
+            "id": "long-late_focus_0",
+            "title": "推进 技能缺口主要集中在目标岗位的核心工具与方法论层面。",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": true
+          },
+          {
+            "id": "long-late_focus_1",
+            "title": "推进 定期复核趋势变化",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": true
+          },
+          {
+            "id": "long-late_focus_2",
+            "title": "推进 复盘能力增量",
+            "note": "",
+            "tag": "技能",
+            "deadline": "",
+            "xp": 20,
+            "done": true
+          },
+          {
+            "id": "long-late_signal_0",
+            "title": "保持职业规划可迭代",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": true
+          },
+          {
+            "id": "long-late_signal_1",
+            "title": "及时修正过时假设",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          }
+        ]
+      },
+      {
+        "id": "report_review_report-a347cbeb7a73",
+        "title": "路径复查与动态回看",
+        "summary": "把需要周期性回看的复查节点统一放到长期阶段里。",
+        "phase_key": "long",
+        "source": "report",
+        "role": "内容创作/编辑",
+        "timeline": "长期阶段 · 复查节点",
+        "report_id": "report-a347cbeb7a73",
+        "created_at": "2026-04-02T16:06:32.400Z",
+        "updated_at": "2026-04-02 03:03:16",
+        "items": [
+          {
+            "id": "checkpoint_0_阶段复查",
+            "title": "阶段复查",
+            "note": "每次画像输入有明显更新后，重新生成并对比新版报告。",
+            "tag": "复查",
+            "deadline": "",
+            "xp": 18,
+            "done": false
+          },
+          {
+            "id": "checkpoint_1_趋势复查",
+            "title": "趋势复查",
+            "note": "结合行业快照，观察目标岗位是否出现明显需求变化。",
+            "tag": "复查",
+            "deadline": "",
+            "xp": 18,
+            "done": false
+          },
+          {
+            "id": "checkpoint_2_证据复查",
+            "title": "证据复查",
+            "note": "优先判断低置信结论是否已被新的经历、项目或访谈补证。",
+            "tag": "复查",
+            "deadline": "",
+            "xp": 18,
+            "done": false
+          }
+        ]
+      },
       {
         "id": "plan_1775043425509",
         "title": "我的职业规划 2026/4/1",
+        "summary": "",
+        "phase_key": "short",
+        "source": "manual",
+        "role": "",
+        "timeline": "",
+        "report_id": "",
         "created_at": "2026-04-01",
-        "source": "user_created",
+        "updated_at": "2026-04-02T15:03:03.783Z",
         "items": []
       },
       {
-        "created_at": "2026-03-31",
         "id": "plan_1774927785403",
-        "items": [],
-        "source": "user_created",
-        "title": "我的职业规划 2026/3/31"
+        "title": "我的职业规划 2026/3/31",
+        "summary": "",
+        "phase_key": "short",
+        "source": "manual",
+        "role": "",
+        "timeline": "",
+        "report_id": "",
+        "created_at": "2026-03-31",
+        "updated_at": "2026-04-02T15:03:03.783Z",
+        "items": []
       }
-    ]
+    ],
+    "progress": {
+      "streak": 1,
+      "best_streak": 1,
+      "xp": 238,
+      "last_checkin": "2026-04-02",
+      "active_days": {
+        "2026-04-02": true
+      }
+    },
+    "updated_at": "2026-04-02T16:06:32.400Z"
   },
   "profile_portrait": {
     "status": "ready",

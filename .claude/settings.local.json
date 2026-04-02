@@ -50,7 +50,8 @@
       "Bash(grep -E \"\\\\.py$|^d\")",
       "Bash(grep -r \"startCareerReportGeneration\" /c/Users/rog/Desktop/web/static/*.js)",
       "Bash(grep -E \"\\\\.\\(py|md\\)$\")",
-      "Bash(find /c/Users/rog/Desktop/web/services/onet -type f -name *.py)"
+      "Bash(find /c/Users/rog/Desktop/web/services/onet -type f -name *.py)",
+      "Bash(python3:*)"
     ],
     "defaultMode": "bypassPermissions"
   }

@@ -265,6 +265,8 @@
       if (status === "ready") {
         await loadCurrentCareerReport({ userCenterRefresh: true });
         toast("职业报告已完成", "新的报告版本已经生成并同步到报告中心。", "success", 2200);
+        // Notify learning plan to auto-refresh from new tracker data
+        window.dispatchEvent(new CustomEvent("career-report:updated"));
         return;
       }
       if (status === "failed") {
