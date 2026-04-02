@@ -1,26 +1,41 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 职业规划智能体 Flask 服务。
 运行方式：python server.py
 访问地址：http://localhost:8080
 """
 
+import gzip
+import io
 import json
+import mimetypes
 import os
 import re
 import threading
 import time
 import urllib.parse
+import urllib.request
+import urllib.error
 import uuid
 import webbrowser
 from datetime import datetime, timedelta
 from functools import wraps
+import random
 
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from services.news import get_career_news_payload
+from services.report import (
+    CAREER_REPORT_STAGE_DEFS,
+    REPORT_VERSION,
+    build_stage_progress,
+    empty_report_job,
+    empty_report_state,
+    generate_career_report_bundle,
+)
 from services.resume import (
     FLEXIBLE_MATCH_ANALYSIS_PROMPT,
     RESUME_REVIEW_PROMPT,
@@ -30,6 +45,11 @@ from services.resume import (
     build_job_payload_from_text,
     build_resume_text_payload,
 )
+
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("application/json", ".json")
 
 # 路径配置
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
@@ -41,6 +61,8 @@ LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "llm_configs.json")
 LLM_PROVIDERS_FILE = os.path.join(APP_DATA_DIR, "llm_providers.json")
 RESUME_LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "resume_llm_config.json")
 RESUME_UPLOAD_DIR = os.path.join(APP_DATA_DIR, "user_uploads")
+CAREER_REPORT_DIR = os.path.join(APP_DATA_DIR, "career_reports")
+PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3.1-flash-image-preview").strip() or "google/gemini-3.1-flash-image-preview"
 ASSESSMENT_DATA_FILE = os.path.join(BASE_DIR, "static", "assessment-data.json")
 JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
@@ -51,6 +73,8 @@ ASSESSMENT_DATA_CACHE = {"signature": None, "payload": {}}
 USERS_CACHE = None
 RESUME_ANALYSIS_LOCK = threading.Lock()
 RESUME_ANALYSIS_JOBS = {}
+CAREER_REPORT_LOCK = threading.Lock()
+CAREER_REPORT_JOBS = {}
 JOB_CACHE_MAX_AGE_SECONDS = 900
 RESUME_MAX_FILE_SIZE = 12 * 1024 * 1024
 RESUME_MAX_PAGES = 20
@@ -93,6 +117,9 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 FRONTEND_ORIGIN = str(os.environ.get("FRONTEND_ORIGIN") or "").strip()
+VITE_DEV_SERVER_URL = str(os.environ.get("VITE_DEV_SERVER_URL") or "").strip().rstrip("/")
+VITE_MANIFEST_FILE = os.path.join(BASE_DIR, "static", "dist", ".vite", "manifest.json")
+VITE_MANIFEST_CACHE = {"mtime": None, "payload": None}
 
 
 @app.before_request
@@ -100,6 +127,56 @@ def _handle_api_preflight():
     if request.method == "OPTIONS" and request.path.startswith("/api/"):
         return ("", 204)
     return None
+
+
+def _load_vite_manifest():
+    if VITE_DEV_SERVER_URL:
+        return {}
+    try:
+        mtime = os.path.getmtime(VITE_MANIFEST_FILE)
+    except OSError:
+        return {}
+    if VITE_MANIFEST_CACHE["mtime"] == mtime and isinstance(VITE_MANIFEST_CACHE["payload"], dict):
+        return VITE_MANIFEST_CACHE["payload"]
+    with open(VITE_MANIFEST_FILE, "r", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    VITE_MANIFEST_CACHE["mtime"] = mtime
+    VITE_MANIFEST_CACHE["payload"] = payload
+    return payload
+
+
+@app.context_processor
+def inject_vite_asset_tags():
+    def vite_asset_tags(entry_name):
+        safe_entry = str(entry_name or "").strip()
+        if not safe_entry:
+            return Markup("")
+        if VITE_DEV_SERVER_URL:
+            client = f'{VITE_DEV_SERVER_URL}/@vite/client'
+            entry = f'{VITE_DEV_SERVER_URL}/{safe_entry}'
+            return Markup(
+                "\n".join(
+                    [
+                        f'<script type="module" src="{escape(client)}"></script>',
+                        f'<script type="module" src="{escape(entry)}"></script>',
+                    ]
+                )
+            )
+
+        manifest = _load_vite_manifest()
+        chunk = manifest.get(safe_entry)
+        if not chunk:
+            raise RuntimeError(f"Missing Vite manifest entry: {safe_entry}")
+
+        tags = []
+        for css_file in chunk.get("css", []):
+            href = url_for("static", filename=f"dist/{css_file}")
+            tags.append(f'<link rel="stylesheet" href="{escape(href)}">')
+        script_src = url_for("static", filename=f"dist/{chunk['file']}")
+        tags.append(f'<script type="module" src="{escape(script_src)}"></script>')
+        return Markup("\n".join(tags))
+
+    return {"vite_asset_tags": vite_asset_tags}
 
 
 @app.after_request
@@ -114,6 +191,47 @@ def _inject_api_cors_headers(response):
     response.headers["Vary"] = "Origin"
     if allow_origin != "*":
         response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+
+# 静态资源缓存 & gzip 压缩
+_STATIC_EXTS_LONG = {".js", ".css", ".json", ".gif", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2"}
+_GZIP_MIME = {"text/html", "text/css", "application/javascript", "application/json", "image/svg+xml", "text/javascript"}
+_GZIP_MIN_SIZE = 1400  # bytes
+
+
+@app.after_request
+def _static_headers_and_gzip(response):
+    path = request.path
+
+    # ── 静态文件长效缓存 ──────────────────────────────
+    if path.startswith("/static/"):
+        ext = os.path.splitext(path)[1].lower()
+        if ext in _STATIC_EXTS_LONG:
+            # 版本号通过 ?v=xxx 实现，可以安全地设置 1 年
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+    # ── gzip 压缩 ──────────────────────────────────────
+    accept_enc = request.headers.get("Accept-Encoding", "")
+    if (
+        "gzip" in accept_enc
+        and response.status_code == 200
+        and not response.direct_passthrough
+        and (response.content_length is None or (response.content_length or 0) > _GZIP_MIN_SIZE)
+    ):
+        mime = (response.content_type or "").split(";")[0].strip()
+        if mime in _GZIP_MIME:
+            data = response.get_data()
+            if len(data) > _GZIP_MIN_SIZE:
+                buf = io.BytesIO()
+                with gzip.GzipFile(mode="wb", fileobj=buf, compresslevel=6) as gz:
+                    gz.write(data)
+                compressed = buf.getvalue()
+                response.set_data(compressed)
+                response.headers["Content-Encoding"] = "gzip"
+                response.headers["Content-Length"] = len(compressed)
+                response.headers.add("Vary", "Accept-Encoding")
+
     return response
 
 CAREER_INTERVIEW_SYSTEM_PROMPT = """
@@ -199,7 +317,7 @@ DEFAULT_USER_SPECS = [
     {"username": "24151007", "password": "123456", "role": "user", "display_name": "24151007"},
 ]
 
-VALID_USER_STATE_SCOPES = {"career_interview", "assessment_hub", "resume_profile"}
+VALID_USER_STATE_SCOPES = {"career_interview", "assessment_hub", "resume_profile", "career_report", "career_plans", "profile_portrait", "account_avatar"}
 VALID_LLM_CONFIG_SCOPES = {"career_interview", "assessment_hub"}
 
 
@@ -358,10 +476,30 @@ def _get_active_provider_and_model():
     return base_url, api_key, model
 
 
+def _get_profile_portrait_runtime():
+    providers = _load_providers()
+    provider = next(
+        (
+            item for item in providers
+            if "openrouter.ai" in str(item.get("base_url") or "").strip().lower()
+            and str(item.get("api_key") or "").strip()
+        ),
+        None,
+    )
+    if not provider:
+        return None, None, PROFILE_PORTRAIT_MODEL
+    return (
+        str(provider.get("base_url") or "").strip(),
+        str(provider.get("api_key") or "").strip(),
+        PROFILE_PORTRAIT_MODEL,
+    )
+
+
 def _ensure_app_storage():
     os.makedirs(APP_DATA_DIR, exist_ok=True)
     os.makedirs(USER_STATE_DIR, exist_ok=True)
     os.makedirs(RESUME_UPLOAD_DIR, exist_ok=True)
+    os.makedirs(CAREER_REPORT_DIR, exist_ok=True)
 
 
 def _load_assessment_knowledge():
@@ -500,6 +638,27 @@ def _load_users():
         return USERS_CACHE
 
 
+def _save_users(users):
+    global USERS_CACHE
+    normalized_users = []
+    seen = set()
+    for item in users if isinstance(users, list) else []:
+        normalized = _normalized_user_record(item)
+        if not normalized:
+            continue
+        username = normalized["username"]
+        if username in seen:
+            continue
+        seen.add(username)
+        normalized_users.append(normalized)
+    normalized_users.sort(key=lambda item: (item["role"] != "super_admin", item["username"]))
+    _ensure_app_storage()
+    with APP_DATA_LOCK:
+        _write_json_file(USERS_FILE, normalized_users)
+    USERS_CACHE = normalized_users
+    return USERS_CACHE
+
+
 def _find_user(username):
     normalized_name = str(username or "").strip()
     if not normalized_name:
@@ -567,6 +726,934 @@ def _save_user_state(username, payload):
     with USER_STATE_LOCK:
         _write_json_file(path, normalized)
     return normalized
+
+
+def _public_profile_portrait_state(raw_state):
+    state = raw_state if isinstance(raw_state, dict) else {}
+    image_url = str(state.get("image_url") or "").strip()
+    if not image_url:
+        return None
+    return {
+        "status": "ready",
+        "image_url": image_url,
+        "created_at": int(state.get("created_at") or 0),
+        "model": str(state.get("model") or PROFILE_PORTRAIT_MODEL).strip() or PROFILE_PORTRAIT_MODEL,
+        "archetype_name": str(state.get("archetype_name") or "").strip(),
+        "prompt_summary": str(state.get("prompt_summary") or "").strip(),
+        "prompt_text": str(state.get("prompt_text") or "").strip(),
+    }
+
+
+def _normalize_profile_portrait_context(raw_context):
+    context = raw_context if isinstance(raw_context, dict) else {}
+    def _clean_text(value, limit=220):
+        return str(value or "").strip()[:limit]
+
+    def _clean_list(values, limit=5, item_limit=48):
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, list):
+            return []
+        result = []
+        for item in values:
+            text = _clean_text(item, item_limit)
+            if text:
+                result.append(text)
+            if len(result) >= limit:
+                break
+        return result
+
+    return {
+        "gender": _clean_text(context.get("gender"), 16),
+        "archetype_name": _clean_text(context.get("archetype_name"), 64),
+        "archetype_scene": _clean_text(context.get("archetype_scene"), 64),
+        "summary": _clean_text(context.get("summary"), 420),
+        "mbti": _clean_text(context.get("mbti"), 32),
+        "holland": _clean_text(context.get("holland"), 32),
+        "holland_top_codes": _clean_list(context.get("holland_top_codes"), limit=3, item_limit=8),
+        "major": _clean_text(context.get("major"), 64),
+        "grade": _clean_text(context.get("grade"), 32),
+        "target_city": _clean_text(context.get("target_city"), 32),
+        "target_direction": _clean_text(context.get("target_direction"), 64),
+        "role_cluster": _clean_list(context.get("role_cluster"), limit=4),
+        "top_roles": _clean_list(context.get("top_roles"), limit=3),
+        "work_values": _clean_list(context.get("work_values"), limit=4),
+        "axis_traits": _clean_list(context.get("axis_traits"), limit=4, item_limit=48),
+        "workstyle_traits": _clean_list(context.get("workstyle_traits"), limit=4, item_limit=48),
+        "interview_summary": _clean_text(context.get("interview_summary"), 320),
+        "interview_roles": _clean_list(context.get("interview_roles"), limit=4, item_limit=48),
+        "interview_values": _clean_list(context.get("interview_values"), limit=5, item_limit=48),
+        "interview_evidence": _clean_list(context.get("interview_evidence"), limit=4, item_limit=96),
+        "resume_summary": _clean_text(context.get("resume_summary"), 320),
+        "resume_roles": _clean_list(context.get("resume_roles"), limit=5, item_limit=48),
+        "resume_signals": _clean_list(context.get("resume_signals"), limit=5, item_limit=48),
+        "resume_projects": _clean_list(context.get("resume_projects"), limit=4, item_limit=120),
+        "resume_experiences": _clean_list(context.get("resume_experiences"), limit=3, item_limit=96),
+        "resume_skills": _clean_list(context.get("resume_skills"), limit=8, item_limit=32),
+        "resume_competitions": _clean_list(context.get("resume_competitions"), limit=3, item_limit=64),
+    }
+
+
+def _normalize_profile_gender(value):
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    mapping = {
+        "男": "男性",
+        "男性": "男性",
+        "male": "男性",
+        "man": "男性",
+        "m": "男性",
+        "女": "女性",
+        "女性": "女性",
+        "female": "女性",
+        "woman": "女性",
+        "f": "女性",
+    }
+    return mapping.get(text, str(value or "").strip())
+
+
+def _join_unique_text(items, sep="、", limit=None):
+    result = []
+    seen = set()
+    for item in items or []:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        marker = text.lower()
+        if marker in seen:
+            continue
+        seen.add(marker)
+        result.append(text)
+        if limit and len(result) >= limit:
+            break
+    return sep.join(result)
+
+
+def _infer_profile_portrait_age_hint(context):
+    grade = str(context.get("grade") or "")
+    if re.search(r"博士|phd", grade, re.IGNORECASE):
+        return "24-30 岁"
+    if re.search(r"硕士|研究生|研一|研二|研三|master", grade, re.IGNORECASE):
+        return "23-27 岁"
+    if re.search(r"大四|四年级|本科|本一|本二|本三|本四|senior", grade, re.IGNORECASE):
+        return "21-25 岁"
+    if re.search(r"大一|大二|大三|一年级|二年级|三年级|freshman|sophomore|junior", grade, re.IGNORECASE):
+        return "18-23 岁"
+    if context.get("resume_experiences") or context.get("resume_projects"):
+        return "22-28 岁"
+    return "20-26 岁"
+
+
+def _describe_mbti_tendency(value):
+    token = "".join(re.findall(r"[A-Za-z]", str(value or "").upper()))[:4]
+    if len(token) != 4:
+        return ""
+    trait_map = {
+        "E": "外向主动",
+        "I": "内敛专注",
+        "S": "务实细致",
+        "N": "抽象探索",
+        "T": "理性判断",
+        "F": "共情敏锐",
+        "J": "结构规划",
+        "P": "灵活应变",
+    }
+    traits = [trait_map.get(letter, "") for letter in token if trait_map.get(letter)]
+    if not traits:
+        return token
+    return f"{token} 倾向，整体更偏{_join_unique_text(traits, '、', 4)}"
+
+
+def _describe_holland_tendency(code, top_codes=None):
+    letters = []
+    raw = "".join(re.findall(r"[A-Za-z]", str(code or "").upper()))
+    for letter in raw:
+        if letter not in letters:
+            letters.append(letter)
+    for item in top_codes or []:
+        text = "".join(re.findall(r"[A-Za-z]", str(item or "").upper()))
+        if text and text[0] not in letters:
+            letters.append(text[0])
+    letters = letters[:3]
+    label_map = {
+        "R": "动手实践",
+        "I": "分析研究",
+        "A": "创意表达",
+        "S": "协作助人",
+        "E": "组织推动",
+        "C": "秩序执行",
+    }
+    labels = [label_map.get(letter, "") for letter in letters if label_map.get(letter)]
+    if not letters and not labels:
+        return ""
+    joined_letters = "".join(letters)
+    if not labels:
+        return joined_letters
+    return f"{joined_letters} 倾向，兴趣上更偏{_join_unique_text(labels, '、', 3)}"
+
+
+def _infer_profile_portrait_visual_cues(context):
+    combined = " ".join(
+        [
+            context.get("target_direction") or "",
+            context.get("archetype_name") or "",
+            context.get("archetype_scene") or "",
+            _join_unique_text(context.get("top_roles"), " "),
+            _join_unique_text(context.get("role_cluster"), " "),
+            _join_unique_text(context.get("resume_roles"), " "),
+            _join_unique_text(context.get("resume_skills"), " "),
+        ]
+    )
+    if re.search(r"产品|项目|运营|行政|助理|协调|hr|人力|pm", combined, re.IGNORECASE):
+        return {
+            "outfit": "商务休闲穿搭，利落西装外套或针织叠穿",
+            "props": "平板、笔记本、进度表或触控笔",
+            "scene": "现代办公室、协作面板、轻度科技感管理界面",
+            "mood": "沉稳、可靠、组织感强",
+        }
+    if re.search(r"数据|分析|财务|审计|研究|算法|开发|后端|测试|工程", combined, re.IGNORECASE):
+        return {
+            "outfit": "干净利落的职场穿搭，衬衫或简洁外套",
+            "props": "笔记本电脑、数据报表、分析界面",
+            "scene": "安静的办公桌面、数据图表屏幕、科技办公环境",
+            "mood": "理性、专注、可信赖",
+        }
+    if re.search(r"设计|内容|新媒体|编辑|品牌|创意", combined, re.IGNORECASE):
+        return {
+            "outfit": "更有设计感的都市职业穿搭，简洁但有创意细节",
+            "props": "数位板、便签、创意稿件或视觉素材",
+            "scene": "创意工作台、品牌墙、轻量工作界面",
+            "mood": "敏锐、清爽、有表达力",
+        }
+    if re.search(r"销售|客户|商务|市场", combined, re.IGNORECASE):
+        return {
+            "outfit": "偏正式的商务穿搭",
+            "props": "手机、文件夹、演示资料",
+            "scene": "会议室或商务洽谈空间",
+            "mood": "自信、利落、有推进感",
+        }
+    return {
+        "outfit": "清爽的职场青年穿搭，商务休闲风",
+        "props": "平板或笔记本、工作记录工具",
+        "scene": "现代办公空间与柔和科技感背景",
+        "mood": "专业、克制、可信赖",
+    }
+
+
+def _build_profile_portrait_subject_summary(context):
+    identity = []
+    gender = _normalize_profile_gender(context.get("gender"))
+    if gender:
+        identity.append(gender)
+    identity.append(_infer_profile_portrait_age_hint(context))
+    identity.append("中国青年职场形象")
+    role_focus = _join_unique_text(
+        context.get("top_roles") or context.get("role_cluster") or [context.get("target_direction") or context.get("archetype_name")],
+        " / ",
+        3,
+    )
+    trait_parts = []
+    if context.get("archetype_name"):
+        trait_parts.append(context.get("archetype_name"))
+    mbti_desc = _describe_mbti_tendency(context.get("mbti"))
+    holland_desc = _describe_holland_tendency(context.get("holland"), context.get("holland_top_codes"))
+    if mbti_desc:
+        trait_parts.append(mbti_desc)
+    if holland_desc:
+        trait_parts.append(holland_desc)
+    if context.get("work_values"):
+        trait_parts.append(f"工作中看重{_join_unique_text(context.get('work_values'), '、', 4)}")
+    if context.get("axis_traits"):
+        trait_parts.append(f"工作方式偏向{_join_unique_text(context.get('axis_traits'), '；', 2)}")
+    evidence_parts = []
+    resume_summary = str(context.get("resume_summary") or "").strip()
+    if resume_summary and resume_summary.lower() != "unknown":
+        evidence_parts.append(f"简历显示{resume_summary}")
+    if context.get("resume_projects"):
+        evidence_parts.append(f"项目经历集中在{_join_unique_text(context.get('resume_projects'), '；', 2)}")
+    if context.get("interview_summary"):
+        evidence_parts.append(f"访谈体现出{context.get('interview_summary')}")
+    elif context.get("interview_evidence"):
+        evidence_parts.append(f"访谈证据包括{_join_unique_text(context.get('interview_evidence'), '；', 2)}")
+    pieces = [
+        "，".join([part for part in identity if part]),
+        f"职业定位接近 {role_focus}" if role_focus else "",
+        "；".join([part for part in trait_parts if part]),
+        "；".join([part for part in evidence_parts if part]),
+    ]
+    return "。".join([piece for piece in pieces if piece])
+
+
+def _has_profile_portrait_signal(context):
+    return any(
+        [
+            context.get("summary"),
+            context.get("archetype_name"),
+            context.get("target_direction"),
+            context.get("resume_summary"),
+            context.get("interview_summary"),
+            context.get("resume_projects"),
+            context.get("resume_roles"),
+            context.get("work_values"),
+        ]
+    )
+
+
+def _build_profile_portrait_prompt(context):
+    gender = _normalize_profile_gender(context.get("gender")) or "未指定"
+    age_hint = _infer_profile_portrait_age_hint(context)
+    archetype_name = context.get("archetype_name") or "综合支持者"
+    role_focus = _join_unique_text(
+        context.get("top_roles") or context.get("role_cluster") or [context.get("target_direction") or "职业探索方向"],
+        " / ",
+        3,
+    )
+    work_values = _join_unique_text(context.get("work_values"), "、", 4) or "成长、清晰感、执行落地"
+    subject_summary = _build_profile_portrait_subject_summary(context)
+    mbti_desc = _describe_mbti_tendency(context.get("mbti"))
+    holland_desc = _describe_holland_tendency(context.get("holland"), context.get("holland_top_codes"))
+    visual_cues = _infer_profile_portrait_visual_cues(context)
+    detail_lines = [
+        f"- 性别：{gender}",
+        f"- 年龄感：{age_hint}",
+        f"- 人物原型：{archetype_name}",
+        f"- 目标职业场景：{role_focus}",
+        f"- 综合摘要：{subject_summary or (context.get('summary') or '')}",
+        f"- MBTI 信息：{mbti_desc}" if mbti_desc else "",
+        f"- 霍兰德信息：{holland_desc}" if holland_desc else "",
+        f"- 工作价值观：{work_values}",
+        f"- 工作方式：{_join_unique_text(context.get('axis_traits'), '；', 3)}" if context.get("axis_traits") else "",
+        f"- 工作风格拼图：{_join_unique_text(context.get('workstyle_traits'), '；', 3)}" if context.get("workstyle_traits") else "",
+        f"- 访谈角色判断：{_join_unique_text(context.get('interview_roles'), '、', 3)}" if context.get("interview_roles") else "",
+        f"- 访谈价值观证据：{_join_unique_text(context.get('interview_values'), '、', 4)}" if context.get("interview_values") else "",
+        f"- 访谈关键证据：{_join_unique_text(context.get('interview_evidence'), '；', 2)}" if context.get("interview_evidence") else "",
+        f"- 简历角色线索：{_join_unique_text(context.get('resume_roles'), '、', 4)}" if context.get("resume_roles") else "",
+        f"- 简历项目线索：{_join_unique_text(context.get('resume_projects'), '；', 2)}" if context.get("resume_projects") else "",
+        f"- 简历经历线索：{_join_unique_text(context.get('resume_experiences'), '；', 2)}" if context.get("resume_experiences") else "",
+        f"- 简历技能关键词：{_join_unique_text(context.get('resume_skills'), '、', 6)}" if context.get("resume_skills") else "",
+        f"- 专业：{context.get('major')}" if context.get("major") else "",
+        f"- 学历：{context.get('grade')}" if context.get("grade") else "",
+        f"- 目标城市：{context.get('target_city')}" if context.get("target_city") else "",
+        f"- 目标方向：{context.get('target_direction')}" if context.get("target_direction") else "",
+    ]
+    detail_block = "\n".join([line for line in detail_lines if line])
+    return (
+        "请为职业规划仪表盘绘制一张 3:4 纵向人物画像插画，只出现 1 位人物，不要文字、不要水印、不要拼贴、不要重复面孔、不要多余手指。\n"
+        "先把下面的人物信息融合成一个统一角色，再作画，不要机械堆叠标签，也不要把 MBTI、霍兰德字母直接画在画面里。\n"
+        "人物信息：\n"
+        f"{detail_block}\n"
+        "视觉表达要求：\n"
+        f"- 整体定位：中国年轻学生或职场新人，气质 {visual_cues['mood']}。\n"
+        f"- 穿搭：{visual_cues['outfit']}。\n"
+        f"- 道具：{visual_cues['props']}。\n"
+        f"- 场景：{visual_cues['scene']}，可带轻度数据面板或协作界面氛围。\n"
+        "- 构图：半身到三分之二身，人物居中或略偏左，主体突出。\n"
+        "- 风格：精致数字插画，写实与动漫融合，光线柔和，高级企业海报质感，蓝白到青蓝渐变背景。\n"
+        "- 氛围：冷静、聪明、可信赖，同时能让人看出其职业方向和工作方式。\n"
+        "负面要求：低清晰度、背景杂乱、夸张卡通、过度赛博朋克、文字乱码、畸形手部、比例失衡。"
+    )
+
+
+def _generate_profile_portrait_image(base_url, api_key, model, prompt):
+    if not base_url or not api_key:
+        raise ValueError("系统中还没有可用的 OpenRouter 图片配置。")
+    endpoint = f"{_normalize_sdk_base_url(base_url)}/chat/completions"
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "modalities": ["image", "text"],
+        "image_config": {"aspect_ratio": "3:4"},
+    }
+    req = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        try:
+            parsed = json.loads(detail or "{}")
+            message = str(parsed.get("error", {}).get("message") or parsed.get("message") or "").strip()
+        except Exception:
+            message = ""
+        raise ValueError(message or f"图片接口调用失败：HTTP {exc.code}") from exc
+    except Exception as exc:
+        raise ValueError(f"图片接口调用失败：{str(exc)[:240]}") from exc
+
+    try:
+        result = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        raise ValueError("图片接口返回了无法解析的数据。") from exc
+
+    choices = result.get("choices") if isinstance(result, dict) else []
+    message = choices[0].get("message") if choices and isinstance(choices[0], dict) else {}
+    images = message.get("images") if isinstance(message, dict) else []
+    if not images:
+        raise ValueError("模型没有返回图片结果。")
+    image_url = str((((images[0] or {}).get("image_url") or {}).get("url")) or "").strip()
+    if not image_url:
+        raise ValueError("图片结果为空。")
+    return image_url
+
+
+def _career_report_user_dir(username):
+    safe_name = re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
+    return os.path.join(CAREER_REPORT_DIR, safe_name)
+
+
+def _career_report_file_paths(username):
+    base_dir = _career_report_user_dir(username)
+    return {
+        "dir": base_dir,
+        "json": os.path.join(base_dir, "latest.json"),
+        "html": os.path.join(base_dir, "latest.html"),
+        "md": os.path.join(base_dir, "latest.md"),
+        "job": os.path.join(base_dir, "current_job.json"),
+    }
+
+
+def _read_career_report_bundle(username):
+    paths = _career_report_file_paths(username)
+    with APP_DATA_LOCK:
+        payload = _read_json_file(paths["json"], {})
+    return payload if isinstance(payload, dict) else {}
+
+
+def _save_career_report_bundle(username, bundle):
+    paths = _career_report_file_paths(username)
+    os.makedirs(paths["dir"], exist_ok=True)
+    payload = bundle if isinstance(bundle, dict) else {}
+    report_document = payload.get("report_document") if isinstance(payload.get("report_document"), dict) else {}
+    markdown_text = str(report_document.get("markdown") or "")
+    html_text = str(report_document.get("html") or "")
+    new_meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    new_report_id = str(new_meta.get("report_id") or "").strip()
+    versions_dir = os.path.join(paths["dir"], "versions")
+    with APP_DATA_LOCK:
+        existing = _read_json_file(paths["json"], {})
+        if (
+            isinstance(existing, dict)
+            and existing.get("meta")
+            and new_report_id
+            and isinstance(existing.get("meta"), dict)
+        ):
+            old_id = str(existing["meta"].get("report_id") or "").strip()
+            if old_id and old_id != new_report_id and existing.get("report_document"):
+                os.makedirs(versions_dir, exist_ok=True)
+                archive_path = os.path.join(versions_dir, f"{old_id}.json")
+                if not os.path.isfile(archive_path):
+                    _write_json_file(archive_path, existing)
+        _write_json_file(paths["json"], payload)
+        if markdown_text:
+            with open(paths["md"], "w", encoding="utf-8") as fp:
+                fp.write(markdown_text)
+        if html_text:
+            with open(paths["html"], "w", encoding="utf-8") as fp:
+                fp.write(html_text)
+        _write_json_file(paths["job"], {
+            "report_id": str(payload.get("meta", {}).get("report_id") or ""),
+            "generated_at": str(payload.get("meta", {}).get("generated_at") or ""),
+            "title": str(payload.get("meta", {}).get("title") or ""),
+        })
+    return payload
+
+
+def _public_career_report_state(raw_state):
+    state = empty_report_state()
+    if isinstance(raw_state, dict):
+        state.update({
+            "status": str(raw_state.get("status") or state["status"]),
+            "job_id": str(raw_state.get("job_id") or ""),
+            "report_id": str(raw_state.get("report_id") or ""),
+            "generated_at": str(raw_state.get("generated_at") or ""),
+            "stage": str(raw_state.get("stage") or ""),
+            "stage_label": str(raw_state.get("stage_label") or ""),
+            "stage_detail": str(raw_state.get("stage_detail") or ""),
+            "error_message": str(raw_state.get("error_message") or ""),
+            "progress": raw_state.get("progress") if isinstance(raw_state.get("progress"), list) else [],
+            "model": str(raw_state.get("model") or ""),
+            "generation_mode": str(raw_state.get("generation_mode") or ""),
+            "focus_role_id": str(raw_state.get("focus_role_id") or ""),
+            "title": str(raw_state.get("title") or ""),
+            "summary": str(raw_state.get("summary") or ""),
+            "export_formats": raw_state.get("export_formats") if isinstance(raw_state.get("export_formats"), list) else ["html", "md"],
+            "tracker": raw_state.get("tracker") if isinstance(raw_state.get("tracker"), dict) else None,
+        })
+    return state
+
+
+def _public_career_report_job(raw_job):
+    job = empty_report_job()
+    if isinstance(raw_job, dict):
+        job.update({
+            "job_id": str(raw_job.get("job_id") or ""),
+            "username": str(raw_job.get("username") or ""),
+            "status": str(raw_job.get("status") or job["status"]),
+            "stage": str(raw_job.get("stage") or ""),
+            "stage_label": str(raw_job.get("stage_label") or ""),
+            "stage_detail": str(raw_job.get("stage_detail") or ""),
+            "message": str(raw_job.get("message") or ""),
+            "created_at": int(raw_job.get("created_at") or 0),
+            "started_at": int(raw_job.get("started_at") or 0),
+            "finished_at": int(raw_job.get("finished_at") or 0),
+            "report_id": str(raw_job.get("report_id") or ""),
+            "progress": raw_job.get("progress") if isinstance(raw_job.get("progress"), list) else [],
+        })
+    return job
+
+
+def _public_career_report_bundle(raw_bundle):
+    bundle = raw_bundle if isinstance(raw_bundle, dict) else {}
+    meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+    public_document = dict(document)
+    public_document.pop("markdown", None)
+    public_document.pop("html", None)
+    return {
+        "meta": meta,
+        "profile_snapshot": bundle.get("profile_snapshot") if isinstance(bundle.get("profile_snapshot"), dict) else {},
+        "role_rankings": bundle.get("role_rankings") if isinstance(bundle.get("role_rankings"), list) else [],
+        "gap_map": bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {},
+        "phase_plan": bundle.get("phase_plan") if isinstance(bundle.get("phase_plan"), dict) else {},
+        "trend_brief": bundle.get("trend_brief") if isinstance(bundle.get("trend_brief"), dict) else {},
+        "report_document": public_document,
+    }
+
+
+def _career_tracker_now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _normalize_tracker_score(value):
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    if score != score:
+        return None
+    return max(0, min(100, int(round(score))))
+
+
+def _normalize_tracker_status(raw_status, allow_doing=True):
+    status = str(raw_status or "").strip().lower()
+    if status in {"done", "completed", "complete", "checked"}:
+        return "done"
+    if allow_doing and status in {"doing", "active", "running", "in_progress", "progress"}:
+        return "doing"
+    return "pending"
+
+
+def _slugify_tracker_id(raw_text):
+    slug = re.sub(r"[^0-9A-Za-z_.-]+", "-", str(raw_text or "").strip()).strip("-").lower()
+    return slug or "item"
+
+
+def _normalize_tracker_history(raw_history):
+    history = []
+    if not isinstance(raw_history, list):
+        return history
+    for item in raw_history:
+        if not isinstance(item, dict):
+            continue
+        score = _normalize_tracker_score(item.get("score"))
+        if score is None:
+            continue
+        history.append({
+            "score": score,
+            "at": str(item.get("at") or ""),
+            "event": str(item.get("event") or "sync"),
+        })
+    return history[-8:]
+
+
+def _append_tracker_history(history, score, timestamp, event):
+    normalized = _normalize_tracker_history(history)
+    safe_score = _normalize_tracker_score(score)
+    if safe_score is None:
+        return normalized
+    if normalized and normalized[-1].get("score") == safe_score:
+        return normalized
+    normalized.append(
+        {
+            "score": safe_score,
+            "at": str(timestamp or _career_tracker_now()),
+            "event": str(event or "sync"),
+        }
+    )
+    return normalized[-8:]
+
+
+def _normalize_tracker_capability_payload(raw_items):
+    payload = {}
+    if not isinstance(raw_items, list):
+        return payload
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        payload[key] = {
+            "key": key,
+            "label": str(item.get("label") or key).strip() or key,
+            "score": _normalize_tracker_score(item.get("score")),
+            "sources": [str(source).strip() for source in (item.get("sources") or []) if str(source).strip()],
+        }
+    return payload
+
+
+def _build_career_report_tracker(bundle, existing_tracker=None, current_capabilities=None):
+    if not isinstance(bundle, dict):
+        return None
+
+    meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    report_id = str(meta.get("report_id") or "").strip()
+    if not report_id:
+        return None
+
+    existing = existing_tracker if isinstance(existing_tracker, dict) else {}
+    phase_plan = bundle.get("phase_plan") if isinstance(bundle.get("phase_plan"), dict) else {}
+    profile_snapshot = bundle.get("profile_snapshot") if isinstance(bundle.get("profile_snapshot"), dict) else {}
+    gap_map = bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {}
+    document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+
+    plan_state_map = {}
+    for item in existing.get("plan_items") or []:
+        if isinstance(item, dict) and item.get("id"):
+            plan_state_map[str(item["id"])] = item
+
+    checkpoint_state_map = {}
+    for item in existing.get("checkpoints") or []:
+        if isinstance(item, dict) and item.get("id"):
+            checkpoint_state_map[str(item["id"])] = item
+
+    ability_state_map = {}
+    for item in existing.get("ability_growth") or []:
+        if isinstance(item, dict) and item.get("key"):
+            ability_state_map[str(item["key"])] = item
+
+    generated_at = str(meta.get("generated_at") or existing.get("generated_at") or "")
+    current_sync_time = _career_tracker_now()
+    capability_payload = _normalize_tracker_capability_payload(current_capabilities)
+
+    plan_items = []
+    raw_plan_items = []
+    raw_plan_items.extend(phase_plan.get("short_term") or [])
+    raw_plan_items.extend(phase_plan.get("long_term") or [])
+    for index, item in enumerate(raw_plan_items):
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or f"plan-{index + 1}").strip() or f"plan-{index + 1}"
+        previous = plan_state_map.get(item_id, {})
+        status = _normalize_tracker_status(previous.get("status"), allow_doing=True)
+        started_at = str(previous.get("started_at") or "")
+        completed_at = str(previous.get("completed_at") or "") if status == "done" else ""
+        if status == "doing" and not started_at:
+            started_at = current_sync_time
+        if status == "done" and not completed_at:
+            completed_at = current_sync_time
+        plan_items.append(
+            {
+                "id": item_id,
+                "phase": str(item.get("phase") or ""),
+                "title": str(item.get("title") or "阶段任务"),
+                "objective": str(item.get("objective") or ""),
+                "focus_points": [str(point).strip() for point in (item.get("focus_points") or []) if str(point).strip()],
+                "signals": [str(signal).strip() for signal in (item.get("signals") or []) if str(signal).strip()],
+                "status": status,
+                "started_at": started_at if status in {"doing", "done"} else "",
+                "completed_at": completed_at,
+                "note": str(previous.get("note") or ""),
+                "updated_at": str(previous.get("updated_at") or ""),
+                "is_phase": True,
+            }
+        )
+        # Also expand nested task items into top-level plan items
+        for task in (item.get("tasks") or []):
+            if not isinstance(task, dict):
+                continue
+            task_id = str(task.get("id") or "").strip()
+            task_text = str(task.get("text") or "").strip()
+            if not task_id or not task_text:
+                continue
+            prev_task = plan_state_map.get(task_id, {})
+            task_status = _normalize_tracker_status(prev_task.get("status"), allow_doing=False)
+            task_completed = str(prev_task.get("completed_at") or "") if task_status == "done" else ""
+            plan_items.append(
+                {
+                    "id": task_id,
+                    "phase": str(item.get("phase") or ""),
+                    "title": task_text,
+                    "objective": task_text,
+                    "focus_points": [],
+                    "signals": [],
+                    "parent_phase": item_id,
+                    "status": task_status,
+                    "started_at": "",
+                    "completed_at": task_completed,
+                    "note": str(prev_task.get("note") or ""),
+                    "updated_at": str(prev_task.get("updated_at") or ""),
+                    "is_task": True,
+                }
+            )
+
+    checkpoints = []
+    for index, item in enumerate(phase_plan.get("checkpoints") or []):
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or f"检查点 {index + 1}").strip() or f"检查点 {index + 1}"
+        checkpoint_id = str(item.get("id") or f"checkpoint-{_slugify_tracker_id(label)}")
+        previous = checkpoint_state_map.get(checkpoint_id, {})
+        status = _normalize_tracker_status(previous.get("status"), allow_doing=False)
+        completed_at = str(previous.get("completed_at") or "") if status == "done" else ""
+        checkpoints.append(
+            {
+                "id": checkpoint_id,
+                "label": label,
+                "summary": str(item.get("summary") or ""),
+                "status": status,
+                "completed_at": completed_at,
+                "note": str(previous.get("note") or ""),
+                "updated_at": str(previous.get("updated_at") or ""),
+            }
+        )
+
+    baseline_map = {}
+    for item in profile_snapshot.get("capability_vector") or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        baseline_map[key] = {
+            "key": key,
+            "label": str(item.get("label") or key).strip() or key,
+            "score": _normalize_tracker_score(item.get("score")),
+            "sources": [str(source).strip() for source in (item.get("sources") or []) if str(source).strip()],
+        }
+
+    for key, item in capability_payload.items():
+        if key not in baseline_map:
+            baseline_map[key] = {
+                "key": key,
+                "label": item.get("label") or key,
+                "score": None,
+                "sources": [],
+            }
+
+    ability_growth = []
+    for key, baseline in baseline_map.items():
+        previous = ability_state_map.get(key, {})
+        baseline_score = _normalize_tracker_score(baseline.get("score"))
+        current_score = None
+        if key in capability_payload:
+            current_score = _normalize_tracker_score(capability_payload[key].get("score"))
+        if current_score is None:
+            current_score = _normalize_tracker_score(previous.get("current_score"))
+        if current_score is None:
+            current_score = baseline_score
+        delta = None
+        if baseline_score is not None and current_score is not None:
+            delta = int(current_score - baseline_score)
+        history = _normalize_tracker_history(previous.get("history"))
+        if not history and baseline_score is not None:
+            history = _append_tracker_history(history, baseline_score, generated_at or current_sync_time, "baseline")
+        if current_capabilities is not None:
+            history = _append_tracker_history(history, current_score, current_sync_time, "profile_sync")
+        ability_growth.append(
+            {
+                "key": key,
+                "label": str(baseline.get("label") or previous.get("label") or key),
+                "baseline_score": baseline_score,
+                "current_score": current_score,
+                "delta": delta,
+                "baseline_sources": baseline.get("sources") or [],
+                "current_sources": capability_payload.get(key, {}).get("sources") or previous.get("current_sources") or baseline.get("sources") or [],
+                "history": history,
+            }
+        )
+
+    # Use task items for progress calculation (more granular); fall back to phase items
+    task_items = [item for item in plan_items if item.get("is_task")]
+    phase_items = [item for item in plan_items if item.get("is_phase")]
+    trackable = task_items if task_items else phase_items
+    done_count = sum(1 for item in trackable if item.get("status") == "done") + sum(1 for item in checkpoints if item.get("status") == "done")
+    doing_count = sum(1 for item in trackable if item.get("status") == "doing")
+    total_count = len(trackable) + len(checkpoints)
+    weighted_progress = (
+        sum(1 for item in trackable if item.get("status") == "done")
+        + sum(0.5 for item in trackable if item.get("status") == "doing")
+        + sum(1 for item in checkpoints if item.get("status") == "done")
+    )
+    completion_rate = int(round(weighted_progress / total_count * 100)) if total_count else 0
+
+    improved_count = sum(1 for item in ability_growth if isinstance(item.get("delta"), int) and item.get("delta") > 0)
+    declined_count = sum(1 for item in ability_growth if isinstance(item.get("delta"), int) and item.get("delta") < 0)
+    stable_count = sum(1 for item in ability_growth if item.get("delta") in {0, None})
+
+    focus_role_name = (
+        str(gap_map.get("focus_role_name") or "")
+        or str(document.get("focus_role_name") or "")
+        or str(existing.get("focus_role_name") or "")
+        or "待识别方向"
+    )
+    focus_role_id = str(meta.get("focus_role_id") or existing.get("focus_role_id") or "")
+
+    current_version = {
+        "report_id": report_id,
+        "title": str(meta.get("title") or document.get("title") or "职业规划报告"),
+        "version": str(meta.get("version") or ""),
+        "generated_at": generated_at,
+        "focus_role_id": focus_role_id,
+        "focus_role_name": focus_role_name,
+    }
+    versions = []
+    versions.append(current_version)
+    for item in existing.get("versions") or []:
+        if not isinstance(item, dict):
+            continue
+        item_report_id = str(item.get("report_id") or "")
+        if item_report_id and item_report_id == report_id:
+            continue
+        versions.append(
+            {
+                "report_id": item_report_id,
+                "title": str(item.get("title") or "职业规划报告"),
+                "version": str(item.get("version") or ""),
+                "generated_at": str(item.get("generated_at") or ""),
+                "focus_role_id": str(item.get("focus_role_id") or ""),
+                "focus_role_name": str(item.get("focus_role_name") or ""),
+            }
+        )
+    versions = versions[:6]
+
+    next_focus = next((item.get("title") for item in plan_items if item.get("status") != "done"), "")
+    if not next_focus:
+        next_focus = next((item.get("label") for item in checkpoints if item.get("status") != "done"), "")
+
+    return {
+        "report_id": report_id,
+        "report_title": str(meta.get("title") or document.get("title") or "职业规划报告"),
+        "report_version": str(meta.get("version") or ""),
+        "focus_role_id": focus_role_id,
+        "focus_role_name": focus_role_name,
+        "generated_at": generated_at,
+        "last_synced_at": current_sync_time if current_capabilities is not None else str(existing.get("last_synced_at") or generated_at),
+        "completion_rate": completion_rate,
+        "completed_count": done_count,
+        "doing_count": doing_count,
+        "total_count": total_count,
+        "next_focus": str(next_focus or ""),
+        "ability_summary": {
+            "improved_count": improved_count,
+            "declined_count": declined_count,
+            "stable_count": stable_count,
+        },
+        "plan_items": plan_items,
+        "checkpoints": checkpoints,
+        "ability_growth": ability_growth,
+        "versions": versions,
+    }
+
+
+def _sync_career_report_tracker_state(username, bundle, current_capabilities=None):
+    state = _load_user_state(username)
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    tracker = _build_career_report_tracker(bundle, report_state.get("tracker"), current_capabilities)
+    meta = bundle.get("meta") if isinstance(bundle, dict) and isinstance(bundle.get("meta"), dict) else {}
+
+    if meta and str(report_state.get("status") or "") not in {"running", "queued"}:
+        report_state.update(
+            {
+                "status": "ready",
+                "report_id": str(meta.get("report_id") or report_state.get("report_id") or ""),
+                "generated_at": str(meta.get("generated_at") or report_state.get("generated_at") or ""),
+                "focus_role_id": str(meta.get("focus_role_id") or report_state.get("focus_role_id") or ""),
+                "title": str(meta.get("title") or report_state.get("title") or ""),
+                "summary": str(meta.get("summary") or report_state.get("summary") or ""),
+                "export_formats": ["html", "md"],
+            }
+        )
+
+    if tracker:
+        report_state["tracker"] = tracker
+        state["career_report"] = report_state
+        _save_user_state(username, state)
+
+    return state, report_state, tracker
+
+
+def _update_career_report_job(job_id, **fields):
+    with CAREER_REPORT_LOCK:
+        job = CAREER_REPORT_JOBS.get(job_id)
+        if not isinstance(job, dict):
+            return
+        job.update(fields)
+        CAREER_REPORT_JOBS[job_id] = job
+
+
+def _find_running_career_report_job(username):
+    with CAREER_REPORT_LOCK:
+        for job in CAREER_REPORT_JOBS.values():
+            if (
+                isinstance(job, dict)
+                and str(job.get("username") or "") == str(username or "")
+                and str(job.get("status") or "") in {"queued", "running"}
+            ):
+                return dict(job)
+    return None
+
+
+def _save_career_report_progress(username, job_id, stage, stage_label, detail, **extra):
+    state = _load_user_state(username)
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    report_state.update(
+        {
+            "status": extra.get("status") or "running",
+            "job_id": job_id,
+            "stage": stage,
+            "stage_label": stage_label,
+            "stage_detail": detail,
+            "progress": build_stage_progress(stage),
+            "error_message": str(extra.get("error_message") or ""),
+            "generated_at": str(extra.get("generated_at") or report_state.get("generated_at") or ""),
+            "report_id": str(extra.get("report_id") or report_state.get("report_id") or ""),
+            "model": str(extra.get("model") or report_state.get("model") or ""),
+            "generation_mode": str(extra.get("generation_mode") or report_state.get("generation_mode") or ""),
+            "focus_role_id": str(extra.get("focus_role_id") or report_state.get("focus_role_id") or ""),
+            "title": str(extra.get("title") or report_state.get("title") or ""),
+            "summary": str(extra.get("summary") or report_state.get("summary") or ""),
+            "export_formats": ["html", "md"],
+        }
+    )
+    state["career_report"] = report_state
+    _save_user_state(username, state)
+
+
+def _build_report_markdown_writer(base_url, api_key, model):
+    if not (base_url and api_key and model):
+        return None
+
+    def _writer(payload, system_prompt):
+        message = [{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+        return _call_markdown_chat(
+            base_url,
+            api_key,
+            model,
+            message,
+            system_prompt=system_prompt,
+            max_tokens=2200,
+        )
+
+    return _writer
 
 
 def _user_upload_dir(username):
@@ -762,7 +1849,7 @@ def _build_resume_extract_prompt():
     return "\n".join(
         [
             "你是中文简历结构化助手。请严格基于输入简历输出 JSON，不要输出任何额外说明。",
-            "输出结构需包含 candidate_summary、basics、roles_detected、leadership_signals、project_highlights、skills、capability_scores、evidence_spans、confidence。",
+            "输出结构需包含 candidate_summary、basics（至少包含 major、education_level、target_city、target_direction、gender）、roles_detected、leadership_signals、project_highlights、skills、capability_scores、evidence_spans、confidence。",
             "- 严禁编造。",
             "- 缺失字段使用 unknown、空字符串或空数组。",
             "- 所有分数范围为 0-100，confidence 范围为 0-1。",
@@ -778,6 +1865,7 @@ def _normalize_resume_profile(raw_payload):
     return {
         "candidate_summary": str(payload.get("candidate_summary") or "unknown").strip() or "unknown",
         "basics": {
+            "gender": str(basics.get("gender") or basics.get("sex") or "").strip(),
             "major": str(basics.get("major") or "").strip(),
             "education_level": str(basics.get("education_level") or basics.get("grade") or "").strip(),
             "target_city": str(basics.get("target_city") or basics.get("targetCity") or "").strip(),
@@ -1356,7 +2444,29 @@ def _parse_structured_json(content):
         return json.loads(repaired)
 
 
-def _safe_create_chat_completion(client, model, messages, temperature, max_tokens, force_json=False):
+# 网络级瞬态错误关键字，命中则触发重试（不含业务错误如鉴权失败）。
+_TRANSIENT_ERROR_KEYWORDS = (
+    "connection", "timeout", "timed out", "reset", "broken pipe",
+    "eof", "remote end closed", "server disconnected", "read timeout",
+    "connect timeout", "service unavailable", "502", "503", "504",
+    "overloaded", "rate limit", "too many requests", "429",
+)
+
+def _is_transient_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(kw in msg for kw in _TRANSIENT_ERROR_KEYWORDS)
+
+def _safe_create_chat_completion(
+    client, model, messages, temperature, max_tokens,
+    force_json=False,
+    max_retries=3,
+    base_delay=1.5,
+):
+    """
+    调用 chat.completions.create，对瞬态网络错误做指数退避重试。
+    - max_retries: 最多额外重试次数（首次调用不计）
+    - base_delay:  首次重试前的基础等待秒数，每次翻倍并加随机抖动
+    """
     kwargs = {
         "model": model,
         "temperature": temperature,
@@ -1365,16 +2475,36 @@ def _safe_create_chat_completion(client, model, messages, temperature, max_token
     }
     if force_json:
         kwargs["response_format"] = {"type": "json_object"}
-    try:
-        return client.chat.completions.create(**kwargs)
-    except Exception as exc:
-        # 兼容不支持 response_format 的 OpenAI-compatible 服务。
-        if force_json:
-            message = str(exc).lower()
-            if "response_format" in message or "json_object" in message:
+
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            last_exc = exc
+            msg = str(exc).lower()
+
+            # response_format 不兼容 — 只重试一次，不计入重试次数
+            if force_json and ("response_format" in msg or "json_object" in msg):
                 kwargs.pop("response_format", None)
-                return client.chat.completions.create(**kwargs)
-        raise
+                try:
+                    return client.chat.completions.create(**kwargs)
+                except Exception as exc2:
+                    last_exc = exc2
+                    msg = str(exc2).lower()
+
+            # 非瞬态错误（如鉴权、模型不存在）直接抛出，不重试
+            if not _is_transient_error(last_exc):
+                raise
+
+            # 最后一次也失败了
+            if attempt >= max_retries:
+                break
+
+            delay = base_delay * (2 ** attempt) + random.uniform(0.1, 0.8)
+            time.sleep(delay)
+
+    raise last_exc
 
 
 def _normalize_profile(raw_payload):
@@ -1447,7 +2577,8 @@ def _normalize_profile(raw_payload):
     return normalized
 
 
-def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max_tokens=480):
+def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max_tokens=480,
+                          max_retries=3, base_delay=1.5):
     base = _normalize_sdk_base_url(base_url)
     client = OpenAI(api_key=api_key, base_url=base)
     try:
@@ -1459,6 +2590,8 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
             temperature=0.1,
             max_tokens=max_tokens,
             force_json=True,
+            max_retries=max_retries,
+            base_delay=base_delay,
         )
     except Exception as exc:
         raise ValueError(f"LLM 接口调用失败: {str(exc)[:300]}") from exc
@@ -1486,6 +2619,8 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
                 temperature=0,
                 max_tokens=min(max_tokens + 600, 3800),
                 force_json=True,
+                max_retries=max_retries,
+                base_delay=base_delay,
             )
             repair_content = str((repair_resp.choices[0].message.content or "") if repair_resp.choices else "").strip()
             return _parse_structured_json(repair_content)
@@ -1507,6 +2642,8 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
                 temperature=0.05,
                 max_tokens=min(max_tokens + 800, 4096),
                 force_json=True,
+                max_retries=max_retries,
+                base_delay=base_delay,
             )
             retry_content = str((retry_resp.choices[0].message.content or "") if retry_resp.choices else "").strip()
             return _parse_structured_json(retry_content)
@@ -1514,7 +2651,8 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
             raise ValueError(f"结构化 JSON 解析失败: {str(exc)[:280]}") from exc
 
 
-def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, max_tokens=3200):
+def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, max_tokens=3200,
+                        max_retries=3, base_delay=1.5):
     base = _normalize_sdk_base_url(base_url)
     client = OpenAI(api_key=api_key, base_url=base)
     merged_messages = list(messages or [])
@@ -1528,6 +2666,8 @@ def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, 
             temperature=0.2,
             max_tokens=max_tokens,
             force_json=False,
+            max_retries=max_retries,
+            base_delay=base_delay,
         )
     except Exception as exc:
         raise ValueError(f"LLM 接口调用失败: {str(exc)[:300]}") from exc
@@ -1590,7 +2730,36 @@ def _normalize_mbti_clarifier_payload(raw_payload):
 @app.route("/")
 @app.route("/main.html")
 def index():
-    return render_template("base.html", career_news=get_career_news_payload())
+    user = _current_user()
+    return render_template(
+        "base.html",
+        career_news=get_career_news_payload(),
+        initial_user=_public_user(user),
+    )
+
+
+@app.route("/user-center")
+@app.route("/user-center.html")
+def user_center_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("user_center.html")
+
+
+@app.route("/test-result")
+@app.route("/test-result.html")
+def test_result_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("test_result.html")
+
+
+@app.route("/test-runner")
+@app.route("/test-runner.html")
+def test_runner_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("test_runner.html")
 
 
 @app.route("/api/auth/status")
@@ -1616,6 +2785,7 @@ def api_auth_status():
 
         state = _load_user_state(user["username"])
         resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
+        career_report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
         payload["llm"] = {
             "selection": selection,
             "providers": [_public_provider(p, is_admin) for p in providers],
@@ -1627,6 +2797,7 @@ def api_auth_status():
             "career_interview": state.get("career_interview"),
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
+            "career_report": _public_career_report_state(career_report_state),
         }
     return jsonify(payload)
 
@@ -1652,6 +2823,7 @@ def api_bootstrap():
 
     state = _load_user_state(user["username"])
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
+    career_report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
 
     return jsonify({
         "authenticated": True,
@@ -1667,6 +2839,7 @@ def api_bootstrap():
             "career_interview": state.get("career_interview"),
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
+            "career_report": _public_career_report_state(career_report_state),
         },
     })
 
@@ -1705,6 +2878,37 @@ def api_auth_logout():
     return jsonify({"message": "已退出登录。"})
 
 
+@app.route("/api/auth/password", methods=["PUT"])
+@_login_required
+def api_auth_password():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    current_password = str(payload.get("current_password") or "")
+    new_password = str(payload.get("new_password") or "")
+    confirm_password = str(payload.get("confirm_password") or "")
+
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({"message": "请完整填写当前密码、新密码和确认密码。"}), 400
+    if not check_password_hash(user.get("password_hash") or "", current_password):
+        return jsonify({"message": "当前密码不正确。"}), 400
+    if len(new_password) < 6:
+        return jsonify({"message": "新密码至少需要 6 位。"}), 400
+    if new_password != confirm_password:
+        return jsonify({"message": "两次输入的新密码不一致。"}), 400
+    if new_password == current_password:
+        return jsonify({"message": "新密码不能与当前密码相同。"}), 400
+
+    users = _load_users()
+    updated_users = []
+    for item in users:
+        next_item = dict(item)
+        if item.get("username") == user["username"]:
+            next_item["password_hash"] = generate_password_hash(new_password)
+        updated_users.append(next_item)
+    _save_users(updated_users)
+    return jsonify({"message": "密码已更新。"})
+
+
 @app.route("/api/user-state/<scope>", methods=["GET", "PUT"])
 @_login_required
 def api_user_state(scope):
@@ -1727,6 +2931,47 @@ def api_user_state(scope):
         state[normalized_scope] = data
     _save_user_state(user["username"], state)
     return jsonify({"message": "用户空间已保存。", "scope": normalized_scope})
+
+
+@app.route("/api/profile-portrait/generate", methods=["POST"])
+@_login_required
+def api_profile_portrait_generate():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    context = _normalize_profile_portrait_context(payload.get("context"))
+    if not _has_profile_portrait_signal(context):
+        return jsonify({"message": "当前画像信息不足，先补充测评、简历或目标方向。"}), 400
+
+    base_url, api_key, model = _get_profile_portrait_runtime()
+    if not base_url or not api_key:
+        return jsonify({"message": "系统中未找到 OpenRouter 图片配置，请先在 system 账号里配置 OpenRouter Provider。"}), 400
+
+    try:
+        prompt_summary = _build_profile_portrait_subject_summary(context) or context.get("summary") or ""
+        prompt = _build_profile_portrait_prompt(context)
+        image_url = _generate_profile_portrait_image(base_url, api_key, model, prompt)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except Exception:
+        app.logger.exception("profile portrait generation failed")
+        return jsonify({"message": "用户画像生成失败，请稍后重试。"}), 502
+
+    portrait_state = {
+        "status": "ready",
+        "image_url": image_url,
+        "created_at": int(time.time()),
+        "model": model,
+        "archetype_name": context.get("archetype_name") or "",
+        "prompt_summary": prompt_summary,
+        "prompt_text": prompt,
+    }
+    state = _load_user_state(user["username"])
+    state["profile_portrait"] = portrait_state
+    _save_user_state(user["username"], state)
+    return jsonify({
+        "message": "用户画像已生成。",
+        "data": _public_profile_portrait_state(portrait_state),
+    })
 
 
 @app.route("/api/llm-config/<scope>", methods=["GET"])
@@ -2178,6 +3423,371 @@ def api_resume_profile():
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
+def _run_career_report_job(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm):
+    stage_defs = {item["key"]: item["label"] for item in CAREER_REPORT_STAGE_DEFS}
+    generation_mode = "llm_orchestrated" if runtime_llm and runtime_llm.get("writer") else "template_orchestrated"
+    model_name = str(runtime_llm.get("model") or "") if isinstance(runtime_llm, dict) else ""
+
+    _update_career_report_job(
+        job_id,
+        status="running",
+        started_at=int(time.time()),
+        stage="profile_fusion",
+        stage_label=stage_defs.get("profile_fusion", "画像融合"),
+        stage_detail="正在汇总测评、访谈、简历与基础信息",
+        progress=build_stage_progress("profile_fusion"),
+    )
+    _save_career_report_progress(
+        username,
+        job_id,
+        "profile_fusion",
+        stage_defs.get("profile_fusion", "画像融合"),
+        "正在汇总测评、访谈、简历与基础信息",
+        model=model_name,
+        generation_mode=generation_mode,
+        report_id=report_id,
+        status="running",
+    )
+
+    def _stage_callback(stage_key, stage_label, detail):
+        _update_career_report_job(
+            job_id,
+            status="running",
+            stage=stage_key,
+            stage_label=stage_label,
+            stage_detail=detail,
+            message=detail,
+            progress=build_stage_progress(stage_key),
+        )
+        _save_career_report_progress(
+            username,
+            job_id,
+            stage_key,
+            stage_label,
+            detail,
+            model=model_name,
+            generation_mode=generation_mode,
+            report_id=report_id,
+            status="running",
+        )
+
+    try:
+        bundle = generate_career_report_bundle(
+            username=username,
+            report_id=report_id,
+            profile_payload=profile_payload,
+            role_payload=role_payload,
+            news_payload=get_career_news_payload(),
+            focus_role_id=focus_role_id,
+            stage_callback=_stage_callback,
+            markdown_writer=(runtime_llm or {}).get("writer"),
+            model_name=model_name,
+            generation_mode=generation_mode,
+        )
+        _save_career_report_bundle(username, bundle)
+        meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+        _update_career_report_job(
+            job_id,
+            status="completed",
+            finished_at=int(time.time()),
+            stage="critic",
+            stage_label=stage_defs.get("critic", "一致性校验"),
+            stage_detail="报告生成完成",
+            message="报告生成完成",
+            report_id=str(meta.get("report_id") or report_id),
+            progress=build_stage_progress("critic"),
+        )
+        _save_career_report_progress(
+            username,
+            job_id,
+            "critic",
+            stage_defs.get("critic", "一致性校验"),
+            "报告生成完成",
+            status="ready",
+            model=model_name,
+            generation_mode=generation_mode,
+            report_id=str(meta.get("report_id") or report_id),
+            generated_at=str(meta.get("generated_at") or ""),
+            focus_role_id=str(meta.get("focus_role_id") or ""),
+            title=str(meta.get("title") or "职业规划报告"),
+            summary=str(meta.get("summary") or ""),
+        )
+        _sync_career_report_tracker_state(username, bundle)
+    except Exception as exc:
+        app.logger.exception("career report generate failed")
+        _update_career_report_job(
+            job_id,
+            status="failed",
+            finished_at=int(time.time()),
+            message=str(exc),
+        )
+        _save_career_report_progress(
+            username,
+            job_id,
+            "critic",
+            stage_defs.get("critic", "一致性校验"),
+            "报告生成失败",
+            status="failed",
+            error_message=str(exc),
+            model=model_name,
+            generation_mode=generation_mode,
+            report_id=report_id,
+        )
+
+
+@app.route("/api/career-report/generate/start", methods=["POST"])
+@_login_required
+def api_career_report_generate_start():
+    user = _current_user()
+    username = user["username"]
+    running = _find_running_career_report_job(username)
+    if running:
+        return jsonify({
+            "message": "已有职业规划报告任务在运行中。",
+            "job_id": str(running.get("job_id") or ""),
+            "already_running": True,
+        }), 409
+
+    payload = request.get_json(silent=True) or {}
+    profile_payload = payload.get("profile_snapshot") if isinstance(payload.get("profile_snapshot"), dict) else {}
+    role_payload = payload.get("role_rankings") if isinstance(payload.get("role_rankings"), list) else []
+    focus_role_id = str(payload.get("focus_role_id") or "").strip()
+    if not profile_payload:
+        return jsonify({"message": "请先完成画像步骤后再生成职业规划报告。"}), 400
+
+    base_url, api_key, model = _get_active_provider_and_model()
+    runtime_llm = {
+        "writer": _build_report_markdown_writer(base_url, api_key, model),
+        "model": model or "",
+    } if (base_url and api_key and model) else {"writer": None, "model": ""}
+
+    job_id = uuid.uuid4().hex
+    report_id = f"report-{uuid.uuid4().hex[:12]}"
+    stage_label = next((item["label"] for item in CAREER_REPORT_STAGE_DEFS if item["key"] == "profile_fusion"), "画像融合")
+    job = {
+        "job_id": job_id,
+        "username": username,
+        "status": "queued",
+        "stage": "profile_fusion",
+        "stage_label": stage_label,
+        "stage_detail": "任务已创建，等待后台编排",
+        "message": "",
+        "created_at": int(time.time()),
+        "started_at": 0,
+        "finished_at": 0,
+        "report_id": report_id,
+        "progress": build_stage_progress("profile_fusion"),
+    }
+    with CAREER_REPORT_LOCK:
+        CAREER_REPORT_JOBS[job_id] = job
+
+    _save_career_report_progress(
+        username,
+        job_id,
+        "profile_fusion",
+        stage_label,
+        "任务已创建，等待后台编排",
+        status="queued",
+        report_id=report_id,
+        model=str(runtime_llm.get("model") or ""),
+        generation_mode="llm_orchestrated" if runtime_llm.get("writer") else "template_orchestrated",
+        focus_role_id=focus_role_id,
+    )
+
+    thread = threading.Thread(
+        target=_run_career_report_job,
+        args=(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm),
+        daemon=True,
+        name=f"career-report-{job_id[:8]}",
+    )
+    thread.start()
+
+    return jsonify({
+        "message": "职业规划报告任务已启动。",
+        "job_id": job_id,
+        "report_id": report_id,
+        "already_running": False,
+    })
+
+
+@app.route("/api/career-report/generate/status", methods=["GET"])
+@_login_required
+def api_career_report_generate_status():
+    user = _current_user()
+    username = user["username"]
+    job_id = str(request.args.get("job_id") or "").strip()
+    selected = None
+    with CAREER_REPORT_LOCK:
+        if job_id:
+            candidate = CAREER_REPORT_JOBS.get(job_id)
+            if isinstance(candidate, dict) and str(candidate.get("username") or "") == username:
+                selected = dict(candidate)
+        else:
+            jobs = [
+                dict(item)
+                for item in CAREER_REPORT_JOBS.values()
+                if isinstance(item, dict) and str(item.get("username") or "") == username
+            ]
+            jobs.sort(key=lambda item: int(item.get("created_at") or 0), reverse=True)
+            if jobs:
+                selected = jobs[0]
+
+    state = _load_user_state(username)
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    return jsonify({
+        "job": _public_career_report_job(selected),
+        "state": _public_career_report_state(report_state),
+    })
+
+
+@app.route("/api/career-report/current", methods=["GET"])
+@_login_required
+def api_career_report_current():
+    user = _current_user()
+    bundle = _read_career_report_bundle(user["username"])
+    if isinstance(bundle, dict) and bundle.get("meta"):
+        state, report_state, _ = _sync_career_report_tracker_state(user["username"], bundle)
+    else:
+        state = _load_user_state(user["username"])
+        report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    data = _public_career_report_bundle(bundle) if isinstance(bundle, dict) and bundle.get("meta") else None
+    return jsonify({
+        "data": data,
+        "state": _public_career_report_state(report_state),
+    })
+
+
+@app.route("/api/career-report/version", methods=["GET"])
+@_login_required
+def api_career_report_version():
+    """按 report_id 读取已归档或当前 latest 的报告正文，不写入用户状态。"""
+    user = _current_user()
+    report_id = str(request.args.get("report_id") or "").strip()
+    if not report_id:
+        return jsonify({"message": "缺少 report_id"}), 400
+    paths = _career_report_file_paths(user["username"])
+    versions_dir = os.path.join(paths["dir"], "versions")
+    bundle = {}
+    with APP_DATA_LOCK:
+        archive_path = os.path.join(versions_dir, f"{report_id}.json")
+        if os.path.isfile(archive_path):
+            bundle = _read_json_file(archive_path, {})
+        else:
+            latest = _read_json_file(paths["json"], {})
+            latest_id = str((latest.get("meta") or {}).get("report_id") or "").strip()
+            if latest_id == report_id:
+                bundle = latest
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "未找到该版本的完整报告（可能生成于版本归档功能之前）。"}), 404
+    tracker = _build_career_report_tracker(bundle, None)
+    return jsonify({
+        "data": _public_career_report_bundle(bundle),
+        "tracker": tracker,
+    })
+
+
+@app.route("/api/career-report/tracker/sync", methods=["POST"])
+@_login_required
+def api_career_report_tracker_sync():
+    user = _current_user()
+    bundle = _read_career_report_bundle(user["username"])
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "当前还没有可同步的职业规划报告。"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    current_capabilities = payload.get("current_capabilities") if isinstance(payload.get("current_capabilities"), list) else []
+    state, report_state, tracker = _sync_career_report_tracker_state(
+        user["username"],
+        bundle,
+        current_capabilities=current_capabilities,
+    )
+    return jsonify(
+        {
+            "tracker": tracker,
+            "state": _public_career_report_state(report_state),
+            "data": _public_career_report_bundle(bundle),
+        }
+    )
+
+
+@app.route("/api/career-report/tracker/item", methods=["POST"])
+@_login_required
+def api_career_report_tracker_item():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    item_type = str(payload.get("item_type") or "").strip().lower()
+    item_id = str(payload.get("item_id") or "").strip()
+    status = _normalize_tracker_status(payload.get("status"), allow_doing=item_type == "plan")
+    if item_type not in {"plan", "checkpoint"} or not item_id:
+        return jsonify({"message": "请指定 item_type 和 item_id。"}), 400
+
+    bundle = _read_career_report_bundle(user["username"])
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "当前还没有可更新的职业规划报告。"}), 404
+
+    state, report_state, tracker = _sync_career_report_tracker_state(user["username"], bundle)
+    if not isinstance(tracker, dict):
+        return jsonify({"message": "当前职业报告尚未完成初始化。"}), 409
+
+    key = "plan_items" if item_type == "plan" else "checkpoints"
+    allow_doing = item_type == "plan"
+    safe_status = _normalize_tracker_status(status, allow_doing=allow_doing)
+    items = tracker.get(key) if isinstance(tracker.get(key), list) else []
+    matched = False
+    now_text = _career_tracker_now()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id") or "") != item_id:
+            continue
+        matched = True
+        item["status"] = safe_status
+        item["updated_at"] = now_text
+        if safe_status == "doing":
+            item["started_at"] = str(item.get("started_at") or now_text)
+            item["completed_at"] = ""
+        elif safe_status == "done":
+            if allow_doing:
+                item["started_at"] = str(item.get("started_at") or now_text)
+            item["completed_at"] = str(item.get("completed_at") or now_text)
+        else:
+            if allow_doing:
+                item["started_at"] = ""
+            item["completed_at"] = ""
+        break
+
+    if not matched:
+        return jsonify({"message": "未找到对应的职业档案条目。"}), 404
+
+    tracker = _build_career_report_tracker(bundle, tracker)
+    report_state["tracker"] = tracker
+    state["career_report"] = report_state
+    _save_user_state(user["username"], state)
+    return jsonify({"tracker": tracker, "state": _public_career_report_state(report_state)})
+
+
+@app.route("/api/career-report/export", methods=["GET"])
+@_login_required
+def api_career_report_export():
+    user = _current_user()
+    export_format = str(request.args.get("format") or "html").strip().lower()
+    if export_format not in {"html", "md"}:
+        return jsonify({"message": "仅支持导出 html 或 md 格式。"}), 400
+    paths = _career_report_file_paths(user["username"])
+    target_path = paths["html"] if export_format == "html" else paths["md"]
+    if not os.path.exists(target_path):
+        return jsonify({"message": "当前还没有可导出的职业规划报告。"}), 404
+    with open(target_path, "r", encoding="utf-8") as fp:
+        content = fp.read()
+    mimetype = "text/html; charset=utf-8" if export_format == "html" else "text/markdown; charset=utf-8"
+    filename = f"career-report-{user['username']}.{export_format}"
+    return app.response_class(
+        content,
+        mimetype=mimetype,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.route("/api/cities")
 def api_cities():
     cities = [fname[:-5] for fname in _list_city_files()]
@@ -2337,6 +3947,59 @@ def api_mbti_clarifier():
         app.logger.exception("mbti clarifier failed")
         return jsonify({"message": f"MBTI 澄清题生成失败: {exc}"}), 502
 
+
+@app.route("/api/deep-test-analysis", methods=["POST"])
+@_login_required
+def api_deep_test_analysis():
+    payload = request.get_json(silent=True) or {}
+    base_url, api_key, model = _get_active_provider_and_model()
+
+    if not base_url or not api_key:
+        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
+
+    mbti_type = str(payload.get("mbti_type", "")).strip()
+    scores = payload.get("scores", {})
+    dimension_details = payload.get("dimension_details", [])
+
+    if not mbti_type:
+        return jsonify({"message": "请先完成深层测试。"}), 400
+
+    system_prompt = f"""你是一位经验丰富的心理咨询师和职业规划专家，擅长基于MBTI性格类型进行深度分析。
+请根据用户的深层MBTI测试结果，给出个性化的心理分析和成长建议。
+
+分析要求：
+1. 深入解读该性格类型的核心心理特征（约100字）
+2. 分析该类型在人际关系、工作、学习中的独特优势（约80字）
+3. 指出需要注意和成长的方向（约80字）
+4. 给出2-3条具体可操作的个人发展建议
+
+风格要求：
+- 语气温和、鼓励性，避免过于笼统
+- 结合用户具体的分数分布进行个性化分析
+- 用中文回答，语言流畅自然
+
+MBTI类型：{mbti_type}
+各维度原始得分：{json.dumps(scores, ensure_ascii=False)}"""
+
+    messages = [{"role": "user", "content": f"请分析我的深层MBTI测试结果。类型：{mbti_type}，维度分布：{json.dumps(dimension_details, ensure_ascii=False)}"}]
+
+    try:
+        analysis = _call_markdown_chat(
+            base_url,
+            api_key,
+            model,
+            messages,
+            system_prompt=system_prompt,
+            max_tokens=800,
+        )
+        return jsonify({"analysis": analysis, "mbti_type": mbti_type})
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("deep test analysis failed")
+        return jsonify({"message": f"AI 分析生成失败: {exc}"}), 502
+
+
 # 启动入口
 def open_browser():
     import time
@@ -2362,9 +4025,4 @@ if __name__ == "__main__":
         threading.Thread(target=open_browser, daemon=True).start()
 
     app.run(host=host, port=port, debug=False, threaded=True)
-
-
-
-
-
 

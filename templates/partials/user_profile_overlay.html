@@ -1,0 +1,171 @@
+<div id="userProfileOverlay" class="up-overlay hidden" onclick="handleOverlayBackdropClick(event)">
+    <div class="up-panel" id="upPanel" onclick="event.stopPropagation()">
+        <div class="up-shell">
+            <aside class="up-report-pane">
+                <div class="up-report-hero">
+                    <p class="up-report-kicker">Career Snapshot</p>
+                    <h3 class="up-report-title" id="upReportTitle">职业报告待生成</h3>
+                    <p class="up-report-summary" id="upReportSummary">完成画像与目标岗位选择后，这里会显示你的最新职业判断、下一步和成长信号。</p>
+                </div>
+
+                <div class="up-report-grid">
+                    <article>
+                        <span>当前主线</span>
+                        <strong id="upReportFocusRole">待识别</strong>
+                    </article>
+                    <article>
+                        <span>下一重点</span>
+                        <strong id="upReportNextFocus">先补基础输入</strong>
+                    </article>
+                    <article>
+                        <span>报告进度</span>
+                        <strong id="upReportCompletion">0%</strong>
+                    </article>
+                    <article>
+                        <span>最近同步</span>
+                        <strong id="upReportLastSync">--</strong>
+                    </article>
+                </div>
+
+                <div class="up-report-block">
+                    <div class="up-report-block-head">
+                        <h4>关键信号</h4>
+                        <button type="button" onclick="openUserCenterPage('report-workspace')">查看完整报告</button>
+                    </div>
+                    <div id="upReportSignals" class="up-report-chip-row">
+                        <span class="up-report-chip">等待生成报告</span>
+                    </div>
+                </div>
+
+                <div class="up-report-block">
+                    <div class="up-report-block-head">
+                        <h4>当前最值得先做的事</h4>
+                        <button type="button" onclick="handleDashboardPrimaryAction(); closeUserProfile();">直接去做</button>
+                    </div>
+                    <div id="upReportTasks" class="up-report-list">
+                        <div class="up-report-list-item">
+                            <strong>补充画像输入</strong>
+                            <p>系统会把待完成项整理到这里，帮助你快速进入下一步。</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="up-side-pane">
+                <div class="up-header">
+                    <div class="up-user-info">
+                        <div class="up-avatar-circle" id="upAvatarCircle">用</div>
+                        <div>
+                            <h2 class="up-name" id="upName">用户名</h2>
+                            <p class="up-role-tag" id="upRoleTag">普通用户</p>
+                        </div>
+                    </div>
+                    <button class="up-close-btn" type="button" onclick="closeUserProfile()">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+
+                <section class="up-account-strip">
+                    <article class="up-account-card">
+                        <span>当前主线岗位</span>
+                        <strong id="upAccountFocusRole">待识别</strong>
+                        <p id="upAccountSummary">职业报告会围绕你当前最值得推进的岗位方向持续更新。</p>
+                    </article>
+                    <article class="up-account-card muted">
+                        <span>当前推进建议</span>
+                        <strong id="upAccountNextAction">先补齐画像输入</strong>
+                        <p id="upAccountPermissionHint">system 用户可配置系统 API，普通用户仅查看自己的职业档案。</p>
+                    </article>
+                </section>
+
+                <div class="up-progress-section">
+                    <div class="up-prog-label-row">
+                        <span class="up-prog-label-left">生涯进度</span>
+                        <span class="up-prog-label-right" id="upProgressText">正在计算...</span>
+                    </div>
+                    <div class="up-prog-track">
+                        <div class="up-prog-fill" id="upProgressFill" style="width: 30%"></div>
+                        <div class="up-prog-dot" style="left:33%" title="开始实习"></div>
+                        <div class="up-prog-dot" style="left:66%" title="校招窗口"></div>
+                    </div>
+                    <div class="up-prog-stages">
+                        <span>在校学习</span>
+                        <span>实习积累</span>
+                        <span>校招冲刺</span>
+                        <span>首份入职</span>
+                    </div>
+                </div>
+
+                <div class="up-stats-row">
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatReports">0</span>
+                        <span class="up-stat-key">规划报告</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatDone">0</span>
+                        <span class="up-stat-key">已完成项</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatScore">—</span>
+                        <span class="up-stat-key">画像完成度</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatPending">—</span>
+                        <span class="up-stat-key">待完成任务</span>
+                    </div>
+                </div>
+
+                <div class="up-plans-section">
+                    <div id="upPlanListView">
+                        <div class="up-section-hd">
+                            <h3 class="up-section-title">我的规划</h3>
+                            <button class="up-new-btn" type="button" onclick="createNewPlan()">
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                新建规划
+                            </button>
+                        </div>
+                        <div id="upPlanList" class="up-plan-list"></div>
+                    </div>
+
+                    <div id="upPlanDetailView" class="hidden">
+                        <div class="up-detail-hd">
+                            <button class="up-back-btn" type="button" onclick="showPlanList()">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <h4 class="up-detail-title" id="upDetailTitle">规划详情</h4>
+                            <span class="up-detail-pct" id="upDetailPct">0%</span>
+                        </div>
+
+                        <div class="up-detail-prog-row">
+                            <div class="up-detail-prog-track">
+                                <div class="up-detail-prog-fill" id="upDetailProgFill" style="width:0%"></div>
+                            </div>
+                            <span class="up-detail-prog-txt" id="upDetailProgTxt">0 / 0 已完成</span>
+                        </div>
+
+                        <div id="upDetailItems" class="up-items-list"></div>
+
+                        <div class="up-add-row">
+                            <input id="upNewItemInput" class="up-add-input" type="text" placeholder="添加新目标或任务..." onkeydown="if(event.key==='Enter') addPlanItem()">
+                            <button class="up-add-btn" type="button" onclick="addPlanItem()">添加</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="upAdminBar" class="up-admin-bar">
+                    <button type="button" class="up-admin-link" onclick="handleUserPermissionCardClick()">
+                        <div class="up-admin-link-copy">
+                            <strong>系统 API 配置</strong>
+                            <span>system 用户可以管理模型与 Provider，普通用户此入口不可用。</span>
+                        </div>
+                        <span>查看权限</span>
+                    </button>
+                </div>
+
+                <div class="up-footer-bar">
+                    <button class="up-logout-btn" type="button" onclick="closeUserProfile(); logout();">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

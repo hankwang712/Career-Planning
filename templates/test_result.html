@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试结果页 | 职业规划智能体</title>
+    {% include "partials/head_fonts.html" %}
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    {{ vite_asset_tags('frontend/src/entries/test-result.js') }}
+</head>
+<body class="tr-page" data-page="test-result">
+    <div class="tr-layout">
+        <aside class="tr-sidebar">
+            <a class="tr-brand" href="{{ url_for('index') }}">
+                <div class="tr-brand-mark">
+                    <img src="{{ url_for('static', filename='trueyouteller/brand/trueyouteller_logo-removebg.png') }}" alt="TrueYouTeller 品牌标识">
+                </div>
+                <div class="tr-brand-copy">
+                    <strong>职业规划智能体</strong>
+                    <span>扩展测试结果中心</span>
+                </div>
+            </a>
+
+            <nav class="tr-nav" aria-label="测试类型导航">
+                <button type="button" class="tr-nav-link active" data-test="deep">深层 MBTI</button>
+                <button type="button" class="tr-nav-link" data-test="friends">老友记角色</button>
+                <button type="button" class="tr-nav-link" data-test="insideout">头脑特工队</button>
+            </nav>
+
+            <div class="tr-sidebar-note">
+                <h2>完整结果查看</h2>
+                <p>这里会保留扩展测试的完整解析、角色说明、分数分布、历史记录以及后续 AI 解读入口，便于你反复回看和对比变化。</p>
+            </div>
+
+            <div class="tr-sidebar-footer">
+                <a class="tr-footer-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+            </div>
+        </aside>
+
+        <div class="tr-main">
+            <header class="tr-topbar">
+                <div class="tr-topbar-left">
+                    <a class="tr-back-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                    <div>
+                        <p class="tr-topbar-kicker">测试结果中心</p>
+                        <h1 id="trPageTitle">深层 MBTI 完整结果</h1>
+                    </div>
+                </div>
+                <div class="tr-topbar-actions">
+                    <span id="currentUserLabel" class="topbar-pill">未登录</span>
+                    <button id="logoutBtn" type="button" class="topbar-text-btn">退出</button>
+                    <button type="button" class="topbar-avatar-btn" id="trAvatarBtn" title="个人中心" aria-label="打开个人中心">
+                        <span id="currentUserAvatar">人</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="tr-content">
+                <section class="tr-surface">
+                    <div class="tr-head-row">
+                        <div>
+                            <p class="tr-kicker">结果总览</p>
+                            <h2 id="trSectionTitle">深层 MBTI 完整结果</h2>
+                            <p id="trSectionHint" class="tr-hint">你可以在这里查看完整结果、历史记录和扩展解析，也可以随时返回重新作答。</p>
+                        </div>
+                        <div class="tr-head-actions">
+                            <button id="trRetestBtn" type="button" class="tr-btn ghost">重新测试</button>
+                            <button id="trBackBtn" type="button" class="tr-btn primary">返回主界面</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tr-surface">
+                    <div id="trResultRoot"></div>
+                </section>
+            </main>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260401-deep-test-v5"></script>
+    <script src="{{ url_for('static', filename='trueyouteller/data/personality-types.js') }}?v=20260401-tyt-data-v1"></script>
+    <script src="{{ url_for('static', filename='trueyouteller/data/friends-quiz-data.js') }}?v=20260401-tyt-data-v1"></script>
+    <script src="{{ url_for('static', filename='trueyouteller/data/insideout-quiz-data.js') }}?v=20260401-tyt-data-v1"></script>
+    <script src="{{ url_for('static', filename='test-result.js') }}?v=20260401-test-result-v4"></script>
+</body>
+</html>

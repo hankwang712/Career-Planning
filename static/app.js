@@ -4,6 +4,12 @@
   profileComplete: false,
   matchingComplete: false,
   reportGenerated: false,
+  careerReport: null,
+  careerReportState: null,
+  careerReportTracker: null,
+  careerReportVersions: [],
+  careerReportCanonicalId: "",
+  careerReportViewingHistorical: false,
   notifications: 3,
   baseExploredJobs: 0,
   score: 0,
@@ -68,12 +74,16 @@ const userWorkspaceState = {
   scopedData: {
     career_interview: null,
     assessment_hub: null,
-    resume_profile: null
+    resume_profile: null,
+    career_report: null,
+    profile_portrait: null
   },
   scopedDataLoaded: {
     career_interview: false,
     assessment_hub: false,
-    resume_profile: false
+    resume_profile: false,
+    career_report: false,
+    profile_portrait: false
   }
 };
 const inFlightGetRequests = new Map();
@@ -298,6 +308,7 @@ const ROLE_LIBRARY = [
 
 function getDefaultProfileBasics() {
   return {
+    gender: "",
     major: "",
     grade: "",
     target_city: "",
@@ -459,7 +470,7 @@ async function requestJson(url, options = {}) {
       method,
       headers,
       body,
-      credentials: "same-origin"
+      credentials: options.credentials || "include"
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -469,9 +480,13 @@ async function requestJson(url, options = {}) {
         userWorkspaceState.scopedData.career_interview = null;
         userWorkspaceState.scopedData.assessment_hub = null;
         userWorkspaceState.scopedData.resume_profile = null;
+        userWorkspaceState.scopedData.career_report = null;
+        userWorkspaceState.scopedData.profile_portrait = null;
         userWorkspaceState.scopedDataLoaded.career_interview = false;
         userWorkspaceState.scopedDataLoaded.assessment_hub = false;
         userWorkspaceState.scopedDataLoaded.resume_profile = false;
+        userWorkspaceState.scopedDataLoaded.career_report = false;
+        userWorkspaceState.scopedDataLoaded.profile_portrait = false;
         if (typeof lockApp === "function") lockApp();
         emitAuthStateChange();
       }
@@ -508,6 +523,14 @@ async function fetchScopedUserState(scope, force = false) {
   return userWorkspaceState.scopedData[scope];
 }
 
+async function loadProfilePortraitState(force = false) {
+  if (!isAuthenticatedUser()) return null;
+  const data = await fetchScopedUserState("profile_portrait", force);
+  userWorkspaceState.scopedData.profile_portrait = data ?? null;
+  userWorkspaceState.scopedDataLoaded.profile_portrait = true;
+  return userWorkspaceState.scopedData.profile_portrait;
+}
+
 async function saveScopedUserState(scope, data) {
   if (!isAuthenticatedUser()) return null;
   await requestJson(`/api/user-state/${scope}`, {
@@ -525,7 +548,7 @@ async function requestFormData(url, formData, options = {}) {
   const response = await fetch(resolveApiUrl(url), {
     method: options.method || "POST",
     body: formData,
-    credentials: "same-origin"
+    credentials: options.credentials || "include"
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -574,6 +597,10 @@ const resumeTaskState = {
   jobInputExpanded: false,
   deckIndices: {},
   reportObserver: null
+};
+
+const profilePortraitTaskState = {
+  loading: false
 };
 
 function setResumeProgress(kind, percent, label = "", active = false) {
@@ -2598,6 +2625,8 @@ window.fetchActiveLlmRuntimeConfig = fetchActiveLlmRuntimeConfig;
 window.saveManagedLlmConfig = saveManagedLlmConfig;
 window.userWorkspaceState = userWorkspaceState;
 window.resolveApiUrl = resolveApiUrl;
+window.requestJson = requestJson;
+window.requestFormData = requestFormData;
 window.setResumeStackDeck = setResumeStackDeck;
 window.shiftResumeStackDeck = shiftResumeStackDeck;
 window.advanceResumeStackDeck = advanceResumeStackDeck;
@@ -2684,7 +2713,9 @@ function writeSessionCache(key, data, ttlMs = JOBS_CACHE_TTL_MS) {
 async function fetchJsonWithSessionCache(url, cacheKey, ttlMs = JOBS_CACHE_TTL_MS) {
   const cached = readSessionCache(cacheKey);
   if (cached) return cached;
-  const response = await fetch(resolveApiUrl(url));
+  const response = await fetch(resolveApiUrl(url), {
+    credentials: "include"
+  });
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.message || `Request failed: ${response.status}`);
@@ -3392,19 +3423,22 @@ async function submitCareerInterviewAnswer() {
   }
 }
 function addLiveActivity(message) {
-  const feed = document.getElementById("liveActivityFeed");
-  if (!feed) return;
-  const li = document.createElement("li");
-  li.className = "live-feed-item";
-  li.innerHTML = `
-    <span class="live-feed-dot"></span>
-    <div>
-      <p class="text-sm text-gray-800">${message}</p>
-      <p class="text-xs text-gray-500">${formatClock(new Date())}</p>
-    </div>
-  `;
-  feed.insertBefore(li, feed.firstChild);
-  while (feed.children.length > 6) feed.removeChild(feed.lastElementChild);
+  const timeLabel = formatClock(new Date());
+  ["liveActivityFeed", "liveActivityFeedDisplay"].forEach((id) => {
+    const feed = document.getElementById(id);
+    if (!feed) return;
+    const li = document.createElement("li");
+    li.className = "live-feed-item";
+    li.innerHTML = `
+      <span class="live-feed-dot"></span>
+      <div>
+        <p class="text-sm text-gray-800">${message}</p>
+        <p class="text-xs text-gray-500">${timeLabel}</p>
+      </div>
+    `;
+    feed.insertBefore(li, feed.firstChild);
+    while (feed.children.length > 6) feed.removeChild(feed.lastElementChild);
+  });
 }
 
 const careerNewsState = {
@@ -3552,6 +3586,7 @@ function uniqueValues(values, limit = 6) {
 function normalizeProfileBasics(raw) {
   const source = raw && typeof raw === "object" ? raw : {};
   return {
+    gender: String(source.gender || "").trim(),
     major: String(source.major || "").trim(),
     grade: String(source.grade || source.education_level || source.educationLevel || "").trim(),
     target_city: String(source.target_city || source.targetCity || "").trim(),
@@ -3570,6 +3605,7 @@ function normalizeResumeBasicValue(value) {
 function extractProfileBasicsFromResume(resumeProfile) {
   const basics = resumeProfile?.basics && typeof resumeProfile.basics === "object" ? resumeProfile.basics : {};
   return normalizeProfileBasics({
+    gender: normalizeResumeBasicValue(basics.gender),
     major: normalizeResumeBasicValue(basics.major),
     grade: normalizeResumeBasicValue(basics.education_level || basics.grade),
     target_city: normalizeResumeBasicValue(basics.target_city || basics.targetCity),
@@ -3585,6 +3621,7 @@ function mergeProfileBasicsWithResume(profileBasics, resumeProfile) {
     ? fromResume.grade
     : (manual.grade || fromResume.grade);
   return normalizeProfileBasics({
+    gender: manual.gender || fromResume.gender,
     major: manual.major || fromResume.major,
     grade: gradeValue,
     target_city: manual.target_city || fromResume.target_city,
@@ -3601,6 +3638,7 @@ function syncProfileBasicsForm() {
   const resumeBasics = extractProfileBasicsFromResume(userWorkspaceState.scopedData.resume_profile?.profile || null);
   const basics = getEffectiveProfileBasics();
   const fieldMap = {
+    profileGenderInput: basics.gender,
     profileMajorInput: basics.major,
     profileGradeInput: basics.grade,
     profileTargetCityInput: basics.target_city,
@@ -3630,6 +3668,7 @@ function syncProfileBasicsForm() {
 
 function collectProfileBasicsFromForm() {
   return normalizeProfileBasics({
+    gender: document.getElementById("profileGenderInput")?.value || "",
     major: document.getElementById("profileMajorInput")?.value || "",
     grade: document.getElementById("profileGradeInput")?.value || "",
     target_city: document.getElementById("profileTargetCityInput")?.value || "",
@@ -3643,6 +3682,567 @@ function saveProfileBasics() {
   syncProfileBasicsForm();
   refreshUnifiedExperience();
   showToast("基础信息已保存", "后续匹配与报告会直接引用这些字段。", "success", 1800);
+}
+
+function formatPortraitProjectHighlight(item) {
+  const source = item && typeof item === "object" ? item : {};
+  const project = String(source.project || source.projectName || source.title || "").trim();
+  const role = String(source.role || source.jobTitle || "").trim();
+  const impact = String(source.impact || "").trim();
+  const evidence = String(source.evidence || source.description || "").trim();
+  const head = project ? `${project}${role ? `（${role}）` : ""}` : role;
+  const parts = [head, impact, evidence].map((part) => String(part || "").trim()).filter(Boolean);
+  return parts.join("：");
+}
+
+function formatPortraitExperience(item) {
+  const source = item && typeof item === "object" ? item : {};
+  const title = String(source.jobTitle || source.role || source.title || "").trim();
+  const company = String(source.company || source.organization || "").trim();
+  const description = Array.isArray(source.description)
+    ? source.description.map((part) => String(part || "").trim()).filter(Boolean).join("；")
+    : String(source.description || source.evidence || "").trim();
+  const head = title ? `${title}${company ? ` @ ${company}` : ""}` : company;
+  const parts = [head, description].map((part) => String(part || "").trim()).filter(Boolean);
+  return parts.join("：");
+}
+
+function buildResumePortraitTraits(resumeState) {
+  const profile = resumeState?.profile && typeof resumeState.profile === "object" ? resumeState.profile : null;
+  const structuredResume = resumeState?.structured_resume && typeof resumeState.structured_resume === "object"
+    ? resumeState.structured_resume
+    : null;
+  const roles = uniqueValues((Array.isArray(profile?.roles_detected) ? profile.roles_detected : [])
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return item?.role || item?.name || "";
+    }), 5);
+  const signals = uniqueValues((Array.isArray(profile?.leadership_signals) ? profile.leadership_signals : [])
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return item?.signal || item?.title || "";
+    }), 5);
+  const competitions = uniqueValues((Array.isArray(profile?.competition_records) ? profile.competition_records : [])
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return item?.competition || item?.award || item?.name || item?.title || "";
+    }), 3);
+  const highlightProjects = uniqueValues((Array.isArray(profile?.project_highlights) ? profile.project_highlights : [])
+    .map((item) => formatPortraitProjectHighlight(item)), 4);
+  const structuredProjects = uniqueValues((Array.isArray(structuredResume?.Projects) ? structuredResume.Projects : [])
+    .map((item) => formatPortraitProjectHighlight(item)), 3);
+  const experiences = uniqueValues((Array.isArray(structuredResume?.Experiences) ? structuredResume.Experiences : [])
+    .map((item) => formatPortraitExperience(item)), 3);
+  const rawProfileSkills = (Array.isArray(profile?.skills) ? profile.skills : []).map((item) => {
+    if (typeof item === "string") return item;
+    return item?.skillName || item?.skill || item?.name || item?.category || "";
+  });
+  const rawStructuredSkills = (Array.isArray(structuredResume?.Skills) ? structuredResume.Skills : []).map((item) => {
+    if (typeof item === "string") return item;
+    return item?.skillName || item?.name || item?.category || "";
+  });
+  const skills = uniqueValues([...rawProfileSkills, ...rawStructuredSkills], 8);
+
+  return {
+    summary: profile?.candidate_summary || "",
+    roles,
+    signals,
+    competitions,
+    projects: uniqueValues([...highlightProjects, ...structuredProjects], 4),
+    experiences,
+    skills
+  };
+}
+
+function unifiedAverageDefined(values) {
+  const nums = values.map((item) => Number(item)).filter((item) => Number.isFinite(item));
+  if (!nums.length) return null;
+  return Math.round(nums.reduce((sum, item) => sum + item, 0) / nums.length);
+}
+
+function getUnifiedCapabilityScore(profile, key) {
+  const raw = Number(profile?.capabilities?.[key]?.score);
+  return Number.isFinite(raw) ? raw : null;
+}
+
+function getUnifiedEvidenceScore(profile, keys, source) {
+  const values = keys
+    .map((key) => profile?.capabilities?.[key])
+    .filter((item) => item && Array.isArray(item.sources) && item.sources.includes(source) && Number.isFinite(Number(item.score)))
+    .map((item) => Number(item.score));
+  return unifiedAverageDefined(values);
+}
+
+function getUnifiedEvidenceTone(score) {
+  if (!Number.isFinite(Number(score))) return "empty";
+  if (Number(score) >= 80) return "hot";
+  if (Number(score) >= 64) return "warm";
+  if (Number(score) >= 48) return "soft";
+  return "empty";
+}
+
+function buildUnifiedArchetype(signals) {
+  const collaboration = Number(signals.collaboration || 0);
+  const structure = Number(signals.structure || 0);
+  const exploration = Number(signals.exploration || 0);
+  const drive = Number(signals.drive || 0);
+  const domain = Number(signals.domain || 0);
+
+  if (collaboration >= 68 && structure >= 70) {
+    return {
+      name: "结构型协调者",
+      short: "协调",
+      thesis: "更擅长在明确目标下整合信息、推动协作，并把事务拆成可执行步骤。",
+      tone: "blue",
+      palette: ["#2563eb", "#7c3aed"],
+      scene: "协同推进 / 中后台支持 / 结构化执行"
+    };
+  }
+  if (exploration >= 72 && collaboration >= 60) {
+    return {
+      name: "探索型连接者",
+      short: "探索",
+      thesis: "更容易在变化中寻找机会，通过连接信息、人和场景形成新方向。",
+      tone: "violet",
+      palette: ["#7c3aed", "#ec4899"],
+      scene: "增长探索 / 内容策划 / 新方向试验"
+    };
+  }
+  if (domain >= 72 && structure >= 66) {
+    return {
+      name: "分析型构建者",
+      short: "分析",
+      thesis: "更适合在信息密度高的场景里建立方法、形成判断并持续优化结果。",
+      tone: "cyan",
+      palette: ["#0891b2", "#2563eb"],
+      scene: "分析判断 / 结构搭建 / 系统优化"
+    };
+  }
+  if (drive >= 66 && structure >= 62) {
+    return {
+      name: "稳态执行者",
+      short: "执行",
+      thesis: "更偏向在稳定环境中持续交付，擅长把明确目标转成持续输出。",
+      tone: "teal",
+      palette: ["#0f766e", "#2563eb"],
+      scene: "执行落地 / 节奏管理 / 事务闭环"
+    };
+  }
+  return {
+    name: "综合支持者",
+    short: "支持",
+    thesis: "当前画像更像一个多面支持型角色，具备一定适配性，但主导特征仍需更多证据来拉开。",
+    tone: "slate",
+    palette: ["#475569", "#2563eb"],
+    scene: "综合支持 / 适应过渡 / 方向待收敛"
+  };
+}
+
+function buildUnifiedProfileConstellationSvg(synthesis) {
+  const [startColor, endColor] = synthesis.archetype.palette;
+  const axes = synthesis.axes || [];
+  const angleMap = {
+    collaboration: 0,
+    structure: -90,
+    exploration: 90,
+    drive: 180
+  };
+  const nodes = axes.map((item) => {
+    const angle = (angleMap[item.key] ?? 0) * Math.PI / 180;
+    const radius = 54 + (Number(item.value || 0) * 0.28);
+    const x = 160 + Math.cos(angle) * radius;
+    const y = 120 + Math.sin(angle) * radius;
+    return { x, y };
+  });
+  const polygon = nodes.map((node) => `${node.x},${node.y}`).join(" ");
+  return `
+    <svg viewBox="0 0 320 240" class="unified-profile-svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="unifiedProfileGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${startColor}" />
+          <stop offset="100%" stop-color="${endColor}" />
+        </linearGradient>
+        <radialGradient id="unifiedProfileGlow" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.9)" />
+          <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+        </radialGradient>
+      </defs>
+      <rect x="12" y="12" width="296" height="216" rx="32" fill="url(#unifiedProfileGlow)" opacity="0.85" />
+      <circle cx="160" cy="120" r="76" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" />
+      <circle cx="160" cy="120" r="56" fill="none" stroke="rgba(255,255,255,0.36)" stroke-width="1.2" />
+      ${nodes.map((node) => `<line x1="160" y1="120" x2="${node.x}" y2="${node.y}" stroke="rgba(255,255,255,0.42)" stroke-width="1.2" />`).join("")}
+      ${polygon ? `<polygon points="${polygon}" fill="url(#unifiedProfileGradient)" opacity="0.24" stroke="url(#unifiedProfileGradient)" stroke-width="2.4" />` : ""}
+      ${nodes.map((node) => `<circle cx="${node.x}" cy="${node.y}" r="7" fill="#ffffff" stroke="url(#unifiedProfileGradient)" stroke-width="3" />`).join("")}
+      <circle cx="160" cy="120" r="36" fill="url(#unifiedProfileGradient)" />
+      <text x="160" y="128" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">${escHtml(synthesis.archetype.short)}</text>
+    </svg>
+  `;
+}
+
+function buildUnifiedProfileSynthesis(profile, roles) {
+  const communication = getUnifiedCapabilityScore(profile, "communication");
+  const execution = getUnifiedCapabilityScore(profile, "execution");
+  const stress = getUnifiedCapabilityScore(profile, "stress_tolerance");
+  const innovation = getUnifiedCapabilityScore(profile, "innovation");
+  const learning = getUnifiedCapabilityScore(profile, "learning");
+  const professional = getUnifiedCapabilityScore(profile, "professional");
+  const internship = getUnifiedCapabilityScore(profile, "internship");
+
+  const signals = {
+    collaboration: unifiedAverageDefined([communication, internship, roles[0]?.willingness?.score]),
+    structure: unifiedAverageDefined([execution, stress, professional]),
+    exploration: unifiedAverageDefined([innovation, learning]),
+    drive: unifiedAverageDefined([execution, communication, innovation]),
+    domain: unifiedAverageDefined([professional, internship, execution])
+  };
+  const archetype = buildUnifiedArchetype(signals);
+  const roleCluster = uniqueValues([
+    ...(profile.recommendedRoles || []),
+    ...(roles || []).slice(0, 2).map((item) => item.name || ""),
+    profile.basics.target_direction || ""
+  ], 4);
+  const workValues = uniqueValues(profile.workValues || [], 4);
+  const coreFocus = roleCluster[0] || archetype.scene;
+  const thesis = `${archetype.thesis} 当前最像的职业场景是 ${coreFocus}。`;
+
+  const axes = [
+    {
+      key: "collaboration",
+      label: "协作倾向",
+      left: "独立深挖",
+      right: "协同推进",
+      value: Number(signals.collaboration || 50),
+      focus: Number(signals.collaboration || 50) >= 55 ? "更偏协同" : "更偏独立",
+      note: Number(signals.collaboration || 50) >= 55 ? "更容易在对齐人与信息后推进结果。" : "更适合先独立梳理，再输出结论。"
+    },
+    {
+      key: "structure",
+      label: "秩序偏好",
+      left: "灵活变化",
+      right: "秩序稳定",
+      value: Number(signals.structure || 50),
+      focus: Number(signals.structure || 50) >= 55 ? "偏结构化" : "偏弹性化",
+      note: Number(signals.structure || 50) >= 55 ? "更适合边界清晰、节奏稳定的工作环境。" : "在更弹性的场景里能保留一定适应空间。"
+    },
+    {
+      key: "exploration",
+      label: "探索倾向",
+      left: "务实收敛",
+      right: "探索拓展",
+      value: Number(signals.exploration || 50),
+      focus: Number(signals.exploration || 50) >= 55 ? "偏探索" : "偏务实",
+      note: Number(signals.exploration || 50) >= 55 ? "会被新问题和新方向激活。" : "更看重可执行性和现实落点。"
+    },
+    {
+      key: "drive",
+      label: "推进方式",
+      left: "支持执行",
+      right: "主动牵引",
+      value: Number(signals.drive || 50),
+      focus: Number(signals.drive || 50) >= 55 ? "偏主动" : "偏支持",
+      note: Number(signals.drive || 50) >= 55 ? "有一定主导意识，愿意带动事情往前走。" : "更适合在清晰目标下稳定支撑与落地。"
+    }
+  ];
+
+  const workstyleCards = [
+    {
+      title: "决策方式",
+      accent: "blue",
+      value: Number(signals.structure || 0) >= 68
+        ? "先建结构，再做判断"
+        : Number(signals.exploration || 0) >= 68
+          ? "先看机会，再逐步收敛"
+          : "会在稳定与试探之间找平衡",
+      copy: Number(signals.structure || 0) >= 68
+        ? "更自然的方式是先厘清边界、步骤和优先级，再推进结果。"
+        : Number(signals.exploration || 0) >= 68
+          ? "面对新方向时更愿意先试，再根据反馈形成方法。"
+          : "既会考虑现实落点，也会保留一定探索空间。"
+    },
+    {
+      title: "沟通风格",
+      accent: "violet",
+      value: Number(signals.collaboration || 0) >= 68
+        ? "对齐共识后推进"
+        : Number(signals.collaboration || 0) >= 54
+          ? "先梳理，再协同"
+          : "更偏独立整理后输出",
+      copy: Number(signals.collaboration || 0) >= 68
+        ? "更适合在多方之间整合信息、统一节奏并推动下一步。"
+        : Number(signals.collaboration || 0) >= 54
+          ? "沟通时会先形成自己的框架，再和他人对齐。"
+          : "更需要先形成内部判断，再对外表达。"
+    },
+    {
+      title: "适配环境",
+      accent: "teal",
+      value: Number(signals.structure || 0) >= 65
+        ? "目标明确、分工清晰"
+        : Number(signals.exploration || 0) >= 65
+          ? "允许试错、节奏灵活"
+          : "中等变化、边界可协商",
+      copy: Number(signals.structure || 0) >= 65
+        ? "在流程明确、节奏清楚的团队里更容易稳定发挥。"
+        : Number(signals.exploration || 0) >= 65
+          ? "面对更开放的任务时，更容易被激活并找到新解法。"
+          : "更适合既有方向又保留一定自主空间的团队。"
+    },
+    {
+      title: "发力位置",
+      accent: "amber",
+      value: archetype.scene,
+      copy: roleCluster.length
+        ? `当前职业画像最容易落在 ${roleCluster.slice(0, 2).join(" / ")} 这类角色附近。`
+        : "当前最强特征更接近支撑协作、执行推进或结构化判断这类位置。"
+    }
+  ];
+
+  const evidenceRows = [
+    {
+      title: "结构秩序",
+      desc: "是否更擅长在清晰目标下保持节奏、稳定输出。",
+      assessment: getUnifiedEvidenceScore(profile, ["execution", "stress_tolerance"], "MBTI") ?? getUnifiedEvidenceScore(profile, ["execution"], "Holland"),
+      resume: getUnifiedEvidenceScore(profile, ["execution", "professional"], "简历"),
+      interview: getUnifiedEvidenceScore(profile, ["execution", "stress_tolerance"], "访谈")
+    },
+    {
+      title: "协作推进",
+      desc: "是否更像协调信息、连接角色并推动结果的人。",
+      assessment: getUnifiedEvidenceScore(profile, ["communication"], "MBTI") ?? getUnifiedEvidenceScore(profile, ["communication"], "Holland"),
+      resume: getUnifiedEvidenceScore(profile, ["communication", "internship"], "简历"),
+      interview: getUnifiedEvidenceScore(profile, ["communication", "internship"], "访谈")
+    },
+    {
+      title: "探索成长",
+      desc: "是否会被新问题、新方向或快速学习场景激活。",
+      assessment: getUnifiedEvidenceScore(profile, ["innovation", "learning"], "MBTI") ?? getUnifiedEvidenceScore(profile, ["innovation", "learning"], "Holland"),
+      resume: getUnifiedEvidenceScore(profile, ["innovation", "learning"], "简历"),
+      interview: getUnifiedEvidenceScore(profile, ["innovation", "learning"], "访谈")
+    },
+    {
+      title: "业务实践",
+      desc: "是否已经有足够的经历证据把画像落到真实角色上。",
+      assessment: getUnifiedEvidenceScore(profile, ["professional", "internship"], "基础信息"),
+      resume: getUnifiedEvidenceScore(profile, ["professional", "internship", "execution"], "简历"),
+      interview: getUnifiedEvidenceScore(profile, ["internship", "execution"], "访谈")
+    }
+  ];
+
+  const uncertainty = [];
+  if (profile.missingItems?.length) {
+    uncertainty.push(...profile.missingItems.slice(0, 2));
+  }
+  const topRole = roles?.[0] || null;
+  if (profile.basics.target_direction && topRole && !roleMatchesText(topRole, profile.basics.target_direction)) {
+    uncertainty.push("当前填写的目标方向，与画像最强证据并不完全一致。");
+  }
+  if (Math.abs(Number(signals.exploration || 0) - Number(signals.structure || 0)) <= 8) {
+    uncertainty.push("探索倾向与秩序偏好接近，说明你的工作风格仍有双重性。");
+  }
+  if (!uncertainty.length) {
+    uncertainty.push("当前关键信号来源较一致，这一页更适合作为后续规划模块的画像基底。");
+  }
+
+  return {
+    archetype,
+    thesis,
+    axes,
+    workstyleCards,
+    evidenceRows,
+    roleCluster,
+    workValues,
+    uncertainty: uniqueValues(uncertainty, 3)
+  };
+}
+
+function renderUnifiedFeatureAxes(axes) {
+  return (axes || []).map((item) => `
+    <article class="unified-axis-item">
+      <div class="unified-axis-head">
+        <p class="unified-axis-title">${escHtml(item.label)}</p>
+        <span class="unified-axis-focus">${escHtml(item.focus)}</span>
+      </div>
+      <div class="unified-axis-meta">
+        <span>${escHtml(item.left)}</span>
+        <span>${escHtml(item.right)}</span>
+      </div>
+      <div class="unified-axis-track">
+        <div class="unified-axis-track-fill"></div>
+        <span class="unified-axis-marker" style="left:${Math.max(6, Math.min(94, Number(item.value || 50)))}%"></span>
+      </div>
+      <p class="unified-axis-note">${escHtml(item.note)}</p>
+    </article>
+  `).join("");
+}
+
+function renderUnifiedWorkstyleCards(items) {
+  return (items || []).map((item) => `
+    <article class="unified-style-card ${escHtml(item.accent || "blue")}">
+      <p class="unified-style-label">${escHtml(item.title)}</p>
+      <p class="unified-style-value">${escHtml(item.value)}</p>
+      <p class="unified-style-copy">${escHtml(item.copy)}</p>
+    </article>
+  `).join("");
+}
+
+function renderUnifiedEvidenceMatrix(rows) {
+  return (rows || []).map((item) => `
+    <article class="unified-evidence-card">
+      <div class="unified-evidence-head">
+        <p class="unified-evidence-title">${escHtml(item.title)}</p>
+        <p class="unified-evidence-copy">${escHtml(item.desc)}</p>
+      </div>
+      <div class="unified-evidence-source-grid">
+        ${[
+          ["测评", item.assessment],
+          ["简历", item.resume],
+          ["访谈", item.interview]
+        ].map(([label, value]) => `
+          <div class="unified-evidence-source ${getUnifiedEvidenceTone(value)}">
+            <span>${escHtml(label)}</span>
+            <strong>${Number.isFinite(Number(value)) ? `${Math.round(Number(value))}` : "--"}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderUnifiedUncertaintyList(items) {
+  return (items || []).length
+    ? (items || []).map((item) => `<div class="unified-uncertainty-item">${escHtml(item)}</div>`).join("")
+    : `<div class="career-list-empty">当前没有明显待验证项</div>`;
+}
+
+function getProfilePortraitState() {
+  const state = userWorkspaceState.scopedData.profile_portrait;
+  return state && typeof state === "object" ? state : null;
+}
+
+function buildProfilePortraitContext(profile, roles, synthesis) {
+  const resumeState = userWorkspaceState.scopedData.resume_profile || null;
+  const resumeTraits = buildResumePortraitTraits(resumeState);
+  const interviewProfile = profile?.interview?.profile || null;
+  return {
+    gender: profile?.basics?.gender || "",
+    archetype_name: synthesis?.archetype?.name || "",
+    archetype_scene: synthesis?.archetype?.scene || "",
+    summary: synthesis?.thesis || profile?.summary || "",
+    mbti: profile?.assessment?.mbti?.display_type || profile?.assessment?.mbti?.final_type || "",
+    holland: profile?.assessment?.holland?.code || "",
+    holland_top_codes: Array.isArray(profile?.assessment?.holland?.top_codes) ? profile.assessment.holland.top_codes : [],
+    major: profile?.basics?.major || "",
+    grade: profile?.basics?.grade || "",
+    target_city: profile?.basics?.target_city || "",
+    target_direction: profile?.basics?.target_direction || "",
+    role_cluster: synthesis?.roleCluster || [],
+    top_roles: (roles || []).slice(0, 3).map((item) => item?.name || "").filter(Boolean),
+    work_values: synthesis?.workValues || [],
+    axis_traits: (synthesis?.axes || []).map((item) => `${item.label}：${item.focus}`).filter(Boolean),
+    workstyle_traits: (synthesis?.workstyleCards || []).map((item) => `${item.title}：${item.value}`).filter(Boolean),
+    interview_summary: interviewProfile?.summary || "",
+    interview_roles: uniqueValues(interviewProfile?.recommended_roles || [], 4),
+    interview_values: uniqueValues(interviewProfile?.work_values || [], 5),
+    interview_evidence: uniqueValues(interviewProfile?.evidence_highlights || [], 4),
+    resume_summary: resumeTraits.summary,
+    resume_roles: resumeTraits.roles,
+    resume_signals: resumeTraits.signals,
+    resume_projects: resumeTraits.projects,
+    resume_experiences: resumeTraits.experiences,
+    resume_skills: resumeTraits.skills,
+    resume_competitions: resumeTraits.competitions
+  };
+}
+
+function renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis) {
+  if (!archetypeVisualEl) return;
+  const hasPortrait = Boolean(portraitState?.image_url);
+  archetypeVisualEl.classList.toggle("has-portrait", hasPortrait);
+  if (!hasPortrait) {
+    archetypeVisualEl.innerHTML = buildUnifiedProfileConstellationSvg(synthesis);
+    return;
+  }
+  const safeUrl = escHtml(String(portraitState.image_url || ""));
+  const safeName = escHtml(portraitState.archetype_name || synthesis?.archetype?.name || "职业画像");
+  const safeSummary = escHtml(String(portraitState.prompt_summary || synthesis?.thesis || "").slice(0, 72));
+  archetypeVisualEl.innerHTML = `
+    <div class="unified-profile-portrait-stage">
+      <img src="${safeUrl}" alt="${safeName}" class="unified-profile-portrait-image">
+      <div class="unified-profile-portrait-badge"><span>AI Portrait</span></div>
+      <div class="unified-profile-portrait-caption">
+        <strong>${safeName}</strong>
+        <p>${safeSummary}</p>
+      </div>
+    </div>
+  `;
+}
+
+function updateProfilePortraitControls(profile, roles, synthesis) {
+  const button = document.getElementById("profilePortraitGenerateBtn");
+  const hint = document.getElementById("profilePortraitHint");
+  const portraitState = getProfilePortraitState();
+  if (button) {
+    button.disabled = profilePortraitTaskState.loading;
+    button.textContent = profilePortraitTaskState.loading
+      ? "生成中..."
+      : portraitState?.image_url
+        ? "重新生成用户画像"
+        : "生成用户画像";
+  }
+  if (hint) {
+    if (profilePortraitTaskState.loading) {
+      hint.textContent = "正在融合测评、工作价值观、访谈证据和简历内容，生成人物画像，请稍候。";
+    } else if (portraitState?.image_url) {
+      hint.textContent = `当前已生成 ${portraitState.archetype_name || synthesis?.archetype?.name || "职业画像"}，可以随时重新生成。`;
+    } else {
+      const focusRole = (roles || [])[0]?.name || profile?.basics?.target_direction || synthesis?.archetype?.name || "当前职业画像";
+      hint.textContent = `基于 ${focusRole} 方向，自动融合测评、工作观、访谈与简历内容，生成一张纵向人物画像。`;
+    }
+  }
+}
+
+async function generateProfilePortrait() {
+  if (profilePortraitTaskState.loading) return;
+  if (!isAuthenticatedUser()) {
+    showToast("请先登录", "登录后才能生成个人画像。", "warning", 1800);
+    return;
+  }
+  const profile = appState.derivedProfile || deriveUnifiedProfile();
+  const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+    ? appState.matchingRoles
+    : computeRoleMatches(profile);
+  const synthesis = buildUnifiedProfileSynthesis(profile, roles);
+  const context = buildProfilePortraitContext(profile, roles, synthesis);
+  const hasPortraitSignals = Boolean(
+    context.summary
+    || context.archetype_name
+    || context.target_direction
+    || context.interview_summary
+    || context.resume_summary
+    || (context.resume_projects || []).length
+    || (context.resume_roles || []).length
+  );
+  if (!hasPortraitSignals) {
+    showToast("画像信息不足", "先完成测评、简历或目标方向补充后再生成。", "warning", 2000);
+    return;
+  }
+
+  profilePortraitTaskState.loading = true;
+  updateProfilePortraitControls(profile, roles, synthesis);
+  try {
+    const payload = await requestJson("/api/profile-portrait/generate", {
+      method: "POST",
+      body: { context }
+    });
+    userWorkspaceState.scopedData.profile_portrait = payload?.data || null;
+    userWorkspaceState.scopedDataLoaded.profile_portrait = true;
+    showToast("用户画像已生成", "左侧画像卡已经更新。", "success", 1800);
+  } catch (error) {
+    showToast("生成失败", error.message || "用户画像生成失败。", "error", 2600);
+  } finally {
+    profilePortraitTaskState.loading = false;
+    renderProfileWorkspace(profile, roles);
+  }
 }
 
 function getProfileFlowCompletion(profile) {
@@ -4377,29 +4977,49 @@ function renderCapabilityCorrelation(profile, roles) {
 function renderProfileWorkspace(profile, roles) {
   syncProfileBasicsForm();
   const topRoles = roles.slice(0, 3);
+  const synthesis = buildUnifiedProfileSynthesis(profile, roles);
   const readinessEl = document.getElementById("profileReadinessValue");
+  const archetypeVisualEl = document.getElementById("profileArchetypeVisual");
+  const archetypeNameEl = document.getElementById("profileArchetypeName");
+  const archetypeDigestEl = document.getElementById("profileArchetypeDigest");
+  const archetypeSummaryEl = document.getElementById("profileArchetypeSummary");
   const summaryEl = document.getElementById("profileUnifiedSummary");
   const assessmentEl = document.getElementById("profileAssessmentDigest");
   const valuesEl = document.getElementById("profileWorkValueTags");
+  const roleClusterEl = document.getElementById("profileRoleClusterTags");
+  const axisEl = document.getElementById("profileFeatureAxisList");
+  const workstyleEl = document.getElementById("profileWorkstyleCards");
+  const evidenceEl = document.getElementById("profileEvidenceMatrix");
+  const uncertaintyEl = document.getElementById("profileUncertaintyList");
   const topRoleEl = document.getElementById("profileTopRoleTags");
   const nextStepEl = document.getElementById("profileNextStepList");
   const missingEl = document.getElementById("profileMissingList");
   const capabilityEl = document.getElementById("profileCapabilityList");
   const correlationEl = document.getElementById("profileCapabilityCorrelation");
   const modulesEl = document.getElementById("agentModuleGrid");
+  const portraitState = getProfilePortraitState();
+  const assessmentItems = [];
+  if (profile.assessment?.mbti?.completed) assessmentItems.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
+  if (profile.assessment?.holland?.completed) assessmentItems.push(`霍兰德：${profile.assessment.holland.code}`);
+  if (profile.basics.major) assessmentItems.push(`专业：${profile.basics.major}`);
+  if (profile.basics.grade) assessmentItems.push(`学历：${profile.basics.grade}`);
+  if (profile.resume?.status === "analyzed") assessmentItems.push("简历：已解析");
+  else if (profile.resume?.status === "uploaded") assessmentItems.push("简历：待解析");
+  const assessmentDigest = assessmentItems.length ? assessmentItems.join("｜") : "尚未形成足够的基础画像。";
+
   if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
+  renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis);
+  if (archetypeNameEl) archetypeNameEl.textContent = synthesis.archetype.name;
+  if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
+  if (archetypeSummaryEl) archetypeSummaryEl.textContent = synthesis.thesis;
   if (summaryEl) summaryEl.textContent = profile.summary;
-  if (assessmentEl) {
-    const items = [];
-    if (profile.assessment?.mbti?.completed) items.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
-    if (profile.assessment?.holland?.completed) items.push(`霍兰德：${profile.assessment.holland.code}`);
-    if (profile.basics.major) items.push(`专业：${profile.basics.major}`);
-    if (profile.basics.grade) items.push(`学历：${profile.basics.grade}`);
-    if (profile.resume?.status === "analyzed") items.push("简历：已解析");
-    else if (profile.resume?.status === "uploaded") items.push("简历：待解析");
-    assessmentEl.textContent = items.length ? items.join("｜") : "尚未形成足够的基础画像。";
-  }
+  if (assessmentEl) assessmentEl.textContent = assessmentDigest;
   if (valuesEl) valuesEl.innerHTML = careerTagHtml(profile.workValues, "待补充工作价值观", "soft");
+  if (roleClusterEl) roleClusterEl.innerHTML = careerTagHtml(synthesis.roleCluster, "等待角色原型收敛", "accent");
+  if (axisEl) axisEl.innerHTML = renderUnifiedFeatureAxes(synthesis.axes);
+  if (workstyleEl) workstyleEl.innerHTML = renderUnifiedWorkstyleCards(synthesis.workstyleCards);
+  if (evidenceEl) evidenceEl.innerHTML = renderUnifiedEvidenceMatrix(synthesis.evidenceRows);
+  if (uncertaintyEl) uncertaintyEl.innerHTML = renderUnifiedUncertaintyList(synthesis.uncertainty);
   if (topRoleEl) topRoleEl.innerHTML = careerTagHtml(uniqueValues([...profile.recommendedRoles, ...topRoles.map((item) => item.name)], 5), "待生成岗位方向", "accent");
   if (nextStepEl) nextStepEl.innerHTML = careerListHtml(uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6), "等待画像完善后生成行动建议");
   if (missingEl) missingEl.innerHTML = careerListHtml(profile.missingItems, "当前画像基础已满足本轮演示范围");
@@ -4434,6 +5054,7 @@ function renderProfileWorkspace(profile, roles) {
       { name: "执行能力", score: profile.capabilities.execution.score || 0 }
     ]
   });
+  updateProfilePortraitControls(profile, roles, synthesis);
   renderResumeProfileSection(getResumeProfileFromCache());
   renderProfileFlow(profile);
 }
@@ -4757,7 +5378,7 @@ function switchAuthTab(tab) {
   loginBtn.classList.toggle("active", isLogin);
   registerBtn.classList.toggle("active", !isLogin);
   if (isLogin) {
-    showAuthMessage("预置账号：system");
+    showAuthMessage("已自动填充预置账号：system，密码：123456。");
   } else if (!authConfig.allowSelfRegister) {
     showAuthMessage("当前环境仅开放预置账号登录，普通用户不支持自助注册。", "warning");
   } else {
@@ -4864,10 +5485,19 @@ async function initAuth() {
           userWorkspaceState.scopedData.resume_profile = scoped.resume_profile || emptyResumeProfile();
           userWorkspaceState.scopedDataLoaded.resume_profile = true;
         }
+        if (Object.prototype.hasOwnProperty.call(scoped, "career_report")) {
+          userWorkspaceState.scopedData.career_report = scoped.career_report ?? null;
+          userWorkspaceState.scopedDataLoaded.career_report = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "profile_portrait")) {
+          userWorkspaceState.scopedData.profile_portrait = scoped.profile_portrait ?? null;
+          userWorkspaceState.scopedDataLoaded.profile_portrait = true;
+        }
         await Promise.allSettled([
           loadCareerInterviewConfig(false),
           hydrateCareerInterviewState(false),
-          refreshResumeProfile(false)
+          refreshResumeProfile(false),
+          loadProfilePortraitState(false)
         ]);
         return payload.user;
       }
@@ -4933,31 +5563,50 @@ function updateLiveClock() {
 
 function updateTaskPanels(explored) {
   const exploreStatus = document.getElementById("taskJobExploreStatus");
+  const exploreStatusCard = document.getElementById("taskJobExploreStatusCard");
   const exploreTag = document.getElementById("taskJobExploreTag");
+  const exploreTagCard = document.getElementById("taskJobExploreTagCard");
   const matchingStatus = document.getElementById("taskMatchingStatus");
+  const matchingStatusCard = document.getElementById("taskMatchingStatusCard");
   const matchingTag = document.getElementById("taskMatchingTag");
+  const matchingTagCard = document.getElementById("taskMatchingTagCard");
   const progressHint = document.getElementById("taskProgressHint");
+  const progressHintDisplay = document.getElementById("taskProgressHintDisplay");
   const reportBtn = document.getElementById("generateReportBtn");
+  const reportBtnCard = document.getElementById("generateReportBtnCard");
   const exploredDone = explored >= 3;
-  if (exploreStatus) exploreStatus.textContent = `已形成 ${explored} 个初步岗位方向`;
-  setTagState(exploreTag, exploredDone ? "done" : "processing");
-  if (matchingStatus) matchingStatus.textContent = appState.matchingRoles.length
+  const exploreText = `已形成 ${explored} 个初步岗位方向`;
+  const matchingText = appState.matchingRoles.length
     ? `已生成 ${appState.matchingRoles.length} 个岗位匹配结果`
     : "等待画像输入生成匹配";
+  if (exploreStatus) exploreStatus.textContent = exploreText;
+  if (exploreStatusCard) exploreStatusCard.textContent = exploreText;
+  setTagState(exploreTag, exploredDone ? "done" : "processing");
+  setTagState(exploreTagCard, exploredDone ? "done" : "processing");
+  if (matchingStatus) matchingStatus.textContent = matchingText;
+  if (matchingStatusCard) matchingStatusCard.textContent = matchingText;
   setTagState(matchingTag, appState.matchingComplete ? "done" : "processing");
+  setTagState(matchingTagCard, appState.matchingComplete ? "done" : "processing");
   const doneCount = [appState.profileComplete, exploredDone, appState.matchingComplete, appState.reportGenerated].filter(Boolean).length;
   if (progressHint) progressHint.textContent = `已完成 ${doneCount}/4 个关键任务`;
-  if (reportBtn) {
+  if (progressHintDisplay) progressHintDisplay.textContent = `已完成 ${doneCount}/4 个关键任务`;
+  [reportBtn, reportBtnCard].forEach((button) => {
+    if (!button) return;
     if (appState.reportGenerated) {
-      reportBtn.textContent = "报告已更新";
-      reportBtn.classList.add("bg-green-600", "hover:bg-green-700");
-      reportBtn.classList.remove("bg-purple-600", "hover:bg-purple-700");
+      button.textContent = "报告已更新";
+      button.classList.add("bg-green-600", "hover:bg-green-700");
+      button.classList.remove("bg-purple-600", "hover:bg-purple-700", "bg-violet-600", "hover:bg-violet-700");
     } else {
-      reportBtn.textContent = "生成当前报告";
-      reportBtn.classList.add("bg-purple-600", "hover:bg-purple-700");
-      reportBtn.classList.remove("bg-green-600", "hover:bg-green-700");
+      button.textContent = "生成当前报告";
+      if (button.id === "generateReportBtnCard") {
+        button.classList.add("bg-violet-600", "hover:bg-violet-700");
+        button.classList.remove("bg-green-600", "hover:bg-green-700");
+      } else {
+        button.classList.add("bg-purple-600", "hover:bg-purple-700");
+        button.classList.remove("bg-green-600", "hover:bg-green-700");
+      }
     }
-  }
+  });
 }
 
 function updateDashboardMetrics() {
@@ -5970,4 +6619,3 @@ async function confirmModelPicker() {
 function saveSettingsAdmin() { openAddProviderForm(); }
 function saveSettingsModel() { openModelPicker(); }
 function fetchSettingsModels() { fetchPickerModels(undefined, true); }
-

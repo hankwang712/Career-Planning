@@ -7,13 +7,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@7/dist/fuse.min.js"></script>
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/500.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/600.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/700.css" rel="stylesheet">
-        <link rel="stylesheet" href="/static/styles.css?v=20260329-resume-report-layout-v9">
+    <!-- 字体：仅加载常规字重，使用 swap 避免阻塞渲染，其余字重延迟加载 -->
+    <style>
+      @font-face {
+        font-family: 'Noto Sans SC';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('https://cdn.fontsource.org/fonts/noto-sans-sc/files/noto-sans-sc-chinese-simplified-400-normal.woff2') format('woff2');
+        unicode-range: U+4E00-9FFF, U+3400-4DBF, U+F900-FAFF, U+2CEB0-2EBE0, U+0020-007F;
+      }
+    </style>
+    <link rel="preload" as="style" href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css"
+          onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css"></noscript>
+    <link rel="stylesheet" href="/static/styles.css?v=20260401-guide-clickfix-v3">
+    <link rel="stylesheet" href="/static/workspace-shell.css?v=20260401-guide-clickfix-v3">
 </head>
-<body class="bg-gray-50 scroll-smooth auth-locked">
+<body class="shell-body scroll-smooth auth-locked">
+    <a href="#dashboard" class="skip-link">跳到主内容</a>
     <div class="ambient-orb a"></div>
     <div class="ambient-orb b"></div>
     <div class="ambient-orb c"></div>
@@ -61,65 +73,124 @@
     </div>
     
     <!-- 顶部导航 -->
-    <nav class="gradient-bg text-white shadow-lg fixed w-full z-50">
-        <div class="w-full px-4 lg:px-6">
-            <div class="flex items-center h-14 gap-3">
-                <!-- 品牌区：紧凑单行 -->
-                <div class="flex items-center space-x-2 flex-shrink-0">
-                    <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-lg">
-                        <span class="text-purple-600 font-bold text-base">DP</span>
-                    </div>
-                    <div class="leading-tight">
-                        <h1 class="text-base font-bold whitespace-nowrap">职业规划智能体</h1>
-                        <p class="text-xs text-purple-200 whitespace-nowrap">双图谱 · 大模型推理 · <span class="team-badge-inline">今天也要Debug</span></p>
+    <nav class="topbar fixed w-full z-50">
+        <div class="topbar-shell">
+            <div class="topbar-row">
+                <div class="topbar-brand">
+                    <div class="topbar-brand-mark">DP</div>
+                    <div class="topbar-brand-copy">
+                        <h1>职业规划智能体</h1>
+                        <p>学生职业决策操作台</p>
                     </div>
                 </div>
 
-                <!-- 分隔线 -->
-                <div class="w-px h-8 bg-white/25 flex-shrink-0"></div>
-
-                <!-- 导航标签区：flex-1 自适应宽度，单行不换行 -->
-                <div class="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
-                    <button onclick="showSection('dashboard')" data-section="dashboard" class="nav-item active px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        📊 智能仪表盘
-                    </button>
-                    <button onclick="showSection('jobs')" data-section="jobs" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        💼 岗位探索
-                    </button>
-                    <button onclick="showSection('profile')" data-section="profile" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        👤 能力画像
-                    </button>
-                    <button onclick="showSection('matching')" data-section="matching" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        🎯 人岗匹配
-                    </button>
-                    <button onclick="showSection('report')" data-section="report" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        📋 规划报告
-                    </button>
-                    <button onclick="showSection('qa')" data-section="qa" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
-                        🔍 职业问答
-                    </button>
+                <div class="topbar-nav scrollbar-none" aria-label="主导航">
+                    <button type="button" onclick="showSection('dashboard')" data-section="dashboard" class="nav-item active">工作台</button>
+                    <button type="button" onclick="showSection('jobs')" data-section="jobs" class="nav-item">岗位探索</button>
+                    <button type="button" onclick="showSection('profile')" data-section="profile" class="nav-item">画像输入</button>
+                    <button type="button" onclick="showSection('matching')" data-section="matching" class="nav-item">人岗匹配</button>
+                    <button type="button" onclick="showSection('report')" data-section="report" class="nav-item">规划报告</button>
+                    <button type="button" onclick="showSection('qa')" data-section="qa" class="nav-item">职业问答</button>
                 </div>
 
-                <!-- 右侧操作区：紧凑布局 -->
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <span id="liveClock" class="hidden xl:inline-flex text-xs bg-white/15 px-2.5 py-1 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
-                    <span id="currentUserLabel" class="hidden lg:inline-flex text-xs bg-white/20 px-2.5 py-1 rounded-full max-w-[120px] truncate whitespace-nowrap">未登录</span>
-                    <button id="notificationBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-xs transition-all tooltip flex-shrink-0" data-tooltip="系统通知">
-                        🔔 <span id="notificationCount" class="ml-0.5">3</span>
+                <div class="topbar-actions">
+                    <span id="currentUserLabel" class="topbar-pill hidden lg:inline-flex">未登录</span>
+                    <button id="workspaceGuideActionBtn" type="button" onclick="openWorkspaceGuide(true)" class="hidden topbar-text-btn">重新引导</button>
+                    <button id="notificationBtn" type="button" class="topbar-icon-btn tooltip" data-tooltip="系统通知" aria-label="查看系统通知">
+                        <span>通知</span>
+                        <span id="notificationCount" class="topbar-count">3</span>
                     </button>
-                    <button id="logoutBtn" onclick="logout()" class="hidden bg-white/20 hover:bg-white/30 px-2.5 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap">
-                        退出
+                    <button id="logoutBtn" type="button" onclick="logout()" class="topbar-text-btn hidden">退出</button>
+                    <button type="button" class="topbar-avatar-btn" onclick="handleAvatarClick(event)" title="个人中心" aria-label="打开个人中心">
+                        <span id="currentUserAvatar">U</span>
                     </button>
-                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="toggleSettingsPanel(event)" title="模型设置">
-                        <span id="currentUserAvatar" class="text-sm">👤</span>
-                    </div>
                 </div>
             </div>
         </div>
     </nav>
 
+    <section class="workspace-journey hidden" id="workspaceJourneyBand" aria-label="职业决策流程">
+    <div class="workspace-journey-shell">
+        <div class="workspace-journey-copy">
+            <p class="workspace-journey-kicker">Career Decision Flow</p>
+            <h2>把岗位判断、画像补充和报告行动串成一条主线</h2>
+            <p id="workspaceJourneyNarrative">先看岗位方向，再补当前最缺的画像信息，最后用报告收束行动。</p>
+        </div>
+
+        <div class="workspace-journey-track workspace-journey-track-rows" id="workspaceJourneyTrack">
+            <div class="workspace-journey-row">
+                <button type="button" class="workspace-journey-step is-active" data-journey-section="dashboard" onclick="showSection('dashboard')">
+                    <span class="workspace-journey-step-index">01</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>总览工作台</strong>
+                        <span>主线、缺口与系统建议的下一步</span>
+                    </span>
+                    <span class="workspace-journey-step-status">当前</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="jobs" onclick="showSection('jobs')">
+                    <span class="workspace-journey-step-index">02</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>岗位探索</strong>
+                        <span>用 JD 与城市机会校准方向</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="profile" onclick="showSection('profile')">
+                    <span class="workspace-journey-step-index">03</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>画像输入</strong>
+                        <span>测评 · 简历 · 访谈，只补关键项</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+            </div>
+            <div class="workspace-journey-row">
+                <button type="button" class="workspace-journey-step" data-journey-section="matching" onclick="showSection('matching')">
+                    <span class="workspace-journey-step-index">04</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>匹配分析</strong>
+                        <span>锁定主线岗位与能力差距</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="report" onclick="openUserCenterPage('report-workspace')">
+                    <span class="workspace-journey-step-index">05</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>职业报告</strong>
+                        <span>结论、版本历史与行动清单</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="qa" onclick="showSection('qa')">
+                    <span class="workspace-journey-step-index">06</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>决策问答</strong>
+                        <span>快速对比选项，辅助纠偏</span>
+                    </span>
+                    <span class="workspace-journey-step-status">辅助</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="workspace-journey-meta">
+            <article>
+                <span>当前阶段</span>
+                <strong id="workspaceJourneyCurrentStage">总览工作台</strong>
+            </article>
+            <article>
+                <span>推荐动作</span>
+                <strong id="workspaceJourneyCurrentAction">继续完善画像</strong>
+            </article>
+        </div>
+    </div>
+</section>
+
     <!-- 主内容区 -->
-    <main class="pt-16 pb-10">
+    <main class="shell-main pt-20 pb-16">
         <!-- 仪表盘 -->
 
                 <section id="dashboard" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 fade-in">
@@ -172,6 +243,18 @@
                         <p id="pendingTaskHint" class="text-xs text-purple-300 mt-1">点击查看</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- 工作台：报告运行记录（与个人中心同源逻辑，点选后跳转打开对应版本） -->
+            <div id="dashboardReportRunPanel" class="dash-report-run-panel rounded-2xl mb-8 border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/80">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">报告运行记录</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">每条为一次生成/归档；点选后在个人中心展开该版本正文</p>
+                    </div>
+                    <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 whitespace-nowrap" onclick="openUserCenterPage('report-workspace')">进入报告工作区</button>
+                </div>
+                <div id="dashboardReportRuns" class="dash-report-runs" aria-live="polite"></div>
             </div>
 
             <!-- 系统架构说明 -->
@@ -253,34 +336,27 @@
 
 
 
-<div id="careerNewsBoard" data-display-limit="10" class="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm mb-8">
-    <div class="mb-5 rounded-3xl border border-sky-100 bg-gradient-to-r from-sky-50 via-cyan-50 to-indigo-50 p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-                <div class="flex items-center gap-2 flex-wrap mb-2">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/80 text-sky-700 border border-sky-200">
-                    每日职业资讯
-                </span>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
-                    每日 12:00 更新
-                </span>
-                
-                </div>
-                <h3 class="text-2xl font-bold text-slate-800">职业规划与计算机行业快报</h3>
-                <p class="text-sm text-slate-500 mt-1">
-                    聚焦就业趋势、校招实习、程序员岗位、AI 与软件工程方向，只保留和你当前系统场景相关的内容。
-                </p>
-                
-            </div>
+<section id="careerNewsBoard" data-display-limit="9" class="news-board news-board-editorial">
+    <div class="news-board-head">
+        <div>
+            <p class="news-board-kicker">Market Signals</p>
+            <h3 class="news-board-title">职业规划与计算机行业快报</h3>
+            <p class="news-board-copy">只保留与你当前场景相关的招聘、技术和就业变化。这里应该像编辑部整理过的资讯台，而不是普通信息流。</p>
+            
+        </div>
+        <div class="news-board-meta">
+            <span class="news-board-chip">每日 12:00 更新</span>
+            <span id="careerNewsShowingCount" class="news-board-chip news-board-chip-quiet">当前展示 0 / 0 条</span>
+            
         </div>
     </div>
 
     
-    <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
-        当前快照暂时没有抓到职业规划或计算机行业相关的新闻，系统会继续在下一次刷新窗口重试。
+    <div class="news-board-empty">
+        当前快照暂时没有抓到职业规划或计算机行业相关的新内容，系统会继续在下一次刷新窗口重试。
     </div>
     
-</div>
+</section>
 
             <div class="product-hero-wrap">
                 <!-- 左侧：双图谱架构网络可视化 -->
@@ -450,7 +526,7 @@
                     <p class="text-gray-500 text-sm mb-4">浏览 100+ 热门岗位，了解行业趋势与技能要求，构建岗位画像</p>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center text-blue-600 text-sm font-medium">
-                            立即探索 <span class="ml-1">?/span>
+                            立即探索 <span class="ml-1">→</span>
                         </div>
                         <span class="text-xs text-gray-400">数据联动：岗位画像</span>
                     </div>
@@ -580,7 +656,7 @@
                     <p class="text-gray-500 text-sm mb-4">AI 智能分析四维能力，找到最适合您的职业发展方向</p>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center text-green-600 text-sm font-medium">
-                            查看匹配 <span class="ml-1">?/span>
+                            查看匹配 <span class="ml-1">→</span>
                         </div>
                         <span class="text-xs text-gray-400">数据联动：匹配分析</span>
                     </div>
@@ -595,7 +671,7 @@
                         <p class="text-gray-500 text-sm">基于 10000+ 岗位数据分析生成的个性化发展路线</p>
                     </div>
                     <button class="text-blue-600 text-sm font-medium hover:underline flex items-center">
-                        查看完整图谱 <span class="ml-1">?/span>
+                        查看完整图谱 <span class="ml-1">→</span>
                     </button>
                 </div>
                 <div class="relative">
@@ -662,14 +738,24 @@
                 </div>
             </div>
 
-            <!-- 能力雷达图与推荐岗位 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white rounded-xl glass-surface p-6 shadow-sm">
+            <!-- 能力雷达图与推荐岗位（items-start：避免左列撑高时右列被强制拉伸出空白） -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start dashboard-radar-jobs-row">
+                <div class="bg-white rounded-xl glass-surface p-6 shadow-sm w-full">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold">📊 能力维度分析</h3>
                         <button onclick="showSection('profile')" class="text-blue-600 text-sm font-medium hover:underline">查看详情 →</button>
                     </div>
-                    <canvas id="radarChart" height="300"></canvas>
+                    <div id="dashboardRadarHost" class="dashboard-radar-chart-host relative w-full rounded-xl bg-slate-50/80 border border-slate-100 overflow-hidden">
+                        <canvas id="radarChart" class="absolute inset-0 w-full h-full block opacity-0 pointer-events-none"></canvas>
+                        <div id="radarChartPlaceholder" class="dash-chart-placeholder dashboard-radar-placeholder absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                            <svg class="w-10 h-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+                                <polygon points="12,2 22,8 22,16 12,22 2,16 2,8" stroke-linejoin="round"/>
+                                <path d="M12 8v8M8 12h8" opacity="0.35"/>
+                            </svg>
+                            <p class="text-sm text-slate-500 leading-relaxed">完成基础画像与测评后，将在此展示六维雷达对比</p>
+                            <button type="button" onclick="showSection('profile')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 mt-1">去画像输入</button>
+                        </div>
+                    </div>
                     <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
                         <div class="flex items-center">
                             <div class="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
@@ -682,7 +768,7 @@
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl glass-surface p-6 shadow-sm">
+                <div class="bg-white rounded-xl glass-surface p-6 shadow-sm w-full lg:max-w-none self-start">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold">💡 智能岗位推荐</h3>
                         <button onclick="showSection('matching')" class="text-blue-600 text-sm font-medium hover:underline">查看全部 →</button>
@@ -755,7 +841,7 @@
                 <div class="space-y-4">
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
                             <div>
                                 <p class="font-medium text-gray-800">完成能力画像评估</p>
                                 <p class="text-sm text-gray-500">包含 8 个维度能力评估</p>
@@ -765,7 +851,7 @@
                     </div>
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
                             <div>
                                 <p class="font-medium text-gray-800">浏览不少于 10 个岗位</p>
                                 <p id="taskJobExploreStatus" class="text-sm text-gray-500">已探索 12 个岗位</p>
@@ -775,7 +861,7 @@
                     </div>
                     <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">?/div>
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
                             <div>
                                 <p class="font-medium text-gray-800">完成人岗匹配分析</p>
                                 <p id="taskMatchingStatus" class="text-sm text-gray-500">已分析 5 个目标岗位</p>
@@ -817,9 +903,16 @@
 
         <!-- 岗位探索 -->
                 <section id="jobs" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold mb-2">💼 岗位探索中心</h2>
-                <p class="text-gray-500">浏览 100+ 热门岗位，了解行业趋势与技能要求，构建岗位画像</p>
+            <div class="workspace-section-lead">
+                <div>
+                    <p class="workspace-section-kicker">Step 03 / Market Discovery</p>
+                    <h2 class="workspace-section-title">岗位探索中心</h2>
+                    <p class="workspace-section-copy">先看市场、城市和技能要求，再决定你真正要围绕哪条主线推进。</p>
+                </div>
+                <div class="workspace-section-side">
+                    <span class="workspace-section-badge">市场输入</span>
+                    <p id="jobsSectionHint">当你已经有主线岗位时，这里更适合用来验证薪资、城市和技能门槛。</p>
+                </div>
             </div>
 
 
@@ -1180,10 +1273,17 @@
         </section>
 
         <!-- 能力画像 -->
-        ﻿<section id="profile" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold mb-2">能力画像构建中心</h2>
-        <p class="text-gray-500">双测评、基础信息、职业访谈共用一份画像状态，直接联动到匹配与报告。</p>
+        <section id="profile" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
+    <div class="workspace-section-lead">
+        <div>
+            <p class="workspace-section-kicker">Step 02 / Profile Input</p>
+            <h2 class="workspace-section-title">能力画像构建中心</h2>
+            <p class="workspace-section-copy">双测评、基础信息、职业访谈共用一份画像状态，直接联动到匹配与报告。</p>
+        </div>
+        <div class="workspace-section-side">
+            <span class="workspace-section-badge">输入阶段</span>
+            <p id="profileSectionHint">先补齐测评、简历和访谈证据，再进入岗位主线判断。</p>
+        </div>
     </div>
 
     <div class="profile-flow-wrap mb-6">
@@ -1411,6 +1511,82 @@
             </p>
         </div>
     </div>
+
+    <!-- ===== 趣味测试 & 深层探索模块 ===== -->
+    <div class="dt-hub-section mb-6">
+        <div class="dt-hub-header">
+            <div>
+                <p class="dt-hub-kicker">Fun Zone · Deep Explore</p>
+                <h3 class="dt-hub-title">趣味测试 &amp; 深层探索</h3>
+                <p class="dt-hub-desc">通过小游戏与深层量表，从不同角度了解自己的性格特质</p>
+            </div>
+            <button type="button" class="dt-compare-btn" onclick="toggleHistoryPanel()">
+                📊 对比两次测试结果
+            </button>
+        </div>
+
+        <!-- 历史对比面板 -->
+        <div id="dtHistoryPanel" class="hidden"></div>
+
+        <!-- 三张卡片 -->
+        <div class="dt-cards-grid">
+            <!-- 游戏1：老友记 -->
+            <div class="dt-game-card" onclick="openDeepTestRunnerPage('friends', true)">
+                <div class="dt-game-icon">🎬</div>
+                <div class="dt-game-body">
+                    <div class="dt-game-head-row">
+                        <h5 class="dt-game-title">你是哪个老友记角色？</h5>
+                        <span id="dtFriendsStatus" class="dt-card-chip">未开始</span>
+                    </div>
+                    <p class="dt-game-desc">10 道情景选择题，看看你最像 Central Perk 的哪位常客</p>
+                    <p id="dtFriendsResult" class="dt-game-result hidden"></p>
+                    <div class="dt-game-footer">
+                        <span class="dt-game-tag">🛋️ 10 题</span>
+                        <span class="dt-game-tag">情景选择</span>
+                        <span class="dt-game-action">进入测试页 →</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 游戏2：头脑特工队 -->
+            <div class="dt-game-card" onclick="openDeepTestRunnerPage('insideout', true)">
+                <div class="dt-game-icon">🎭</div>
+                <div class="dt-game-body">
+                    <div class="dt-game-head-row">
+                        <h5 class="dt-game-title">你是哪种情绪？</h5>
+                        <span id="dtIOStatus" class="dt-card-chip">未开始</span>
+                    </div>
+                    <p class="dt-game-desc">14 道情绪测题，揭示你内心的主导情感角色</p>
+                    <p id="dtIOResult" class="dt-game-result hidden"></p>
+                    <div class="dt-game-footer">
+                        <span class="dt-game-tag">🧠 14 题</span>
+                        <span class="dt-game-tag">情绪类型</span>
+                        <span class="dt-game-action">进入测试页 →</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 深度测试 -->
+            <div class="dt-game-card deep-card" onclick="openDeepTestRunnerPage('deep', true)">
+                <div class="dt-game-icon">🧬</div>
+                <div class="dt-game-body">
+                    <div class="dt-game-head-row">
+                        <h5 class="dt-game-title">深层性格探索</h5>
+                        <span id="dtDeepStatus" class="dt-card-chip">未开始</span>
+                    </div>
+                    <p class="dt-game-desc">52 道五档量表题，比标准 MBTI 更细腻的维度解析，含 AI 深度分析与历史对比</p>
+                    <div id="dtDeepResult" class="dt-game-result dt-deep-result hidden"></div>
+                    <div class="dt-game-footer">
+                        <span class="dt-game-tag">🔬 52 题</span>
+                        <span class="dt-game-tag">五档量表</span>
+                        <span class="dt-game-tag ai-tag">✨ AI 分析</span>
+                        <span class="dt-game-action">进入测试页 →</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="profile-flow-actions mb-6">
         <button type="button" class="profile-flow-btn ghost" onclick="skipProfileStep(1)">跳过本步</button>
         <button type="button" class="profile-flow-btn primary" onclick="nextProfileStep()">下一步：简历输入</button>
@@ -1667,18 +1843,54 @@
     </div>
 
     <div id="profileFlowStep4" class="profile-flow-panel hidden">
-    <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] mb-6">
-        <div class="space-y-6">
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Static Memory</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">基础信息入口</h3>
-                        <p class="text-sm text-slate-500 mt-1">专业、学历、目标城市和方向会进入统一画像；简历解析后会自动回填，未提供简历时可手动补充。</p>
+    <div class="unified-profile-shell mb-6">
+        <div class="unified-profile-top">
+            <section class="unified-profile-hero">
+                <div class="unified-profile-visual" id="profileArchetypeVisual"></div>
+                <div class="unified-profile-hero-body">
+                    <div class="unified-profile-hero-head">
+                        <div>
+                            <p class="unified-profile-kicker">Unified Identity</p>
+                            <h3 id="profileArchetypeName" class="unified-profile-title">职业原型生成中</h3>
+                        </div>
+                        <div class="unified-profile-readiness">
+                            <span>画像成熟度</span>
+                            <strong id="profileReadinessValue">0%</strong>
+                        </div>
                     </div>
-                    <span id="profileBasicsStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">待补充</span>
+                    <p id="profileAssessmentDigest" class="unified-profile-digest"></p>
+                    <p id="profileUnifiedSummary" class="unified-profile-summary"></p>
+                    <div class="unified-profile-portrait-actions">
+                        <button id="profilePortraitGenerateBtn" type="button" onclick="generateProfilePortrait()" class="unified-profile-portrait-btn">
+                            生成用户画像
+                        </button>
+                        <p id="profilePortraitHint" class="unified-profile-portrait-hint">基于当前测评、简历和目标方向生成一张纵向人物画像。</p>
+                    </div>
+                    <div class="unified-profile-tag-block">
+                        <p class="unified-profile-tag-label">原型簇</p>
+                        <div id="profileRoleClusterTags" class="career-tag-row mt-3"></div>
+                    </div>
+                    <div class="unified-profile-tag-block">
+                        <p class="unified-profile-tag-label">价值偏好</p>
+                        <div id="profileWorkValueTags" class="career-tag-row mt-3"></div>
+                    </div>
                 </div>
-                <div class="grid gap-4 md:grid-cols-2">
+            </section>
+
+            <aside class="unified-profile-basics-card">
+                <div class="unified-profile-basics-head">
+                    <div>
+                        <p class="unified-profile-kicker">Static Memory</p>
+                        <h3 class="unified-profile-side-title">基础信息入口</h3>
+                        <p class="unified-profile-side-copy">这一块只负责补齐画像基底，不承担结果展示。</p>
+                    </div>
+                    <span id="profileBasicsStatus" class="unified-profile-status">待补充</span>
+                </div>
+                <div class="unified-profile-basics-grid">
+                    <label class="block">
+                        <span class="text-sm text-slate-600">性别（可选）</span>
+                        <input id="profileGenderInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：男 / 女">
+                    </label>
                     <label class="block">
                         <span class="text-sm text-slate-600">专业</span>
                         <input id="profileMajorInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：智能科学与技术">
@@ -1696,76 +1908,54 @@
                         <input id="profileTargetDirectionInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：产品经理 / 数据分析">
                     </label>
                 </div>
-                <button onclick="saveProfileBasics()" class="mt-5 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-all">保存基础信息</button>
-            </div>
-
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Unified Profile</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">统一画像摘要</h3>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xs text-slate-500">完成度</p>
-                        <p id="profileReadinessValue" class="text-2xl font-bold text-sky-700">0%</p>
-                    </div>
-                </div>
-                <p id="profileAssessmentDigest" class="text-sm text-slate-500 leading-7"></p>
-                <p id="profileUnifiedSummary" class="mt-3 text-sm text-slate-700 leading-7"></p>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">工作价值观</p>
-                    <div id="profileWorkValueTags" class="career-tag-row mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">Top 岗位方向</p>
-                    <div id="profileTopRoleTags" class="career-tag-row mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">下一步行动</p>
-                    <div id="profileNextStepList" class="career-list mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">待补充信息</p>
-                    <div id="profileMissingList" class="career-list mt-3"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="space-y-6">
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Capability View</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">能力推断与覆盖度</h3>
-                    </div>
+                <div class="unified-profile-basics-actions">
+                    <button onclick="saveProfileBasics()" class="rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-all">保存基础信息</button>
                     <button onclick="recalculateProfile()" class="rounded-xl border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">重新同步画像</button>
                 </div>
-                <div class="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                    <div class="h-80 rounded-2xl bg-slate-50 p-4">
-                        <canvas id="profileRadarChart"></canvas>
-                    </div>
-                    <div id="profileCapabilityList" class="grid gap-3"></div>
-                </div>
-            </div>
-
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Capability Link</p>
-                    <h3 class="text-xl font-semibold text-slate-900 mt-1">优势与不足联动分析</h3>
-                    <p class="text-sm text-slate-500 mt-1">展示“已有能力”与“配套能力缺口”的关联，避免单点能力导致岗位推进卡住。</p>
-                </div>
-                <div id="profileCapabilityCorrelation" class="grid gap-3"></div>
-            </div>
-
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Agent Core</p>
-                    <h3 class="text-xl font-semibold text-slate-900 mt-1">记忆 / 规划 / 工具 / 反思状态</h3>
-                    <p class="text-sm text-slate-500 mt-1">未实现模块统一标记为 `待接入 / 即将上线`，保留规范接口字段。</p>
-                </div>
-                <div id="agentModuleGrid" class="grid gap-4 md:grid-cols-2"></div>
-            </div>
+            </aside>
         </div>
+
+        <div class="unified-profile-body">
+            <section class="unified-profile-panel">
+                <div class="unified-profile-panel-head">
+                    <div>
+                        <p class="unified-profile-kicker">Feature Axes</p>
+                        <h3 class="unified-profile-section-title">特征坐标</h3>
+                    </div>
+                </div>
+                <div id="profileFeatureAxisList" class="unified-axis-list"></div>
+            </section>
+
+            <section class="unified-profile-panel">
+                <div class="unified-profile-panel-head">
+                    <div>
+                        <p class="unified-profile-kicker">Work Mode</p>
+                        <h3 class="unified-profile-section-title">工作方式拼图</h3>
+                    </div>
+                </div>
+                <div id="profileWorkstyleCards" class="unified-workstyle-grid"></div>
+            </section>
+        </div>
+
+        <section class="unified-profile-panel">
+            <div class="unified-profile-panel-head">
+                <div>
+                    <p class="unified-profile-kicker">Evidence Graph</p>
+                    <h3 class="unified-profile-section-title">证据热力图</h3>
+                </div>
+            </div>
+            <div id="profileEvidenceMatrix" class="unified-evidence-grid"></div>
+        </section>
+
+        <section class="unified-profile-panel subtle">
+            <div class="unified-profile-panel-head">
+                <div>
+                    <p class="unified-profile-kicker">Uncertainty Zone</p>
+                    <h3 class="unified-profile-section-title">待验证区</h3>
+                </div>
+            </div>
+            <div id="profileUncertaintyList" class="unified-uncertainty-list"></div>
+        </section>
     </div>
     </div>
 
@@ -1777,7 +1967,7 @@
                     <h3 class="mt-1 text-2xl font-semibold text-slate-900">职业访谈工作台</h3>
                     <p class="mt-2 text-sm text-slate-500">访谈结果会自动进入统一画像，并作为匹配与报告的上下文输入。</p>
                 </div>
-                <button onclick="closeCareerInterviewModal()" class="text-3xl leading-none text-slate-400 hover:text-slate-600">&times;</button>
+                <button type="button" onclick="closeCareerInterviewModal()" class="text-3xl leading-none text-slate-400 hover:text-slate-600" aria-label="关闭职业访谈弹窗">&times;</button>
             </div>
 
             <div class="grid gap-6 px-6 py-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -1821,7 +2011,7 @@
                             </div>
                             <span id="careerInterviewConfigStatus" class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">未配置</span>
                         </div>
-                        <p class="text-sm text-slate-500 mb-4">管理员可点击右上角头像在「API 配置」中添加多个 API；当前用户侧按系统默认模型执行。</p>
+                        <p class="text-sm text-slate-500 mb-4">管理员可点击「API 配置」按钮添加多个 API；当前用户侧按系统默认模型执行。</p>
                         <div class="flex flex-wrap gap-2">
                             <button onclick="openSettingsPanel()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
                                 ⚙️ API 配置
@@ -1855,10 +2045,40 @@
         </div>
     </div>
 </section>
+
+<!-- ===== 深度测试通用模态框 ===== -->
+<div id="deepTestModal" class="dt-modal-overlay hidden" onclick="handleDeepTestOverlayClick(event)">
+    <div class="dt-modal-shell">
+        <div class="dt-modal-header">
+            <div class="dt-modal-header-info">
+                <div id="dtModalTitle" class="dt-modal-title">深度测试</div>
+                <div id="dtModalSub"   class="dt-modal-sub">加载中…</div>
+            </div>
+            <button type="button" class="dt-modal-close" onclick="closeDeepTestModal()">✕</button>
+        </div>
+        <div class="dt-modal-progress-wrap">
+            <div class="dt-modal-progress-track">
+                <div id="dtModalProgressBar" class="dt-modal-progress-fill" style="width:0%"></div>
+            </div>
+            <span id="dtModalProgress" class="dt-modal-progress-text">0 / 0</span>
+        </div>
+        <div class="dt-modal-body">
+            <div id="dtModalContent"></div>
+        </div>
+    </div>
+</div>
+
         <section id="matching" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold mb-2">人岗匹配分析中心</h2>
-        <p class="text-gray-500">按技术路线拆成特征 30% / 能力 40% / 专业 15% / 意愿 15%，缺失信息显式标记为待补充或待接入</p>/p>
+    <div class="workspace-section-lead">
+        <div>
+            <p class="workspace-section-kicker">Step 04 / Matching Review</p>
+            <h2 class="workspace-section-title">人岗匹配分析中心</h2>
+            <p class="workspace-section-copy">按特征 30% / 能力 40% / 专业 15% / 意愿 15% 做初筛，让你先锁定一个真正值得推进的目标岗位。</p>
+        </div>
+        <div class="workspace-section-side">
+            <span class="workspace-section-badge">主线判断</span>
+            <p id="matchingSectionHint">不要一次比较太多方向，先围绕一个候选岗位把差距讲清楚。</p>
+        </div>
     </div>
 
     <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-800 p-6 text-white shadow-lg mb-6">
@@ -1867,7 +2087,8 @@
                 <p class="text-xs font-semibold tracking-[0.22em] text-cyan-100 uppercase">Matching Engine</p>
                 <h3 class="mt-2 text-2xl font-bold">统一画像驱动岗位初筛</h3>
                 <p class="mt-3 text-sm leading-7 text-cyan-50/90">
-                    当前版本不接数据库、RAG 或真实招聘 API。岗位画像先使用技术路线中的 10 个标准化岗位，后续继续扩展外部数据源即可</p>                </p>
+                    当前版本不接数据库、RAG 或真实招聘 API。岗位画像先使用技术路线中的 10 个标准化岗位，后续继续扩展外部数据源即可。
+                </p>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="rounded-2xl bg-white/10 p-4">
@@ -1958,67 +2179,112 @@
     </div>
 </section>
         <section id="report" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
-    <div class="mb-6">
-        <div class="flex justify-between items-center flex-wrap gap-4">
+    <div class="career-report-shell">
+        <div class="career-report-page-head">
             <div>
-                <h2 class="text-2xl font-bold mb-2">职业生涯发展报告</h2>
-                <p class="text-gray-500">报告内容由统一画像和匹配结果实时生成，缺失信息会明确标注为待补充或待接入</p>
+                <p class="career-report-kicker">Step 05 / Career Report</p>
+                <h3 class="career-report-page-title">职业规划报告中心</h3>
+                <p class="career-report-page-copy">基于统一画像、O*NET 岗位数据、岗位匹配与职业访谈，生成包含职业路径、差距分析与可执行任务的个人定制报告。</p>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button onclick="editReport()" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">说明</button>
-                <button onclick="saveReport()" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">保存草稿</button>
-                <button onclick="exportReport()" class="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-all">导出报告</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="reportStatus" class="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-cyan-50 p-4 mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div class="flex items-start gap-3">
-            <span class="text-2xl">📘</span>
-            <div>
-                <p id="reportStatusTitle" class="font-semibold text-sky-900">报告为可编辑草稿</p>
-                <p id="reportStatusHint" class="text-sm text-sky-700">完成更多输入后，报告会自动刷新</p>
-            </div>
-        </div>
-        <div class="text-sm text-slate-500">
-            生成时间：<span id="reportGeneratedTime" class="font-medium">2026 年 3 月 21 日 10:00</span>
-        </div>
-    </div>
-
-    <div id="reportContent" class="overflow-hidden rounded-3xl bg-white shadow-sm">
-        <div class="bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-800 px-8 py-7 text-white">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <p class="text-xs font-semibold tracking-[0.22em] text-cyan-100 uppercase">Career Report</p>
-                    <h3 class="mt-2 text-3xl font-bold"><span id="reportHeaderName">当前用户</span> 的职业发展规划报告</h3>
-                    <p class="mt-3 text-sm text-cyan-100">
-                        目标岗位：<span id="reportHeaderRole">待确定岗位方向</span>  · 生成日期：<span id="reportHeaderDate">2026 ?3 ?21 ?/span>
-                    </p>
-                    <p class="mt-1 text-xs text-cyan-100/80">有效期 6 个月 · 动态联动版本</p>
-                </div>
-                <div class="text-right">
-                    <p id="reportHeaderScore" class="text-4xl font-bold">初筛</p>
-                    <p id="reportHeaderConfidence" class="text-sm text-cyan-100">等待画像输入</p>
-                </div>
+            <div class="career-report-page-actions">
+                <button id="careerReportGenerateBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成职业报告</button>
+                <button id="careerReportViewBtn" type="button" class="career-report-secondary-btn hidden" onclick="openReportViewer()">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="margin-right:5px"><path d="M1.5 7.5S3.5 3 7.5 3s6 4.5 6 4.5-2 4.5-6 4.5S1.5 7.5 1.5 7.5Z" stroke="currentColor" stroke-width="1.3"/><circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                    查看完整报告
+                </button>
+                <button id="careerReportSaveBtn" type="button" class="career-report-secondary-btn" onclick="saveReport()">保存版本</button>
+                <button id="careerReportExportHtmlBtn" type="button" class="career-report-secondary-btn" onclick="exportReport('html')">导出 HTML</button>
+                <button id="careerReportExportMdBtn" type="button" class="career-report-secondary-btn" onclick="exportReport('md')">导出 MD</button>
             </div>
         </div>
 
-        <div class="p-8">
-            <div id="reportBody"></div>
-        </div>
+        <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
 
-        <div class="border-t border-slate-200 bg-slate-50 px-8 py-5 text-xs text-slate-500">
-            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <span>生成日期：<span id="reportFooterGeneratedDate">2026 年 3 月 21 日</span></span>
-                <span>建议复查日期：<span id="reportFooterValidDate">2026 年 9 月 21 日</span></span>
-            </div>
+        <div class="career-report-layout">
+            <aside id="careerReportAside" class="career-report-aside"></aside>
+            <div id="careerReportMain" class="career-report-main"></div>
         </div>
     </div>
 </section>
+
+<!-- ════════════════════════════════════════════════════════════
+     Report Viewer — Full-Page Immersive Report Experience
+════════════════════════════════════════════════════════════ -->
+<div id="reportViewerOverlay" class="report-viewer-overlay hidden" role="dialog" aria-modal="true" aria-label="职业规划报告">
+    <div class="report-viewer-shell">
+
+        <!-- Left Sidebar: TOC + Task Tracker -->
+        <aside class="report-viewer-sidebar">
+            <div class="report-viewer-sidebar-inner">
+                <!-- Report meta -->
+                <div class="report-viewer-meta">
+                    <div class="report-viewer-meta-brand">
+                        <span class="report-viewer-meta-icon">📋</span>
+                        <div>
+                            <p class="report-viewer-meta-label">职业规划报告</p>
+                            <strong id="rvMetaTitle" class="report-viewer-meta-title">—</strong>
+                        </div>
+                    </div>
+                    <div class="report-viewer-progress-row">
+                        <div class="report-viewer-progress-track">
+                            <div id="rvProgressFill" class="report-viewer-progress-fill" style="width:0%"></div>
+                        </div>
+                        <span id="rvProgressLabel" class="report-viewer-progress-label">0%</span>
+                    </div>
+                    <div class="report-viewer-stat-row">
+                        <span id="rvStatDone">已完成 0 项</span>
+                        <span id="rvStatTotal">共 0 项任务</span>
+                    </div>
+                </div>
+
+                <!-- Section TOC -->
+                <nav class="report-viewer-toc" id="rvToc" aria-label="报告章节导航"></nav>
+
+                <!-- Short-term Task Tracker -->
+                <div class="report-viewer-tasks-section">
+                    <div class="report-viewer-tasks-head">
+                        <span>短期行动任务</span>
+                        <span class="report-viewer-tasks-note">点击任务打勾</span>
+                    </div>
+                    <div id="rvTaskList" class="report-viewer-task-list"></div>
+                </div>
+
+                <!-- Quick actions -->
+                <div class="report-viewer-sidebar-actions">
+                    <button type="button" class="report-viewer-action-btn" onclick="exportReport('html')">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        导出 HTML
+                    </button>
+                    <button type="button" class="report-viewer-action-btn" onclick="exportReport('md')">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        导出 Markdown
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="report-viewer-main" id="rvMain">
+            <!-- Content rendered by JS -->
+        </div>
+
+        <!-- Close button -->
+        <button class="report-viewer-close-btn" onclick="closeReportViewer()" aria-label="关闭报告">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 2l14 14M16 2L2 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+    </div>
+</div>
                 <section id="qa" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold mb-2">🔍 职业问答知识库</h2>
-                <p class="text-gray-500">不只是问什么答什么——职业认知纠偏 · 岗位对比决策 · 换岗路径说明，三类深度问答</p>
+            <div class="workspace-section-lead">
+                <div>
+                    <p class="workspace-section-kicker">Step 06 / Decision Q&amp;A</p>
+                    <h2 class="workspace-section-title">职业问答知识库</h2>
+                    <p class="workspace-section-copy">这里不是闲聊入口，而是用来做认知纠偏、岗位对比和路径判断的辅助层。</p>
+                </div>
+                <div class="workspace-section-side">
+                    <span class="workspace-section-badge">辅助决策</span>
+                    <p id="qaSectionHint">当你对主线岗位犹豫时，用问答验证疑问，不要替代正式画像和报告。</p>
+                </div>
             </div>
 
             <!-- RAG引擎说明 -->
@@ -2064,7 +2330,7 @@
                     提出你的职业问题
                 </h3>
                 <div class="flex space-x-3 mb-3">
-                    <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-medium hover:bg-red-200 transition-all" onclick="fillQAQuestion('数据分析师是不是只会SQL就行？)">认知纠偏</button>
+                    <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-medium hover:bg-red-200 transition-all" onclick="fillQAQuestion('数据分析师是不是只会SQL就行？')">认知纠偏</button>
                     <button class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition-all" onclick="fillQAQuestion('算法工程师和AI产品经理的区别是什么？')">比较决策</button>
                     <button class="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-all" onclick="fillQAQuestion('我现在学前端，想转产品经理，现实吗？')">路径说明</button>
                 </div>
@@ -2368,6 +2634,8 @@
                     <p class="assessment-mini-label">当前状态</p>
                     <div id="assessmentModalStateText" class="assessment-side-state">等待选择测评</div>
                     <div id="assessmentModalProgressText" class="assessment-side-progress">0 / 0</div>
+                    <!-- 卡通助手 -->
+                    <div id="assessmentPetSlot" class="assessment-pet-slot"></div>
                 </div>
 
                 <div class="assessment-side-card">
@@ -2385,51 +2653,250 @@
     </div>
 </div>
 
-    <footer class="bg-gray-800 text-white py-8">
-        <div class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <div>
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                            <span class="text-purple-600 font-bold text-xl">MS</span>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">明杉科技</h3>
-                            <p class="text-xs text-gray-400">AI 大学生职业规划智能体</p>
-                            <p class="footer-team">队伍：今天也要Debug</p>
+    <div id="userProfileOverlay" class="up-overlay hidden" onclick="handleOverlayBackdropClick(event)">
+    <div class="up-panel" id="upPanel" onclick="event.stopPropagation()">
+        <div class="up-shell">
+            <aside class="up-report-pane">
+                <div class="up-report-hero">
+                    <p class="up-report-kicker">Career Snapshot</p>
+                    <h3 class="up-report-title" id="upReportTitle">职业报告待生成</h3>
+                    <p class="up-report-summary" id="upReportSummary">完成画像与目标岗位选择后，这里会显示你的最新职业判断、下一步和成长信号。</p>
+                </div>
+
+                <div class="up-report-grid">
+                    <article>
+                        <span>当前主线</span>
+                        <strong id="upReportFocusRole">待识别</strong>
+                    </article>
+                    <article>
+                        <span>下一重点</span>
+                        <strong id="upReportNextFocus">先补基础输入</strong>
+                    </article>
+                    <article>
+                        <span>报告进度</span>
+                        <strong id="upReportCompletion">0%</strong>
+                    </article>
+                    <article>
+                        <span>最近同步</span>
+                        <strong id="upReportLastSync">--</strong>
+                    </article>
+                </div>
+
+                <div class="up-report-block">
+                    <div class="up-report-block-head">
+                        <h4>关键信号</h4>
+                        <button type="button" onclick="openUserCenterPage('report-workspace')">查看完整报告</button>
+                    </div>
+                    <div id="upReportSignals" class="up-report-chip-row">
+                        <span class="up-report-chip">等待生成报告</span>
+                    </div>
+                </div>
+
+                <div class="up-report-block">
+                    <div class="up-report-block-head">
+                        <h4>当前最值得先做的事</h4>
+                        <button type="button" onclick="handleDashboardPrimaryAction(); closeUserProfile();">直接去做</button>
+                    </div>
+                    <div id="upReportTasks" class="up-report-list">
+                        <div class="up-report-list-item">
+                            <strong>补充画像输入</strong>
+                            <p>系统会把待完成项整理到这里，帮助你快速进入下一步。</p>
                         </div>
                     </div>
-                    <p class="text-sm text-gray-400">应用创新科技推进现代教育，数据融合推动未来发展</p>
                 </div>
+            </aside>
+
+            <div class="up-side-pane">
+                <div class="up-header">
+                    <div class="up-user-info">
+                        <div class="up-avatar-circle" id="upAvatarCircle">用</div>
+                        <div>
+                            <h2 class="up-name" id="upName">用户名</h2>
+                            <p class="up-role-tag" id="upRoleTag">普通用户</p>
+                        </div>
+                    </div>
+                    <button class="up-close-btn" type="button" onclick="closeUserProfile()">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+
+                <section class="up-account-strip">
+                    <article class="up-account-card">
+                        <span>当前主线岗位</span>
+                        <strong id="upAccountFocusRole">待识别</strong>
+                        <p id="upAccountSummary">职业报告会围绕你当前最值得推进的岗位方向持续更新。</p>
+                    </article>
+                    <article class="up-account-card muted">
+                        <span>当前推进建议</span>
+                        <strong id="upAccountNextAction">先补齐画像输入</strong>
+                        <p id="upAccountPermissionHint">system 用户可配置系统 API，普通用户仅查看自己的职业档案。</p>
+                    </article>
+                </section>
+
+                <div class="up-progress-section">
+                    <div class="up-prog-label-row">
+                        <span class="up-prog-label-left">生涯进度</span>
+                        <span class="up-prog-label-right" id="upProgressText">正在计算...</span>
+                    </div>
+                    <div class="up-prog-track">
+                        <div class="up-prog-fill" id="upProgressFill" style="width: 30%"></div>
+                        <div class="up-prog-dot" style="left:33%" title="开始实习"></div>
+                        <div class="up-prog-dot" style="left:66%" title="校招窗口"></div>
+                    </div>
+                    <div class="up-prog-stages">
+                        <span>在校学习</span>
+                        <span>实习积累</span>
+                        <span>校招冲刺</span>
+                        <span>首份入职</span>
+                    </div>
+                </div>
+
+                <div class="up-stats-row">
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatReports">0</span>
+                        <span class="up-stat-key">规划报告</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatDone">0</span>
+                        <span class="up-stat-key">已完成项</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatScore">—</span>
+                        <span class="up-stat-key">画像完成度</span>
+                    </div>
+                    <div class="up-stat-cell">
+                        <span class="up-stat-num" id="upStatPending">—</span>
+                        <span class="up-stat-key">待完成任务</span>
+                    </div>
+                </div>
+
+                <div class="up-plans-section">
+                    <div id="upPlanListView">
+                        <div class="up-section-hd">
+                            <h3 class="up-section-title">我的规划</h3>
+                            <button class="up-new-btn" type="button" onclick="createNewPlan()">
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                新建规划
+                            </button>
+                        </div>
+                        <div id="upPlanList" class="up-plan-list"></div>
+                    </div>
+
+                    <div id="upPlanDetailView" class="hidden">
+                        <div class="up-detail-hd">
+                            <button class="up-back-btn" type="button" onclick="showPlanList()">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <h4 class="up-detail-title" id="upDetailTitle">规划详情</h4>
+                            <span class="up-detail-pct" id="upDetailPct">0%</span>
+                        </div>
+
+                        <div class="up-detail-prog-row">
+                            <div class="up-detail-prog-track">
+                                <div class="up-detail-prog-fill" id="upDetailProgFill" style="width:0%"></div>
+                            </div>
+                            <span class="up-detail-prog-txt" id="upDetailProgTxt">0 / 0 已完成</span>
+                        </div>
+
+                        <div id="upDetailItems" class="up-items-list"></div>
+
+                        <div class="up-add-row">
+                            <input id="upNewItemInput" class="up-add-input" type="text" placeholder="添加新目标或任务..." onkeydown="if(event.key==='Enter') addPlanItem()">
+                            <button class="up-add-btn" type="button" onclick="addPlanItem()">添加</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="upAdminBar" class="up-admin-bar">
+                    <button type="button" class="up-admin-link" onclick="handleUserPermissionCardClick()">
+                        <div class="up-admin-link-copy">
+                            <strong>系统 API 配置</strong>
+                            <span>system 用户可以管理模型与 Provider，普通用户此入口不可用。</span>
+                        </div>
+                        <span>查看权限</span>
+                    </button>
+                </div>
+
+                <div class="up-footer-bar">
+                    <button class="up-logout-btn" type="button" onclick="closeUserProfile(); logout();">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="workspaceGuideOverlay" class="workspace-guide-overlay hidden" onclick="handleWorkspaceGuideBackdropClick(event)">
+    <div id="workspaceGuideFullFrost" class="workspace-guide-full-frost hidden" aria-hidden="true"></div>
+    <div id="workspaceGuideFrostFrame" class="workspace-guide-frost-frame hidden" aria-hidden="true">
+        <div class="workspace-guide-frost-bar workspace-guide-frost-top"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-left"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-right"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-bottom"></div>
+    </div>
+    <div class="workspace-guide-highlight" id="workspaceGuideHighlight"></div>
+    <div class="workspace-guide-card" id="workspaceGuideCard" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="workspaceGuideTitle">
+        <div class="workspace-guide-top">
+            <span id="workspaceGuideStepLabel">01 / 06</span>
+            <button type="button" onclick="closeWorkspaceGuide(true)">跳过</button>
+        </div>
+        <p class="workspace-guide-kicker" id="workspaceGuideKicker">首次进入引导</p>
+        <h3 id="workspaceGuideTitle">先看你的当前阶段</h3>
+        <div class="workspace-guide-copy" id="workspaceGuideCopy">这里会结合画像完成度、目标岗位和职业报告，告诉你现在最值得先做什么。</div>
+        <p class="workspace-guide-meta" id="workspaceGuideMeta">系统会根据真实数据动态调整这段说明。</p>
+        <div class="workspace-guide-actions">
+            <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrimaryBtn" onclick="handleWorkspaceGuidePrimary()">去这里看看</button>
+            <div class="workspace-guide-actions-end">
+                <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrevBtn" onclick="prevWorkspaceGuideStep()">上一步</button>
+                <button type="button" class="workspace-guide-btn" id="workspaceGuideNextBtn" onclick="nextWorkspaceGuideStep()">下一步</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <footer class="site-footer">
+        <div class="site-footer-shell">
+            <div class="site-footer-head">
+                <div class="site-footer-brand">
+                    <div class="site-footer-mark">DP</div>
+                    <div>
+                        <h3>职业规划智能体</h3>
+                        <p>把岗位、能力与规划结果放进同一个决策界面。</p>
+                    </div>
+                </div>
+                <p class="site-footer-summary">适合在校生和初入职场用户进行岗位探索、画像整理和行动规划。</p>
+            </div>
+
+            <div class="site-footer-grid">
                 <div>
-                    <h4 class="font-semibold mb-3">产品服务</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="#" onclick="showSection('jobs')" class="hover:text-white transition-all">岗位探索</a></li>
-                        <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
-                        <li><a href="#" onclick="showSection('matching')" class="hover:text-white transition-all">人岗匹配</a></li>
-                        <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
+                    <h4>产品模块</h4>
+                    <ul>
+                        <li><a href="#" onclick="showSection('dashboard')">工作台</a></li>
+                        <li><a href="#" onclick="showSection('jobs')">岗位探索</a></li>
+                        <li><a href="#" onclick="showSection('profile')">画像输入</a></li>
+                        <li><a href="#" onclick="showSection('matching')">人岗匹配</a></li>
+                        <li><a href="#" onclick="showSection('report')">规划报告</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-semibold mb-3">支持资源</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="#" class="hover:text-white transition-all">使用指南</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">常见问题</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">联系客服</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">反馈建议</a></li>
+                    <h4>支持资源</h4>
+                    <ul>
+                        <li><a href="#">使用指南</a></li>
+                        <li><a href="#">常见问题</a></li>
+                        <li><a href="#">反馈建议</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-semibold mb-3">联系我们</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li>📧 support@mingshan.com</li>
-                        <li>📞 400-XXX-XXXX</li>
-                        <li>🏢 深圳市南山区科技园</li>
+                    <h4>联系信息</h4>
+                    <ul>
+                        <li>邮箱 support@mingshan.com</li>
+                        <li>热线 400-XXX-XXXX</li>
+                        <li>地址 深圳市南山区科技园</li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-                <p>© <span id="footerYear">2025</span> 明杉科技 版权所有 | 中国大学生服务外包创新创业大赛参赛作品</p>
+
+            <div class="site-footer-bottom">
+                <p>© <span id="footerYear">2025</span> 明杉科技 版权所有</p>
+                <p>中国大学生服务外包创新创业大赛参赛作品</p>
             </div>
         </div>
     </footer>
@@ -2443,7 +2910,7 @@
                         <h3 class="text-2xl font-bold" id="modalJobTitle">机器学习工程师</h3>
                         <p class="text-purple-200" id="modalJobCompany">明杉科技 · 北京</p>
                     </div>
-                    <button onclick="closeModal('jobDetailModal')" class="text-white hover:text-purple-200 text-2xl">&times;</button>
+                    <button type="button" onclick="closeModal('jobDetailModal')" class="text-white hover:text-purple-200 text-2xl" aria-label="关闭岗位详情">&times;</button>
                 </div>
             </div>
             <div class="p-6">
@@ -2556,12 +3023,23 @@
                     <span class="text-base">⚙️</span>
                     <h3 class="font-bold text-sm">API 配置</h3>
                 </div>
-                <button onclick="closeSettingsPanel()" class="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+                <button type="button" onclick="closeSettingsPanel()" class="text-white/60 hover:text-white text-xl leading-none" aria-label="关闭设置面板">&times;</button>
             </div>
             <p id="settingsPanelUserLabel" class="text-xs text-purple-200 mt-1">未登录</p>
         </div>
 
-        <div class="p-4 space-y-3 max-h-[85vh] overflow-y-auto">
+        <div class="p-4 space-y-4 max-h-[85vh] overflow-y-auto">
+            <section id="settingsCareerArchiveSection" class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-widest">职业档案</span>
+                    <button type="button" onclick="openUserCenterPage('report-workspace'); closeSettingsPanel();" class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
+                        打开报告页
+                    </button>
+                </div>
+                <div id="settingsCareerArchiveContent" class="space-y-3">
+                    <p class="text-xs text-gray-400 text-center py-3">正在加载职业档案…</p>
+                </div>
+            </section>
 
             <!-- 已配置的 Provider 列表 -->
             <div>
@@ -2659,8 +3137,12 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="/static/app.js?v=20260329-resume-report-layout-v9"></script>
+    <script src="/static/app.js?v=20260401-app-restore-v1"></script>
+    <script src="/static/app-hotfix.js?v=20260401-guide-clickfix-v1"></script>
+    <script src="/static/workspace-shell.js?v=20260331-workspace-rebuild-v1"></script>
     <script src="/static/assessment-hub.js?v=20260322-top-model-status-v1"></script>
+    <script src="/static/deep-test-hub.js?v=20260401-deep-test-v5"></script>
+    <script src="/static/assessment-pet.js?v=20260330-pet-v1"></script>
     <script src="/static/jobs-analytics.js?v=20260321-analytics-v1"></script>
 </body>
 </html>

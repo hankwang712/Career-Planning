@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>职业规划智能体｜今天也要Debug</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7/dist/fuse.min.js"></script>
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/500.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/600.css" rel="stylesheet">
-    <link href="https://cdn.fontsource.org/fonts/noto-sans-sc/700.css" rel="stylesheet">
+    <style>
+      :root {
+        --app-font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      html,
+      body,
+      button,
+      input,
+      textarea,
+      select {
+        font-family: var(--app-font-stack);
+      }
+    </style>
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260329-resume-report-layout-v9">
 </head>
 <body class="bg-gray-50 scroll-smooth auth-locked">
@@ -33,14 +41,14 @@
 
             <div class="auth-tabs">
                 <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
-                <button id="registerTabBtn" class="auth-tab hidden" type="button" onclick="switchAuthTab('register')">注册</button>
+                <button id="registerTabBtn" class="auth-tab" type="button" onclick="switchAuthTab('register')">注册</button>
             </div>
 
             <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
                 <label class="auth-label" for="loginUsername">用户名</label>
-                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名">
+                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名" value="system">
                 <label class="auth-label" for="loginPassword">密码</label>
-                <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码">
+                <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码" value="123456">
                 <button class="auth-submit" type="submit">进入系统</button>
                 <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填充超级用户</button>
             </form>
@@ -56,7 +64,7 @@
                 <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
             </form>
 
-            <p id="authMessage" class="auth-message">预置账号：system、23030134、24110403、24030115、24151007，密码均为 123456。</p>
+            <p id="authMessage" class="auth-message">已自动填充预置账号：system，密码：123456。也可以切换为其他预置账号登录。</p>
         </div>
     </div>
     
@@ -110,9 +118,12 @@
                     <button id="logoutBtn" onclick="logout()" class="hidden bg-white/20 hover:bg-white/30 px-2.5 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap">
                         退出
                     </button>
-                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="toggleSettingsPanel(event)" title="模型设置">
+                    <button type="button" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="window.location.href='/user-center.html#report-workspace'" title="个人中心" aria-label="打开个人中心">
                         <span id="currentUserAvatar" class="text-sm">👤</span>
-                    </div>
+                    </button>
+                    <button type="button" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="toggleSettingsPanel(event)" title="模型设置" aria-label="打开模型设置">
+                        <span class="text-sm">⚙</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -408,8 +419,13 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260329-resume-report-layout-v9"></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260402-restore-main-v1"></script>
     <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260322-top-model-status-v1"></script>
+    <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260402-assessment-pet-restore-v1"></script>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260401-deep-test-v5"></script>
     <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260321-analytics-v1"></script>
 </body>
 </html>

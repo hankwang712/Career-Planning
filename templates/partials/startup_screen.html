@@ -1,0 +1,40 @@
+<div id="startupScreen" class="startup-screen{% if initial_user %} hidden{% endif %}">
+    <div class="startup-card">
+        <div class="startup-brand">
+            <div class="startup-logo">DP</div>
+            <div>
+                <p class="startup-brand-name">职业规划智能体</p>
+                <p class="startup-brand-sub">开发版产品 · 今天也要 Debug</p>
+            </div>
+        </div>
+        <h2 class="startup-title">欢迎进入职业规划智能体</h2>
+        <p class="startup-subtitle">请使用预置账号登录。每个账号只会看到自己的访谈与测评内容。</p>
+
+        <div class="auth-tabs">
+            <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
+            <button id="registerTabBtn" class="auth-tab hidden" type="button" onclick="switchAuthTab('register')">注册</button>
+        </div>
+
+        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+            <label class="auth-label" for="loginUsername">用户名</label>
+            <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名">
+            <label class="auth-label" for="loginPassword">密码</label>
+            <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码">
+            <button class="auth-submit" type="submit">进入系统</button>
+            <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填入超级用户</button>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+            <label class="auth-label" for="registerUsername">注册用户名</label>
+            <input id="registerUsername" class="auth-input" type="text" autocomplete="username" placeholder="例如：student01">
+            <label class="auth-label" for="registerPassword">登录密码</label>
+            <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
+            <label class="auth-label" for="registerConfirmPassword">确认密码</label>
+            <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="请再次输入密码">
+            <button class="auth-submit" type="submit">创建普通用户</button>
+            <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
+        </form>
+
+        <p id="authMessage" class="auth-message">预置账号：system、23030134、24110403、24030115、24151007，密码均为 123456。</p>
+    </div>
+</div>

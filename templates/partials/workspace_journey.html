@@ -1,0 +1,80 @@
+<section class="workspace-journey hidden" id="workspaceJourneyBand" aria-label="职业决策流程">
+    <div class="workspace-journey-shell">
+        <div class="workspace-journey-copy">
+            <p class="workspace-journey-kicker">Career Decision Flow</p>
+            <h2>把岗位判断、画像补充和报告行动汇成一条主线</h2>
+            <p id="workspaceJourneyNarrative">先看岗位方向，再补当前最缺的画像信息，最后用报告收束行动。</p>
+        </div>
+
+        <div class="workspace-journey-track workspace-journey-track-rows" id="workspaceJourneyTrack">
+            <div class="workspace-journey-row">
+                <button type="button" class="workspace-journey-step is-active" data-journey-section="dashboard" data-show-section="dashboard">
+                    <span class="workspace-journey-step-index">01</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>总览工作台</strong>
+                        <span>主线、缺口与系统建议的下一步</span>
+                    </span>
+                    <span class="workspace-journey-step-status">当前</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="jobs" data-show-section="jobs">
+                    <span class="workspace-journey-step-index">02</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>岗位探索</strong>
+                        <span>用 JD 与城市机会校准方向</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="profile" data-show-section="profile">
+                    <span class="workspace-journey-step-index">03</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>画像输入</strong>
+                        <span>测评 · 简历 · 访谈，只补关键项</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+            </div>
+            <div class="workspace-journey-row">
+                <button type="button" class="workspace-journey-step" data-journey-section="matching" data-show-section="matching">
+                    <span class="workspace-journey-step-index">04</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>匹配分析</strong>
+                        <span>锁定主线岗位与能力差距</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="report" onclick="openUserCenterPage('report-workspace')">
+                    <span class="workspace-journey-step-index">05</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>职业报告</strong>
+                        <span>结案、版本历史与行动清单</span>
+                    </span>
+                    <span class="workspace-journey-step-status">待开始</span>
+                </button>
+
+                <button type="button" class="workspace-journey-step" data-journey-section="qa" data-show-section="qa">
+                    <span class="workspace-journey-step-index">06</span>
+                    <span class="workspace-journey-step-body">
+                        <strong>决策问答</strong>
+                        <span>快速比对选项，辅助纠偏</span>
+                    </span>
+                    <span class="workspace-journey-step-status">辅助</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="workspace-journey-meta">
+            <article>
+                <span>当前阶段</span>
+                <strong id="workspaceJourneyCurrentStage">总览工作台</strong>
+            </article>
+            <article>
+                <span>推荐动作</span>
+                <strong id="workspaceJourneyCurrentAction">继续完善画像</strong>
+            </article>
+        </div>
+    </div>
+</section>
+

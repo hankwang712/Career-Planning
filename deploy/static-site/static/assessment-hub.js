@@ -96,8 +96,8 @@
   }
 
   async function saveAssessmentConfig() {
-    // 配置入口已移至头像设置面板，此函数仅作兼容保留
-    notify("提示", "请点击右上角头像图标打开模型设置。", "info", 2000);
+    // 配置入口已迁移至系统 API 配置面板，此函数仅作兼容保留
+    notify("提示", "请点击“API 配置”打开模型设置面板。", "info", 2000);
   }
 
   function getProgressStorageKey() {

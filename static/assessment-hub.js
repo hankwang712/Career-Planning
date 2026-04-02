@@ -15,6 +15,34 @@
   ];
   const MBTI_PAIRS = [["E", "I"], ["S", "N"], ["T", "F"], ["J", "P"]];
   const HOLLAND_ORDER = ["R", "I", "A", "S", "E", "C"];
+  const ASSESSMENT_HISTORY_META = {
+    mbti: {
+      title: "MBTI 最近两次结果对比",
+      subtitle: "仅展示相邻两次完成测评后的数值变化，不记录文字结论。",
+      dimensions: [
+        { key: "E", label: "E 外向" },
+        { key: "I", label: "I 内向" },
+        { key: "S", label: "S 感觉" },
+        { key: "N", label: "N 直觉" },
+        { key: "T", label: "T 思考" },
+        { key: "F", label: "F 情感" },
+        { key: "J", label: "J 判断" },
+        { key: "P", label: "P 感知" }
+      ]
+    },
+    holland: {
+      title: "霍兰德最近两次结果对比",
+      subtitle: "仅展示相邻两次完成测评后的数值变化，不记录文字结论。",
+      dimensions: [
+        { key: "R", label: "R 实作" },
+        { key: "I", label: "I 研究" },
+        { key: "A", label: "A 艺术" },
+        { key: "S", label: "S 社会" },
+        { key: "E", label: "E 企业" },
+        { key: "C", label: "C 常规" }
+      ]
+    }
+  };
 
   let hollandChart = null;
   let persistTimer = null;
@@ -26,6 +54,7 @@
     data: null,
     dataPromise: null,
     modalOpen: false,
+    compareModal: { open: false, test: null },
     activeTest: null,
     configOpen: false,
     hydrated: false,
@@ -41,12 +70,18 @@
       currentIndex: 0,
       answers: {},
       result: null,
-      clarifier: { loading: false, summary: "", questions: [], currentIndex: 0, answers: {}, applied: false, requestedSignature: "" }
+      clarifier: { loading: false, summary: "", questions: [], currentIndex: 0, answers: {}, applied: false, requestedSignature: "" },
+      historyRuns: [],
+      runSessionId: 1,
+      archivedSessionId: 0
     },
     holland: {
       currentIndex: 0,
       answers: {},
-      result: null
+      result: null,
+      historyRuns: [],
+      runSessionId: 1,
+      archivedSessionId: 0
     }
   };
 
@@ -96,8 +131,8 @@
   }
 
   async function saveAssessmentConfig() {
-    // 配置入口已移至头像设置面板，此函数仅作兼容保留
-    notify("提示", "请点击右上角头像图标打开模型设置。", "info", 2000);
+    // 配置入口已迁移至系统 API 配置面板，此函数仅作兼容保留
+    notify("提示", "请点击“API 配置”打开模型设置面板。", "info", 2000);
   }
 
   function getProgressStorageKey() {
@@ -113,12 +148,53 @@
     return `${LOCAL_PROGRESS_PREFIX}${userKey}`;
   }
 
+  function getAssessmentHistoryMeta(test) {
+    return ASSESSMENT_HISTORY_META[test] || ASSESSMENT_HISTORY_META.mbti;
+  }
+
+  function getAssessmentHistoryDimensionKeys(test) {
+    return getAssessmentHistoryMeta(test).dimensions.map((item) => item.key);
+  }
+
+  function normalizeAssessmentHistoryScores(test, scores) {
+    const next = {};
+    getAssessmentHistoryDimensionKeys(test).forEach((key) => {
+      next[key] = Number(scores?.[key] || 0);
+    });
+    return next;
+  }
+
+  function buildAssessmentHistorySignature(test, scores) {
+    return getAssessmentHistoryDimensionKeys(test).map((key) => `${key}:${Number(scores?.[key] || 0)}`).join("|");
+  }
+
+  function normalizeAssessmentHistoryRuns(test, runs) {
+    if (!Array.isArray(runs)) return [];
+    const normalized = runs
+      .map((item) => {
+        const scores = normalizeAssessmentHistoryScores(test, item?.scores || {});
+        return {
+          recordedAt: Number(item?.recordedAt || item?.savedAt || 0),
+          signature: String(item?.signature || buildAssessmentHistorySignature(test, scores)),
+          scores,
+          displayType: test === "mbti" ? String(item?.displayType || item?.finalType || "").trim().toUpperCase() : "",
+          code: test === "holland" ? String(item?.code || "").trim().toUpperCase() : ""
+        };
+      })
+      .filter((item) => item.recordedAt > 0 && item.signature);
+    normalized.sort((a, b) => a.recordedAt - b.recordedAt);
+    return normalized.slice(-2);
+  }
+
   function buildPersistPayload() {
     return {
       savedAt: Date.now(),
       mbti: {
         currentIndex: state.mbti.currentIndex,
         answers: state.mbti.answers,
+        historyRuns: normalizeAssessmentHistoryRuns("mbti", state.mbti.historyRuns),
+        runSessionId: Math.max(1, Number(state.mbti.runSessionId || 1)),
+        archivedSessionId: Math.max(0, Number(state.mbti.archivedSessionId || 0)),
         clarifier: {
           loading: false,
           summary: String(state.mbti.clarifier?.summary || ""),
@@ -131,7 +207,10 @@
       },
       holland: {
         currentIndex: state.holland.currentIndex,
-        answers: state.holland.answers
+        answers: state.holland.answers,
+        historyRuns: normalizeAssessmentHistoryRuns("holland", state.holland.historyRuns),
+        runSessionId: Math.max(1, Number(state.holland.runSessionId || 1)),
+        archivedSessionId: Math.max(0, Number(state.holland.archivedSessionId || 0))
       },
       knowledge_version: state.data?.knowledge_version || ""
     };
@@ -161,8 +240,10 @@
     if (!s || typeof s !== "object") return -1;
     const m = Object.keys(s.mbti?.answers || {}).length;
     const h = Object.keys(s.holland?.answers || {}).length;
+    const mh = normalizeAssessmentHistoryRuns("mbti", s.mbti?.historyRuns).length;
+    const hh = normalizeAssessmentHistoryRuns("holland", s.holland?.historyRuns).length;
     const t = Number(s.savedAt || 0);
-    return m * 500 + h * 2 + Math.min(t / 1e12, 1);
+    return m * 500 + h * 2 + (mh + hh) * 25 + Math.min(t / 1e12, 1);
   }
 
   function mergeRemoteAndLocalProgress(serverSnap, localSnap) {
@@ -189,11 +270,17 @@
     if (snapshot.mbti) {
       state.mbti.currentIndex = Number(snapshot.mbti.currentIndex || 0);
       state.mbti.answers = snapshot.mbti.answers || {};
+      state.mbti.historyRuns = normalizeAssessmentHistoryRuns("mbti", snapshot.mbti.historyRuns);
+      state.mbti.runSessionId = Math.max(1, Number(snapshot.mbti.runSessionId || state.mbti.runSessionId || 1));
+      state.mbti.archivedSessionId = Math.max(0, Number(snapshot.mbti.archivedSessionId || 0));
       state.mbti.clarifier = { ...state.mbti.clarifier, ...(snapshot.mbti.clarifier || {}) };
     }
     if (snapshot.holland) {
       state.holland.currentIndex = Number(snapshot.holland.currentIndex || 0);
       state.holland.answers = snapshot.holland.answers || {};
+      state.holland.historyRuns = normalizeAssessmentHistoryRuns("holland", snapshot.holland.historyRuns);
+      state.holland.runSessionId = Math.max(1, Number(snapshot.holland.runSessionId || state.holland.runSessionId || 1));
+      state.holland.archivedSessionId = Math.max(0, Number(snapshot.holland.archivedSessionId || 0));
     }
   }
 
@@ -468,9 +555,71 @@
     };
   }
 
+  function buildMbtiHistoryRun(result = state.mbti.result) {
+    if (!result?.completed) return null;
+    const scores = normalizeAssessmentHistoryScores("mbti", result.scores);
+    return {
+      recordedAt: Date.now(),
+      signature: buildAssessmentHistorySignature("mbti", scores),
+      scores,
+      displayType: String(getMbtiDisplayType(result) || "").trim().toUpperCase()
+    };
+  }
+
+  function buildHollandHistoryRun(result = state.holland.result) {
+    if (!result?.completed) return null;
+    const scores = normalizeAssessmentHistoryScores("holland", result.scores);
+    return {
+      recordedAt: Date.now(),
+      signature: buildAssessmentHistorySignature("holland", scores),
+      scores,
+      code: String(result.code || "").trim().toUpperCase()
+    };
+  }
+
+  function syncMbtiHistoryRuns() {
+    state.mbti.historyRuns = normalizeAssessmentHistoryRuns("mbti", state.mbti.historyRuns);
+    const result = state.mbti.result;
+    if (!result?.completed) return;
+    const sessionId = Math.max(1, Number(state.mbti.runSessionId || 1));
+    if (Number(state.mbti.archivedSessionId || 0) === sessionId) return;
+    const nextRun = buildMbtiHistoryRun(result);
+    if (!nextRun) return;
+    const lastRun = state.mbti.historyRuns[state.mbti.historyRuns.length - 1] || null;
+    if (!state.mbti.archivedSessionId && lastRun && lastRun.signature === nextRun.signature) {
+      state.mbti.archivedSessionId = sessionId;
+      return;
+    }
+    state.mbti.historyRuns = [...state.mbti.historyRuns, nextRun].slice(-2);
+    state.mbti.archivedSessionId = sessionId;
+  }
+
+  function syncHollandHistoryRuns() {
+    state.holland.historyRuns = normalizeAssessmentHistoryRuns("holland", state.holland.historyRuns);
+    const result = state.holland.result;
+    if (!result?.completed) return;
+    const sessionId = Math.max(1, Number(state.holland.runSessionId || 1));
+    if (Number(state.holland.archivedSessionId || 0) === sessionId) return;
+    const nextRun = buildHollandHistoryRun(result);
+    if (!nextRun) return;
+    const lastRun = state.holland.historyRuns[state.holland.historyRuns.length - 1] || null;
+    if (!state.holland.archivedSessionId && lastRun && lastRun.signature === nextRun.signature) {
+      state.holland.archivedSessionId = sessionId;
+      return;
+    }
+    state.holland.historyRuns = [...state.holland.historyRuns, nextRun].slice(-2);
+    state.holland.archivedSessionId = sessionId;
+  }
+
+  function syncAssessmentHistoryRuns() {
+    syncMbtiHistoryRuns();
+    syncHollandHistoryRuns();
+  }
+
   function recomputeAll() {
     state.mbti.result = computeMbti();
     state.holland.result = computeHolland();
+    syncAssessmentHistoryRuns();
     persistState();
   }
 
@@ -564,6 +713,7 @@
         summary: getMbtiSummaryText(mbti),
         confidence: mbti.confidence,
         scores: { ...mbti.scores },
+        history_runs: normalizeAssessmentHistoryRuns("mbti", state.mbti.historyRuns),
         close_pairs: (mbti.closePairs || []).map((item) => ({
           pair: item.pair,
           diff: item.diff,
@@ -580,6 +730,7 @@
         code: holland.code,
         summary: holland.summary,
         scores: { ...holland.scores },
+        history_runs: normalizeAssessmentHistoryRuns("holland", state.holland.historyRuns),
         top_codes: (holland.top3 || []).map((item) => item.code),
         primary: holland.primary ? {
           code: holland.primary.code,
@@ -701,6 +852,117 @@
     card.classList.remove("hidden");
   }
 
+  function getAssessmentHistoryPair(test) {
+    const runs = normalizeAssessmentHistoryRuns(test, test === "mbti" ? state.mbti.historyRuns : state.holland.historyRuns);
+    if (runs.length < 2) return null;
+    return {
+      previous: runs[runs.length - 2],
+      current: runs[runs.length - 1]
+    };
+  }
+
+  function formatAssessmentHistoryTime(value) {
+    const ts = Number(value || 0);
+    if (!ts) return "--";
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return "--";
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  }
+
+  function formatAssessmentDelta(value) {
+    const number = Number(value || 0);
+    if (number > 0) return `+${number}`;
+    return String(number);
+  }
+
+  function buildAssessmentCompareRows(test, previous, current) {
+    const meta = getAssessmentHistoryMeta(test);
+    const header = `
+      <div class="assessment-history-row header">
+        <span>维度</span>
+        <span>上一次</span>
+        <span>差值</span>
+        <span>这一次</span>
+      </div>
+    `;
+    const rows = meta.dimensions.map((item) => {
+      const prevValue = Number(previous?.scores?.[item.key] || 0);
+      const currentValue = Number(current?.scores?.[item.key] || 0);
+      const delta = currentValue - prevValue;
+      const deltaClass = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+      return `
+        <div class="assessment-history-row">
+          <span class="assessment-history-axis">${esc(item.label)}</span>
+          <span class="assessment-history-value">${prevValue}</span>
+          <span class="assessment-history-delta ${deltaClass}">${esc(formatAssessmentDelta(delta))}</span>
+          <span class="assessment-history-value current">${currentValue}</span>
+        </div>
+      `;
+    }).join("");
+    return header + rows;
+  }
+
+  function updateAssessmentCompareButtons() {
+    const mbtiBtn = document.getElementById("mbtiCompareTrigger");
+    const hollandBtn = document.getElementById("hollandCompareTrigger");
+    const hasMbtiCompare = Boolean(state.mbti.result?.completed && getAssessmentHistoryPair("mbti"));
+    const hasHollandCompare = Boolean(state.holland.result?.completed && getAssessmentHistoryPair("holland"));
+    if (mbtiBtn) mbtiBtn.classList.toggle("hidden", !hasMbtiCompare);
+    if (hollandBtn) hollandBtn.classList.toggle("hidden", !hasHollandCompare);
+  }
+
+  function renderAssessmentHistoryCompareModal() {
+    const overlay = document.getElementById("assessmentHistoryCompareModal");
+    if (!overlay) return;
+    if (!state.compareModal.open || !state.compareModal.test) {
+      overlay.classList.add("hidden");
+      return;
+    }
+    const pair = getAssessmentHistoryPair(state.compareModal.test);
+    if (!pair) {
+      closeAssessmentHistoryCompare();
+      return;
+    }
+    const meta = getAssessmentHistoryMeta(state.compareModal.test);
+    const title = document.getElementById("assessmentHistoryCompareTitle");
+    const subtitle = document.getElementById("assessmentHistoryCompareSubtitle");
+    const prevTime = document.getElementById("assessmentHistoryPrevTime");
+    const currentTime = document.getElementById("assessmentHistoryCurrentTime");
+    const rows = document.getElementById("assessmentHistoryCompareRows");
+    if (title) title.textContent = meta.title;
+    if (subtitle) subtitle.textContent = meta.subtitle;
+    if (prevTime) prevTime.textContent = formatAssessmentHistoryTime(pair.previous.recordedAt);
+    if (currentTime) currentTime.textContent = formatAssessmentHistoryTime(pair.current.recordedAt);
+    if (rows) rows.innerHTML = buildAssessmentCompareRows(state.compareModal.test, pair.previous, pair.current);
+    overlay.classList.remove("hidden");
+  }
+
+  function openAssessmentHistoryCompare(test) {
+    const pair = getAssessmentHistoryPair(test);
+    if (!pair) {
+      notify("暂无对比数据", "至少完成两次同类基础测评后，才会显示前后对比。", "info", 2200);
+      return;
+    }
+    state.compareModal = { open: true, test };
+    renderAssessmentHistoryCompareModal();
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeAssessmentHistoryCompare() {
+    state.compareModal = { open: false, test: null };
+    document.getElementById("assessmentHistoryCompareModal")?.classList.add("hidden");
+    if (!state.modalOpen) document.body.style.overflow = "";
+  }
+
+  function handleAssessmentHistoryOverlayClick(event) {
+    if (event.target?.id === "assessmentHistoryCompareModal") closeAssessmentHistoryCompare();
+  }
+
   function updateRadar(result) {
     const canvas = document.getElementById("hollandRadarChart");
     if (!canvas || !window.Chart || !state.data) return;
@@ -731,8 +993,10 @@
     updateConfigStatus();
     updateMbtiCard();
     updateHollandCard();
+    updateAssessmentCompareButtons();
     updateCombinedCard();
     publishAssessmentSnapshot();
+    renderAssessmentHistoryCompareModal();
     if (state.modalOpen) renderModal();
   }
 
@@ -1076,16 +1340,27 @@
   }
 
   function restartAssessmentFlow() {
+    closeAssessmentHistoryCompare();
     if (!state.activeTest || state.activeTest === "mbti") {
-      state.mbti = { currentIndex: 0, answers: {}, result: null, clarifier: createEmptyClarifier() };
+      state.mbti = {
+        currentIndex: 0,
+        answers: {},
+        result: null,
+        clarifier: createEmptyClarifier(),
+        historyRuns: normalizeAssessmentHistoryRuns("mbti", state.mbti.historyRuns),
+        runSessionId: Math.max(1, Number(state.mbti.runSessionId || 1)) + 1,
+        archivedSessionId: Math.max(0, Number(state.mbti.archivedSessionId || 0))
+      };
     }
     if (!state.activeTest || state.activeTest === "holland") {
-      state.holland = { currentIndex: 0, answers: {}, result: null };
-    }
-    try {
-      localStorage.removeItem(getProgressStorageKey());
-    } catch (_) {
-      /* ignore */
+      state.holland = {
+        currentIndex: 0,
+        answers: {},
+        result: null,
+        historyRuns: normalizeAssessmentHistoryRuns("holland", state.holland.historyRuns),
+        runSessionId: Math.max(1, Number(state.holland.runSessionId || 1)) + 1,
+        archivedSessionId: Math.max(0, Number(state.holland.archivedSessionId || 0))
+      };
     }
     recomputeAll();
     renderAll();
@@ -1193,6 +1468,7 @@
       const response = await fetch(apiTarget, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           close_pairs: result.closePairs.map((item) => ({ pair: item.pair, left: item.left, right: item.right, left_score: item.leftScore, right_score: item.rightScore, diff: item.diff })),
           score_snapshot: result.scores,
@@ -1239,6 +1515,7 @@
 
   function resetWorkspaceState() {
     state.activeTest = null;
+    closeAssessmentHistoryCompare();
     state.configOpen = false;
     state.hydrated = false;
     state.config = {
@@ -1253,12 +1530,18 @@
       currentIndex: 0,
       answers: {},
       result: null,
-      clarifier: createEmptyClarifier()
+      clarifier: createEmptyClarifier(),
+      historyRuns: [],
+      runSessionId: 1,
+      archivedSessionId: 0
     };
     state.holland = {
       currentIndex: 0,
       answers: {},
-      result: null
+      result: null,
+      historyRuns: [],
+      runSessionId: 1,
+      archivedSessionId: 0
     };
     publishAssessmentSnapshot();
   }
@@ -1318,6 +1601,9 @@
   window.runMbtiClarifier = runMbtiClarifier;
   window.submitClarifierChoice = submitClarifierChoice;
   window.goToPreviousClarifierQuestion = goToPreviousClarifierQuestion;
+  window.openAssessmentHistoryCompare = openAssessmentHistoryCompare;
+  window.closeAssessmentHistoryCompare = closeAssessmentHistoryCompare;
+  window.handleAssessmentHistoryOverlayClick = handleAssessmentHistoryOverlayClick;
   window.renderAssessmentModal = renderModal;
   window.getAssessmentHubSnapshot = function () { return buildAssessmentHubSnapshot(); };
   window.assessmentHubUpdateConfigStatus = function () {

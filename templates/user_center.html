@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 | 职业规划智能体</title>
+    {% include "partials/head_fonts.html" %}
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    {{ vite_asset_tags('frontend/src/entries/user-center.js') }}
+    <style>
+      .career-report-shell {
+        display: grid;
+        gap: 16px;
+      }
+
+      .career-report-status-banner {
+        display: grid;
+        gap: 12px;
+      }
+
+      .career-report-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .career-report-aside,
+      .career-report-main {
+        min-height: 320px;
+      }
+
+      .career-report-aside {
+        display: grid;
+        gap: 12px;
+      }
+
+      .report-viewer-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        background: rgba(2, 6, 23, 0.82);
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+      }
+
+      .report-viewer-overlay.hidden {
+        display: none;
+      }
+
+      .report-viewer-shell {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        background: #050b16;
+        color: #e2e8f0;
+        position: relative;
+      }
+
+      .report-viewer-sidebar {
+        border-right: 1px solid rgba(148, 163, 184, 0.16);
+        background: rgba(15, 23, 42, 0.92);
+        overflow: hidden;
+      }
+
+      .report-viewer-sidebar-inner {
+        height: 100%;
+        overflow-y: auto;
+        padding: 20px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .report-viewer-meta,
+      .report-viewer-toc,
+      .report-viewer-tasks-section {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .report-viewer-progress-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        margin: 12px 0 10px;
+      }
+
+      .report-viewer-progress-track {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
+        overflow: hidden;
+      }
+
+      .report-viewer-progress-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #2563eb, #38bdf8);
+      }
+
+      .report-viewer-stat-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .report-viewer-toc-label,
+      .report-viewer-tasks-head span:first-child {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #93c5fd;
+      }
+
+      .report-viewer-task-list,
+      #rvToc {
+        display: grid;
+        gap: 8px;
+      }
+
+      .report-viewer-main {
+        overflow-y: auto;
+        padding: 28px 32px 36px;
+      }
+
+      .report-viewer-close-btn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.88);
+        color: #e2e8f0;
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      @media (max-width: 1100px) {
+        .career-report-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .report-viewer-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .report-viewer-sidebar {
+          display: none;
+        }
+
+        .report-viewer-main {
+          padding: 24px 18px 32px;
+        }
+      }
+    </style>
+</head>
+<body class="user-center-page" data-page="user-center">
+    <div class="user-center-layout">
+        <aside class="uc-sidebar">
+            <a class="uc-brand" href="{{ url_for('index') }}">
+                <div class="uc-brand-mark">DP</div>
+                <div class="uc-brand-copy">
+                    <strong>职业规划智能体</strong>
+                    <span>个人工作台与成长中心</span>
+                </div>
+            </a>
+
+            <nav class="uc-nav" aria-label="个人中心导航">
+                <button type="button" class="uc-nav-link active" data-target="report-workspace">
+                    <span class="uc-nav-icon">📄</span>
+                    <span>职业报告</span>
+                </button>
+                <button type="button" class="uc-nav-link" data-target="plan-workspace">
+                    <span class="uc-nav-icon">🧭</span>
+                    <span>学习路径</span>
+                </button>
+                <button type="button" class="uc-nav-link" data-target="account-center">
+                    <span class="uc-nav-icon">👤</span>
+                    <span>账户中心</span>
+                </button>
+            </nav>
+
+            <div class="uc-sidebar-note">
+                <h2>个人中心说明</h2>
+                <p>这里集中查看职业报告版本、学习路径进度、账户头像与密码设置。头像入口已经重新接回主站顶部，点击后会直接进入这个页面。</p>
+            </div>
+
+            <div class="uc-sidebar-footer">
+                <a class="uc-footer-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+            </div>
+        </aside>
+
+        <div class="uc-main">
+            <header class="uc-topbar">
+                <div class="uc-topbar-left">
+                    <a class="uc-back-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                    <div>
+                        <p class="uc-topbar-kicker">User Center</p>
+                        <h1>个人中心与工作台</h1>
+                    </div>
+                </div>
+                <div class="uc-topbar-actions">
+                    <span id="currentUserLabel" class="topbar-pill">未登录</span>
+                    <button id="notificationBtn" type="button" class="topbar-icon-btn tooltip" data-tooltip="系统通知" aria-label="系统通知">
+                        <span>通知</span>
+                        <span id="notificationCount" class="topbar-count">3</span>
+                    </button>
+                    <button id="logoutBtn" type="button" onclick="logout()" class="topbar-text-btn">退出</button>
+                    <button type="button" class="topbar-avatar-btn" onclick="window.switchUserCenterSection?.('report-workspace', { updateHash: true })" title="职业报告" aria-label="打开职业报告">
+                        <span id="currentUserAvatar">人</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="uc-content">
+                <section id="report-workspace" class="uc-section active">
+                    <div class="uc-section-shell">
+                        <section class="uc-surface">
+                            <div class="uc-section-head">
+                                <div>
+                                    <p class="uc-section-kicker">Career Report</p>
+                                    <h2 class="uc-section-title">职业报告工作台</h2>
+                                    <p id="userCenterReportSubline" class="uc-section-subline">当前还没有可查看的报告版本。</p>
+                                    <p class="uc-section-copy">这里会集中展示报告运行记录、当前关注岗位、版本切换和完整报告查看入口。选中一个历史版本后，下方会展开对应正文与侧栏导航。</p>
+                                </div>
+                                <div class="uc-section-actions">
+                                    <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成职业报告</button>
+                                    <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="openReportViewer()">查看完整报告</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="uc-report-top">
+                            <section class="uc-surface uc-report-runs-panel">
+                                <div class="uc-block-head">
+                                    <div>
+                                        <h3 class="uc-block-title">报告运行记录</h3>
+                                        <p class="uc-block-copy">系统会保留每次生成的职业报告版本。点击任意一条记录，即可切换并查看对应时间点的完整内容。</p>
+                                    </div>
+                                </div>
+                                <div id="userCenterReportRuns" class="uc-report-runs" role="list" aria-label="职业报告版本列表"></div>
+                            </section>
+
+                            <section class="uc-surface uc-report-summary">
+                                <div class="uc-block-head compact">
+                                    <div>
+                                        <p class="uc-section-kicker">Report Summary</p>
+                                        <h3 class="uc-block-title">当前报告概览</h3>
+                                    </div>
+                                </div>
+                                <div class="uc-summary-metrics">
+                                    <article>
+                                        <span>当前主岗位</span>
+                                        <strong id="userCenterFocusRole">待识别</strong>
+                                    </article>
+                                    <article>
+                                        <span>生成 / 更新时间</span>
+                                        <strong id="userCenterUpdatedAt">--</strong>
+                                    </article>
+                                    <article>
+                                        <span>完成度</span>
+                                        <strong id="userCenterCompletionRate">0%</strong>
+                                    </article>
+                                    <article>
+                                        <span>版本数</span>
+                                        <strong id="userCenterVersionCount">0</strong>
+                                    </article>
+                                </div>
+                                <p id="userCenterReportHistory" class="uc-summary-hint" aria-hidden="true"></p>
+                                <p id="userCenterReportSwitchHint" class="uc-summary-hint"></p>
+                            </section>
+                        </div>
+
+                        <section class="uc-surface uc-role-strip-surface">
+                            <div class="uc-role-strip-line">
+                                <div class="uc-role-strip-label">目标岗位追踪</div>
+                                <div id="userCenterTargetRoles" class="uc-role-strip-list" aria-live="polite">
+                                    <span class="uc-role-strip-empty">正在加载岗位追踪...</span>
+                                </div>
+                                <div class="uc-role-strip-actions">
+                                    <button id="userCenterTargetRoleAddBtn" type="button" class="uc-filter-chip">+ 添加岗位</button>
+                                    <button type="button" class="uc-filter-chip active" data-role-filter="all">全部</button>
+                                    <button type="button" class="uc-filter-chip" data-role-filter="employed">在职</button>
+                                    <button type="button" class="uc-filter-chip" data-role-filter="reapply">再投</button>
+                                    <button type="button" class="uc-filter-chip" data-role-filter="expected">期望</button>
+                                    <button type="button" class="uc-filter-chip" data-role-filter="left">离职</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="uc-surface">
+                            <div class="uc-block-head">
+                                <div>
+                                    <p class="uc-section-kicker">Report Reader</p>
+                                    <h3 class="uc-block-title">职业报告正文</h3>
+                                    <p class="uc-block-copy">这里会加载当前选择版本的正文内容与侧栏目录。默认先展示报告状态，选中版本后再展开完整正文。</p>
+                                </div>
+                            </div>
+                            <div class="career-report-shell">
+                                <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
+                                <div class="career-report-layout">
+                                    <aside id="careerReportAside" class="career-report-aside"></aside>
+                                    <div id="careerReportMain" class="career-report-main"></div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section id="plan-workspace" class="uc-section">
+                    <div class="uc-section-shell">
+                        <section class="uc-surface">
+                            <div class="uc-section-head">
+                                <div>
+                                    <p class="uc-section-kicker">Learning Path</p>
+                                    <h2 class="uc-section-title">学习路径</h2>
+                                    <p class="uc-section-copy">这里保留你的打卡、经验值、任务清单和计划详情。之前新增的学习路径和成长记录能力会继续在这里维护。</p>
+                                </div>
+                                <div class="uc-stat-strip">
+                                    <article>
+                                        <span>连续打卡</span>
+                                        <strong id="upStatStreak">0 天</strong>
+                                    </article>
+                                    <article>
+                                        <span>累计经验值</span>
+                                        <strong id="upStatXP">0 XP</strong>
+                                    </article>
+                                    <article>
+                                        <span>完成任务</span>
+                                        <strong id="upStatDone">0</strong>
+                                    </article>
+                                    <article>
+                                        <span>解锁徽章</span>
+                                        <strong id="upStatBadges">0</strong>
+                                    </article>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="lp-grid">
+                            <aside class="uc-surface lp-left-panel">
+                                <div class="lp-streak-hero">
+                                    <div class="lp-streak-flame" id="lpStreakIcon">🔥</div>
+                                    <div class="lp-streak-num" id="lpStreakCount">0</div>
+                                    <div class="lp-streak-label">连续打卡天数</div>
+                                    <div class="lp-streak-best">历史最佳 <strong id="lpStreakBest">0</strong> 天</div>
+                                </div>
+
+                                <div class="lp-level-row">
+                                    <span class="lp-level-tag" id="lpLevel">Lv.1</span>
+                                    <div class="lp-xp-bar">
+                                        <div class="lp-xp-numbers"><span id="lpXP">0</span> / <span id="lpXPNext">100</span> XP</div>
+                                        <div class="lp-xp-track"><div class="lp-xp-fill" id="lpXPFill" style="width:0%"></div></div>
+                                    </div>
+                                </div>
+
+                                <button id="lpCheckinBtn" class="lp-checkin-btn" type="button" onclick="doCheckin()">
+                                    今日打卡 +10 XP
+                                </button>
+                                <p class="lp-checkin-sub" id="lpCheckinHint">每天打卡会累积连续天数，完成学习任务还可获得额外经验值。</p>
+
+                                <div class="lp-week-grid" id="lpWeekStrip"></div>
+
+                                <div class="lp-heatmap-wrap">
+                                    <p class="lp-section-label">最近 4 周活跃度</p>
+                                    <div class="lp-heatmap" id="lpHeatmap"></div>
+                                </div>
+
+                                <div class="lp-badges-wrap">
+                                    <p class="lp-section-label">成长徽章</p>
+                                    <div class="lp-badge-grid" id="lpBadgeGrid"></div>
+                                </div>
+                            </aside>
+
+                            <section class="uc-surface lp-plan-board">
+                                <div id="upPlanListView">
+                                    <div class="up-section-hd">
+                                        <h3 class="up-section-title">学习计划列表</h3>
+                                        <button class="up-new-btn" type="button" onclick="createNewPlan()">
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                            新建计划
+                                        </button>
+                                    </div>
+                                    <div id="upPlanList" class="up-plan-list"></div>
+                                </div>
+
+                                <div id="upPlanDetailView" class="hidden">
+                                    <div class="up-detail-hd">
+                                        <button class="up-back-btn" type="button" onclick="showPlanList()">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </button>
+                                        <h4 class="up-detail-title" id="upDetailTitle">计划详情</h4>
+                                        <span class="up-detail-pct" id="upDetailPct">0%</span>
+                                    </div>
+                                    <div class="up-detail-prog-row">
+                                        <div class="up-detail-prog-track">
+                                            <div class="up-detail-prog-fill" id="upDetailProgFill" style="width:0%"></div>
+                                        </div>
+                                        <span class="up-detail-prog-txt" id="upDetailProgTxt">0 / 0 项完成</span>
+                                    </div>
+                                    <div id="upDetailItems" class="up-items-list"></div>
+                                    <div class="up-add-row">
+                                        <input id="upNewItemInput" class="up-add-input" type="text" placeholder="添加一条新的学习任务..." onkeydown="if(event.key==='Enter') addPlanItem()">
+                                        <button class="up-add-btn" type="button" onclick="addPlanItem()">添加</button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="account-center" class="uc-section">
+                    <div class="uc-section-shell">
+                        <section class="uc-surface">
+                            <div class="uc-section-head">
+                                <div>
+                                    <p class="uc-section-kicker">Account Center</p>
+                                    <h2 class="uc-section-title">账户中心</h2>
+                                    <p class="uc-section-copy">这里可以维护头像、密码和账户信息。管理员也可以从这里直接进入系统 API 配置面板。</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="uc-account-grid">
+                            <section class="uc-surface uc-account-card uc-avatar-card">
+                                <div class="uc-avatar-stage" id="userCenterAvatarStage">
+                                    <div class="up-avatar-circle">人</div>
+                                </div>
+                                <div class="uc-account-copy">
+                                    <p class="uc-section-kicker">Account Avatar</p>
+                                    <h3 id="upName">当前用户</h3>
+                                    <p id="upRoleTag">普通用户</p>
+                                    <div class="uc-account-actions">
+                                        <button id="userCenterAvatarUploadBtn" type="button" class="career-report-primary-btn">上传头像</button>
+                                        <button id="userCenterAvatarRemoveBtn" type="button" class="career-report-secondary-btn hidden">移除头像</button>
+                                    </div>
+                                    <input id="userCenterAvatarInput" class="hidden" type="file" accept="image/*">
+                                    <p id="userCenterAvatarHint" class="uc-muted-copy">支持本地图片上传，并在裁剪框中调整后保存为账户头像。</p>
+                                </div>
+                            </section>
+
+                            <section class="uc-surface uc-account-card">
+                                <div class="uc-account-card-head">
+                                    <h3>密码更新</h3>
+                                    <span>修改当前登录密码</span>
+                                </div>
+                                <form class="uc-password-form" onsubmit="submitUserCenterPassword(event)">
+                                    <label for="ucCurrentPassword">当前密码</label>
+                                    <input id="ucCurrentPassword" type="password" autocomplete="current-password" placeholder="请输入当前密码">
+                                    <label for="ucNewPassword">新密码</label>
+                                    <input id="ucNewPassword" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
+                                    <label for="ucConfirmPassword">确认新密码</label>
+                                    <input id="ucConfirmPassword" type="password" autocomplete="new-password" placeholder="请再次输入新密码">
+                                    <div class="uc-password-actions">
+                                        <button type="submit" class="career-report-primary-btn">更新密码</button>
+                                        <span id="ucPasswordMessage" class="uc-inline-message">修改后下次登录请使用新密码。</span>
+                                    </div>
+                                </form>
+                            </section>
+                        </div>
+
+                        <section class="uc-surface uc-account-card uc-admin-card">
+                            <div class="uc-account-card-head">
+                                <div>
+                                    <h3>系统 API 配置</h3>
+                                    <p id="upAccountPermissionHint" class="uc-muted-copy">管理员可在这里打开模型与 Provider 配置；普通用户仅保留查看权限。</p>
+                                </div>
+                            </div>
+                            <div id="upAdminBar" class="up-admin-bar">
+                                <button type="button" class="up-admin-link" onclick="openSettingsPanel()">
+                                    <div class="up-admin-link-copy">
+                                        <strong>系统 API 配置</strong>
+                                        <span>打开模型设置面板，查看或编辑当前可用的 Provider、模型和 API Key。</span>
+                                    </div>
+                                    <span>打开配置</span>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div id="userCenterCropperModal" class="uc-cropper-modal hidden" role="dialog" aria-modal="true" aria-label="头像裁剪">
+        <div class="uc-cropper-dialog">
+            <div class="uc-cropper-head">
+                <div>
+                    <p class="uc-section-kicker">Avatar Cropper</p>
+                    <h3 class="uc-block-title">裁剪并保存头像</h3>
+                    <p class="uc-block-copy">拖动图片并调整缩放比例，确认后会同步更新顶部头像和个人中心展示。</p>
+                </div>
+                <button type="button" class="uc-cropper-close" id="userCenterCropperClose" aria-label="关闭头像裁剪">×</button>
+            </div>
+            <div class="uc-cropper-body">
+                <div class="uc-cropper-frame" id="userCenterCropFrame">
+                    <img id="userCenterCropImage" class="uc-cropper-image" alt="头像裁剪预览">
+                    <div class="uc-cropper-mask" aria-hidden="true"></div>
+                </div>
+                <div class="uc-cropper-controls">
+                    <label for="userCenterCropZoom">缩放比例</label>
+                    <input id="userCenterCropZoom" type="range" min="100" max="300" step="1" value="100">
+                    <p class="uc-muted-copy">拖动滑块可以放大或缩小头像，拖拽图片可调整最终显示位置。</p>
+                </div>
+            </div>
+            <div class="uc-cropper-actions">
+                <button type="button" class="career-report-secondary-btn" id="userCenterCropperCancel">取消</button>
+                <button type="button" class="career-report-primary-btn" id="userCenterCropperSave">保存头像</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="reportViewerOverlay" class="report-viewer-overlay hidden" role="dialog" aria-modal="true" aria-label="职业规划报告">
+        <div class="report-viewer-shell">
+            <aside class="report-viewer-sidebar">
+                <div class="report-viewer-sidebar-inner">
+                    <div class="report-viewer-meta">
+                        <div class="report-viewer-meta-brand">
+                            <div>
+                                <p class="report-viewer-meta-label">职业规划报告</p>
+                                <strong id="rvMetaTitle" class="report-viewer-meta-title">—</strong>
+                            </div>
+                        </div>
+                        <div class="report-viewer-progress-row">
+                            <div class="report-viewer-progress-track">
+                                <div id="rvProgressFill" class="report-viewer-progress-fill"></div>
+                            </div>
+                            <span id="rvProgressLabel" class="report-viewer-progress-label">0%</span>
+                        </div>
+                        <div class="report-viewer-stat-row">
+                            <span id="rvStatDone">已完成 0 项</span>
+                            <span id="rvStatTotal">共 0 项任务</span>
+                        </div>
+                    </div>
+
+                    <div id="rvToc" class="report-viewer-toc"></div>
+
+                    <div class="report-viewer-tasks-section">
+                        <div class="report-viewer-tasks-head">
+                            <span>执行追踪</span>
+                            <span class="report-viewer-tasks-note">点击切换状态</span>
+                        </div>
+                        <div id="rvTaskList" class="report-viewer-task-list"></div>
+                    </div>
+                </div>
+            </aside>
+
+            <main id="rvMain" class="report-viewer-main"></main>
+
+            <button type="button" class="report-viewer-close-btn" onclick="closeReportViewer()" aria-label="关闭报告查看器">×</button>
+        </div>
+    </div>
+
+    {% include "partials/settings_panel.html" %}
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260401-app-restore-v1"></script>
+    <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20260401-app-hotfix-v2"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260402-restoration-v1"></script>
+    <script src="{{ url_for('static', filename='user-center.js') }}?v=20260401-user-center-v3"></script>
+</body>
+</html>

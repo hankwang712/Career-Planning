@@ -30,7 +30,7 @@ CAREER_NEWS_LOCK = threading.Lock()
 
 CAREER_NEWS_TIMEZONE = ZoneInfo("Asia/Shanghai")
 CAREER_NEWS_REFRESH_HOUR = 12
-CAREER_NEWS_DISPLAY_LIMIT = 10
+CAREER_NEWS_DISPLAY_LIMIT = 9
 CAREER_NEWS_FETCH_LIMIT = 180
 CAREER_NEWS_MAX_ITEMS = 50
 CAREER_NEWS_TIMEOUT_SECONDS = 8
@@ -767,6 +767,68 @@ def _split_visible_items(items: list[dict], display_limit: int) -> tuple[list[di
     return ordered_items[:limit], ordered_items[limit:]
 
 
+def _split_source_label(value: str) -> tuple[str, str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return "", ""
+    if " / " in raw:
+        left, right = raw.split(" / ", 1)
+        return left.strip(), right.strip()
+    return raw, ""
+
+
+def _extract_domain_label(url: str) -> str:
+    try:
+        parsed = urllib.parse.urlparse(str(url or "").strip())
+    except Exception:
+        return ""
+    host = (parsed.netloc or "").strip().lower()
+    host = re.sub(r"^www\.", "", host)
+    host = re.sub(r"^m\.", "", host)
+    return host
+
+
+def _build_preview_image(url: str) -> str:
+    safe_url = str(url or "").strip()
+    if not safe_url:
+        return ""
+    domain = _extract_domain_label(safe_url)
+    if not domain or "news.google.com" in domain:
+        return ""
+    encoded = urllib.parse.quote(safe_url, safe="")
+    return f"https://s.wordpress.com/mshots/v1/{encoded}?w=1200"
+
+
+def _normalize_news_summary(summary: str, source_name: str, topic_label: str) -> str:
+    text = _clean_text(summary)
+    if text in {"点击查看原文", "点击查看原文>", "点击查看原文 >", "查看原文"}:
+        text = ""
+    if text:
+        return text
+    if source_name and topic_label:
+        return f"{source_name} · {topic_label} 快讯，点击查看原文获取完整内容。"
+    if source_name:
+        return f"{source_name} 快讯，点击查看原文获取完整内容。"
+    return ""
+
+
+def _decorate_news_item(item: dict) -> dict:
+    enriched = dict(item or {})
+    source_name, source_topic = _split_source_label(str(enriched.get("source") or ""))
+    topic_label = str(enriched.get("topic") or source_topic or "").strip()
+    domain_label = _extract_domain_label(str(enriched.get("url") or ""))
+    enriched["source_name"] = source_name or str(enriched.get("source") or "").strip()
+    enriched["topic_label"] = topic_label
+    enriched["domain_label"] = domain_label
+    enriched["preview_image"] = _build_preview_image(str(enriched.get("url") or ""))
+    enriched["summary"] = _normalize_news_summary(
+        str(enriched.get("summary") or ""),
+        enriched["source_name"],
+        topic_label,
+    )
+    return enriched
+
+
 def get_career_news_payload(
     force_refresh: bool = False,
     display_limit: int = CAREER_NEWS_DISPLAY_LIMIT,
@@ -794,7 +856,10 @@ def get_career_news_payload(
             payload["items"] = trimmed_items
             _write_cached_snapshot(payload)
 
-    items = _sort_and_trim_items_by_time(payload.get("items") if isinstance(payload.get("items"), list) else [])
+    items = [
+        _decorate_news_item(item)
+        for item in _sort_and_trim_items_by_time(payload.get("items") if isinstance(payload.get("items"), list) else [])
+    ]
     visible_items, hidden_items = _split_visible_items(items, display_limit)
 
     payload["items"] = items

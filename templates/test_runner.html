@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试作答页 | 职业规划智能体</title>
+    {% include "partials/head_fonts.html" %}
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    {{ vite_asset_tags('frontend/src/entries/test-runner.js') }}
+</head>
+<body class="tr-page" data-page="test-runner">
+    <div class="tr-layout">
+        <aside class="tr-sidebar">
+            <a class="tr-brand" href="{{ url_for('index') }}">
+                <div class="tr-brand-mark">
+                    <img src="{{ url_for('static', filename='trueyouteller/brand/trueyouteller_logo-removebg.png') }}" alt="TrueYouTeller 品牌标识">
+                </div>
+                <div class="tr-brand-copy">
+                    <strong>职业规划智能体</strong>
+                    <span>扩展测试中心</span>
+                </div>
+            </a>
+
+            <nav class="tr-nav" aria-label="测试类型导航">
+                <button type="button" class="tr-nav-link active" data-test="deep">深层 MBTI</button>
+                <button type="button" class="tr-nav-link" data-test="friends">老友记角色</button>
+                <button type="button" class="tr-nav-link" data-test="insideout">头脑特工队</button>
+            </nav>
+
+            <div class="tr-sidebar-note">
+                <h2>完整测试流程</h2>
+                <p>这里保留了你之前新增的扩展测试内容。每次作答都会自动记录当前进度，提交后可直接进入完整结果页，并保留历史记录用于前后对比。</p>
+            </div>
+
+            <div class="tr-sidebar-footer">
+                <a class="tr-footer-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+            </div>
+        </aside>
+
+        <div class="tr-main">
+            <header class="tr-topbar">
+                <div class="tr-topbar-left">
+                    <a class="tr-back-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                    <div>
+                        <p class="tr-topbar-kicker">测试作答区</p>
+                        <h1 id="tsPageTitle">深层 MBTI 测试作答页</h1>
+                    </div>
+                </div>
+                <div class="tr-topbar-actions">
+                    <span id="currentUserLabel" class="topbar-pill">未登录</span>
+                    <button id="logoutBtn" type="button" class="topbar-text-btn">退出</button>
+                    <button type="button" class="topbar-avatar-btn" id="tsAvatarBtn" title="个人中心" aria-label="打开个人中心">
+                        <span id="currentUserAvatar">人</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="tr-content">
+                <section class="tr-surface">
+                    <div class="tr-head-row">
+                        <div>
+                            <p class="tr-kicker">扩展测试流程</p>
+                            <h2 id="tsSectionTitle">深层 MBTI 测试</h2>
+                            <p id="tsSectionHint" class="tr-hint">完成全部题目后，会进入完整结果页，展示分布、角色解析、历史记录和后续扩展内容。</p>
+                        </div>
+                        <div class="tr-head-actions">
+                            <button id="tsViewResultBtn" type="button" class="tr-btn ghost">查看完整结果</button>
+                            <button id="tsRestartBtn" type="button" class="tr-btn ghost">重新开始</button>
+                            <button id="tsBackBtn" type="button" class="tr-btn primary">返回主界面</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tr-surface">
+                    <div class="ts-quiz-shell">
+                        <div class="ts-hero">
+                            <img id="tsCoverImage" src="{{ url_for('static', filename='trueyouteller/brand/trueyouteller.png') }}" alt="测试封面图">
+                            <div class="ts-hero-copy">
+                                <h3 id="tsHeroTitle">进入当前测试</h3>
+                                <p id="tsHeroDesc">点击选项后会自动记录答案，并在完成后跳转到对应的完整结果页。</p>
+                                <p id="tsMetaLine" class="ts-meta-line"></p>
+                            </div>
+                        </div>
+
+                        <div class="ts-progress-wrap">
+                            <div class="ts-progress-head">
+                                <strong id="tsProgressText">进度 0 / 0</strong>
+                                <span id="tsAnsweredText">已作答 0 / 0</span>
+                            </div>
+                            <div class="ts-progress-track">
+                                <div id="tsProgressFill" class="ts-progress-fill"></div>
+                            </div>
+                        </div>
+
+                        <article class="ts-question-card">
+                            <p id="tsQuestionNo" class="ts-question-no">第 1 题 / 共 0 题</p>
+                            <h3 id="tsQuestionText" class="ts-question-text">题目加载中...</h3>
+                            <div id="tsOptions" class="ts-options"></div>
+                        </article>
+
+                        <div class="ts-nav-row">
+                            <button id="tsPrevBtn" type="button" class="tr-btn ghost">上一题</button>
+                            <button id="tsNextBtn" type="button" class="tr-btn ghost">下一题</button>
+                            <button id="tsSubmitBtn" type="button" class="tr-btn primary">完成并查看完整结果</button>
+                        </div>
+                        <p id="tsHintLine" class="ts-hint-line"></p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260401-deep-test-v5"></script>
+    <script src="{{ url_for('static', filename='test-runner.js') }}?v=20260401-test-runner-v2"></script>
+</body>
+</html>

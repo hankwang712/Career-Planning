@@ -7,7 +7,7 @@
     <div class="profile-flow-wrap mb-6">
         <div class="profile-flow-head">
             <div>
-                <p class="profile-flow-kicker">Profile Flow</p>
+                <p class="profile-flow-kicker">画像流程</p>
                 <h3 class="profile-flow-title">流程导航：可按步骤完成，也可跳过后直接查看结果</h3>
                 <p id="profileFlowProgressText" class="profile-flow-hint">当前步骤：1 / 4</p>
             </div>
@@ -55,6 +55,7 @@
                     <button type="button" class="assessment-hero-btn primary" onclick="openAssessmentModal('mbti')">开始 MBTI 测评</button>
                     <button type="button" class="assessment-hero-btn secondary" onclick="openAssessmentModal('holland')">开始霍兰德测评</button>
                     <button type="button" class="assessment-hero-btn ghost" onclick="openAssessmentModal()">打开测评中心</button>
+                    <button type="button" class="assessment-hero-btn ghost" onclick="document.getElementById('assessmentExtendedBoard')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">查看扩展测试区</button>
                 </div>
             </div>
             <div class="assessment-hero-side">
@@ -76,14 +77,77 @@
             </div>
         </div>
 
+        <section id="assessmentExtendedBoard" class="assessment-extended-board">
+            <div class="assessment-extended-head">
+                <div>
+                            <p class="assessment-result-kicker">扩展测试</p>
+                            <h4 class="assessment-result-title">扩展测试展示区</h4>
+                    <p class="assessment-extended-copy">扩展测试不再只保留一个入口按钮。这里直接展示题型、当前状态和最近一次结果，你可以随时继续测试或查看完整结果。</p>
+                </div>
+                <button type="button" class="assessment-inline-btn" onclick="window.location.href='/test-runner.html?test=deep'">进入扩展测试中心</button>
+            </div>
+            <div class="assessment-extended-grid">
+                <article class="assessment-extended-card accent-deep">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
+                            <h5 class="assessment-extended-title">深层 MBTI</h5>
+                        </div>
+                        <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">五档量表题，适合做二次复测和最近两次结果对比。</p>
+                    <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('deep', true)">开始测试</button>
+                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('deep')">查看结果</button>
+                    </div>
+                </article>
+
+                <article class="assessment-extended-card accent-friends">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">老友记测试 · 10 题</p>
+                            <h5 class="assessment-extended-title">老友记角色</h5>
+                        </div>
+                        <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">情景选择题，快速识别你最像哪位角色，并保留最近一次画像结果。</p>
+                    <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('friends', true)">开始测试</button>
+                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('friends')">查看结果</button>
+                    </div>
+                </article>
+
+                <article class="assessment-extended-card accent-insideout">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">情绪测试 · 14 题</p>
+                            <h5 class="assessment-extended-title">头脑特工队</h5>
+                        </div>
+                        <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">情绪选择题，判断当前主导情绪，并把结果接到统一画像的观察维度中。</p>
+                    <div id="dtIOResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('insideout', true)">开始测试</button>
+                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('insideout')">查看结果</button>
+                    </div>
+                </article>
+            </div>
+        </section>
+
         <div class="assessment-result-grid">
             <div id="mbtiProfileCard" class="assessment-result-card">
                 <div class="assessment-result-head">
                     <div>
-                        <p class="assessment-result-kicker">MBTI Result</p>
+                        <p class="assessment-result-kicker">MBTI 结果</p>
                         <h4 class="assessment-result-title">MBTI 性格倾向</h4>
                     </div>
-                    <span id="mbtiResultStatus" class="assessment-status-chip">未开始</span>
+                    <div class="assessment-result-actions">
+                        <button id="mbtiCompareTrigger" type="button" class="assessment-compare-btn hidden" onclick="openAssessmentHistoryCompare('mbti')">最近两次对比</button>
+                        <span id="mbtiResultStatus" class="assessment-status-chip">未开始</span>
+                    </div>
                 </div>
                 <div id="mbtiResultEmpty" class="assessment-empty-state">
                     <div class="assessment-empty-icon">🧩</div>
@@ -162,10 +226,13 @@
             <div id="hollandProfileCard" class="assessment-result-card">
                 <div class="assessment-result-head">
                     <div>
-                        <p class="assessment-result-kicker">RIASEC Result</p>
+                        <p class="assessment-result-kicker">RIASEC 结果</p>
                         <h4 class="assessment-result-title">霍兰德职业兴趣</h4>
                     </div>
-                    <span id="hollandResultStatus" class="assessment-status-chip">未开始</span>
+                    <div class="assessment-result-actions">
+                        <button id="hollandCompareTrigger" type="button" class="assessment-compare-btn hidden" onclick="openAssessmentHistoryCompare('holland')">最近两次对比</button>
+                        <span id="hollandResultStatus" class="assessment-status-chip">未开始</span>
+                    </div>
                 </div>
                 <div id="hollandResultEmpty" class="assessment-empty-state">
                     <div class="assessment-empty-icon">🧭</div>
@@ -221,12 +288,37 @@
 
         <div id="assessmentCombinedCard" class="assessment-combined-card hidden">
             <div>
-                <p class="assessment-result-kicker">Profile Synthesis</p>
+                <p class="assessment-result-kicker">画像汇总</p>
                 <h4 class="assessment-result-title">综合画像提示</h4>
             </div>
             <p id="assessmentCombinedText" class="assessment-summary-text">
                 当 MBTI 和霍兰德结果都生成后，这里会自动汇总你的性格倾向与职业兴趣。
             </p>
+        </div>
+
+        <div id="assessmentHistoryCompareModal" class="assessment-history-modal-overlay hidden" onclick="handleAssessmentHistoryOverlayClick(event)">
+            <div class="assessment-history-modal">
+                <div class="assessment-history-head">
+                    <div>
+                        <p class="assessment-result-kicker">最近两次</p>
+                        <h4 id="assessmentHistoryCompareTitle" class="assessment-modal-title">最近两次结果对比</h4>
+                        <p id="assessmentHistoryCompareSubtitle" class="assessment-modal-subtitle">仅展示数值变化，不记录文字结论。</p>
+                    </div>
+                    <button type="button" class="assessment-history-close" onclick="closeAssessmentHistoryCompare()" aria-label="关闭">×</button>
+                </div>
+                <div class="assessment-history-timeline">
+                    <div class="assessment-history-stamp">
+                        <span>上一次测试</span>
+                        <strong id="assessmentHistoryPrevTime">--</strong>
+                    </div>
+                    <div class="assessment-history-arrow">→</div>
+                    <div class="assessment-history-stamp current">
+                        <span>这一次测试</span>
+                        <strong id="assessmentHistoryCurrentTime">--</strong>
+                    </div>
+                </div>
+                <div id="assessmentHistoryCompareRows" class="assessment-history-grid"></div>
+            </div>
         </div>
     </div>
     <div class="profile-flow-actions mb-6">
@@ -485,6 +577,72 @@
     </div>
 
     <div id="profileFlowStep4" class="profile-flow-panel hidden">
+    <div class="unified-profile-shell mb-6">
+        <section class="unified-profile-hero">
+            <div class="unified-profile-visual" id="profileArchetypeVisual"></div>
+            <div class="unified-profile-hero-body">
+                <div class="unified-profile-hero-head">
+                    <div>
+                        <p class="unified-profile-kicker">Unified Identity</p>
+                        <h3 id="profileArchetypeName" class="unified-profile-title">职业原型生成中</h3>
+                    </div>
+                    <button id="profilePortraitGenerateBtn" type="button" onclick="generateProfilePortrait()" class="unified-profile-portrait-btn">
+                        生成用户画像
+                    </button>
+                </div>
+                <p id="profileArchetypeDigest" class="unified-profile-digest"></p>
+                <p id="profileArchetypeSummary" class="unified-profile-summary"></p>
+                <p id="profilePortraitHint" class="unified-profile-portrait-hint">基于当前测评、简历、访谈和目标方向，生成一张纵向人物画像并回写到画像中心。</p>
+                <div class="unified-profile-tag-block">
+                    <p class="unified-profile-tag-label">任务画像 / 原型簇</p>
+                    <div id="profileRoleClusterTags" class="career-tag-row mt-3"></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid gap-6 xl:grid-cols-2">
+            <section class="unified-profile-panel">
+                <div class="unified-profile-panel-head">
+                    <div>
+                        <p class="unified-profile-kicker">Feature Axes</p>
+                        <h3 class="unified-profile-section-title">特征坐标</h3>
+                    </div>
+                </div>
+                <div id="profileFeatureAxisList" class="unified-axis-list"></div>
+            </section>
+
+            <section class="unified-profile-panel">
+                <div class="unified-profile-panel-head">
+                    <div>
+                        <p class="unified-profile-kicker">Work Mode</p>
+                        <h3 class="unified-profile-section-title">工作方式拼图</h3>
+                    </div>
+                </div>
+                <div id="profileWorkstyleCards" class="unified-workstyle-grid"></div>
+            </section>
+        </div>
+
+        <section class="unified-profile-panel">
+            <div class="unified-profile-panel-head">
+                <div>
+                    <p class="unified-profile-kicker">Evidence Graph</p>
+                    <h3 class="unified-profile-section-title">证据热力图</h3>
+                </div>
+            </div>
+            <div id="profileEvidenceMatrix" class="unified-evidence-grid"></div>
+        </section>
+
+        <section class="unified-profile-panel">
+            <div class="unified-profile-panel-head">
+                <div>
+                    <p class="unified-profile-kicker">Uncertainty Zone</p>
+                    <h3 class="unified-profile-section-title">待验证区</h3>
+                </div>
+            </div>
+            <div id="profileUncertaintyList" class="unified-uncertainty-list"></div>
+        </section>
+    </div>
+
     <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] mb-6">
         <div class="space-y-6">
             <div class="rounded-2xl bg-white p-6 shadow-sm">
@@ -497,6 +655,10 @@
                     <span id="profileBasicsStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">待补充</span>
                 </div>
                 <div class="grid gap-4 md:grid-cols-2">
+                    <label class="block">
+                        <span class="text-sm text-slate-600">性别（可选）</span>
+                        <input id="profileGenderInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：男 / 女">
+                    </label>
                     <label class="block">
                         <span class="text-sm text-slate-600">专业</span>
                         <input id="profileMajorInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：智能科学与技术">

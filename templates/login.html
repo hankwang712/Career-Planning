@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 | 职业规划智能体</title>
+    {% include "partials/head_fonts.html" %}
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    {{ vite_asset_tags('frontend/src/entries/login.js') }}
+</head>
+<body class="shell-body auth-locked page-login">
+    <div class="ambient-orb a"></div>
+    <div class="ambient-orb b"></div>
+    <div class="ambient-orb c"></div>
+
+    {% include "partials/startup_screen.html" %}
+</body>
+</html>

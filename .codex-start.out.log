@@ -1,0 +1,7 @@
+
+> start
+> node scripts/start-server.mjs
+
+runtime assets ready
+ * Serving Flask app 'server'
+ * Debug mode: off
