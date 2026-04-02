@@ -1133,18 +1133,34 @@
    * ==================================================== */
 
   function refreshCards() {
+    function applyStatus(el, done) {
+      if (!el) return;
+      el.textContent = done ? "已完成" : "未开始";
+      el.className = done ? "assessment-status-chip done" : "assessment-status-chip";
+    }
+
+    function applyResultButtonState(id, enabled) {
+      const button = $id(id);
+      if (!button) return;
+      button.disabled = !enabled;
+      button.classList.toggle("opacity-50", !enabled);
+      button.classList.toggle("cursor-not-allowed", !enabled);
+    }
+
     // Friends
     const fStatus = $id("dtFriendsStatus");
     const fResult = $id("dtFriendsResult");
     if (fStatus && fResult) {
       const r = st.friends.result;
       if (r && r.winner) {
-        fStatus.textContent = "已完成"; fStatus.className = "dt-card-chip done";
+        applyStatus(fStatus, true);
         fResult.textContent = `结果：${FRIENDS_RESULTS[r.winner]?.name||r.winner}`;
         fResult.classList.remove("hidden");
+        applyResultButtonState("dtFriendsResultBtn", true);
       } else {
-        fStatus.textContent = "未开始"; fStatus.className = "dt-card-chip";
+        applyStatus(fStatus, false);
         fResult.classList.add("hidden");
+        applyResultButtonState("dtFriendsResultBtn", false);
       }
     }
     // Inside Out
@@ -1153,12 +1169,14 @@
     if (ioStatus && ioResult) {
       const r = st.insideout.result;
       if (r && r.winner) {
-        ioStatus.textContent = "已完成"; ioStatus.className = "dt-card-chip done";
+        applyStatus(ioStatus, true);
         ioResult.textContent = `结果：${IO_RESULTS[r.winner]?.name||r.winner}`;
         ioResult.classList.remove("hidden");
+        applyResultButtonState("dtIOResultBtn", true);
       } else {
-        ioStatus.textContent = "未开始"; ioStatus.className = "dt-card-chip";
+        applyStatus(ioStatus, false);
         ioResult.classList.add("hidden");
+        applyResultButtonState("dtIOResultBtn", false);
       }
     }
     // Deep MBTI
@@ -1167,12 +1185,14 @@
     if (dpStatus && dpResult) {
       const r = st.deep.result;
       if (r && r.completed) {
-        dpStatus.textContent = "已完成"; dpStatus.className = "dt-card-chip done";
+        applyStatus(dpStatus, true);
         dpResult.innerHTML = `<span class="dt-deep-type">${esc(r.type)}</span><span class="dt-deep-name">${esc(MBTI_NAMES[r.type]||"")}</span>`;
         dpResult.classList.remove("hidden");
+        applyResultButtonState("dtDeepResultBtn", true);
       } else {
-        dpStatus.textContent = "未开始"; dpStatus.className = "dt-card-chip";
+        applyStatus(dpStatus, false);
         dpResult.classList.add("hidden");
+        applyResultButtonState("dtDeepResultBtn", false);
       }
     }
   }

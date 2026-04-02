@@ -43,7 +43,8 @@
             </div>
         </div>
 
-        <div id="careerNewsGrid" class="news-board-grid mt-1">
+        <!-- 数据池：所有条目在此渲染，JS 读取后分发到展示区 -->
+        <div id="careerNewsPool" class="hidden" aria-hidden="true">
             {% for item in all_items %}
             {% set source_name = item.source_name or item.source %}
             {% set topic_label = item.topic_label or item.topic %}
@@ -62,11 +63,12 @@
                 href="{{ item.url }}"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="career-news-item group"
+                class="career-news-item"
                 data-group="{{ group }}"
                 data-published="{{ item.published_at }}"
                 data-score="{{ item.relevance_score|default(0) }}"
             >
+                <!-- 大卡预览区（仅精选第一条显示） -->
                 <div class="career-news-preview" aria-hidden="true">
                     <div class="career-news-preview-frame{% if not item.preview_image %} is-fallback{% endif %}">
                         {% if item.preview_image %}
@@ -98,7 +100,7 @@
                             <span class="career-news-top-story">TOP STORY</span>
                             <span class="career-news-rank">{{ loop.index }}</span>
                             {% if topic_label %}
-                            <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700">{{ topic_label }}</span>
+                            <span class="career-news-topic-tag">{{ topic_label }}</span>
                             {% endif %}
                         </div>
                         <div class="career-news-meta">
@@ -111,24 +113,27 @@
                     <p class="career-news-summary">{{ item.summary }}</p>
                     {% endif %}
                 </div>
+
+                <!-- 列表行模式元数据（仅列表行可见） -->
+                <div class="career-news-row-meta">
+                    {% if topic_label %}<span class="career-news-row-tag">{{ topic_label }}</span>{% endif %}
+                    <span class="career-news-row-source">{{ source_name }}</span>
+                    <span class="career-news-row-dot">·</span>
+                    <span class="career-news-row-date">{{ item.published_label }}</span>
+                </div>
+                <span class="career-news-row-arrow">›</span>
             </a>
             {% endfor %}
         </div>
 
-        <div id="careerNewsMore" class="news-board-grid hidden"></div>
+        <!-- 精选大卡（始终展示当前过滤结果的第一条） -->
+        <div id="careerNewsFeatured" class="news-board-grid mt-1"></div>
 
-        <div class="flex justify-center pt-2">
-            <button
-                id="careerNewsMoreBtn"
-                type="button"
-                data-expand-text="查看更多"
-                data-collapse-text="收起"
-                onclick="toggleCareerNewsMore()"
-                class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50"
-            >
-                查看更多
-            </button>
-        </div>
+        <!-- 列表行（精选之后的所有条目，分页展示） -->
+        <div id="careerNewsListRows" class="career-news-list-rows"></div>
+
+        <!-- 分页控制 -->
+        <div id="careerNewsPagination" class="career-news-pagination hidden"></div>
         {% else %}
         <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
             {{ news.get("empty_reason", "当前快照暂时没有抓到职业规划或计算机行业相关的新内容，系统会继续在下一次刷新窗口重试。") }}

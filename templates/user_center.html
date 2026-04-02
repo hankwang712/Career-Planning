@@ -229,95 +229,126 @@
             <main class="uc-content">
                 <section id="report-workspace" class="uc-section active">
                     <div class="uc-section-shell">
-                        <section class="uc-surface">
-                            <div class="uc-section-head">
-                                <div>
-                                    <p class="uc-section-kicker">Career Report</p>
-                                    <h2 class="uc-section-title">职业报告工作台</h2>
-                                    <p id="userCenterReportSubline" class="uc-section-subline">当前还没有可查看的报告版本。</p>
-                                    <p class="uc-section-copy">这里会集中展示报告运行记录、当前关注岗位、版本切换和完整报告查看入口。选中一个历史版本后，下方会展开对应正文与侧栏导航。</p>
-                                </div>
-                                <div class="uc-section-actions">
-                                    <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成职业报告</button>
-                                    <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="openReportViewer()">查看完整报告</button>
-                                </div>
-                            </div>
-                        </section>
 
-                        <div class="uc-report-top">
-                            <section class="uc-surface uc-report-runs-panel">
-                                <div class="uc-block-head">
+                        <!-- ══ 列表视图（默认入口） ══ -->
+                        <div id="ucRptListView">
+                            <!-- 顶部操作栏 -->
+                            <section class="uc-surface">
+                                <div class="uc-section-head">
                                     <div>
-                                        <h3 class="uc-block-title">报告运行记录</h3>
-                                        <p class="uc-block-copy">系统会保留每次生成的职业报告版本。点击任意一条记录，即可切换并查看对应时间点的完整内容。</p>
+                                        <p class="uc-section-kicker">Career Report</p>
+                                        <h2 class="uc-section-title">职业报告</h2>
+                                        <p id="userCenterReportSubline" class="uc-section-subline">选择一份报告查看详情，或生成新报告。</p>
+                                    </div>
+                                    <div class="uc-section-actions">
+                                        <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成新报告</button>
                                     </div>
                                 </div>
-                                <div id="userCenterReportRuns" class="uc-report-runs" role="list" aria-label="职业报告版本列表"></div>
                             </section>
 
-                            <section class="uc-surface uc-report-summary">
-                                <div class="uc-block-head compact">
-                                    <div>
-                                        <p class="uc-section-kicker">Report Summary</p>
-                                        <h3 class="uc-block-title">当前报告概览</h3>
+                            <!-- 报告版本卡片列表 -->
+                            <div id="ucRptCards" class="uc-rpt-card-grid" role="list" aria-label="职业报告版本列表">
+                                <div class="uc-rpt-card-empty">
+                                    <span class="uc-rpt-card-empty-icon">📄</span>
+                                    <p>暂无报告记录</p>
+                                    <p class="uc-rpt-card-empty-sub">先在主界面完善能力画像并锁定目标岗位，再回来生成报告</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══ 详情视图（点击报告后展开） ══ -->
+                        <div id="ucRptDetailView" class="hidden">
+                            <!-- 返回按钮栏 -->
+                            <div class="uc-rpt-back-bar">
+                                <button type="button" class="uc-rpt-back-btn" onclick="ucRptShowList()">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    返回报告列表
+                                </button>
+                                <div class="uc-rpt-back-title" id="ucRptDetailTitle">职业规划报告</div>
+                                <div class="uc-section-actions" style="margin-left:auto;">
+                                    <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="openReportViewer()">全屏查看</button>
+                                </div>
+                            </div>
+
+                            <!-- 运行记录 + 概览 -->
+                            <div class="uc-report-top">
+                                <section class="uc-surface uc-report-runs-panel">
+                                    <div class="uc-block-head">
+                                        <div>
+                                            <h3 class="uc-block-title">版本历史</h3>
+                                            <p class="uc-block-copy">点击切换查看不同时间点的报告内容。</p>
+                                        </div>
+                                    </div>
+                                    <div id="userCenterReportRuns" class="uc-report-runs" role="list" aria-label="职业报告版本列表"></div>
+                                </section>
+
+                                <section class="uc-surface uc-report-summary">
+                                    <div class="uc-block-head compact">
+                                        <div>
+                                            <p class="uc-section-kicker">Report Summary</p>
+                                            <h3 class="uc-block-title">当前报告概览</h3>
+                                        </div>
+                                    </div>
+                                    <div class="uc-summary-metrics">
+                                        <article>
+                                            <span>当前主岗位</span>
+                                            <strong id="userCenterFocusRole">待识别</strong>
+                                        </article>
+                                        <article>
+                                            <span>生成 / 更新时间</span>
+                                            <strong id="userCenterUpdatedAt">--</strong>
+                                        </article>
+                                        <article>
+                                            <span>完成度</span>
+                                            <strong id="userCenterCompletionRate">0%</strong>
+                                        </article>
+                                        <article>
+                                            <span>版本数</span>
+                                            <strong id="userCenterVersionCount">0</strong>
+                                        </article>
+                                    </div>
+                                    <p id="userCenterReportHistory" class="uc-summary-hint" aria-hidden="true"></p>
+                                    <p id="userCenterReportSwitchHint" class="uc-summary-hint"></p>
+                                </section>
+                            </div>
+
+                            <!-- 目标岗位追踪 -->
+                            <section class="uc-surface uc-role-strip-surface">
+                                <div class="uc-role-strip-line">
+                                    <div class="uc-role-strip-label">目标岗位追踪</div>
+                                    <div id="userCenterTargetRoles" class="uc-role-strip-list" aria-live="polite">
+                                        <span class="uc-role-strip-empty">正在加载岗位追踪...</span>
+                                    </div>
+                                    <div class="uc-role-strip-actions">
+                                        <button id="userCenterTargetRoleAddBtn" type="button" class="uc-filter-chip">+ 添加岗位</button>
+                                        <button type="button" class="uc-filter-chip active" data-role-filter="all">全部</button>
+                                        <button type="button" class="uc-filter-chip" data-role-filter="employed">在职</button>
+                                        <button type="button" class="uc-filter-chip" data-role-filter="reapply">再投</button>
+                                        <button type="button" class="uc-filter-chip" data-role-filter="expected">期望</button>
+                                        <button type="button" class="uc-filter-chip" data-role-filter="left">离职</button>
                                     </div>
                                 </div>
-                                <div class="uc-summary-metrics">
-                                    <article>
-                                        <span>当前主岗位</span>
-                                        <strong id="userCenterFocusRole">待识别</strong>
-                                    </article>
-                                    <article>
-                                        <span>生成 / 更新时间</span>
-                                        <strong id="userCenterUpdatedAt">--</strong>
-                                    </article>
-                                    <article>
-                                        <span>完成度</span>
-                                        <strong id="userCenterCompletionRate">0%</strong>
-                                    </article>
-                                    <article>
-                                        <span>版本数</span>
-                                        <strong id="userCenterVersionCount">0</strong>
-                                    </article>
+                            </section>
+
+                            <!-- 报告正文阅读器 -->
+                            <section class="uc-surface">
+                                <div class="uc-block-head">
+                                    <div>
+                                        <p class="uc-section-kicker">Report Reader</p>
+                                        <h3 class="uc-block-title">职业报告正文</h3>
+                                        <p class="uc-block-copy">报告正文与目录导航，可点击左侧目录快速定位章节。</p>
+                                    </div>
                                 </div>
-                                <p id="userCenterReportHistory" class="uc-summary-hint" aria-hidden="true"></p>
-                                <p id="userCenterReportSwitchHint" class="uc-summary-hint"></p>
+                                <div class="career-report-shell">
+                                    <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
+                                    <div class="career-report-layout">
+                                        <aside id="careerReportAside" class="career-report-aside"></aside>
+                                        <div id="careerReportMain" class="career-report-main"></div>
+                                    </div>
+                                </div>
                             </section>
                         </div>
 
-                        <section class="uc-surface uc-role-strip-surface">
-                            <div class="uc-role-strip-line">
-                                <div class="uc-role-strip-label">目标岗位追踪</div>
-                                <div id="userCenterTargetRoles" class="uc-role-strip-list" aria-live="polite">
-                                    <span class="uc-role-strip-empty">正在加载岗位追踪...</span>
-                                </div>
-                                <div class="uc-role-strip-actions">
-                                    <button id="userCenterTargetRoleAddBtn" type="button" class="uc-filter-chip">+ 添加岗位</button>
-                                    <button type="button" class="uc-filter-chip active" data-role-filter="all">全部</button>
-                                    <button type="button" class="uc-filter-chip" data-role-filter="employed">在职</button>
-                                    <button type="button" class="uc-filter-chip" data-role-filter="reapply">再投</button>
-                                    <button type="button" class="uc-filter-chip" data-role-filter="expected">期望</button>
-                                    <button type="button" class="uc-filter-chip" data-role-filter="left">离职</button>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="uc-surface">
-                            <div class="uc-block-head">
-                                <div>
-                                    <p class="uc-section-kicker">Report Reader</p>
-                                    <h3 class="uc-block-title">职业报告正文</h3>
-                                    <p class="uc-block-copy">这里会加载当前选择版本的正文内容与侧栏目录。默认先展示报告状态，选中版本后再展开完整正文。</p>
-                                </div>
-                            </div>
-                            <div class="career-report-shell">
-                                <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
-                                <div class="career-report-layout">
-                                    <aside id="careerReportAside" class="career-report-aside"></aside>
-                                    <div id="careerReportMain" class="career-report-main"></div>
-                                </div>
-                            </div>
-                        </section>
                     </div>
                 </section>
 
@@ -477,17 +508,43 @@
                             <div class="uc-account-card-head">
                                 <div>
                                     <h3>系统 API 配置</h3>
-                                    <p id="upAccountPermissionHint" class="uc-muted-copy">管理员可在这里打开模型与 Provider 配置；普通用户仅保留查看权限。</p>
+                                    <p id="upAccountPermissionHint" class="uc-muted-copy">在这里直接管理 API Provider，添加或删除 Base URL 与 API Key。</p>
                                 </div>
+                                <button type="button" class="career-report-primary-btn" id="ucApiToggleBtn" onclick="ucApiTogglePanel()">打开配置</button>
                             </div>
-                            <div id="upAdminBar" class="up-admin-bar">
-                                <button type="button" class="up-admin-link" onclick="openSettingsPanel()">
-                                    <div class="up-admin-link-copy">
-                                        <strong>系统 API 配置</strong>
-                                        <span>打开模型设置面板，查看或编辑当前可用的 Provider、模型和 API Key。</span>
+
+                            <!-- 内联 API 配置面板 -->
+                            <div id="ucApiInlinePanel" class="uc-api-inline-panel hidden">
+                                <!-- 已配置列表 -->
+                                <div class="uc-api-section-head">
+                                    <span class="uc-api-section-label">已配置的 API Provider</span>
+                                    <button type="button" class="uc-api-add-btn" id="ucApiShowAddBtn" onclick="ucApiShowAdd()">＋ 添加新 API</button>
+                                </div>
+                                <div id="ucApiProviderList" class="uc-api-provider-list">
+                                    <p class="uc-api-loading">正在加载…</p>
+                                </div>
+
+                                <!-- 添加表单（默认折叠） -->
+                                <div id="ucApiAddForm" class="uc-api-add-form hidden">
+                                    <p class="uc-api-add-form-title">添加新 API</p>
+                                    <div class="uc-api-form-grid">
+                                        <label>名称
+                                            <input id="ucApiName" type="text" placeholder="如：DeepSeek / OpenRouter">
+                                        </label>
+                                        <label>Base URL
+                                            <input id="ucApiBaseUrl" type="text" placeholder="https://api.deepseek.com/v1">
+                                        </label>
+                                        <label>API Key
+                                            <input id="ucApiKey" type="password" placeholder="sk-...">
+                                        </label>
                                     </div>
-                                    <span>打开配置</span>
-                                </button>
+                                    <div class="uc-api-form-actions">
+                                        <button type="button" class="career-report-primary-btn" onclick="ucApiSubmitAdd()">确认添加</button>
+                                        <button type="button" class="career-report-secondary-btn" onclick="ucApiHideAdd()">取消</button>
+                                    </div>
+                                </div>
+
+                                <p class="uc-api-hint">在各功能页面点击「选择模型」，选择对应 Provider 和模型后生效。</p>
                             </div>
                         </section>
                     </div>
@@ -570,9 +627,541 @@
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260401-app-restore-v1"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260402-news-board-fix-v1"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20260401-app-hotfix-v2"></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260402-restoration-v1"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}?v=20260401-user-center-v3"></script>
+    <style>
+      /* ── 报告列表视图 ── */
+      .uc-rpt-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+        gap: 20px;
+        align-items: stretch;
+      }
+      .uc-rpt-card-grid > .uc-rpt-card:only-child,
+      .uc-rpt-card-grid > .uc-rpt-card-empty:only-child {
+        width: min(100%, 620px);
+        justify-self: start;
+      }
+      .uc-rpt-card {
+        background: var(--uc-surface-strong);
+        border: 1px solid var(--uc-line);
+        border-radius: 18px;
+        padding: 26px 28px;
+        cursor: pointer;
+        transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        position: relative;
+        min-height: 164px;
+        text-align: left;
+      }
+      .uc-rpt-card:hover {
+        box-shadow: 0 8px 28px rgba(15,23,42,0.12);
+        transform: translateY(-2px);
+        border-color: var(--uc-accent);
+      }
+      .uc-rpt-card-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 4px 10px;
+        border-radius: 99px;
+        width: fit-content;
+      }
+      .uc-rpt-card-badge.latest {
+        background: rgba(37,99,235,0.1);
+        color: var(--uc-accent);
+      }
+      .uc-rpt-card-badge.history {
+        background: rgba(100,116,139,0.1);
+        color: var(--uc-muted);
+      }
+      .uc-rpt-card-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--uc-copy);
+        line-height: 1.35;
+      }
+      .uc-rpt-card-meta {
+        font-size: 14px;
+        color: var(--uc-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .uc-rpt-card-meta span { display: flex; align-items: center; gap: 5px; }
+      .uc-rpt-card-arrow {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        color: #cbd5e1;
+        font-size: 24px;
+        transition: color 0.2s, transform 0.2s;
+      }
+      .uc-rpt-card:hover .uc-rpt-card-arrow {
+        color: var(--uc-accent);
+        transform: translateX(3px);
+      }
+      .uc-rpt-card-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 56px 24px;
+        color: var(--uc-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        background: var(--uc-surface);
+        border-radius: 14px;
+        border: 1px dashed var(--uc-line-strong);
+      }
+      .uc-rpt-card-empty-icon { font-size: 36px; }
+      .uc-rpt-card-empty p { font-size: 14px; font-weight: 600; margin: 0; }
+      .uc-rpt-card-empty-sub { font-size: 12px; color: #94a3b8; margin: 0; }
+
+      /* ── 详情视图返回栏 ── */
+      .uc-rpt-back-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0 4px;
+        flex-wrap: wrap;
+      }
+      .uc-rpt-back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--uc-accent);
+        background: rgba(37,99,235,0.08);
+        border: none;
+        border-radius: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition: background 0.18s;
+        flex-shrink: 0;
+      }
+      .uc-rpt-back-btn:hover { background: rgba(37,99,235,0.15); }
+      .uc-rpt-back-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--uc-copy);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ── 内联 API 配置面板 ── */
+      .uc-api-inline-panel {
+        margin-top: 16px;
+        border-top: 1px solid var(--uc-line);
+        padding-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .uc-api-inline-panel.hidden { display: none; }
+      .uc-api-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .uc-api-section-label {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--uc-muted);
+      }
+      .uc-api-add-btn {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--uc-accent);
+        background: rgba(37,99,235,0.08);
+        border: none;
+        border-radius: 7px;
+        padding: 5px 12px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .uc-api-add-btn:hover { background: rgba(37,99,235,0.15); }
+      .uc-api-provider-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .uc-api-loading {
+        font-size: 12px;
+        color: var(--uc-muted);
+        text-align: center;
+        padding: 12px 0;
+        margin: 0;
+      }
+      .uc-api-provider-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--uc-line);
+        background: #f8fafc;
+        transition: border-color 0.15s;
+      }
+      .uc-api-provider-row.selected {
+        background: rgba(37,99,235,0.05);
+        border-color: rgba(37,99,235,0.28);
+      }
+      .uc-api-provider-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .uc-api-provider-info { flex: 1; min-width: 0; }
+      .uc-api-provider-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--uc-copy);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .uc-api-provider-badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 99px;
+        font-weight: 600;
+      }
+      .uc-api-provider-badge.sel {
+        background: rgba(37,99,235,0.12);
+        color: var(--uc-accent);
+      }
+      .uc-api-provider-badge.tag {
+        background: #f1f5f9;
+        color: #64748b;
+      }
+      .uc-api-provider-url {
+        font-size: 11px;
+        color: var(--uc-muted);
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .uc-api-provider-key {
+        font-size: 11px;
+        color: #94a3b8;
+        font-family: monospace;
+      }
+      .uc-api-provider-del {
+        background: none;
+        border: none;
+        color: #f87171;
+        font-size: 13px;
+        cursor: pointer;
+        padding: 2px 5px;
+        border-radius: 5px;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
+      .uc-api-provider-del:hover { background: rgba(239,68,68,0.1); }
+      .uc-api-add-form {
+        background: #f8faff;
+        border: 1px solid rgba(37,99,235,0.2);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .uc-api-add-form.hidden { display: none; }
+      .uc-api-add-form-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--uc-accent);
+        margin: 0;
+      }
+      .uc-api-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      .uc-api-form-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--uc-muted);
+      }
+      .uc-api-form-grid input {
+        border: 1px solid var(--uc-line-strong);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .uc-api-form-grid input:focus { border-color: var(--uc-accent); }
+      .uc-api-form-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .uc-api-hint {
+        font-size: 11px;
+        color: #94a3b8;
+        text-align: center;
+        margin: 0;
+      }
+      .uc-api-empty-hint {
+        font-size: 12px;
+        color: var(--uc-muted);
+        text-align: center;
+        padding: 16px 0;
+        margin: 0;
+      }
+    </style>
+    <script>
+    /* ═══════════════════════════════════
+       Fix2: 报告列表 / 详情视图切换
+       ═══════════════════════════════════ */
+
+    function ucRptShowDetail(reportId, title) {
+      const listView = document.getElementById('ucRptListView');
+      const detailView = document.getElementById('ucRptDetailView');
+      if (listView) listView.classList.add('hidden');
+      if (detailView) detailView.classList.remove('hidden');
+      if (title) {
+        const titleEl = document.getElementById('ucRptDetailTitle');
+        if (titleEl) titleEl.textContent = title;
+      }
+      // 将视图状态存入 sessionStorage，刷新后可恢复
+      try { sessionStorage.setItem('uc_rpt_view', 'detail'); } catch(_) {}
+    }
+
+    function ucRptShowList() {
+      const listView = document.getElementById('ucRptListView');
+      const detailView = document.getElementById('ucRptDetailView');
+      if (detailView) detailView.classList.add('hidden');
+      if (listView) listView.classList.remove('hidden');
+      try { sessionStorage.setItem('uc_rpt_view', 'list'); } catch(_) {}
+      // 同步更新卡片列表（可能有新报告）
+      setTimeout(ucRptRenderCards, 100);
+    }
+
+    function ucRptRenderCards() {
+      const host = document.getElementById('ucRptCards');
+      if (!host) return;
+      const pack = typeof window.getCareerReportVersionList === 'function'
+        ? window.getCareerReportVersionList()
+        : { versions: [], canonicalReportId: '' };
+      const { versions, canonicalReportId } = pack;
+
+      if (!versions || !versions.length) {
+        host.innerHTML = '<div class="uc-rpt-card-empty">' +
+          '<span class="uc-rpt-card-empty-icon">📄</span>' +
+          '<p>暂无报告记录</p>' +
+          '<p class="uc-rpt-card-empty-sub">先在主界面完善能力画像并锁定目标岗位，再回来生成报告</p>' +
+          '</div>';
+        return;
+      }
+
+      host.innerHTML = versions.map(function(v) {
+        var rid = String(v && v.report_id || '').trim();
+        var title = String(v && v.title || '职业规划报告');
+        var when = String(v && v.generated_at || '--');
+        var role = String(v && v.focus_role_name || '待识别');
+        var isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
+        var badge = isLatest
+          ? '<span class="uc-rpt-card-badge latest">📌 最新版本</span>'
+          : '<span class="uc-rpt-card-badge history">📂 历史版本</span>';
+        return '<button type="button" class="uc-rpt-card" data-rid="' + rid + '" data-title="' + title.replace(/"/g,'&quot;') + '">' +
+          '<span class="uc-rpt-card-arrow">›</span>' +
+          badge +
+          '<div class="uc-rpt-card-title">' + title + '</div>' +
+          '<div class="uc-rpt-card-meta">' +
+            '<span>🎯 目标岗位：' + role + '</span>' +
+            '<span>🕐 生成时间：' + when + '</span>' +
+          '</div>' +
+        '</button>';
+      }).join('');
+
+      host.querySelectorAll('.uc-rpt-card[data-rid]').forEach(function(card) {
+        card.addEventListener('click', function() {
+          var rid = card.getAttribute('data-rid') || '';
+          var title = card.getAttribute('data-title') || '职业规划报告';
+          if (!rid) return;
+          ucRptShowDetail(rid, title);
+          // 触发现有的报告加载逻辑
+          if (typeof userCenterState !== 'undefined') {
+            userCenterState.reportReaderExpanded = true;
+          }
+          var pack2 = typeof window.getCareerReportVersionList === 'function'
+            ? window.getCareerReportVersionList() : { canonicalReportId: '' };
+          if (pack2.canonicalReportId && rid === pack2.canonicalReportId) {
+            if (typeof window.restoreLatestCareerReportView === 'function') {
+              void window.restoreLatestCareerReportView();
+            }
+          } else {
+            if (typeof window.fetchCareerReportVersion === 'function') {
+              void window.fetchCareerReportVersion(rid);
+            }
+          }
+          // 同步高亮 runs 列表中的对应行
+          setTimeout(function() {
+            var runRow = document.querySelector('[data-report-id="' + rid + '"]');
+            if (runRow) runRow.click();
+          }, 200);
+        });
+      });
+    }
+
+    // 监听报告数据变化，自动刷新卡片列表
+    (function() {
+      var _prevLen = -1;
+      function poll() {
+        if (typeof window.getCareerReportVersionList === 'function') {
+          var pack = window.getCareerReportVersionList();
+          var len = (pack.versions || []).length;
+          if (len !== _prevLen) {
+            _prevLen = len;
+            ucRptRenderCards();
+          }
+        }
+        setTimeout(poll, 1800);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(poll, 800); });
+      } else {
+        setTimeout(poll, 800);
+      }
+    })();
+
+    /* ═══════════════════════════════════
+       Fix3: 内联 API 配置面板
+       ═══════════════════════════════════ */
+
+    var _ucApiOpen = false;
+
+    function ucApiTogglePanel() {
+      _ucApiOpen = !_ucApiOpen;
+      var panel = document.getElementById('ucApiInlinePanel');
+      var btn = document.getElementById('ucApiToggleBtn');
+      if (panel) panel.classList.toggle('hidden', !_ucApiOpen);
+      if (btn) btn.textContent = _ucApiOpen ? '收起配置' : '打开配置';
+      if (_ucApiOpen) ucApiLoadProviders();
+    }
+
+    function ucApiShowAdd() {
+      var form = document.getElementById('ucApiAddForm');
+      if (form) { form.classList.remove('hidden'); document.getElementById('ucApiName') && document.getElementById('ucApiName').focus(); }
+    }
+
+    function ucApiHideAdd() {
+      var form = document.getElementById('ucApiAddForm');
+      if (form) form.classList.add('hidden');
+      ['ucApiName','ucApiBaseUrl','ucApiKey'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+
+    async function ucApiLoadProviders() {
+      var listEl = document.getElementById('ucApiProviderList');
+      if (!listEl) return;
+      listEl.innerHTML = '<p class="uc-api-loading">正在加载…</p>';
+      try {
+        var data = await requestJson('/api/llm-providers');
+        var providers = data.providers || [];
+        var selection = data.selection || {};
+        ucApiRenderProviders(providers, selection);
+      } catch(e) {
+        listEl.innerHTML = '<p class="uc-api-loading" style="color:#dc2626">加载失败：' + (e.message || '网络错误') + '</p>';
+      }
+    }
+
+    function ucApiRenderProviders(providers, selection) {
+      var listEl = document.getElementById('ucApiProviderList');
+      if (!listEl) return;
+      var isSuperAdmin = typeof isSuperAdminUser === 'function' ? isSuperAdminUser() : false;
+
+      if (!providers.length) {
+        listEl.innerHTML = '<p class="uc-api-empty-hint">尚未添加任何 API Provider。' + (isSuperAdmin ? '点击右上角「+ 添加新 API」开始配置。' : '请联系管理员配置。') + '</p>';
+        return;
+      }
+
+      var addBtn = document.getElementById('ucApiShowAddBtn');
+      if (addBtn) addBtn.style.display = isSuperAdmin ? '' : 'none';
+
+      var icons = { deepseek: '🐋', openai: '🤖', openrouter: '🔀', claude: '🌟', qwen: '☁️', zhipu: '⚡' };
+      function getIcon(name) {
+        var n = String(name || '').toLowerCase();
+        for (var k in icons) { if (n.includes(k)) return icons[k]; }
+        return '🔌';
+      }
+
+      listEl.innerHTML = providers.map(function(p) {
+        var isSel = selection.provider_id === p.id;
+        var delBtn = isSuperAdmin ? '<button class="uc-api-provider-del" title="删除" onclick="ucApiDeleteProvider(\'' + p.id + '\')">✕</button>' : '';
+        return '<div class="uc-api-provider-row' + (isSel ? ' selected' : '') + '">' +
+          '<div class="uc-api-provider-icon">' + getIcon(p.name) + '</div>' +
+          '<div class="uc-api-provider-info">' +
+            '<div class="uc-api-provider-name">' + (p.name || '未命名') +
+              (isSel ? '<span class="uc-api-provider-badge sel">✓ 当前使用</span>' : '') +
+            '</div>' +
+            '<div class="uc-api-provider-url">' + (p.base_url || '--') + '</div>' +
+            '<div class="uc-api-provider-key">Key: ' + (p.api_key_masked || '未配置') + '</div>' +
+          '</div>' +
+          delBtn +
+        '</div>';
+      }).join('');
+    }
+
+    async function ucApiSubmitAdd() {
+      var name = (document.getElementById('ucApiName') && document.getElementById('ucApiName').value || '').trim();
+      var base_url = (document.getElementById('ucApiBaseUrl') && document.getElementById('ucApiBaseUrl').value || '').trim();
+      var api_key = (document.getElementById('ucApiKey') && document.getElementById('ucApiKey').value || '').trim();
+      if (!base_url || !api_key) {
+        if (typeof showToast === 'function') showToast('填写不完整', '请填写 Base URL 和 API Key', 'warning', 2000);
+        return;
+      }
+      try {
+        await requestJson('/api/llm-providers', { method: 'POST', body: { name: name || '未命名', base_url, api_key } });
+        if (typeof showToast === 'function') showToast('API 已添加', name || '未命名', 'success', 1600);
+        ucApiHideAdd();
+        await ucApiLoadProviders();
+      } catch(e) {
+        if (typeof showToast === 'function') showToast('添加失败', e.message, 'error', 2400);
+      }
+    }
+
+    async function ucApiDeleteProvider(providerId) {
+      if (!confirm('确认删除此 API 配置？')) return;
+      try {
+        await requestJson('/api/llm-providers/' + providerId, { method: 'DELETE' });
+        if (typeof showToast === 'function') showToast('已删除', '', 'success', 1400);
+        await ucApiLoadProviders();
+      } catch(e) {
+        if (typeof showToast === 'function') showToast('删除失败', e.message, 'error', 2000);
+      }
+    }
+    </script>
 </body>
 </html>

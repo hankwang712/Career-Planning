@@ -3443,10 +3443,11 @@ function addLiveActivity(message) {
 
 const careerNewsState = {
   initialized: false,
-  expanded: false,
   filter: "all",
   sort: "newest",
   displayLimit: 10,
+  currentPage: 1,
+  pageSize: 5,     // 列表行每页条数
   items: []
 };
 
@@ -3483,16 +3484,18 @@ function _updateCareerNewsFilterBtnState() {
 
 function _applyCareerNewsBoard() {
   const board = document.getElementById("careerNewsBoard");
-  const grid = document.getElementById("careerNewsGrid");
-  const more = document.getElementById("careerNewsMore");
-  const btn = document.getElementById("careerNewsMoreBtn");
-  if (!board || !grid || !more) return;
+  const featured = document.getElementById("careerNewsFeatured");
+  const listRows = document.getElementById("careerNewsListRows");
+  const pagination = document.getElementById("careerNewsPagination");
+  if (!board || !featured || !listRows) return;
 
+  // 过滤
   let working = [...careerNewsState.items];
   if (careerNewsState.filter !== "all") {
     working = working.filter((el) => String(el.dataset.group || "all") === careerNewsState.filter);
   }
 
+  // 排序
   working.sort((a, b) => {
     if (careerNewsState.sort === "relevance") {
       const scoreDiff = _careerNewsScore(b) - _careerNewsScore(a);
@@ -3502,31 +3505,57 @@ function _applyCareerNewsBoard() {
     return _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a);
   });
 
-  grid.innerHTML = "";
-  more.innerHTML = "";
+  // 更新序号
   working.forEach((el, idx) => {
     const rank = el.querySelector(".career-news-rank");
     if (rank) rank.textContent = String(idx + 1);
-    if (idx < careerNewsState.displayLimit) {
-      grid.appendChild(el);
-    } else {
-      more.appendChild(el);
-    }
   });
 
-  const hiddenCount = Math.max(0, working.length - careerNewsState.displayLimit);
-  const showingCount = Math.min(careerNewsState.displayLimit + (careerNewsState.expanded ? hiddenCount : 0), working.length);
-  const countEl = document.getElementById("careerNewsShowingCount");
-  if (countEl) countEl.textContent = `当前展示 ${showingCount} / ${working.length} 条`;
+  // ── 精选大卡（第一条） ──
+  featured.innerHTML = "";
+  const featuredItem = working[0];
+  if (featuredItem) {
+    featuredItem.classList.remove("career-news-list-row");
+    featured.appendChild(featuredItem);
+  }
 
-  more.classList.toggle("hidden", !careerNewsState.expanded || hiddenCount === 0);
-  if (btn) {
-    const expandText = hiddenCount > 0 ? `查看更多 +${hiddenCount}` : "暂无更多";
-    btn.dataset.expandText = expandText;
-    btn.textContent = (careerNewsState.expanded && hiddenCount > 0)
-      ? (btn.dataset.collapseText || "收起")
-      : expandText;
-    btn.classList.toggle("hidden", hiddenCount === 0);
+  // ── 分页列表行（第二条起） ──
+  const listItems = working.slice(1);
+  const totalPages = Math.max(1, Math.ceil(listItems.length / careerNewsState.pageSize));
+  careerNewsState.currentPage = Math.min(careerNewsState.currentPage, totalPages);
+
+  const startIdx = (careerNewsState.currentPage - 1) * careerNewsState.pageSize;
+  const pageItems = listItems.slice(startIdx, startIdx + careerNewsState.pageSize);
+
+  listRows.innerHTML = "";
+  pageItems.forEach((el) => {
+    el.classList.add("career-news-list-row");
+    listRows.appendChild(el);
+  });
+
+  // ── 分页控制 ──
+  if (pagination) {
+    if (totalPages <= 1) {
+      pagination.classList.add("hidden");
+    } else {
+      pagination.classList.remove("hidden");
+      const p = careerNewsState.currentPage;
+      pagination.innerHTML = `
+        <button class="career-news-page-btn" onclick="careerNewsGoPage(${p - 1})" ${p <= 1 ? "disabled" : ""}>← 上一页</button>
+        <span class="career-news-page-info">第 ${p} / ${totalPages} 页</span>
+        <button class="career-news-page-btn" onclick="careerNewsGoPage(${p + 1})" ${p >= totalPages ? "disabled" : ""}>下一页 →</button>
+      `;
+    }
+  }
+
+  // ── 计数更新 ──
+  const countEl = document.getElementById("careerNewsShowingCount");
+  if (countEl) {
+    if (totalPages <= 1) {
+      countEl.textContent = `共 ${working.length} 条`;
+    } else {
+      countEl.textContent = `第 ${careerNewsState.currentPage} / ${totalPages} 页 · 共 ${working.length} 条`;
+    }
   }
 }
 
@@ -3535,7 +3564,9 @@ function initCareerNewsBoard() {
   if (!board || careerNewsState.initialized) return;
   careerNewsState.initialized = true;
   careerNewsState.displayLimit = Math.max(1, Number(board.dataset.displayLimit || 10));
-  careerNewsState.items = [...board.querySelectorAll(".career-news-item")];
+  // 从数据池读取所有条目
+  const pool = document.getElementById("careerNewsPool");
+  careerNewsState.items = [...(pool || board).querySelectorAll(".career-news-item")];
 
   const bar = document.getElementById("careerNewsFilterBar");
   if (bar) {
@@ -3543,7 +3574,7 @@ function initCareerNewsBoard() {
       const btn = event.target.closest(".career-news-filter-btn");
       if (!btn) return;
       careerNewsState.filter = String(btn.dataset.filter || "all");
-      careerNewsState.expanded = false;
+      careerNewsState.currentPage = 1; // 切换过滤重置到第1页
       _updateCareerNewsFilterBtnState();
       _applyCareerNewsBoard();
     });
@@ -3553,6 +3584,7 @@ function initCareerNewsBoard() {
   if (sortSelect) {
     sortSelect.addEventListener("change", () => {
       careerNewsState.sort = String(sortSelect.value || "newest");
+      careerNewsState.currentPage = 1; // 切换排序重置到第1页
       _applyCareerNewsBoard();
     });
   }
@@ -3561,11 +3593,18 @@ function initCareerNewsBoard() {
   _applyCareerNewsBoard();
 }
 
-function toggleCareerNewsMore() {
+// 分页跳转（替代原 toggleCareerNewsMore）
+function careerNewsGoPage(page) {
   if (!careerNewsState.initialized) initCareerNewsBoard();
-  careerNewsState.expanded = !careerNewsState.expanded;
+  careerNewsState.currentPage = Math.max(1, page);
   _applyCareerNewsBoard();
+  // 平滑滚动到新闻板块顶部
+  const board = document.getElementById("careerNewsBoard");
+  if (board) board.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+// 兼容旧调用（以防模板中还有残留）
+function toggleCareerNewsMore() { careerNewsGoPage(careerNewsState.currentPage + 1); }
 
 function clampPercent(value, fallback = 0) {
   const num = Number(value);
@@ -5664,6 +5703,8 @@ function showSection(sectionId) {
     }
   });
   appState.currentSection = sectionId;
+  // 更新 URL hash，让 return-nav 能记录当前 section，返回时恢复正确页面
+  try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
   if (sectionId === "report") markReportGenerated();
   if (sectionId === "jobs" && allJobsData.length === 0) loadJobs();
   if (sectionId === "profile") {
@@ -6274,6 +6315,14 @@ document.addEventListener("DOMContentLoaded", function () {
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
     refreshUnifiedExperience();
+    // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
+    try {
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "qa"];
+      const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
+      if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
+        showSection(hashId);
+      }
+    } catch (_) {}
   });
 
   // 双保险绑定，避免仅依赖内联 onclick 在部分环境失效。

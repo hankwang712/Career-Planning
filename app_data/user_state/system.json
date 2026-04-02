@@ -1,6 +1,6 @@
 {
   "assessment_hub": {
-    "savedAt": 1775115535337,
+    "savedAt": 1775122340892,
     "mbti": {
       "currentIndex": 92,
       "answers": {
@@ -98,26 +98,6 @@
         "92": "a_strong",
         "93": "a_strong"
       },
-      "historyRuns": [
-        {
-          "recordedAt": 1775111962470,
-          "signature": "E:11|I:14|S:25|N:13|T:19|F:22|J:13|P:15",
-          "scores": {
-            "E": 11,
-            "I": 14,
-            "S": 25,
-            "N": 13,
-            "T": 19,
-            "F": 22,
-            "J": 13,
-            "P": 15
-          },
-          "displayType": "ISTP",
-          "code": ""
-        }
-      ],
-      "runSessionId": 1,
-      "archivedSessionId": 1,
       "clarifier": {
         "loading": false,
         "summary": "本轮主要澄清 EI（外向/内向）、TF（思考/情感）和 JP（判断/感知）三个临界维度，以帮助确认用户的倾向。",
@@ -268,25 +248,7 @@
         "88": "yes",
         "89": "yes",
         "90": "yes"
-      },
-      "historyRuns": [
-        {
-          "recordedAt": 1775111962470,
-          "signature": "R:9|I:12|A:12|S:10|E:9|C:7",
-          "scores": {
-            "R": 9,
-            "I": 12,
-            "A": 12,
-            "S": 10,
-            "E": 9,
-            "C": 7
-          },
-          "displayType": "",
-          "code": "IAS"
-        }
-      ],
-      "runSessionId": 1,
-      "archivedSessionId": 1
+      }
     },
     "knowledge_version": "20260321-route-align-v2"
   },

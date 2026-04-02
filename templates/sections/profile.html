@@ -55,7 +55,7 @@
                     <button type="button" class="assessment-hero-btn primary" onclick="openAssessmentModal('mbti')">开始 MBTI 测评</button>
                     <button type="button" class="assessment-hero-btn secondary" onclick="openAssessmentModal('holland')">开始霍兰德测评</button>
                     <button type="button" class="assessment-hero-btn ghost" onclick="openAssessmentModal()">打开测评中心</button>
-                    <button type="button" class="assessment-hero-btn ghost" onclick="document.getElementById('assessmentExtendedBoard')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">查看扩展测试区</button>
+                    <button type="button" class="assessment-hero-btn ghost" onclick="window.location.href='/test-runner.html?test=deep'">进入扩展测试中心</button>
                 </div>
             </div>
             <div class="assessment-hero-side">
@@ -76,66 +76,6 @@
                 </div>
             </div>
         </div>
-
-        <section id="assessmentExtendedBoard" class="assessment-extended-board">
-            <div class="assessment-extended-head">
-                <div>
-                            <p class="assessment-result-kicker">扩展测试</p>
-                            <h4 class="assessment-result-title">扩展测试展示区</h4>
-                    <p class="assessment-extended-copy">扩展测试不再只保留一个入口按钮。这里直接展示题型、当前状态和最近一次结果，你可以随时继续测试或查看完整结果。</p>
-                </div>
-                <button type="button" class="assessment-inline-btn" onclick="window.location.href='/test-runner.html?test=deep'">进入扩展测试中心</button>
-            </div>
-            <div class="assessment-extended-grid">
-                <article class="assessment-extended-card accent-deep">
-                    <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
-                            <h5 class="assessment-extended-title">深层 MBTI</h5>
-                        </div>
-                        <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
-                    </div>
-                    <p class="assessment-extended-copy">五档量表题，适合做二次复测和最近两次结果对比。</p>
-                    <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
-                    <div class="assessment-extended-actions">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('deep', true)">开始测试</button>
-                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('deep')">查看结果</button>
-                    </div>
-                </article>
-
-                <article class="assessment-extended-card accent-friends">
-                    <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">老友记测试 · 10 题</p>
-                            <h5 class="assessment-extended-title">老友记角色</h5>
-                        </div>
-                        <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
-                    </div>
-                    <p class="assessment-extended-copy">情景选择题，快速识别你最像哪位角色，并保留最近一次画像结果。</p>
-                    <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
-                    <div class="assessment-extended-actions">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('friends', true)">开始测试</button>
-                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('friends')">查看结果</button>
-                    </div>
-                </article>
-
-                <article class="assessment-extended-card accent-insideout">
-                    <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">情绪测试 · 14 题</p>
-                            <h5 class="assessment-extended-title">头脑特工队</h5>
-                        </div>
-                        <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
-                    </div>
-                    <p class="assessment-extended-copy">情绪选择题，判断当前主导情绪，并把结果接到统一画像的观察维度中。</p>
-                    <div id="dtIOResult" class="assessment-extended-result hidden"></div>
-                    <div class="assessment-extended-actions">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('insideout', true)">开始测试</button>
-                        <button type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('insideout')">查看结果</button>
-                    </div>
-                </article>
-            </div>
-        </section>
 
         <div class="assessment-result-grid">
             <div id="mbtiProfileCard" class="assessment-result-card">
@@ -295,6 +235,66 @@
                 当 MBTI 和霍兰德结果都生成后，这里会自动汇总你的性格倾向与职业兴趣。
             </p>
         </div>
+
+        <section id="assessmentExtendedBoard" class="assessment-extended-board">
+            <div class="assessment-extended-head">
+                <div>
+                    <p class="assessment-result-kicker">扩展测试</p>
+                    <h4 class="assessment-result-title">补充测试入口</h4>
+                    <p class="assessment-extended-copy">这部分只作为补充观察，不替代上面的 MBTI 和霍兰德主结论。</p>
+                </div>
+                <button type="button" class="assessment-inline-btn" onclick="window.location.href='/test-runner.html?test=deep'">进入扩展测试中心</button>
+            </div>
+            <div class="assessment-extended-grid compact">
+                <article class="assessment-extended-card compact accent-deep">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
+                            <h5 class="assessment-extended-title">深层 MBTI</h5>
+                        </div>
+                        <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">适合复测，保留最近相邻记录。</p>
+                    <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions compact">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('deep', true)">开始</button>
+                        <button id="dtDeepResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('deep')" disabled>结果</button>
+                    </div>
+                </article>
+
+                <article class="assessment-extended-card compact accent-friends">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">老友记测试 · 10 题</p>
+                            <h5 class="assessment-extended-title">老友记角色</h5>
+                        </div>
+                        <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">用情景选择看角色偏向。</p>
+                    <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions compact">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('friends', true)">开始</button>
+                        <button id="dtFriendsResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('friends')" disabled>结果</button>
+                    </div>
+                </article>
+
+                <article class="assessment-extended-card compact accent-insideout">
+                    <div class="assessment-extended-card-head">
+                        <div>
+                            <p class="assessment-result-kicker">情绪测试 · 14 题</p>
+                            <h5 class="assessment-extended-title">头脑特工队</h5>
+                        </div>
+                        <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">补充当前主导情绪倾向。</p>
+                    <div id="dtIOResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions compact">
+                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('insideout', true)">开始</button>
+                        <button id="dtIOResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('insideout')" disabled>结果</button>
+                    </div>
+                </article>
+            </div>
+        </section>
 
         <div id="assessmentHistoryCompareModal" class="assessment-history-modal-overlay hidden" onclick="handleAssessmentHistoryOverlayClick(event)">
             <div class="assessment-history-modal">
@@ -583,7 +583,7 @@
             <div class="unified-profile-hero-body">
                 <div class="unified-profile-hero-head">
                     <div>
-                        <p class="unified-profile-kicker">Unified Identity</p>
+                        <p class="unified-profile-kicker">统一画像</p>
                         <h3 id="profileArchetypeName" class="unified-profile-title">职业原型生成中</h3>
                     </div>
                     <button id="profilePortraitGenerateBtn" type="button" onclick="generateProfilePortrait()" class="unified-profile-portrait-btn">
@@ -604,7 +604,7 @@
             <section class="unified-profile-panel">
                 <div class="unified-profile-panel-head">
                     <div>
-                        <p class="unified-profile-kicker">Feature Axes</p>
+                        <p class="unified-profile-kicker">特征坐标</p>
                         <h3 class="unified-profile-section-title">特征坐标</h3>
                     </div>
                 </div>
@@ -614,7 +614,7 @@
             <section class="unified-profile-panel">
                 <div class="unified-profile-panel-head">
                     <div>
-                        <p class="unified-profile-kicker">Work Mode</p>
+                        <p class="unified-profile-kicker">工作方式</p>
                         <h3 class="unified-profile-section-title">工作方式拼图</h3>
                     </div>
                 </div>
@@ -625,7 +625,7 @@
         <section class="unified-profile-panel">
             <div class="unified-profile-panel-head">
                 <div>
-                    <p class="unified-profile-kicker">Evidence Graph</p>
+                    <p class="unified-profile-kicker">证据热力图</p>
                     <h3 class="unified-profile-section-title">证据热力图</h3>
                 </div>
             </div>
@@ -635,7 +635,7 @@
         <section class="unified-profile-panel">
             <div class="unified-profile-panel-head">
                 <div>
-                    <p class="unified-profile-kicker">Uncertainty Zone</p>
+                    <p class="unified-profile-kicker">待验证区</p>
                     <h3 class="unified-profile-section-title">待验证区</h3>
                 </div>
             </div>
@@ -648,7 +648,7 @@
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="flex items-start justify-between gap-4 mb-4">
                     <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Static Memory</p>
+                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">基础信息</p>
                         <h3 class="text-xl font-semibold text-slate-900 mt-1">基础信息入口</h3>
                         <p class="text-sm text-slate-500 mt-1">专业、学历、目标城市和方向会进入统一画像；简历解析后会自动回填，未提供简历时可手动补充。</p>
                     </div>
@@ -682,7 +682,7 @@
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="flex items-start justify-between gap-4 mb-4">
                     <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Unified Profile</p>
+                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">统一画像</p>
                         <h3 class="text-xl font-semibold text-slate-900 mt-1">统一画像摘要</h3>
                     </div>
                     <div class="text-right">
@@ -715,7 +715,7 @@
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-4 mb-4">
                     <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Capability View</p>
+                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力视图</p>
                         <h3 class="text-xl font-semibold text-slate-900 mt-1">能力推断与覆盖度</h3>
                     </div>
                     <button onclick="recalculateProfile()" class="rounded-xl border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">重新同步画像</button>
@@ -730,7 +730,7 @@
 
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Capability Link</p>
+                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力联动</p>
                     <h3 class="text-xl font-semibold text-slate-900 mt-1">优势与不足联动分析</h3>
                     <p class="text-sm text-slate-500 mt-1">展示“已有能力”与“配套能力缺口”的关联，避免单点能力导致岗位推进卡住。</p>
                 </div>
@@ -739,7 +739,7 @@
 
             <div class="rounded-2xl bg-white p-6 shadow-sm">
                 <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">Agent Core</p>
+                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">模块状态</p>
                     <h3 class="text-xl font-semibold text-slate-900 mt-1">记忆 / 规划 / 工具 / 反思状态</h3>
                     <p class="text-sm text-slate-500 mt-1">未实现模块统一标记为 `待接入 / 即将上线`，保留规范接口字段。</p>
                 </div>
