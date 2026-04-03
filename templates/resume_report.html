@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简历分析结果 | 职业规划智能体</title>
+    {% include "partials/head_fonts.html" %}
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    {{ vite_asset_tags('frontend/src/entries/resume-report.js') }}
+</head>
+<body class="rr-page" data-page="resume-report">
+    <div class="rr-shell">
+        <header class="rr-topbar">
+            <div class="rr-topbar-left">
+                <a class="rr-back-link" href="/main.html#profile" data-return-last="1">返回画像页</a>
+                <div class="rr-title-stack">
+                    <p id="rrTopbarKicker" class="rr-topbar-kicker">Resume Analysis</p>
+                    <h1 id="rrTopbarTitle" class="rr-topbar-title">简历详细分析</h1>
+                    <p id="rrTopbarSubtitle" class="rr-topbar-subtitle">完成分析后，这里会展示结构化摘要、重点判断和完整建议。</p>
+                </div>
+            </div>
+            <div class="rr-topbar-actions">
+                <span id="rrCurrentUser" class="rr-user-pill">未登录</span>
+                <button id="rrLogoutBtn" type="button" class="rr-text-btn">退出</button>
+                <button id="rrAvatarBtn" type="button" class="rr-avatar-btn" aria-label="打开个人中心">人</button>
+            </div>
+        </header>
+
+        <main class="rr-main">
+            <section class="rr-hero">
+                <div class="rr-hero-copy">
+                    <p id="rrHeroKicker" class="rr-hero-kicker">详细报告</p>
+                    <h2 id="rrHeroTitle" class="rr-hero-title">等待生成简历分析</h2>
+                    <p id="rrHeroSummary" class="rr-hero-summary">完成匹配后，这里会展示简历摘要、重点判断和完整报告。</p>
+                    <div id="rrHeroMeta" class="rr-hero-meta"></div>
+                </div>
+                <aside id="rrSidebarMeta" class="rr-side-card rr-overview-card"></aside>
+            </section>
+
+            <div id="rrStatusBanner"></div>
+
+            <section class="rr-stage-shell">
+                <div class="rr-stage-head">
+                    <div class="rr-stage-head-copy">
+                        <p class="rr-stage-kicker">阅读结构</p>
+                        <h3 class="rr-stage-title">按章节浏览分析结果</h3>
+                    </div>
+                    <div id="rrSectionTabs" class="rr-section-tabs"></div>
+                </div>
+
+                <div class="rr-stage-layout">
+                    <article id="rrContentRoot" class="rr-stage-main"></article>
+
+                    <aside class="rr-stage-side">
+                        <section class="rr-side-card">
+                            <p class="rr-side-kicker">章节导航</p>
+                            <div id="rrToc" class="rr-toc">
+                                <div class="rr-toc-empty">分析完成后，这里会显示当前章节的小标题导航。</div>
+                            </div>
+                        </section>
+
+                        <section class="rr-side-card">
+                            <p class="rr-side-kicker">阅读说明</p>
+                            <p id="rrSidebarHint" class="rr-side-copy">先看顶部摘要，再切到你最关心的章节。右侧导航只保留当前章节的关键小节。</p>
+                        </section>
+                    </aside>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='resume-report.js') }}?v=20260403-resume-report-white-v1"></script>
+</body>
+</html>

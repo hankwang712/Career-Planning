@@ -1,12 +1,370 @@
 {
-  "window_snapshot_key": "2026-04-02",
-  "window_snapshot_label": "2026-04-02 12:00",
-  "next_refresh_label": "2026-04-03 12:00",
+  "window_snapshot_key": "2026-04-03",
+  "window_snapshot_label": "2026-04-03 12:00",
+  "next_refresh_label": "2026-04-04 12:00",
   "refresh_rule": "每日 12:00 更新",
-  "snapshot_key": "2026-04-02",
-  "snapshot_label": "2026-04-02 12:00",
-  "generated_at": "2026-04-02 14:39",
+  "snapshot_key": "2026-04-03",
+  "snapshot_label": "2026-04-03 12:00",
+  "generated_at": "2026-04-03 13:53",
   "items": [
+    {
+      "title": "微软推出 Azure Copilot Migration Agent，加速云迁移规划",
+      "url": "https://www.infoq.cn/article/ZQsEz5TXqUWGcbk2FWDL?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-03T18:00:00+08:00",
+      "published_label": "04-03 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "招聘+培训双轮驱动 ，滨河街道就业服务站揭牌 - 手机新浪网",
+      "url": "https://news.google.com/rss/articles/CBMisgJBVV95cUxQalUtYkJXWks4WVlOMTlJQzJuX3VxQkwwOUw3MGtzSkRnVFFBMV83VDhwVkVCdi1WNHdEMG92TEROQUh5UlpDT2d4VWxSNDlFbHNmRU1aOFp3cndrTDM1M3BtOFY5eVZPQUpyY1FCdkFwOVVLcDN4MXVSYV9pRjNpVkdKSG9UT1dMNWQya0M5RXJHcmxpekEzR25hNUZXaWxMNGtiSVdhenRfTGZLRkxZWExHN01PWThlZzFRNlkxTWlELUpJOENVQTViVXA1cVR6TGt3WktKbGxucVhlUlZIX1pJNEZDSmNwakhGZXRzd2hpREhMUFE0VzBpV1Z4NjJXTE81TlBFYkZ4N1ppTTRzTmprWFpubEJHSVJUcndRblNTNURPS3ZXbVRfcklvLWh2Snc?oc=5",
+      "summary": "招聘+培训双轮驱动 ，滨河街道就业服务站揭牌 手机新浪网",
+      "source": "Google News / 职业规划",
+      "published_at": "2026-04-03T12:04:56+08:00",
+      "published_label": "04-03 12:04",
+      "topic": "职业规划",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "智元官宣“AI 发布周”4 月 7 日启幕：每个工作日都会发布物理 AI“王炸”突破",
+      "url": "https://www.ithome.com/0/935/660.htm",
+      "summary": "IT之家 4 月 3 日消息，今天上午，@智元AGIBOT 宣布，“智元 AI 发布周”（AGIBOT AI Week）将于 4 月 7 日-14 日 启动。这场为期一周的集中发布，将是智元…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-03T12:00:49+08:00",
+      "published_label": "04-03 12:00",
+      "topic": "科技行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "2026年美国科技行业裁员规模创三年同期新高 - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE5uYmJRdzdrNG50U1FodDdEY2U0eW9JejBHUVlzWFlSSTdianl1eGRLYjRzd25XaHdXTXRObDFSdG9hNUJqSWJxX0o4aGpDNGdWZ2pKTEdnYVNWckdQejltR2VCNFBweXdpR0lIMTduNWtwelc2MEliZA?oc=5",
+      "summary": "2026年美国科技行业裁员规模创三年同期新高 新浪财经",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-03T11:18:00+08:00",
+      "published_label": "04-03 11:18",
+      "topic": "科技行业变化",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "广汽本田 P7 推送 4.2.2 OTA 升级：AI 大模型上车，支持声音复刻",
+      "url": "https://www.ithome.com/0/935/589.htm",
+      "summary": "IT之家 4 月 3 日消息，今日，广汽本田 P7 推送智导互联 4.2.2 OTA 升级，带来 AI 大模型、声音复刻等功能。 IT之家整理如下： AI 大模型上车：支持旅行规划大师、用车…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-03T09:59:57+08:00",
+      "published_label": "04-03 09:59",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "韩国 FuriosaAI 今年量产 2 万颗 RNGD 芯片，计划云与端侧双轨并行",
+      "url": "https://www.ithome.com/0/935/560.htm",
+      "summary": "IT之家 4 月 3 日消息，韩国 AI 芯片企业 FuriosaAI 当地时间昨日举行了其首届 RENEGADE 峰会，宣布了有关其高能效数据中心 AI 推理芯片产品线的一系列进展。 根据…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-03T09:12:11+08:00",
+      "published_label": "04-03 09:12",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "今年美国科技行业裁员规模创2023年以来新高，开年至今已裁逾5万人 - 凤凰网",
+      "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTFA0SkhEcXpBM05CakRrNXhYWUZ0N095TVlVNDJQZXVGZzhKY1BTTTVGXzBXaVhmaTNhczNoOURDNVltZnVhZV9lOA?oc=5",
+      "summary": "今年美国科技行业裁员规模创2023年以来新高，开年至今已裁逾5万人 凤凰网",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-03T08:34:42+08:00",
+      "published_label": "04-03 08:34",
+      "topic": "科技行业变化",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "今年美国科技行业裁员规模创 2023 年以来新高，开年至今已裁逾 5 万人 - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE9lYzk4RzJUSEFfMGdZb195a2Z0Q3I0d0NXc2tBZmJDaWJpS0pQZHJic0NYUGpmZXFGdkpCZ2oweTEtaVV0ajlFLUtKUkVGa29uQVFJYU5DanhiREVVcnBDbFhZT1ZmT2NsNVdjVzBpa2xOZWtacHpzMEhoY2FOM1E?oc=5",
+      "summary": "今年美国科技行业裁员规模创 2023 年以来新高，开年至今已裁逾 5 万人 新浪财经",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-03T08:18:00+08:00",
+      "published_label": "04-03 08:18",
+      "topic": "科技行业变化",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "Google Vids gets AI upgrade with Veo and Lyria models, directable AI avatars",
+      "url": "https://arstechnica.com/ai/2026/04/google-vids-gets-ai-upgrade-with-veo-and-lyria-models-directable-ai-avatars/",
+      "summary": "Google Vids brings together Google's most capable AI creation tools.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-04-03T03:58:37+08:00",
+      "published_label": "04-03 03:58",
+      "topic": "开发与行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "OpenAI Acquires Tech Talk Show ‘TBPN’—and Buys Itself Some Positive News",
+      "url": "https://www.wired.com/story/openai-acquires-tbpn-buys-positive-news-coverage/",
+      "summary": "OpenAI is acquiring TBPN, a business talk show that’s popular among Silicon Valley elites, as i…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-03T03:29:48+08:00",
+      "published_label": "04-03 03:29",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Pinterest said he violated laid-off colleagues’ privacy. Now he’s going public",
+      "url": "https://www.theverge.com/policy/906122/pinterest-employee-fired-obstructionist-speaks-out",
+      "summary": "It was late January, and Pinterest engineer Teddy Martin was on edge about recent layoffs at th…",
+      "source": "The Verge / 科技职场",
+      "published_at": "2026-04-03T03:27:52+08:00",
+      "published_label": "04-03 03:27",
+      "topic": "科技职场",
+      "relevance_score": 6,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "OpenAI acquires TBPN, the buzzy founder-led business talk show",
+      "url": "https://techcrunch.com/2026/04/02/openai-acquires-tbpn-the-buzzy-founder-led-business-talk-show/",
+      "summary": "TBPN, Silicon Valley's cult-favorite tech podcast, will operate independently, even as it's ove…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-03T03:21:00+08:00",
+      "published_label": "04-03 03:21",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "一个周末 + 1100 美元，干完 5 人 6 个月的活：Cloudflare 用 AI“复刻”Next.js，已跑进生产环境",
+      "url": "https://www.infoq.cn/article/XNfsebiwgEd1hbcissWd?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-03T03:07:02+08:00",
+      "published_label": "04-03 03:07",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "从数据留底到隐身进开源，Claude Code 泄露的代码里，处处写着：这家公司人品不行",
+      "url": "https://www.infoq.cn/article/oyztKc9IQUguMOOx6imT?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-03T02:53:27+08:00",
+      "published_label": "04-03 02:53",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "AI 资本大转向：OpenAI 凉、Anthropic 火、马斯克赢",
+      "url": "https://www.infoq.cn/article/jTBOKdUUCdR86YYD1cBF?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-03T01:53:24+08:00",
+      "published_label": "04-03 01:53",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Cursor Launches a New AI Agent Experience to Take On Claude Code and Codex",
+      "url": "https://www.wired.com/story/cusor-launches-coding-agent-openai-anthropic/",
+      "summary": "As Cursor launches the next generation of its product, the AI coding startup has to compete wit…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-03T01:00:00+08:00",
+      "published_label": "04-03 01:00",
+      "topic": "AI 与工作",
+      "relevance_score": 6,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Microsoft takes on AI rivals with three new foundational models",
+      "url": "https://techcrunch.com/2026/04/02/microsoft-takes-on-ai-rivals-with-three-new-foundational-models/",
+      "summary": "MAI released models that can transcribe voice into text as well as generate audio and images af…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-03T00:48:16+08:00",
+      "published_label": "04-03 00:48",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Google announces Gemma 4 open AI models, switches to Apache 2.0 license",
+      "url": "https://arstechnica.com/ai/2026/04/google-announces-gemma-4-open-ai-models-switches-to-apache-2-0-license/",
+      "summary": "Gemma 4 brings the first major update to Google's open models in a year.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-04-03T00:01:33+08:00",
+      "published_label": "04-03 00:01",
+      "topic": "开发与行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Anthropic Says That Claude Contains Its Own Kind of Emotions",
+      "url": "https://www.wired.com/story/anthropic-claude-research-functional-emotions/",
+      "summary": "Researchers at the company found representations inside of Claude that perform functions simila…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-03T00:00:00+08:00",
+      "published_label": "04-03 00:00",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Anthropic says its leak-focused DMCA effort unintentionally hit legit GitHub forks",
+      "url": "https://arstechnica.com/ai/2026/04/anthropic-says-its-leak-focused-dmca-effort-unintentionally-hit-legit-github-forks/",
+      "summary": "But the effort to stop the spread of leaked Claude Code client code is an uphill battle.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-04-02T23:40:53+08:00",
+      "published_label": "04-02 23:40",
+      "topic": "开发与行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "科技行业招聘现状解析：AI人才需求激增但整体市场冷却 - 搜狐网",
+      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxQbW9oSkM3ZXpqUDdPRmhheHF3bzJBYXFvNHJaSlI5TklKQURDN0oxZUJGajhTRGV3U0JkcjJxbTd1WVE5NEdDalM1SmxQX0RpcjUtMFhvZTI4SUxGMTNtWGZLRzJTeVVyeW5xU09IMGl5bHR6MjRTeUZlOEJSQTQ5V3I1eEM3NW1z?oc=5",
+      "summary": "科技行业招聘现状解析：AI人才需求激增但整体市场冷却 搜狐网",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-02T22:45:25+08:00",
+      "published_label": "04-02 22:45",
+      "topic": "科技行业变化",
+      "relevance_score": 5,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "“京彩就业”中国社会科学院大学2026届毕业生春季线下专场双选会2 - thepaper.cn",
+      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTFBvUW9QMkp2Nkh5Qm9tc19fQVFiWWxsb1FVaDFWYi1Rd2pkb1dBdzN6TEU4emplQW1RTjU5cTNNVUIwbnlzejN5ZjlKRWNiTGxkXzB4QzJ6ODBfb3l6OHc?oc=5",
+      "summary": "“京彩就业”中国社会科学院大学2026届毕业生春季线下专场双选会2 thepaper.cn",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-02T20:17:00+08:00",
+      "published_label": "04-02 20:17",
+      "topic": "求职就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "“京彩就业 逐光而上”北京印刷学院2026届毕业生4月双选会 - thepaper.cn",
+      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE9Hc0Z2WTVEbHZqNFRvYUlMMUtrOTJvRmdCMS1LNjhPelk2QmFkUUhzTDh3VDZXNW5QUTBhYThPNEZWWWJ1dnBGTnEycFVqendlamw2ckRXeWVvNElzOGc?oc=5",
+      "summary": "“京彩就业 逐光而上”北京印刷学院2026届毕业生4月双选会 thepaper.cn",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-02T20:17:00+08:00",
+      "published_label": "04-02 20:17",
+      "topic": "求职就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "Our 7 Favorite Humidifiers for Home, Travel & More (2026)",
+      "url": "https://www.wired.com/gallery/the-best-humidifier/",
+      "summary": "From models for traveling to humidifiers that double as planters or air purifiers, we've tested…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-02T19:09:00+08:00",
+      "published_label": "04-02 19:09",
+      "topic": "AI 与工作",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "解锁就业新buff |高校毕业生就业协会+腾讯AI公益行动落地郑州软件职业技术学院 - 中国青年网",
+      "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE9McGVIZ0l6Y2p4MTdyLWlkVkRTYWZCdDZZMHV1ZFZxVV9WVHhVdkxyc1M1d3NjNkNJd2RfVWhmYXNBR01ZZU4zRlNRYU9XZ3d4dDV1NDItWjhMVzNrNzNEN3Njcnk?oc=5",
+      "summary": "解锁就业新buff |高校毕业生就业协会+腾讯AI公益行动落地郑州软件职业技术学院 中国青年网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-02T18:51:00+08:00",
+      "published_label": "04-02 18:51",
+      "topic": "求职就业",
+      "relevance_score": 6,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "Unmasking the Paramilitary Agents Behind Trump’s Violent Immigration Crackdown",
+      "url": "https://www.wired.com/story/border-patrol-bortac-borstar-use-of-force-midway-blitz/",
+      "summary": "A WIRED analysis of DHS records identified dozens of specialized federal agents who used force…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-02T18:00:00+08:00",
+      "published_label": "04-02 18:00",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "“数智青春 智汇未来”2026年云南省大学生“就业引航”宣讲活动举办 - 中青在线",
+      "url": "https://news.google.com/rss/articles/CBMickFVX3lxTE82dXAwRXJwVWItU1VTZk9sOGZNMExVWDNOUVdiUTFGS2YzNEpWRVVjNl9PRXJFeUlzWGhFcXV2SlVPQ1dBY1pIVnpLUnhaUWdzbmJjNEY4bDdxbExVNkRyM3NtYU5XbVh0NlNNdXJIZmlLdw?oc=5",
+      "summary": "“数智青春 智汇未来”2026年云南省大学生“就业引航”宣讲活动举办 中青在线",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-02T17:31:00+08:00",
+      "published_label": "04-02 17:31",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
     {
       "title": "Anthropic 版“龙虾” Conway 曝光：7*24 小时 AI 待命，引入专属插件生态",
       "url": "https://www.ithome.com/0/935/291.htm",
@@ -60,9 +418,9 @@
       ]
     },
     {
-      "title": "大模型算法先进封装、海外总经理？2026年最缺最值钱的岗位有这些 - finance.sina.cn",
+      "title": "大模型算法先进封装、海外总经理？2026年最缺最值钱的岗位有这些 - 新浪财经",
       "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxQbVp3VDR3ektDOUxzaWRJcllBMDBadDRoNDQzM3IwMFRoV00wbFUwM2pJRkkxMU1zRW01cTRWUnZldkVsWWx5WlNKbzVTT3ZXdnVyQUx6c1FZa1B2OHhzcndrVW93Y0dhY1RBUS00b2kwSURvTjV1U2Vrb2Z2RTU5aUpnWU1OSG9XRTBzcjlRQzlVWVBXdXg2eXVyUnZxQktBWEEya1dSTm16TW9BVmI1LXZsb1lvQzFYVEhOWA?oc=5",
-      "summary": "大模型算法先进封装、海外总经理？2026年最缺最值钱的岗位有这些 finance.sina.cn",
+      "summary": "大模型算法先进封装、海外总经理？2026年最缺最值钱的岗位有这些 新浪财经",
       "source": "Google News / AI 与计算机岗位",
       "published_at": "2026-04-02T11:42:17+08:00",
       "published_label": "04-02 11:42",
@@ -204,6 +562,19 @@
       ]
     },
     {
+      "title": "【说案】大学生实习期间因交通事故受伤，可以索赔误工费吗？ - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMifkFVX3lxTE1iVDgtX3dFU1pfbS0zVVlLajQ4WllEcDQtcGdrZGRtZUtNWko3eTB2YzJZSk5HX2gzamRWR0F1NnRndTQ2MzVteWNrU2J3WGs3N05XTFNBLUhVNWtXMmVVNHhpWTNhYnFaZnkwd3NqazZWdnNsQVMxdE9DdE5tZw?oc=5",
+      "summary": "【说案】大学生实习期间因交通事故受伤，可以索赔误工费吗？ 新浪财经",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-02T02:05:29+08:00",
+      "published_label": "04-02 02:05",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
       "title": "1220亿美金！OpenAI 完成史上最大规模融资，微软“退居二线”，首次提及“超级应用”",
       "url": "https://www.infoq.cn/article/0gETwo2o5fFsUQxotf1J?utm_source=rss&utm_medium=article",
       "summary": "点击查看原文>",
@@ -295,377 +666,6 @@
       "match_tags": [
         "career"
       ]
-    },
-    {
-      "title": "大学生求职就业：从“要我下基层”到“我要守家乡” - jpchinapress.com",
-      "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxPQ0dGUkJRWndPQmdlY2xMZlk1OTZXejAzTGZoZUxsdmgxWlJPLWYxeGhDVHlxY0U4RkRRTWhaZUdZdzhRbFgxemU5WGRQVlJ4ZEJRRjcwZllUTElwVU9SaVlKZFMyLW1USnpaQ0VBeEpGTFMwaXRmZThxd2k2a2NXaEJsTzQtaEp6d1E?oc=5",
-      "summary": "大学生求职就业：从“要我下基层”到“我要守家乡” jpchinapress.com",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-04-01T15:56:27+08:00",
-      "published_label": "04-01 15:56",
-      "topic": "求职就业",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "OpenClaw 3.31 重磅更新：“龙虾”框架原生集成腾讯 QQ 机器人",
-      "url": "https://www.ithome.com/0/934/873.htm",
-      "summary": "IT之家 4 月 1 日消息，AI 智能体与自动化框架 OpenClaw 日前正式发布了 v2026.3.31 版本。根据更新日志显示，此版本的主要变动是原生捆绑了 QQ 机器人（QQ Bo…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-01T12:06:03+08:00",
-      "published_label": "04-01 12:06",
-      "topic": "科技行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Anthropic 与澳大利亚政府签署 AI 安全研究谅解备忘录",
-      "url": "https://www.ithome.com/0/934/851.htm",
-      "summary": "IT之家 4 月 1 日消息，Anthropic 当地时间昨日宣布与澳大利亚政府签署了一份谅解备忘录 (MOU)， 双方将在人工智能安全研究领域展开合作 ， 并支持澳大利亚国家人工智能计划的…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-01T11:36:49+08:00",
-      "published_label": "04-01 11:36",
-      "topic": "科技行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Mercor says it was hit by cyberattack tied to compromise of open source LiteLLM project",
-      "url": "https://techcrunch.com/2026/03/31/mercor-says-it-was-hit-by-cyberattack-tied-to-compromise-of-open-source-litellm-project/",
-      "summary": "The AI recruiting startup confirmed a security incident after an extortion hacking crew took cr…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-01T09:42:59+08:00",
-      "published_label": "04-01 09:42",
-      "topic": "全球科技",
-      "relevance_score": 8,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "Running local models on Macs gets faster with Ollama's MLX support",
-      "url": "https://arstechnica.com/apple/2026/03/running-local-models-on-macs-gets-faster-with-ollamas-mlx-support/",
-      "summary": "Apple Silicon Macs get a performance boost thanks to better unified memory usage.",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-04-01T07:00:23+08:00",
-      "published_label": "04-01 07:00",
-      "topic": "开发与行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Claude Code leak exposes a Tamagotchi-style ‘pet’ and an always-on agent",
-      "url": "https://www.theverge.com/ai-artificial-intelligence/904776/anthropic-claude-source-code-leak",
-      "summary": "After Anthropic released Claude Code's 2.1.88 update, users quickly discovered that it containe…",
-      "source": "The Verge / 科技职场",
-      "published_at": "2026-04-01T06:24:19+08:00",
-      "published_label": "04-01 06:24",
-      "topic": "科技职场",
-      "relevance_score": 4,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "ClawTip来了！京东科技首发推出AI智能体的“专属自主零钱包”",
-      "url": "https://www.infoq.cn/article/0LYV5gNFxcNMV4vUeISx?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-01T05:53:56+08:00",
-      "published_label": "04-01 05:53",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "OpenAI, not yet public, raises $3B from retail investors in monster $122B fund raise",
-      "url": "https://techcrunch.com/2026/03/31/openai-not-yet-public-raises-3b-from-retail-investors-in-monster-122b-fund-raise/",
-      "summary": "OpenAI's latest funding round, led by Amazon, Nvidia, and SoftBank, values the AI lab at $852 b…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-01T05:25:04+08:00",
-      "published_label": "04-01 05:25",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "It’s not your imagination: AI seed startups are commanding higher valuations",
-      "url": "https://techcrunch.com/2026/03/31/its-not-your-imagination-ai-seed-startups-are-commanding-higher-valuations/",
-      "summary": "Among the most recent Y Combinator cohort, many startups were commanding $40 million valuations…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-01T05:00:00+08:00",
-      "published_label": "04-01 05:00",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Entire Claude Code CLI source code leaks thanks to exposed map file",
-      "url": "https://arstechnica.com/ai/2026/03/entire-claude-code-cli-source-code-leaks-thanks-to-exposed-map-file/",
-      "summary": "512,000 lines of code that competitors and hobbyists will be studying for weeks.",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-04-01T03:09:33+08:00",
-      "published_label": "04-01 03:09",
-      "topic": "开发与行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "昨夜，Claude 接管电脑狂飙代码！OpenAI 发布最“阴险”插件截胡",
-      "url": "https://www.infoq.cn/article/5PyUjNXpqHs9Zd3kB67m?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-01T01:14:25+08:00",
-      "published_label": "04-01 01:14",
-      "topic": "技术趋势",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "2026年海归留学生求职机构实力推荐榜解析：青林职途凭全行业资源、口碑、导师质量、成功率脱颖而出 - xtrb.cn",
-      "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTFBoZnpQT3FnRWo3WDdVUXJwb1dNQVR3dFFxT3lObEFfZm5uN21VVnNyc2IyeXdyd0E5dmtneS10VXMwZUtyWW82X3U3RGY0RjkzdVlVSk5IYVcwYTVCUEk5djk2cWxFMWc?oc=5",
-      "summary": "2026年海归留学生求职机构实力推荐榜解析：青林职途凭全行业资源、口碑、导师质量、成功率脱颖而出 xtrb.cn",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-04-01T00:00:00+08:00",
-      "published_label": "04-01 00:00",
-      "topic": "职业规划",
-      "relevance_score": 3,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "Health data giant CareCloud says hackers accessed patients’ medical records",
-      "url": "https://techcrunch.com/2026/03/31/carecloud-breach-hackers-accessed-patients-medical-records-ehr/",
-      "summary": "CareCloud, a major provider of medical records storage, said hackers accessed one of its reposi…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-03-31T22:50:02+08:00",
-      "published_label": "03-31 22:50",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "How did Anthropic measure AI's \"theoretical capabilities\" in the job market?",
-      "url": "https://arstechnica.com/ai/2026/03/how-did-anthropic-measure-ais-theoretical-capabilities-in-the-job-market/",
-      "summary": "2023 study made a lot of assumptions about future \"anticipated LLM-powered software.\"",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-03-31T22:01:33+08:00",
-      "published_label": "03-31 22:01",
-      "topic": "开发与行业",
-      "relevance_score": 5,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "湖南召开高校毕业生就业创业暨“智汇潇湘 才聚湖南”动员部署会 营造良好就业创业环境 - 湖南红网",
-      "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9XNG94ck9xZmducDlGQlBKMnZpckFhNU1oWXlGRElyZk40TEZhZ3F2QU01eFRzWXdwZ09xaktzSTRhMmhLQVg2WXNaTlBMRk1lMElnMDRKLWotMEZ2LXAwNVUwQ2steGM?oc=5",
-      "summary": "湖南召开高校毕业生就业创业暨“智汇潇湘 才聚湖南”动员部署会 营造良好就业创业环境 湖南红网",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-03-31T21:20:21+08:00",
-      "published_label": "03-31 21:20",
-      "topic": "求职就业",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "AI Has Flooded All the Weather Apps",
-      "url": "https://www.wired.com/story/ai-has-flooded-all-the-weather-apps/",
-      "summary": "Weather forecasting has gotten a big boost from machine learning. How that translates into what…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-03-31T21:00:00+08:00",
-      "published_label": "03-31 21:00",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "北京化工大学2026届经管·数理·文法·马院·艺术系毕业生专场双选会 - thepaper.cn",
-      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE82S3pRRndLTDlBUGpqQTZMRU1ReXNzRGpfTjljQUtNdkw0TFZCSHdJT056V0FfLWEtUkJzTGg3Q0hrZUYzcGhQMFBobnpFVUJJelFYRzhNWTdscVcyY0E?oc=5",
-      "summary": "北京化工大学2026届经管·数理·文法·马院·艺术系毕业生专场双选会 thepaper.cn",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-03-31T18:48:00+08:00",
-      "published_label": "03-31 18:48",
-      "topic": "求职就业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "北京体育大学2026年春季省市专场人才招聘会 - thepaper.cn",
-      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE8zZmFkS1pPR3ZhakFBRmtpRWJOTnRTbS1LMnc1ekZLUFQxaVNXRFFTdXlkaDIzX3BjVUhKQmw1SDJWUHRqZ0p3ZmRhb0FvOHBIdkIxN1lMajUydG96Y0E?oc=5",
-      "summary": "北京体育大学2026年春季省市专场人才招聘会 thepaper.cn",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-03-31T18:48:00+08:00",
-      "published_label": "03-31 18:48",
-      "topic": "求职就业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "“京彩就业”中华女子学院 2026春季专场双选会（二） - thepaper.cn",
-      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE56NnRmZ2JUYnFZSXJlN2tuSnZBVHNmWEU1NXpVUEp2a1FNcHhUdFJQaGhqWWxhZXZZT1AteXdYbWYzVnhUVFpxZDRTMmxuN1RKSWpaQm9zLVhsU1FsTFE?oc=5",
-      "summary": "“京彩就业”中华女子学院 2026春季专场双选会（二） thepaper.cn",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-03-31T18:42:00+08:00",
-      "published_label": "03-31 18:42",
-      "topic": "求职就业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "阶跃星辰安全研发专家李昌昊确认出席QCon北京站，分享构建 AI Agent 从推理到执行的全链路无侵入可观测体系",
-      "url": "https://www.infoq.cn/article/aY5ud3jSqH1U8cvCCW13?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-03-31T18:00:00+08:00",
-      "published_label": "03-31 18:00",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "化学与分子工程学院举办2026届毕业生就业双选会 - news.pku.edu.cn",
-      "url": "https://news.google.com/rss/articles/CBMic0FVX3lxTE9reEk2VXpId3dSNTZyV2FIOHhURU5xYW5zMW9pM1I4X1RRMzhtXzNYLURMTGYwLS1WbzFhdWxXaEdRelF3UzBoNkZyT0tTZmFBQUY5YW8wUzJELVNsUFp2cmNua3l5X3Yzb2dxTXN2dHktYWM?oc=5",
-      "summary": "化学与分子工程学院举办2026届毕业生就业双选会 news.pku.edu.cn",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-03-31T17:14:19+08:00",
-      "published_label": "03-31 17:14",
-      "topic": "职业规划",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "知乎上线“求职数据通”工具 用AI 帮助毕业生精准择业快讯 - TMT观察网",
-      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTFBsX2dDd1dCZnAyeDBzcDZQNjNCcTJaRkpHWU5TTkZtM2FORG1OXzBTanF1LVdJVUZKYUoxZVF0OC1WXzdDb3dTOEx1NnlzOE1LNG02a19rZUpPTkdV?oc=5",
-      "summary": "知乎上线“求职数据通”工具 用AI 帮助毕业生精准择业快讯 TMT观察网",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-03-31T14:42:00+08:00",
-      "published_label": "03-31 14:42",
-      "topic": "职业规划",
-      "relevance_score": 6,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "开源修图工具 GIMP 3.2.2 版发布：Win10/Win11 安装包瘦身超 100MB",
-      "url": "https://www.ithome.com/0/934/504.htm",
-      "summary": "IT之家 3 月 31 日消息，开源图像编辑器 GIMP 发布 3.2.2 版本更新， 重点修复了图层渲染、PSD 文件导入以及 SVG 矢量图缩放等核心功能漏洞，从而提升软件在复杂工作流中…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-03-31T14:28:23+08:00",
-      "published_label": "03-31 14:28",
-      "topic": "科技行业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "iOS 26.5 Beta 1 实时活动在欧盟接入第三方配件通知，苹果设红线严禁投放广告 / 训练 AI",
-      "url": "https://www.ithome.com/0/934/464.htm",
-      "summary": "IT之家 3 月 31 日消息，科技媒体 9to5Mac 今天（3 月 31 日）发布博文，报道称苹果更新开发者协议， 在欧盟地区为第三方配件接入 iPhone 通知和实时活动（Live A…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-03-31T14:14:23+08:00",
-      "published_label": "03-31 14:14",
-      "topic": "科技行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "知乎上线“求职数据通”工具，以AI和大数据助力毕业生精准择业 - 品玩",
-      "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE5ROS1icHVLbDhSck00azJwOExUaE1mVkNHemEzZU9xNVVybXRISWtVcWRTSVhtOXlqbFMzZHkxamR4OHUxQWJpbQ?oc=5",
-      "summary": "知乎上线“求职数据通”工具，以AI和大数据助力毕业生精准择业 品玩",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-03-31T14:12:35+08:00",
-      "published_label": "03-31 14:12",
-      "topic": "职业规划",
-      "relevance_score": 6,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "Allbirds is selling for $39 million. It raised nearly 10 times that amount in its IPO.",
-      "url": "https://techcrunch.com/2026/03/30/allbirds-is-selling-for-39-million-it-raised-nearly-10-times-that-amount-in-its-ipo/",
-      "summary": "The collapse of the brand, which was originally venture-backed and that went public in 2021, ha…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-03-31T13:30:20+08:00",
-      "published_label": "03-31 13:30",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "T-Mobile Business Promo Codes and Deals",
-      "url": "https://www.wired.com/story/t-mobile-business-promo-code/",
-      "summary": "Discover how to save on T-Mobile Business Internet and phone plans, from sign-up perks and swit…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-03-31T13:00:00+08:00",
-      "published_label": "03-31 13:00",
-      "topic": "AI 与工作",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "Meta计划裁员20%！不是AI替代，而是科技行业的结构性重置 - 搜狐网",
-      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxPSUFhVFNQSnhjQ096NXlYeXpyOFlWZHFaLVBWVUloRzZQSWhkS05fSDNHblMxLWJVX09LSkFJa2lnQlJhUEZXNmxodkctUHEzTU04TjAwNTJCMllrM1JnQzBUdnU2QUtGTDFPaVlOd1RHbWlqdXM2dW1HdDI1VjBYNnhwUmNlUzZ3?oc=5",
-      "summary": "Meta计划裁员20%！不是AI替代，而是科技行业的结构性重置 搜狐网",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-03-31T12:39:05+08:00",
-      "published_label": "03-31 12:39",
-      "topic": "科技行业变化",
-      "relevance_score": 5,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
     }
   ],
   "status": "ready",
@@ -678,8 +678,8 @@
       "topic": "职业规划",
       "kind": "search",
       "status": "ok",
-      "raw_count": 38,
-      "kept_count": 16,
+      "raw_count": 43,
+      "kept_count": 17,
       "error": ""
     },
     {
@@ -688,7 +688,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 49,
+      "kept_count": 43,
       "error": ""
     },
     {
@@ -696,7 +696,7 @@
       "topic": "程序员就业",
       "kind": "search",
       "status": "ok",
-      "raw_count": 57,
+      "raw_count": 65,
       "kept_count": 4,
       "error": ""
     },
@@ -706,7 +706,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 23,
+      "kept_count": 22,
       "error": ""
     },
     {
@@ -714,8 +714,8 @@
       "topic": "科技行业变化",
       "kind": "search",
       "status": "ok",
-      "raw_count": 79,
-      "kept_count": 5,
+      "raw_count": 93,
+      "kept_count": 11,
       "error": ""
     },
     {
@@ -724,7 +724,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 5,
+      "kept_count": 6,
       "error": ""
     },
     {
@@ -733,7 +733,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 60,
-      "kept_count": 4,
+      "kept_count": 3,
       "error": ""
     },
     {
@@ -742,7 +742,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 6,
+      "kept_count": 3,
       "error": ""
     },
     {
@@ -751,7 +751,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 50,
-      "kept_count": 5,
+      "kept_count": 9,
       "error": ""
     },
     {
@@ -760,7 +760,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 2,
+      "kept_count": 4,
       "error": ""
     },
     {

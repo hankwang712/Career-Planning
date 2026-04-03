@@ -11,6 +11,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import threading
 import time
 import urllib.parse
@@ -38,6 +39,7 @@ from services.report import (
 )
 from services.resume import (
     FLEXIBLE_MATCH_ANALYSIS_PROMPT,
+    HR_JUDGE_PROMPT,
     RESUME_REVIEW_PROMPT,
     STRUCTURED_RESUME_PROMPT,
     STRUCTURED_RESUME_SCHEMA,
@@ -97,9 +99,16 @@ except Exception:  # pragma: no cover - optional dependency
     fitz = None
 
 try:
-    from PIL import Image
+    import pdfplumber
+except Exception:  # pragma: no cover - optional dependency
+    pdfplumber = None
+
+try:
+    from PIL import Image, ImageFilter, ImageOps
 except Exception:  # pragma: no cover - optional dependency
     Image = None
+    ImageFilter = None
+    ImageOps = None
 
 try:
     import pytesseract
@@ -1740,49 +1749,227 @@ def _save_resume_pdf(file_storage, username):
     return target_path, saved_name, size
 
 
-def _extract_pdf_text_pages(pdf_path):
-    pages = []
+def _normalize_resume_text(raw_text):
+    return re.sub(r"\s+", " ", str(raw_text or "")).strip()
 
+
+def _resume_text_quality_score(raw_text):
+    text = _normalize_resume_text(raw_text)
+    if not text:
+        return 0.0
+    compact = re.sub(r"\s+", "", text)
+    cjk_count = len(re.findall(r"[\u4e00-\u9fff]", compact))
+    latin_count = len(re.findall(r"[A-Za-z]", compact))
+    digit_count = len(re.findall(r"\d", compact))
+    symbol_bonus = len(re.findall(r"[@:/.()%+\-]", compact))
+    noise_penalty = len(re.findall(r"[=~`|_^<>*]", compact))
+    return (
+        len(compact) * 0.6
+        + cjk_count * 1.8
+        + latin_count * 0.25
+        + digit_count * 0.2
+        + symbol_bonus * 0.1
+        - noise_penalty * 0.8
+    )
+
+
+def _resume_text_meaningful_ratio(raw_text):
+    text = _normalize_resume_text(raw_text)
+    if not text:
+        return 0.0
+    compact = re.sub(r"\s+", "", text)
+    meaningful = len(re.findall(r"[\u4e00-\u9fffA-Za-z0-9@:/.()%+\-]", compact))
+    return meaningful / max(len(compact), 1)
+
+
+def _merge_resume_page_candidates(*candidate_groups):
+    merged = {}
+    for group in candidate_groups:
+        for item in group or []:
+            if not isinstance(item, dict):
+                continue
+            page_no = int(item.get("page_no") or 0)
+            if page_no <= 0:
+                continue
+            text = _normalize_resume_text(item.get("text") or item.get("content") or item.get("markdown") or "")
+            if not text:
+                continue
+            score = _resume_text_quality_score(text)
+            previous = merged.get(page_no)
+            if previous is None or score > previous["score"]:
+                merged[page_no] = {
+                    "page_no": page_no,
+                    "source": str(item.get("source") or "text"),
+                    "text": text,
+                    "score": score,
+                }
+    result = []
+    for page_no in sorted(merged.keys())[:RESUME_MAX_PAGES]:
+        payload = dict(merged[page_no])
+        payload.pop("score", None)
+        result.append(payload)
+    return result
+
+
+def _resolve_tesseract_executable():
+    if pytesseract is None:
+        return ""
+    current = str(getattr(pytesseract.pytesseract, "tesseract_cmd", "") or "").strip()
+    candidates = [
+        current,
+        os.environ.get("TESSERACT_CMD", ""),
+        "tesseract",
+        r"D:\software\OCR\tesseract.exe",
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+    for candidate in candidates:
+        candidate = str(candidate or "").strip()
+        if not candidate:
+            continue
+        if os.path.isabs(candidate) and os.path.exists(candidate):
+            return candidate
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return ""
+
+
+def _configure_tesseract_command():
+    executable = _resolve_tesseract_executable()
+    if executable and pytesseract is not None:
+        pytesseract.pytesseract.tesseract_cmd = executable
+    return executable
+
+
+def _available_tesseract_languages():
+    if pytesseract is None:
+        return []
+    _configure_tesseract_command()
+    try:
+        return [str(item or "").strip() for item in pytesseract.get_languages(config="") if str(item or "").strip()]
+    except Exception:
+        return []
+
+
+def _resolve_resume_ocr_lang():
+    langs = {item.lower() for item in _available_tesseract_languages()}
+    if {"chi_sim", "eng"}.issubset(langs):
+        return "chi_sim+eng"
+    if "chi_sim" in langs:
+        return "chi_sim"
+    if "eng" in langs:
+        return "eng"
+    return ""
+
+
+def _prepare_resume_ocr_image(image):
+    if image is None or Image is None:
+        return image
+    prepared = image.convert("L")
+    if ImageOps is not None:
+        prepared = ImageOps.autocontrast(prepared)
+    if ImageFilter is not None:
+        prepared = prepared.filter(ImageFilter.MedianFilter(size=3))
+    return prepared
+
+
+def _run_resume_ocr(image, lang):
+    if pytesseract is None or image is None or not lang:
+        return ""
+    _configure_tesseract_command()
+    primary_text = ""
+    try:
+        primary_text = pytesseract.image_to_string(image, lang=lang, config="--oem 3 --psm 6")
+    except Exception:
+        primary_text = ""
+    primary_score = _resume_text_quality_score(primary_text)
+    if primary_score >= 900:
+        return _normalize_resume_text(primary_text)
+
+    prepared_image = _prepare_resume_ocr_image(image)
+    if prepared_image is image:
+        return _normalize_resume_text(primary_text)
+
+    try:
+        fallback_text = pytesseract.image_to_string(prepared_image, lang=lang, config="--oem 3 --psm 6")
+    except Exception:
+        fallback_text = ""
+
+    if _resume_text_quality_score(fallback_text) > primary_score:
+        return _normalize_resume_text(fallback_text)
+    return _normalize_resume_text(primary_text)
+
+
+def _extract_pdf_text_pages(pdf_path):
+    pypdf_pages = []
     if PdfReader is not None:
         try:
             reader = PdfReader(pdf_path)
             for idx, page in enumerate(reader.pages[:RESUME_MAX_PAGES], start=1):
-                text = re.sub(r"\s+", " ", str(page.extract_text() or "")).strip()
+                text = _normalize_resume_text(page.extract_text() or "")
                 if text:
-                    pages.append({"page_no": idx, "source": "text", "text": text})
+                    pypdf_pages.append({"page_no": idx, "source": "pypdf", "text": text})
         except Exception:
             pass
 
-    if pages:
-        return pages
+    plumber_pages = []
+    if pdfplumber is not None:
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for idx, page in enumerate(pdf.pages[:RESUME_MAX_PAGES], start=1):
+                    variants = []
+                    for kwargs in ({}, {"layout": True}):
+                        try:
+                            variants.append(page.extract_text(**kwargs) or "")
+                        except TypeError:
+                            variants.append(page.extract_text() or "")
+                        except Exception:
+                            continue
+                    text = max(variants, key=_resume_text_quality_score, default="")
+                    text = _normalize_resume_text(text)
+                    if text:
+                        plumber_pages.append({"page_no": idx, "source": "pdfplumber", "text": text})
+        except Exception:
+            pass
 
+    pymupdf_pages = []
     if fitz is not None:
         try:
             with fitz.open(pdf_path) as doc:
                 for idx in range(min(len(doc), RESUME_MAX_PAGES)):
-                    text = re.sub(r"\s+", " ", str(doc[idx].get_text("text") or "")).strip()
+                    text = _normalize_resume_text(doc[idx].get_text("text") or "")
                     if text:
-                        pages.append({"page_no": idx + 1, "source": "text", "text": text})
+                        pymupdf_pages.append({"page_no": idx + 1, "source": "pymupdf", "text": text})
         except Exception:
-            return pages
-    return pages
+            pass
+
+    return _merge_resume_page_candidates(pypdf_pages, plumber_pages, pymupdf_pages)
 
 
 def _should_fallback_ocr(text_pages, *_):
     if not text_pages:
         return True
     total_chars = 0
+    meaningful_chars = 0
     for item in text_pages:
         if isinstance(item, dict):
             text = item.get("text") or item.get("content") or item.get("markdown") or ""
         else:
             text = item
-        total_chars += len(str(text or ""))
-    return total_chars < 240
+        normalized = _normalize_resume_text(text)
+        compact = re.sub(r"\s+", "", normalized)
+        total_chars += len(compact)
+        meaningful_chars += len(re.findall(r"[\u4e00-\u9fffA-Za-z0-9@:/.()%+\-]", compact))
+    meaningful_ratio = meaningful_chars / max(total_chars, 1)
+    return total_chars < 240 or meaningful_ratio < 0.42
 
 
 def _ocr_pdf_pages(pdf_path):
     if fitz is None or pytesseract is None or Image is None:
+        return []
+    ocr_lang = _resolve_resume_ocr_lang()
+    if not ocr_lang:
         return []
 
     start_at = time.monotonic()
@@ -1794,10 +1981,9 @@ def _ocr_pdf_pages(pdf_path):
                     break
                 pix = doc[idx].get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
                 image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                text = pytesseract.image_to_string(image, lang="chi_sim+eng")
-                text = re.sub(r"\s+", " ", str(text or "")).strip()
+                text = _run_resume_ocr(image, ocr_lang)
                 if text:
-                    pages.append({"page_no": idx + 1, "source": "ocr", "text": text})
+                    pages.append({"page_no": idx + 1, "source": f"ocr:{ocr_lang}", "text": text})
     except Exception:
         return pages
     return pages
@@ -1943,18 +2129,18 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
     if analysis_mode == "job_match":
         _report("job_context", "正在理解岗位文本")
         structured_job = build_job_payload_from_text(job_text)
-        _report("hr_judge", "正在生成岗位匹配分析")
+        _report("hr_judge", "正在生成岗位匹配分析（深度五步审计）")
         analysis_markdown = _call_markdown_chat(
             base_url,
             api_key,
             model,
             [{"role": "user", "content": "请输出最终 Markdown 分析报告。"}],
-            system_prompt=FLEXIBLE_MATCH_ANALYSIS_PROMPT.format(
+            system_prompt=HR_JUDGE_PROMPT.format(
                 datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                job_description=job_text,
+                Job_Description=job_text,
                 raw_resume=resume_text,
             ),
-            max_tokens=3600,
+            max_tokens=6000,
         )
     else:
         _report("resume_review", "正在生成简历诊断")
@@ -2744,6 +2930,14 @@ def user_center_page():
     if not _current_user():
         return redirect(url_for("index"))
     return render_template("user_center.html")
+
+
+@app.route("/resume-report")
+@app.route("/resume-report.html")
+def resume_report_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("resume_report.html")
 
 
 @app.route("/test-result")
@@ -4025,4 +4219,3 @@ if __name__ == "__main__":
         threading.Thread(target=open_browser, daemon=True).start()
 
     app.run(host=host, port=port, debug=False, threaded=True)
-

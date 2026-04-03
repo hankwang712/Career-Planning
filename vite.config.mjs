@@ -16,6 +16,7 @@ export default defineConfig({
         "frontend/src/entries/login.js": path.join(ROOT_DIR, "frontend", "src", "entries", "login.js"),
         "frontend/src/entries/workspace.js": path.join(ROOT_DIR, "frontend", "src", "entries", "workspace.js"),
         "frontend/src/entries/user-center.js": path.join(ROOT_DIR, "frontend", "src", "entries", "user-center.js"),
+        "frontend/src/entries/resume-report.js": path.join(ROOT_DIR, "frontend", "src", "entries", "resume-report.js"),
         "frontend/src/entries/test-result.js": path.join(ROOT_DIR, "frontend", "src", "entries", "test-result.js"),
         "frontend/src/entries/test-runner.js": path.join(ROOT_DIR, "frontend", "src", "entries", "test-runner.js")
       },

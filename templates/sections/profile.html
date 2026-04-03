@@ -328,106 +328,81 @@
     </div>
 
     <div id="profileFlowStep2" class="profile-flow-panel hidden">
-    <div class="resume-workbench mb-6">
-        <div class="resume-workbench-header">
-            <div>
-                <p class="resume-header-kicker">Resume Matcher</p>
-                <h3 class="resume-header-title">简历输入与岗位匹配</h3>
-                <p class="resume-header-copy">上传简历后，可以直接做岗位匹配；如果你还没明确目标岗位，也可以先留空 JD，拿到更偏职业诊断的判断结果。</p>
+    <div class="resume-workbench resume-judge-workspace mb-6">
+        <section class="resume-judge-workspace-header">
+            <div class="resume-judge-heading">
+                <p class="resume-judge-heading-kicker">Resume Matcher</p>
+                <h3 class="resume-judge-heading-title">简历输入与岗位匹配</h3>
+                <p class="resume-judge-heading-copy">按照 2.html 的报告式结构重排这一整屏。上传简历后，可以直接做岗位匹配；如果你还没明确目标岗位，也可以先留空 JD，拿到更偏职业诊断的判断结果。</p>
             </div>
-            <div class="resume-toolbar">
-                <span class="resume-toolbar-badge">企业级分析视图</span>
-                <div class="resume-toolbar-actions">
+            <div class="resume-judge-toolbar">
+                <span class="resume-judge-toolbar-badge">白底报告视图</span>
+                <div class="resume-judge-toolbar-actions">
                     <button id="resumeUploadBtn" type="button" onclick="pickResumeFile()" class="resume-toolbar-btn primary">上传简历</button>
                     <button id="resumeAnalyzeBtn" type="button" onclick="analyzeResumeMatch()" class="resume-toolbar-btn secondary">开始匹配</button>
                     <button id="resumeDeleteBtn" type="button" onclick="deleteResumeProfile()" class="resume-toolbar-btn ghost">删除内容</button>
                 </div>
             </div>
-        </div>
+        </section>
         <input id="resumeFileInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden" onchange="onResumeFileSelected(event)">
 
-        <div class="resume-status-grid">
-            <div class="resume-status-card">
-                <p class="resume-status-label">文件状态</p>
-                <p id="resumeUploadStatus" class="resume-status-value">未上传</p>
-                <p id="resumeUploadMeta" class="resume-status-meta">请先上传 PDF 或 DOCX 简历</p>
+        <section id="resumeJudgeInputSection" class="resume-judge-flow-section">
+            <div class="resume-judge-status-strip">
+                <article class="resume-judge-status-tile">
+                    <p class="resume-status-label">文件状态</p>
+                    <p id="resumeUploadStatus" class="resume-status-value">未上传</p>
+                    <p id="resumeUploadMeta" class="resume-status-meta">请先上传 PDF 或 DOCX 简历</p>
+                </article>
+                <article class="resume-judge-status-tile">
+                    <p class="resume-status-label">分析状态</p>
+                    <p id="resumeAnalyzeStatus" class="resume-status-value">待分析</p>
+                    <p id="resumeAnalyzeMeta" class="resume-status-meta">等待简历上传，JD 可选</p>
+                </article>
+                <article class="resume-judge-status-tile emphasis">
+                    <p class="resume-status-label">综合判断</p>
+                    <p id="resumeConfidence" class="resume-status-score">--</p>
+                    <p id="resumeModelHint" class="resume-status-meta">等待首次匹配结果</p>
+                </article>
             </div>
-            <div class="resume-status-card">
-                <p class="resume-status-label">分析状态</p>
-                <p id="resumeAnalyzeStatus" class="resume-status-value">待分析</p>
-                <p id="resumeAnalyzeMeta" class="resume-status-meta">等待简历上传，JD 可选</p>
-            </div>
-            <div class="resume-status-card emphasis">
-                <p class="resume-status-label">综合判断</p>
-                <p id="resumeConfidence" class="resume-status-score">--</p>
-                <p id="resumeModelHint" class="resume-status-meta">等待首次匹配结果</p>
-            </div>
-        </div>
 
-        <div class="resume-studio-grid">
-            <section class="resume-sidebar-card primary resume-grid-span-12">
-                <div class="resume-sidebar-card-head">
-                    <div>
-                        <p class="resume-sidebar-kicker">Candidate Snapshot</p>
-                        <p class="resume-sidebar-title">候选人摘要</p>
-                    </div>
-                </div>
-                <p id="resumeCandidateSummary" class="resume-summary-text mt-3">暂无匹配结果。</p>
-                <div id="resumeQuickBoard" class="resume-quick-board mt-4"></div>
-                <div class="mt-4">
-                    <p class="resume-block-label">识别角色</p>
-                    <div id="resumeRoleTags" class="assessment-tag-row mt-2"></div>
-                </div>
-                <details class="resume-stack-details mt-4" open>
-                    <summary>关键词与方向</summary>
-                    <div class="resume-stack-content">
-                        <div class="resume-keyword-group">
-                            <p class="resume-block-label">已命中</p>
-                            <div id="resumeMatchedKeywordTags" class="assessment-tag-row mt-2"></div>
+            <div class="resume-judge-stage-grid">
+                <section class="resume-judge-surface-card resume-judge-input-card resume-judge-input-card-wide">
+                    <div class="resume-judge-surface-head">
+                        <div>
+                            <p class="resume-judge-surface-kicker">Role Input</p>
+                            <p class="resume-judge-surface-title">JD / 补充说明</p>
                         </div>
-                        <div class="resume-keyword-group">
-                            <p class="resume-block-label">待补强</p>
-                            <div id="resumeMissingKeywordTags" class="assessment-tag-row mt-2"></div>
-                        </div>
-                        <div class="resume-keyword-group">
-                            <p class="resume-block-label">岗位关键词 / 建议方向</p>
-                            <div id="resumeJobKeywordTags" class="assessment-tag-row mt-2"></div>
+                        <div class="resume-panel-actions">
+                            <span class="resume-local-badge">仅保存到当前用户状态</span>
+                            <button id="resumeJobInputToggleBtn" type="button" class="resume-link-btn" onclick="toggleResumeJobInput()">展开输入区</button>
                         </div>
                     </div>
-                </details>
-                <details class="resume-stack-details mt-3">
-                    <summary>结构化概览</summary>
-                    <div id="resumeOverviewList" class="resume-stack-content mt-2"></div>
-                </details>
-            </section>
+                    <textarea id="resumeJobDescriptionInput" rows="8" class="resume-job-input mt-4" placeholder="可以直接粘贴岗位 JD，也可以只写几句你目前想尝试的方向；如果留空，系统会先根据简历本身做优劣分析和方向建议。"></textarea>
+                    <div id="resumeJobAssist" class="resume-job-assist mt-4"></div>
+                    <p class="resume-panel-help">支持自由文本，不要求固定格式。填写时系统会直接理解原文重点；留空时会自动切换为简历诊断模式。</p>
+                    <div id="resumeUploadProgressWrap" class="hidden resume-progress-card mt-4">
+                        <div class="resume-progress-head">
+                            <span>文件上传进度</span>
+                            <span id="resumeUploadProgressText">0%</span>
+                        </div>
+                        <div class="resume-progress-track">
+                            <div id="resumeUploadProgressBar" class="resume-progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="resume-judge-inline-summary mt-4">
+                        <p class="resume-judge-block-label">当前简历摘要</p>
+                        <p id="resumeCandidateSummary" class="resume-judge-summary-text mt-2">上传简历后会在这里显示摘要，开始匹配后可查看完整结果。</p>
+                    </div>
+                </section>
+            </div>
+        </section>
 
-            <section class="resume-surface-panel resume-grid-span-12">
-                <div class="resume-panel-head">
-                    <div>
-                        <p class="resume-panel-kicker">Role Input</p>
-                        <p class="resume-panel-title">JD / 补充说明</p>
-                    </div>
-                    <div class="resume-panel-actions">
-                        <span class="resume-local-badge">仅保存到当前用户状态</span>
-                        <button id="resumeJobInputToggleBtn" type="button" class="resume-link-btn" onclick="toggleResumeJobInput()">展开输入区</button>
-                    </div>
-                </div>
-                <textarea id="resumeJobDescriptionInput" rows="7" class="resume-job-input mt-4" placeholder="可以直接粘贴岗位 JD，也可以只写几句你目前想尝试的方向；如果留空，系统会先根据简历本身做优劣分析和方向建议。"></textarea>
-                <div id="resumeJobAssist" class="resume-job-assist mt-4"></div>
-                <p class="resume-panel-help">支持自由文本，不要求固定格式。填写时系统会直接理解原文重点；留空时会自动切换为简历诊断模式。</p>
-            </section>
-
-            <div class="resume-progress-grid resume-grid-span-12">
-                <div id="resumeUploadProgressWrap" class="hidden resume-progress-card">
-                    <div class="resume-progress-head">
-                        <span>文件上传进度</span>
-                        <span id="resumeUploadProgressText">0%</span>
-                    </div>
-                    <div class="resume-progress-track">
-                        <div id="resumeUploadProgressBar" class="resume-progress-fill" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div id="resumeAnalyzeProgressWrap" class="hidden resume-progress-card">
+        <section id="resumeJudgeLoadingSection" class="resume-judge-flow-section hidden">
+            <div class="resume-judge-loading-card">
+                <div class="resume-judge-loading-icon">◎</div>
+                <h4 class="resume-judge-loading-title">正在生成简历分析</h4>
+                <p id="resumeJudgeLoadingText" class="resume-judge-loading-copy">系统正在提取简历文本并组织诊断结构，请稍候。</p>
+                <div id="resumeAnalyzeProgressWrap" class="resume-progress-card resume-judge-loading-progress">
                     <div class="resume-progress-head">
                         <span>匹配分析进度</span>
                         <span id="resumeAnalyzeProgressText">0%</span>
@@ -436,28 +411,40 @@
                         <div id="resumeAnalyzeProgressBar" class="resume-progress-fill brand" style="width: 0%"></div>
                     </div>
                 </div>
+                <div class="resume-judge-loading-steps">
+                    <div class="resume-judge-loading-step active" data-step-index="0">提取简历文本</div>
+                    <div class="resume-judge-loading-step" data-step-index="1">结构化简历</div>
+                    <div class="resume-judge-loading-step" data-step-index="2">理解岗位文本</div>
+                    <div class="resume-judge-loading-step" data-step-index="3">生成分析结论</div>
+                </div>
             </div>
+        </section>
 
-            <section class="resume-surface-panel resume-grid-span-12">
-                <div class="resume-panel-head">
+        <section id="resumeJudgeReportSection" class="resume-judge-flow-section hidden">
+            <div class="resume-judge-report-toolbar">
+                <button type="button" class="resume-judge-back-btn" onclick="showResumeJudgeInputView()">返回重新上传</button>
+                <button type="button" class="resume-judge-back-btn" onclick="pickResumeFile()">重新上传简历</button>
+            </div>
+            <section class="resume-judge-report-card">
+                <div class="resume-judge-report-head">
                     <div>
-                        <p class="resume-panel-kicker">Match Overview</p>
-                        <p class="resume-panel-title">分析总览</p>
+                        <p class="resume-judge-surface-kicker">Match Overview</p>
+                        <p class="resume-judge-surface-title">分析总览</p>
                     </div>
-                    <p id="resumeAnalysisResultMeta" class="resume-panel-meta">等待分析</p>
+                    <p id="resumeAnalysisResultMeta" class="resume-judge-report-meta">等待分析</p>
                 </div>
-                <div id="resumeAnalysisResult" class="mt-4"></div>
+                <div id="resumeAnalysisResult" class="resume-judge-report-mount mt-4"></div>
             </section>
+        </section>
 
-            <section class="resume-surface-panel resume-grid-span-12">
-                <div class="resume-panel-head">
-                    <div>
-                        <p class="resume-panel-kicker">Evidence</p>
-                        <p class="resume-panel-title">证据片段</p>
-                    </div>
-                </div>
-                <div id="resumeEvidenceList" class="mt-4"></div>
-            </section>
+        <div class="hidden">
+            <div id="resumeQuickBoard"></div>
+            <div id="resumeRoleTags"></div>
+            <div id="resumeJobKeywordTags"></div>
+            <div id="resumeMatchedKeywordTags"></div>
+            <div id="resumeMissingKeywordTags"></div>
+            <div id="resumeOverviewList"></div>
+            <div id="resumeEvidenceList"></div>
         </div>
     </div>
     <div class="profile-flow-actions mb-6">

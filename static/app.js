@@ -594,6 +594,7 @@ const resumeTaskState = {
   analyzeTimer: null,
   analyzeFrameIndex: 0,
   analyzeStartedAt: 0,
+  forceInputView: false,
   jobInputExpanded: false,
   deckIndices: {},
   reportObserver: null
@@ -617,6 +618,56 @@ function setResumeProgress(kind, percent, label = "", active = false) {
   } else {
     bar.classList.remove("animate-pulse");
   }
+}
+
+function setResumeLoadingText(text) {
+  const el = document.getElementById("resumeJudgeLoadingText");
+  if (!el) return;
+  el.textContent = String(text || "系统正在提取简历文本并组织诊断结构，请稍候。");
+}
+
+function hideResumeProgress(kind) {
+  const wrap = document.getElementById(kind === "upload" ? "resumeUploadProgressWrap" : "resumeAnalyzeProgressWrap");
+  if (wrap) wrap.classList.add("hidden");
+}
+
+function setResumeLoadingStage(stage) {
+  const stageMap = {
+    queued: 0,
+    extract_resume: 0,
+    structured_resume: 1,
+    job_context: 2,
+    resume_review: 3,
+    hr_judge: 3,
+    done: 3,
+    failed: 3
+  };
+  const activeIndex = typeof stage === "number" ? stage : (stageMap[String(stage || "").trim()] ?? 0);
+  document.querySelectorAll(".resume-judge-loading-step").forEach((node) => {
+    const index = Number(node.dataset.stepIndex || 0);
+    node.classList.toggle("active", index === activeIndex);
+    node.classList.toggle("done", index < activeIndex);
+  });
+}
+
+function syncResumeJudgeFlow(state) {
+  const inputSection = document.getElementById("resumeJudgeInputSection");
+  const loadingSection = document.getElementById("resumeJudgeLoadingSection");
+  const reportSection = document.getElementById("resumeJudgeReportSection");
+  if (!inputSection || !loadingSection || !reportSection) return;
+  const status = String(state?.status || "").trim();
+  const hasReport = status === "analyzed" && (String(state?.analysis_result || "").trim() || String(state?.analysis_html || "").trim());
+  const showLoading = resumeTaskState.analyzeInFlight || status === "analyzing";
+  const showReport = !showLoading && hasReport && !resumeTaskState.forceInputView;
+  const showInput = !showLoading && !showReport;
+  inputSection.classList.toggle("hidden", !showInput);
+  loadingSection.classList.toggle("hidden", !showLoading);
+  reportSection.classList.toggle("hidden", !showReport);
+}
+
+function showResumeJudgeInputView() {
+  resumeTaskState.forceInputView = true;
+  syncResumeJudgeFlow(getResumeProfileFromCache());
 }
 
 function updateResumeActionButtons() {
@@ -656,6 +707,8 @@ function startAnalyzeProgressTicker() {
   resumeTaskState.analyzeStartedAt = Date.now();
   resumeTaskState.analyzeFrameIndex = 0;
   setResumeProgress("analyze", 100, "正在启动简历分析 · 0s", true);
+  setResumeLoadingText("系统正在提取简历文本并组织诊断结构，请稍候。");
+  setResumeLoadingStage("queued");
   const stages = ["提取简历文本", "结构化简历", "理解岗位文本", "生成分析结论"];
   resumeTaskState.analyzeTimer = setInterval(() => {
     if (!resumeTaskState.analyzeInFlight) return;
@@ -663,6 +716,8 @@ function startAnalyzeProgressTicker() {
     const stage = stages[resumeTaskState.analyzeFrameIndex % stages.length];
     resumeTaskState.analyzeFrameIndex += 1;
     setResumeProgress("analyze", 100, `${stage} · ${elapsedSec}s`, true);
+    setResumeLoadingText(`${stage}，预计很快完成。`);
+    setResumeLoadingStage(Math.min(3, resumeTaskState.analyzeFrameIndex - 1));
   }, 900);
 }
 
@@ -696,6 +751,8 @@ function applyResumeAnalyzeRuntimeStatus(job, elapsedSec) {
   if (analyzeStatus) analyzeStatus.textContent = stage === "queued" ? "排队中" : "分析中";
   if (analyzeMeta) analyzeMeta.textContent = `${stageLabel} · 已运行 ${elapsedSec}s`;
   setResumeProgress("analyze", 100, `${stageLabel} · ${elapsedSec}s`, true);
+  setResumeLoadingText(`${stageLabel} · 已运行 ${elapsedSec}s`);
+  setResumeLoadingStage(stage);
 }
 
 function getResumeProfileFromCache() {
@@ -813,8 +870,34 @@ function resumeReportBlocksHtml(blocks) {
     if (block.type === "list") {
       return resumeReportListHtml(block);
     }
+    if (block.type === "codeblock") {
+      const id = `rcb-${Math.random().toString(36).slice(2, 9)}`;
+      return `
+        <div class="resume-report-code-block">
+          <div class="resume-report-code-toolbar">
+            <span class="resume-report-code-label">📄 修改后简历范本</span>
+            <button class="resume-report-code-copy" onclick="copyResumeCodeBlock('${id}')">复制全文</button>
+          </div>
+          <pre id="${id}" class="resume-report-code-pre"><code>${escHtml(block.code)}</code></pre>
+        </div>
+      `;
+    }
     return "";
   }).join("");
+}
+
+function copyResumeCodeBlock(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.innerText || el.textContent || "";
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = el.closest(".resume-report-code-block")?.querySelector(".resume-report-code-copy");
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = "已复制 ✓";
+      setTimeout(() => { btn.textContent = prev; }, 2000);
+    }
+  }).catch(() => {});
 }
 
 function resumeMarkdownBlocksHtml(raw) {
@@ -823,6 +906,8 @@ function resumeMarkdownBlocksHtml(raw) {
   let paragraphLines = [];
   let listItems = [];
   let listType = "";
+  let inCodeBlock = false;
+  let codeBlockLines = [];
 
   function flushParagraph() {
     if (!paragraphLines.length) return;
@@ -846,6 +931,19 @@ function resumeMarkdownBlocksHtml(raw) {
 
   lines.forEach((rawLine) => {
     const line = String(rawLine || "").trim();
+
+    // Inside a fenced code block — collect lines until closing fence
+    if (inCodeBlock) {
+      if (/^```/.test(line)) {
+        inCodeBlock = false;
+        blocks.push({ type: "codeblock", code: codeBlockLines.join("\n") });
+        codeBlockLines = [];
+      } else {
+        codeBlockLines.push(rawLine);
+      }
+      return;
+    }
+
     if (!line) {
       flushParagraph();
       flushList();
@@ -854,6 +952,8 @@ function resumeMarkdownBlocksHtml(raw) {
     if (/^```/.test(line)) {
       flushParagraph();
       flushList();
+      inCodeBlock = true;
+      codeBlockLines = [];
       return;
     }
     if (/^-{3,}$/.test(line)) {
@@ -881,6 +981,16 @@ function resumeMarkdownBlocksHtml(raw) {
       listItems.push(resumeInlineMarkupHtml(ordered[1]));
       return;
     }
+    // Checklist items: - [ ] or - [x]
+    const checklist = line.match(/^[-*]\s+\[( |x)\]\s+(.+)$/i);
+    if (checklist) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      const checked = checklist[1].toLowerCase() === "x";
+      listItems.push(`<span class="resume-checklist-icon">${checked ? "✅" : "⬜"}</span> ${resumeInlineMarkupHtml(checklist[2])}`);
+      return;
+    }
     const unordered = line.match(/^[-*]\s+(.+)$/);
     if (unordered) {
       flushParagraph();
@@ -892,6 +1002,10 @@ function resumeMarkdownBlocksHtml(raw) {
     flushList();
     paragraphLines.push(line);
   });
+  // flush any open code block
+  if (inCodeBlock && codeBlockLines.length) {
+    blocks.push({ type: "codeblock", code: codeBlockLines.join("\n") });
+  }
 
   flushParagraph();
   flushList();
@@ -1032,9 +1146,13 @@ function resumeReportLauncherHtml(state, profile, matcher, analysisMode, recomme
   const previewItems = buildResumeReportPreviewItems(titles);
   const matchedCount = Array.isArray(matcher?.matched_keywords) ? matcher.matched_keywords.length : 0;
   const jobCount = Array.isArray(matcher?.job_keywords) ? matcher.job_keywords.length : 0;
-  const summaryText = profile?.candidate_summary || (analysisMode === "resume_review"
-    ? "完整报告会收纳方向建议、优势短板、风险边界和下一步修改建议。"
-    : "完整报告会收纳匹配结论、命中缺口、风险边界和可执行修改建议。");
+  const summaryText = profile?.candidate_summary || (
+    String(state?.status || "").trim() === "failed"
+      ? (humanizeResumeErrorMessage(state?.error_message || state?.analysis_meta?.stage_detail || "") || "这份简历暂时没有生成可阅读的完整报告。")
+      : (analysisMode === "resume_review"
+        ? "完整报告会收纳方向建议、优势短板、风险边界和下一步修改建议。"
+        : "完整报告会收纳匹配结论、命中缺口、风险边界和可执行修改建议。")
+  );
   return `
     <section class="resume-bento-card resume-bento-span-12 resume-details-card resume-report-entry ${hasReport ? "" : "is-placeholder"}">
       <div class="resume-bento-head">
@@ -1042,7 +1160,7 @@ function resumeReportLauncherHtml(state, profile, matcher, analysisMode, recomme
           <p class="resume-bento-kicker">Full Report</p>
           <p class="resume-bento-title">${analysisMode === "resume_review" ? "完整诊断报告" : "完整匹配报告"}</p>
         </div>
-        <button type="button" class="resume-report-open-btn" onclick="openResumeReportModal()" ${hasReport ? "" : "disabled"}>${hasReport ? "查看详细报告" : "等待分析完成"}</button>
+        <button type="button" class="resume-report-open-btn" onclick="openResumeReportPage()" ${hasReport ? "" : "disabled"}>${hasReport ? "跳转详细报告" : (String(state?.status || "").trim() === "failed" ? "分析失败，暂无报告" : "等待分析完成")}</button>
       </div>
       <div class="resume-report-entry-grid">
         <div class="resume-report-entry-summary">
@@ -1077,6 +1195,228 @@ function resumeReportLauncherHtml(state, profile, matcher, analysisMode, recomme
       </div>
     </section>
   `;
+}
+
+function resolveResumeCapabilityScore(profile, key) {
+  const scores = profile?.capability_scores && typeof profile.capability_scores === "object"
+    ? profile.capability_scores
+    : {};
+  const raw = scores[key];
+  const num = Number(raw);
+  return Number.isFinite(num) ? normalizeResumeScore(num) : 0;
+}
+
+function resumeJudgeStoryScore(profile, matcher) {
+  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
+  const experienceCount = Number(overview.experience_count || 0);
+  const projectCount = Number(overview.project_count || 0);
+  const evidenceCount = Array.isArray(profile?.evidence_spans) ? profile.evidence_spans.length : 0;
+  const summaryBonus = profile?.candidate_summary ? 10 : 0;
+  return normalizeResumeScore(42 + experienceCount * 14 + projectCount * 9 + evidenceCount * 4 + summaryBonus);
+}
+
+function resumeJudgeTechScore(profile) {
+  const professional = resolveResumeCapabilityScore(profile, "professional");
+  const learning = resolveResumeCapabilityScore(profile, "learning");
+  const execution = resolveResumeCapabilityScore(profile, "execution");
+  return averageResumeScores([professional, learning, execution]);
+}
+
+function resumeJudgeFormatScore(profile, matcher) {
+  const basics = profile?.basics && typeof profile.basics === "object" ? profile.basics : {};
+  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
+  const baseScore = 44
+    + (basics.major ? 10 : 0)
+    + (basics.grade ? 10 : 0)
+    + (profile?.candidate_summary ? 10 : 0)
+    + Math.min(Number(overview.skill_count || 0) * 3, 16)
+    + Math.min(Number(overview.project_count || 0) * 3, 10);
+  return normalizeResumeScore(baseScore);
+}
+
+function resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections) {
+  const matchedCount = Array.isArray(matcher?.matched_keywords) ? matcher.matched_keywords.length : 0;
+  const jobCount = Array.isArray(matcher?.job_keywords) ? matcher.job_keywords.length : 0;
+  if (analysisMode === "resume_review") {
+    const matching = resolveResumeCapabilityScore(profile, "matching");
+    return matching || normalizeResumeScore((recommendedDirections.length ? 72 : 58) + Math.min(recommendedDirections.length * 6, 18));
+  }
+  if (jobCount > 0) {
+    return normalizeResumeScore((matchedCount / jobCount) * 100);
+  }
+  return resolveResumeCapabilityScore(profile, "matching") || normalizeResumeScore(Number(profile?.confidence || 0) * 100);
+}
+
+function resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections) {
+  return averageResumeScores([
+    normalizeResumeScore(Number(profile?.confidence || 0) * 100),
+    resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections),
+    resumeJudgeStoryScore(profile, matcher),
+    resumeJudgeTechScore(profile),
+    resumeJudgeFormatScore(profile, matcher)
+  ]);
+}
+
+function resumeJudgeScoreOverviewHtml(profile, matcher, analysisMode, recommendedDirections) {
+  const scores = [
+    {
+      label: "综合评分",
+      value: `${resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections)}%`,
+      tone: "primary"
+    },
+    {
+      label: "岗位匹配",
+      value: `${resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections)}%`,
+      tone: ""
+    },
+    {
+      label: "故事线",
+      value: `${resumeJudgeStoryScore(profile, matcher)}%`,
+      tone: "warm"
+    },
+    {
+      label: "技术深度",
+      value: `${resumeJudgeTechScore(profile)}%`,
+      tone: "success"
+    },
+    {
+      label: "格式规范",
+      value: `${resumeJudgeFormatScore(profile, matcher)}%`,
+      tone: ""
+    }
+  ];
+  return `
+    <div class="resume-judge-score-grid">
+      ${scores.map((item) => `
+        <article class="resume-judge-score-card ${escHtml(item.tone || "")}">
+          <span class="resume-judge-score-value">${escHtml(item.value)}</span>
+          <span class="resume-judge-score-label">${escHtml(item.label)}</span>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function resumeJudgePanelsHtml(reportHtml) {
+  if (!reportHtml) return "";
+  if (typeof document === "undefined") return reportHtml;
+  const shell = document.createElement("div");
+  shell.innerHTML = reportHtml;
+  const sections = Array.from(shell.querySelectorAll(".resume-report-section"));
+  sections.forEach((section, index) => {
+    section.classList.add("resume-judge-tab-panel");
+    section.dataset.sectionIndex = String(index + 1);
+    if (index === 0) section.classList.add("active");
+  });
+  return shell.innerHTML;
+}
+
+function resumeJudgeStepLabel(title, index) {
+  const defaults = ["第一印象", "深度审计", "修改蓝图", "简历范本", "最终裁决"];
+  return defaults[index] || title || `章节 ${index + 1}`;
+}
+
+function resumeJudgeTabsHtml(titles) {
+  if (!titles.length) return "";
+  return titles.map((title, index) => `
+    <button type="button" class="resume-judge-tab-btn ${index === 0 ? "active" : ""}" data-section-index="${index + 1}" onclick="switchResumeJudgeTab(${index + 1})">
+      ${String(index + 1).padStart(2, "0")} ${escHtml(resumeJudgeStepLabel(title, index))}
+    </button>
+  `).join("");
+}
+
+function resumeJudgeSidebarHtml(profile, matcher, analysisMode, recommendedDirections, titles) {
+  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
+  const focusTags = analysisMode === "resume_review"
+    ? previewTagValues(recommendedDirections, 4)
+    : previewTagValues(matcher?.matched_keywords || [], 4);
+  return `
+    <aside class="resume-judge-side">
+      <div class="resume-judge-side-card">
+        <p class="resume-judge-side-kicker">分析概览</p>
+        <p class="resume-judge-side-title">${escHtml(profile?.candidate_summary || "等待生成候选人摘要")}</p>
+        <div class="resume-judge-side-list">
+          <div class="resume-judge-side-row"><span>角色</span><strong>${escHtml(overview.headline || "待识别")}</strong></div>
+          <div class="resume-judge-side-row"><span>经历</span><strong>${Number(overview.experience_count || 0)} 段</strong></div>
+          <div class="resume-judge-side-row"><span>项目</span><strong>${Number(overview.project_count || 0)} 个</strong></div>
+          <div class="resume-judge-side-row"><span>章节</span><strong>${titles.length || 1} 个</strong></div>
+        </div>
+      </div>
+      <div class="resume-judge-side-card">
+        <p class="resume-judge-side-kicker">关键焦点</p>
+        <div class="resume-judge-side-tags">
+          ${focusTags.length ? focusTags.map((item) => `<span class="resume-judge-side-tag">${escHtml(item)}</span>`).join("") : `<span class="resume-judge-side-tag muted">等待生成关键词</span>`}
+        </div>
+      </div>
+    </aside>
+  `;
+}
+
+function resumeJudgeDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections) {
+  const hasReport = state?.status === "analyzed" && (String(state?.analysis_result || "").trim() || String(state?.analysis_html || "").trim());
+  const reportHtml = hasReport ? resumeDetailedReportHtml(state) : "";
+  const titles = hasReport ? extractResumeReportTitles(reportHtml) : [];
+  const modeLabel = analysisMode === "resume_review" ? "简历诊断报告" : "岗位匹配报告";
+  const panelsHtml = hasReport ? resumeJudgePanelsHtml(reportHtml) : "";
+  const subtitle = state?.analyzed_at
+    ? `最近生成于 ${formatUnixTime(state.analyzed_at)}`
+    : "完成匹配后，这里会生成完整报告。";
+  return `
+    <div id="resumeJudgeShell" class="resume-judge-shell">
+      <section class="resume-judge-hero">
+        <div class="resume-judge-hero-main">
+          <div class="resume-judge-hero-top">
+            <div>
+              <span class="resume-judge-badge">诊断报告</span>
+              <h4 class="resume-judge-title">${escHtml(modeLabel)}</h4>
+              <p class="resume-judge-copy">${escHtml(profile?.candidate_summary || "系统已根据当前简历生成结构化分析结果。")}</p>
+            </div>
+            <div class="resume-judge-actions">
+              <button type="button" class="resume-judge-action-btn primary" onclick="openResumeReportPage()">查看独立页</button>
+              <button type="button" class="resume-judge-action-btn" onclick="analyzeResumeMatch()">重新匹配</button>
+            </div>
+          </div>
+          <p class="resume-judge-meta">${escHtml(subtitle)}</p>
+          ${resumeJudgeScoreOverviewHtml(profile, matcher, analysisMode, recommendedDirections)}
+        </div>
+      </section>
+
+      <div class="resume-judge-tabbar">
+        ${resumeJudgeTabsHtml(titles)}
+      </div>
+
+      <div class="resume-judge-layout">
+        <div class="resume-judge-main">
+          <div class="resume-judge-panels">
+            ${panelsHtml}
+          </div>
+        </div>
+        ${resumeJudgeSidebarHtml(profile, matcher, analysisMode, recommendedDirections, titles)}
+      </div>
+    </div>
+  `;
+}
+
+function switchResumeJudgeTab(index) {
+  const shell = document.getElementById("resumeJudgeShell");
+  if (!shell) return;
+  const safeIndex = Number(index || 1);
+  shell.querySelectorAll(".resume-judge-tab-btn, .resume-hj-tab-btn").forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.sectionIndex || 0) === safeIndex);
+  });
+  shell.querySelectorAll(".resume-judge-tab-panel, .resume-hj-panel").forEach((panel) => {
+    panel.classList.toggle("active", Number(panel.dataset.sectionIndex || 0) === safeIndex);
+  });
+}
+
+function openResumeReportPage() {
+  const state = userWorkspaceState.scopedData.resume_profile || emptyResumeProfile();
+  const hasReport = state?.status === "analyzed" && (String(state?.analysis_result || "").trim() || String(state?.analysis_html || "").trim());
+  if (!hasReport) {
+    showToast("完整报告未生成", "请先完成简历分析。", "warning", 1800);
+    return;
+  }
+  window.location.href = "/resume-report.html";
 }
 
 function renderResumeReportModal(state, profile, matcher, analysisMode, recommendedDirections) {
@@ -1309,6 +1649,29 @@ function shortenResumeText(value, max = 92) {
   if (!text) return "";
   if (text.length <= max) return text;
   return `${text.slice(0, max)}...`;
+}
+
+function humanizeResumeErrorMessage(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return "";
+  if (text.includes("未能从简历中提取到有效文本")) {
+    return "这份简历更像扫描版图片，系统暂时没有拿到可分析文本。建议优先上传文字版 PDF 或 DOCX；如果继续使用扫描版 PDF，识别结果可能会有偏差。";
+  }
+  return text;
+}
+
+function resumeProfileSummaryText(state, profile) {
+  if (profile?.candidate_summary) return profile.candidate_summary;
+  const status = String(state?.status || "").trim();
+  const hasFile = Boolean(state?.file_name);
+  const errorText = humanizeResumeErrorMessage(state?.error_message || state?.analysis_meta?.stage_detail || "");
+  if (status === "failed" && hasFile) {
+    return errorText || "简历已上传，但本次分析失败。请检查文件内容后重新开始匹配。";
+  }
+  if (hasFile) {
+    return "简历已上传，当前还没有生成分析结果。点击“开始匹配”后即可查看摘要和详细报告。";
+  }
+  return "上传简历后会在这里显示摘要，开始匹配后可查看完整结果。";
 }
 
 function resumeQuickBoardHtml(profile, matcher, analysisMode, recommendedDirections) {
@@ -2143,40 +2506,57 @@ function resumeProjectHighlightsHtml(profile) {
   `;
 }
 
-function resumeEmptyDashboardHtml() {
+function resumeEmptyDashboardHtml(state) {
+  const status = String(state?.status || "").trim();
+  const hasFile = Boolean(state?.file_name);
+  const bannerTitle = status === "failed"
+    ? "本次分析未生成结果"
+    : hasFile
+      ? "简历已上传，等待开始匹配"
+      : "等待生成诊断报告";
+  const bannerCopy = status === "failed"
+    ? (humanizeResumeErrorMessage(state?.error_message || state?.analysis_meta?.stage_detail || "") || "当前没有得到可展示的分析结果，建议检查文件内容后重试。")
+    : hasFile
+      ? "这份简历已经保存到当前账号，但系统还没有开始生成完整报告。点击“开始匹配”后，这里会切换为新的报告式布局。"
+      : "上传简历并完成匹配后，这里会直接展示报告式分析，不再是当前这种概览卡片拼盘。";
   return `
-    <div class="resume-analysis-shell">
-      <div class="resume-analysis-banner is-placeholder">
-        <div>
-          <p class="resume-analysis-kicker">Resume Workspace</p>
-          <h4 class="resume-analysis-title">能力画像仪表盘</h4>
-          <p class="resume-analysis-copy">上传简历后，这里会生成匹配度仪表盘、能力雷达、重点判断、待补强项和行动建议。</p>
+    <div class="resume-judge-shell is-placeholder">
+      <section class="resume-judge-hero is-placeholder">
+        <div class="resume-judge-hero-main">
+          <div class="resume-judge-hero-top">
+            <div>
+              <span class="resume-judge-badge muted">待生成</span>
+              <h4 class="resume-judge-title">${escHtml(bannerTitle)}</h4>
+              <p class="resume-judge-copy">${escHtml(bannerCopy)}</p>
+            </div>
+            <div class="resume-judge-actions">
+              <button type="button" class="resume-judge-action-btn primary" onclick="pickResumeFile()">上传简历</button>
+              <button type="button" class="resume-judge-action-btn" onclick="analyzeResumeMatch()" ${hasFile ? "" : "disabled"}>开始匹配</button>
+            </div>
+          </div>
+          <p class="resume-judge-meta">${hasFile ? `文件：${escHtml(state.file_name || "")}` : "上传 PDF 或 DOCX 后，这里会生成完整分析。"}</p>
+          <div class="resume-judge-score-grid">
+            <article class="resume-judge-score-card primary"><span class="resume-judge-score-value">--</span><span class="resume-judge-score-label">综合评分</span></article>
+            <article class="resume-judge-score-card"><span class="resume-judge-score-value">--</span><span class="resume-judge-score-label">岗位匹配</span></article>
+            <article class="resume-judge-score-card warm"><span class="resume-judge-score-value">--</span><span class="resume-judge-score-label">故事线</span></article>
+            <article class="resume-judge-score-card success"><span class="resume-judge-score-value">--</span><span class="resume-judge-score-label">技术深度</span></article>
+            <article class="resume-judge-score-card"><span class="resume-judge-score-value">--</span><span class="resume-judge-score-label">格式规范</span></article>
+          </div>
         </div>
-      </div>
-      <div class="resume-bento-grid">
-        ${resumeGaugePlaceholderHtml()}
-        ${resumeTargetPlaceholderHtml()}
-        <section class="resume-bento-card resume-bento-span-8 is-placeholder">
-          <div class="resume-bento-head">
-            <div>
-              <p class="resume-bento-kicker">Capability Scores</p>
-              <p class="resume-bento-title">关键维度</p>
-            </div>
-          </div>
-          <div class="resume-score-grid">${resumeScorePlaceholderHtml()}</div>
-        </section>
-        <section class="resume-bento-card resume-bento-span-8 is-placeholder">
-          <div class="resume-bento-head">
-            <div>
-              <p class="resume-bento-kicker">Key Calls</p>
-              <p class="resume-bento-title">重点判断</p>
-            </div>
-          </div>
-          ${resumeInsightPlaceholderHtml()}
-        </section>
-        ${resumeGapPlaceholderHtml()}
-        ${resumeActionPlaceholderHtml()}
-        ${resumeReportLauncherHtml(emptyResumeProfile(), null, {}, "", [])}
+      </section>
+
+      <div class="resume-judge-empty-card">
+        <div class="resume-judge-empty-copy">
+          <p class="resume-judge-empty-title">${escHtml(status === "failed" ? "请先修正文件后再重新匹配" : "分析完成后，这里会切换成和 2.html 同一类的报告式排版")}</p>
+          <p class="resume-judge-empty-text">${escHtml(bannerCopy)}</p>
+        </div>
+        <div class="resume-judge-tabbar is-placeholder">
+          <button type="button" class="resume-judge-tab-btn active" disabled>01 30 秒结论</button>
+          <button type="button" class="resume-judge-tab-btn" disabled>02 详细诊断</button>
+          <button type="button" class="resume-judge-tab-btn" disabled>03 优化建议</button>
+          <button type="button" class="resume-judge-tab-btn" disabled>04 简历范本</button>
+          <button type="button" class="resume-judge-tab-btn" disabled>05 最终裁决</button>
+        </div>
       </div>
     </div>
   `;
@@ -2204,54 +2584,758 @@ function resumeEvidencePlaceholderHtml() {
   `).join("")}</div>`;
 }
 
-function resumeAnalysisDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections) {
-  if (!profile) {
-    return resumeEmptyDashboardHtml();
+function resumePlainText(raw) {
+  return decodeHtmlEntities(String(raw || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resumeMarkdownSections(raw) {
+  const lines = String(raw || "").replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
+  let paragraphLines = [];
+  let listItems = [];
+  let listType = "";
+  let inCodeBlock = false;
+  let codeBlockLines = [];
+
+  function flushParagraph() {
+    if (!paragraphLines.length) return;
+    blocks.push({
+      type: "paragraph",
+      html: resumeInlineMarkupHtml(paragraphLines.join(" "))
+    });
+    paragraphLines = [];
   }
-  const modeMeta = resumeModeMeta(analysisMode);
-  const hasHighlights = Array.isArray(profile?.project_highlights) && profile.project_highlights.length > 0;
+
+  function flushList() {
+    if (!listItems.length) return;
+    blocks.push({
+      type: "list",
+      listType,
+      items: [...listItems]
+    });
+    listItems = [];
+    listType = "";
+  }
+
+  lines.forEach((rawLine) => {
+    const line = String(rawLine || "").trim();
+    if (inCodeBlock) {
+      if (/^```/.test(line)) {
+        inCodeBlock = false;
+        blocks.push({ type: "codeblock", code: codeBlockLines.join("\n") });
+        codeBlockLines = [];
+      } else {
+        codeBlockLines.push(rawLine);
+      }
+      return;
+    }
+    if (!line) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+    if (/^```/.test(line)) {
+      flushParagraph();
+      flushList();
+      inCodeBlock = true;
+      codeBlockLines = [];
+      return;
+    }
+    if (/^-{3,}$/.test(line)) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "divider" });
+      return;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "heading",
+        level: heading[1].length,
+        html: resumeInlineMarkupHtml(heading[2])
+      });
+      return;
+    }
+    const ordered = line.match(/^\d+\.\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      if (listType && listType !== "ol") flushList();
+      listType = "ol";
+      listItems.push(resumeInlineMarkupHtml(ordered[1]));
+      return;
+    }
+    const checklist = line.match(/^[-*]\s+\[( |x)\]\s+(.+)$/i);
+    if (checklist) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      const checked = checklist[1].toLowerCase() === "x";
+      listItems.push(`<span class="resume-checklist-icon">${checked ? "✅" : "⬜"}</span> ${resumeInlineMarkupHtml(checklist[2])}`);
+      return;
+    }
+    const unordered = line.match(/^[-*]\s+(.+)$/);
+    if (unordered) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      listItems.push(resumeInlineMarkupHtml(unordered[1]));
+      return;
+    }
+    flushList();
+    paragraphLines.push(line);
+  });
+
+  if (inCodeBlock && codeBlockLines.length) {
+    blocks.push({ type: "codeblock", code: codeBlockLines.join("\n") });
+  }
+
+  flushParagraph();
+  flushList();
+
+  const sectionParts = [];
+  let currentSection = null;
+
+  function pushCurrentSection() {
+    if (!currentSection) return;
+    if (!currentSection.intro && !currentSection.content.length) return;
+    sectionParts.push(currentSection);
+  }
+
+  blocks.forEach((block) => {
+    if (block.type === "heading" && block.level <= 2) {
+      pushCurrentSection();
+      currentSection = {
+        title: block.html,
+        intro: "",
+        content: []
+      };
+      return;
+    }
+    if (!currentSection) {
+      currentSection = {
+        title: "分析内容",
+        intro: "",
+        content: []
+      };
+    }
+    if (block.type === "paragraph" && !currentSection.intro) {
+      currentSection.intro = block.html;
+      return;
+    }
+    currentSection.content.push(block);
+  });
+
+  pushCurrentSection();
+  return sectionParts;
+}
+
+function resumeSectionsFromState(state) {
+  const markdown = String(state?.analysis_result || "").trim();
+  if (markdown) return resumeMarkdownSections(markdown);
+  const htmlText = resumeAnalysisHtmlToText(state?.analysis_html);
+  if (htmlText) return resumeMarkdownSections(htmlText);
+  return [];
+}
+
+function resumeFindSectionByKeywords(sections, keywords, fallbackIndex = 0) {
+  const patterns = (keywords || []).map((item) => String(item || "").toLowerCase()).filter(Boolean);
+  const matched = (sections || []).find((section) => {
+    const title = resumePlainText(section?.title || "").toLowerCase();
+    return patterns.some((pattern) => title.includes(pattern));
+  });
+  if (matched) return matched;
+  return sections?.[fallbackIndex] || null;
+}
+
+function resumeFindGroupByKeywords(section, keywords) {
+  const patterns = (keywords || []).map((item) => String(item || "").toLowerCase()).filter(Boolean);
+  const groups = resumeReportBlocksPartition(section?.content || []).groups;
+  return groups.find((group) => {
+    const title = resumePlainText(group?.title || "").toLowerCase();
+    return patterns.some((pattern) => title.includes(pattern));
+  }) || null;
+}
+
+function resumeFlattenBlocks(blocks) {
+  const items = [];
+  (blocks || []).forEach((block) => {
+    if (block.type === "paragraph") {
+      const text = resumePlainText(block.html);
+      if (text) items.push(text);
+      return;
+    }
+    if (block.type === "list") {
+      block.items.forEach((item) => {
+        const text = resumePlainText(item);
+        if (text) items.push(text);
+      });
+      return;
+    }
+    if (block.type === "codeblock") {
+      const text = String(block.code || "").trim();
+      if (text) items.push(text);
+    }
+  });
+  return items;
+}
+
+function resumeJudgeVerdictPayload(state, profile, matcher, analysisMode, recommendedDirections, conclusionItems) {
+  const overall = resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections);
+  let tone = "brand";
+  let icon = "→";
+  let title = "建议进入下一轮";
+  if (overall >= 86) {
+    tone = "success";
+    icon = "✓";
+    title = "建议优先推进";
+  } else if (overall < 70) {
+    tone = "danger";
+    icon = "!";
+    title = "建议补强后再投递";
+  }
+  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
+  return {
+    tone,
+    icon,
+    title,
+    role: overview.headline || profile?.basics?.target_direction || "待识别方向",
+    reason: conclusionItems[1] || profile?.candidate_summary || "系统已根据当前简历生成结构化判断。",
+    summary: conclusionItems[0] || profile?.candidate_summary || "等待生成总结。"
+  };
+}
+
+function resumeJudgeQuickStatItems(state, profile, matcher, analysisMode, recommendedDirections) {
+  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
+  const textSources = Array.isArray(state?.analysis_meta?.text_sources) ? state.analysis_meta.text_sources : [];
+  return [
+    ["综合评分", `${resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections)}%`],
+    ["识别角色", overview.headline || "待识别"],
+    ["经历段数", `${Number(overview.experience_count || 0)} 段`],
+    ["项目数量", `${Number(overview.project_count || 0)} 个`],
+    ["技能覆盖", `${Number(overview.skill_count || 0)} 项`],
+    ["提取方式", textSources[0] || (state?.analysis_meta?.ocr_used ? "OCR" : "文本解析")]
+  ];
+}
+
+function resumeJudgeRiskItems(detailSection, matcher, profile) {
+  const riskGroup = resumeFindGroupByKeywords(detailSection, ["风险", "缺口", "risk", "gap"]);
+  const groupItems = resumeFlattenBlocks(riskGroup?.blocks || []);
+  if (groupItems.length) return groupItems.slice(0, 4);
+  const uncertainty = Array.isArray(profile?.uncertainty_layer) ? profile.uncertainty_layer : [];
+  if (uncertainty.length) {
+    return uncertainty.slice(0, 4).map((item) => String(item?.reason || item?.item || "").trim()).filter(Boolean);
+  }
+  const missing = previewTagValues(matcher?.missing_keywords || [], 4);
+  if (missing.length) {
+    return missing.map((item) => `缺少与目标岗位强相关的关键词：${item}`);
+  }
+  return ["当前结果里没有结构化风险项，建议重点补充业务背景、量化结果和个人独立贡献。"];
+}
+
+function resumeJudgeModuleAuditItems(state, profile, matcher) {
+  const structured = state?.structured_resume && typeof state.structured_resume === "object" ? state.structured_resume : {};
+  const educationCount = Array.isArray(structured.education) ? structured.education.length : 0;
+  const experienceCount = Array.isArray(structured.experiences) ? structured.experiences.length : 0;
+  const projectCount = Array.isArray(structured.projects) ? structured.projects.length : 0;
+  const skillCount = Array.isArray(structured.skills) ? structured.skills.length : 0;
+  return [
+    {
+      title: "教育背景",
+      text: educationCount
+        ? `已识别 ${educationCount} 段教育信息。学术项较强，建议把排名、绩点、论文与专利放在更靠前的位置。`
+        : "当前没有识别到清晰教育信息，建议补齐学校、专业、时间与核心成绩。"
+    },
+    {
+      title: "实习经历",
+      text: experienceCount
+        ? `已识别 ${experienceCount} 段实习/工作经历。当前最大的短板通常在于业务背景、个人贡献和结果量化表达不足。`
+        : "当前没有识别到稳定的实习或工作经历模块，建议至少补一段真实项目或实习经历。"
+    },
+    {
+      title: "项目经历",
+      text: projectCount
+        ? `已识别 ${projectCount} 个项目。项目题材足够强，但需要再向“业务价值、技术决策、可验证结果”三件事收口。`
+        : "项目经历过少，难以支撑岗位判断，建议补齐 2 到 3 个高质量项目。"
+    },
+    {
+      title: "技能模块",
+      text: skillCount
+        ? `已识别 ${skillCount} 项技能。建议按“语言 / 框架 / 技术方向 / 工具”分组，而不是一行平铺。`
+        : "技能项过少，建议拆出独立“专业技能”模块并做分组呈现。"
+    }
+  ];
+}
+
+function resumeJudgeEvidenceAuditItems(profile) {
+  const evidence = Array.isArray(profile?.evidence_spans) ? profile.evidence_spans.slice(0, 4) : [];
+  if (!evidence.length) {
+    return [{
+      quote: "等待生成证据片段",
+      note: "分析完成后，这里会引用简历原文并指出每条描述还缺什么。"
+    }];
+  }
+  return evidence.map((item) => {
+    const quote = String(item?.quote || "").trim();
+    const notes = [];
+    if (!/\d/.test(quote)) notes.push("建议补充量化结果");
+    if (/负责|协助|参与/.test(quote)) notes.push("动词偏弱，建议改成主导 / 设计 / 实现");
+    if (!notes.length) notes.push("建议补充业务背景或边界条件");
+    return {
+      quote,
+      note: notes.join("；")
+    };
+  });
+}
+
+function resumeJudgeQuestionItems(state, profile, riskItems) {
+  const questions = [];
+  const highlights = Array.isArray(profile?.project_highlights) ? profile.project_highlights.slice(0, 2) : [];
+  highlights.forEach((item) => {
+    const project = String(item?.project || "").trim();
+    if (project) {
+      questions.push(`围绕“${project}”，准备一句 STAR 表达：问题背景、你的动作、可验证结果分别是什么？`);
+    }
+  });
+  if (riskItems[0]) questions.push(`如果面试官追问“${riskItems[0]}”，你准备用哪组数据回应？`);
+  const uncertainty = Array.isArray(profile?.uncertainty_layer) ? profile.uncertainty_layer : [];
+  uncertainty.slice(0, 2).forEach((item) => {
+    const title = String(item?.item || "").trim();
+    if (title) questions.push(`针对“${title}”，你还能补充哪些证据来降低面试官的不确定感？`);
+  });
+  return questions.slice(0, 6);
+}
+
+function resumeJudgeQuantTips() {
+  return [
+    ["性能类", "把“优化性能”改成“响应时间从 Xms 降到 Yms，P99 下降 Z%”。"],
+    ["规模类", "把“大量数据”改成“日均处理 N 条记录 / 支撑 N 次请求”。"],
+    ["效率类", "把“提升开发效率”改成“发布时间从 X 小时缩短到 Y 分钟”。"],
+    ["质量类", "把“系统更稳定”改成“MTTR 降低 X%，可用性提升到 Y%”。"]
+  ];
+}
+
+function resumeJudgeTemplateText(state, profile, matcher) {
+  const structured = state?.structured_resume && typeof state.structured_resume === "object" ? state.structured_resume : {};
+  const personal = structured.personal_data && typeof structured.personal_data === "object" ? structured.personal_data : {};
+  const name = [personal.first_name, personal.last_name].filter(Boolean).join(" ") || profile?.basics?.name || matcher?.resume_overview?.candidate_name || "候选人";
+  const contacts = [personal.phone, personal.email, personal.linkedin, personal.portfolio].filter(Boolean);
+  const lines = [name];
+  if (contacts.length) lines.push(contacts.join(" | "));
+  if (profile?.candidate_summary) {
+    lines.push("", "【个人摘要】", resumePlainText(profile.candidate_summary));
+  }
+  const education = Array.isArray(structured.education) ? structured.education : [];
+  if (education.length) {
+    lines.push("", "【教育背景】");
+    education.slice(0, 2).forEach((item) => {
+      lines.push(`${resumePlainText(item.institution)} | ${resumePlainText(item.field_of_study)} | ${resumePlainText(item.degree)} | ${resumePlainText(item.start_date)} - ${resumePlainText(item.end_date)}`);
+      if (item.grade) lines.push(`- ${resumePlainText(item.grade)}`);
+      if (item.description) lines.push(`- ${shortenResumeText(resumePlainText(item.description), 180)}`);
+    });
+  }
+  const experiences = Array.isArray(structured.experiences) ? structured.experiences : [];
+  if (experiences.length) {
+    lines.push("", "【实习 / 工作经历】");
+    experiences.slice(0, 3).forEach((item) => {
+      lines.push(`${resumePlainText(item.company)} | ${resumePlainText(item.job_title)} | ${resumePlainText(item.start_date)} - ${resumePlainText(item.end_date)}`);
+      (Array.isArray(item.description) ? item.description : []).slice(0, 3).forEach((desc) => {
+        lines.push(`- ${shortenResumeText(resumePlainText(desc), 160)}`);
+      });
+    });
+  }
+  const projects = Array.isArray(structured.projects) ? structured.projects : [];
+  if (projects.length) {
+    lines.push("", "【项目经历】");
+    projects.slice(0, 3).forEach((item) => {
+      lines.push(`${resumePlainText(item.project_name)} | ${resumePlainText(item.start_date)} - ${resumePlainText(item.end_date)}`);
+      lines.push(`- ${shortenResumeText(resumePlainText(item.description), 180)}`);
+    });
+  }
+  const research = Array.isArray(structured.research_work) ? structured.research_work : [];
+  if (research.length) {
+    lines.push("", "【论文 / 专利】");
+    research.slice(0, 4).forEach((item) => {
+      lines.push(`- ${resumePlainText(item.title)} | ${resumePlainText(item.publication || item.description)}`);
+    });
+  }
+  const skills = Array.isArray(structured.skills) ? structured.skills : [];
+  if (skills.length) {
+    const byCategory = skills.reduce((acc, item) => {
+      const category = resumePlainText(item.category || "技能");
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(resumePlainText(item.skill_name));
+      return acc;
+    }, {});
+    lines.push("", "【专业技能】");
+    Object.entries(byCategory).forEach(([category, items]) => {
+      lines.push(`${category}：${items.filter(Boolean).join("、")}`);
+    });
+  }
+  const achievements = Array.isArray(structured.achievements) ? structured.achievements : [];
+  if (achievements.length) {
+    lines.push("", "【荣誉与获奖】");
+    achievements.slice(0, 6).forEach((item) => lines.push(`- ${resumePlainText(item)}`));
+  }
+  return lines.join("\n");
+}
+
+function resumeJudgeComparisonItems(profile, matcher, analysisMode, recommendedDirections) {
+  return [
+    ["综合评分", resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections), 88],
+    ["岗位匹配", resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections), 85],
+    ["故事线", resumeJudgeStoryScore(profile, matcher), 82],
+    ["技术深度", resumeJudgeTechScore(profile), 84],
+    ["格式规范", resumeJudgeFormatScore(profile, matcher), 80]
+  ];
+}
+
+function resumeJudgeFixedTabsHtml() {
+  const tabs = ["第一印象", "深度审计", "修改蓝图", "简历范本", "最终裁决"];
+  return tabs.map((label, index) => `
+    <button type="button" class="resume-hj-tab-btn ${index === 0 ? "active" : ""}" data-section-index="${index + 1}" onclick="switchResumeJudgeTab(${index + 1})">
+      ${String(index + 1).padStart(2, "0")} ${label}
+    </button>
+  `).join("");
+}
+
+function resumeJudgeExactEmptyDashboardHtml(state) {
+  const hasFile = Boolean(state?.file_name);
+  const copy = hasFile
+    ? "简历已经上传，点击“开始匹配”后会生成和 2.html 同构的五步报告。"
+    : "先上传 PDF 或 DOCX，然后开始匹配。这里会切换成 2.html 的五步分析页面。";
   return `
-    <div class="resume-analysis-shell">
-      <div class="resume-analysis-banner">
-        <div>
-          <p class="resume-analysis-kicker">${escHtml(modeMeta.badge)}</p>
-          <h4 class="resume-analysis-title">${escHtml(modeMeta.title)}</h4>
-          <p class="resume-analysis-copy">${escHtml(modeMeta.description)}</p>
+    <div id="resumeJudgeShell" class="resume-hj-shell">
+      <section class="resume-hj-header-card">
+        <div class="resume-hj-header-top">
+          <div>
+            <div class="resume-hj-badge-row">
+              <span class="resume-hj-badge">诊断报告</span>
+              <span class="resume-hj-mode">待生成</span>
+            </div>
+            <h3 class="resume-hj-title">简历诊断报告</h3>
+            <p class="resume-hj-subtitle">${escHtml(copy)}</p>
+          </div>
+          <div class="resume-hj-header-actions">
+            <button type="button" class="resume-hj-action-btn primary" onclick="pickResumeFile()">上传简历</button>
+            <button type="button" class="resume-hj-action-btn" onclick="analyzeResumeMatch()" ${hasFile ? "" : "disabled"}>开始匹配</button>
+          </div>
         </div>
-      </div>
-
-      <div class="resume-bento-grid">
-        ${resumeGaugeCardHtml(profile, matcher, analysisMode, recommendedDirections)}
-        ${resumeTargetPanelHtml(profile, matcher, analysisMode, recommendedDirections)}
-
-        <section class="resume-bento-card resume-bento-span-8">
-          <div class="resume-bento-head">
-            <div>
-              <p class="resume-bento-kicker">Capability Scores</p>
-              <p class="resume-bento-title">关键维度</p>
-            </div>
-          </div>
-          <div class="resume-score-grid">${resumeScoreCardsHtml(profile, analysisMode)}</div>
-        </section>
-        ${resumeGapPanelHtml(profile, matcher, analysisMode)}
-
-        <section class="resume-bento-card resume-bento-span-8">
-          <div class="resume-bento-head">
-            <div>
-              <p class="resume-bento-kicker">Key Calls</p>
-              <p class="resume-bento-title">重点判断</p>
-            </div>
-          </div>
-          ${resumeInsightCardsHtml(profile)}
-        </section>
-
-        ${hasHighlights ? resumeProjectHighlightsHtml(profile) : ""}
-        ${resumeActionPanelHtml(profile, matcher, analysisMode, recommendedDirections, !hasHighlights)}
-
-        ${resumeReportLauncherHtml(state, profile, matcher, analysisMode, recommendedDirections)}
-      </div>
+        <div class="resume-hj-score-grid">
+          ${["综合评分", "岗位匹配", "故事线", "技术深度", "格式规范"].map((label) => `
+            <article class="resume-hj-score-card">
+              <div class="resume-hj-score-value">--</div>
+              <div class="resume-hj-score-label">${label}</div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <div class="resume-hj-tabs">${resumeJudgeFixedTabsHtml()}</div>
+      <section class="resume-hj-panel active" data-section-index="1">
+        <div class="resume-hj-card">
+          <h4 class="resume-hj-card-title">等待分析</h4>
+          <p class="resume-hj-card-copy">${escHtml(copy)}</p>
+        </div>
+      </section>
+      ${[2, 3, 4, 5].map((index) => `<section class="resume-hj-panel" data-section-index="${index}"></section>`).join("")}
     </div>
   `;
+}
+
+function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections) {
+  const sections = resumeSectionsFromState(state);
+  const conclusionSection = resumeFindSectionByKeywords(sections, ["30 秒结论", "30秒结论", "30 绉掔粨璁"], 1);
+  const detailSection = resumeFindSectionByKeywords(sections, ["详细诊断", "璇︾粏"], 2);
+  const adviceSection = resumeFindSectionByKeywords(sections, ["简历优化建议", "优化建议", "可立即执行"], 3);
+  const conclusionItems = resumeFlattenBlocks(conclusionSection?.content || []);
+  const adviceItems = resumeFlattenBlocks(adviceSection?.content || []);
+  const riskItems = resumeJudgeRiskItems(detailSection, matcher, profile);
+  const strengthGroup = resumeFindGroupByKeywords(detailSection, ["优势", "strength"]);
+  const suggestionGroup = resumeFindGroupByKeywords(detailSection, ["方向", "建议", "suggest"]);
+  const verdict = resumeJudgeVerdictPayload(state, profile, matcher, analysisMode, recommendedDirections, conclusionItems);
+  const quickStats = resumeJudgeQuickStatItems(state, profile, matcher, analysisMode, recommendedDirections);
+  const moduleAuditItems = resumeJudgeModuleAuditItems(state, profile, matcher);
+  const evidenceAuditItems = resumeJudgeEvidenceAuditItems(profile);
+  const questionItems = resumeJudgeQuestionItems(state, profile, riskItems);
+  const quantTips = resumeJudgeQuantTips();
+  const templateText = resumeJudgeTemplateText(state, profile, matcher);
+  const comparisonItems = resumeJudgeComparisonItems(profile, matcher, analysisMode, recommendedDirections);
+  const finalSummaryItems = [
+    profile?.candidate_summary || verdict.summary,
+    ...resumeFlattenBlocks(strengthGroup?.blocks || []).slice(0, 2),
+    ...resumeFlattenBlocks(suggestionGroup?.blocks || []).slice(0, 1)
+  ].filter(Boolean).slice(0, 4);
+  const modeLabel = analysisMode === "resume_review" ? "简历诊断模式" : "岗位匹配模式";
+  const subtitle = state?.analyzed_at
+    ? `最近生成于 ${formatUnixTime(state.analyzed_at)}`
+    : "等待分析";
+  const scoreCards = [
+    ["综合评分", `${resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections)}%`],
+    ["岗位匹配", `${resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections)}%`],
+    ["故事线", `${resumeJudgeStoryScore(profile, matcher)}%`],
+    ["技术深度", `${resumeJudgeTechScore(profile)}%`],
+    ["格式规范", `${resumeJudgeFormatScore(profile, matcher)}%`]
+  ];
+
+  return `
+    <div id="resumeJudgeShell" class="resume-hj-shell">
+      <section class="resume-hj-header-card">
+        <div class="resume-hj-header-top">
+          <div>
+            <div class="resume-hj-badge-row">
+              <span class="resume-hj-badge">诊断报告</span>
+              <span class="resume-hj-mode">${modeLabel}</span>
+            </div>
+            <h3 class="resume-hj-title">简历诊断报告</h3>
+            <p class="resume-hj-subtitle">${escHtml(subtitle)}</p>
+          </div>
+          <div class="resume-hj-header-actions">
+            <button type="button" class="resume-hj-action-btn primary" onclick="openResumeReportPage()">查看独立页</button>
+            <button type="button" class="resume-hj-action-btn" onclick="analyzeResumeMatch()">重新匹配</button>
+          </div>
+        </div>
+        <div class="resume-hj-score-grid">
+          ${scoreCards.map((item) => `
+            <article class="resume-hj-score-card">
+              <div class="resume-hj-score-value">${item[1]}</div>
+              <div class="resume-hj-score-label">${item[0]}</div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+
+      <div class="resume-hj-tabs">
+        ${resumeJudgeFixedTabsHtml()}
+      </div>
+
+      <section class="resume-hj-panel active" data-section-index="1">
+        <div class="resume-hj-intro-grid">
+          <div class="resume-hj-stack">
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-card-title"><span class="resume-hj-chip">30</span>30 秒定论</h4>
+              <div class="resume-hj-verdict ${verdict.tone}">
+                <div class="resume-hj-verdict-top">
+                  <span class="resume-hj-verdict-icon">${verdict.icon}</span>
+                  <div>
+                    <div class="resume-hj-verdict-title">${escHtml(verdict.title)}</div>
+                    <div class="resume-hj-verdict-role">${escHtml(verdict.role)}</div>
+                  </div>
+                </div>
+                <p class="resume-hj-verdict-copy">${escHtml(verdict.reason)}</p>
+              </div>
+            </article>
+
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-card-title">初步诊断要点</h4>
+              <div class="resume-hj-point-list">
+                ${conclusionItems.slice(0, 4).map((item, index) => `
+                  <div class="resume-hj-point ${index === 1 ? "danger" : index === 0 ? "success" : "brand"}">
+                    <p>${escHtml(item)}</p>
+                  </div>
+                `).join("") || `<div class="resume-hj-point brand"><p>${escHtml(profile?.candidate_summary || "等待生成初步诊断。")}</p></div>`}
+              </div>
+            </article>
+          </div>
+
+          <div class="resume-hj-stack">
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-side-title">快速扫描</h4>
+              <div class="resume-hj-stat-list">
+                ${quickStats.map((item) => `
+                  <div class="resume-hj-stat-row">
+                    <span>${item[0]}</span>
+                    <strong>${escHtml(String(item[1]))}</strong>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-side-title">关键风险</h4>
+              <div class="resume-hj-risk-list">
+                ${riskItems.map((item) => `<div class="resume-hj-risk-item">${escHtml(item)}</div>`).join("")}
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="resume-hj-panel" data-section-index="2">
+        <div class="resume-hj-stack">
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title"><span class="resume-hj-dot brand"></span>整体层面审计</h4>
+            <div class="resume-hj-audit-grid">
+              <div class="resume-hj-subcard">
+                <p class="resume-hj-subcard-title">优势</p>
+                <div class="resume-hj-subcard-content">
+                  ${resumeReportBlocksHtml(strengthGroup?.blocks || []) || `<p class="resume-report-paragraph">${escHtml("等待生成优势诊断。")}</p>`}
+                </div>
+              </div>
+              <div class="resume-hj-subcard">
+                <p class="resume-hj-subcard-title">风险与缺口</p>
+                <div class="resume-hj-subcard-content">
+                  ${resumeReportBlocksHtml(resumeFindGroupByKeywords(detailSection, ["风险", "缺口", "risk", "gap"])?.blocks || []) || `<p class="resume-report-paragraph">${escHtml(riskItems[0] || "等待生成风险提示。")}</p>`}
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title"><span class="resume-hj-dot warn"></span>模块逐项审计</h4>
+            <div class="resume-hj-module-grid">
+              ${moduleAuditItems.map((item) => `
+                <article class="resume-hj-module-card">
+                  <p class="resume-hj-module-title">${escHtml(item.title)}</p>
+                  <p class="resume-hj-module-copy">${escHtml(item.text)}</p>
+                </article>
+              `).join("")}
+            </div>
+          </article>
+
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title"><span class="resume-hj-dot danger"></span>证据片段拷问</h4>
+            <div class="resume-hj-evidence-audit">
+              ${evidenceAuditItems.map((item) => `
+                <article class="resume-hj-evidence-card">
+                  <p class="resume-hj-evidence-quote">${escHtml(shortenResumeText(item.quote, 180))}</p>
+                  <p class="resume-hj-evidence-note">${escHtml(item.note)}</p>
+                </article>
+              `).join("")}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="resume-hj-panel" data-section-index="3">
+        <div class="resume-hj-stack">
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title">写作公式</h4>
+            <div class="resume-hj-formula-grid">
+              <div class="resume-hj-formula-card">
+                <p class="resume-hj-formula-title">STAR / CAR 基础公式</p>
+                <ul class="resume-hj-formula-list">
+                  <li>Situation: 问题发生在什么场景</li>
+                  <li>Task: 你要解决的具体目标</li>
+                  <li>Action: 你做了什么关键动作</li>
+                  <li>Result: 最终带来了什么结果</li>
+                </ul>
+              </div>
+              <div class="resume-hj-formula-card">
+                <p class="resume-hj-formula-title">业务导向表达公式</p>
+                <ul class="resume-hj-formula-list">
+                  <li>背景: 这个模块解决什么业务问题</li>
+                  <li>方案: 为什么选择当前技术路线</li>
+                  <li>动作: 你主导了哪些关键环节</li>
+                  <li>结果: 指标、效率、成本有什么变化</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title">修改蓝图</h4>
+            <div class="resume-hj-blueprint-grid">
+              ${adviceItems.slice(0, 4).map((item, index) => `
+                <article class="resume-hj-blueprint-card">
+                  <p class="resume-hj-blueprint-index">改法 ${String(index + 1).padStart(2, "0")}</p>
+                  <p class="resume-hj-blueprint-copy">${escHtml(item)}</p>
+                </article>
+              `).join("") || `<article class="resume-hj-blueprint-card"><p class="resume-hj-blueprint-copy">${escHtml("等待生成可执行修改建议。")}</p></article>`}
+            </div>
+          </article>
+
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title">启发式追问清单</h4>
+            <div class="resume-hj-question-list">
+              ${questionItems.map((item) => `<div class="resume-hj-question-item">${escHtml(item)}</div>`).join("")}
+            </div>
+          </article>
+
+          <article class="resume-hj-card">
+            <h4 class="resume-hj-card-title">量化训练</h4>
+            <div class="resume-hj-quant-grid">
+              ${quantTips.map((item) => `
+                <article class="resume-hj-quant-card">
+                  <p class="resume-hj-quant-title">${escHtml(item[0])}</p>
+                  <p class="resume-hj-quant-copy">${escHtml(item[1])}</p>
+                </article>
+              `).join("")}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="resume-hj-panel" data-section-index="4">
+        <article class="resume-hj-card">
+          <div class="resume-hj-card-head">
+            <h4 class="resume-hj-card-title">重写后的完整简历范本</h4>
+            <button type="button" class="resume-hj-copy-btn" onclick="copyResumeCodeBlock('resumeJudgeFullResume')">复制全文</button>
+          </div>
+          <div class="resume-hj-code-shell">
+            <pre id="resumeJudgeFullResume" class="resume-hj-code-pre"><code>${escHtml(templateText)}</code></pre>
+          </div>
+          <p class="resume-hj-footnote">如果模型没有单独返回完整改写版，这里会用结构化简历信息自动拼装成一份可继续修改的范本。</p>
+        </article>
+      </section>
+
+      <section class="resume-hj-panel" data-section-index="5">
+        <div class="resume-hj-final-grid">
+          <div class="resume-hj-stack">
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-card-title">整体评价</h4>
+              <div class="resume-hj-summary-list">
+                ${finalSummaryItems.map((item) => `<div class="resume-hj-summary-item">${escHtml(item)}</div>`).join("")}
+              </div>
+            </article>
+            <article class="resume-hj-card danger">
+              <h4 class="resume-hj-card-title">最致命风险点</h4>
+              <div class="resume-hj-summary-list">
+                ${riskItems.slice(0, 3).map((item) => `<div class="resume-hj-summary-item">${escHtml(item)}</div>`).join("")}
+              </div>
+            </article>
+          </div>
+          <div class="resume-hj-stack">
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-card-title">行动清单</h4>
+              <div class="resume-hj-action-list">
+                ${adviceItems.slice(0, 3).map((item, index) => `
+                  <div class="resume-hj-action-item">
+                    <span>${String(index + 1).padStart(2, "0")}</span>
+                    <p>${escHtml(item)}</p>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-card-title">修改前后对比</h4>
+              <div class="resume-hj-compare-list">
+                ${comparisonItems.map((item) => `
+                  <div class="resume-hj-compare-row">
+                    <div class="resume-hj-compare-meta">
+                      <span>${item[0]}</span>
+                      <strong>${item[1]} / ${item[2]}</strong>
+                    </div>
+                    <div class="resume-hj-compare-track">
+                      <div class="resume-hj-compare-fill" style="width:${Math.min(100, Number(item[1] || 0))}%"></div>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function resumeAnalysisDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections) {
+  if (!profile) {
+    return resumeJudgeExactEmptyDashboardHtml(state);
+  }
+  return resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections);
 }
 
 function renderResumeProfileSection(data) {
@@ -2307,7 +3391,7 @@ function renderResumeProfileSection(data) {
     } else if (state.status === "analyzing") {
       analyzeMeta.textContent = `${meta.stage_detail || "正在分析中..."}`;
     } else {
-      analyzeMeta.textContent = state.error_message || "等待简历上传，JD 可选";
+      analyzeMeta.textContent = humanizeResumeErrorMessage(state.error_message || meta.stage_detail || "") || "等待简历上传，JD 可选";
     }
   }
 
@@ -2316,20 +3400,18 @@ function renderResumeProfileSection(data) {
     const model = String(state.analysis_meta?.model || "").trim();
     modelHint.textContent = profile
       ? `${model || "matcher 模型"} · ${formatUnixTime(state.analyzed_at)}`
-      : "等待首次匹配结果";
+      : (state.status === "failed"
+        ? "本次分析失败，可修正文件后重试"
+        : "等待首次匹配结果");
   }
-  if (summary) summary.textContent = profile?.candidate_summary || "暂无匹配结果。";
+  if (summary) summary.textContent = resumeProfileSummaryText(state, profile);
 
   if (!resumeTaskState.uploadInFlight) {
-    if (state.file_name) setResumeProgress("upload", 100, "已上传 100%", false);
-    else setResumeProgress("upload", 0, "0%", false);
+    hideResumeProgress("upload");
   }
   if (!resumeTaskState.analyzeInFlight) {
-    if (state.status === "analyzed") setResumeProgress("analyze", 100, "分析完成 100%", false);
-    else if (state.status === "failed") setResumeProgress("analyze", 0, "分析失败", false);
-    else if (state.status === "analyzing") setResumeProgress("analyze", 100, `${state.analysis_meta?.stage_detail || "分析中"}`, true);
-    else if (state.status === "uploaded") setResumeProgress("analyze", 0, "等待开始", false);
-    else setResumeProgress("analyze", 0, "0%", false);
+    if (state.status === "analyzing") setResumeProgress("analyze", 100, `${state.analysis_meta?.stage_detail || "分析中"}`, true);
+    else hideResumeProgress("analyze");
   }
 
   if (roleTags) {
@@ -2354,13 +3436,13 @@ function renderResumeProfileSection(data) {
   if (quickBoard) {
     quickBoard.innerHTML = profile
       ? resumeQuickBoardHtml(profile, matcher, analysisMode, recommendedDirections)
-      : `<div class="career-list-empty">上传并分析后会在这里显示简明概览卡片</div>`;
+      : `<div class="career-list-empty">${escHtml(state.file_name ? (state.status === "failed" ? "这份简历本次没有成功生成摘要，请根据上方提示修正后重新开始匹配。" : "简历已上传，点击“开始匹配”后会在这里显示简明概览卡片。") : "上传并分析后会在这里显示简明概览卡片")}</div>`;
   }
 
   if (overviewList) {
     overviewList.innerHTML = profile
       ? resumeOverviewCardsHtml(profile, matcher, analysisMode, recommendedDirections)
-      : `<div class="career-list-empty">等待结构化概览</div>`;
+      : `<div class="career-list-empty">${escHtml(state.status === "failed" ? "本次分析失败，暂时没有结构化概览。" : "等待结构化概览")}</div>`;
   }
 
   if (analysisResultMeta) {
@@ -2383,6 +3465,7 @@ function renderResumeProfileSection(data) {
       ? resumeEvidenceCardsHtml(profile)
       : resumeEvidencePlaceholderHtml();
   }
+  syncResumeJudgeFlow(state);
 }
 
 async function refreshResumeProfile(force = false) {
@@ -2419,6 +3502,8 @@ async function onResumeFileSelected(event) {
   const formData = new FormData();
   formData.append("file", file);
   resumeTaskState.uploadInFlight = true;
+  resumeTaskState.forceInputView = true;
+  syncResumeJudgeFlow(getResumeProfileFromCache());
   updateResumeActionButtons();
   const uploadStatus = document.getElementById("resumeUploadStatus");
   const uploadMeta = document.getElementById("resumeUploadMeta");
@@ -2455,8 +3540,12 @@ async function onResumeFileSelected(event) {
     });
     userWorkspaceState.scopedData.resume_profile = payload.data || emptyResumeProfile();
     userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    resumeTaskState.forceInputView = true;
     renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
     setResumeProgress("upload", 100, "已上传 100%", false);
+    setTimeout(() => {
+      if (!resumeTaskState.uploadInFlight) hideResumeProgress("upload");
+    }, 1200);
     showToast("上传成功", "简历文件已保存。", "success", 1600);
     refreshUnifiedExperience();
   } catch (error) {
@@ -2481,6 +3570,8 @@ async function analyzeResumeMatch() {
   const jobDescription = getResumeJobDescription();
   const hasJobDescription = jobDescription.length > 0;
   resumeTaskState.analyzeInFlight = true;
+  resumeTaskState.forceInputView = false;
+  syncResumeJudgeFlow(getResumeProfileFromCache());
   updateResumeActionButtons();
   startAnalyzeProgressTicker();
   const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
@@ -2518,11 +3609,14 @@ async function analyzeResumeMatch() {
 
     userWorkspaceState.scopedData.resume_profile = resumeData;
     userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    resumeTaskState.forceInputView = false;
     renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
     setResumeProgress("analyze", 100, "分析完成", false);
     showToast("分析完成", hasJobDescription ? "简历匹配结果已更新。" : "简历诊断结果已更新。", "success", 1800);
     refreshUnifiedExperience();
   } catch (error) {
+    resumeTaskState.forceInputView = true;
+    syncResumeJudgeFlow(getResumeProfileFromCache());
     setResumeProgress("analyze", 0, "分析失败", false);
     showToast("分析失败", error.message, "error", 2600);
   } finally {
@@ -2542,6 +3636,7 @@ async function deleteResumeProfile() {
     await requestJson("/api/resume/profile", { method: "DELETE" });
     userWorkspaceState.scopedData.resume_profile = null;
     userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    resumeTaskState.forceInputView = true;
     renderResumeProfileSection(emptyResumeProfile());
     toggleResumeJobInput(false);
     setResumeJobDescription("");
