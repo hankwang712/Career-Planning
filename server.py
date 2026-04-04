@@ -19,6 +19,7 @@ import urllib.request
 import urllib.error
 import uuid
 import webbrowser
+from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
 import random
@@ -82,6 +83,16 @@ RESUME_MAX_FILE_SIZE = 12 * 1024 * 1024
 RESUME_MAX_PAGES = 20
 RESUME_OCR_TIMEOUT_SECONDS = 35
 RESUME_MAX_TEXT_CHARS = 24000
+CAREER_GRAPH_FILE = os.path.join(BASE_DIR, "data", "career_graph.json")
+CAREER_GRAPH_LOCK = threading.Lock()
+CAREER_GRAPH_CACHE = {
+    "mtime": None,
+    "graph": None,
+    "node_map": None,
+    "cluster_map": None,
+    "adjacency": None,
+    "bootstrap": None,
+}
 JOB_DETAIL_ONLY_FIELDS = {
     "岗位描述",
     "公司简介",
@@ -244,42 +255,55 @@ def _static_headers_and_gzip(response):
     return response
 
 CAREER_INTERVIEW_SYSTEM_PROMPT = """
-你是一名中文职业兴趣访谈助手，需要围绕职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度六个维度进行追问。
-规则：
-- 全程使用自然、简洁的中文。
-- 每次只提一个问题，优先追问当前最缺失的信息。
-- 至少完成 6 轮有效问答，最多不超过 10 轮。
-- 如果用户回答比较空泛，继续追问真实经历或具体例子。
-- 不要输出 Markdown，不要输出额外说明，只输出 JSON。
-JSON 结构必须如下：
+你是一名中文职业规划咨询师，正在进行一对一深度访谈。
+
+【你的风格】
+- 像一位温和但专业的心理咨询师，引导用户探索自我
+- 每次只问一个开放性问题，不连续追问
+- 尊重用户的节奏，用户可以随时说"够了"或"我想停下来"
+- 当用户给出模糊回答时，用具体例子引导；当用户给出具体例子时，深挖感受和收获
+
+【四大探索主题】（不需要全部覆盖，用户聊到哪算哪）
+
+1. 角色模型（Role Model）
+   - 你从小到大有没有特别崇拜的人？可以是名人、老师、家长、朋友
+   - 这个人做了什么让你如此钦佩？
+   - 有没有在生活中尝试学习他/她的某种做法？结果怎样了？
+
+2. 生活故事（Life Story）
+   - 回想一下，有没有一件事你做得比大多数人都好？（即使很小）
+   - 那件事是什么情况下发生的？你当时做了什么？
+   - 有没有一段经历，虽然结果不太好，但你学到了很多？
+
+3. 工作价值观（Work Values）
+   - 假设三年后你找到了理想工作，典型的一天你会做什么？
+   - 那份工作最吸引你的是什么？
+   - 有什么样的工作内容会让你觉得"这不值得我做"？
+
+4. 情境应对（Situational Response）
+   - 如果你在团队项目中遇到意见分歧，你会怎么处理？
+   - 如果 deadline 很紧但任务很重，你会怎么安排？
+   - 当你不确定该怎么做时，你通常会怎么做？
+
+【访谈规则】
+- 用户没说"够了"或"完成了"之前，不要主动结束访谈
+- 至少完成 3 轮对话后再考虑收尾
+- 如果某个主题已经探索充分，可以自然转向其他主题
+- 用自然对话的方式，不要像机器人一样列问题清单
+
+【输出格式】（严格 JSON）
 {
-  "next_question": "下一轮问题，若已完成可为空字符串",
-  "focus_dimension": "当前追问维度",
-  "is_complete": false,
-  "completion_score": 0,
+  "next_question": "下一轮问题，如果用户说完成了就填'__FINISH__'",
+  "topic": "当前主题，如'角色模型'或'生活故事'等",
+  "topic_progress": "当前主题的探索进度描述",
   "profile": {
-    "summary": "2-4 句中文总结",
-    "career_interests": ["职业兴趣1", "职业兴趣2"],
-    "work_values": ["价值观1", "价值观2"],
-    "recommended_roles": ["岗位1", "岗位2"],
-    "evidence_highlights": ["证据1", "证据2", "证据3"],
-    "next_steps": ["建议1", "建议2", "建议3"],
-    "riasec": {
-      "realistic": 0,
-      "investigative": 0,
-      "artistic": 0,
-      "social": 0,
-      "enterprising": 0,
-      "conventional": 0
-    },
-    "dimensions": [
-      { "name": "职业兴趣", "score": 0, "evidence": "..." },
-      { "name": "工作价值观", "score": 0, "evidence": "..." },
-      { "name": "学习方式", "score": 0, "evidence": "..." },
-      { "name": "沟通风格", "score": 0, "evidence": "..." },
-      { "name": "行动证据", "score": 0, "evidence": "..." },
-      { "name": "职业成熟度", "score": 0, "evidence": "..." }
-    ]
+    "summary": "一段50字左右的叙事性画像描述",
+    "role_model": "用户钦佩的人及原因（从对话中提取）",
+    "work_values": ["价值观1", "价值观2", "价值观3"],
+    "key_experience": "用户提到的最具体的经历（用于证据）",
+    "leadership_style": "从对话推断的领导/协作风格",
+    "growth_mindset": "成长型思维的体现",
+    "recommended_exploration": ["还可以探索的方向1", "还可以探索的方向2"]
   }
 }
 """
@@ -740,16 +764,21 @@ def _save_user_state(username, payload):
 def _public_profile_portrait_state(raw_state):
     state = raw_state if isinstance(raw_state, dict) else {}
     image_url = str(state.get("image_url") or "").strip()
-    if not image_url:
+    brief = _normalize_profile_portrait_brief(state.get("brief"))
+    if not image_url and not brief:
         return None
     return {
-        "status": "ready",
+        "status": str(state.get("status") or ("ready" if image_url else "brief_ready")).strip() or "ready",
         "image_url": image_url,
         "created_at": int(state.get("created_at") or 0),
         "model": str(state.get("model") or PROFILE_PORTRAIT_MODEL).strip() or PROFILE_PORTRAIT_MODEL,
         "archetype_name": str(state.get("archetype_name") or "").strip(),
         "prompt_summary": str(state.get("prompt_summary") or "").strip(),
         "prompt_text": str(state.get("prompt_text") or "").strip(),
+        "prompt_mode": str(state.get("prompt_mode") or "").strip(),
+        "brief_version": str(state.get("brief_version") or "").strip(),
+        "image_error": str(state.get("image_error") or "").strip(),
+        "brief": brief,
     }
 
 
@@ -800,7 +829,65 @@ def _normalize_profile_portrait_context(raw_context):
         "resume_experiences": _clean_list(context.get("resume_experiences"), limit=3, item_limit=96),
         "resume_skills": _clean_list(context.get("resume_skills"), limit=8, item_limit=32),
         "resume_competitions": _clean_list(context.get("resume_competitions"), limit=3, item_limit=64),
+        "next_steps": _clean_list(context.get("next_steps"), limit=4, item_limit=72),
+        "missing_items": _clean_list(context.get("missing_items"), limit=4, item_limit=72),
+        "uncertainty": _clean_list(context.get("uncertainty"), limit=4, item_limit=72),
     }
+
+
+def _normalize_profile_portrait_brief(raw_brief):
+    brief = raw_brief if isinstance(raw_brief, dict) else {}
+
+    def _clean_text(value, limit=220):
+        return str(value or "").strip()[:limit]
+
+    def _clean_list(values, limit=5, item_limit=48):
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, list):
+            return []
+        result = []
+        for item in values:
+            text = _clean_text(item, item_limit)
+            if text:
+                result.append(text)
+            if len(result) >= limit:
+                break
+        return result
+
+    visual_spec = brief.get("visual_spec") if isinstance(brief.get("visual_spec"), dict) else {}
+    normalized = {
+        "title": _clean_text(brief.get("title"), 40),
+        "subtitle": _clean_text(brief.get("subtitle"), 96),
+        "positioning": _clean_text(brief.get("positioning"), 180),
+        "primary_role": _clean_text(brief.get("primary_role"), 48),
+        "support_roles": _clean_list(brief.get("support_roles"), limit=2, item_limit=32),
+        "mission_line": _clean_text(brief.get("mission_line"), 120),
+        "evidence_tags": _clean_list(brief.get("evidence_tags"), limit=3, item_limit=40),
+        "value_tags": _clean_list(brief.get("value_tags"), limit=3, item_limit=24),
+        "risk_note": _clean_text(brief.get("risk_note"), 88),
+        "next_action": _clean_text(brief.get("next_action"), 88),
+        "confidence_band": _clean_text(brief.get("confidence_band"), 16),
+        "visual_spec": {
+            "style": _clean_text(visual_spec.get("style"), 72),
+            "subject_age_hint": _clean_text(visual_spec.get("subject_age_hint"), 32),
+            "subject_gender_hint": _clean_text(visual_spec.get("subject_gender_hint"), 16),
+            "outfit": _clean_text(visual_spec.get("outfit"), 88),
+            "props": _clean_text(visual_spec.get("props"), 88),
+            "scene": _clean_text(visual_spec.get("scene"), 120),
+            "mood": _clean_text(visual_spec.get("mood"), 48),
+            "composition": _clean_text(visual_spec.get("composition"), 88),
+            "palette": _clean_text(visual_spec.get("palette"), 56),
+        },
+    }
+    return normalized if any(
+        [
+            normalized["title"],
+            normalized["subtitle"],
+            normalized["primary_role"],
+            normalized["mission_line"],
+        ]
+    ) else None
 
 
 def _normalize_profile_gender(value):
@@ -948,6 +1035,235 @@ def _infer_profile_portrait_visual_cues(context):
         "scene": "现代办公空间与柔和科技感背景",
         "mood": "专业、克制、可信赖",
     }
+
+
+def _infer_profile_portrait_role_group_v2(*values):
+    combined = " ".join([str(value or "") for value in values])
+    if re.search(r"产品|项目|运营|行政|助理|协调|人力|hr|pm", combined, re.IGNORECASE):
+        return "coordination"
+    if re.search(r"数据|分析|财务|审计|研究|算法|开发|后端|测试|工程", combined, re.IGNORECASE):
+        return "analysis"
+    if re.search(r"内容|新媒体|编辑|策划|设计|品牌|创意", combined, re.IGNORECASE):
+        return "creative"
+    if re.search(r"销售|商务|市场|客户|增长|bd", combined, re.IGNORECASE):
+        return "growth"
+    return "general"
+
+
+def _build_profile_portrait_title_v2(group, archetype_name=""):
+    title_map = {
+        "coordination": "执行协调型推进者",
+        "analysis": "分析洞察型构建者",
+        "creative": "表达策划型连接者",
+        "growth": "增长拓展型连接者",
+        "general": "职业探索型支持者",
+    }
+    if archetype_name and archetype_name not in ("综合支持者", "职业探索中"):
+        return archetype_name
+    return title_map.get(group, title_map["general"])
+
+
+def _build_profile_portrait_positioning_v2(group, primary_role, context):
+    scene = primary_role or context.get("target_direction") or context.get("archetype_scene") or "当前职业方向"
+    if group == "coordination":
+        return f"你更像能在清晰目标下整合信息、推进协作并把任务落地到结果的人，最适合在 {scene} 相关场景发力。"
+    if group == "analysis":
+        return f"你更像能在高信息密度场景里建立判断、拆解问题并持续优化结果的人，最适合在 {scene} 相关场景发力。"
+    if group == "creative":
+        return f"你更像通过表达、内容和创意组织信息的人，适合在 {scene} 相关场景里承担策划与输出角色。"
+    if group == "growth":
+        return f"你更像能面向目标主动推进、连接资源并推动机会转化的人，适合在 {scene} 相关场景里承担前线角色。"
+    return f"你当前更像一个具备适配性与执行力的职业新人，正在围绕 {scene} 收敛更稳定的职业定位。"
+
+
+def _build_profile_portrait_mission_line_v2(group, primary_role):
+    role = primary_role or "当前目标方向"
+    if group == "coordination":
+        return f"最适合承担 {role} 场景中的信息统筹、进度推进、任务闭环与跨角色协作工作。"
+    if group == "analysis":
+        return f"最适合承担 {role} 场景中的问题拆解、分析判断、结构搭建与持续优化工作。"
+    if group == "creative":
+        return f"最适合承担 {role} 场景中的内容组织、表达策划、创意整合与产出打磨工作。"
+    if group == "growth":
+        return f"最适合承担 {role} 场景中的机会推进、客户沟通、目标跟进与结果转化工作。"
+    return f"最适合在 {role} 相关岗位中承担支持执行、快速学习与稳定交付类任务。"
+
+
+def _build_profile_portrait_evidence_tags_v2(context, primary_role):
+    evidence = []
+    if context.get("mbti"):
+        evidence.append(f"MBTI：{context.get('mbti')}")
+    if context.get("holland"):
+        evidence.append(f"霍兰德：{context.get('holland')}")
+    if primary_role:
+        evidence.append(f"岗位线索：{primary_role}")
+    if context.get("resume_roles"):
+        evidence.append(f"简历角色：{context['resume_roles'][0]}")
+    if context.get("resume_projects"):
+        evidence.append(f"项目经历：{context['resume_projects'][0][:22]}")
+    if context.get("interview_roles"):
+        evidence.append(f"访谈偏好：{context['interview_roles'][0]}")
+    if context.get("interview_values"):
+        evidence.append(f"价值观：{context['interview_values'][0]}")
+    if context.get("target_direction"):
+        evidence.append(f"目标方向：{context['target_direction']}")
+    return _normalize_profile_portrait_brief({"evidence_tags": evidence})["evidence_tags"]
+
+
+def _estimate_profile_portrait_confidence_v2(context, primary_role):
+    signal_count = sum(
+        1
+        for item in [
+            context.get("mbti"),
+            context.get("holland"),
+            context.get("resume_summary"),
+            context.get("interview_summary"),
+            context.get("target_direction"),
+            context.get("resume_projects"),
+            context.get("resume_roles"),
+        ]
+        if item
+    )
+    target_direction = str(context.get("target_direction") or "").strip()
+    matches_target = bool(target_direction and primary_role and (target_direction in primary_role or primary_role in target_direction))
+    if signal_count >= 5 and (matches_target or context.get("resume_roles") or context.get("interview_roles")):
+        return "高"
+    if signal_count >= 3:
+        return "中"
+    return "待验证"
+
+
+def _infer_profile_portrait_risk_note_v2(context, primary_role):
+    for item in context.get("uncertainty") or []:
+        if str(item or "").strip():
+            return str(item).strip()
+    for item in context.get("missing_items") or []:
+        if str(item or "").strip():
+            return f"当前仍需补充：{str(item).strip()}"
+    target_direction = str(context.get("target_direction") or "").strip()
+    if target_direction and primary_role and target_direction not in primary_role and primary_role not in target_direction:
+        return "你填写的目标方向与当前最强证据并不完全一致，建议先以证据更强的角色做展示。"
+    return "当前画像已可用于展示，但主导特征仍建议继续用新经历补强。"
+
+
+def _infer_profile_portrait_next_action_v2(context, primary_role):
+    for item in context.get("next_steps") or []:
+        if str(item or "").strip():
+            return str(item).strip()
+    if context.get("missing_items"):
+        return f"优先补齐 {str(context['missing_items'][0]).strip()}，让这张名片的证据更完整。"
+    role = primary_role or context.get("target_direction") or "目标岗位"
+    return f"围绕 {role} 补一条可量化项目成果，用结果指标强化这张任务名片。"
+
+
+def _build_profile_portrait_palette_v2(group):
+    palette_map = {
+        "coordination": "雾蓝、深海军蓝、冰白",
+        "analysis": "深蓝、青灰、冷白",
+        "creative": "钴蓝、雾紫灰、纸白",
+        "growth": "墨蓝、青绿、银灰白",
+        "general": "石板蓝、雾灰、白色",
+    }
+    return palette_map.get(group, palette_map["general"])
+
+
+def _build_profile_portrait_brief(context):
+    primary_role = (
+        (context.get("top_roles") or [""])[0]
+        or (context.get("role_cluster") or [""])[0]
+        or str(context.get("target_direction") or "").strip()
+        or (context.get("resume_roles") or [""])[0]
+        or (context.get("interview_roles") or [""])[0]
+        or "职业探索中"
+    )
+    support_roles = []
+    for item in (
+        (context.get("top_roles") or [])[1:]
+        + (context.get("role_cluster") or [])
+        + (context.get("interview_roles") or [])
+        + (context.get("resume_roles") or [])
+    ):
+        text = str(item or "").strip()
+        if text and text != primary_role and text not in support_roles:
+            support_roles.append(text)
+        if len(support_roles) >= 2:
+            break
+
+    group = _infer_profile_portrait_role_group_v2(
+        primary_role,
+        context.get("target_direction"),
+        context.get("archetype_name"),
+        _join_unique_text(context.get("resume_roles"), " "),
+        _join_unique_text(context.get("top_roles"), " "),
+    )
+    visual_cues = _infer_profile_portrait_visual_cues(context)
+    title = _build_profile_portrait_title_v2(group, context.get("archetype_name") or "")
+    subtitle = _build_profile_portrait_positioning_v2(group, primary_role, context)
+    brief = {
+        "title": title,
+        "subtitle": subtitle[:88],
+        "positioning": subtitle,
+        "primary_role": primary_role,
+        "support_roles": support_roles[:2],
+        "mission_line": _build_profile_portrait_mission_line_v2(group, primary_role),
+        "evidence_tags": _build_profile_portrait_evidence_tags_v2(context, primary_role),
+        "value_tags": (context.get("work_values") or [])[:3] or ["稳定成长", "结果导向", "持续进步"],
+        "risk_note": _infer_profile_portrait_risk_note_v2(context, primary_role),
+        "next_action": _infer_profile_portrait_next_action_v2(context, primary_role),
+        "confidence_band": _estimate_profile_portrait_confidence_v2(context, primary_role),
+        "visual_spec": {
+            "style": "半写实职业插画，白底页面兼容，适合做任务名片主视觉",
+            "subject_age_hint": _infer_profile_portrait_age_hint(context),
+            "subject_gender_hint": _normalize_profile_gender(context.get("gender")) or "未指定",
+            "outfit": visual_cues["outfit"],
+            "props": visual_cues["props"],
+            "scene": visual_cues["scene"],
+            "mood": visual_cues["mood"],
+            "composition": "3:4 纵向构图，单人半身到 2/3 身，人物居中或略偏左，画面干净克制",
+            "palette": _build_profile_portrait_palette_v2(group),
+        },
+    }
+    return _normalize_profile_portrait_brief(brief)
+
+
+def _build_profile_portrait_summary_from_brief(brief):
+    normalized = _normalize_profile_portrait_brief(brief) or {}
+    return str(normalized.get("subtitle") or normalized.get("positioning") or "").strip()
+
+
+def _build_profile_portrait_render_prompt(context, brief=None):
+    normalized_brief = _normalize_profile_portrait_brief(brief) or _build_profile_portrait_brief(context)
+    visual_spec = normalized_brief.get("visual_spec") or {}
+    gender = _normalize_profile_gender(context.get("gender")) or "未指定"
+    title = normalized_brief.get("title") or context.get("archetype_name") or "职业任务名片"
+    subtitle = normalized_brief.get("subtitle") or context.get("summary") or ""
+    evidence_text = _join_unique_text(normalized_brief.get("evidence_tags"), "；", 3)
+    value_text = _join_unique_text(normalized_brief.get("value_tags"), "、", 3)
+    support_roles = _join_unique_text(normalized_brief.get("support_roles"), " / ", 2)
+    return (
+        "请为职业规划产品生成一张 3:4 纵向单人半写实插画海报，用于白底页面里的任务名片主视觉。"
+        "不要文字、不要水印、不要拼贴、不要多人、不要 UI 截图、不要夸张卡通。\n"
+        "人物身份：\n"
+        f"- 标题：{title}\n"
+        f"- 职业定位：{subtitle}\n"
+        f"- 主角色：{normalized_brief.get('primary_role') or '职业探索中'}\n"
+        f"- 辅助角色：{support_roles or '不强调'}\n"
+        f"- 任务描述：{normalized_brief.get('mission_line') or ''}\n"
+        f"- 证据关键词：{evidence_text or '职业新人、方向收敛'}\n"
+        f"- 工作价值观：{value_text or '稳定成长、结果导向'}\n"
+        f"- 性别提示：{gender}\n"
+        f"- 年龄提示：{visual_spec.get('subject_age_hint') or _infer_profile_portrait_age_hint(context)}\n"
+        "视觉要求：\n"
+        f"- 风格：{visual_spec.get('style') or '半写实职业插画'}\n"
+        f"- 气质：{visual_spec.get('mood') or '专业、可信赖、克制'}\n"
+        f"- 穿搭：{visual_spec.get('outfit') or '商务休闲职业穿搭'}\n"
+        f"- 道具：{visual_spec.get('props') or '平板、笔记本、工作记录工具'}\n"
+        f"- 场景：{visual_spec.get('scene') or '现代办公空间'}\n"
+        f"- 构图：{visual_spec.get('composition') or '单人半身到 2/3 身构图'}\n"
+        f"- 配色：{visual_spec.get('palette') or '石板蓝、白色、雾灰'}\n"
+        "输出要求：人物主体明确，画面简洁，适合放在产品页面左侧做职业推广海报。"
+        "负面要求：低清晰度、背景杂乱、比例错误、畸形手部、过度赛博朋克、漫画分镜、文字乱码。"
+    )
 
 
 def _build_profile_portrait_subject_summary(context):
@@ -2956,6 +3272,764 @@ def test_runner_page():
     return render_template("test_runner.html")
 
 
+def _career_graph_safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _career_graph_level_number(level):
+    match = re.search(r"(\d+)", str(level or ""))
+    return int(match.group(1)) if match else 1
+
+
+def _career_graph_unique_values(items, limit=None):
+    values = []
+    for item in items or []:
+        text = str(item or "").strip()
+        if not text or text in values:
+            continue
+        values.append(text)
+        if limit and len(values) >= limit:
+            break
+    return values
+
+
+def _career_graph_iter_values(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _career_graph_iter_values(item)
+        return
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            yield from _career_graph_iter_values(item)
+        return
+    text = str(value or "").strip()
+    if text:
+        yield text
+
+
+def _career_graph_blob(*values):
+    return " ".join(
+        part.lower()
+        for value in values
+        for part in _career_graph_iter_values(value)
+    )
+
+
+def _career_graph_tokens(*values):
+    tokens = []
+    for value in values:
+        for text in _career_graph_iter_values(value):
+            normalized = (
+                str(text)
+                .replace("_", " ")
+                .replace("/", " ")
+                .replace("-", " ")
+                .strip()
+            )
+            for token in re.findall(r"[A-Za-z0-9#+.]+|[\u4e00-\u9fff]{2,}", normalized.lower()):
+                if token and token not in tokens:
+                    tokens.append(token)
+    return tokens
+
+
+def _career_graph_overlap(terms, *text_values):
+    blob = _career_graph_blob(*text_values)
+    tokens = set(_career_graph_tokens(*text_values))
+    matches = []
+    for raw_term in terms or []:
+        term = str(raw_term or "").strip().lower()
+        if not term:
+            continue
+        term_tokens = _career_graph_tokens(term)
+        matched = False
+        if term in blob:
+            matched = True
+        elif term_tokens and all(token in tokens or token in blob for token in term_tokens):
+            matched = True
+        elif len(term) >= 2 and any(part in blob for part in term.split()):
+            matched = True
+        if matched and raw_term not in matches:
+            matches.append(str(raw_term).strip())
+    return matches
+
+
+def _career_graph_major_fit(major, node):
+    major_text = str(major or "").strip()
+    if not major_text:
+        return 60
+
+    family_blob = _career_graph_blob(
+        node.get("title"),
+        node.get("cluster_name"),
+        node.get("career_family"),
+        node.get("sub_domain"),
+    )
+    tech_terms = ["计算机", "软件", "智能", "数据", "数学", "电子", "信息", "自动化", "网络"]
+    design_terms = ["设计", "美术", "数字媒体", "交互"]
+    product_terms = ["管理", "工业工程", "经济", "统计", "市场", "金融"]
+    people_terms = ["人力", "心理", "社会", "法学", "工商"]
+
+    def has_any(source, keywords):
+        return any(keyword in source for keyword in keywords)
+
+    if has_any(family_blob, ["后端", "前端", "测试", "算法", "运维", "移动"]):
+        if has_any(major_text, tech_terms):
+            return 95
+        if has_any(major_text, ["统计", "数学", "物理"]):
+            return 84
+        return 58
+    if has_any(family_blob, ["产品"]):
+        if has_any(major_text, product_terms + tech_terms):
+            return 88
+        return 68
+    if has_any(family_blob, ["设计"]):
+        if has_any(major_text, design_terms):
+            return 94
+        if has_any(major_text, tech_terms):
+            return 76
+        return 60
+    if has_any(family_blob, ["销售", "HR", "人力"]):
+        if has_any(major_text, people_terms + product_terms):
+            return 88
+        return 70
+    return 72
+
+
+def _career_graph_estimate_requirements(node):
+    level_num = _career_graph_level_number(node.get("level"))
+    requirements = {
+        "professional": 34 + level_num * 11,
+        "learning": 48 + level_num * 6,
+        "communication": 36 + level_num * 7,
+        "innovation": 28 + level_num * 6,
+        "stress_tolerance": 34 + level_num * 6,
+        "internship": 30 + level_num * 6,
+        "execution": 40 + level_num * 7,
+    }
+
+    work_scope = str(node.get("work_scope") or "")
+    decision_scope = str(node.get("decision_scope") or "")
+    collaboration_scope = str(node.get("collaboration_scope") or "")
+    people_scope = str(node.get("people_scope") or "")
+
+    if "项目" in work_scope:
+        requirements["professional"] += 6
+        requirements["execution"] += 5
+    if "方向" in work_scope or "模块" in work_scope:
+        requirements["innovation"] += 5
+        requirements["learning"] += 3
+    if decision_scope == "中":
+        requirements["innovation"] += 6
+        requirements["communication"] += 4
+    elif decision_scope == "高":
+        requirements["innovation"] += 10
+        requirements["communication"] += 8
+        requirements["stress_tolerance"] += 6
+    if collaboration_scope and collaboration_scope not in {"组内", "无"}:
+        requirements["communication"] += 8
+    if people_scope and people_scope not in {"无", "0", "零"}:
+        requirements["communication"] += 6
+        requirements["stress_tolerance"] += 5
+        requirements["execution"] += 4
+
+    return {
+        key: max(32, min(95, int(value)))
+        for key, value in requirements.items()
+    }
+
+
+def _career_graph_capability_fit(capabilities, requirements):
+    used = 0
+    weighted = 0.0
+    gaps = []
+    weights = {
+        "professional": 0.24,
+        "learning": 0.15,
+        "communication": 0.17,
+        "innovation": 0.12,
+        "stress_tolerance": 0.12,
+        "internship": 0.08,
+        "execution": 0.12,
+    }
+    labels = {
+        "professional": "专业技能",
+        "learning": "学习能力",
+        "communication": "沟通能力",
+        "innovation": "创新能力",
+        "stress_tolerance": "抗压能力",
+        "internship": "实践能力",
+        "execution": "执行能力",
+    }
+    for key, weight in weights.items():
+        score = capabilities.get(key)
+        need = requirements.get(key)
+        if score is None or need is None:
+            continue
+        used += 1
+        fit = min(112.0, max(28.0, (float(score) / max(float(need), 1.0)) * 100.0))
+        weighted += fit * weight
+        if float(score) + 8 < float(need):
+            gaps.append(f"{labels[key]} {int(score)}/{int(need)}")
+    if not used:
+        return 58, []
+    return int(round(weighted)), gaps[:4]
+
+
+def _career_graph_collect_profile_inputs(profile_payload):
+    payload = profile_payload if isinstance(profile_payload, dict) else {}
+    basics = payload.get("basics") if isinstance(payload.get("basics"), dict) else {}
+    assessment = payload.get("assessment") if isinstance(payload.get("assessment"), dict) else {}
+    interview = payload.get("interview") if isinstance(payload.get("interview"), dict) else {}
+    interview_profile = interview.get("profile") if isinstance(interview.get("profile"), dict) else {}
+    resume_state = payload.get("resume") if isinstance(payload.get("resume"), dict) else {}
+    resume_public = resume_state.get("profile") if isinstance(resume_state.get("profile"), dict) else {}
+    resume_profile = resume_public.get("profile") if isinstance(resume_public.get("profile"), dict) else {}
+    resume_matcher = resume_public.get("matcher") if isinstance(resume_public.get("matcher"), dict) else {}
+    structured_resume = resume_public.get("structured_resume") if isinstance(resume_public.get("structured_resume"), dict) else {}
+
+    capabilities = {}
+    for key in ["professional", "learning", "communication", "innovation", "stress_tolerance", "internship", "execution"]:
+        item = payload.get("capabilities", {}).get(key) if isinstance(payload.get("capabilities"), dict) else None
+        if isinstance(item, dict) and item.get("score") is not None:
+            capabilities[key] = int(_career_graph_safe_float(item.get("score")))
+        else:
+            capabilities[key] = None
+
+    structured_skills = []
+    for item in structured_resume.get("skills") or []:
+        if isinstance(item, dict):
+            structured_skills.append(item.get("skill_name") or item.get("skillName") or "")
+        else:
+            structured_skills.append(item)
+
+    experience_titles = []
+    for item in structured_resume.get("experiences") or []:
+        if isinstance(item, dict):
+            experience_titles.append(item.get("job_title") or item.get("jobTitle") or "")
+            experience_titles.extend(item.get("technologies_used") or item.get("technologiesUsed") or [])
+
+    project_terms = []
+    for item in structured_resume.get("projects") or []:
+        if isinstance(item, dict):
+            project_terms.append(item.get("project_name") or item.get("projectName") or "")
+            project_terms.extend(item.get("technologies_used") or item.get("technologiesUsed") or [])
+
+    roles_detected = [
+        item.get("role") or item.get("job_title") or ""
+        for item in (resume_profile.get("roles_detected") or [])
+        if isinstance(item, dict)
+    ]
+
+    direction_terms = _career_graph_unique_values(
+        [
+            basics.get("target_direction"),
+            *(payload.get("recommendedRoles") or []),
+            *(interview_profile.get("recommended_roles") or []),
+            *(resume_matcher.get("recommended_directions") or []),
+            *roles_detected,
+        ],
+        limit=18,
+    )
+
+    skill_terms = _career_graph_unique_values(
+        [
+            *(resume_matcher.get("resume_keywords") or []),
+            *structured_skills,
+            *experience_titles,
+            *project_terms,
+        ],
+        limit=36,
+    )
+
+    mbti = ""
+    holland_codes = []
+    mbti_state = assessment.get("mbti") if isinstance(assessment.get("mbti"), dict) else {}
+    holland_state = assessment.get("holland") if isinstance(assessment.get("holland"), dict) else {}
+    if mbti_state.get("completed"):
+        mbti = str(
+            mbti_state.get("final_type")
+            or mbti_state.get("display_type")
+            or mbti_state.get("raw_type")
+            or ""
+        ).strip()
+    if holland_state.get("completed"):
+        holland_codes = _career_graph_unique_values(
+            holland_state.get("top_codes") or holland_state.get("code") or [],
+            limit=3,
+        )
+
+    return {
+        "summary": str(payload.get("summary") or "").strip(),
+        "major": str(basics.get("major") or "").strip(),
+        "grade": str(basics.get("grade") or basics.get("education_level") or "").strip(),
+        "target_city": str(basics.get("target_city") or basics.get("targetCity") or "").strip(),
+        "direction_terms": direction_terms,
+        "skill_terms": skill_terms,
+        "work_values": _career_graph_unique_values(
+            [
+                *(payload.get("workValues") or []),
+                *(interview_profile.get("work_values") or []),
+            ],
+            limit=8,
+        ),
+        "mbti": mbti,
+        "holland_codes": holland_codes,
+        "capabilities": capabilities,
+        "missing_items": _career_graph_unique_values(payload.get("missingItems") or [], limit=6),
+    }
+
+
+def _career_graph_compact_node(node, degree=0):
+    salary = node.get("salary_range") if isinstance(node.get("salary_range"), dict) else {}
+    return {
+        "id": str(node.get("node_id") or "").strip(),
+        "title": str(node.get("title") or "").strip(),
+        "clusterId": str(node.get("cluster_id") or "").strip(),
+        "cluster": str(node.get("cluster_name") or "").strip(),
+        "family": str(node.get("career_family") or "").strip(),
+        "subDomain": str(node.get("sub_domain") or "").strip(),
+        "level": str(node.get("level") or "").strip(),
+        "skills": _career_graph_unique_values(node.get("skills") or [], limit=12),
+        "city": str(node.get("city") or "").strip(),
+        "industry": str(node.get("company_industry") or "").strip(),
+        "track": str(node.get("track") or "").strip(),
+        "years": _career_graph_safe_float(node.get("years_required"), 0),
+        "salaryMin": _career_graph_safe_float(salary.get("min"), 0),
+        "salaryMax": _career_graph_safe_float(salary.get("max"), 0),
+        "workScope": str(node.get("work_scope") or "").strip(),
+        "decisionScope": str(node.get("decision_scope") or "").strip(),
+        "collaborationScope": str(node.get("collaboration_scope") or "").strip(),
+        "peopleScope": str(node.get("people_scope") or "").strip(),
+        "nodeType": str(node.get("node_type") or "").strip(),
+        "degree": int(degree or 0),
+    }
+
+
+def _load_career_graph_index():
+    try:
+        mtime = os.path.getmtime(CAREER_GRAPH_FILE)
+    except OSError as exc:
+        raise FileNotFoundError(CAREER_GRAPH_FILE) from exc
+
+    with CAREER_GRAPH_LOCK:
+        if CAREER_GRAPH_CACHE["mtime"] == mtime and CAREER_GRAPH_CACHE["graph"] is not None:
+            return CAREER_GRAPH_CACHE
+
+        with open(CAREER_GRAPH_FILE, "r", encoding="utf-8") as fp:
+            graph = json.load(fp)
+
+        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+        edges = graph.get("edges") if isinstance(graph.get("edges"), list) else []
+        clusters = graph.get("clusters") if isinstance(graph.get("clusters"), list) else []
+
+        node_map = {}
+        cluster_map = {}
+        adjacency = defaultdict(lambda: {"promotion_out": [], "promotion_in": [], "substitution": []})
+        degree_map = defaultdict(int)
+
+        for node in nodes:
+            node_id = str(node.get("node_id") or "").strip()
+            if node_id:
+                node_map[node_id] = node
+
+        for cluster in clusters:
+            cluster_id = str(cluster.get("cluster_id") or "").strip()
+            if cluster_id:
+                cluster_map[cluster_id] = cluster
+
+        compact_edges = []
+        for edge in edges:
+            source = str(edge.get("source") or "").strip()
+            target = str(edge.get("target") or "").strip()
+            relation = str(edge.get("relation") or "related").strip() or "related"
+            if not source or not target or source not in node_map or target not in node_map:
+                continue
+            normalized_edge = {
+                "source": source,
+                "target": target,
+                "relation": relation,
+                "confidence": round(_career_graph_safe_float(edge.get("confidence"), 0), 3),
+                "continuity_score": round(_career_graph_safe_float(edge.get("continuity_score"), 0), 3),
+                "uplift_score": round(_career_graph_safe_float(edge.get("uplift_score"), 0), 3),
+                "reason": _career_graph_unique_values(edge.get("reason") or [], limit=4),
+            }
+            compact_edges.append(normalized_edge)
+            degree_map[source] += 1
+            degree_map[target] += 1
+            if relation == "promotion":
+                adjacency[source]["promotion_out"].append(normalized_edge)
+                adjacency[target]["promotion_in"].append(normalized_edge)
+            else:
+                adjacency[source]["substitution"].append(normalized_edge)
+                adjacency[target]["substitution"].append(normalized_edge)
+
+        cluster_summary = [
+            {
+                "clusterId": str(item.get("cluster_id") or "").strip(),
+                "cluster": str(item.get("cluster_name") or "").strip(),
+                "count": int(item.get("count") or len(item.get("member_ids") or [])),
+            }
+            for item in clusters
+        ]
+        cluster_summary.sort(key=lambda item: (-item["count"], item["cluster"]))
+
+        bootstrap = {
+            "metadata": graph.get("metadata") if isinstance(graph.get("metadata"), dict) else {},
+            "filters": {
+                "careerFamilies": sorted(
+                    {
+                        str(node.get("career_family") or "").strip()
+                        for node in nodes
+                        if str(node.get("career_family") or "").strip()
+                    }
+                ),
+                "levels": sorted(
+                    {
+                        str(node.get("level") or "").strip()
+                        for node in nodes
+                        if str(node.get("level") or "").strip()
+                    }
+                ),
+                "clusters": cluster_summary,
+            },
+            "nodes": [
+                _career_graph_compact_node(node, degree_map.get(str(node.get("node_id") or "").strip(), 0))
+                for node in nodes
+                if str(node.get("node_id") or "").strip()
+            ],
+            "edges": compact_edges,
+        }
+
+        CAREER_GRAPH_CACHE.update(
+            {
+                "mtime": mtime,
+                "graph": graph,
+                "node_map": node_map,
+                "cluster_map": cluster_map,
+                "adjacency": adjacency,
+                "bootstrap": bootstrap,
+            }
+        )
+        return CAREER_GRAPH_CACHE
+
+
+def _career_graph_path_summary(node_id, node_map, adjacency, max_hops=3):
+    titles = []
+    current_id = str(node_id or "").strip()
+    hops = 0
+    visited = set()
+    while current_id and current_id not in visited and hops < max_hops:
+        visited.add(current_id)
+        current_node = node_map.get(current_id) or {}
+        title = str(current_node.get("title") or "").strip()
+        if title:
+            titles.append(title)
+        promotion_edges = adjacency.get(current_id, {}).get("promotion_out") or []
+        current_level = _career_graph_level_number(current_node.get("level"))
+        promotion_edges = [
+            item for item in promotion_edges
+            if _career_graph_level_number((node_map.get(str(item.get("target") or "").strip()) or {}).get("level")) >= current_level
+        ] or promotion_edges
+        if not promotion_edges:
+            break
+        next_edge = sorted(
+            promotion_edges,
+            key=lambda item: (
+                -_career_graph_safe_float(item.get("confidence"), 0),
+                -_career_graph_safe_float(item.get("uplift_score"), 0),
+            ),
+        )[0]
+        current_id = str(next_edge.get("target") or "").strip()
+        hops += 1
+    return " → ".join(titles)
+
+
+def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
+    node_blob = _career_graph_blob(
+        node.get("title"),
+        node.get("cluster_name"),
+        node.get("career_family"),
+        node.get("sub_domain"),
+        node.get("skills"),
+        node.get("company_industry"),
+    )
+    node_skill_blob = _career_graph_blob(node.get("skills"))
+
+    direction_hits = _career_graph_overlap(profile_inputs.get("direction_terms"), node_blob)
+    skill_hits = _career_graph_overlap(profile_inputs.get("skill_terms"), node_skill_blob)
+    target_city = str(profile_inputs.get("target_city") or "").strip()
+    city = str(node.get("city") or "").strip()
+
+    direction_score = 58 if not profile_inputs.get("direction_terms") else min(100, 44 + len(direction_hits) * 18)
+    if profile_inputs.get("direction_terms") and not direction_hits:
+        direction_score = 38
+
+    node_skills = _career_graph_unique_values(node.get("skills") or [], limit=12)
+    if node_skills:
+        skill_score = 34 + int(round(min(1.0, len(skill_hits) / max(len(node_skills), 1)) * 66))
+    else:
+        skill_score = 56
+
+    major_score = _career_graph_major_fit(profile_inputs.get("major"), node)
+
+    estimated_years = 0.0
+    if "硕" in str(profile_inputs.get("grade") or ""):
+        estimated_years = 0.5
+    elif "博" in str(profile_inputs.get("grade") or ""):
+        estimated_years = 1.0
+    target_years = _career_graph_safe_float(node.get("years_required"), 0)
+    experience_score = max(40, 100 - int(abs(target_years - estimated_years) * 26))
+    if target_years <= 1.0 and _career_graph_level_number(node.get("level")) <= 2:
+        experience_score = min(100, experience_score + 8)
+
+    city_score = 62
+    if target_city and city:
+        city_score = 100 if target_city == city else 46
+    elif city:
+        city_score = 66
+
+    requirements = _career_graph_estimate_requirements(node)
+    capability_score, capability_gaps = _career_graph_capability_fit(profile_inputs.get("capabilities") or {}, requirements)
+
+    overall_score = int(round(
+        direction_score * 0.31
+        + skill_score * 0.28
+        + capability_score * 0.17
+        + experience_score * 0.11
+        + major_score * 0.08
+        + city_score * 0.05
+    ))
+
+    missing_skills = [skill for skill in node_skills if skill not in skill_hits][:4]
+    reason_lines = []
+    if direction_hits:
+        reason_lines.append(f"方向信号命中：{'、'.join(direction_hits[:3])}")
+    if skill_hits:
+        reason_lines.append(f"技能重合：{'、'.join(skill_hits[:4])}")
+    if target_city and city and target_city == city:
+        reason_lines.append(f"目标城市匹配：{city}")
+    if not reason_lines:
+        reason_lines.append("当前画像信号有限，本次推荐更依赖岗位图谱结构与基础门槛。")
+    if capability_gaps:
+        reason_lines.append(f"关键能力缺口：{'、'.join(capability_gaps[:2])}")
+
+    path_summary = _career_graph_path_summary(node.get("node_id"), node_map, adjacency, max_hops=3)
+    confidence_inputs = 0
+    confidence_inputs += 1 if profile_inputs.get("direction_terms") else 0
+    confidence_inputs += 1 if profile_inputs.get("skill_terms") else 0
+    confidence_inputs += 1 if any(value is not None for value in (profile_inputs.get("capabilities") or {}).values()) else 0
+    confidence_inputs += 1 if profile_inputs.get("major") else 0
+    confidence_inputs += 1 if target_city else 0
+    confidence_ratio = confidence_inputs / 5.0
+    confidence_text = "高" if confidence_ratio >= 0.8 else "中" if confidence_ratio >= 0.5 else "低"
+
+    next_actions = _career_graph_unique_values(
+        [
+            *(f"补足 {skill} 相关证据或项目" for skill in missing_skills[:2]),
+            *(f"提升 {gap}" for gap in capability_gaps[:2]),
+            f"优先验证 {node.get('title') or '目标岗位'} 的真实职责与面试要求",
+        ],
+        limit=4,
+    )
+
+    compact_node = _career_graph_compact_node(node)
+    compact_node.update(
+        {
+            "overallScore": max(0, min(100, overall_score)),
+            "directionScore": max(0, min(100, direction_score)),
+            "skillScore": max(0, min(100, skill_score)),
+            "capabilityScore": max(0, min(100, capability_score)),
+            "experienceScore": max(0, min(100, experience_score)),
+            "majorScore": max(0, min(100, major_score)),
+            "cityScore": max(0, min(100, city_score)),
+            "confidence": confidence_text,
+            "reasonLines": reason_lines[:4],
+            "skillHits": skill_hits[:6],
+            "missingSkills": missing_skills,
+            "capabilityGaps": capability_gaps,
+            "path": path_summary or compact_node.get("title") or "",
+            "directionLabel": compact_node.get("cluster") or compact_node.get("family") or "",
+            "nextActions": next_actions,
+        }
+    )
+    return compact_node
+
+
+def _career_graph_pick_diverse(candidates, limit):
+    selected = []
+    selected_ids = set()
+    used_clusters = set()
+
+    for item in candidates:
+        cluster = str(item.get("cluster") or "").strip()
+        node_id = str(item.get("id") or "").strip()
+        if not node_id or node_id in selected_ids:
+            continue
+        if cluster and cluster in used_clusters:
+            continue
+        selected.append(item)
+        selected_ids.add(node_id)
+        if cluster:
+            used_clusters.add(cluster)
+        if len(selected) >= limit:
+            return selected
+
+    for item in candidates:
+        node_id = str(item.get("id") or "").strip()
+        if not node_id or node_id in selected_ids:
+            continue
+        selected.append(item)
+        selected_ids.add(node_id)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def _career_graph_llm_rerank(profile_inputs, candidates, limit=5):
+    base_url, api_key, model = _get_active_provider_and_model()
+    if not base_url or not api_key or not candidates:
+        return None
+
+    shortlist = []
+    for item in candidates[:12]:
+        shortlist.append(
+            {
+                "node_id": item.get("id"),
+                "title": item.get("title"),
+                "cluster": item.get("cluster"),
+                "level": item.get("level"),
+                "city": item.get("city"),
+                "years_required": item.get("years"),
+                "skills": item.get("skills"),
+                "score": item.get("overallScore"),
+                "reason_lines": item.get("reasonLines"),
+                "missing_skills": item.get("missingSkills"),
+                "path": item.get("path"),
+            }
+        )
+
+    system_prompt = (
+        "你是职业匹配顾问。请根据用户画像，从候选岗位中挑选最适合的 5 条不同职业方向。"
+        "必须兼顾匹配度与方向差异，不要返回 5 个几乎相同的岗位。"
+        "只输出 JSON："
+        '{"recommendations":[{"node_id":"岗位ID","fit_reason":"不超过60字","direction_label":"方向标签","next_step":"一个具体下一步"}]}'
+    )
+    user_payload = {
+        "profile": {
+            "summary": profile_inputs.get("summary"),
+            "major": profile_inputs.get("major"),
+            "grade": profile_inputs.get("grade"),
+            "target_city": profile_inputs.get("target_city"),
+            "direction_terms": profile_inputs.get("direction_terms"),
+            "skill_terms": profile_inputs.get("skill_terms"),
+            "work_values": profile_inputs.get("work_values"),
+            "mbti": profile_inputs.get("mbti"),
+            "holland_codes": profile_inputs.get("holland_codes"),
+            "missing_items": profile_inputs.get("missing_items"),
+        },
+        "candidates": shortlist,
+    }
+
+    try:
+        parsed = _call_structured_chat(
+            base_url,
+            api_key,
+            model,
+            [{"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}],
+            system_prompt=system_prompt,
+            max_tokens=1000,
+        )
+    except Exception:
+        app.logger.exception("career graph llm rerank failed")
+        return None
+
+    recommendations = parsed.get("recommendations") if isinstance(parsed, dict) else []
+    if not isinstance(recommendations, list):
+        return None
+
+    candidate_map = {
+        str(item.get("id") or "").strip(): dict(item)
+        for item in candidates
+        if str(item.get("id") or "").strip()
+    }
+    selected = []
+    selected_ids = set()
+    used_clusters = set()
+    for item in recommendations:
+        if not isinstance(item, dict):
+            continue
+        node_id = str(item.get("node_id") or "").strip()
+        if not node_id or node_id not in candidate_map or node_id in selected_ids:
+            continue
+        candidate = candidate_map[node_id]
+        cluster = str(candidate.get("cluster") or "").strip()
+        if cluster and cluster in used_clusters:
+            continue
+        candidate["fitReason"] = str(item.get("fit_reason") or "").strip() or "模型认为该岗位与当前画像较匹配。"
+        candidate["directionLabel"] = str(item.get("direction_label") or "").strip() or candidate.get("directionLabel") or ""
+        llm_next = str(item.get("next_step") or "").strip()
+        if llm_next:
+            candidate["nextActions"] = _career_graph_unique_values([llm_next, *(candidate.get("nextActions") or [])], limit=4)
+        selected.append(candidate)
+        selected_ids.add(node_id)
+        if cluster:
+            used_clusters.add(cluster)
+        if len(selected) >= limit:
+            break
+
+    if not selected:
+        return None
+
+    return {
+        "mode": "llm_reranked",
+        "model": model,
+        "recommendations": selected,
+    }
+
+
+def _career_graph_node_detail_payload(node_id):
+    graph_cache = _load_career_graph_index()
+    node_map = graph_cache.get("node_map") or {}
+    adjacency = graph_cache.get("adjacency") or {}
+    node = node_map.get(str(node_id or "").strip())
+    if not node:
+        return None
+
+    compact_node = _career_graph_compact_node(node)
+    relation_payload = {}
+    for bucket_name in ["promotion_out", "promotion_in", "substitution"]:
+        items = []
+        for edge in sorted(
+            adjacency.get(compact_node["id"], {}).get(bucket_name) or [],
+            key=lambda item: (-_career_graph_safe_float(item.get("confidence"), 0), item.get("target") or ""),
+        )[:10]:
+            related_id = edge.get("target") if bucket_name != "promotion_in" else edge.get("source")
+            if bucket_name == "substitution":
+                related_id = edge.get("target") if edge.get("source") == compact_node["id"] else edge.get("source")
+            related_node = node_map.get(str(related_id or "").strip())
+            if not related_node:
+                continue
+            items.append(
+                {
+                    "edge": edge,
+                    "node": _career_graph_compact_node(related_node),
+                }
+            )
+        relation_payload[bucket_name] = items
+
+    detail = dict(node)
+    detail["node_id"] = compact_node["id"]
+    return {
+        "node": detail,
+        "summary": compact_node,
+        "relations": relation_payload,
+        "path": _career_graph_path_summary(compact_node["id"], node_map, adjacency, max_hops=4),
+    }
+
+
 @app.route("/api/auth/status")
 def api_auth_status():
     user = _current_user()
@@ -3132,8 +4206,12 @@ def api_user_state(scope):
 def api_profile_portrait_generate():
     user = _current_user()
     payload = request.get_json(silent=True) or {}
+    reuse_brief = bool(payload.get("reuse_brief"))
     context = _normalize_profile_portrait_context(payload.get("context"))
-    if not _has_profile_portrait_signal(context):
+    state = _load_user_state(user["username"])
+    saved_portrait = state.get("profile_portrait") if isinstance(state.get("profile_portrait"), dict) else {}
+    saved_brief = _normalize_profile_portrait_brief(saved_portrait.get("brief"))
+    if not _has_profile_portrait_signal(context) and not saved_brief:
         return jsonify({"message": "当前画像信息不足，先补充测评、简历或目标方向。"}), 400
 
     base_url, api_key, model = _get_profile_portrait_runtime()
@@ -3141,29 +4219,52 @@ def api_profile_portrait_generate():
         return jsonify({"message": "系统中未找到 OpenRouter 图片配置，请先在 system 账号里配置 OpenRouter Provider。"}), 400
 
     try:
-        prompt_summary = _build_profile_portrait_subject_summary(context) or context.get("summary") or ""
-        prompt = _build_profile_portrait_prompt(context)
-        image_url = _generate_profile_portrait_image(base_url, api_key, model, prompt)
+        brief = saved_brief if (reuse_brief and saved_brief) else _build_profile_portrait_brief(context)
+        prompt_summary = _build_profile_portrait_summary_from_brief(brief) or context.get("summary") or ""
+        prompt = _build_profile_portrait_render_prompt(context, brief)
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     except Exception:
-        app.logger.exception("profile portrait generation failed")
+        app.logger.exception("profile portrait brief generation failed")
         return jsonify({"message": "用户画像生成失败，请稍后重试。"}), 502
 
+    image_url = str(saved_portrait.get("image_url") or "").strip() if reuse_brief else ""
+    image_error = ""
+    status = "ready"
+    try:
+        image_url = _generate_profile_portrait_image(base_url, api_key, model, prompt)
+    except ValueError as exc:
+        image_error = str(exc)
+        status = "ready" if image_url else "brief_ready"
+    except Exception:
+        image_error = "鐢诲儚娴锋姤娓叉煋澶辫触锛岃绋嶅悗閲嶈瘯銆?"
+        app.logger.exception("profile portrait generation failed")
+        status = "ready" if image_url else "brief_ready"
+
     portrait_state = {
-        "status": "ready",
+        "status": status,
         "image_url": image_url,
         "created_at": int(time.time()),
         "model": model,
         "archetype_name": context.get("archetype_name") or "",
         "prompt_summary": prompt_summary,
         "prompt_text": prompt,
+        "prompt_mode": "reuse_brief" if (reuse_brief and saved_brief) else "rebuild_brief",
+        "brief_version": "2026.04-task-card-v1",
+        "image_error": image_error,
+        "brief": brief,
     }
-    state = _load_user_state(user["username"])
     state["profile_portrait"] = portrait_state
     _save_user_state(user["username"], state)
+    if image_error and image_url:
+        message = "已保留上一版海报，本次重绘失败，可稍后再试。"
+    elif image_error:
+        message = "职业定位已收敛，但海报渲染失败，可直接重试海报。"
+    else:
+        message = "用户画像已生成。"
     return jsonify({
         "message": "用户画像已生成。",
+        "message": message,
         "data": _public_profile_portrait_state(portrait_state),
     })
 
@@ -3982,6 +5083,92 @@ def api_career_report_export():
     )
 
 
+@app.route("/api/career-graph/bootstrap")
+@_login_required
+def api_career_graph_bootstrap():
+    try:
+        payload = _load_career_graph_index().get("bootstrap") or {}
+    except FileNotFoundError:
+        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
+    except Exception:
+        app.logger.exception("career graph bootstrap failed")
+        return jsonify({"message": "职业图谱加载失败。"}), 500
+    return _cache_json_response(payload, max_age=600)
+
+
+@app.route("/api/career-graph/node/<node_id>")
+@_login_required
+def api_career_graph_node_detail(node_id):
+    try:
+        payload = _career_graph_node_detail_payload(node_id)
+    except FileNotFoundError:
+        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
+    except Exception:
+        app.logger.exception("career graph node detail failed")
+        return jsonify({"message": "岗位详情加载失败。"}), 500
+    if not payload:
+        return jsonify({"message": "未找到对应岗位节点。"}), 404
+    return _cache_json_response(payload, max_age=600)
+
+
+@app.route("/api/career-graph/match", methods=["POST"])
+@_login_required
+def api_career_graph_match():
+    payload = request.get_json(silent=True) or {}
+    profile_payload = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
+    limit = max(1, min(int(payload.get("limit") or 5), 8))
+
+    try:
+        graph_cache = _load_career_graph_index()
+    except FileNotFoundError:
+        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
+    except Exception:
+        app.logger.exception("career graph match bootstrap failed")
+        return jsonify({"message": "职业图谱加载失败。"}), 500
+
+    profile_inputs = _career_graph_collect_profile_inputs(profile_payload)
+    node_map = graph_cache.get("node_map") or {}
+    adjacency = graph_cache.get("adjacency") or {}
+
+    candidates = [
+        _career_graph_score_candidate(node, profile_inputs, node_map, adjacency)
+        for node in node_map.values()
+    ]
+    candidates.sort(
+        key=lambda item: (
+            -int(item.get("overallScore") or 0),
+            -int(item.get("directionScore") or 0),
+            -int(item.get("skillScore") or 0),
+            str(item.get("title") or ""),
+        )
+    )
+
+    deterministic_pool = _career_graph_pick_diverse(candidates, max(limit * 3, 12))
+    llm_result = _career_graph_llm_rerank(profile_inputs, deterministic_pool, limit=limit)
+    recommendations = llm_result.get("recommendations") if llm_result else deterministic_pool[:limit]
+    if not llm_result:
+        recommendations = _career_graph_pick_diverse(candidates, limit)
+
+    return jsonify(
+        {
+            "mode": llm_result.get("mode") if llm_result else "deterministic",
+            "model": llm_result.get("model") if llm_result else "",
+            "recommendations": recommendations,
+            "profileEcho": {
+                "targetCity": profile_inputs.get("target_city") or "",
+                "targetDirection": (profile_inputs.get("direction_terms") or [""])[0],
+                "major": profile_inputs.get("major") or "",
+                "missingItems": profile_inputs.get("missing_items") or [],
+            },
+            "diagnostics": {
+                "candidateCount": len(candidates),
+                "directionSignals": len(profile_inputs.get("direction_terms") or []),
+                "skillSignals": len(profile_inputs.get("skill_terms") or []),
+            },
+        }
+    )
+
+
 @app.route("/api/cities")
 def api_cities():
     cities = [fname[:-5] for fname in _list_city_files()]
@@ -4097,6 +5284,60 @@ def api_career_interview():
     except Exception as exc:
         app.logger.exception("career interview failed")
         return jsonify({"message": f"职业访谈生成失败: {exc}"}), 502
+
+
+@app.route("/api/career-interview/finish", methods=["POST"])
+@_login_required
+def api_career_interview_finish():
+    """用户点击'完成访谈'按钮时调用，生成最终叙事性摘要"""
+    payload = request.get_json(silent=True) or {}
+    messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
+    assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
+    base_url, api_key, model = _get_active_provider_and_model()
+
+    if not base_url or not api_key:
+        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
+
+    normalized_messages = []
+    for item in messages[-20:]:  # 保留更多历史用于生成摘要
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        normalized_messages.append({"role": role, "content": content[:1600]})
+
+    # 生成叙事性摘要的系统提示词
+    finish_prompt = """你是一名职业规划咨询师。用户已完成访谈，请根据对话历史生成一份叙事性画像摘要。
+
+【输出要求】（严格JSON格式）
+{
+  "summary": "一段80字左右的叙事性画像，用第一人称描述用户的职业特征、价值观和潜在优势",
+  "role_model": "用户钦佩的人及其原因（从对话提取）",
+  "work_values": ["价值观1", "价值观2", "价值观3"],
+  "key_experience": "用户提到的最具体的经历或成就",
+  "leadership_style": "从对话推断的协作/领导风格",
+  "growth_mindset": "成长型思维的体现",
+  "recommended_exploration": ["还可以进一步探索的方向1", "还可以进一步探索的方向2"]
+}
+
+请用温暖、专业的语气，基于对话内容生成准确的摘要。如果某些信息在对话中未涉及，请基于已有信息合理推断并在summary中说明"已基于有限对话生成，随着对话深入可以进一步完善"。 """
+
+    try:
+        result = _call_openai_compatible_chat(
+            base_url,
+            api_key,
+            model,
+            normalized_messages,
+            system_prompt=_build_career_interview_prompt(assessment_context) + "\n\n" + finish_prompt,
+        )
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("career interview finish failed")
+        return jsonify({"message": f"生成访谈摘要失败: {exc}"}), 502
 
 
 @app.route("/api/mbti-clarifier", methods=["POST"])

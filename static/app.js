@@ -1,4 +1,4 @@
-﻿const appState = {
+const appState = {
   currentSection: "dashboard",
   selectedJobs: [],
   profileComplete: false,
@@ -33,6 +33,7 @@ const JOB_PAGE_SIZE  = 12;
 let fuseIndex = null;
 
 let jobsGeoAssetsPromise = null;
+let careerGraphAssetsPromise = null;
 const JOBS_CACHE_TTL_MS = 15 * 60 * 1000;
 const JOBS_CACHE_VERSION = "v4";
 const JOBS_CITIES_CACHE_KEY = `ms_jobs_cities_${JOBS_CACHE_VERSION}`;
@@ -414,6 +415,55 @@ async function ensureJobsGeoAssets() {
   return jobsGeoAssetsPromise;
 }
 
+function getCareerGraphMatchingApi() {
+  return window.__careerGraphMatchingApi || null;
+}
+
+async function ensureCareerGraphMatchingAssets() {
+  if (getCareerGraphMatchingApi()) return getCareerGraphMatchingApi();
+  if (!careerGraphAssetsPromise) {
+    careerGraphAssetsPromise = (async () => {
+      if (!window.d3) {
+        await loadScriptOnce("/static/vendor/d3.v7.min.js?v=20260404-kb-v1", "d3");
+      }
+      await loadScriptOnce("/static/career-graph-matching.js?v=20260404-kb-v1", "career-graph-matching");
+      const api = getCareerGraphMatchingApi();
+      if (!api) {
+        throw new Error("职业图谱模块已加载，但没有成功完成初始化");
+      }
+      return api;
+    })().catch((error) => {
+      careerGraphAssetsPromise = null;
+      throw error;
+    });
+  }
+  return careerGraphAssetsPromise;
+}
+
+window.startCareerGraphMatching = function startCareerGraphMatching(force = false) {
+  return ensureCareerGraphMatchingAssets()
+    .then((api) => api?.startMatch?.({ force }))
+    .catch((error) => {
+      showToast("职业匹配加载失败", error.message, "error", 2200);
+    });
+};
+
+window.focusCareerGraphNodeById = function focusCareerGraphNodeById(nodeId) {
+  return ensureCareerGraphMatchingAssets()
+    .then((api) => api?.focusNode?.(nodeId))
+    .catch((error) => {
+      showToast("图谱加载失败", error.message, "warning", 2200);
+    });
+};
+
+window.resetCareerGraphLayout = function resetCareerGraphLayout() {
+  return ensureCareerGraphMatchingAssets()
+    .then((api) => api?.resetLayout?.())
+    .catch((error) => {
+      showToast("图谱布局重置失败", error.message, "warning", 2200);
+    });
+};
+
 function getDefaultCareerInterviewConfig() {
   return {
     base_url: "",
@@ -601,7 +651,10 @@ const resumeTaskState = {
 };
 
 const profilePortraitTaskState = {
-  loading: false
+  loading: false,
+  stageIndex: 0,
+  stageTimer: null,
+  mode: "render"
 };
 
 function setResumeProgress(kind, percent, label = "", active = false) {
@@ -713,11 +766,13 @@ function startAnalyzeProgressTicker() {
   resumeTaskState.analyzeTimer = setInterval(() => {
     if (!resumeTaskState.analyzeInFlight) return;
     const elapsedSec = Math.max(0, Math.floor((Date.now() - resumeTaskState.analyzeStartedAt) / 1000));
-    const stage = stages[resumeTaskState.analyzeFrameIndex % stages.length];
+    // 顺序推进，到最后一步后锁定，不回绕
+    const stageIndex = Math.min(resumeTaskState.analyzeFrameIndex, stages.length - 1);
+    const stage = stages[stageIndex];
     resumeTaskState.analyzeFrameIndex += 1;
     setResumeProgress("analyze", 100, `${stage} · ${elapsedSec}s`, true);
     setResumeLoadingText(`${stage}，预计很快完成。`);
-    setResumeLoadingStage(Math.min(3, resumeTaskState.analyzeFrameIndex - 1));
+    setResumeLoadingStage(stageIndex);
   }, 900);
 }
 
@@ -898,6 +953,21 @@ function copyResumeCodeBlock(id) {
       setTimeout(() => { btn.textContent = prev; }, 2000);
     }
   }).catch(() => {});
+}
+
+function copyPlainText(text, successTitle = "已复制", successMessage = "内容已复制到剪贴板。") {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    showToast("没有可复制内容", "先生成任务名片后再复制。", "warning", 1800);
+    return Promise.resolve(false);
+  }
+  return navigator.clipboard.writeText(raw).then(() => {
+    showToast(successTitle, successMessage, "success", 1600);
+    return true;
+  }).catch(() => {
+    showToast("复制失败", "当前环境不允许直接写入剪贴板。", "error", 1800);
+    return false;
+  });
 }
 
 function resumeMarkdownBlocksHtml(raw) {
@@ -4180,17 +4250,21 @@ function renderCareerInterviewMessages() {
   const hintEl = document.getElementById("careerInterviewHint");
   if (!thread) return;
 
-  const focusName = normalizeCareerDimensionName(careerInterviewState.focusDimension);
-  const focusProgress = getCareerDimensionProgressByName(focusName);
-  const answered = focusProgress ? Math.min(focusProgress.answered, focusProgress.target) : 0;
-  const target = focusProgress ? focusProgress.target : 0;
+  // 新的主题式进度（旧维度系统仍保留兼容）
+  const topicDots = ["角色模型", "生活故事", "工作价值观", "情境应对"];
+  const userMessageCount = careerInterviewState.messages.filter(m => m.role === "user").length;
+  const exploredCount = Math.min(Math.floor(userMessageCount / 2), 4); // 约每2轮探索一个主题
+  const dotsHtml = topicDots.map((t, i) =>
+    `<span class="career-chat-topic-dot ${i < exploredCount ? "active" : ""}">${t}</span>`
+  ).join("");
+
   const bannerHtml = careerInterviewState.started ? `
     <div class="career-chat-dimension-banner">
       <div class="career-chat-dimension-title">
-        <span>当前维度</span>
-        <strong>${escHtml(focusName)}</strong>
+        <span>已探索主题</span>
       </div>
-      <div class="career-chat-dimension-meta">${answered}/${target}</div>
+      <div class="career-chat-topic-dots">${dotsHtml}</div>
+      <div class="career-chat-dimension-meta">${userMessageCount}轮对话</div>
     </div>
   ` : "";
 
@@ -4234,7 +4308,7 @@ function renderCareerInterviewMessages() {
   if (hintEl) {
     hintEl.textContent = careerInterviewState.isComplete
       ? "访谈已完成，可直接参考同步到能力画像的结果。"
-      : `当前维度：${focusName}（${answered}/${target}）`;
+      : `已完成 ${userMessageCount} 轮对话，点击「完成访谈」可随时结束`;
   }
 
   renderCareerInterviewDimensionProgress();
@@ -4277,15 +4351,63 @@ function renderCareerInterviewResult(result) {
   if (content) content.classList.remove("hidden");
   if (progressEl) progressEl.textContent = progressText;
   if (modalProgressEl) modalProgressEl.textContent = progressText;
-  if (focusEl) focusEl.textContent = focusName;
-  if (modalFocusEl) modalFocusEl.textContent = focusName;
-  if (summaryEl) summaryEl.textContent = result.profile.summary || "访谈结果已更新。";
-  if (valueTagsEl) valueTagsEl.innerHTML = careerTagHtml(result.profile.work_values, "等待补充", "soft");
-  if (interestTagsEl) interestTagsEl.innerHTML = careerTagHtml(result.profile.career_interests, "等待识别", "primary");
-  if (roleTagsEl) roleTagsEl.innerHTML = careerTagHtml(result.profile.recommended_roles, "等待生成", "accent");
-  if (dimensionListEl) dimensionListEl.innerHTML = careerDimensionHtml(result.profile.dimensions || []);
-  if (evidenceListEl) evidenceListEl.innerHTML = careerListHtml(result.profile.evidence_highlights, "等待更多真实经历证据");
-  if (actionListEl) actionListEl.innerHTML = careerListHtml(result.profile.next_steps, "等待生成下一步建议");
+  if (focusEl) focusEl.textContent = result.profile?.topic || focusName;
+  if (modalFocusEl) modalFocusEl.textContent = result.profile?.topic || focusName;
+
+  // 新的profile格式：叙事性摘要
+  if (summaryEl) {
+    summaryEl.textContent = result.profile?.summary || "访谈进行中，继续探索以完善画像。";
+  }
+
+  // 工作价值观
+  if (valueTagsEl) {
+    const values = result.profile?.work_values || [];
+    valueTagsEl.innerHTML = values.length > 0
+      ? careerTagHtml(values, "等待补充", "soft")
+      : '<span class="text-xs text-gray-400">继续对话，探索你的工作价值观</span>';
+  }
+
+  // 角色模型/钦佩的人
+  if (interestTagsEl) {
+    const roleModel = result.profile?.role_model;
+    interestTagsEl.innerHTML = roleModel
+      ? `<span class="career-tag primary">${escHtml(roleModel)}</span>`
+      : '<span class="text-xs text-gray-400">继续对话，探索你的职业榜样</span>';
+  }
+
+  // 领导/协作风格
+  if (roleTagsEl) {
+    const leadership = result.profile?.leadership_style;
+    roleTagsEl.innerHTML = leadership
+      ? `<span class="career-tag accent">${escHtml(leadership)}</span>`
+      : '<span class="text-xs text-gray-400">继续对话，探索你的协作风格</span>';
+  }
+
+  // 关键经历证据
+  if (evidenceListEl) {
+    const experience = result.profile?.key_experience;
+    evidenceListEl.innerHTML = experience
+      ? `<div class="career-evidence-item"><span class="career-evidence-icon">&#127908;</span><p>${escHtml(experience)}</p></div>`
+      : '<p class="text-xs text-gray-400">继续对话，挖掘你的关键经历</p>';
+  }
+
+  // 推荐探索方向
+  if (actionListEl) {
+    const exploration = result.profile?.recommended_exploration || [];
+    actionListEl.innerHTML = exploration.length > 0
+      ? careerListHtml(exploration, "")
+      : '<p class="text-xs text-gray-400">继续对话，发现更多探索方向</p>';
+  }
+
+  // 维度列表（旧格式兼容）
+  if (dimensionListEl) {
+    const dims = result.profile?.dimensions;
+    if (dims && dims.length > 0) {
+      dimensionListEl.innerHTML = careerDimensionHtml(dims);
+    } else {
+      dimensionListEl.innerHTML = "";
+    }
+  }
 
   renderCareerInterviewDimensionProgress();
   updateProfileRadarChart(result.profile);
@@ -4488,22 +4610,25 @@ async function submitCareerInterviewAnswer() {
     careerInterviewState.loading = false;
     careerInterviewState.result = result;
     syncCareerInterviewProgress(result);
-    const nextFocus = getNextPendingCareerDimensionName();
-    careerInterviewState.isComplete = !nextFocus || Boolean(result.is_complete) || careerInterviewState.completionScore >= 100;
-    careerInterviewState.focusDimension = careerInterviewState.isComplete
-      ? normalizeCareerDimensionName(result.focus_dimension || careerInterviewState.focusDimension)
-      : nextFocus;
-    result.completion_score = careerInterviewState.completionScore;
-    result.focus_dimension = careerInterviewState.focusDimension;
-    if (careerInterviewState.isComplete) {
+
+    // 检查是否是 __FINISH__ 标记（AI认为可以结束）
+    const nextQuestion = result.next_question || "";
+    const shouldFinish = nextQuestion === "__FINISH__" || Boolean(result.is_complete);
+
+    // 更新完成度（基于对话轮次）
+    const userMessageCount = careerInterviewState.messages.filter(m => m.role === "user").length;
+    careerInterviewState.completionScore = Math.min(Math.round(userMessageCount / 3 * 100), 95); // 3轮=100%,最多95%
+    careerInterviewState.isComplete = shouldFinish;
+
+    if (shouldFinish) {
       careerInterviewState.messages.push({
         role: "assistant",
-        content: result.assistant_reply || "访谈完成，我已经整理出你的职业兴趣画像。"
+        content: result.profile?.summary || "访谈完成，我已经整理出你的职业画像。"
       });
     } else {
       careerInterviewState.messages.push({
         role: "assistant",
-        content: getCareerDimensionPrompt(careerInterviewState.focusDimension)
+        content: nextQuestion
       });
     }
     persistCareerInterviewSnapshot();
@@ -4517,6 +4642,56 @@ async function submitCareerInterviewAnswer() {
     showToast("继续访谈失败", error.message, "error", 2400);
   }
 }
+
+async function finishCareerInterview() {
+  if (careerInterviewState.loading || !careerInterviewState.started) return;
+  if (careerInterviewState.messages.length === 0) {
+    showToast("还没有开始访谈", "请先开始访谈再完成。", "warning", 1800);
+    return;
+  }
+
+  careerInterviewState.loading = true;
+  renderCareerInterviewMessages();
+  renderCareerInterviewResult(careerInterviewState.result);
+
+  try {
+    const result = await requestJson("/api/career-interview/finish", {
+      method: "POST",
+      body: {
+        messages: careerInterviewState.messages.slice(-20),
+        assessment_context: buildAssessmentContextPayload()
+      }
+    });
+
+    careerInterviewState.loading = false;
+    careerInterviewState.isComplete = true;
+
+    // 更新 result 中的 profile
+    if (result.profile) {
+      careerInterviewState.result = {
+        ...careerInterviewState.result,
+        profile: result.profile,
+        summary: result.summary || result.profile.summary || "访谈已完成"
+      };
+    }
+
+    careerInterviewState.messages.push({
+      role: "assistant",
+      content: result.summary || "感谢你的分享！我已经整理出你的职业画像。"
+    });
+
+    persistCareerInterviewSnapshot();
+    renderCareerInterviewMessages();
+    renderCareerInterviewResult(careerInterviewState.result);
+    showToast("访谈已完成", "感谢你的参与！", "success", 1600);
+  } catch (error) {
+    careerInterviewState.loading = false;
+    renderCareerInterviewMessages();
+    renderCareerInterviewResult(careerInterviewState.result);
+    showToast("完成访谈失败", error.message, "error", 2400);
+  }
+}
+
 function addLiveActivity(message) {
   const timeLabel = formatClock(new Date());
   ["liveActivityFeed", "liveActivityFeedDisplay"].forEach((id) => {
@@ -5257,6 +5432,10 @@ function buildProfilePortraitContext(profile, roles, synthesis) {
   const resumeState = userWorkspaceState.scopedData.resume_profile || null;
   const resumeTraits = buildResumePortraitTraits(resumeState);
   const interviewProfile = profile?.interview?.profile || null;
+  const nextSteps = uniqueValues([
+    ...(Array.isArray(profile?.nextSteps) ? profile.nextSteps : []),
+    ...(((roles || [])[0]?.nextActions) || [])
+  ], 4);
   return {
     gender: profile?.basics?.gender || "",
     archetype_name: synthesis?.archetype?.name || "",
@@ -5284,58 +5463,337 @@ function buildProfilePortraitContext(profile, roles, synthesis) {
     resume_projects: resumeTraits.projects,
     resume_experiences: resumeTraits.experiences,
     resume_skills: resumeTraits.skills,
-    resume_competitions: resumeTraits.competitions
+    resume_competitions: resumeTraits.competitions,
+    next_steps: nextSteps,
+    missing_items: uniqueValues(profile?.missingItems || [], 4),
+    uncertainty: uniqueValues(synthesis?.uncertainty || [], 4)
   };
 }
 
-function renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis) {
+const PROFILE_PORTRAIT_LOADING_STAGES = [
+  { title: "收敛定位", copy: "从测评、简历与访谈里收敛主角色和职业定位。" },
+  { title: "生成名片", copy: "把定位压缩成可对外展示的任务名片结构。" },
+  { title: "渲染海报", copy: "沿用当前图片 API 生成 3:4 半写实人物海报。" }
+];
+
+function startProfilePortraitLoading(mode = "render") {
+  if (profilePortraitTaskState.stageTimer) clearInterval(profilePortraitTaskState.stageTimer);
+  profilePortraitTaskState.loading = true;
+  profilePortraitTaskState.mode = mode;
+  profilePortraitTaskState.stageIndex = 0;
+  profilePortraitTaskState.stageTimer = setInterval(() => {
+    profilePortraitTaskState.stageIndex = Math.min(PROFILE_PORTRAIT_LOADING_STAGES.length - 1, profilePortraitTaskState.stageIndex + 1);
+    const profile = appState.derivedProfile || deriveUnifiedProfile();
+    const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+      ? appState.matchingRoles
+      : computeRoleMatches(profile);
+    renderProfileWorkspace(profile, roles);
+  }, 850);
+}
+
+function stopProfilePortraitLoading() {
+  if (profilePortraitTaskState.stageTimer) clearInterval(profilePortraitTaskState.stageTimer);
+  profilePortraitTaskState.stageTimer = null;
+  profilePortraitTaskState.loading = false;
+  profilePortraitTaskState.stageIndex = 0;
+}
+
+function buildFallbackProfilePortraitBrief(profile, roles, synthesis, portraitState) {
+  const primaryRole = (roles || [])[0]?.name || synthesis?.roleCluster?.[0] || profile?.basics?.target_direction || "职业探索中";
+  const supportRoles = uniqueValues([
+    ...(synthesis?.roleCluster || []).slice(1),
+    ...(Array.isArray(profile?.recommendedRoles) ? profile.recommendedRoles : [])
+  ], 3).filter((item) => item !== primaryRole).slice(0, 2);
+  const nextAction = uniqueValues([
+    ...(Array.isArray(profile?.nextSteps) ? profile.nextSteps : []),
+    ...((((roles || [])[0]?.nextActions) || []))
+  ], 3)[0] || `围绕 ${primaryRole} 补一条更可量化的项目成果。`;
+  return {
+    title: synthesis?.archetype?.name || portraitState?.archetype_name || "职业探索型支持者",
+    subtitle: String(portraitState?.prompt_summary || synthesis?.thesis || "当前画像会先收敛成一张可对外展示的职业任务名片。").slice(0, 88),
+    positioning: synthesis?.thesis || "当前画像会优先总结你的职业定位，再生成海报。",
+    primary_role: primaryRole,
+    support_roles: supportRoles,
+    mission_line: `最适合在 ${primaryRole} 相关场景中承担支持执行、信息组织与任务推进类工作。`,
+    evidence_tags: uniqueValues([
+      profile?.assessment?.mbti?.display_type ? `MBTI：${profile.assessment.mbti.display_type}` : "",
+      profile?.assessment?.holland?.code ? `霍兰德：${profile.assessment.holland.code}` : "",
+      primaryRole ? `岗位线索：${primaryRole}` : ""
+    ], 3),
+    value_tags: uniqueValues(profile?.workValues || synthesis?.workValues || [], 3),
+    risk_note: (Array.isArray(synthesis?.uncertainty) && synthesis.uncertainty[0]) || "当前主导特征仍建议继续用新经历补强。",
+    next_action: nextAction,
+    confidence_band: portraitState?.brief?.confidence_band || ((roles || [])[0]?.confidence || "待验证")
+  };
+}
+
+function getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState) {
+  const brief = portraitState?.brief && typeof portraitState.brief === "object" ? portraitState.brief : null;
+  if (brief) return brief;
+  return buildFallbackProfilePortraitBrief(profile, roles, synthesis, portraitState);
+}
+
+function buildProfilePortraitCopyText(brief) {
+  const safeBrief = brief && typeof brief === "object" ? brief : {};
+  const roles = [safeBrief.primary_role, ...(Array.isArray(safeBrief.support_roles) ? safeBrief.support_roles : [])].filter(Boolean).join(" / ");
+  return [
+    safeBrief.title || "职业任务名片",
+    safeBrief.subtitle || "",
+    roles ? `最像岗位：${roles}` : "",
+    safeBrief.mission_line ? `适合任务：${safeBrief.mission_line}` : "",
+    safeBrief.next_action ? `下一步：${safeBrief.next_action}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis, brief) {
   if (!archetypeVisualEl) return;
-  const hasPortrait = Boolean(portraitState?.image_url);
-  archetypeVisualEl.classList.toggle("has-portrait", hasPortrait);
-  if (!hasPortrait) {
-    archetypeVisualEl.innerHTML = buildUnifiedProfileConstellationSvg(synthesis);
+  const safeBrief = brief && typeof brief === "object" ? brief : {};
+  if (profilePortraitTaskState.loading) {
+    const items = PROFILE_PORTRAIT_LOADING_STAGES.map((item, index) => {
+      const stateClass = index < profilePortraitTaskState.stageIndex
+        ? "done"
+        : index === profilePortraitTaskState.stageIndex
+          ? "active"
+          : "";
+      return `
+        <div class="profile-portrait-loading-item ${stateClass}">
+          <span class="profile-portrait-loading-dot">${index + 1}</span>
+          <div class="profile-portrait-loading-copy">
+            <strong>${escHtml(item.title)}</strong>
+            <span>${escHtml(item.copy)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+    archetypeVisualEl.innerHTML = `
+      <div class="profile-portrait-poster-empty">
+        <div class="profile-portrait-poster-copy-block">
+          <span class="profile-portrait-poster-status">生成中</span>
+          <div>
+            <h4 class="profile-portrait-poster-title">任务海报正在生成</h4>
+            <p class="profile-portrait-poster-copy">系统会先收敛职业定位，再把结果压缩成任务名片，最后渲染为半写实人物海报。</p>
+          </div>
+        </div>
+        <div class="profile-portrait-loading-list">${items}</div>
+      </div>
+    `;
     return;
   }
-  const safeUrl = escHtml(String(portraitState.image_url || ""));
-  const safeName = escHtml(portraitState.archetype_name || synthesis?.archetype?.name || "职业画像");
-  const safeSummary = escHtml(String(portraitState.prompt_summary || synthesis?.thesis || "").slice(0, 72));
+
+  const hasPortrait = Boolean(portraitState?.image_url);
+  if (hasPortrait) {
+    const safeUrl = escHtml(String(portraitState.image_url || ""));
+    const safeTitle = escHtml(safeBrief.title || portraitState?.archetype_name || synthesis?.archetype?.name || "职业画像");
+    const safeSubtitle = escHtml(String(safeBrief.subtitle || portraitState?.prompt_summary || synthesis?.thesis || "").slice(0, 80));
+    archetypeVisualEl.innerHTML = `
+      <div class="profile-portrait-poster-shell has-image">
+        <img src="${safeUrl}" alt="${safeTitle}" class="profile-portrait-poster-image">
+        <div class="profile-portrait-poster-badge">AI Portrait</div>
+        <div class="profile-portrait-poster-overlay">
+          <strong>${safeTitle}</strong>
+          <p>${safeSubtitle}</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const statusLabel = portraitState?.status === "brief_ready" ? "待重试海报" : "待生成";
+  const posterTitle = safeBrief.title || synthesis?.archetype?.name || "任务海报";
+  const posterCopy = portraitState?.status === "brief_ready"
+    ? "职业定位已经收敛完成，但海报渲染失败。你可以直接重试海报，不需要重新分析整套输入。"
+    : "这里会显示 3:4 半写实人物海报。完成输入后，系统会先收敛职业定位，再生成可对外展示的任务名片。";
   archetypeVisualEl.innerHTML = `
-    <div class="unified-profile-portrait-stage">
-      <img src="${safeUrl}" alt="${safeName}" class="unified-profile-portrait-image">
-      <div class="unified-profile-portrait-badge"><span>AI Portrait</span></div>
-      <div class="unified-profile-portrait-caption">
-        <strong>${safeName}</strong>
-        <p>${safeSummary}</p>
+    <div class="profile-portrait-poster-empty">
+      <div class="profile-portrait-poster-copy-block">
+        <span class="profile-portrait-poster-status">${escHtml(statusLabel)}</span>
+        <div>
+          <h4 class="profile-portrait-poster-title">${escHtml(posterTitle)}</h4>
+          <p class="profile-portrait-poster-copy">${escHtml(posterCopy)}</p>
+        </div>
+      </div>
+      <div class="profile-portrait-poster-mini-card">
+        <span class="profile-portrait-poster-mini-label">当前主角色</span>
+        <strong class="profile-portrait-poster-mini-value">${escHtml(safeBrief.primary_role || "职业探索中")}</strong>
       </div>
     </div>
   `;
 }
 
+function renderProfilePortraitBriefCard(briefCardEl, portraitState, brief) {
+  if (!briefCardEl) return;
+  const safeBrief = brief && typeof brief === "object" ? brief : {};
+  const hasGeneratedBrief = Boolean(portraitState?.brief && typeof portraitState.brief === "object");
+  if (profilePortraitTaskState.loading) {
+    const items = PROFILE_PORTRAIT_LOADING_STAGES.map((item, index) => {
+      const stateClass = index < profilePortraitTaskState.stageIndex
+        ? "done"
+        : index === profilePortraitTaskState.stageIndex
+          ? "active"
+          : "";
+      return `
+        <div class="profile-portrait-loading-item ${stateClass}">
+          <span class="profile-portrait-loading-dot">${index + 1}</span>
+          <div class="profile-portrait-loading-copy">
+            <strong>${escHtml(item.title)}</strong>
+            <span>${escHtml(item.copy)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+    briefCardEl.innerHTML = `
+      <div class="profile-portrait-brief-surface">
+        <div class="profile-portrait-brief-head">
+          <div>
+            <p class="profile-portrait-kicker">任务名片生成中</p>
+            <h4 class="profile-portrait-brief-title">正在压缩关键信息</h4>
+            <p class="profile-portrait-brief-subtitle">结果页只会保留首屏最重要的信息，避免把分析内容一次性铺满。</p>
+          </div>
+        </div>
+        <div class="profile-portrait-loading-list">${items}</div>
+      </div>
+    `;
+    return;
+  }
+
+  if (!hasGeneratedBrief && !portraitState?.image_url) {
+    briefCardEl.innerHTML = `
+      <div class="profile-portrait-brief-surface">
+        <div class="profile-portrait-brief-head">
+          <div>
+            <p class="profile-portrait-kicker">待生成</p>
+            <h4 class="profile-portrait-brief-title">任务名片尚未生成</h4>
+            <p class="profile-portrait-brief-subtitle">首屏会只保留 5 个关键信息块，让人一眼看懂你是谁、最像什么岗位，以及下一步该做什么。</p>
+          </div>
+        </div>
+        <div class="profile-portrait-brief-grid">
+          <section class="profile-portrait-brief-section label-strong">
+            <p class="profile-portrait-brief-label">你是谁</p>
+            <p class="profile-portrait-brief-body muted">点击“生成任务海报”后，系统会先收敛职业定位，再把结果压缩成任务名片。</p>
+          </section>
+          <section class="profile-portrait-brief-section">
+            <p class="profile-portrait-brief-label">最像岗位</p>
+            <div class="profile-portrait-chip-row"><span class="profile-portrait-chip soft">等待生成后展示</span></div>
+          </section>
+          <section class="profile-portrait-brief-section">
+            <p class="profile-portrait-brief-label">你能承担什么任务</p>
+            <p class="profile-portrait-brief-body muted">生成后会输出一句清晰的任务描述，而不是整页堆叠分析内容。</p>
+          </section>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const roleChips = [safeBrief.primary_role, ...(Array.isArray(safeBrief.support_roles) ? safeBrief.support_roles : [])]
+    .filter(Boolean)
+    .map((item, index) => `<span class="profile-portrait-chip ${index === 0 ? "" : "soft"}">${escHtml(item)}</span>`)
+    .join("");
+  const evidenceChips = (Array.isArray(safeBrief.evidence_tags) ? safeBrief.evidence_tags : [])
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((item) => `<span class="profile-portrait-chip soft">${escHtml(item)}</span>`)
+    .join("");
+  const confidence = escHtml(safeBrief.confidence_band || (portraitState?.status === "brief_ready" ? "待验证" : "中"));
+  const riskHtml = safeBrief.risk_note
+    ? `<div class="profile-portrait-risk">${escHtml(safeBrief.risk_note)}</div>`
+    : "";
+  briefCardEl.innerHTML = `
+    <div class="profile-portrait-brief-surface">
+      <div class="profile-portrait-brief-head">
+        <div>
+          <p class="profile-portrait-kicker">任务名片</p>
+          <h4 class="profile-portrait-brief-title">${escHtml(safeBrief.title || "职业探索型支持者")}</h4>
+          <p class="profile-portrait-brief-subtitle">${escHtml(safeBrief.subtitle || "当前画像会先收敛职业定位，再生成任务海报。")}</p>
+        </div>
+        <span class="profile-portrait-confidence">置信度 ${confidence}</span>
+      </div>
+
+      <div class="profile-portrait-brief-grid">
+        <section class="profile-portrait-brief-section label-strong">
+          <p class="profile-portrait-brief-label">你是谁</p>
+          <p class="profile-portrait-brief-body">${escHtml(safeBrief.positioning || safeBrief.subtitle || "当前画像会优先总结你的职业定位。")}</p>
+        </section>
+
+        <section class="profile-portrait-brief-section">
+          <p class="profile-portrait-brief-label">最像岗位</p>
+          <div class="profile-portrait-chip-row">${roleChips || `<span class="profile-portrait-chip soft">职业探索中</span>`}</div>
+        </section>
+
+        <section class="profile-portrait-brief-section">
+          <p class="profile-portrait-brief-label">你能承担什么任务</p>
+          <p class="profile-portrait-brief-body muted">${escHtml(safeBrief.mission_line || "系统会把你的主角色压缩成一句任务描述。")}</p>
+        </section>
+
+        <section class="profile-portrait-brief-section">
+          <p class="profile-portrait-brief-label">为什么这么判断</p>
+          <div class="profile-portrait-chip-row">${evidenceChips || `<span class="profile-portrait-chip soft">等待更多输入证据</span>`}</div>
+        </section>
+
+        <section class="profile-portrait-brief-section">
+          <p class="profile-portrait-brief-label">下一步最该做什么</p>
+          <p class="profile-portrait-brief-body muted">${escHtml(safeBrief.next_action || "先完成测评、简历或访谈中的任一输入。")}</p>
+        </section>
+      </div>
+
+      ${riskHtml}
+    </div>
+  `;
+}
+
 function updateProfilePortraitControls(profile, roles, synthesis) {
-  const button = document.getElementById("profilePortraitGenerateBtn");
-  const hint = document.getElementById("profilePortraitHint");
   const portraitState = getProfilePortraitState();
-  if (button) {
-    button.disabled = profilePortraitTaskState.loading;
-    button.textContent = profilePortraitTaskState.loading
+  const brief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
+  const hasGeneratedBrief = Boolean(portraitState?.brief && typeof portraitState.brief === "object");
+  const renderBtn = document.getElementById("profilePortraitGenerateBtn");
+  const refineBtn = document.getElementById("profilePortraitRefineBtn");
+  const copyBtn = document.getElementById("profilePortraitCopyBtn");
+  const backBtn = document.getElementById("profilePortraitBackBtn");
+  const statusLead = document.getElementById("profilePortraitStatusLead");
+  const hint = document.getElementById("profilePortraitHint");
+  if (renderBtn) {
+    renderBtn.disabled = profilePortraitTaskState.loading;
+    renderBtn.textContent = profilePortraitTaskState.loading
       ? "生成中..."
       : portraitState?.image_url
-        ? "重新生成用户画像"
-        : "生成用户画像";
+        ? "重新生成海报"
+        : portraitState?.status === "brief_ready"
+          ? "重试海报"
+        : "生成任务海报";
   }
+  if (refineBtn) refineBtn.disabled = profilePortraitTaskState.loading || !hasGeneratedBrief;
+  if (copyBtn) copyBtn.disabled = profilePortraitTaskState.loading || !hasGeneratedBrief;
+  if (backBtn) backBtn.disabled = profilePortraitTaskState.loading;
+
+  if (statusLead) {
+    if (profilePortraitTaskState.loading) {
+      statusLead.textContent = "系统会按“收敛定位 -> 生成名片 -> 渲染海报”的顺序输出，首屏只保留最关键的职业信息。";
+    } else if (portraitState?.status === "brief_ready") {
+      statusLead.textContent = "任务名片已经生成，但海报渲染失败。你可以直接重试海报，不需要重新收敛整套输入。";
+    } else if (portraitState?.image_url) {
+      statusLead.textContent = "首屏现在已经收敛成可对外展示的任务名片，你可以复制定位文案或重新渲染海报。";
+    } else if (!hasGeneratedBrief) {
+      statusLead.textContent = "这一页默认保持占位态，等你点击生成后再把结果压缩成首屏可读的任务名片。";
+    } else {
+      statusLead.textContent = "结果页优先展示你是谁、最像什么岗位、为什么这样判断，以及下一步最该做什么。";
+    }
+  }
+
   if (hint) {
     if (profilePortraitTaskState.loading) {
-      hint.textContent = "正在融合测评、工作价值观、访谈证据和简历内容，生成人物画像，请稍候。";
+      hint.textContent = "正在融合测评、简历、访谈与目标方向，收敛职业定位并生成任务海报。";
+    } else if (portraitState?.status === "brief_ready") {
+      hint.textContent = portraitState?.image_error || "职业定位已生成，可直接重试海报。";
     } else if (portraitState?.image_url) {
-      hint.textContent = `当前已生成 ${portraitState.archetype_name || synthesis?.archetype?.name || "职业画像"}，可以随时重新生成。`;
+      hint.textContent = `当前任务名片已聚焦到 ${brief?.primary_role || synthesis?.archetype?.name || "职业画像"}，可随时重绘海报或重新收敛定位。`;
     } else {
-      const focusRole = (roles || [])[0]?.name || profile?.basics?.target_direction || synthesis?.archetype?.name || "当前职业画像";
-      hint.textContent = `基于 ${focusRole} 方向，自动融合测评、工作观、访谈与简历内容，生成一张纵向人物画像。`;
+      const focusRole = brief?.primary_role || (roles || [])[0]?.name || profile?.basics?.target_direction || synthesis?.archetype?.name || "当前职业画像";
+      hint.textContent = `系统会先围绕 ${focusRole} 收敛主角色，再生成适合白底页面展示的半写实人物海报。`;
     }
   }
 }
 
-async function generateProfilePortrait() {
+async function generateProfilePortrait(options = {}) {
   if (profilePortraitTaskState.loading) return;
   if (!isAuthenticatedUser()) {
     showToast("请先登录", "登录后才能生成个人画像。", "warning", 1800);
@@ -5361,22 +5819,53 @@ async function generateProfilePortrait() {
     return;
   }
 
-  profilePortraitTaskState.loading = true;
-  updateProfilePortraitControls(profile, roles, synthesis);
+  startProfilePortraitLoading(options?.reuseBrief ? "rerender" : "rebuild");
+  renderProfileWorkspace(profile, roles);
   try {
     const payload = await requestJson("/api/profile-portrait/generate", {
       method: "POST",
-      body: { context }
+      body: {
+        context,
+        reuse_brief: Boolean(options?.reuseBrief)
+      }
     });
     userWorkspaceState.scopedData.profile_portrait = payload?.data || null;
     userWorkspaceState.scopedDataLoaded.profile_portrait = true;
-    showToast("用户画像已生成", "左侧画像卡已经更新。", "success", 1800);
+    const imageError = payload?.data?.image_error;
+    if (imageError) {
+      showToast("名片已更新", payload?.message || "职业定位已生成，但海报渲染失败。", "warning", 2600);
+    } else {
+      showToast("用户画像已生成", payload?.message || "任务名片与海报已经更新。", "success", 1800);
+    }
   } catch (error) {
     showToast("生成失败", error.message || "用户画像生成失败。", "error", 2600);
   } finally {
-    profilePortraitTaskState.loading = false;
+    stopProfilePortraitLoading();
     renderProfileWorkspace(profile, roles);
   }
+}
+
+function rerenderProfilePortrait() {
+  return generateProfilePortrait({ reuseBrief: true });
+}
+
+function regenerateProfilePortraitBrief() {
+  return generateProfilePortrait({ reuseBrief: false });
+}
+
+function copyProfilePortraitSummary() {
+  const portraitState = getProfilePortraitState();
+  if (!(portraitState?.brief && typeof portraitState.brief === "object")) {
+    showToast("没有可复制内容", "先生成任务名片后再复制。", "warning", 1800);
+    return;
+  }
+  const profile = appState.derivedProfile || deriveUnifiedProfile();
+  const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+    ? appState.matchingRoles
+    : computeRoleMatches(profile);
+  const synthesis = buildUnifiedProfileSynthesis(profile, roles);
+  const brief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
+  return copyPlainText(buildProfilePortraitCopyText(brief), "定位文案已复制", "任务名片文案已经复制到剪贴板。");
 }
 
 function getProfileFlowCompletion(profile) {
@@ -6114,6 +6603,7 @@ function renderProfileWorkspace(profile, roles) {
   const synthesis = buildUnifiedProfileSynthesis(profile, roles);
   const readinessEl = document.getElementById("profileReadinessValue");
   const archetypeVisualEl = document.getElementById("profileArchetypeVisual");
+  const briefCardEl = document.getElementById("profilePortraitBriefCard");
   const archetypeNameEl = document.getElementById("profileArchetypeName");
   const archetypeDigestEl = document.getElementById("profileArchetypeDigest");
   const archetypeSummaryEl = document.getElementById("profileArchetypeSummary");
@@ -6132,6 +6622,7 @@ function renderProfileWorkspace(profile, roles) {
   const correlationEl = document.getElementById("profileCapabilityCorrelation");
   const modulesEl = document.getElementById("agentModuleGrid");
   const portraitState = getProfilePortraitState();
+  const portraitBrief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
   const assessmentItems = [];
   if (profile.assessment?.mbti?.completed) assessmentItems.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
   if (profile.assessment?.holland?.completed) assessmentItems.push(`霍兰德：${profile.assessment.holland.code}`);
@@ -6142,14 +6633,19 @@ function renderProfileWorkspace(profile, roles) {
   const assessmentDigest = assessmentItems.length ? assessmentItems.join("｜") : "尚未形成足够的基础画像。";
 
   if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
-  renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis);
-  if (archetypeNameEl) archetypeNameEl.textContent = synthesis.archetype.name;
+  renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis, portraitBrief);
+  renderProfilePortraitBriefCard(briefCardEl, portraitState, portraitBrief);
+  if (archetypeNameEl) archetypeNameEl.textContent = portraitBrief?.title || synthesis.archetype.name;
   if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
-  if (archetypeSummaryEl) archetypeSummaryEl.textContent = synthesis.thesis;
+  if (archetypeSummaryEl) archetypeSummaryEl.textContent = portraitBrief?.positioning || synthesis.thesis;
   if (summaryEl) summaryEl.textContent = profile.summary;
   if (assessmentEl) assessmentEl.textContent = assessmentDigest;
   if (valuesEl) valuesEl.innerHTML = careerTagHtml(profile.workValues, "待补充工作价值观", "soft");
-  if (roleClusterEl) roleClusterEl.innerHTML = careerTagHtml(synthesis.roleCluster, "等待角色原型收敛", "accent");
+  if (roleClusterEl) roleClusterEl.innerHTML = careerTagHtml(
+    uniqueValues([portraitBrief?.primary_role, ...(portraitBrief?.support_roles || []), ...(synthesis.roleCluster || [])], 5),
+    "等待角色原型收敛",
+    "accent"
+  );
   if (axisEl) axisEl.innerHTML = renderUnifiedFeatureAxes(synthesis.axes);
   if (workstyleEl) workstyleEl.innerHTML = renderUnifiedWorkstyleCards(synthesis.workstyleCards);
   if (evidenceEl) evidenceEl.innerHTML = renderUnifiedEvidenceMatrix(synthesis.evidenceRows);
@@ -6302,6 +6798,193 @@ function renderMatchingWorkspace(profile, roles) {
       </div>
     `).join("");
   }
+}
+
+function renderMatchingWorkspace(profile, roles) {
+  const metricsEl = document.getElementById("careerGraphMetrics");
+  const signalsEl = document.getElementById("matchingProfileSignals");
+  const summaryEl = document.getElementById("careerGraphProfileSummary");
+  const statusEl = document.getElementById("careerGraphStatusBadge");
+  const sublineEl = document.getElementById("careerGraphSubline");
+  const hintEl = document.getElementById("matchingSectionHint");
+
+  const capabilityCount = Object.values(profile.capabilities || {}).filter((item) => item?.score !== null && item?.score !== undefined).length;
+  const topRole = roles[0] || null;
+  const cards = [
+    {
+      label: "画像完整度",
+      value: `${Math.max(0, Math.min(100, Number(appState.profileCompletion || 0)))}%`,
+      hint: profile.missingItems?.length ? `待补充：${profile.missingItems[0]}` : "已可用于职业图谱匹配"
+    },
+    {
+      label: "方向信号",
+      value: `${Math.max(1, (profile.recommendedRoles || []).length)}`,
+      hint: (profile.recommendedRoles || []).slice(0, 2).join("、") || "等待从测评、访谈或简历中收敛"
+    },
+    {
+      label: "能力维度",
+      value: `${capabilityCount}/7`,
+      hint: capabilityCount ? "已接入统一画像能力轴" : "能力轴仍在等待更多输入"
+    },
+    {
+      label: "旧版参考",
+      value: topRole?.overallScore != null ? `${topRole.overallScore}%` : "待生成",
+      hint: topRole ? `旧版 Top1：${topRole.name}` : "当前页面已切换为图谱驱动模式"
+    }
+  ];
+
+  if (metricsEl) {
+    metricsEl.innerHTML = cards.map((card) => `
+      <article class="career-graph-metric-card">
+        <span class="career-graph-metric-label">${escHtml(card.label)}</span>
+        <strong class="career-graph-metric-value">${escHtml(card.value)}</strong>
+        <p class="career-graph-metric-note">${escHtml(card.hint)}</p>
+      </article>
+    `).join("");
+  }
+
+  if (signalsEl) {
+    const tags = [
+      profile.basics?.target_direction ? `目标方向：${profile.basics.target_direction}` : "",
+      profile.basics?.target_city ? `目标城市：${profile.basics.target_city}` : "",
+      profile.basics?.major ? `专业：${profile.basics.major}` : "",
+      profile.assessment?.mbti?.completed ? `MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}` : "",
+      profile.assessment?.holland?.completed ? `霍兰德：${profile.assessment.holland.code}` : "",
+      ...(profile.recommendedRoles || []).slice(0, 3)
+    ].filter(Boolean);
+    signalsEl.innerHTML = tags.length
+      ? tags.map((tag) => `<span class="career-graph-signal-chip">${escHtml(tag)}</span>`).join("")
+      : `<span class="career-graph-empty-inline">先补充测评、简历或目标方向，匹配结果会更稳。</span>`;
+  }
+
+  if (summaryEl) {
+    summaryEl.textContent = profile.summary || "图谱会把岗位节点关系、当前画像和推荐方向联动展示在同一页。";
+  }
+  if (statusEl) {
+    statusEl.textContent = "图谱准备中";
+    statusEl.dataset.state = profile.missingItems?.length ? "warning" : "ready";
+  }
+  if (sublineEl) {
+    sublineEl.textContent = "岗位全部以节点呈现，支持缩放、拖拽、点击查看详情，并在图谱下方生成 5 条职业方向推荐。";
+  }
+  if (hintEl) {
+    hintEl.textContent = profile.missingItems?.length
+      ? `当前仍缺少 ${profile.missingItems.length} 项输入，系统会继续给出结果，但推荐可信度会下降。`
+      : "当前画像已满足基础匹配条件，可以直接开始职业匹配。";
+  }
+
+  void ensureCareerGraphMatchingAssets()
+    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
+    .catch((error) => {
+      if (statusEl) {
+        statusEl.textContent = "图谱加载失败";
+        statusEl.dataset.state = "error";
+      }
+      const resultsEl = document.getElementById("careerGraphResults");
+      if (resultsEl) {
+        resultsEl.innerHTML = `<div class="career-graph-results-empty">职业图谱模块加载失败：${escHtml(error.message)}</div>`;
+      }
+    });
+}
+
+function renderMatchingWorkspace(profile, roles) {
+  const metricsEl = document.getElementById("careerGraphMetrics");
+  const signalsEl = document.getElementById("matchingProfileSignals");
+  const summaryEl = document.getElementById("careerGraphProfileSummary");
+  const statusEl = document.getElementById("careerGraphStatusBadge");
+  const sublineEl = document.getElementById("careerGraphSubline");
+  const hintEl = document.getElementById("matchingSectionHint");
+
+  const capabilityCount = Object.values(profile.capabilities || {}).filter((item) => item?.score !== null && item?.score !== undefined).length;
+  const topRole = roles[0] || null;
+  const cards = [
+    {
+      label: "画像完整度",
+      value: `${Math.max(0, Math.min(100, Number(appState.profileCompletion || 0)))}%`,
+      hint: profile.missingItems?.length ? `待补充：${profile.missingItems[0]}` : "已经满足图谱检索的基础条件"
+    },
+    {
+      label: "方向信号",
+      value: `${Math.max(1, (profile.recommendedRoles || []).length)}`,
+      hint: (profile.recommendedRoles || []).slice(0, 2).join("、") || "等待从测评、访谈或简历中收敛"
+    },
+    {
+      label: "能力维度",
+      value: `${capabilityCount}/7`,
+      hint: capabilityCount ? "已接入统一画像能力轴" : "能力信号仍在等待更多输入"
+    },
+    {
+      label: "旧版参照",
+      value: topRole?.overallScore != null ? `${topRole.overallScore}%` : "待生成",
+      hint: topRole ? `旧版 Top1：${topRole.name}` : "当前页面已切换为图谱驱动模式"
+    }
+  ];
+
+  if (metricsEl) {
+    metricsEl.innerHTML = cards.map((card) => `
+      <article class="career-graph-metric-card">
+        <span class="career-graph-metric-label">${escHtml(card.label)}</span>
+        <strong class="career-graph-metric-value">${escHtml(card.value)}</strong>
+        <p class="career-graph-metric-note">${escHtml(card.hint)}</p>
+      </article>
+    `).join("");
+  }
+
+  if (signalsEl) {
+    const tags = [
+      profile.basics?.target_direction ? `目标方向：${profile.basics.target_direction}` : "",
+      profile.basics?.target_city ? `目标城市：${profile.basics.target_city}` : "",
+      profile.basics?.major ? `专业：${profile.basics.major}` : "",
+      profile.assessment?.mbti?.completed ? `MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}` : "",
+      profile.assessment?.holland?.completed ? `霍兰德：${profile.assessment.holland.code}` : "",
+      ...(profile.recommendedRoles || []).slice(0, 3)
+    ].filter(Boolean);
+    signalsEl.innerHTML = tags.length
+      ? tags.map((tag) => `<span class="career-graph-signal-chip">${escHtml(tag)}</span>`).join("")
+      : `<span class="career-graph-empty-inline">先补充测评、简历或目标方向，匹配结果会更稳定。</span>`;
+  }
+
+  if (summaryEl) {
+    summaryEl.textContent = profile.summary || "系统会把岗位节点关系、当前画像和推荐方向联动展示在同一页。";
+  }
+  if (statusEl) {
+    statusEl.textContent = "图谱准备中";
+    statusEl.dataset.state = profile.missingItems?.length ? "warning" : "ready";
+  }
+  if (sublineEl) {
+    sublineEl.textContent = "所有岗位都会作为节点出现在图谱里，支持缩放、拖拽、点击查看详情，并在下方生成 5 条职业方向推荐。";
+  }
+  if (hintEl) {
+    hintEl.textContent = profile.missingItems?.length
+      ? `当前仍缺少 ${profile.missingItems.length} 项输入，系统仍会给出结果，但推荐可信度会下降。`
+      : "当前画像已经满足基础匹配条件，可以直接开始职业匹配。";
+  }
+
+  void ensureCareerGraphMatchingAssets()
+    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
+    .catch((error) => {
+      if (statusEl) {
+        statusEl.textContent = "图谱加载失败";
+        statusEl.dataset.state = "error";
+      }
+      const resultsEl = document.getElementById("careerGraphResults");
+      if (resultsEl) {
+        resultsEl.innerHTML = `<div class="career-graph-results-empty">职业图谱模块加载失败：${escHtml(error.message)}</div>`;
+      }
+    });
+}
+
+function renderMatchingWorkspace(profile, roles) {
+  void ensureCareerGraphMatchingAssets()
+    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
+    .catch((error) => {
+      const statusEl = document.getElementById("knowledgeBaseStatus");
+      const panelBody = document.getElementById("knowledgeBasePanelBody");
+      if (statusEl) statusEl.textContent = "图谱加载失败";
+      if (panelBody) {
+        panelBody.innerHTML = `<p class="kb-empty-copy">职业图谱模块加载失败：${escHtml(error.message)}</p>`;
+      }
+    });
 }
 
 function renderReportWorkspace(profile, roles) {
@@ -6805,6 +7488,20 @@ function showSection(sectionId) {
   if (sectionId === "profile") {
     initProfileFlow();
     void refreshResumeProfile(true);
+  }
+  if (sectionId === "matching") {
+    const profile = appState.derivedProfile || deriveUnifiedProfile();
+    const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+      ? appState.matchingRoles
+      : computeRoleMatches(profile);
+    renderMatchingWorkspace(profile, roles);
+  }
+  if (sectionId === "matching") {
+    void ensureCareerGraphMatchingAssets()
+      .then((api) => api?.onSectionVisible?.())
+      .catch((error) => {
+        showToast("职业图谱加载失败", error.message, "warning", 2200);
+      });
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }

@@ -1,4 +1,4 @@
-﻿<section id="profile" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
+<section id="profile" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
     <div class="mb-6">
         <h2 class="text-2xl font-bold mb-2">能力画像构建中心</h2>
         <p class="text-gray-500">双测评、基础信息、职业访谈共用一份画像状态，直接联动到匹配与报告。</p>
@@ -514,8 +514,8 @@
         <div id="careerInterviewContent" class="hidden space-y-5">
             <div class="career-result-topline">
                 <div>
-                    <p class="text-xs text-gray-500">当前聚焦</p>
-                    <p id="careerInterviewResultFocus" class="text-sm font-semibold text-gray-800">职业兴趣</p>
+                    <p class="text-xs text-gray-500">当前探索</p>
+                    <p id="careerInterviewResultFocus" class="text-sm font-semibold text-gray-800">等待开始</p>
                 </div>
                 <div>
                     <p class="text-xs text-gray-500">工作价值观</p>
@@ -524,18 +524,18 @@
             </div>
 
             <div class="career-summary-card">
-                <p class="career-summary-label">画像摘要</p>
-                <p id="careerInterviewSummary" class="career-summary-text">访谈开始后，这里会显示动态总结。</p>
+                <p class="career-summary-label">叙事性画像</p>
+                <p id="careerInterviewSummary" class="career-summary-text">开始对话后，这里会逐渐形成你的叙事性画像。</p>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
                 <div class="space-y-4">
                     <div>
-                        <p class="career-block-title">高相关职业兴趣</p>
+                        <p class="career-block-title">职业榜样</p>
                         <div id="careerInterviewInterestTags" class="career-tag-row"></div>
                     </div>
                     <div>
-                        <p class="career-block-title">推荐岗位方向</p>
+                        <p class="career-block-title">协作风格</p>
                         <div id="careerInterviewRoleTags" class="career-tag-row"></div>
                     </div>
                     <div>
@@ -546,11 +546,11 @@
 
                 <div class="space-y-4">
                     <div class="career-side-panel">
-                        <p class="career-block-title">关键证据</p>
+                        <p class="career-block-title">关键经历</p>
                         <div id="careerInterviewEvidenceList" class="career-list"></div>
                     </div>
                     <div class="career-side-panel">
-                        <p class="career-block-title">下一步建议</p>
+                        <p class="career-block-title">探索方向</p>
                         <div id="careerInterviewActionList" class="career-list"></div>
                     </div>
                 </div>
@@ -564,176 +564,207 @@
     </div>
 
     <div id="profileFlowStep4" class="profile-flow-panel hidden">
-    <div class="unified-profile-shell mb-6">
-        <section class="unified-profile-hero">
-            <div class="unified-profile-visual" id="profileArchetypeVisual"></div>
-            <div class="unified-profile-hero-body">
-                <div class="unified-profile-hero-head">
-                    <div>
-                        <p class="unified-profile-kicker">统一画像</p>
-                        <h3 id="profileArchetypeName" class="unified-profile-title">职业原型生成中</h3>
-                    </div>
-                    <button id="profilePortraitGenerateBtn" type="button" onclick="generateProfilePortrait()" class="unified-profile-portrait-btn">
-                        生成用户画像
-                    </button>
+    <section class="profile-portrait-stage-shell mb-6">
+        <div class="profile-portrait-stage-head">
+            <div class="profile-portrait-stage-copywrap">
+                <p class="profile-portrait-kicker">统一画像结果</p>
+                <h3 class="profile-portrait-stage-title">任务名片</h3>
+                <p id="profilePortraitStatusLead" class="profile-portrait-stage-copy">完成测评、简历或访谈后，这里会先收敛职业定位，再生成可对外展示的任务名片与人物海报。</p>
+            </div>
+            <div class="profile-portrait-action-row">
+                <button id="profilePortraitBackBtn" type="button" onclick="goProfileStep(2)" class="profile-portrait-action-btn subtle">
+                    返回补充输入
+                </button>
+                <button id="profilePortraitCopyBtn" type="button" onclick="copyProfilePortraitSummary()" class="profile-portrait-action-btn subtle">
+                    复制定位文案
+                </button>
+                <button id="profilePortraitRefineBtn" type="button" onclick="regenerateProfilePortraitBrief()" class="profile-portrait-action-btn subtle">
+                    重新收敛定位
+                </button>
+                <button id="profilePortraitGenerateBtn" type="button" onclick="rerenderProfilePortrait()" class="profile-portrait-action-btn primary">
+                    生成任务海报
+                </button>
+            </div>
+        </div>
+
+        <div class="profile-portrait-main-grid">
+            <div id="profileArchetypeVisual" class="profile-portrait-poster-panel"></div>
+            <div id="profilePortraitBriefCard" class="profile-portrait-brief-card"></div>
+        </div>
+    </section>
+
+    <details class="profile-portrait-details mb-6">
+        <summary>展开详细依据</summary>
+        <div class="profile-portrait-details-body">
+            <div class="profile-portrait-detail-intro">
+                <div>
+                    <p class="profile-portrait-detail-label">当前定位</p>
+                    <h3 id="profileArchetypeName" class="profile-portrait-detail-title">职业原型生成中</h3>
+                    <p id="profileArchetypeDigest" class="profile-portrait-detail-copy"></p>
+                    <p id="profileArchetypeSummary" class="profile-portrait-detail-copy strong"></p>
+                    <p id="profilePortraitHint" class="profile-portrait-detail-hint">基于当前测评、简历、访谈和目标方向，生成一张纵向人物画像并回写到画像中心。</p>
                 </div>
-                <p id="profileArchetypeDigest" class="unified-profile-digest"></p>
-                <p id="profileArchetypeSummary" class="unified-profile-summary"></p>
-                <p id="profilePortraitHint" class="unified-profile-portrait-hint">基于当前测评、简历、访谈和目标方向，生成一张纵向人物画像并回写到画像中心。</p>
-                <div class="unified-profile-tag-block">
-                    <p class="unified-profile-tag-label">任务画像 / 原型簇</p>
+                <div class="profile-portrait-detail-tags">
+                    <p class="profile-portrait-detail-label">任务画像 / 原型簇</p>
                     <div id="profileRoleClusterTags" class="career-tag-row mt-3"></div>
                 </div>
             </div>
-        </section>
 
-        <div class="grid gap-6 xl:grid-cols-2">
-            <section class="unified-profile-panel">
-                <div class="unified-profile-panel-head">
-                    <div>
-                        <p class="unified-profile-kicker">特征坐标</p>
-                        <h3 class="unified-profile-section-title">特征坐标</h3>
+            <div class="unified-profile-shell">
+                <div class="grid gap-6 xl:grid-cols-2">
+                    <section class="unified-profile-panel">
+                        <div class="unified-profile-panel-head">
+                            <div>
+                                <p class="unified-profile-kicker">特征坐标</p>
+                                <h3 class="unified-profile-section-title">特征坐标</h3>
+                            </div>
+                        </div>
+                        <div id="profileFeatureAxisList" class="unified-axis-list"></div>
+                    </section>
+
+                    <section class="unified-profile-panel">
+                        <div class="unified-profile-panel-head">
+                            <div>
+                                <p class="unified-profile-kicker">工作方式</p>
+                                <h3 class="unified-profile-section-title">工作方式拼图</h3>
+                            </div>
+                        </div>
+                        <div id="profileWorkstyleCards" class="unified-workstyle-grid"></div>
+                    </section>
+                </div>
+
+                <section class="unified-profile-panel">
+                    <div class="unified-profile-panel-head">
+                        <div>
+                            <p class="unified-profile-kicker">证据依据</p>
+                            <h3 class="unified-profile-section-title">证据热力图</h3>
+                        </div>
                     </div>
-                </div>
-                <div id="profileFeatureAxisList" class="unified-axis-list"></div>
-            </section>
+                    <div id="profileEvidenceMatrix" class="unified-evidence-grid"></div>
+                </section>
 
-            <section class="unified-profile-panel">
-                <div class="unified-profile-panel-head">
-                    <div>
-                        <p class="unified-profile-kicker">工作方式</p>
-                        <h3 class="unified-profile-section-title">工作方式拼图</h3>
+                <section class="unified-profile-panel">
+                    <div class="unified-profile-panel-head">
+                        <div>
+                            <p class="unified-profile-kicker">待验证区</p>
+                            <h3 class="unified-profile-section-title">待验证区</h3>
+                        </div>
                     </div>
-                </div>
-                <div id="profileWorkstyleCards" class="unified-workstyle-grid"></div>
-            </section>
-        </div>
-
-        <section class="unified-profile-panel">
-            <div class="unified-profile-panel-head">
-                <div>
-                    <p class="unified-profile-kicker">证据热力图</p>
-                    <h3 class="unified-profile-section-title">证据热力图</h3>
-                </div>
-            </div>
-            <div id="profileEvidenceMatrix" class="unified-evidence-grid"></div>
-        </section>
-
-        <section class="unified-profile-panel">
-            <div class="unified-profile-panel-head">
-                <div>
-                    <p class="unified-profile-kicker">待验证区</p>
-                    <h3 class="unified-profile-section-title">待验证区</h3>
-                </div>
-            </div>
-            <div id="profileUncertaintyList" class="unified-uncertainty-list"></div>
-        </section>
-    </div>
-
-    <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] mb-6">
-        <div class="space-y-6">
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">基础信息</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">基础信息入口</h3>
-                        <p class="text-sm text-slate-500 mt-1">专业、学历、目标城市和方向会进入统一画像；简历解析后会自动回填，未提供简历时可手动补充。</p>
-                    </div>
-                    <span id="profileBasicsStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">待补充</span>
-                </div>
-                <div class="grid gap-4 md:grid-cols-2">
-                    <label class="block">
-                        <span class="text-sm text-slate-600">性别（可选）</span>
-                        <input id="profileGenderInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：男 / 女">
-                    </label>
-                    <label class="block">
-                        <span class="text-sm text-slate-600">专业</span>
-                        <input id="profileMajorInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：智能科学与技术">
-                    </label>
-                    <label class="block">
-                        <span class="text-sm text-slate-600">学历</span>
-                        <input id="profileGradeInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：本科 / 硕士">
-                    </label>
-                    <label class="block">
-                        <span class="text-sm text-slate-600">目标城市</span>
-                        <input id="profileTargetCityInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：上海 / 深圳">
-                    </label>
-                    <label class="block">
-                        <span class="text-sm text-slate-600">目标方向</span>
-                        <input id="profileTargetDirectionInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：产品经理 / 数据分析">
-                    </label>
-                </div>
-                <button onclick="saveProfileBasics()" class="mt-5 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-all">保存基础信息</button>
-            </div>
-
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">统一画像</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">统一画像摘要</h3>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xs text-slate-500">完成度</p>
-                        <p id="profileReadinessValue" class="text-2xl font-bold text-sky-700">0%</p>
-                    </div>
-                </div>
-                <p id="profileAssessmentDigest" class="text-sm text-slate-500 leading-7"></p>
-                <p id="profileUnifiedSummary" class="mt-3 text-sm text-slate-700 leading-7"></p>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">工作价值观</p>
-                    <div id="profileWorkValueTags" class="career-tag-row mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">Top 岗位方向</p>
-                    <div id="profileTopRoleTags" class="career-tag-row mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">下一步行动</p>
-                    <div id="profileNextStepList" class="career-list mt-3"></div>
-                </div>
-                <div class="mt-5">
-                    <p class="text-sm font-semibold text-slate-800">待补充信息</p>
-                    <div id="profileMissingList" class="career-list mt-3"></div>
-                </div>
+                    <div id="profileUncertaintyList" class="unified-uncertainty-list"></div>
+                </section>
             </div>
         </div>
+    </details>
 
-        <div class="space-y-6">
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-4 mb-4">
-                    <div>
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力视图</p>
-                        <h3 class="text-xl font-semibold text-slate-900 mt-1">能力推断与覆盖度</h3>
+    <details class="profile-portrait-details">
+        <summary>展开基础信息与能力工作台</summary>
+        <div class="profile-portrait-details-body">
+            <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <div class="space-y-6">
+                    <div class="rounded-2xl bg-white p-6 shadow-sm">
+                        <div class="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">基础信息</p>
+                                <h3 class="text-xl font-semibold text-slate-900 mt-1">基础信息入口</h3>
+                                <p class="text-sm text-slate-500 mt-1">专业、学历、目标城市和方向会进入统一画像；简历解析后会自动回填，未提供简历时可手动补充。</p>
+                            </div>
+                            <span id="profileBasicsStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">待补充</span>
+                        </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <label class="block">
+                                <span class="text-sm text-slate-600">性别（可选）</span>
+                                <input id="profileGenderInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：男 / 女">
+                            </label>
+                            <label class="block">
+                                <span class="text-sm text-slate-600">专业</span>
+                                <input id="profileMajorInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：智能科学与技术">
+                            </label>
+                            <label class="block">
+                                <span class="text-sm text-slate-600">学历</span>
+                                <input id="profileGradeInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：本科 / 硕士">
+                            </label>
+                            <label class="block">
+                                <span class="text-sm text-slate-600">目标城市</span>
+                                <input id="profileTargetCityInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：上海 / 深圳">
+                            </label>
+                            <label class="block">
+                                <span class="text-sm text-slate-600">目标方向</span>
+                                <input id="profileTargetDirectionInput" type="text" class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="如：产品经理 / 数据分析">
+                            </label>
+                        </div>
+                        <button onclick="saveProfileBasics()" class="mt-5 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-all">保存基础信息</button>
                     </div>
-                    <button onclick="recalculateProfile()" class="rounded-xl border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">重新同步画像</button>
-                </div>
-                <div class="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                    <div class="h-80 rounded-2xl bg-slate-50 p-4">
-                        <canvas id="profileRadarChart"></canvas>
+
+                    <div class="rounded-2xl bg-white p-6 shadow-sm">
+                        <div class="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">统一画像</p>
+                                <h3 class="text-xl font-semibold text-slate-900 mt-1">统一画像摘要</h3>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">完成度</p>
+                                <p id="profileReadinessValue" class="text-2xl font-bold text-sky-700">0%</p>
+                            </div>
+                        </div>
+                        <p id="profileAssessmentDigest" class="text-sm text-slate-500 leading-7"></p>
+                        <p id="profileUnifiedSummary" class="mt-3 text-sm text-slate-700 leading-7"></p>
+                        <div class="mt-5">
+                            <p class="text-sm font-semibold text-slate-800">工作价值观</p>
+                            <div id="profileWorkValueTags" class="career-tag-row mt-3"></div>
+                        </div>
+                        <div class="mt-5">
+                            <p class="text-sm font-semibold text-slate-800">Top 岗位方向</p>
+                            <div id="profileTopRoleTags" class="career-tag-row mt-3"></div>
+                        </div>
+                        <div class="mt-5">
+                            <p class="text-sm font-semibold text-slate-800">下一步行动</p>
+                            <div id="profileNextStepList" class="career-list mt-3"></div>
+                        </div>
+                        <div class="mt-5">
+                            <p class="text-sm font-semibold text-slate-800">待补充信息</p>
+                            <div id="profileMissingList" class="career-list mt-3"></div>
+                        </div>
                     </div>
-                    <div id="profileCapabilityList" class="grid gap-3"></div>
                 </div>
-            </div>
 
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力联动</p>
-                    <h3 class="text-xl font-semibold text-slate-900 mt-1">优势与不足联动分析</h3>
-                    <p class="text-sm text-slate-500 mt-1">展示“已有能力”与“配套能力缺口”的关联，避免单点能力导致岗位推进卡住。</p>
-                </div>
-                <div id="profileCapabilityCorrelation" class="grid gap-3"></div>
-            </div>
+                <div class="space-y-6">
+                    <div class="rounded-2xl bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between gap-4 mb-4">
+                            <div>
+                                <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力视图</p>
+                                <h3 class="text-xl font-semibold text-slate-900 mt-1">能力推断与覆盖度</h3>
+                            </div>
+                            <button onclick="recalculateProfile()" class="rounded-xl border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">重新同步画像</button>
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                            <div class="h-80 rounded-2xl bg-slate-50 p-4">
+                                <canvas id="profileRadarChart"></canvas>
+                            </div>
+                            <div id="profileCapabilityList" class="grid gap-3"></div>
+                        </div>
+                    </div>
 
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
-                <div class="mb-4">
-                    <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">模块状态</p>
-                    <h3 class="text-xl font-semibold text-slate-900 mt-1">记忆 / 规划 / 工具 / 反思状态</h3>
-                    <p class="text-sm text-slate-500 mt-1">未实现模块统一标记为 `待接入 / 即将上线`，保留规范接口字段。</p>
+                    <div class="rounded-2xl bg-white p-6 shadow-sm">
+                        <div class="mb-4">
+                            <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">能力联动</p>
+                            <h3 class="text-xl font-semibold text-slate-900 mt-1">优势与不足联动分析</h3>
+                            <p class="text-sm text-slate-500 mt-1">展示“已有能力”与“配套能力缺口”的关联，避免单点能力导致岗位推进卡住。</p>
+                        </div>
+                        <div id="profileCapabilityCorrelation" class="grid gap-3"></div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-6 shadow-sm">
+                        <div class="mb-4">
+                            <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">模块状态</p>
+                            <h3 class="text-xl font-semibold text-slate-900 mt-1">记忆 / 规划 / 工具 / 反思状态</h3>
+                            <p class="text-sm text-slate-500 mt-1">未实现模块统一标记为 `待接入 / 即将上线`，保留规范接口字段。</p>
+                        </div>
+                        <div id="agentModuleGrid" class="grid gap-4 md:grid-cols-2"></div>
+                    </div>
                 </div>
-                <div id="agentModuleGrid" class="grid gap-4 md:grid-cols-2"></div>
             </div>
         </div>
-    </div>
+    </details>
     </div>
 
     <div id="careerInterviewModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/55 p-4" onclick="handleCareerInterviewOverlayClick(event)">
@@ -773,8 +804,11 @@
 
                     <div id="careerInterviewComposer" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <textarea id="careerInterviewInput" rows="4" onkeydown="handleCareerInterviewInputKeydown(event)" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="输入你的回答，尽量给出真实经历、具体任务或行动证据。"></textarea>
-                        <div class="mt-3 flex justify-end">
-                            <button id="careerInterviewSendBtn" onclick="submitCareerInterviewAnswer()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition-all">发送并继续</button>
+                        <div class="mt-3 flex justify-between items-center">
+                            <button onclick="finishCareerInterview()" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-all">完成访谈</button>
+                            <div class="flex gap-2">
+                                <button id="careerInterviewSendBtn" onclick="submitCareerInterviewAnswer()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition-all">发送并继续</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -797,8 +831,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-5">
-                        <h4 class="text-lg font-semibold text-slate-900">对接说明</h4>
-                        <p class="mt-3 text-sm text-slate-600 leading-6">访谈接口现在会携带 MBTI、霍兰德和基础信息上下文，但不会把测评结果直接当结论。后续你可以在这里继续扩展工具调用、资源推荐和趋势分析。</p>
+                        <h4 class="text-lg font-semibold text-slate-900">自由探索式访谈</h4>
+                        <p class="mt-3 text-sm text-slate-600 leading-6">不同于传统问答，我们采用心理咨询师风格：探索角色模型、生活故事、工作价值观和情境应对四大主题。你可以随时点击「完成访谈」结束，已回答的内容会自动保存。</p>
                     </div>
                 </div>
             </div>
