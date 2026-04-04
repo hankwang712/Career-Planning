@@ -160,6 +160,123 @@ const CAREER_INTERVIEW_DIMENSION_PLAN = [
   }
 ];
 
+const CAREER_INTERVIEW_GUIDE_LIBRARY = {
+  "职业兴趣": {
+    headline: "先从真正吸引你的工作画面切入",
+    body: "不要急着给自己贴职业标签。先选一个你愿意长期投入的场景，再补一句为什么。",
+    guide: "比如：我会被 AI 产品这类工作吸引，因为它既需要理解用户，也能把想法真正落地。",
+    scenes: [
+      { title: "AI 产品", caption: "理解用户，再把想法落成真实功能", draft: "如果不考虑专业限制，我会先被 AI 产品这类工作吸引，因为它既需要理解用户，也能把想法真正落地。" },
+      { title: "技术研发", caption: "搭系统、解问题、长期深挖", draft: "我会被技术研发这类工作吸引，因为我更享受搭结构、解决复杂问题，并愿意长期深挖一个方向。" },
+      { title: "内容表达", caption: "写作、策划、传播与表达", draft: "我会被内容表达这类工作吸引，因为我喜欢把复杂信息整理清楚，再用更有感染力的方式传达出去。" },
+      { title: "商业分析", caption: "用信息和数据支持判断", draft: "我会被商业分析这类工作吸引，因为我享受从信息和数据里找规律，并据此支持决策。" }
+    ],
+    chips: [
+      { label: "互联网行业", draft: "我对互联网行业会更有兴趣，因为" },
+      { label: "体制内", draft: "如果长期选择方向，我会认真考虑体制内，因为" },
+      { label: "自由职业", draft: "自由职业会吸引我，因为我在意" },
+      { label: "创业", draft: "创业这条路对我有吸引力，因为" },
+      { label: "教育方向", draft: "教育相关方向吸引我，因为" },
+      { label: "AI 应用", draft: "我会被 AI 应用相关方向吸引，因为" }
+    ]
+  },
+  "工作价值观": {
+    headline: "先说你真正看重什么，再谈职业选择",
+    body: "很多人不是不知道能做什么，而是不清楚自己为什么想选。先把判断标准说清楚。",
+    guide: "先选一个价值关键词，再补一句它为什么会影响你的职业选择。",
+    scenes: [
+      { title: "成长速度", caption: "更在意学习曲线和成长密度", draft: "选职业时，我会优先看成长速度，因为我希望在短时间内获得明显的学习和能力提升。" },
+      { title: "稳定保障", caption: "更在意确定性与长期安全感", draft: "选职业时，我会优先看稳定保障，因为我希望未来的生活节奏和风险都更可控。" },
+      { title: "收入回报", caption: "希望投入和回报更匹配", draft: "选职业时，收入回报会是很重要的标准，因为我希望自己的投入能得到明确反馈。" },
+      { title: "影响力", caption: "希望工作本身能产生真实影响", draft: "我比较看重工作的影响力，因为我希望做的事情不仅完成任务，还能对别人产生价值。" }
+    ],
+    chips: [
+      { label: "团队氛围", draft: "如果两份工作内容差不多，我会看团队氛围，因为" },
+      { label: "自主空间", draft: "我会重视自主空间，因为" },
+      { label: "发展平台", draft: "平台和发展空间对我重要，因为" },
+      { label: "成就感", draft: "我会看这份工作是否有成就感，因为" },
+      { label: "生活平衡", draft: "工作和生活平衡会影响我的选择，因为" },
+      { label: "社会价值", draft: "我会在意工作的社会价值，因为" }
+    ]
+  },
+  "学习方式": {
+    headline: "用你最真实的学习路径来回答",
+    body: "系统更想知道你怎么学得快、学得稳，而不是听一个标准答案。",
+    guide: "先选一个你最常用的学习方式，再补一句这套方法为什么对你有效。",
+    scenes: [
+      { title: "边做边学", caption: "先上手实践，再边做边补", draft: "遇到陌生方向时，我通常更适合边做边学，因为先动手会让我更快理解关键问题。" },
+      { title: "先搭框架", caption: "先建立结构，再逐步填细节", draft: "面对新方向时，我会先搭一个整体框架，因为这样我更容易判断该先学什么。" },
+      { title: "找案例模仿", caption: "先看成熟案例，再拆方法", draft: "我经常通过看案例、模仿成熟做法来学，因为这样能更快建立正确的判断标准。" },
+      { title: "找人请教", caption: "向有经验的人快速取经", draft: "遇到陌生问题时，我会优先找有经验的人请教，因为这样能少走很多弯路。" }
+    ],
+    chips: [
+      { label: "自己查资料", draft: "我经常自己查资料推进学习，因为" },
+      { label: "反复练习", draft: "我更依赖反复练习来掌握新内容，因为" },
+      { label: "先理解原理", draft: "我会先弄懂原理再动手，因为" },
+      { label: "快速复盘", draft: "我会通过快速复盘来加深学习，因为" },
+      { label: "和别人讨论", draft: "我通过和别人讨论学得更快，因为" },
+      { label: "项目驱动", draft: "如果有项目牵引，我会学得更快，因为" }
+    ]
+  },
+  "沟通风格": {
+    headline: "先把你在团队里更自然的角色说出来",
+    body: "不用追求最强势或最标准的表达，只要说清你平时更像哪种人。",
+    guide: "先选一个最像你的协作角色，再补一句在冲突或推进里你通常怎么做。",
+    scenes: [
+      { title: "推动事情前进", caption: "更像推进者，喜欢把事情往前拽", draft: "在团队里，我更像推动事情前进的人，因为我不太喜欢任务长期悬着，会主动把节奏往前带。" },
+      { title: "协调多方资源", caption: "更像协调者，擅长对齐信息", draft: "我比较像协调者，因为我擅长在不同人的想法之间找平衡，并把信息对齐。" },
+      { title: "深度执行交付", caption: "更像执行者，把结果做扎实", draft: "在协作里我更像深度执行者，因为我习惯把自己的部分做扎实，再推动整体结果稳定落地。" },
+      { title: "用事实说服", caption: "更依赖逻辑、证据和结构", draft: "遇到分歧时，我更倾向用事实和逻辑说服别人，因为这样能让讨论更聚焦问题本身。" }
+    ],
+    chips: [
+      { label: "先听再说", draft: "我通常会先听清楚再表达，因为" },
+      { label: "喜欢当面沟通", draft: "我更喜欢当面沟通，因为" },
+      { label: "写下来更清楚", draft: "很多时候我会先写下来再沟通，因为" },
+      { label: "不怕冲突", draft: "遇到意见不一致时，我并不太怕冲突，因为" },
+      { label: "重视边界", draft: "我在沟通里会比较重视边界，因为" },
+      { label: "愿意补位", draft: "如果团队需要，我通常愿意补位，因为" }
+    ]
+  },
+  "行动证据": {
+    headline: "用一段做过的事情证明你的偏好",
+    body: "比起“我想做什么”，更有价值的是“我曾经为这个方向真的投入过什么”。",
+    guide: "先选一类最有代表性的经历，再补结果、任务和你承担的角色。",
+    scenes: [
+      { title: "课程项目", caption: "课堂内做过的完整任务", draft: "如果要举一个行动证据，我会先讲课程项目，因为那段经历最能体现我在真实任务里的投入方式。" },
+      { title: "社团活动", caption: "组织、策划或协调过事情", draft: "我有一段比较能说明问题的社团活动经历，因为它能体现我在组织和推进上的真实状态。" },
+      { title: "实习经历", caption: "在真实工作环境里承担过职责", draft: "我最能拿得出手的行动证据可能是实习经历，因为它直接体现了我在真实工作环境中的表现。" },
+      { title: "个人作品", caption: "自己主动做出来的东西", draft: "如果要证明我不是停留在兴趣层面，我会讲一个个人作品，因为那是我主动投入并真的做出来的成果。" }
+    ],
+    chips: [
+      { label: "比赛作品", draft: "我有一段比赛作品经历能说明这个方向，因为" },
+      { label: "兼职副业", draft: "我做过一段兼职或副业，这能说明我的投入，因为" },
+      { label: "主动发起", draft: "我主动发起过一件事，这能说明我的行动力，因为" },
+      { label: "长期投入", draft: "我曾经持续投入过一段时间，这能说明我的稳定性，因为" },
+      { label: "自己补技能", draft: "我曾经主动补过相关技能，因为" },
+      { label: "拿到结果", draft: "那段经历最后拿到了明确结果，这说明" }
+    ]
+  },
+  "职业成熟度": {
+    headline: "把下一步怎么走说得更具体一点",
+    body: "不用现在就完全确定，但最好能说清楚你最近会先做什么。",
+    guide: "先选一件你最可能先行动的事，再补一句为什么它是优先级最高的。",
+    scenes: [
+      { title: "先找实习", caption: "用真实岗位快速验证方向", draft: "如果今天就开始准备下一阶段，我会先去找实习，因为我想先用真实岗位反馈来验证方向。" },
+      { title: "先补作品", caption: "先把可展示成果做出来", draft: "我会先补作品或项目成果，因为如果没有能展示的内容，后面的投递和沟通都会比较弱。" },
+      { title: "先定城市", caption: "先把地域和生活节奏想清楚", draft: "我会先把目标城市和生活方式想清楚，因为这会直接影响我后面的选择范围。" },
+      { title: "先定方向", caption: "先收窄赛道，再集中准备", draft: "我会先收窄职业方向，因为方向不清楚的话，后面准备会很容易发散。" }
+    ],
+    chips: [
+      { label: "考证准备", draft: "如果要马上行动，我可能会先做考证准备，因为" },
+      { label: "信息访谈", draft: "我会先去做信息访谈，因为" },
+      { label: "补简历", draft: "我会先把简历和经历整理清楚，因为" },
+      { label: "投递尝试", draft: "我会先做一轮投递尝试，因为" },
+      { label: "继续深造", draft: "继续深造也会进入我的考虑，因为" },
+      { label: "转方向验证", draft: "如果转方向，我会先做小范围验证，因为" }
+    ]
+  }
+};
+
 const PROFILE_BASIC_FIELDS = ["major", "grade", "target_city", "target_direction"];
 const PROFILE_BASIC_LABELS = {
   major: "专业",
@@ -325,7 +442,14 @@ const careerInterviewState = {
   result: null,
   completionScore: 0,
   focusDimension: "职业兴趣",
-  profileBasics: getDefaultProfileBasics()
+  profileBasics: getDefaultProfileBasics(),
+  helperAnchor: ""
+};
+
+const careerInterviewVoiceState = {
+  recognition: null,
+  listening: false,
+  supported: null
 };
 
 careerInterviewState.dimensionProgress = [];
@@ -3985,6 +4109,208 @@ function getCareerDimensionPrompt(name) {
   return plan.prompts[promptIndex];
 }
 
+function getCareerInterviewGuideConfig(name) {
+  const normalizedName = normalizeCareerDimensionName(name);
+  return CAREER_INTERVIEW_GUIDE_LIBRARY[normalizedName] || CAREER_INTERVIEW_GUIDE_LIBRARY["职业兴趣"];
+}
+
+function getCurrentCareerInterviewQuestion() {
+  if (careerInterviewState.isComplete) {
+    return "访谈已完成。你仍然可以继续补充新的经历，再点击“发送并继续”让系统更新理解。";
+  }
+  const assistantMessages = (careerInterviewState.messages || []).filter((item) => item.role === "assistant");
+  const lastAssistant = assistantMessages[assistantMessages.length - 1];
+  return String(lastAssistant?.content || getCareerDimensionPrompt(careerInterviewState.focusDimension) || "").trim();
+}
+
+function renderCareerInterviewHelperAnchor() {
+  const anchorEl = document.getElementById("careerInterviewSelectedScene");
+  if (!anchorEl) return;
+  const anchor = String(careerInterviewState.helperAnchor || "").trim();
+  if (!anchor) {
+    anchorEl.classList.add("hidden");
+    anchorEl.innerHTML = "";
+    return;
+  }
+  anchorEl.classList.remove("hidden");
+  anchorEl.innerHTML = `
+    <span class="career-chat-anchor-label">当前线索</span>
+    <strong>${escHtml(anchor)}</strong>
+    <button type="button" class="career-chat-anchor-clear" onclick="clearCareerInterviewHelperAnchor()">清除</button>
+  `;
+}
+
+function setCareerInterviewComposerDraft(rawText, options = {}) {
+  const input = document.getElementById("careerInterviewInput");
+  const text = String(rawText || "").trim();
+  if (!input || !text) return;
+  const append = Boolean(options.append);
+  const current = String(input.value || "").trim();
+  const nextValue = append && current
+    ? `${current}${/[。！？.!?]$/.test(current) ? "" : "。"}\n${text}`
+    : text;
+  input.value = nextValue;
+  careerInterviewState.helperAnchor = String(options.anchorLabel || options.anchor || "").trim();
+  renderCareerInterviewHelperAnchor();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+async function useCareerInterviewDraft(rawText, options = {}) {
+  const draft = String(rawText || "").trim();
+  if (!draft) return;
+  if (!careerInterviewState.started) {
+    await startCareerInterview({
+      initialDraft: draft,
+      helperAnchor: String(options.anchorLabel || options.anchor || "").trim()
+    });
+    return;
+  }
+  setCareerInterviewComposerDraft(draft, {
+    append: Boolean(options.append),
+    anchorLabel: options.anchorLabel || options.anchor || ""
+  });
+}
+
+function bindCareerInterviewHelperInteractions() {
+  const chipRow = document.getElementById("careerInterviewQuickChips");
+  const sceneGrid = document.getElementById("careerInterviewSceneGrid");
+
+  if (chipRow && chipRow.dataset.bound !== "true") {
+    chipRow.dataset.bound = "true";
+    chipRow.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-draft]");
+      if (!target) return;
+      void useCareerInterviewDraft(target.getAttribute("data-draft"), {
+        anchorLabel: target.getAttribute("data-label") || "",
+        append: target.getAttribute("data-mode") === "append"
+      });
+    });
+  }
+
+  if (sceneGrid && sceneGrid.dataset.bound !== "true") {
+    sceneGrid.dataset.bound = "true";
+    sceneGrid.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-draft]");
+      if (!target) return;
+      void useCareerInterviewDraft(target.getAttribute("data-draft"), {
+        anchorLabel: target.getAttribute("data-label") || "",
+        append: false
+      });
+    });
+  }
+}
+
+function getCareerInterviewSpeechApi() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function updateCareerInterviewVoiceButton() {
+  const voiceBtn = document.getElementById("careerInterviewVoiceBtn");
+  if (!voiceBtn) return;
+  if (careerInterviewVoiceState.supported === null) {
+    careerInterviewVoiceState.supported = Boolean(getCareerInterviewSpeechApi());
+  }
+  const supported = Boolean(careerInterviewVoiceState.supported);
+  voiceBtn.disabled = !supported || !careerInterviewState.started || careerInterviewState.loading || careerInterviewState.isComplete;
+  voiceBtn.classList.toggle("is-listening", careerInterviewVoiceState.listening);
+  if (!supported) {
+    voiceBtn.textContent = "当前浏览器不支持语音";
+    return;
+  }
+  voiceBtn.textContent = careerInterviewVoiceState.listening ? "停止录音" : "语音输入";
+}
+
+function stopCareerInterviewVoice() {
+  if (careerInterviewVoiceState.recognition && careerInterviewVoiceState.listening) {
+    careerInterviewVoiceState.recognition.stop();
+  }
+  careerInterviewVoiceState.listening = false;
+  updateCareerInterviewVoiceButton();
+}
+
+function ensureCareerInterviewVoiceRecognition() {
+  if (careerInterviewVoiceState.recognition) return careerInterviewVoiceState.recognition;
+  const SpeechApi = getCareerInterviewSpeechApi();
+  careerInterviewVoiceState.supported = Boolean(SpeechApi);
+  if (!SpeechApi) return null;
+
+  const recognition = new SpeechApi();
+  recognition.lang = "zh-CN";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    careerInterviewVoiceState.listening = true;
+    updateCareerInterviewVoiceButton();
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results || [])
+      .map((item) => item[0]?.transcript || "")
+      .join("")
+      .trim();
+    if (transcript) {
+      setCareerInterviewComposerDraft(transcript, {
+        append: Boolean(document.getElementById("careerInterviewInput")?.value?.trim()),
+        anchorLabel: careerInterviewState.helperAnchor || "语音输入"
+      });
+    }
+  };
+
+  recognition.onerror = (event) => {
+    careerInterviewVoiceState.listening = false;
+    updateCareerInterviewVoiceButton();
+    if (event?.error && event.error !== "no-speech") {
+      showToast("语音输入失败", "当前浏览器没有成功识别语音，请改用文本输入。", "warning", 2000);
+    }
+  };
+
+  recognition.onend = () => {
+    careerInterviewVoiceState.listening = false;
+    updateCareerInterviewVoiceButton();
+  };
+
+  careerInterviewVoiceState.recognition = recognition;
+  return recognition;
+}
+
+function renderCareerInterviewAssistSurface() {
+  const config = getCareerInterviewGuideConfig(careerInterviewState.focusDimension);
+  const headlineEl = document.getElementById("careerInterviewPromptHeadline");
+  const bodyEl = document.getElementById("careerInterviewPromptBody");
+  const guideEl = document.getElementById("careerInterviewGuideText");
+  const questionEl = document.getElementById("careerInterviewCurrentQuestion");
+  const chipRow = document.getElementById("careerInterviewQuickChips");
+  const sceneGrid = document.getElementById("careerInterviewSceneGrid");
+
+  if (headlineEl) headlineEl.textContent = config.headline;
+  if (bodyEl) bodyEl.textContent = config.body;
+  if (guideEl) guideEl.textContent = config.guide;
+  if (questionEl) questionEl.textContent = getCurrentCareerInterviewQuestion() || "模型就绪后会在这里显示当前问题。";
+
+  if (sceneGrid) {
+    sceneGrid.innerHTML = (config.scenes || []).map((item) => `
+      <button type="button" class="career-scene-card${careerInterviewState.helperAnchor === item.title ? " is-active" : ""}" data-draft="${escHtml(item.draft)}" data-label="${escHtml(item.title)}">
+        <strong class="career-scene-title">${escHtml(item.title)}</strong>
+        <span class="career-scene-copy">${escHtml(item.caption)}</span>
+      </button>
+    `).join("");
+  }
+
+  if (chipRow) {
+    chipRow.innerHTML = (config.chips || []).map((item) => `
+      <button type="button" class="career-quick-chip${careerInterviewState.helperAnchor === item.label ? " is-active" : ""}" data-draft="${escHtml(item.draft)}" data-label="${escHtml(item.label)}" data-mode="append">
+        ${escHtml(item.label)}
+      </button>
+    `).join("");
+  }
+
+  renderCareerInterviewHelperAnchor();
+  updateCareerInterviewVoiceButton();
+  bindCareerInterviewHelperInteractions();
+}
+
 function markCareerDimensionAnswered(name) {
   const target = getCareerDimensionProgressByName(name);
   if (!target) return;
@@ -4137,6 +4463,7 @@ function persistCareerInterviewSnapshot() {
 function resetCareerInterviewState(options = {}) {
   const preserveBasics = options.preserveBasics !== false;
   const retainedBasics = preserveBasics ? normalizeProfileBasics(careerInterviewState.profileBasics) : getDefaultProfileBasics();
+  stopCareerInterviewVoice();
   careerInterviewState.started = false;
   careerInterviewState.loading = false;
   careerInterviewState.isComplete = false;
@@ -4146,6 +4473,7 @@ function resetCareerInterviewState(options = {}) {
   careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
   careerInterviewState.profileBasics = retainedBasics;
+  careerInterviewState.helperAnchor = "";
 }
 async function saveCareerInterviewConfig() {
   // 配置入口已迁移至头像设置面板
@@ -4271,8 +4599,8 @@ function renderCareerInterviewMessages() {
   if (!careerInterviewState.started || careerInterviewState.messages.length === 0) {
     thread.innerHTML = `
       <div class="career-chat-empty">
-        <p class="career-chat-empty-title">模型就绪后再开始访谈。</p>
-        <p class="career-chat-empty-copy">${isSuperAdminUser() ? "请先保存系统模型配置，然后开始第一轮提问。" : "当前模型由系统管理员统一配置，配置完成后即可开始第一轮提问。"}</p>
+        <p class="career-chat-empty-title">从上面的场景卡或快捷标签开始，会更容易开口。</p>
+        <p class="career-chat-empty-copy">${isSuperAdminUser() ? "请先确认模型配置，然后选一条线索开始第一轮访谈。" : "当前模型由系统管理员统一配置。你可以先点场景卡，系统会自动带着这条线索进入第一轮访谈。"}</p>
       </div>
     `;
   } else {
@@ -4303,7 +4631,7 @@ function renderCareerInterviewMessages() {
       ? "生成中..."
       : careerInterviewState.started
         ? "访谈已启动"
-        : "立即开始访谈";
+        : (careerInterviewState.helperAnchor ? `围绕「${careerInterviewState.helperAnchor}」开始` : "立即开始访谈");
   }
   if (hintEl) {
     hintEl.textContent = careerInterviewState.isComplete
@@ -4311,6 +4639,7 @@ function renderCareerInterviewMessages() {
       : `已完成 ${userMessageCount} 轮对话，点击「完成访谈」可随时结束`;
   }
 
+  renderCareerInterviewAssistSurface();
   renderCareerInterviewDimensionProgress();
 }
 function renderCareerInterviewResult(result) {
@@ -4410,6 +4739,7 @@ function renderCareerInterviewResult(result) {
   }
 
   renderCareerInterviewDimensionProgress();
+  renderCareerInterviewAssistSurface();
   updateProfileRadarChart(result.profile);
   refreshUnifiedExperience();
 }
@@ -4470,6 +4800,8 @@ function openCareerInterviewModal(mode = "chat") {
   updateCareerInterviewConfigStatus();
   renderCareerInterviewMessages();
   renderCareerInterviewResult(careerInterviewState.result);
+  renderCareerInterviewAssistSurface();
+  bindCareerInterviewHelperInteractions();
   const modal = document.getElementById("careerInterviewModal");
   if (!modal) return;
   modal.classList.remove("hidden");
@@ -4490,6 +4822,7 @@ function openCareerInterviewModal(mode = "chat") {
 function closeCareerInterviewModal() {
   const modal = document.getElementById("careerInterviewModal");
   if (modal) modal.classList.add("hidden");
+  stopCareerInterviewVoice();
   document.body.style.overflow = "";
 }
 
@@ -4506,6 +4839,29 @@ function clearCareerInterviewSession() {
   renderCareerInterviewResult(null);
   showToast("访谈已清空", "你可以重新开始新的访谈。", "info", 1600);
 }
+
+window.clearCareerInterviewHelperAnchor = function clearCareerInterviewHelperAnchor() {
+  careerInterviewState.helperAnchor = "";
+  renderCareerInterviewAssistSurface();
+};
+
+window.toggleCareerInterviewVoice = function toggleCareerInterviewVoice() {
+  if (!careerInterviewState.started || careerInterviewState.isComplete || careerInterviewState.loading) return;
+  const recognition = ensureCareerInterviewVoiceRecognition();
+  if (!recognition) {
+    showToast("当前浏览器不支持语音", "请继续使用文本输入。", "warning", 1800);
+    return;
+  }
+  if (careerInterviewVoiceState.listening) {
+    recognition.stop();
+    return;
+  }
+  try {
+    recognition.start();
+  } catch (_) {
+    showToast("语音输入暂不可用", "请稍后再试或直接输入文字。", "warning", 1800);
+  }
+};
 
 function handleCareerInterviewInputKeydown(event) {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -4529,7 +4885,7 @@ async function requestCareerInterview(messages) {
     }
   });
 }
-async function startCareerInterview() {
+async function startCareerInterview(options = {}) {
   if (careerInterviewState.loading) {
     showToast("访谈正在处理中", "请稍候，当前请求尚未完成。", "info", 1600);
     return;
@@ -4567,7 +4923,14 @@ async function startCareerInterview() {
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
     showToast("访谈已启动", "请先回答第一轮问题。", "success", 1200);
-    document.getElementById("careerInterviewInput")?.focus();
+    if (options.initialDraft) {
+      setCareerInterviewComposerDraft(options.initialDraft, {
+        append: false,
+        anchorLabel: options.helperAnchor || ""
+      });
+    } else {
+      document.getElementById("careerInterviewInput")?.focus();
+    }
   } catch (error) {
     showToast("启动访谈失败", error?.message || "请稍后重试。", "error", 2200);
   }
@@ -5428,10 +5791,210 @@ function getProfilePortraitState() {
   return state && typeof state === "object" ? state : null;
 }
 
+function buildProfileAssessmentModuleOutput(profile) {
+  const mbti = profile?.assessment?.mbti?.display_type || profile?.assessment?.mbti?.final_type || "";
+  const holland = profile?.assessment?.holland?.code || "";
+  const chips = uniqueValues([
+    mbti ? `MBTI ${mbti}` : "",
+    holland ? `霍兰德 ${holland}` : "",
+    ...(Array.isArray(profile?.assessment?.holland?.top_codes) ? profile.assessment.holland.top_codes.map((item) => `兴趣 ${item}`) : [])
+  ], 6);
+  const status = mbti && holland ? "complete" : (mbti || holland ? "partial" : "missing");
+  const summary = mbti && holland
+    ? `测评阶段已经给出人格倾向和职业兴趣锚点，当前人物画像会把 ${mbti} 与 ${holland} 的共同信号作为底层基调。`
+    : mbti || holland
+      ? `测评阶段只形成了部分锚点，当前会先使用已有结果参与人物画像收敛。`
+      : "测评阶段尚未形成稳定输出，人物画像会更多依赖简历和访谈信号。";
+  const note = mbti && holland
+    ? "这一层主要负责回答“你大致是什么样的人、会被什么工作场景激活”。"
+    : "测评没有补齐时，人物画像仍可生成，但人格与兴趣的稳定度会下降。";
+  return {
+    stepLabel: "01",
+    title: "测评输出",
+    status,
+    summary,
+    chips,
+    note,
+    raw: {
+      status,
+      summary,
+      chips,
+      note,
+      mbti,
+      holland
+    }
+  };
+}
+
+function buildProfileResumeModuleOutput(profile, resumeTraits = null) {
+  const traits = resumeTraits || buildResumePortraitTraits(userWorkspaceState.scopedData.resume_profile || null);
+  const resumeStatus = String(profile?.resume?.status || "");
+  const chips = uniqueValues([
+    ...(traits.roles || []),
+    ...(traits.skills || []).slice(0, 3),
+    ...(traits.projects || []).slice(0, 2)
+  ], 6);
+  const status = resumeStatus === "analyzed" ? "complete" : (resumeStatus === "uploaded" ? "partial" : "missing");
+  const summary = traits.summary
+    || (resumeStatus === "uploaded"
+      ? "简历已经上传，但还没有解析完成，当前无法稳定提取经历证据。"
+      : "简历阶段尚未形成角色线索、项目证据和技能关键词。");
+  const note = status === "complete"
+    ? "这一层主要负责告诉系统“你做过什么、拿什么证明自己像这个岗位”。"
+    : "没有简历证据时，人物画像可以做首版，但岗位证明材料会更弱。";
+  return {
+    stepLabel: "02",
+    title: "简历输出",
+    status,
+    summary,
+    chips,
+    note,
+    raw: {
+      status,
+      summary,
+      chips,
+      note,
+      roles: traits.roles || [],
+      projects: traits.projects || [],
+      experiences: traits.experiences || [],
+      skills: traits.skills || []
+    }
+  };
+}
+
+function buildProfileInterviewModuleOutput(profile) {
+  const interviewProfile = profile?.interview?.profile || null;
+  const completionScore = Math.max(0, Math.min(100, Number(profile?.interview?.completionScore || 0)));
+  const isComplete = Boolean(profile?.interview?.isComplete);
+  const usableForPortrait = Boolean(
+    interviewProfile?.portrait_ready
+    || interviewProfile?.output_scope === "full"
+    || interviewProfile?.output_scope === "usable"
+    || interviewProfile?.summary
+  );
+  const status = !interviewProfile
+    ? "missing"
+    : isComplete
+      ? "complete"
+      : (usableForPortrait ? "partial" : "missing");
+  const chips = uniqueValues([
+    ...(interviewProfile?.work_values || []),
+    ...(interviewProfile?.recommended_roles || []),
+    interviewProfile?.leadership_style || "",
+    interviewProfile?.role_model || ""
+  ], 6);
+  const summary = interviewProfile?.summary
+    || (completionScore
+      ? `访谈已经形成 ${completionScore}% 的动态画像，但还没有沉淀出稳定摘要。`
+      : "访谈阶段尚未形成可用输出。");
+  const note = !interviewProfile
+    ? "这一层负责补足价值观、关键经历、协作风格和行动证据。"
+    : (interviewProfile?.coverage_note
+      || (isComplete
+        ? "访谈已经形成完整输出，可直接进入人物明信片。"
+        : "即使提前结束，只要已经收敛出价值观、经历或协作风格，也可以进入人物明信片首版。"));
+  const missingFollowups = uniqueValues(interviewProfile?.missing_followups || [], 4);
+  return {
+    stepLabel: "03",
+    title: "访谈输出",
+    status,
+    summary,
+    chips,
+    note,
+    raw: {
+      status,
+      summary,
+      chips,
+      note,
+      completion_score: completionScore,
+      usable_for_portrait: usableForPortrait,
+      missing_followups: missingFollowups,
+      work_values: interviewProfile?.work_values || [],
+      recommended_roles: interviewProfile?.recommended_roles || [],
+      role_model: interviewProfile?.role_model || "",
+      leadership_style: interviewProfile?.leadership_style || "",
+      key_experience: interviewProfile?.key_experience || "",
+      growth_mindset: interviewProfile?.growth_mindset || "",
+      evidence_highlights: interviewProfile?.evidence_highlights || [],
+      recommended_exploration: interviewProfile?.recommended_exploration || [],
+    }
+  };
+}
+
+function buildProfilePromptOutput(profile, roles, synthesis, portraitState) {
+  const brief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
+  const promptWriterMode = String(portraitState?.prompt_writer_mode || "").trim();
+  const promptModeLabel = promptWriterMode === "llm"
+    ? `AI 重写${portraitState?.prompt_writer_model ? ` · ${portraitState.prompt_writer_model}` : ""}`
+    : (portraitState?.brief ? "规则兜底" : "待生成");
+  const status = portraitState?.brief ? "complete" : "partial";
+  const chips = uniqueValues([
+    brief?.title || "",
+    brief?.primary_role || "",
+    ...(brief?.evidence_tags || []).slice(0, 2),
+    ...(brief?.value_tags || []).slice(0, 2)
+  ], 6);
+  const summary = portraitState?.prompt_summary
+    || brief?.subtitle
+    || synthesis?.thesis
+    || "系统会把前 3 步的输出压缩成标题、定位句、主角色、任务句和视觉设定。";
+  const note = portraitState?.brief
+    ? `系统会先把 1/2/3 步的输出重写成画像 brief，再生成适合白底人物明信片的渲染提示词。当前模式：${promptModeLabel}。`
+    : "点击“生成任务海报”后，系统会自动整理三步输出并重写为人物画像提示词。";
+  return {
+    stepLabel: "AI",
+    title: "提示词重写",
+    status,
+    summary,
+    chips,
+    note,
+    meta: promptModeLabel
+  };
+}
+
+function buildProfilePortraitOutputCards(profile, roles, synthesis, portraitState, resumeTraits = null) {
+  return [
+    buildProfileAssessmentModuleOutput(profile),
+    buildProfileResumeModuleOutput(profile, resumeTraits),
+    buildProfileInterviewModuleOutput(profile),
+    buildProfilePromptOutput(profile, roles, synthesis, portraitState)
+  ];
+}
+
+function renderProfilePortraitOutputBoard(boardEl, cards) {
+  if (!boardEl) return;
+  const items = Array.isArray(cards) ? cards : [];
+  boardEl.innerHTML = items.map((item) => {
+    const chips = Array.isArray(item.chips) && item.chips.length
+      ? item.chips.map((chip) => `<span class="profile-portrait-output-chip">${escHtml(chip)}</span>`).join("")
+      : `<span class="profile-portrait-output-chip is-muted">当前还没有稳定信号</span>`;
+    const metaHtml = item.meta ? `<span class="profile-portrait-output-meta">${escHtml(item.meta)}</span>` : "";
+    return `
+      <article class="profile-portrait-output-card is-${escHtml(item.status || "missing")}">
+        <div class="profile-portrait-output-head">
+          <div class="profile-portrait-output-headline">
+            <span class="profile-portrait-output-step">${escHtml(item.stepLabel || "--")}</span>
+            <div>
+              <h4 class="profile-portrait-output-title">${escHtml(item.title || "模块输出")}</h4>
+              <p class="profile-portrait-output-summary">${escHtml(item.summary || "当前还没有稳定输出。")}</p>
+            </div>
+          </div>
+          ${metaHtml}
+        </div>
+        <div class="profile-portrait-output-chiprow">${chips}</div>
+        <p class="profile-portrait-output-note">${escHtml(item.note || "")}</p>
+      </article>
+    `;
+  }).join("");
+}
+
 function buildProfilePortraitContext(profile, roles, synthesis) {
   const resumeState = userWorkspaceState.scopedData.resume_profile || null;
   const resumeTraits = buildResumePortraitTraits(resumeState);
   const interviewProfile = profile?.interview?.profile || null;
+  const assessmentOutput = buildProfileAssessmentModuleOutput(profile);
+  const resumeOutput = buildProfileResumeModuleOutput(profile, resumeTraits);
+  const interviewOutput = buildProfileInterviewModuleOutput(profile);
   const nextSteps = uniqueValues([
     ...(Array.isArray(profile?.nextSteps) ? profile.nextSteps : []),
     ...(((roles || [])[0]?.nextActions) || [])
@@ -5466,7 +6029,18 @@ function buildProfilePortraitContext(profile, roles, synthesis) {
     resume_competitions: resumeTraits.competitions,
     next_steps: nextSteps,
     missing_items: uniqueValues(profile?.missingItems || [], 4),
-    uncertainty: uniqueValues(synthesis?.uncertainty || [], 4)
+    uncertainty: uniqueValues(synthesis?.uncertainty || [], 4),
+    module_outputs: {
+      assessment: assessmentOutput.raw,
+      resume: resumeOutput.raw,
+      interview: interviewOutput.raw
+    },
+    prompt_request: {
+      card_style: "人物明信片",
+      card_goal: "美观清晰，一眼看懂这个人最像什么岗位、能做什么任务、下一步该补什么。",
+      visual_direction: "适合白底页面展示，职业感明确，信息克制，避免宣传海报式堆砌。",
+      required_fields: ["标题", "定位句", "主角色", "任务句", "证据标签", "下一步"]
+    }
   };
 }
 
@@ -6601,9 +7175,11 @@ function renderProfileWorkspace(profile, roles) {
   syncProfileBasicsForm();
   const topRoles = roles.slice(0, 3);
   const synthesis = buildUnifiedProfileSynthesis(profile, roles);
+  const resumeTraits = buildResumePortraitTraits(userWorkspaceState.scopedData.resume_profile || null);
   const readinessEl = document.getElementById("profileReadinessValue");
   const archetypeVisualEl = document.getElementById("profileArchetypeVisual");
   const briefCardEl = document.getElementById("profilePortraitBriefCard");
+  const portraitOutputBoardEl = document.getElementById("profilePortraitOutputBoard");
   const archetypeNameEl = document.getElementById("profileArchetypeName");
   const archetypeDigestEl = document.getElementById("profileArchetypeDigest");
   const archetypeSummaryEl = document.getElementById("profileArchetypeSummary");
@@ -6623,6 +7199,7 @@ function renderProfileWorkspace(profile, roles) {
   const modulesEl = document.getElementById("agentModuleGrid");
   const portraitState = getProfilePortraitState();
   const portraitBrief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
+  const portraitOutputCards = buildProfilePortraitOutputCards(profile, roles, synthesis, portraitState, resumeTraits);
   const assessmentItems = [];
   if (profile.assessment?.mbti?.completed) assessmentItems.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
   if (profile.assessment?.holland?.completed) assessmentItems.push(`霍兰德：${profile.assessment.holland.code}`);
@@ -6635,6 +7212,7 @@ function renderProfileWorkspace(profile, roles) {
   if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
   renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis, portraitBrief);
   renderProfilePortraitBriefCard(briefCardEl, portraitState, portraitBrief);
+  renderProfilePortraitOutputBoard(portraitOutputBoardEl, portraitOutputCards);
   if (archetypeNameEl) archetypeNameEl.textContent = portraitBrief?.title || synthesis.archetype.name;
   if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
   if (archetypeSummaryEl) archetypeSummaryEl.textContent = portraitBrief?.positioning || synthesis.thesis;
