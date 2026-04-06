@@ -1691,28 +1691,31 @@ body.auth-locked footer {
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
 
+/* 职业访谈：内嵌页面式工作台（非全屏遮罩，便于同时看到上下方画像流程） */
 .career-interview-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1600;
-    padding: 1.5rem;
-    background: rgba(15, 23, 42, 0.56);
-    backdrop-filter: blur(10px);
-    overflow-y: auto;
+    position: relative;
+    z-index: 1;
+    padding: 0;
+    margin: 0 0 1.5rem;
+    background: transparent;
+    overflow: visible;
+    scroll-margin-top: 5.5rem;
 }
 
 .career-interview-shell {
-    width: min(1180px, 100%);
-    height: calc(100vh - 3rem);
-    max-height: calc(100vh - 3rem);
-    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-height: min(720px, 78vh);
+    height: auto;
+    max-height: none;
+    margin: 0;
     border-radius: 1.6rem;
     overflow: hidden;
     display: grid;
     grid-template-columns: 340px minmax(0, 1fr);
     background: #f8fafc;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.32);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
 }
 
 .career-interview-side {
@@ -2387,14 +2390,10 @@ body.auth-locked footer {
 }
 
 @media (max-width: 960px) {
-    .career-interview-modal {
-        padding: 0.8rem;
-    }
-
     .career-interview-shell {
         height: auto;
         max-height: none;
-        min-height: calc(100vh - 1.6rem);
+        min-height: min(640px, 72vh);
         grid-template-columns: 1fr;
     }
 

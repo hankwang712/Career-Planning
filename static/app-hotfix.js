@@ -221,16 +221,6 @@
       },
       {
         phase: "spotlight",
-        selector: 'button[data-section="qa"]',
-        kicker: "Step 07",
-        title: "决策问答",
-        copy: "用于快速对比方案和澄清疑问，作为决策辅助。",
-        meta: "适合做短问题验证。",
-        actionLabel: "去决策问答",
-        onPrimary: () => window.showSection?.("qa")
-      },
-      {
-        phase: "spotlight",
         selector: ".topbar-avatar-btn",
         kicker: "Step 08",
         title: "个人中心入口",

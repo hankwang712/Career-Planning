@@ -51,7 +51,11 @@
       "Bash(grep -r \"startCareerReportGeneration\" /c/Users/rog/Desktop/web/static/*.js)",
       "Bash(grep -E \"\\\\.\\(py|md\\)$\")",
       "Bash(find /c/Users/rog/Desktop/web/services/onet -type f -name *.py)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(grep -l \"portrait\\\\|画像\\\\|career.*report\\\\|统一画像\" /c/Users/rog/Desktop/web/templates/sections/*.html)",
+      "Bash(git -C /c/Users/rog/Desktop/web log --oneline -5 -- static/user-center.css)",
+      "Bash(git -C /c/Users/rog/Desktop/web show 6831d14:static/user-center.css)",
+      "Bash(grep -r \"职业问答\\\\|QA\\\\|qa\" C:UsersrogDesktopweb --include=*.json)"
     ],
     "defaultMode": "bypassPermissions"
   }

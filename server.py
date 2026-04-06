@@ -29,7 +29,7 @@ from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from services.news import get_career_news_payload
+from services.news import get_career_news_payload, get_kb_stats, search_news_kb
 from services.report import (
     CAREER_REPORT_STAGE_DEFS,
     REPORT_VERSION,
@@ -37,6 +37,15 @@ from services.report import (
     empty_report_job,
     empty_report_state,
     generate_career_report_bundle,
+)
+from services.report.enhancements import (
+    CAREER_FEEDBACK_VERSION,
+    CAREER_REPORT_PIPELINE_VERSION,
+    PORTRAIT_PROMPT_PIPELINE_VERSION,
+    PORTRAIT_TEMPLATE_VERSION,
+    build_portrait_prompt_layers,
+    evaluate_portrait_prompt_packet,
+    normalize_feedback_memory,
 )
 from services.resume import (
     FLEXIBLE_MATCH_ANALYSIS_PROMPT,
@@ -294,6 +303,8 @@ CAREER_INTERVIEW_SYSTEM_PROMPT = """
 【输出格式】（严格 JSON）
 {
   "next_question": "下一轮问题，如果用户说完成了就填'__FINISH__'",
+  "focus_dimension": "必须是以下之一（一字不差）：职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度。表示下一轮主要在为哪一维度收集信息。若系统消息里给出了各维度已答/目标数，已答满的维度不得再作为 focus_dimension，必须切换到下一个未答满的维度。",
+  "completion_score": 0,
   "topic": "当前主题，如'角色模型'或'生活故事'等",
   "topic_progress": "当前主题的探索进度描述",
   "profile": {
@@ -306,6 +317,7 @@ CAREER_INTERVIEW_SYSTEM_PROMPT = """
     "recommended_exploration": ["还可以探索的方向1", "还可以探索的方向2"]
   }
 }
+completion_score 按六维整体信息完整度估算 0-100；六维未覆盖时不超过 40。
 """
 
 MBTI_CLARIFIER_SYSTEM_PROMPT = """
@@ -779,6 +791,8 @@ def _public_profile_portrait_state(raw_state):
         "prompt_writer_mode": str(state.get("prompt_writer_mode") or "").strip(),
         "prompt_writer_model": str(state.get("prompt_writer_model") or "").strip(),
         "brief_version": str(state.get("brief_version") or "").strip(),
+        "prompt_pipeline": state.get("prompt_pipeline") if isinstance(state.get("prompt_pipeline"), dict) else None,
+        "prompt_evaluation": state.get("prompt_evaluation") if isinstance(state.get("prompt_evaluation"), dict) else None,
         "image_error": str(state.get("image_error") or "").strip(),
         "brief": brief,
     }
@@ -1343,21 +1357,27 @@ def _normalize_profile_portrait_prompt_packet(raw_payload):
         "brief": _normalize_profile_portrait_brief(payload.get("brief")),
         "prompt_summary": _clean_text(payload.get("prompt_summary"), 180),
         "render_prompt": _clean_text(payload.get("render_prompt"), 2600),
+        "prompt_pipeline": payload.get("prompt_pipeline") if isinstance(payload.get("prompt_pipeline"), dict) else None,
+        "prompt_evaluation": payload.get("prompt_evaluation") if isinstance(payload.get("prompt_evaluation"), dict) else None,
     }
 
 
 def _build_profile_portrait_prompt_packet(context, preset_brief=None):
     fallback_brief = _normalize_profile_portrait_brief(preset_brief) or _build_profile_portrait_brief(context)
+    prompt_layers = build_portrait_prompt_layers(context, fallback_brief)
     packet = {
         "brief": fallback_brief,
         "prompt_summary": _build_profile_portrait_summary_from_brief(fallback_brief) or context.get("summary") or "",
         "render_prompt": _build_profile_portrait_render_prompt(context, fallback_brief),
         "mode": "heuristic",
         "writer_model": "",
+        "prompt_pipeline": prompt_layers,
+        "prompt_evaluation": None,
     }
 
     base_url, api_key, model = _get_active_provider_and_model()
     if not base_url or not api_key or not model:
+        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
         return packet
 
     module_outputs = _build_profile_portrait_module_outputs(context)
@@ -1407,6 +1427,7 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
         "assessment_output": module_outputs.get("assessment") or {},
         "resume_output": module_outputs.get("resume") or {},
         "interview_output": module_outputs.get("interview") or {},
+        "prompt_pipeline": prompt_layers,
         "global_context": {
             "summary": context.get("summary") or "",
             "archetype_name": context.get("archetype_name") or "",
@@ -1455,9 +1476,55 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
         )
         packet["mode"] = "llm"
         packet["writer_model"] = model
+        packet["prompt_pipeline"] = prompt_layers
+        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
+        if packet["prompt_evaluation"].get("needs_refinement"):
+            refiner_payload = {
+                "current_output": {
+                    "brief": packet.get("brief"),
+                    "prompt_summary": packet.get("prompt_summary"),
+                    "render_prompt": packet.get("render_prompt"),
+                },
+                "evaluation": packet.get("prompt_evaluation"),
+                "prompt_pipeline": prompt_layers,
+                "target": "补齐缺失字段，强化角色-证据一致性，并保留 3:4、单人、半写实、无文字等视觉硬约束。",
+            }
+            refined = _call_structured_chat(
+                base_url,
+                api_key,
+                model,
+                [{"role": "user", "content": json.dumps(refiner_payload, ensure_ascii=False)}],
+                system_prompt=(
+                    "你是职业画像提示词优化器。"
+                    "请根据上一版输出和自动评分结果，修复缺失字段、增强证据一致性，并输出同样结构的 JSON。"
+                    "不要扩写成报告，不要删除已经成立的角色判断。"
+                ),
+                max_tokens=1400,
+            )
+            refined_packet = _normalize_profile_portrait_prompt_packet(refined)
+            packet["brief"] = _merge_profile_portrait_brief(refined_packet.get("brief"), packet["brief"]) or packet["brief"]
+            packet["prompt_summary"] = (
+                refined_packet.get("prompt_summary")
+                or packet.get("prompt_summary")
+                or _build_profile_portrait_summary_from_brief(packet["brief"])
+            )
+            packet["render_prompt"] = (
+                refined_packet.get("render_prompt")
+                or packet.get("render_prompt")
+                or _build_profile_portrait_render_prompt(context, packet["brief"])
+            )
+            packet["mode"] = "llm_refined"
+            packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
+            if isinstance(packet.get("prompt_evaluation"), dict):
+                packet["prompt_evaluation"]["rewrite_used"] = True
     except Exception:
         app.logger.exception("profile portrait prompt writer failed")
 
+    if not isinstance(packet.get("prompt_evaluation"), dict):
+        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
+    if isinstance(packet.get("prompt_evaluation"), dict):
+        packet["prompt_evaluation"].setdefault("rewrite_used", False)
+    packet["prompt_pipeline"] = prompt_layers
     return packet
 
 
@@ -1721,6 +1788,30 @@ def _save_career_report_bundle(username, bundle):
     return payload
 
 
+def _normalize_career_report_feedback(raw_feedback):
+    return normalize_feedback_memory(raw_feedback)
+
+
+def _append_career_report_feedback(raw_feedback, entry):
+    normalized = _normalize_career_report_feedback(raw_feedback)
+    entries = normalized.get("entries") if isinstance(normalized.get("entries"), list) else []
+    entries.append(
+        {
+            "id": str(entry.get("id") or f"feedback-{uuid.uuid4().hex[:10]}").strip(),
+            "report_id": str(entry.get("report_id") or "").strip(),
+            "focus_role_id": str(entry.get("focus_role_id") or "").strip(),
+            "focus_role_name": str(entry.get("focus_role_name") or "").strip(),
+            "verdict": str(entry.get("verdict") or "partial").strip().lower(),
+            "note": str(entry.get("note") or "").strip()[:320],
+            "created_at": str(entry.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")).strip(),
+        }
+    )
+    return _normalize_career_report_feedback({
+        "version": CAREER_FEEDBACK_VERSION,
+        "entries": entries,
+    })
+
+
 def _public_career_report_state(raw_state):
     state = empty_report_state()
     if isinstance(raw_state, dict):
@@ -1741,6 +1832,7 @@ def _public_career_report_state(raw_state):
             "summary": str(raw_state.get("summary") or ""),
             "export_formats": raw_state.get("export_formats") if isinstance(raw_state.get("export_formats"), list) else ["html", "md"],
             "tracker": raw_state.get("tracker") if isinstance(raw_state.get("tracker"), dict) else None,
+            "feedback": _normalize_career_report_feedback(raw_state.get("feedback")),
         })
     return state
 
@@ -1780,6 +1872,7 @@ def _public_career_report_bundle(raw_bundle):
         "phase_plan": bundle.get("phase_plan") if isinstance(bundle.get("phase_plan"), dict) else {},
         "trend_brief": bundle.get("trend_brief") if isinstance(bundle.get("trend_brief"), dict) else {},
         "report_document": public_document,
+        "generation_diagnostics": bundle.get("generation_diagnostics") if isinstance(bundle.get("generation_diagnostics"), dict) else {},
     }
 
 
@@ -3239,6 +3332,96 @@ def _safe_create_chat_completion(
     raise last_exc
 
 
+def _infer_career_interview_focus_from_topic(topic: str) -> str:
+    """当模型未返回 focus_dimension 时，用 topic 粗映射到六维之一。"""
+    t = str(topic or "").strip()
+    if not t:
+        return ""
+    if "工作价值观" in t:
+        return "工作价值观"
+    if "角色模型" in t or "榜样" in t:
+        return "职业成熟度"
+    if "生活故事" in t:
+        return "行动证据"
+    if "情境应对" in t or t == "情境":
+        return "沟通风格"
+    if "学习方式" in t or "学习" in t and "风格" in t:
+        return "学习方式"
+    return ""
+
+
+def _coerce_career_interview_focus_dimension(payload: dict) -> str:
+    raw = str(payload.get("focus_dimension") or "").strip()
+    if raw in DEFAULT_CAREER_DIMENSIONS:
+        return raw
+    inferred = _infer_career_interview_focus_from_topic(payload.get("topic"))
+    if inferred in DEFAULT_CAREER_DIMENSIONS:
+        return inferred
+    for name in DEFAULT_CAREER_DIMENSIONS:
+        if name and name in raw:
+            return name
+    return "职业兴趣"
+
+
+def _career_interview_progress_system_suffix(focus_dimension: str, progress: list) -> str:
+    """把前端维度进度注入系统提示，避免模型永远在「职业兴趣」上打转。"""
+    if not isinstance(progress, list) or not progress:
+        return ""
+    lines = []
+    for item in progress:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            answered = int(item.get("answered") or 0)
+            target = int(item.get("target") or 0)
+        except (TypeError, ValueError):
+            answered, target = 0, 0
+        lines.append(f"- {name}：已答 {answered} / 目标 {target}" + ("（已满，勿再作为 focus_dimension）" if target > 0 and answered >= target else ""))
+    if not lines:
+        return ""
+    fd = str(focus_dimension or "").strip() or "（请根据下表选择下一未完成维度）"
+    return (
+        "\n\n【维度进度快照】（必须遵守；next_question 与 focus_dimension 要与下一未完成维度一致）\n"
+        + "\n".join(lines)
+        + f"\n前端当前聚焦维度参考：{fd}"
+    )
+
+
+def _merge_career_interview_focus_with_progress(normalized: dict, client_progress: list) -> None:
+    """若模型仍把 focus 指到已答满维度，强制改为按顺序第一个未答满维度。"""
+    if not isinstance(normalized, dict):
+        return
+    if not isinstance(client_progress, list) or not client_progress:
+        return
+
+    def answered_target(dim_name: str) -> tuple[int, int]:
+        for item in client_progress:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("name") or "").strip() != dim_name:
+                continue
+            try:
+                return int(item.get("answered") or 0), int(item.get("target") or 0)
+            except (TypeError, ValueError):
+                return 0, 0
+        return 0, 0
+
+    focus = str(normalized.get("focus_dimension") or "").strip()
+    if focus in DEFAULT_CAREER_DIMENSIONS:
+        a, t = answered_target(focus)
+        if t <= 0 or a < t:
+            return
+
+    for name in DEFAULT_CAREER_DIMENSIONS:
+        a, t = answered_target(name)
+        if t > 0 and a < t:
+            normalized["focus_dimension"] = name
+            return
+
+
 def _normalize_profile(raw_payload):
     payload = raw_payload if isinstance(raw_payload, dict) else {}
     profile = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
@@ -3270,7 +3453,7 @@ def _normalize_profile(raw_payload):
     riasec = profile.get("riasec") if isinstance(profile.get("riasec"), dict) else {}
     normalized = {
         "next_question": str(payload.get("next_question") or "").strip(),
-        "focus_dimension": str(payload.get("focus_dimension") or "职业兴趣").strip() or "职业兴趣",
+        "focus_dimension": _coerce_career_interview_focus_dimension(payload),
         "is_complete": bool(payload.get("is_complete")),
         "completion_score": _safe_score(payload.get("completion_score"), 0),
         "profile": {
@@ -3485,7 +3668,7 @@ def _call_openai_compatible_chat(base_url, api_key, model, messages, system_prom
         model,
         messages,
         system_prompt=system_prompt or CAREER_INTERVIEW_SYSTEM_PROMPT,
-        max_tokens=480,
+        max_tokens=900,
     )
     return _normalize_profile(parsed)
 
@@ -4417,6 +4600,28 @@ def api_career_news():
     return _cache_json_response(payload, max_age=300)
 
 
+@app.route("/api/news-kb/stats")
+def api_news_kb_stats():
+    try:
+        stats = get_kb_stats()
+        return jsonify({"data": stats})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/news-kb/search")
+def api_news_kb_search():
+    query = str(request.args.get("q") or "").strip()
+    if not query:
+        return jsonify({"message": "请提供查询关键词 q"}), 400
+    top_k = min(int(request.args.get("k") or 8), 20)
+    try:
+        results = search_news_kb(query, top_k=top_k)
+        return jsonify({"data": results, "total": len(results)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
     payload = request.get_json(silent=True) or {}
@@ -4526,6 +4731,8 @@ def api_profile_portrait_generate():
         prompt = prompt_packet.get("render_prompt") or _build_profile_portrait_render_prompt(context, brief)
         prompt_writer_mode = str(prompt_packet.get("mode") or "heuristic").strip() or "heuristic"
         prompt_writer_model = str(prompt_packet.get("writer_model") or "").strip()
+        prompt_pipeline = prompt_packet.get("prompt_pipeline") if isinstance(prompt_packet.get("prompt_pipeline"), dict) else None
+        prompt_evaluation = prompt_packet.get("prompt_evaluation") if isinstance(prompt_packet.get("prompt_evaluation"), dict) else None
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     except Exception:
@@ -4556,7 +4763,9 @@ def api_profile_portrait_generate():
         "prompt_mode": "reuse_brief" if (reuse_brief and saved_brief) else "rebuild_brief",
         "prompt_writer_mode": prompt_writer_mode,
         "prompt_writer_model": prompt_writer_model,
-        "brief_version": "2026.04-task-card-v2",
+        "brief_version": PORTRAIT_TEMPLATE_VERSION,
+        "prompt_pipeline": prompt_pipeline or {"pipeline_version": PORTRAIT_PROMPT_PIPELINE_VERSION},
+        "prompt_evaluation": prompt_evaluation,
         "image_error": image_error,
         "brief": brief,
     }
@@ -5024,26 +5233,52 @@ def api_resume_profile():
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
+def _build_llm_caller_for_report(base_url, api_key, model):
+    """Build an LLMCaller for the career report agents."""
+    if not (base_url and api_key and model):
+        return None
+
+    def _caller(messages, system_prompt, max_tokens=3500):
+        return _call_markdown_chat(
+            base_url,
+            api_key,
+            model,
+            messages,
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+        )
+
+    return _caller
+
+
 def _run_career_report_job(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm):
     stage_defs = {item["key"]: item["label"] for item in CAREER_REPORT_STAGE_DEFS}
-    generation_mode = "llm_orchestrated" if runtime_llm and runtime_llm.get("writer") else "template_orchestrated"
     model_name = str(runtime_llm.get("model") or "") if isinstance(runtime_llm, dict) else ""
+
+    # Build LLM caller for agents
+    base_url, api_key, _model = _get_active_provider_and_model()
+    llm_caller = _build_llm_caller_for_report(base_url, api_key, model_name or _model)
+    generation_mode = "llm" if llm_caller else "fallback"
+
+    # Attach caller to runtime_llm
+    runtime_llm_with_caller = dict(runtime_llm or {})
+    runtime_llm_with_caller["caller"] = llm_caller
 
     _update_career_report_job(
         job_id,
         status="running",
         started_at=int(time.time()),
-        stage="profile_fusion",
-        stage_label=stage_defs.get("profile_fusion", "画像融合"),
-        stage_detail="正在汇总测评、访谈、简历与基础信息",
-        progress=build_stage_progress("profile_fusion"),
+        stage="industry_analysis",
+        stage_label=stage_defs.get("industry_analysis", "行业分析"),
+        stage_detail="正在分析行业趋势与劳动力市场动态",
+        progress=build_stage_progress("industry_analysis"),
     )
     _save_career_report_progress(
         username,
         job_id,
-        "profile_fusion",
-        stage_defs.get("profile_fusion", "画像融合"),
-        "正在汇总测评、访谈、简历与基础信息",
+        "industry_analysis",
+        stage_defs.get("industry_analysis", "行业分析"),
+        "正在分析行业趋势与劳动力市场动态",
         model=model_name,
         generation_mode=generation_mode,
         report_id=report_id,
@@ -5081,9 +5316,8 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             news_payload=get_career_news_payload(),
             focus_role_id=focus_role_id,
             stage_callback=_stage_callback,
-            markdown_writer=(runtime_llm or {}).get("writer"),
+            runtime_llm=runtime_llm_with_caller,
             model_name=model_name,
-            generation_mode=generation_mode,
         )
         _save_career_report_bundle(username, bundle)
         meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
@@ -5091,18 +5325,18 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             job_id,
             status="completed",
             finished_at=int(time.time()),
-            stage="critic",
-            stage_label=stage_defs.get("critic", "一致性校验"),
+            stage="path_planning",
+            stage_label=stage_defs.get("path_planning", "路径规划"),
             stage_detail="报告生成完成",
             message="报告生成完成",
             report_id=str(meta.get("report_id") or report_id),
-            progress=build_stage_progress("critic"),
+            progress=build_stage_progress("path_planning"),
         )
         _save_career_report_progress(
             username,
             job_id,
-            "critic",
-            stage_defs.get("critic", "一致性校验"),
+            "path_planning",
+            stage_defs.get("path_planning", "路径规划"),
             "报告生成完成",
             status="ready",
             model=model_name,
@@ -5125,8 +5359,8 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
         _save_career_report_progress(
             username,
             job_id,
-            "critic",
-            stage_defs.get("critic", "一致性校验"),
+            "path_planning",
+            stage_defs.get("path_planning", "路径规划"),
             "报告生成失败",
             status="failed",
             error_message=str(exc),
@@ -5156,6 +5390,16 @@ def api_career_report_generate_start():
     if not profile_payload:
         return jsonify({"message": "请先完成画像步骤后再生成职业规划报告。"}), 400
 
+    state = _load_user_state(username)
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    profile_portrait = state.get("profile_portrait") if isinstance(state.get("profile_portrait"), dict) else {}
+    profile_payload = dict(profile_payload)
+    profile_payload["feedback_memory"] = _normalize_career_report_feedback(report_state.get("feedback"))
+    profile_payload["portrait_prompt_version"] = str(
+        ((profile_portrait.get("prompt_pipeline") or {}).get("pipeline_version"))
+        or PORTRAIT_PROMPT_PIPELINE_VERSION
+    ).strip()
+
     base_url, api_key, model = _get_active_provider_and_model()
     runtime_llm = {
         "writer": _build_report_markdown_writer(base_url, api_key, model),
@@ -5164,12 +5408,12 @@ def api_career_report_generate_start():
 
     job_id = uuid.uuid4().hex
     report_id = f"report-{uuid.uuid4().hex[:12]}"
-    stage_label = next((item["label"] for item in CAREER_REPORT_STAGE_DEFS if item["key"] == "profile_fusion"), "画像融合")
+    stage_label = next((item["label"] for item in CAREER_REPORT_STAGE_DEFS if item["key"] == "industry_analysis"), "行业分析")
     job = {
         "job_id": job_id,
         "username": username,
         "status": "queued",
-        "stage": "profile_fusion",
+        "stage": "industry_analysis",
         "stage_label": stage_label,
         "stage_detail": "任务已创建，等待后台编排",
         "message": "",
@@ -5177,7 +5421,7 @@ def api_career_report_generate_start():
         "started_at": 0,
         "finished_at": 0,
         "report_id": report_id,
-        "progress": build_stage_progress("profile_fusion"),
+        "progress": build_stage_progress("industry_analysis"),
     }
     with CAREER_REPORT_LOCK:
         CAREER_REPORT_JOBS[job_id] = job
@@ -5185,13 +5429,13 @@ def api_career_report_generate_start():
     _save_career_report_progress(
         username,
         job_id,
-        "profile_fusion",
+        "industry_analysis",
         stage_label,
         "任务已创建，等待后台编排",
         status="queued",
         report_id=report_id,
         model=str(runtime_llm.get("model") or ""),
-        generation_mode="llm_orchestrated" if runtime_llm.get("writer") else "template_orchestrated",
+        generation_mode="llm",
         focus_role_id=focus_role_id,
     )
 
@@ -5254,6 +5498,46 @@ def api_career_report_current():
     data = _public_career_report_bundle(bundle) if isinstance(bundle, dict) and bundle.get("meta") else None
     return jsonify({
         "data": data,
+        "state": _public_career_report_state(report_state),
+    })
+
+
+@app.route("/api/career-report/feedback", methods=["POST"])
+@_login_required
+def api_career_report_feedback():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    verdict = str(payload.get("verdict") or "").strip().lower()
+    if verdict not in {"accurate", "partial", "off_target"}:
+        return jsonify({"message": "请先选择反馈结论。"}), 400
+
+    note = str(payload.get("note") or "").strip()[:320]
+    bundle = _read_career_report_bundle(user["username"])
+    meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+
+    state = _load_user_state(user["username"])
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else empty_report_state()
+    report_state["feedback"] = _append_career_report_feedback(
+        report_state.get("feedback"),
+        {
+            "report_id": str(payload.get("report_id") or meta.get("report_id") or report_state.get("report_id") or "").strip(),
+            "focus_role_id": str(payload.get("focus_role_id") or meta.get("focus_role_id") or report_state.get("focus_role_id") or "").strip(),
+            "focus_role_name": str(
+                payload.get("focus_role_name")
+                or document.get("focus_role_name")
+                or meta.get("focus_role_name")
+                or ""
+            ).strip(),
+            "verdict": verdict,
+            "note": note,
+        },
+    )
+    state["career_report"] = report_state
+    _save_user_state(user["username"], state)
+    return jsonify({
+        "message": "反馈已记录，下次生成会优先吸收。",
+        "feedback": report_state.get("feedback"),
         "state": _public_career_report_state(report_state),
     })
 
@@ -5561,6 +5845,8 @@ def api_career_interview():
     payload = request.get_json(silent=True) or {}
     messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
     assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
+    client_focus = str(payload.get("focus_dimension") or "").strip()
+    client_progress = payload.get("progress") if isinstance(payload.get("progress"), list) else []
     base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
@@ -5576,14 +5862,19 @@ def api_career_interview():
             continue
         normalized_messages.append({"role": role, "content": content[:1600]})
 
+    system_prompt = _build_career_interview_prompt(assessment_context) + _career_interview_progress_system_suffix(
+        client_focus, client_progress
+    )
+
     try:
         result = _call_openai_compatible_chat(
             base_url,
             api_key,
             model,
             normalized_messages,
-            system_prompt=_build_career_interview_prompt(assessment_context),
+            system_prompt=system_prompt,
         )
+        _merge_career_interview_focus_with_progress(result, client_progress)
         return jsonify(result)
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400

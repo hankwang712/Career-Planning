@@ -1,254 +1,28 @@
 {
   "assessment_hub": {
-    "savedAt": 1775314280853,
+    "savedAt": 1775489533138,
     "mbti": {
-      "currentIndex": 92,
-      "answers": {
-        "1": "neutral",
-        "2": "a_lean",
-        "3": "a_lean",
-        "4": "a_lean",
-        "5": "a_lean",
-        "6": "a_lean",
-        "7": "a_lean",
-        "8": "a_lean",
-        "9": "a_lean",
-        "10": "a_lean",
-        "11": "a_lean",
-        "12": "a_lean",
-        "13": "a_lean",
-        "14": "a_lean",
-        "15": "a_lean",
-        "16": "a_lean",
-        "17": "a_lean",
-        "18": "a_lean",
-        "19": "a_lean",
-        "20": "a_lean",
-        "21": "a_lean",
-        "22": "a_lean",
-        "23": "a_lean",
-        "24": "a_lean",
-        "25": "a_strong",
-        "26": "a_lean",
-        "27": "neutral",
-        "28": "neutral",
-        "29": "b_lean",
-        "30": "a_lean",
-        "31": "a_strong",
-        "32": "a_lean",
-        "33": "neutral",
-        "34": "b_lean",
-        "35": "a_lean",
-        "36": "a_strong",
-        "37": "a_lean",
-        "38": "b_lean",
-        "39": "b_strong",
-        "40": "a_strong",
-        "41": "a_lean",
-        "42": "b_lean",
-        "43": "b_strong",
-        "44": "b_lean",
-        "45": "neutral",
-        "46": "a_lean",
-        "47": "a_strong",
-        "48": "a_lean",
-        "49": "neutral",
-        "50": "b_lean",
-        "51": "b_strong",
-        "52": "b_strong",
-        "53": "b_strong",
-        "54": "b_lean",
-        "55": "b_lean",
-        "56": "neutral",
-        "57": "neutral",
-        "58": "a_lean",
-        "59": "a_lean",
-        "60": "a_strong",
-        "61": "a_strong",
-        "62": "a_lean",
-        "63": "a_lean",
-        "64": "neutral",
-        "65": "neutral",
-        "66": "b_lean",
-        "67": "b_lean",
-        "68": "neutral",
-        "69": "neutral",
-        "70": "a_lean",
-        "71": "a_lean",
-        "72": "a_strong",
-        "73": "a_strong",
-        "74": "a_lean",
-        "75": "a_lean",
-        "76": "neutral",
-        "77": "neutral",
-        "78": "neutral",
-        "79": "neutral",
-        "80": "neutral",
-        "81": "neutral",
-        "82": "neutral",
-        "83": "neutral",
-        "84": "neutral",
-        "85": "a_lean",
-        "86": "a_lean",
-        "87": "a_lean",
-        "88": "a_lean",
-        "89": "a_lean",
-        "90": "a_strong",
-        "91": "a_strong",
-        "92": "a_strong",
-        "93": "a_strong"
-      },
+      "currentIndex": 0,
+      "answers": {},
+      "historyRuns": [],
+      "runSessionId": 1,
+      "archivedSessionId": 0,
       "clarifier": {
         "loading": false,
-        "summary": "本轮主要澄清 EI（外向/内向）、TF（思考/情感）和 JP（判断/感知）三个临界维度，以帮助确认用户的倾向。",
-        "questions": [
-          {
-            "id": "q1",
-            "option_a": "主动发起话题，带动气氛",
-            "option_b": "倾听他人，在必要时才发言",
-            "pair": "EI",
-            "question": "在社交活动中，你更倾向于",
-            "weight": 2
-          },
-          {
-            "id": "q2",
-            "option_a": "分析问题，提供逻辑建议",
-            "option_b": "先表达关心，再考虑解决方案",
-            "pair": "TF",
-            "question": "当朋友遇到困难时，你通常会",
-            "weight": 2
-          },
-          {
-            "id": "q3",
-            "option_a": "制定详细计划，按部就班执行",
-            "option_b": "灵活调整，根据进展决定下一步",
-            "pair": "JP",
-            "question": "面对一个长期项目，你更可能",
-            "weight": 2
-          },
-          {
-            "id": "q4",
-            "option_a": "参加讨论小组，与他人交流想法",
-            "option_b": "独自阅读或思考，深入理解",
-            "pair": "EI",
-            "question": "学习新知识时，你更喜欢",
-            "weight": 2
-          },
-          {
-            "id": "q5",
-            "option_a": "客观数据和事实分析",
-            "option_b": "个人价值观和他人感受",
-            "pair": "TF",
-            "question": "做重要决策时，你更依赖",
-            "weight": 2
-          }
-        ],
-        "currentIndex": 4,
-        "answers": {
-          "q1": "a_lean",
-          "q2": "a_strong",
-          "q3": "neutral",
-          "q4": "b_lean",
-          "q5": "neutral"
-        },
-        "applied": true,
-        "requestedSignature": "EI:11-14|SN:25-13|TF:19-22|JP:13-15"
+        "summary": "",
+        "questions": [],
+        "currentIndex": 0,
+        "answers": {},
+        "applied": false,
+        "requestedSignature": ""
       }
     },
     "holland": {
-      "currentIndex": 89,
-      "answers": {
-        "1": "yes",
-        "2": "yes",
-        "3": "no",
-        "4": "no",
-        "5": "no",
-        "6": "yes",
-        "7": "yes",
-        "8": "yes",
-        "9": "yes",
-        "10": "no",
-        "11": "no",
-        "12": "no",
-        "13": "no",
-        "14": "yes",
-        "15": "yes",
-        "16": "yes",
-        "17": "yes",
-        "18": "yes",
-        "19": "yes",
-        "20": "yes",
-        "21": "yes",
-        "22": "yes",
-        "23": "yes",
-        "24": "yes",
-        "25": "yes",
-        "26": "yes",
-        "27": "yes",
-        "28": "yes",
-        "29": "yes",
-        "30": "no",
-        "31": "yes",
-        "32": "yes",
-        "33": "yes",
-        "34": "yes",
-        "35": "yes",
-        "36": "yes",
-        "37": "yes",
-        "38": "yes",
-        "39": "yes",
-        "40": "no",
-        "41": "yes",
-        "42": "yes",
-        "43": "yes",
-        "44": "no",
-        "45": "no",
-        "46": "yes",
-        "47": "yes",
-        "48": "no",
-        "49": "no",
-        "50": "yes",
-        "51": "yes",
-        "52": "no",
-        "53": "no",
-        "54": "no",
-        "55": "yes",
-        "56": "yes",
-        "57": "yes",
-        "58": "yes",
-        "59": "no",
-        "60": "no",
-        "61": "no",
-        "62": "no",
-        "63": "yes",
-        "64": "yes",
-        "65": "yes",
-        "66": "no",
-        "67": "no",
-        "68": "yes",
-        "69": "yes",
-        "70": "yes",
-        "71": "no",
-        "72": "no",
-        "73": "no",
-        "74": "yes",
-        "75": "yes",
-        "76": "yes",
-        "77": "no",
-        "78": "no",
-        "79": "yes",
-        "80": "yes",
-        "81": "no",
-        "82": "no",
-        "83": "yes",
-        "84": "yes",
-        "85": "no",
-        "86": "no",
-        "87": "yes",
-        "88": "yes",
-        "89": "yes",
-        "90": "yes"
-      }
+      "currentIndex": 0,
+      "answers": {},
+      "historyRuns": [],
+      "runSessionId": 1,
+      "archivedSessionId": 0
     },
     "knowledge_version": "20260321-route-align-v2"
   },
@@ -259,11 +33,11 @@
   "career_interview": {
     "started": true,
     "loading": false,
-    "isComplete": true,
+    "isComplete": false,
     "messages": [
       {
-        "content": "如果不考虑专业限制，你最想长期投入哪类工作或行业？为什么？",
-        "role": "assistant"
+        "role": "assistant",
+        "content": "如果不考虑专业限制，你最想长期投入哪类工作或行业？为什么？"
       },
       {
         "role": "user",
@@ -275,65 +49,38 @@
       },
       {
         "role": "user",
-        "content": "我会被技术研发这类工作吸引，因为我更享受搭结构、解决复杂问题，并愿意长期深挖一个方向。"
+        "content": "vibe coding"
       },
       {
         "role": "assistant",
-        "content": "在你提到的技术研发工作中，什么样的团队氛围或协作方式会让你觉得最有动力？"
+        "content": "你提到'vibe coding'时，具体是指哪种状态或体验？可以描述一个最近的例子吗？"
       },
       {
         "role": "user",
-        "content": "大家可以随便的阐述自己的想法"
+        "content": "就是让ai、帮我写代码，我来抓取写比较好的提示词"
       },
       {
         "role": "assistant",
-        "content": "如果在一个项目中，你的技术方案和团队的主流意见不同，你会怎么处理？"
+        "content": "当你成功抓取到好的提示词时，那种'搞定'的感觉，对你来说意味着什么？"
       },
       {
         "role": "user",
-        "content": "听从他人意见"
+        "content": "很爽啊"
       },
       {
         "role": "assistant",
-        "content": "如果有一个机会，让你可以完全主导一个技术项目，你会最想解决一个什么样的具体问题？"
-      },
-      {
-        "role": "user",
-        "content": "创新性"
-      },
-      {
-        "role": "assistant",
-        "content": "如果三年后你找到了理想的工作，典型的一天里，你会花最多时间在什么事情上？"
-      },
-      {
-        "role": "user",
-        "content": "开发"
-      },
-      {
-        "role": "assistant",
-        "content": "在你理想的工作中，有什么样的工作内容或任务会让你觉得‘这不值得我做’？"
-      },
-      {
-        "role": "user",
-        "content": "大量重复性的工作"
-      },
-      {
-        "role": "assistant",
-        "content": "回想一下，有没有一件事你做得比大多数人都好？（即使很小）"
-      },
-      {
-        "role": "assistant",
-        "content": "感谢你的分享！我已经整理出你的职业画像。"
+        "content": "假设三年后你找到了理想工作，典型的一天你会做什么？"
       }
     ],
     "result": {
-      "assistant_reply": "回想一下，有没有一件事你做得比大多数人都好？（即使很小）",
+      "assistant_reply": "假设三年后你找到了理想工作，典型的一天你会做什么？",
       "completion_score": 0,
       "focus_dimension": "职业兴趣",
       "is_complete": false,
-      "next_question": "回想一下，有没有一件事你做得比大多数人都好？（即使很小）",
+      "next_question": "假设三年后你找到了理想工作，典型的一天你会做什么？",
       "profile": {
         "career_interests": [],
+        "coverage_note": "当前访谈基于有限对话已形成首版画像，可直接进入人物明信片生成。",
         "dimensions": [
           {
             "evidence": "",
@@ -366,8 +113,27 @@
             "score": 0
           }
         ],
-        "evidence_highlights": [],
-        "next_steps": [],
+        "evidence_highlights": [
+          "进行'vibe coding'，即通过AI辅助写代码并专注于抓取优质提示词，在此过程中感到非常投入和'爽'。",
+          "体现在主动探索和优化与AI协作的方法（抓取提示词），以提升效率和质量。",
+          "暂无明确信息"
+        ],
+        "growth_mindset": "体现在主动探索和优化与AI协作的方法（抓取提示词），以提升效率和质量。",
+        "key_experience": "进行'vibe coding'，即通过AI辅助写代码并专注于抓取优质提示词，在此过程中感到非常投入和'爽'。",
+        "leadership_style": "倾向于独立或策略性协作，通过工具（如AI）优化流程来达成目标，可能偏好幕后或技术性主导的角色。",
+        "missing_followups": [],
+        "next_steps": [
+          "崇拜或欣赏的行业人物及其特质",
+          "在团队中处理分歧或压力的方式",
+          "对工作环境或团队文化的偏好"
+        ],
+        "output_scope": "usable",
+        "portrait_ready": true,
+        "recommended_exploration": [
+          "崇拜或欣赏的行业人物及其特质",
+          "在团队中处理分歧或压力的方式",
+          "对工作环境或团队文化的偏好"
+        ],
         "recommended_roles": [],
         "riasec": {
           "artistic": 0,
@@ -377,43 +143,47 @@
           "realistic": 0,
           "social": 0
         },
-        "summary": "访谈已启动，系统正在根据回答逐步生成职业兴趣画像。",
-        "work_values": []
-      },
-      "summary": "访谈已启动，系统正在根据回答逐步生成职业兴趣画像。"
+        "role_model": "暂无明确信息",
+        "summary": "一位冷静实操的ISTP型思考者，对AI产品运营充满兴趣，享受通过策略性引导AI（如抓取优质提示词）来高效解决问题，并从中获得强烈的掌控感和成就感。",
+        "work_values": [
+          "高效解决问题",
+          "策略性引导",
+          "将想法落地"
+        ]
+      }
     },
-    "completionScore": 17,
+    "completionScore": 95,
     "focusDimension": "职业兴趣",
     "dimensionProgress": [
       {
-        "answered": 2,
         "name": "职业兴趣",
-        "target": 2
+        "target": 2,
+        "answered": 2
       },
       {
-        "answered": 0,
         "name": "工作价值观",
-        "target": 2
+        "target": 2,
+        "answered": 0
       },
       {
-        "answered": 0,
         "name": "学习方式",
-        "target": 2
+        "target": 2,
+        "answered": 0
       },
       {
-        "answered": 0,
         "name": "沟通风格",
-        "target": 2
+        "target": 2,
+        "answered": 0
       },
       {
-        "answered": 0,
         "name": "行动证据",
-        "target": 2
+        "target": 2,
+        "answered": 0
       },
       {
-        "answered": 0,
         "name": "职业成熟度",
-        "target": 2
+        "target": 2,
+        "answered": 0
       }
     ],
     "profileBasics": {
@@ -1056,7 +826,7 @@
         "role": "内容创作/编辑",
         "timeline": "短期 · 起步期",
         "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-03T12:41:45.176Z",
+        "created_at": "2026-04-06T15:33:00.929Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
@@ -1066,7 +836,7 @@
             "tag": "阶段目标",
             "deadline": "",
             "xp": 40,
-            "done": false
+            "done": true
           },
           {
             "id": "short-early_focus_0",
@@ -1075,7 +845,7 @@
             "tag": "技能",
             "deadline": "",
             "xp": 20,
-            "done": false
+            "done": true
           },
           {
             "id": "short-early_focus_1",
@@ -1124,7 +894,7 @@
         "role": "内容创作/编辑",
         "timeline": "短期 · 进阶期",
         "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-03T12:41:45.176Z",
+        "created_at": "2026-04-06T15:33:00.929Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
@@ -1192,7 +962,7 @@
         "role": "内容创作/编辑",
         "timeline": "长期 · 初期阶段",
         "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-03T12:41:45.176Z",
+        "created_at": "2026-04-06T15:33:00.929Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
@@ -1260,7 +1030,7 @@
         "role": "内容创作/编辑",
         "timeline": "长期 · 进阶阶段",
         "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-03T12:41:45.176Z",
+        "created_at": "2026-04-06T15:33:00.929Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
@@ -1328,7 +1098,7 @@
         "role": "内容创作/编辑",
         "timeline": "长期阶段 · 复查节点",
         "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-03T12:41:45.176Z",
+        "created_at": "2026-04-06T15:33:00.929Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
@@ -1390,13 +1160,14 @@
     "progress": {
       "streak": 1,
       "best_streak": 1,
-      "xp": 238,
-      "last_checkin": "2026-04-02",
+      "xp": 308,
+      "last_checkin": "2026-04-06",
       "active_days": {
-        "2026-04-02": true
+        "2026-04-02": true,
+        "2026-04-06": true
       }
     },
-    "updated_at": "2026-04-03T12:41:45.176Z"
+    "updated_at": "2026-04-06T15:33:00.929Z"
   },
   "profile_portrait": {
     "status": "ready",

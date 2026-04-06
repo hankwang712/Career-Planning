@@ -834,6 +834,7 @@ def get_career_news_payload(
     display_limit: int = CAREER_NEWS_DISPLAY_LIMIT,
 ) -> dict:
     window = _snapshot_window()
+    _newly_fetched: list = []
 
     with CAREER_NEWS_LOCK:
         cached = _read_cached_snapshot()
@@ -844,6 +845,7 @@ def get_career_news_payload(
             items, source_stats = _fetch_latest_career_news()
             if items:
                 payload = _build_ready_payload(window, items, source_stats, cached_items)
+                _newly_fetched = list(items)
             elif cached and isinstance(cached.get("items"), list) and cached.get("items"):
                 payload = _build_stale_payload(window, cached, source_stats)
             else:
@@ -855,6 +857,18 @@ def get_career_news_payload(
         if trimmed_items != current_items:
             payload["items"] = trimmed_items
             _write_cached_snapshot(payload)
+
+    # Store newly fetched items to the news knowledge base in a background thread
+    if _newly_fetched:
+        def _store_to_kb(items):
+            try:
+                from .news_kb import store_news_items
+                store_news_items(items, fetch_content=True)
+            except Exception:
+                pass
+        import threading
+        threading.Thread(target=_store_to_kb, args=(_newly_fetched,), daemon=True,
+                         name="news-kb-store").start()
 
     items = [
         _decorate_news_item(item)

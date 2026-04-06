@@ -4323,7 +4323,12 @@ function syncCareerInterviewProgress(result = null) {
     careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
   }
 
-  const focusName = normalizeCareerDimensionName(result?.focus_dimension || careerInterviewState.focusDimension);
+  let focusName = normalizeCareerDimensionName(result?.focus_dimension || careerInterviewState.focusDimension);
+  const cur = getCareerDimensionProgressByName(focusName);
+  if (cur && !result?.is_complete && Number(cur.answered) >= Number(cur.target)) {
+    const nextPending = getNextPendingCareerDimensionName();
+    if (nextPending) focusName = nextPending;
+  }
   careerInterviewState.focusDimension = focusName;
 
   if (result?.is_complete) {
@@ -4680,8 +4685,8 @@ function renderCareerInterviewResult(result) {
   if (content) content.classList.remove("hidden");
   if (progressEl) progressEl.textContent = progressText;
   if (modalProgressEl) modalProgressEl.textContent = progressText;
-  if (focusEl) focusEl.textContent = result.profile?.topic || focusName;
-  if (modalFocusEl) modalFocusEl.textContent = result.profile?.topic || focusName;
+  if (focusEl) focusEl.textContent = focusName;
+  if (modalFocusEl) modalFocusEl.textContent = focusName;
 
   // 新的profile格式：叙事性摘要
   if (summaryEl) {
@@ -4805,7 +4810,9 @@ function openCareerInterviewModal(mode = "chat") {
   const modal = document.getElementById("careerInterviewModal");
   if (!modal) return;
   modal.classList.remove("hidden");
-  document.body.style.overflow = "hidden";
+  window.requestAnimationFrame(() => {
+    modal.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   window.setTimeout(() => {
     if (mode === "config") {
@@ -4816,14 +4823,13 @@ function openCareerInterviewModal(mode = "chat") {
     } else {
       document.getElementById("careerInterviewStartBtn")?.focus();
     }
-  }, 50);
+  }, 120);
 }
 
 function closeCareerInterviewModal() {
   const modal = document.getElementById("careerInterviewModal");
   if (modal) modal.classList.add("hidden");
   stopCareerInterviewVoice();
-  document.body.style.overflow = "";
 }
 
 function handleCareerInterviewOverlayClick(event) {
@@ -8042,7 +8048,7 @@ function markReportGenerated(source = "view") {
 
 function showSection(sectionId) {
   if (sectionId === appState.currentSection) return;
-  const sections = ["dashboard", "jobs", "profile", "matching", "report", "qa"];
+  const sections = ["dashboard", "jobs", "profile", "matching", "report"];
   sections.forEach((id) => {
     const section = document.getElementById(id);
     // 优先使用 data-section 选择导航按钮，避免依赖 onclick 选择器。
@@ -8687,7 +8693,7 @@ document.addEventListener("DOMContentLoaded", function () {
     refreshUnifiedExperience();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
-      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "qa"];
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report"];
       const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
       if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
         showSection(hashId);
@@ -8711,43 +8717,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// 职业问答模块
-function fillQAQuestion(question) {
-  const input = document.getElementById("qaInput");
-  if (input) {
-    input.value = question;
-    input.focus();
-  }
-}
-
-function submitQAQuestion() {
-  const input = document.getElementById("qaInput");
-  if (!input || !input.value.trim()) {
-    showToast("提示", "请先输入你的职业问题", "warning", 2000);
-    return;
-  }
-  showToast(
-    "职业问答",
-    `RAG 引擎正在接入中，当前可先参考下方预置问答示例。问题已记录：${input.value.substring(0, 20)}...`,
-    "info",
-    3000
-  );
-}
-
-function expandQA(el) {
-  const content = el.querySelector(".hidden, .block");
-  const arrow = el.querySelector("span:last-child");
-  if (!content) return;
-  if (content.classList.contains("hidden")) {
-    content.classList.remove("hidden");
-    content.classList.add("block");
-    if (arrow) arrow.textContent = "▴";
-  } else {
-    content.classList.add("hidden");
-    content.classList.remove("block");
-    if (arrow) arrow.textContent = "▾";
-  }
-}
 
 // ── 设置面板（头像点击） ────────────────────────────────────────────────────────
 

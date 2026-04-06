@@ -32,11 +32,6 @@
       target: '[data-section="report"]',
     },
     {
-      title: '职业问答 — 随时咨询',
-      content: '有任何职业困惑，都可以在这里向 AI 提问，支持检索岗位知识库，快速找到答案。',
-      target: '[data-section="qa"]',
-    },
-    {
       title: '智能仪表盘 — 查看全局进度',
       content: '你现在所在的位置。实时显示画像成熟度、匹配情况和待办任务，让你随时掌握整体状态。',
       target: '[data-section="dashboard"]',

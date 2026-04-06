@@ -17,7 +17,9 @@
     renderQueued: false,
     planWrapped: false,
     eventsBound: false,
-    previousBodyOverflow: ""
+    previousBodyOverflow: "",
+    feedbackVerdict: "",
+    feedbackNote: ""
   };
 
   const avatarRuntime = {
@@ -52,6 +54,298 @@
 
   function formatText(value) {
     return esc(String(value || "").trim()).replace(/\n/g, "<br>");
+  }
+
+  // Lightweight markdown-to-HTML for v2 module content
+  function renderMarkdownBasic(md) {
+    if (!md) return "";
+    let text = String(md);
+    // Escape HTML first
+    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Code blocks (```...```)
+    text = text.replace(/```(?:json|python|markdown|md)?\s*([\s\S]*?)```/g, (_, code) =>
+      `<pre><code>${code.trim()}</code></pre>`);
+    // Inline code
+    text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Headings
+    text = text.replace(/^#### (.+)$/gm, "<h4>$1</h4>");
+    text = text.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+    text = text.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+    text = text.replace(/^# (.+)$/gm, "<h2>$1</h2>");
+    // Bold
+    text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Tables: find lines with | separators
+    text = text.replace(/((?:\|.+\|\n?)+)/g, (tableBlock) => {
+      const lines = tableBlock.trim().split("\n").filter((l) => l.trim());
+      if (lines.length < 2) return tableBlock;
+      const rows = lines.map((line) => {
+        const cells = line.split("|").slice(1, -1).map((c) => c.trim());
+        return cells;
+      });
+      const isSep = (row) => row.every((c) => /^[-:]+$/.test(c));
+      let html = "<table>";
+      let headerDone = false;
+      for (let i = 0; i < rows.length; i++) {
+        if (i === 1 && isSep(rows[i])) continue;
+        const tag = !headerDone && i === 0 ? "th" : "td";
+        if (tag === "th") headerDone = true;
+        html += "<tr>" + rows[i].map((c) => `<${tag}>${c}</${tag}>`).join("") + "</tr>";
+      }
+      html += "</table>";
+      return html;
+    });
+    // Unordered lists
+    text = text.replace(/((?:^[-*] .+\n?)+)/gm, (block) => {
+      const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^[-*] /, "")}</li>`).join("");
+      return `<ul>${items}</ul>`;
+    });
+    // Numbered lists
+    text = text.replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
+      const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("");
+      return `<ol>${items}</ol>`;
+    });
+    // Horizontal rules
+    text = text.replace(/^---+$/gm, "<hr>");
+    // Paragraphs (double newlines)
+    text = text.replace(/\n\n+/g, "</p><p>");
+    text = `<p>${text}</p>`;
+    // Single newlines
+    text = text.replace(/\n/g, "<br>");
+    // Clean up empty paragraphs
+    text = text.replace(/<p>\s*<\/p>/g, "");
+    text = text.replace(/<p>(<(?:h[1-4]|ul|ol|table|pre|hr)[^>]*>)/g, "$1");
+    text = text.replace(/(<\/(?:h[1-4]|ul|ol|table|pre|hr)>)<\/p>/g, "$1");
+    return text;
+  }
+
+  function truncateSummary(text, maxLen = 100) {
+    const t = String(text || "").replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    if (t.length <= maxLen) return t;
+    return `${t.slice(0, maxLen)}…`;
+  }
+
+  function computeGenerationPercent(progress) {
+    const items = Array.isArray(progress) && progress.length ? progress : getDefaultStageProgress();
+    const done = items.filter((x) => x && x.status === "done").length;
+    return Math.round((done / Math.max(items.length, 1)) * 100);
+  }
+
+  function renderReportGenerationMain(state, progress) {
+    const pct = computeGenerationPercent(progress);
+    const dash = Math.max(0, Math.min(264, (pct / 100) * 264));
+    const detail = esc(String(state?.stage_detail || state?.stage_label || "后台正在按阶段生成结构化职业规划报告，请稍候。").trim());
+    const items = Array.isArray(progress) && progress.length ? progress : getDefaultStageProgress();
+    return `
+      <div class="career-report-gen">
+        <div class="career-report-gen-inner">
+          <p class="career-report-gen-kicker">Career Report Pipeline</p>
+          <h2 class="career-report-gen-title">正在生成你的职业发展报告</h2>
+          <p class="career-report-gen-copy">当前页面仅展示生成进度，不展开报告正文。完成后会出现「报告已同步」提示，并自动载入新版式正文；也可通过顶部头像随时回到此处阅读。</p>
+          <div class="career-report-gen-ring-wrap" aria-hidden="true">
+            <svg class="career-report-gen-ring" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(148,163,184,0.28)" stroke-width="8" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#crGenGradPipe)" stroke-width="8"
+                stroke-dasharray="${dash} 264" stroke-linecap="round" transform="rotate(-90 50 50)" />
+              <defs>
+                <linearGradient id="crGenGradPipe" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#2563eb" />
+                  <stop offset="100%" stop-color="#38bdf8" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="career-report-gen-ring-label">
+              <strong>${pct}%</strong>
+              <span>阶段完成度</span>
+            </div>
+          </div>
+          <p class="career-report-gen-status">${detail}</p>
+          <div class="career-report-gen-stages">
+            ${items.map((item) => {
+              const done = item.status === "done";
+              const active = item.status === "active" || item.status === "running";
+              return `
+                <div class="career-report-gen-stage${done ? " done" : ""}${active ? " active" : ""}">
+                  <span class="career-report-gen-dot"></span>
+                  <span class="career-report-gen-stage-label">${esc(item.label || item.key || "阶段")}</span>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderScoreRing(pct) {
+    const v = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+    const dash = (v / 100) * 264;
+    return `
+      <div class="cr-v2-score">
+        <svg class="cr-v2-score-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="7" />
+          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="7"
+            stroke-dasharray="${dash} 264" stroke-linecap="round" transform="rotate(-90 50 50)" />
+        </svg>
+        <div class="cr-v2-score-val">${v}%</div>
+        <div class="cr-v2-score-cap">综合置信</div>
+      </div>
+    `;
+  }
+
+  function renderReportMagazineLayout(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const snap = bundle?.profile_snapshot || {};
+    const interest = snap?.interest_profile || {};
+    const basics = snap?.basics || {};
+    const roles = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 5) : [];
+    const gapMap = bundle?.gap_map || {};
+    const gaps = Array.isArray(gapMap.capability_gaps) ? gapMap.capability_gaps.slice(0, 6) : [];
+    const phasePlan = bundle?.phase_plan || {};
+    const shortPhases = Array.isArray(phasePlan.short_term) ? phasePlan.short_term.slice(0, 2) : [];
+    const longPhases = Array.isArray(phasePlan.long_term) ? phasePlan.long_term.slice(0, 1) : [];
+    const trend = bundle?.trend_brief || {};
+    const workValues = Array.isArray(snap?.work_values) ? snap.work_values : [];
+    const exec = String(bundle?.report_document?.executive_summary || meta.summary || snap?.summary || "").trim();
+    const focusRole = bundle?.report_document?.focus_role_name || gapMap?.focus_role_name || tracker?.focus_role_name || "待识别";
+    const userLabel = esc(currentUser()?.display_name || currentUser()?.username || "用户");
+    const conf = Math.max(
+      0,
+      Math.min(
+        100,
+        Number(meta.evidence_score ?? tracker?.completion_rate ?? snap?.readiness_score ?? 67) || 0
+      )
+    );
+    const mbtiPill = esc(String(interest.mbti || "MBTI 待补充"));
+    const holPill = esc(String(interest.holland || "Holland 待补充"));
+
+    const roleRows = roles.length
+      ? roles.map((r) => {
+          const score = Math.max(0, Math.min(100, Number(r.overallScore ?? r.overall_score ?? 0)));
+          return `
+            <div class="cr-v2-role-row">
+              <span>${esc(r.name || r.title || "岗位")}</span>
+              <span>${score}%</span>
+            </div>
+          `;
+        }).join("")
+      : `<div class="cr-v2-role-row"><span>${esc(focusRole)}</span><span>--</span></div>`;
+
+    const gapRows = gaps.length
+      ? gaps.map((g) => {
+          const cur = g.current != null ? Number(g.current) : 0;
+          const req = g.required != null ? Number(g.required) : 85;
+          const ratio = req > 0 ? Math.round(Math.min(100, (cur / req) * 100)) : 0;
+          return `
+            <div class="cr-v2-gap-row">
+              <div class="cr-v2-gap-head">
+                <span>${esc(g.label || "能力项")}</span>
+                <span>${esc(String(cur))}/${esc(String(req))}</span>
+              </div>
+              <div class="cr-v2-bar"><i style="width:${ratio}%"></i></div>
+            </div>
+          `;
+        }).join("")
+      : `<p class="cr-v2-lead" style="margin:0;color:#94a3b8;font-size:0.8rem;">差距分析将在生成完成后显示。</p>`;
+
+    const phaseBlocks = [...shortPhases, ...longPhases]
+      .map((ph) => {
+        const tasks = Array.isArray(ph.tasks) ? ph.tasks.map((t) => esc(t.text || t.title || "")).filter(Boolean) : [];
+        return `
+          <div class="cr-v2-phase">
+            <h5>${esc(ph.phase || ph.title || "阶段")}</h5>
+            <p>${esc(ph.objective || ph.title || "")}</p>
+            ${tasks.length ? `<ul>${tasks.slice(0, 4).map((t) => `<li>${t}</li>`).join("")}</ul>` : ""}
+          </div>
+        `;
+      })
+      .join("");
+
+    const valueTags = workValues.length
+      ? workValues.slice(0, 8).map((w) => `<span class="cr-v2-pill">${esc(w)}</span>`).join("")
+      : `<span class="cr-v2-pill neutral">继续补充访谈与简历以丰富价值观标签</span>`;
+
+    const basicsLine = [basics.major, basics.grade, basics.target_city, basics.target_direction]
+      .filter(Boolean)
+      .map((x) => esc(x))
+      .join(" · ");
+
+    const trendSignals = Array.isArray(trend.signals) && trend.signals.length
+      ? trend.signals.slice(0, 2).map((s) => `<span class="cr-v2-pill neutral">${esc(s.title || s.summary || s.text || "趋势")}</span>`).join("")
+      : `<span class="cr-v2-pill neutral">趋势快照待刷新</span>`;
+
+    // v2: additional data
+    const matchOutput = bundle?.match_output || {};
+    const fitScore = Number(matchOutput.fit_score || 0);
+    const fitBand = String(matchOutput.fit_band || "");
+    const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || "";
+    const positioning = bundle?.positioning_output || {};
+    const recommendedTracks = Array.isArray(positioning.recommended_tracks) ? positioning.recommended_tracks : [];
+
+    return `
+      <div class="cr-v2-wrap">
+        <header class="cr-v2-hero">
+          <div>
+            <p class="cr-v2-hero-kicker">Career Report · 发展规划摘要</p>
+            <h2 class="cr-v2-hero-title">${esc(meta.title || "职业生涯发展报告")}</h2>
+            <p class="cr-v2-hero-copy">${formatText(exec || "报告已整合测评、画像、岗位匹配与阶段规划，以下为结构化摘要。")}</p>
+            <div class="cr-v2-hero-meta">
+              <span>主线岗位：${esc(focusRole)}</span>
+              <span>生成时间：${esc(meta.generated_at || "--")}</span>
+              <span>版本：${esc(meta.version || "--")}</span>
+              <span>姓名：${userLabel}</span>
+            </div>
+          </div>
+          ${renderScoreRing(conf)}
+        </header>
+        <div class="cr-v2-grid">
+          <div class="cr-v2-stack" style="display:grid;gap:1rem;">
+            <article class="cr-v2-card">
+              <h4>测评与画像结论</h4>
+              <p class="cr-v2-lead">${formatText(snap.core_thesis || snap.summary || "画像摘要已同步至报告。")}</p>
+              <div class="cr-v2-pill-row">
+                <span class="cr-v2-pill">MBTI：${mbtiPill}</span>
+                <span class="cr-v2-pill">Holland：${holPill}</span>
+              </div>
+            </article>
+            <article class="cr-v2-card">
+              <h4>优先岗位方向</h4>
+              <div class="cr-v2-role-list">${roleRows}</div>
+            </article>
+            <article class="cr-v2-card">
+              <h4>差距驱动 · 能力对照</h4>
+              ${gapRows}
+              ${Array.isArray(gapMap.skill_gaps) && gapMap.skill_gaps.length ? `
+                <p class="cr-v2-lead" style="margin-top:0.5rem;font-size:0.78rem;color:#64748b;">
+                  ${esc(gapMap.skill_gaps.slice(0, 2).join("；"))}
+                </p>
+              ` : ""}
+            </article>
+          </div>
+          <div class="cr-v2-stack" style="display:grid;gap:1rem;">
+            <article class="cr-v2-card">
+              <h4>阶段性职业规划</h4>
+              ${phaseBlocks || '<p class="cr-v2-lead" style="margin:0;color:#94a3b8;">阶段任务将在生成完成后展示。</p>'}
+            </article>
+            <article class="cr-v2-card">
+              <h4>工作价值观与基础信息</h4>
+              <div class="cr-v2-pill-row" style="margin-bottom:0.65rem;">${valueTags}</div>
+              <p class="cr-v2-lead" style="margin:0;font-size:0.78rem;">${basicsLine || "专业 / 学历 / 目标城市等可在画像中继续补充。"}</p>
+            </article>
+            <article class="cr-v2-card">
+              <h4>行业信号与待接入能力</h4>
+              <div class="cr-v2-pill-row" style="margin-bottom:0.65rem;">${trendSignals}</div>
+              <div class="cr-v2-placeholder-grid">
+                <div class="cr-v2-placeholder">资源推荐<br/>待接入</div>
+                <div class="cr-v2-placeholder">趋势解读<br/>待接入</div>
+                <div class="cr-v2-placeholder">提醒追踪<br/>待接入</div>
+              </div>
+            </article>
+            ${renderReportFeedbackCard()}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function escapeSelectorId(value) {
@@ -147,6 +441,18 @@
     ensureAppState();
     const scopedTracker = getCareerReportStateSafe()?.tracker;
     return window.appState.careerReportTracker || scopedTracker || null;
+  }
+
+  function getCareerReportFeedback() {
+    const feedback = getCareerReportStateSafe()?.feedback;
+    return feedback && typeof feedback === "object" ? feedback : null;
+  }
+
+  function getFeedbackVerdictLabel(verdict) {
+    const key = String(verdict || "").trim().toLowerCase();
+    if (key === "accurate") return "基本准确";
+    if (key === "off_target") return "明显偏差";
+    return "部分准确";
   }
 
   function normalizeVersions(tracker, bundle) {
@@ -449,7 +755,15 @@
   }
 
   function renderReportSections(bundle) {
-    const sections = Array.isArray(bundle?.report_document?.sections) ? bundle.report_document.sections : [];
+    const rawSections = bundle?.report_document?.sections;
+
+    // v2: sections is an object keyed by module name
+    if (rawSections && !Array.isArray(rawSections) && typeof rawSections === "object") {
+      return renderReportSections4(bundle, rawSections);
+    }
+
+    // Legacy: sections is an array
+    const sections = Array.isArray(rawSections) ? rawSections : [];
     if (!sections.length) {
       return `
         <div class="career-report-empty-grid">
@@ -469,16 +783,457 @@
               <div>
                 <p class="career-report-section-kicker">${esc(section.kicker || `Section ${index + 1}`)}</p>
                 <h3 class="career-report-section-title">${esc(section.title || "章节")}</h3>
-                <p class="career-report-section-summary">${formatText(section.summary || "")}</p>
+                ${section.summary ? `<p class="career-report-section-deck">${esc(truncateSummary(section.summary, 140))}</p>` : ""}
               </div>
             </div>
             ${renderMetricRow(section.metrics)}
             ${renderVisualization(section.visualization)}
             ${renderCardGrid(section.cards)}
+            ${section.summary ? `<div class="career-report-section-body">${formatText(section.summary)}</div>` : ""}
           </section>
         `).join("")}
       </div>
     `;
+  }
+
+  function renderReportSections4(bundle, sections) {
+    const navOrder = ["industry_analysis", "career_positioning", "resume_evidence", "competency_profile", "role_match", "path_plan"];
+    const navMeta = {
+      "industry_analysis":  { label: "行业分析",   icon: "📈", anchor: "cr-sec-industry",    kicker: "Industry Analyst",             accentClass: "cr-module-purple" },
+      "career_positioning": { label: "职业定位",   icon: "🎯", anchor: "cr-sec-positioning", kicker: "Career Positioning Advisor",   accentClass: "cr-module-blue" },
+      "resume_evidence":    { label: "简历证据",   icon: "📄", anchor: "cr-sec-resume",       kicker: "Resume Evidence Analyst",      accentClass: "cr-module-amber" },
+      "competency_profile": { label: "能力评估",   icon: "💡", anchor: "cr-sec-competency",   kicker: "Competency Assessor",          accentClass: "cr-module-green" },
+      "role_match":         { label: "岗位匹配",   icon: "🎯", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
+      "path_plan":          { label: "路径规划",   icon: "🛤️", anchor: "cr-sec-path",         kicker: "Career Path Planner",          accentClass: "cr-module-teal" },
+    };
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    function skillBar(label, pct, colorVar) {
+      const w = Math.min(100, Math.max(0, Number(pct) || 0));
+      return `
+        <div class="cr4-skill-item">
+          <div class="cr4-skill-header">
+            <span class="cr4-skill-name">${esc(label)}</span>
+            <span class="cr4-skill-score">${w}</span>
+          </div>
+          <div class="cr4-skill-bar">
+            <div class="cr4-skill-bar-fill" style="width:${w}%;background:${colorVar || "var(--cr4-primary)"};"></div>
+          </div>
+        </div>`;
+    }
+
+    function dimCard(icon, title, desc, pct, colorVar, accentClass) {
+      const w = Math.min(100, Math.max(0, Number(pct) || 0));
+      return `
+        <div class="cr4-dim-card">
+          <div class="cr4-dim-header">
+            <div class="cr4-dim-icon ${accentClass}">${icon}</div>
+            <div class="cr4-dim-score" style="color:${colorVar}">${w}</div>
+          </div>
+          <div class="cr4-dim-title">${esc(title)}</div>
+          <div class="cr4-dim-desc">${esc(desc)}</div>
+          <div class="cr4-dim-bar">
+            <div class="cr4-dim-bar-fill" style="width:${w}%;background:${colorVar};"></div>
+          </div>
+        </div>`;
+    }
+
+    function statCard(label, value, sub, accentClass) {
+      return `
+        <div class="cr4-stat-card ${accentClass}">
+          <div class="cr4-stat-label">${esc(label)}</div>
+          <div class="cr4-stat-value">${esc(String(value))}</div>
+          ${sub ? `<div class="cr4-stat-sub">${esc(sub)}</div>` : ""}
+        </div>`;
+    }
+
+    function gapPill(text, type) {
+      const cls = type === "urgent" ? "cr4-gap-urgent" : type === "warn" ? "cr4-gap-warn" : "cr4-gap-info";
+      const label = type === "urgent" ? "急需提升" : type === "warn" ? "需要提升" : "建议加强";
+      return `
+        <div class="cr4-gap-pill ${cls}">
+          <div class="cr4-gap-pill-label">${label}</div>
+          <div class="cr4-gap-pill-text">${esc(text)}</div>
+        </div>`;
+    }
+
+    function timelineItem(phase, title, period, desc, tags, state) {
+      return `
+        <div class="cr4-timeline-item ${state || "future"}">
+          <div class="cr4-timeline-dot"></div>
+          <div class="cr4-timeline-content">
+            <div class="cr4-timeline-phase">${esc(phase)}</div>
+            <div class="cr4-timeline-title">${esc(title)}</div>
+            ${period ? `<div class="cr4-timeline-period">${esc(period)}</div>` : ""}
+            ${desc ? `<div class="cr4-timeline-desc">${esc(desc)}</div>` : ""}
+            ${tags && tags.length ? `<div class="cr4-timeline-tags">${tags.map((t) => `<span class="cr4-tag">${esc(String(t))}</span>`).join("")}</div>` : ""}
+          </div>
+        </div>`;
+    }
+
+    // grade → 0-100 score for bar widths
+    function gradeToScore(level) {
+      return {"S": 96, "A": 85, "B": 70, "C": 55, "D": 35}[String(level).toUpperCase()] || 0;
+    }
+
+    // ── per-section body renderers ────────────────────────────────────────────
+
+    function renderIndustryBody(data) {
+      const hotDirs   = Array.isArray(data.hot_directions)   ? data.hot_directions.slice(0, 4)   : [];
+      const skillPrios = Array.isArray(data.skill_priorities) ? data.skill_priorities.slice(0, 6) : [];
+      const risks      = Array.isArray(data.risk_signals)     ? data.risk_signals.slice(0, 4)     : [];
+      const summary    = data.industry_summary || "";
+
+      const statCards = [
+        statCard("升温方向", hotDirs.length || "—", "个热点赛道", "cr4-ac-purple"),
+        statCard("高优先技能", skillPrios.filter((s) => s.importance === "高").length || skillPrios.length || "—", "项能力投资", "cr4-ac-blue"),
+        statCard("风险信号", risks.length || "—", "项待关注", "cr4-ac-amber"),
+      ];
+
+      const hotList = hotDirs.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">升温方向</div></div>
+          ${hotDirs.map((d) => `
+            <div class="cr4-row-item">
+              <span class="cr4-row-label">${esc(d.name || String(d))}</span>
+              <span class="cr4-badge ${d.confidence === "高" ? "cr4-badge-green" : d.confidence === "低" ? "cr4-badge-red" : "cr4-badge-amber"}">${esc(d.confidence || "中")}</span>
+            </div>`).join("")}
+        </div>` : "";
+
+      const skillList = skillPrios.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">能力投资优先级</div></div>
+          ${skillPrios.map((s) => skillBar(s.skill || String(s), s.importance === "高" ? 85 : s.importance === "低" ? 40 : 65,
+            s.importance === "高" ? "linear-gradient(90deg,var(--cr4-primary),var(--cr4-primary-light))" :
+            s.importance === "低" ? "linear-gradient(90deg,#94a3b8,#cbd5e1)" :
+            "linear-gradient(90deg,var(--cr4-secondary),#38bdf8)")).join("")}
+        </div>` : "";
+
+      const riskList = risks.length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">风险信号</div></div>
+          <div class="cr4-gap-grid">
+            ${risks.map((r, i) => gapPill(String(r), i === 0 ? "urgent" : "warn")).join("")}
+          </div>
+        </div>` : "";
+
+      return `
+        ${summary ? `<div class="cr4-summary-banner">${esc(summary)}</div>` : ""}
+        <div class="cr4-stat-row">${statCards.join("")}</div>
+        <div class="cr4-grid-2">${hotList}${skillList}</div>
+        ${riskList}`;
+    }
+
+    function renderPositioningBody(data) {
+      const tracks      = Array.isArray(data.recommended_tracks)       ? data.recommended_tracks      : [];
+      const hyps        = Array.isArray(data.hypotheses_for_evidence)  ? data.hypotheses_for_evidence : [];
+      const constraints = Array.isArray(data.constraints_hard)         ? data.constraints_hard        : [];
+      const summary     = data.user_intent_summary || "";
+
+      const trackCards = tracks.map((t, i) => `
+        <div class="cr4-track-card ${i === 0 ? "cr4-track-primary" : ""}">
+          <div class="cr4-track-priority">${i === 0 ? "P0 主推荐" : `P${i} 备选`}</div>
+          <div class="cr4-track-name">${esc(String(t))}</div>
+          ${hyps[i] ? `<div class="cr4-track-prove">须证明：${esc((hyps[i].must_prove || []).slice(0, 2).join("、"))}</div>` : ""}
+        </div>`).join("");
+
+      const constraintBlock = constraints.length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">硬约束</div></div>
+          <div class="cr4-gap-grid">
+            ${constraints.map((c) => gapPill(String(c), "warn")).join("")}
+          </div>
+        </div>` : "";
+
+      return `
+        ${summary ? `<div class="cr4-summary-banner">${esc(summary)}</div>` : ""}
+        <div class="cr4-stat-row">
+          ${statCard("推荐方向", tracks.length || "—", "条并行假设", "cr4-ac-purple")}
+          ${statCard("硬约束", constraints.length || "0", "项限制条件", "cr4-ac-amber")}
+          ${statCard("证据命题", hyps.reduce((n, h) => n + (h.must_prove || []).length, 0) || "—", "项待验证", "cr4-ac-blue")}
+        </div>
+        ${tracks.length ? `<div class="cr4-track-grid">${trackCards}</div>` : ""}
+        ${constraintBlock}`;
+    }
+
+    function renderResumeBody(data) {
+      const skills  = Array.isArray(data.technical_skills)    ? data.technical_skills.slice(0, 8)   : [];
+      const genComp = Array.isArray(data.general_competencies) ? data.general_competencies.slice(0, 6) : [];
+      const gaps    = Array.isArray(data.gaps)                 ? data.gaps.slice(0, 4)               : [];
+      const hyps    = Array.isArray(data.hypothesis_support)   ? data.hypothesis_support              : [];
+
+      const strengthCount = skills.filter((s) => s.strength === "strong").length;
+      const gapCount = gaps.length;
+
+      const skillBars = skills.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">专业技能证据</div><div class="cr4-card-sub">技术能力</div></div>
+          ${skills.map((s) => skillBar(s.skill || String(s),
+            s.strength === "strong" ? 88 : s.strength === "medium" ? 65 : 38,
+            s.strength === "strong" ? "linear-gradient(90deg,var(--cr4-primary),var(--cr4-primary-light))" :
+            s.strength === "medium" ? "linear-gradient(90deg,var(--cr4-secondary),#38bdf8)" :
+            "linear-gradient(90deg,#f59e0b,#fbbf24)")).join("")}
+        </div>` : "";
+
+      const genBars = genComp.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">通用能力证据</div><div class="cr4-card-sub">软技能</div></div>
+          ${genComp.map((g) => skillBar(g.competency || String(g),
+            g.strength === "strong" ? 85 : g.strength === "medium" ? 62 : 35,
+            "linear-gradient(90deg,var(--cr4-success),#34d399)")).join("")}
+        </div>` : "";
+
+      const gapBlock = gaps.length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">证据缺口</div></div>
+          <div class="cr4-gap-grid">
+            ${gaps.map((g, i) => gapPill(String(g.claim_in_resume || g.issue || g), i === 0 ? "urgent" : "warn")).join("")}
+          </div>
+        </div>` : "";
+
+      const hypBlock = hyps.length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">方向假设对齐</div></div>
+          ${hyps.map((h) => `
+            <div class="cr4-row-item">
+              <span class="cr4-row-label">${esc(h.track || "")}</span>
+              <span class="cr4-badge ${h.status === "supported" ? "cr4-badge-green" : h.status === "partial" ? "cr4-badge-amber" : h.status === "unsupported" ? "cr4-badge-red" : "cr4-badge-muted"}">
+                ${esc(h.status === "supported" ? "已支持" : h.status === "partial" ? "部分支持" : h.status === "unsupported" ? "不支持" : "待核实")}
+              </span>
+            </div>`).join("")}
+        </div>` : "";
+
+      return `
+        <div class="cr4-stat-row">
+          ${statCard("强证据", strengthCount || "—", "项可追溯", "cr4-ac-green")}
+          ${statCard("证据缺口", gapCount || "0", "项待补充", "cr4-ac-amber")}
+          ${statCard("通用能力", genComp.length || "—", "项", "cr4-ac-blue")}
+        </div>
+        <div class="cr4-grid-2">${skillBars}${genBars}</div>
+        ${gapBlock}
+        ${hypBlock}`;
+    }
+
+    function renderCompetencyBody(data) {
+      const dims     = data.dimensions || {};
+      const strengths = Array.isArray(data.strengths) ? data.strengths.slice(0, 4) : [];
+      const gaps     = Array.isArray(data.gaps)       ? data.gaps.slice(0, 4)      : [];
+
+      const DIM_CFG = [
+        { key: "professional_skills",       label: "专业技能",  icon: "📚", color: "var(--cr4-primary)",   accent: "cr4-dim-purple" },
+        { key: "general_ability",           label: "通用能力",  icon: "💻", color: "var(--cr4-secondary)", accent: "cr4-dim-blue"   },
+        { key: "communication_collaboration",label: "沟通协作", icon: "🤝", color: "var(--cr4-accent)",    accent: "cr4-dim-amber"  },
+        { key: "learning_agility",          label: "学习力",    icon: "🚀", color: "var(--cr4-success)",   accent: "cr4-dim-green"  },
+        { key: "execution",                 label: "执行力",    icon: "⚡", color: "var(--cr4-primary)",   accent: "cr4-dim-purple" },
+        { key: "practice_maturity",         label: "实践力",    icon: "🔧", color: "var(--cr4-secondary)", accent: "cr4-dim-blue"   },
+      ];
+
+      const dimCards = DIM_CFG.map((cfg) => {
+        const d = dims[cfg.key] || {};
+        const level = String(d.level || "unknown");
+        const score = gradeToScore(level);
+        const conf  = String(d.confidence || "low");
+        const confLabel = conf === "high" ? "高置信" : conf === "medium" ? "中置信" : "低置信/未知";
+        return dimCard(cfg.icon, cfg.label, `等级 ${level.toUpperCase()} · ${confLabel}`, score, cfg.color, cfg.accent);
+      }).join("");
+
+      const overallScore = (() => {
+        const scored = DIM_CFG.map((cfg) => gradeToScore((dims[cfg.key] || {}).level)).filter((s) => s > 0);
+        return scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0;
+      })();
+
+      const strengthBlock = strengths.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">核心优势</div></div>
+          ${strengths.map((s) => `<div class="cr4-row-item"><span class="cr4-row-label">✓ ${esc(String(s))}</span></div>`).join("")}
+        </div>` : "";
+
+      const gapBlock = gaps.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">短板与提升项</div></div>
+          ${gaps.map((g, i) => `
+            <div class="cr4-row-item">
+              <span class="cr4-row-label">${esc(g.dimension || String(g.id || ""))}</span>
+              <span class="cr4-badge ${g.severity === "high" ? "cr4-badge-red" : g.severity === "medium" ? "cr4-badge-amber" : "cr4-badge-muted"}">${esc(g.severity === "high" ? "高" : g.severity === "medium" ? "中" : "低")}</span>
+            </div>`).join("")}
+        </div>` : "";
+
+      return `
+        <div class="cr4-stat-row">
+          ${statCard("综合能力分", overallScore || "—", "基于证据推算", "cr4-ac-purple")}
+          ${statCard("核心优势", strengths.length || "—", "项", "cr4-ac-green")}
+          ${statCard("短板项", gaps.length || "0", "项待提升", "cr4-ac-amber")}
+        </div>
+        <div class="cr4-dim-grid">${dimCards}</div>
+        <div class="cr4-grid-2">${strengthBlock}${gapBlock}</div>`;
+    }
+
+    function renderMatchBody(data) {
+      const fitScore  = Number(data.fit_score || 0);
+      const fitBand   = String(data.fit_band || "not_ready");
+      const hardFails = Array.isArray(data.hard_failures) ? data.hard_failures.slice(0, 4) : [];
+      const gapsArr   = Array.isArray(data.partial_gaps)  ? data.partial_gaps.slice(0, 5)  : [];
+      const bandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || fitBand;
+      const bandClass = fitBand === "strong" ? "cr4-badge-green" : fitBand === "moderate" ? "cr4-badge-blue" : fitBand === "weak" ? "cr4-badge-amber" : "cr4-badge-red";
+      const scoreColor = fitScore >= 70 ? "#10b981" : fitScore >= 50 ? "#f59e0b" : "#ef4444";
+      const circum = 2 * Math.PI * 54;
+      const offset = circum * (1 - fitScore / 100);
+
+      const scoreRing = `
+        <div class="cr4-card cr4-match-score-card">
+          <div class="cr4-card-title" style="margin-bottom:16px">综合契合度</div>
+          <div class="cr4-match-circle">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="54" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+              <circle cx="70" cy="70" r="54" fill="none" stroke="${scoreColor}" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="${circum.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+                transform="rotate(-90 70 70)"/>
+              <defs>
+                <linearGradient id="cr4matchGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="${scoreColor}"/>
+                  <stop offset="100%" stop-color="${scoreColor}88"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="cr4-match-circle-text">
+              <div class="cr4-match-circle-value" style="color:${scoreColor}">${fitScore}</div>
+              <div class="cr4-match-circle-unit">/ 100</div>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div style="font-size:14px;font-weight:600;margin-bottom:6px">${esc(data.target_role || "目标岗位")}</div>
+            <span class="cr4-badge ${bandClass}">${esc(bandLabel)}</span>
+          </div>
+          <div class="cr4-match-details">
+            <div class="cr4-match-detail"><div class="cr4-match-detail-label">硬门槛缺口</div><div class="cr4-match-detail-val" style="color:var(--cr4-danger)">${hardFails.length}</div></div>
+            <div class="cr4-match-detail"><div class="cr4-match-detail-label">待补强项</div><div class="cr4-match-detail-val" style="color:var(--cr4-accent)">${gapsArr.length}</div></div>
+          </div>
+        </div>`;
+
+      const hardBlock = hardFails.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">硬门槛缺口</div></div>
+          <div class="cr4-gap-grid">
+            ${hardFails.map((f) => gapPill(String(f), "urgent")).join("")}
+          </div>
+        </div>` : "";
+
+      const gapBlock = gapsArr.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">待补强项</div></div>
+          ${gapsArr.map((g) => `
+            <div class="cr4-row-item">
+              <span class="cr4-row-label">${esc(g.requirement || String(g))}</span>
+              <span class="cr4-badge cr4-badge-amber">${esc(g.remediation_type || "待补充")}</span>
+            </div>`).join("")}
+        </div>` : "";
+
+      return `
+        <div class="cr4-match-layout">
+          ${scoreRing}
+          <div class="cr4-match-right">
+            ${hardBlock}
+            ${gapBlock}
+          </div>
+        </div>`;
+    }
+
+    function renderPathBody(data) {
+      const milestones = Array.isArray(data.milestones)    ? data.milestones    : [];
+      const visions    = Array.isArray(data.vision_roles)  ? data.vision_roles  : [];
+      const contin     = Array.isArray(data.contingency)   ? data.contingency   : [];
+      const hardMust   = ((data.dependencies || {}).must_resolve_hard_failures || []);
+
+      const timelineHtml = milestones.length ? milestones.slice(0, 5).map((m, i) => {
+        const stateClass = i === 0 ? "current" : "future";
+        return timelineItem(
+          m.horizon || `阶段${i + 1}`,
+          m.title || "",
+          "",
+          (m.actions || []).slice(0, 2).join("；"),
+          m.metrics || [],
+          stateClass
+        );
+      }).join("") : "";
+
+      const visionBlock = visions.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">长期愿景角色</div></div>
+          ${visions.map((v, i) => `
+            <div class="cr4-row-item">
+              <span class="cr4-badge ${i === 0 ? "cr4-badge-purple" : "cr4-badge-blue"}">${i === 0 ? "主目标" : "远期"}</span>
+              <span class="cr4-row-label">${esc(String(v))}</span>
+            </div>`).join("")}
+        </div>` : "";
+
+      const continBlock = contin.length ? `
+        <div class="cr4-card">
+          <div class="cr4-card-header"><div class="cr4-card-title">B 计划 / 应急</div></div>
+          ${contin.map((c) => `<div class="cr4-row-item"><span class="cr4-row-label">· ${esc(String(c))}</span></div>`).join("")}
+        </div>` : "";
+
+      const hardBlock = hardMust.length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">必须先解决的硬门槛</div></div>
+          <div class="cr4-gap-grid">
+            ${hardMust.map((h) => gapPill(String(h), "urgent")).join("")}
+          </div>
+        </div>` : "";
+
+      return `
+        <div class="cr4-stat-row">
+          ${statCard("里程碑", milestones.length || "—", "个阶段", "cr4-ac-blue")}
+          ${statCard("长期角色", visions.length || "—", "个愿景", "cr4-ac-purple")}
+          ${statCard("B计划", contin.length || "—", "条应急", "cr4-ac-green")}
+        </div>
+        <div class="cr4-grid-2">
+          ${timelineHtml ? `<div class="cr4-card cr4-card-full"><div class="cr4-card-header"><div class="cr4-card-title">成长路径时间线</div></div><div class="cr4-timeline">${timelineHtml}</div></div>` : ""}
+        </div>
+        <div class="cr4-grid-2">${visionBlock}${continBlock}</div>
+        ${hardBlock}`;
+    }
+
+    // ── render all sections ───────────────────────────────────────────────────
+
+    const bodyRenderers = {
+      industry_analysis:  renderIndustryBody,
+      career_positioning: renderPositioningBody,
+      resume_evidence:    renderResumeBody,
+      competency_profile: renderCompetencyBody,
+      role_match:         renderMatchBody,
+      path_plan:          renderPathBody,
+    };
+
+    const sectionHtml = navOrder.map((key, idx) => {
+      const sec  = sections[key];
+      const meta = navMeta[key];
+      if (!sec) return "";
+      const markdown = String(sec.markdown || "").trim();
+      const data     = sec.data || {};
+      const renderer = bodyRenderers[key];
+      const body     = renderer ? renderer(data) : "";
+
+      return `
+        <section id="${meta.anchor}" class="cr4-module ${meta.accentClass}">
+          <div class="cr4-module-head">
+            <div class="cr4-module-icon">${meta.icon}</div>
+            <div class="cr4-module-titles">
+              <div class="cr4-module-kicker">${esc(meta.kicker)}</div>
+              <h3 class="cr4-module-title">${esc(meta.label)}</h3>
+            </div>
+            <div class="cr4-module-num">${String(idx + 1).padStart(2, "0")}</div>
+          </div>
+          <div class="cr4-module-body">${body}</div>
+          ${markdown ? `
+            <details class="cr4-module-detail">
+              <summary>查看完整分析文本</summary>
+              <div class="cr4-module-markdown">${renderMarkdownBasic(markdown)}</div>
+            </details>` : `<p class="cr4-module-empty">该模块尚未生成内容</p>`}
+        </section>`;
+    }).filter(Boolean).join("");
+
+    return `<div class="cr4-report-modules">${sectionHtml}</div>`;
   }
 
   function renderHistoricalNotice() {
@@ -505,6 +1260,7 @@
           <span>生成时间：${esc(meta.generated_at || "--")}</span>
         </div>
       </section>
+      ${renderReportFeedbackCard()}
     `;
   }
 
@@ -565,7 +1321,9 @@
       ? (state?.error_message || "请检查画像输入和模型配置后重试。")
       : (status === "queued" || status === "running")
         ? (state?.stage_detail || state?.summary || "后台正在按阶段生成职业报告，请稍候。")
-        : (bundle?.meta?.summary || state?.summary || "当前展示的是已完成的职业报告。");
+        : (bundle?.report_document
+          ? "报告已生成并加载新版式正文。请向下滚动阅读摘要与章节，或使用「全屏查看」。"
+          : (bundle?.meta?.summary || state?.summary || "当前展示的是已完成的职业报告。"));
 
     host.innerHTML = `
       <div class="career-report-banner-main ${toneClass}">
@@ -582,17 +1340,165 @@
     `;
   }
 
+  function renderReportFeedbackCard() {
+    const feedback = getCareerReportFeedback();
+    const selectedVerdict = reportRuntime.feedbackVerdict || feedback?.latest_verdict || "partial";
+    const noteValue = reportRuntime.feedbackNote || "";
+    const summary = String(
+      feedback?.summary
+      || "标记本版是否准确。你的反馈会被写入下次职业报告生成链路。"
+    ).trim();
+    const latestMeta = feedback?.count
+      ? `最近一次：${getFeedbackVerdictLabel(feedback?.latest_verdict)}${feedback?.last_updated ? ` · ${feedback.last_updated}` : ""}`
+      : "还没有记录过纠偏反馈。";
+
+    return `
+      <section class="career-report-side-card">
+        <p class="career-report-side-kicker">Feedback Loop</p>
+        <h3 class="career-report-side-title">纠偏反馈</h3>
+        <p class="career-report-side-copy">${formatText(summary)}</p>
+        <div class="career-report-feedback-actions" data-report-feedback-root="1">
+          ${[
+            ["accurate", "基本准确"],
+            ["partial", "部分准确"],
+            ["off_target", "明显偏差"]
+          ].map(([value, label]) => `
+            <button
+              type="button"
+              class="career-report-feedback-pill${selectedVerdict === value ? " active" : ""}"
+              data-report-feedback-verdict="${esc(value)}"
+            >${esc(label)}</button>
+          `).join("")}
+        </div>
+        <textarea
+          class="career-report-feedback-input"
+          data-report-feedback-note="1"
+          rows="4"
+          placeholder="补充哪里不准、漏了什么，或者哪些判断值得保留。"
+        >${esc(noteValue)}</textarea>
+        <div class="career-report-feedback-foot">
+          <span class="career-report-feedback-meta">${esc(latestMeta)}</span>
+          <button type="button" class="career-report-primary-btn career-report-feedback-submit" data-report-feedback-submit="1">保存反馈</button>
+        </div>
+      </section>
+    `;
+  }
+
+  async function submitCareerReportFeedback(verdict, note) {
+    const bundle = window.appState?.careerReport || null;
+    const payload = await requestJsonSafe("/api/career-report/feedback", {
+      method: "POST",
+      body: {
+        verdict,
+        note,
+        report_id: bundle?.meta?.report_id || "",
+        focus_role_id: bundle?.meta?.focus_role_id || "",
+        focus_role_name: bundle?.report_document?.focus_role_name || ""
+      }
+    });
+    reportRuntime.feedbackVerdict = payload?.feedback?.latest_verdict || verdict;
+    reportRuntime.feedbackNote = "";
+    applyCareerReportState(undefined, getCareerReportTracker(), payload.state || getCareerReportStateSafe(), {
+      keepBundle: true,
+      historical: Boolean(window.appState?.careerReportViewingHistorical),
+      userCenterRefresh: true
+    });
+    return payload;
+  }
+
+  function bindCareerReportFeedbackHandlers(root) {
+    if (!root || typeof root.querySelector !== "function") return;
+    const feedbackNoteInput = root.querySelector("[data-report-feedback-note]");
+    if (feedbackNoteInput) {
+      feedbackNoteInput.addEventListener("input", () => {
+        reportRuntime.feedbackNote = feedbackNoteInput.value || "";
+      });
+    }
+    root.querySelectorAll("[data-report-feedback-verdict]").forEach((button) => {
+      button.addEventListener("click", () => {
+        reportRuntime.feedbackVerdict = String(button.dataset.reportFeedbackVerdict || "partial").trim() || "partial";
+        root.querySelectorAll("[data-report-feedback-verdict]").forEach((item) => {
+          item.classList.toggle("active", item === button);
+        });
+      });
+    });
+    const feedbackSubmitButton = root.querySelector("[data-report-feedback-submit]");
+    if (feedbackSubmitButton) {
+      feedbackSubmitButton.addEventListener("click", async () => {
+        const verdict = reportRuntime.feedbackVerdict || getCareerReportFeedback()?.latest_verdict || "partial";
+        const note = String(feedbackNoteInput?.value || reportRuntime.feedbackNote || "").trim();
+        try {
+          await submitCareerReportFeedback(verdict, note);
+          if (feedbackNoteInput) feedbackNoteInput.value = "";
+          toast("反馈已记录", "下一次生成职业报告时会优先吸收这条纠偏信息。", "success", 2200);
+        } catch (error) {
+          toast("反馈保存失败", error.message || "请稍后重试。", "error", 2200);
+        }
+      });
+    }
+  }
+
+  // section definitions for nav
+  const SECTION_NAV = [
+    { key: "industry_analysis",  label: "行业分析",   icon: "📈", anchor: "cr-sec-industry" },
+    { key: "career_positioning", label: "职业定位",   icon: "🎯", anchor: "cr-sec-positioning" },
+    { key: "resume_evidence",    label: "简历证据",   icon: "📄", anchor: "cr-sec-resume" },
+    { key: "competency_profile", label: "能力评估",   icon: "💡", anchor: "cr-sec-competency" },
+    { key: "role_match",         label: "岗位匹配",   icon: "🔗", anchor: "cr-sec-match" },
+    { key: "path_plan",          label: "路径规划",   icon: "🛤️", anchor: "cr-sec-path" },
+  ];
+
+  function isModularBundle(bundle) {
+    const sections = bundle?.report_document?.sections;
+    return sections && !Array.isArray(sections) && typeof sections === "object";
+  }
+
   function renderReportAside() {
     const aside = document.getElementById("careerReportAside");
     if (!aside) return;
 
+    const state = getCareerReportStateSafe();
+    const status = String(state?.status || "").trim().toLowerCase();
+    const generating = status === "queued" || status === "running";
+    if (generating) {
+      aside.innerHTML = "";
+      return;
+    }
+
     const bundle = window.appState?.careerReport || null;
     const tracker = getCareerReportTracker();
-    const state = getCareerReportStateSafe();
     const progress = Array.isArray(state?.progress) ? state.progress : getDefaultStageProgress();
     const outline = Array.isArray(bundle?.report_document?.outline) ? bundle.report_document.outline : [];
     const roleRankings = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 5) : [];
     const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || window.jobNameMap?.[window.appState?.focusedRoleId] || window.appState?.focusedRoleId || "待识别";
+    const isModular = isModularBundle(bundle);
+
+    // Build module nav for modular reports
+    const moduleNavHtml = isModular ? `
+      <section class="career-report-side-card">
+        <p class="career-report-side-kicker">Report Modules</p>
+        <h3 class="career-report-side-title">报告模块</h3>
+        <nav class="cr4-module-nav">
+          ${SECTION_NAV.map((sec) => {
+            const hasData = Boolean(bundle?.report_document?.sections?.[sec.key]?.markdown);
+            return `
+              <button type="button" class="cr4-module-nav-btn${hasData ? "" : " muted"}"
+                data-report-scroll-target="${sec.anchor}">
+                <span class="cr4-module-nav-icon">${sec.icon}</span>
+                <span>${esc(sec.label)}</span>
+                ${hasData ? "" : '<span class="cr4-module-nav-empty">待生成</span>'}
+              </button>
+            `;
+          }).join("")}
+        </nav>
+      </section>
+    ` : "";
+
+    // v2: show match score if available
+    const matchOutput = bundle?.match_output || {};
+    const fitScore = Number(matchOutput.fit_score || bundle?.role_rankings?.[0]?.overall_score || 0);
+    const fitBand = String(matchOutput.fit_band || "");
+    const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || "--";
 
     aside.innerHTML = `
       <section class="career-report-side-card primary">
@@ -605,8 +1511,8 @@
             <strong>${esc(focusRole)}</strong>
           </article>
           <article>
-            <span>报告版本</span>
-            <strong>${esc(bundle?.meta?.version || tracker?.report_version || "--")}</strong>
+            <span>${v2 ? "人岗契合" : "报告版本"}</span>
+            <strong>${v2 ? esc(`${fitScore}% · ${fitBandLabel}`) : esc(bundle?.meta?.version || tracker?.report_version || "--")}</strong>
           </article>
           <article>
             <span>完成度</span>
@@ -614,6 +1520,7 @@
           </article>
         </div>
       </section>
+      ${moduleNavHtml}
       <section class="career-report-side-card">
         <p class="career-report-side-kicker">Pipeline</p>
         <h3 class="career-report-side-title">生成进度</h3>
@@ -629,6 +1536,7 @@
           }).join("")}
         </div>
       </section>
+      ${!v2 ? `
       <section class="career-report-side-card">
         <p class="career-report-side-kicker">Outline</p>
         <h3 class="career-report-side-title">章节导航</h3>
@@ -645,7 +1553,7 @@
             </div>
           `}
         </div>
-      </section>
+      </section>` : ""}
       <section class="career-report-side-card">
         <p class="career-report-side-kicker">Top Roles</p>
         <h3 class="career-report-side-title">当前候选岗位</h3>
@@ -674,6 +1582,8 @@
         window.setCareerReportFocusRole(roleId);
       });
     });
+
+    bindCareerReportFeedbackHandlers(aside);
   }
 
   function renderReportMain() {
@@ -684,6 +1594,13 @@
     const tracker = getCareerReportTracker();
     const state = getCareerReportStateSafe();
     const progress = Array.isArray(state?.progress) ? state.progress : getDefaultStageProgress();
+    const status = String(state?.status || "").trim().toLowerCase();
+    const generating = status === "queued" || status === "running";
+
+    if (generating) {
+      main.innerHTML = renderReportGenerationMain(state, progress);
+      return;
+    }
 
     if (!bundle || !bundle.report_document) {
       main.innerHTML = renderEmptyReportMain();
@@ -692,8 +1609,7 @@
 
     main.innerHTML = `
       ${renderHistoricalNotice()}
-      ${renderReportHero(bundle, tracker)}
-      ${renderReportProgressCards(progress)}
+      ${renderReportMagazineLayout(bundle, tracker)}
       ${renderReportSections(bundle)}
     `;
 
@@ -702,6 +1618,7 @@
         void window.restoreLatestCareerReportView();
       });
     });
+    bindCareerReportFeedbackHandlers(main);
   }
 
   function cycleTrackerStatus(itemType, currentStatus) {
@@ -822,8 +1739,11 @@
 
     if (main) {
       main.innerHTML = bundle && bundle.report_document
-        ? `${renderHistoricalNotice()}${renderReportHero(bundle, tracker)}${renderReportSections(bundle)}`
+        ? `${renderHistoricalNotice()}${renderReportMagazineLayout(bundle, tracker)}${renderReportSections(bundle)}`
         : renderEmptyReportMain();
+      if (bundle && bundle.report_document) {
+        bindCareerReportFeedbackHandlers(main);
+      }
     }
 
     overlay.querySelectorAll("[data-rv-target]").forEach((button) => {
@@ -845,6 +1765,13 @@
 
   function renderCareerReportPanels() {
     renderStatusBanner();
+    const state = getCareerReportStateSafe();
+    const status = String(state?.status || "").trim().toLowerCase();
+    const generating = status === "queued" || status === "running";
+    const layout = document.querySelector("#report-workspace .career-report-layout");
+    if (layout) {
+      layout.classList.toggle("career-report-layout--generating", generating);
+    }
     renderReportAside();
     renderReportMain();
     renderReportViewer();

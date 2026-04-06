@@ -468,7 +468,7 @@
                 <div class="mt-5 flex flex-wrap gap-3">
                     <button onclick="openCareerInterviewModal()" class="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-cyan-50 transition-all">开始职业访谈</button>
                 </div>
-                <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">访谈完成后会自动更新下方画像摘要、工作价值观和推荐方向。</p>
+                <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">点击开始后会在本页展开工作台（不再遮挡整屏），可上下滚动对照说明与下方「访谈结果」。</p>
             </div>
             <div>
                 <p class="text-sm font-semibold text-white mb-3">维度推进</p>
@@ -484,6 +484,146 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="careerInterviewModal" class="career-interview-modal hidden" role="region" aria-label="职业访谈工作台">
+        <div class="career-interview-shell">
+            <aside class="career-interview-side">
+                <div class="career-interview-side-head">
+                    <div>
+                        <p class="career-interview-side-kicker">访谈引导</p>
+                        <h3 class="career-interview-side-title">职业访谈采集台</h3>
+                        <p class="career-interview-side-copy">先选一条线索，再补一句真实经历。访谈结果会直接进入统一画像、岗位匹配和规划报告。</p>
+                    </div>
+                    <button type="button" class="career-close-btn" onclick="closeCareerInterviewModal()" aria-label="收起职业访谈工作台">&times;</button>
+                </div>
+
+                <div class="career-side-panel career-side-panel-spotlight">
+                    <p class="career-summary-label">当前聚焦</p>
+                    <div class="career-interview-focus-row">
+                        <div>
+                            <span class="career-focus-label">主题</span>
+                            <strong id="careerInterviewModalFocus">职业兴趣</strong>
+                        </div>
+                        <div class="career-focus-progress">
+                            <span class="career-focus-label">进度</span>
+                            <strong id="careerInterviewModalProgress">0%</strong>
+                        </div>
+                    </div>
+                    <div id="careerInterviewModalDimensionProgress" class="career-progress-grid career-progress-grid-compact"></div>
+                </div>
+
+                <div class="career-side-panel">
+                    <p class="career-summary-label">模型状态</p>
+                    <div class="career-config-status-row">
+                        <span>当前模型</span>
+                        <span id="careerInterviewConfigStatus">未配置</span>
+                    </div>
+                    <p class="career-interview-side-copy">系统会统一驱动追问逻辑。你只需要讲清偏好、经历和选择依据。</p>
+                    <div class="career-config-actions">
+                        <button type="button" onclick="openSettingsPanel()" class="career-secondary-btn">API 配置</button>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="career-interview-main">
+                <div class="career-interview-main-head">
+                    <div>
+                        <p class="career-interview-main-kicker">访谈工作台</p>
+                        <h3 class="career-interview-main-title">从一个真实场景开始，比空白输入更容易说清楚</h3>
+                        <p class="career-interview-main-copy">这里不是普通聊天框，而是一块带引导的访谈板。系统会先帮你起头，再围绕你的回答继续追问。</p>
+                    </div>
+                    <div class="career-chat-toolbar">
+                        <button id="careerInterviewStartBtn" type="button" onclick="startCareerInterview()" class="career-primary-btn">立即开始访谈</button>
+                        <button type="button" onclick="clearCareerInterviewSession()" class="career-secondary-btn">清空当前访谈</button>
+                    </div>
+                </div>
+
+                <section class="career-interview-playbook">
+                    <div class="career-interview-playbook-head">
+                        <div class="career-interview-playbook-copy">
+                            <p class="career-interview-main-kicker">访谈建议</p>
+                            <h4 id="careerInterviewPromptHeadline" class="career-interview-playbook-title">先从一个最贴近你的场景开始</h4>
+                            <p id="careerInterviewPromptBody" class="career-interview-playbook-body">点一下场景卡或快捷标签，系统会帮你把第一句话写进输入框。</p>
+                        </div>
+                        <div class="career-interview-current-card">
+                            <span class="career-interview-section-label">当前问题</span>
+                            <p id="careerInterviewCurrentQuestion" class="career-interview-question-text">模型就绪后，会先给你一个更容易回答的起始问题。</p>
+                        </div>
+                    </div>
+
+                    <div class="career-interview-playbook-grid">
+                        <article class="career-interview-step-card">
+                            <span class="career-interview-step-index">1</span>
+                            <div>
+                                <strong>先选一个场景</strong>
+                                <p>不要一上来回答“我适合什么工作”，先从你想靠近的职业画面开始。</p>
+                            </div>
+                        </article>
+                        <article class="career-interview-step-card">
+                            <span class="career-interview-step-index">2</span>
+                            <div>
+                                <strong>再点一个标签</strong>
+                                <p>用快捷标签把话头带起来，再补一句“为什么”，会比空白输入更自然。</p>
+                            </div>
+                        </article>
+                        <article class="career-interview-step-card">
+                            <span class="career-interview-step-index">3</span>
+                            <div>
+                                <strong>尽量举真实经历</strong>
+                                <p>越接近项目、任务、选择依据和实际行动，最终画像就越稳定。</p>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="career-interview-answer-note">
+                        <span class="career-interview-section-label">回答提示</span>
+                        <p id="careerInterviewGuideText" class="career-interview-guide-text">先点一个场景，再补一句“为什么会被它吸引”，比空白输入更容易说清楚。</p>
+                    </div>
+                </section>
+
+                <section class="career-interview-scene-board">
+                    <div class="career-interview-section-head">
+                        <div>
+                            <p class="career-interview-main-kicker">场景入口</p>
+                            <h4 class="career-block-title">探索场景</h4>
+                        </div>
+                        <p class="career-chat-hint">把模糊兴趣先变成具体画面。</p>
+                    </div>
+                    <div id="careerInterviewSceneGrid" class="career-scene-grid"></div>
+                </section>
+
+                <section class="career-interview-chip-board">
+                    <div class="career-interview-section-head">
+                        <div>
+                            <p class="career-interview-main-kicker">快捷开场</p>
+                            <h4 class="career-block-title">快捷标签</h4>
+                        </div>
+                        <p class="career-chat-hint">适合先说关键词，再往下补充原因。</p>
+                    </div>
+                    <div id="careerInterviewQuickChips" class="career-quick-chip-row"></div>
+                </section>
+
+                <div id="careerInterviewMessages" class="career-chat-thread"></div>
+                <p id="careerInterviewHint" class="career-chat-hint">模型就绪后可开始访谈。</p>
+
+                <div id="careerInterviewComposer" class="career-chat-composer hidden">
+                    <div class="career-chat-toolbar career-chat-toolbar-stack">
+                        <div class="career-chat-toolbar-copy">
+                            <span class="career-interview-section-label">输入你的回答</span>
+                            <p class="career-chat-hint">可以先用上面的场景卡或快捷标签起头，再补一段真实经历。</p>
+                        </div>
+                        <button id="careerInterviewVoiceBtn" type="button" class="career-secondary-btn career-voice-btn" onclick="toggleCareerInterviewVoice()">语音输入</button>
+                    </div>
+                    <div id="careerInterviewSelectedScene" class="career-chat-anchor hidden"></div>
+                    <textarea id="careerInterviewInput" rows="4" onkeydown="handleCareerInterviewInputKeydown(event)" class="career-chat-textarea" placeholder="输入你的回答，尽量给出真实经历、具体任务或行动证据。"></textarea>
+                    <div class="career-chat-composer-actions">
+                        <button type="button" onclick="finishCareerInterview()" class="career-secondary-btn">完成访谈</button>
+                        <button id="careerInterviewSendBtn" type="button" onclick="submitCareerInterviewAnswer()" class="career-primary-btn">发送并继续</button>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 
@@ -776,146 +916,6 @@
             </div>
         </div>
     </details>
-    </div>
-
-    <div id="careerInterviewModal" class="career-interview-modal hidden" onclick="handleCareerInterviewOverlayClick(event)">
-        <div class="career-interview-shell" role="dialog" aria-modal="true" aria-label="职业访谈工作台">
-            <aside class="career-interview-side">
-                <div class="career-interview-side-head">
-                    <div>
-                        <p class="career-interview-side-kicker">访谈引导</p>
-                        <h3 class="career-interview-side-title">职业访谈采集台</h3>
-                        <p class="career-interview-side-copy">先选一条线索，再补一句真实经历。访谈结果会直接进入统一画像、岗位匹配和规划报告。</p>
-                    </div>
-                    <button type="button" class="career-close-btn" onclick="closeCareerInterviewModal()" aria-label="关闭访谈窗口">&times;</button>
-                </div>
-
-                <div class="career-side-panel career-side-panel-spotlight">
-                    <p class="career-summary-label">当前聚焦</p>
-                    <div class="career-interview-focus-row">
-                        <div>
-                            <span class="career-focus-label">主题</span>
-                            <strong id="careerInterviewModalFocus">职业兴趣</strong>
-                        </div>
-                        <div class="career-focus-progress">
-                            <span class="career-focus-label">进度</span>
-                            <strong id="careerInterviewModalProgress">0%</strong>
-                        </div>
-                    </div>
-                    <div id="careerInterviewModalDimensionProgress" class="career-progress-grid career-progress-grid-compact"></div>
-                </div>
-
-                <div class="career-side-panel">
-                    <p class="career-summary-label">模型状态</p>
-                    <div class="career-config-status-row">
-                        <span>当前模型</span>
-                        <span id="careerInterviewConfigStatus">未配置</span>
-                    </div>
-                    <p class="career-interview-side-copy">系统会统一驱动追问逻辑。你只需要讲清偏好、经历和选择依据。</p>
-                    <div class="career-config-actions">
-                        <button type="button" onclick="openSettingsPanel()" class="career-secondary-btn">API 配置</button>
-                    </div>
-                </div>
-            </aside>
-
-            <main class="career-interview-main">
-                <div class="career-interview-main-head">
-                    <div>
-                        <p class="career-interview-main-kicker">访谈工作台</p>
-                        <h3 class="career-interview-main-title">从一个真实场景开始，比空白输入更容易说清楚</h3>
-                        <p class="career-interview-main-copy">这里不是普通聊天框，而是一块带引导的访谈板。系统会先帮你起头，再围绕你的回答继续追问。</p>
-                    </div>
-                    <div class="career-chat-toolbar">
-                        <button id="careerInterviewStartBtn" type="button" onclick="startCareerInterview()" class="career-primary-btn">立即开始访谈</button>
-                        <button type="button" onclick="clearCareerInterviewSession()" class="career-secondary-btn">清空当前访谈</button>
-                    </div>
-                </div>
-
-                <section class="career-interview-playbook">
-                    <div class="career-interview-playbook-head">
-                        <div class="career-interview-playbook-copy">
-                            <p class="career-interview-main-kicker">访谈建议</p>
-                            <h4 id="careerInterviewPromptHeadline" class="career-interview-playbook-title">先从一个最贴近你的场景开始</h4>
-                            <p id="careerInterviewPromptBody" class="career-interview-playbook-body">点一下场景卡或快捷标签，系统会帮你把第一句话写进输入框。</p>
-                        </div>
-                        <div class="career-interview-current-card">
-                            <span class="career-interview-section-label">当前问题</span>
-                            <p id="careerInterviewCurrentQuestion" class="career-interview-question-text">模型就绪后，会先给你一个更容易回答的起始问题。</p>
-                        </div>
-                    </div>
-
-                    <div class="career-interview-playbook-grid">
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">1</span>
-                            <div>
-                                <strong>先选一个场景</strong>
-                                <p>不要一上来回答“我适合什么工作”，先从你想靠近的职业画面开始。</p>
-                            </div>
-                        </article>
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">2</span>
-                            <div>
-                                <strong>再点一个标签</strong>
-                                <p>用快捷标签把话头带起来，再补一句“为什么”，会比空白输入更自然。</p>
-                            </div>
-                        </article>
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">3</span>
-                            <div>
-                                <strong>尽量举真实经历</strong>
-                                <p>越接近项目、任务、选择依据和实际行动，最终画像就越稳定。</p>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div class="career-interview-answer-note">
-                        <span class="career-interview-section-label">回答提示</span>
-                        <p id="careerInterviewGuideText" class="career-interview-guide-text">先点一个场景，再补一句“为什么会被它吸引”，比空白输入更容易说清楚。</p>
-                    </div>
-                </section>
-
-                <section class="career-interview-scene-board">
-                    <div class="career-interview-section-head">
-                        <div>
-                            <p class="career-interview-main-kicker">场景入口</p>
-                            <h4 class="career-block-title">探索场景</h4>
-                        </div>
-                        <p class="career-chat-hint">把模糊兴趣先变成具体画面。</p>
-                    </div>
-                    <div id="careerInterviewSceneGrid" class="career-scene-grid"></div>
-                </section>
-
-                <section class="career-interview-chip-board">
-                    <div class="career-interview-section-head">
-                        <div>
-                            <p class="career-interview-main-kicker">快捷开场</p>
-                            <h4 class="career-block-title">快捷标签</h4>
-                        </div>
-                        <p class="career-chat-hint">适合先说关键词，再往下补充原因。</p>
-                    </div>
-                    <div id="careerInterviewQuickChips" class="career-quick-chip-row"></div>
-                </section>
-
-                <div id="careerInterviewMessages" class="career-chat-thread"></div>
-                <p id="careerInterviewHint" class="career-chat-hint">模型就绪后可开始访谈。</p>
-
-                <div id="careerInterviewComposer" class="career-chat-composer hidden">
-                    <div class="career-chat-toolbar career-chat-toolbar-stack">
-                        <div class="career-chat-toolbar-copy">
-                            <span class="career-interview-section-label">输入你的回答</span>
-                            <p class="career-chat-hint">可以先用上面的场景卡或快捷标签起头，再补一段真实经历。</p>
-                        </div>
-                        <button id="careerInterviewVoiceBtn" type="button" class="career-secondary-btn career-voice-btn" onclick="toggleCareerInterviewVoice()">语音输入</button>
-                    </div>
-                    <div id="careerInterviewSelectedScene" class="career-chat-anchor hidden"></div>
-                    <textarea id="careerInterviewInput" rows="4" onkeydown="handleCareerInterviewInputKeydown(event)" class="career-chat-textarea" placeholder="输入你的回答，尽量给出真实经历、具体任务或行动证据。"></textarea>
-                    <div class="career-chat-composer-actions">
-                        <button type="button" onclick="finishCareerInterview()" class="career-secondary-btn">完成访谈</button>
-                        <button id="careerInterviewSendBtn" type="button" onclick="submitCareerInterviewAnswer()" class="career-primary-btn">发送并继续</button>
-                    </div>
-                </div>
-            </main>
-        </div>
     </div>
 
     <div id="resumeReportModal" class="resume-report-modal hidden" onclick="handleResumeReportOverlayClick(event)">
