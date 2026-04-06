@@ -103,6 +103,12 @@
                     <button onclick="showSection('report')" data-section="report" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
                         📋 规划报告
                     </button>
+                    <button onclick="showSection('forum')" data-section="forum" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
+                        ☕ Offer 茶水间
+                    </button>
+                    <button onclick="showSection('qa')" data-section="qa" class="nav-item px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0">
+                        🔍 职业问答
+                    </button>
                 </div>
 
                 <!-- 右侧操作区：紧凑布局 -->
@@ -135,6 +141,8 @@
         {% include "sections/profile.html" %}
         {% include "sections/matching.html" %}
         {% include "sections/report.html" %}
+        {% include "sections/forum.html" %}
+        {% include "sections/qa.html" %}
 
     </main>
 

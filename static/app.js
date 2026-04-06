@@ -100,6 +100,34 @@ const liveActivityTemplates = [
   "System detected new job trend changes"
 ];
 
+const COMMUNITY_FORUM_BOARD_META = {
+  all: { label: "全部", icon: "全", chip: "bg-slate-100 text-slate-700 border-slate-200", soft: "bg-slate-50 text-slate-600" },
+  "面经互助": { label: "面经互助", icon: "面", chip: "bg-rose-100 text-rose-700 border-rose-200", soft: "bg-rose-50 text-rose-700" },
+  "简历门诊": { label: "简历门诊", icon: "简", chip: "bg-sky-100 text-sky-700 border-sky-200", soft: "bg-sky-50 text-sky-700" },
+  "实习内推": { label: "实习内推", icon: "推", chip: "bg-amber-100 text-amber-700 border-amber-200", soft: "bg-amber-50 text-amber-700" },
+  "选岗热议": { label: "选岗热议", icon: "岗", chip: "bg-emerald-100 text-emerald-700 border-emerald-200", soft: "bg-emerald-50 text-emerald-700" },
+  "职场日常": { label: "职场日常", icon: "聊", chip: "bg-violet-100 text-violet-700 border-violet-200", soft: "bg-violet-50 text-violet-700" }
+};
+
+const communityForumState = {
+  loading: false,
+  loaded: false,
+  posts: [],
+  boards: [],
+  hotTags: [],
+  stats: {
+    threads: 0,
+    today_posts: 0,
+    active_users: 0,
+    unanswered: 0
+  },
+  board: "all",
+  sort: "hot",
+  query: "",
+  selectedPostId: "",
+  viewedIds: {}
+};
+
 const CAREER_INTERVIEW_DIMENSIONS = ["职业兴趣", "工作价值观", "学习方式", "沟通风格", "行动证据", "职业成熟度"];
 const CAREER_INTERVIEW_RIASEC_LABELS = [
   { key: "realistic", label: "现实型" },
@@ -469,6 +497,21 @@ function formatClock(date) {
   const mm = String(date.getMinutes()).padStart(2, "0");
   const ss = String(date.getSeconds()).padStart(2, "0");
   return `${hh}:${mm}:${ss}`;
+}
+
+function formatRelativeTimeCN(value) {
+  const ts = Number(value || 0);
+  if (!ts) return "刚刚";
+  const diff = Math.max(0, Math.floor(Date.now() / 1000) - ts);
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} 天前`;
+  try {
+    return new Date(ts * 1000).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+  } catch (_) {
+    return "较早";
+  }
 }
 
 function addMonths(date, count) {
@@ -8048,7 +8091,7 @@ function markReportGenerated(source = "view") {
 
 function showSection(sectionId) {
   if (sectionId === appState.currentSection) return;
-  const sections = ["dashboard", "jobs", "profile", "matching", "report"];
+  const sections = ["dashboard", "jobs", "profile", "matching", "report", "forum", "qa"];
   sections.forEach((id) => {
     const section = document.getElementById(id);
     // 优先使用 data-section 选择导航按钮，避免依赖 onclick 选择器。
@@ -8069,6 +8112,9 @@ function showSection(sectionId) {
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
   if (sectionId === "report") markReportGenerated();
   if (sectionId === "jobs" && allJobsData.length === 0) loadJobs();
+  if (sectionId === "forum") {
+    void ensureCommunityForumLoaded();
+  }
   if (sectionId === "profile") {
     initProfileFlow();
     void refreshResumeProfile(true);
@@ -8675,6 +8721,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initCharts();
   initAnimations();
   bindGlobalEvents();
+  initCommunityForumEvents();
   initCareerNewsBoard();
   startRealtimeEngine();
   updateReportDates(new Date());
@@ -8693,7 +8740,7 @@ document.addEventListener("DOMContentLoaded", function () {
     refreshUnifiedExperience();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
-      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report"];
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "forum", "qa"];
       const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
       if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
         showSection(hashId);
@@ -8717,6 +8764,499 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+// 职业问答模块
+function getCommunityBoardMeta(board) {
+  return COMMUNITY_FORUM_BOARD_META[board] || COMMUNITY_FORUM_BOARD_META.all;
+}
+
+function getCommunityForumPostById(postId) {
+  return (communityForumState.posts || []).find((item) => String(item.id) === String(postId || "")) || null;
+}
+
+function upsertCommunityForumPost(post) {
+  if (!post || !post.id) return;
+  const next = [];
+  let replaced = false;
+  (communityForumState.posts || []).forEach((item) => {
+    if (String(item.id) === String(post.id)) {
+      next.push(post);
+      replaced = true;
+    } else {
+      next.push(item);
+    }
+  });
+  if (!replaced) next.unshift(post);
+  communityForumState.posts = next;
+}
+
+function applyCommunityForumFeed(payload) {
+  communityForumState.posts = Array.isArray(payload?.posts) ? payload.posts : [];
+  communityForumState.boards = Array.isArray(payload?.boards) ? payload.boards : [];
+  communityForumState.hotTags = Array.isArray(payload?.hot_tags) ? payload.hot_tags : [];
+  communityForumState.stats = payload?.stats && typeof payload.stats === "object"
+    ? payload.stats
+    : { threads: 0, today_posts: 0, active_users: 0, unanswered: 0 };
+  if (!getCommunityForumPostById(communityForumState.selectedPostId)) {
+    communityForumState.selectedPostId = communityForumState.posts[0]?.id || "";
+  }
+}
+
+function getCommunityForumHotScore(post) {
+  const createdAt = Number(post?.created_at || post?.updated_at || 0);
+  const ageHours = createdAt ? Math.max(0, (Date.now() / 1000 - createdAt) / 3600) : 999;
+  const freshness = Math.max(0, 72 - ageHours);
+  return (post?.pinned ? 60 : 0)
+    + Number(post?.reply_count || 0) * 7
+    + Number(post?.likes || 0) * 5
+    + Number(post?.views || 0) * 0.08
+    + freshness;
+}
+
+function getCommunityForumFilteredPosts() {
+  const query = String(communityForumState.query || "").trim().toLowerCase();
+  const board = String(communityForumState.board || "all");
+  const sort = String(communityForumState.sort || "hot");
+  let posts = Array.isArray(communityForumState.posts) ? [...communityForumState.posts] : [];
+  if (board !== "all") {
+    posts = posts.filter((item) => String(item.board || "") === board);
+  }
+  if (query) {
+    posts = posts.filter((item) => {
+      const blob = [
+        item.title,
+        item.content,
+        item.board,
+        (item.tags || []).join(" "),
+        item.author?.display_name
+      ].join(" ").toLowerCase();
+      return blob.includes(query);
+    });
+  }
+  posts.sort((a, b) => {
+    const pinDiff = Number(Boolean(b?.pinned)) - Number(Boolean(a?.pinned));
+    if (pinDiff) return pinDiff;
+    if (sort === "latest") return Number(b?.updated_at || 0) - Number(a?.updated_at || 0);
+    if (sort === "unanswered") {
+      const replyDiff = Number(a?.reply_count || 0) - Number(b?.reply_count || 0);
+      if (replyDiff) return replyDiff;
+      return Number(b?.updated_at || 0) - Number(a?.updated_at || 0);
+    }
+    return getCommunityForumHotScore(b) - getCommunityForumHotScore(a);
+  });
+  return posts;
+}
+
+function renderCommunityForumBoardFilters() {
+  const container = document.getElementById("forumBoardFilters");
+  if (!container) return;
+  const boards = communityForumState.boards.length
+    ? communityForumState.boards
+    : [{ key: "all", label: "全部", count: 0 }].concat(
+        Object.keys(COMMUNITY_FORUM_BOARD_META)
+          .filter((key) => key !== "all")
+          .map((key) => ({ key, label: key, count: 0 }))
+      );
+  container.innerHTML = boards.map((item) => {
+    const key = String(item.key || item.label || "all");
+    const active = key === communityForumState.board;
+    const meta = getCommunityBoardMeta(key);
+    return `
+      <button
+        type="button"
+        onclick="setCommunityForumBoard('${key}')"
+        class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${active ? "border-slate-900 bg-slate-900 text-white shadow-sm" : `${meta.chip} hover:-translate-y-0.5`}"
+      >
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[11px]">${escHtml(meta.icon)}</span>
+        <span>${escHtml(String(item.label || key))}</span>
+        <span class="${active ? "text-white/80" : "text-slate-500"}">${Number(item.count || 0)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function renderCommunityForumSortFilters() {
+  const container = document.getElementById("forumSortFilters");
+  if (!container) return;
+  const options = [
+    { key: "hot", label: "最热" },
+    { key: "latest", label: "最新" },
+    { key: "unanswered", label: "待回复" }
+  ];
+  container.innerHTML = options.map((item) => `
+    <button
+      type="button"
+      onclick="setCommunityForumSort('${item.key}')"
+      class="rounded-full border px-3 py-2 text-xs font-semibold transition ${communityForumState.sort === item.key ? "border-violet-600 bg-violet-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"}"
+    >
+      ${item.label}
+    </button>
+  `).join("");
+}
+
+function renderCommunityForumHotTags() {
+  const container = document.getElementById("forumHotTags");
+  if (!container) return;
+  if (!communityForumState.hotTags.length) {
+    container.innerHTML = '<p class="text-sm text-slate-400">还没有生成热议标签，先发一条讨论试试看。</p>';
+    return;
+  }
+  container.innerHTML = communityForumState.hotTags.map((item) => {
+    const tagText = String(item.tag || "");
+    const safeTag = JSON.stringify(tagText);
+    return `
+      <button
+        type="button"
+        onclick="applyCommunityForumTag(${safeTag})"
+        class="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:-translate-y-0.5 hover:bg-amber-100"
+      >
+        #${escHtml(tagText)} <span class="ml-1 text-amber-500">${Number(item.count || 0)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function renderCommunityForumList() {
+  const summaryEl = document.getElementById("forumListSummary");
+  const listEl = document.getElementById("forumThreadList");
+  if (!summaryEl || !listEl) return;
+  if (communityForumState.loading && !communityForumState.loaded) {
+    summaryEl.textContent = "正在同步讨论内容...";
+    listEl.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">帖子正在加载中...</div>';
+    return;
+  }
+  const posts = getCommunityForumFilteredPosts();
+  summaryEl.textContent = `当前显示 ${posts.length} 条讨论，排序方式：${communityForumState.sort === "hot" ? "最热" : (communityForumState.sort === "latest" ? "最新" : "待回复")}`;
+  if (!posts.length) {
+    listEl.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">这个筛选条件下还没有帖子，换个关键词，或者你先发起第一条讨论。</div>';
+    return;
+  }
+  listEl.innerHTML = posts.map((post) => {
+    const meta = getCommunityBoardMeta(post.board);
+    const active = String(post.id) === String(communityForumState.selectedPostId || "");
+    const excerpt = String(post.content || "").length > 120
+      ? `${String(post.content || "").slice(0, 120)}...`
+      : String(post.content || "");
+    const tags = (post.tags || []).slice(0, 3);
+    return `
+      <button
+        type="button"
+        onclick="selectCommunityPost('${post.id}')"
+        class="block w-full rounded-[1.5rem] border p-5 text-left transition ${active ? "border-rose-300 bg-rose-50/70 shadow-sm" : "border-slate-200 bg-slate-50/70 hover:border-rose-200 hover:bg-white"}"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.chip}">
+            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/80">${escHtml(meta.icon)}</span>
+            ${escHtml(meta.label)}
+          </span>
+          ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">置顶</span>' : ""}
+          ${Number(post.reply_count || 0) === 0 ? '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">待回复</span>' : ""}
+        </div>
+        <h4 class="mt-3 text-lg font-bold leading-7 text-slate-900">${escHtml(post.title || "")}</h4>
+        <p class="mt-2 text-sm leading-6 text-slate-600">${escHtml(excerpt)}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          ${tags.map((tag) => `<span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500">#${escHtml(tag)}</span>`).join("")}
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          <span>${escHtml(post.author?.display_name || "匿名同学")}</span>
+          <span>${formatRelativeTimeCN(post.updated_at || post.created_at)}</span>
+          <span>${Number(post.views || 0)} 浏览</span>
+          <span>${Number(post.likes || 0)} 点赞</span>
+          <span>${Number(post.reply_count || 0)} 回复</span>
+        </div>
+      </button>
+    `;
+  }).join("");
+}
+
+function renderCommunityForumDetail() {
+  const container = document.getElementById("forumThreadDetail");
+  const badge = document.getElementById("forumDetailBadge");
+  if (!container || !badge) return;
+  const post = getCommunityForumPostById(communityForumState.selectedPostId);
+  if (!post) {
+    badge.textContent = "等待选择帖子";
+    container.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500">从左侧帖子大厅选择一条讨论，这里会展示正文、回复和互动入口。</div>';
+    return;
+  }
+  const meta = getCommunityBoardMeta(post.board);
+  const replies = Array.isArray(post.replies) ? post.replies : [];
+  const replyHtml = replies.length
+    ? replies.map((item) => `
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span class="font-semibold text-slate-700">${escHtml(item.author?.display_name || "匿名同学")}</span>
+            <span>${formatRelativeTimeCN(item.created_at)}</span>
+          </div>
+          <p class="mt-2 text-sm leading-6 text-slate-700">${escHtml(item.content || "")}</p>
+        </div>
+      `).join("")
+    : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">这条帖子还没有收到回复，你可以成为第一个回帖的人。</div>';
+  badge.textContent = meta.label;
+  container.innerHTML = `
+    <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.chip}">
+            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/80">${escHtml(meta.icon)}</span>
+            ${escHtml(meta.label)}
+          </span>
+          ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">置顶讨论</span>' : ""}
+        </div>
+        <button
+          type="button"
+          onclick="toggleCommunityPostLike('${post.id}')"
+          class="rounded-full border px-3 py-2 text-xs font-semibold transition ${post.liked ? "border-rose-200 bg-rose-100 text-rose-700" : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-700"}"
+        >
+          ${post.liked ? "已赞" : "点赞"} · ${Number(post.likes || 0)}
+        </button>
+      </div>
+      <h4 class="mt-4 text-2xl font-bold leading-9 text-slate-900">${escHtml(post.title || "")}</h4>
+      <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span>楼主：${escHtml(post.author?.display_name || "匿名同学")}</span>
+        <span>发布于 ${formatRelativeTimeCN(post.created_at)}</span>
+        <span>${Number(post.views || 0)} 浏览</span>
+        <span>${Number(post.reply_count || 0)} 回复</span>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        ${(post.tags || []).map((tag) => {
+          const safeTag = JSON.stringify(String(tag || ""));
+          return `<button type="button" onclick="applyCommunityForumTag(${safeTag})" class="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100">#${escHtml(tag)}</button>`;
+        }).join("")}
+      </div>
+      <div class="mt-5 rounded-2xl border border-white bg-white px-5 py-4 text-sm leading-7 text-slate-700 shadow-sm">
+        ${escHtml(post.content || "")}
+      </div>
+      <div class="mt-6">
+        <div class="flex items-center justify-between gap-3">
+          <h5 class="text-base font-bold text-slate-900">回复区</h5>
+          <span class="text-xs text-slate-500">最近更新：${formatRelativeTimeCN(post.last_reply_at || post.updated_at || post.created_at)}</span>
+        </div>
+        <div class="mt-4 space-y-3">${replyHtml}</div>
+      </div>
+      <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <label for="forumReplyInput" class="mb-2 block text-sm font-medium text-slate-700">写个回复</label>
+        <textarea id="forumReplyInput" rows="4" maxlength="1200" placeholder="比如：你目前最缺的是哪一部分、已经投了哪些岗位、卡在什么反馈上？" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"></textarea>
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <p class="text-xs text-slate-500">回复越具体，越容易收到真正有帮助的建议。</p>
+          <button type="button" onclick="submitCommunityReply('${post.id}')" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+            发送回复
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCommunityForum() {
+  const threadCount = document.getElementById("forumThreadCount");
+  const todayCount = document.getElementById("forumTodayCount");
+  const activeUsers = document.getElementById("forumActiveUsers");
+  const unansweredCount = document.getElementById("forumUnansweredCount");
+  if (threadCount) threadCount.textContent = String(Number(communityForumState.stats?.threads || 0));
+  if (todayCount) todayCount.textContent = String(Number(communityForumState.stats?.today_posts || 0));
+  if (activeUsers) activeUsers.textContent = String(Number(communityForumState.stats?.active_users || 0));
+  if (unansweredCount) unansweredCount.textContent = String(Number(communityForumState.stats?.unanswered || 0));
+  renderCommunityForumBoardFilters();
+  renderCommunityForumSortFilters();
+  renderCommunityForumHotTags();
+  renderCommunityForumList();
+  renderCommunityForumDetail();
+}
+
+async function ensureCommunityForumLoaded(force = false) {
+  if (communityForumState.loading) return;
+  if (!force && communityForumState.loaded) {
+    renderCommunityForum();
+    return;
+  }
+  communityForumState.loading = true;
+  renderCommunityForum();
+  try {
+    const payload = await requestJson("/api/community-feed");
+    applyCommunityForumFeed(payload);
+    communityForumState.loaded = true;
+    renderCommunityForum();
+  } catch (error) {
+    showToast("论坛加载失败", error.message, "warning", 2200);
+  } finally {
+    communityForumState.loading = false;
+    renderCommunityForum();
+  }
+}
+
+function setCommunityForumBoard(board) {
+  communityForumState.board = String(board || "all");
+  renderCommunityForum();
+}
+
+function setCommunityForumSort(sort) {
+  communityForumState.sort = String(sort || "hot");
+  renderCommunityForum();
+}
+
+function applyCommunityForumTag(tag) {
+  const input = document.getElementById("forumSearchInput");
+  const value = String(tag || "").trim();
+  communityForumState.query = value;
+  if (input) input.value = value;
+  renderCommunityForum();
+}
+
+async function selectCommunityPost(postId, options = {}) {
+  const normalizedId = String(postId || "").trim();
+  if (!normalizedId) return;
+  communityForumState.selectedPostId = normalizedId;
+  renderCommunityForum();
+  if (options.trackView === false || communityForumState.viewedIds[normalizedId]) return;
+  communityForumState.viewedIds[normalizedId] = true;
+  try {
+    const payload = await requestJson(`/api/community-feed/posts/${encodeURIComponent(normalizedId)}/view`, {
+      method: "POST"
+    });
+    if (payload?.post) {
+      upsertCommunityForumPost(payload.post);
+      renderCommunityForum();
+    }
+  } catch (error) {
+    console.warn("community forum view update failed", error);
+  }
+}
+
+async function submitCommunityPost() {
+  const titleEl = document.getElementById("forumPostTitle");
+  const boardEl = document.getElementById("forumPostBoard");
+  const tagsEl = document.getElementById("forumPostTags");
+  const contentEl = document.getElementById("forumPostContent");
+  const title = String(titleEl?.value || "").trim();
+  const board = String(boardEl?.value || "面经互助").trim();
+  const tags = String(tagsEl?.value || "").trim();
+  const content = String(contentEl?.value || "").trim();
+  if (title.length < 4) {
+    showToast("标题太短", "至少写 4 个字，让大家知道你想讨论什么。", "warning", 1800);
+    return;
+  }
+  if (content.length < 10) {
+    showToast("正文太短", "再补充一点背景和你的卡点，回复会更有针对性。", "warning", 1800);
+    return;
+  }
+  try {
+    const payload = await requestJson("/api/community-feed/posts", {
+      method: "POST",
+      body: { title, board, tags, content }
+    });
+    applyCommunityForumFeed(payload?.feed || payload);
+    if (payload?.post?.id) {
+      communityForumState.selectedPostId = payload.post.id;
+      communityForumState.viewedIds[payload.post.id] = true;
+    }
+    if (titleEl) titleEl.value = "";
+    if (tagsEl) tagsEl.value = "";
+    if (contentEl) contentEl.value = "";
+    renderCommunityForum();
+    addLiveActivity(`Community post published: ${title}`);
+    appState.notifications = Math.min(9, appState.notifications + 1);
+    updateNotificationCount();
+    showToast("发帖成功", "新的讨论已经进入 Offer 茶水间。", "success", 1800);
+  } catch (error) {
+    showToast("发帖失败", error.message, "error", 2200);
+  }
+}
+
+async function submitCommunityReply(postId) {
+  const replyEl = document.getElementById("forumReplyInput");
+  const content = String(replyEl?.value || "").trim();
+  if (content.length < 4) {
+    showToast("回复太短", "至少补充一句完整建议再发出去。", "warning", 1800);
+    return;
+  }
+  try {
+    const payload = await requestJson(`/api/community-feed/posts/${encodeURIComponent(postId)}/reply`, {
+      method: "POST",
+      body: { content }
+    });
+    applyCommunityForumFeed(payload?.feed || payload);
+    if (payload?.post?.id) {
+      communityForumState.selectedPostId = payload.post.id;
+      communityForumState.viewedIds[payload.post.id] = true;
+    }
+    if (replyEl) replyEl.value = "";
+    renderCommunityForum();
+    addLiveActivity("Community reply sent");
+    appState.notifications = Math.min(9, appState.notifications + 1);
+    updateNotificationCount();
+    showToast("回复已发送", "你的建议已经出现在帖子详情里。", "success", 1800);
+  } catch (error) {
+    showToast("回复失败", error.message, "error", 2200);
+  }
+}
+
+async function toggleCommunityPostLike(postId) {
+  try {
+    const payload = await requestJson(`/api/community-feed/posts/${encodeURIComponent(postId)}/like`, {
+      method: "POST"
+    });
+    if (payload?.post) {
+      upsertCommunityForumPost(payload.post);
+      renderCommunityForum();
+    }
+  } catch (error) {
+    showToast("点赞失败", error.message, "warning", 2000);
+  }
+}
+
+function scrollToForumComposer() {
+  const target = document.getElementById("forumComposerCard");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function initCommunityForumEvents() {
+  const searchInput = document.getElementById("forumSearchInput");
+  if (searchInput && !searchInput.dataset.boundForumInput) {
+    searchInput.addEventListener("input", (event) => {
+      communityForumState.query = String(event.target?.value || "").trim();
+      renderCommunityForum();
+    });
+    searchInput.dataset.boundForumInput = "1";
+  }
+  renderCommunityForum();
+}
+
+function fillQAQuestion(question) {
+  const input = document.getElementById("qaInput");
+  if (input) {
+    input.value = question;
+    input.focus();
+  }
+}
+
+function submitQAQuestion() {
+  const input = document.getElementById("qaInput");
+  if (!input || !input.value.trim()) {
+    showToast("提示", "请先输入你的职业问题", "warning", 2000);
+    return;
+  }
+  showToast(
+    "职业问答",
+    `RAG 引擎正在接入中，当前可先参考下方预置问答示例。问题已记录：${input.value.substring(0, 20)}...`,
+    "info",
+    3000
+  );
+}
+
+function expandQA(el) {
+  const content = el.querySelector(".hidden, .block");
+  const arrow = el.querySelector("span:last-child");
+  if (!content) return;
+  if (content.classList.contains("hidden")) {
+    content.classList.remove("hidden");
+    content.classList.add("block");
+    if (arrow) arrow.textContent = "▴";
+  } else {
+    content.classList.add("hidden");
+    content.classList.remove("block");
+    if (arrow) arrow.textContent = "▾";
+  }
+}
 
 // ── 设置面板（头像点击） ────────────────────────────────────────────────────────
 
