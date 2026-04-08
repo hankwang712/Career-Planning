@@ -12,7 +12,7 @@
                             <div>
                                 <p class="jobs-geo-kicker">全国招聘版图</p>
                                 <h3 class="jobs-geo-title">点击省份，查看城市岗位画像</h3>
-                                <p class="jobs-geo-copy">基于 `boss_info` 真实岗位样本聚合。薪资已统一折算为月薪口径，日薪按 30 天，13/14/16 薪按年化折算。</p>
+                                <p class="jobs-geo-copy">基于 `boss_info` 真实岗位样本聚合。薪资统一为估算月薪口径：日薪优先按岗位天/周折算，未注明时按 22 个工作日/月估算；13/14/16 薪按月均口径折算。</p>
                             </div>
                             <div class="jobs-geo-legend">
                                 <span>平均折算月薪</span>
@@ -76,6 +76,15 @@
                             </div>
                         </div>
 
+                        <div class="jobs-geo-section jobs-geo-salary-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>薪资口径</h4>
+                                <span>折算说明</span>
+                            </div>
+                            <p id="jobGeoSalaryPolicy" class="jobs-geo-policy-note">--</p>
+                            <div id="jobGeoSalaryMix" class="jobs-geo-salary-mix"></div>
+                        </div>
+
                         <div class="jobs-geo-section">
                             <div class="jobs-geo-section-head">
                                 <h4>省内城市对比</h4>
@@ -90,6 +99,14 @@
                                 <span id="jobGeoExpLabel">Top 4</span>
                             </div>
                             <div id="jobGeoExperienceList" class="jobs-geo-bar-list compact"></div>
+                        </div>
+
+                        <div class="jobs-geo-section">
+                            <div class="jobs-geo-section-head">
+                                <h4>学历要求分布</h4>
+                                <span id="jobGeoEducationLabel">Top 4</span>
+                            </div>
+                            <div id="jobGeoEducationList" class="jobs-geo-bar-list compact"></div>
                         </div>
 
                         <div class="jobs-geo-section">

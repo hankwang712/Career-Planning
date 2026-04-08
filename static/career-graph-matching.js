@@ -43,6 +43,10 @@
     queryResultIds: new Set(),
     recommendationIds: new Set(),
     matchResults: [],
+    matchMeta: null,
+    cityPreferences: [],
+    suggestedCities: [],
+    pathDeckHidden: false,
     positions: new Map(),
     simulation: null,
     svg: null,
@@ -82,6 +86,102 @@
       result.push(value);
     });
     return result.slice(0, limit);
+  }
+
+  function splitCityTokens(value) {
+    const rawValues = Array.isArray(value) ? value : [value];
+    return unique(
+      rawValues.flatMap((raw) => String(raw == null ? "" : raw)
+        .split(/[,\u3001;；/|｜\s]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)),
+      12
+    );
+  }
+
+  function getProfileCityTokens() {
+    return splitCityTokens([
+      state.profile?.basics?.target_city,
+      state.profile?.basics?.targetCity
+    ]);
+  }
+
+  function getActiveCityPreferences() {
+    const chosen = splitCityTokens(state.cityPreferences);
+    return chosen.length ? chosen : getProfileCityTokens();
+  }
+
+  function buildSuggestedCities(nodes) {
+    const counts = new Map();
+    (Array.isArray(nodes) ? nodes : []).forEach((node) => {
+      const city = String(node?.city || "").trim();
+      if (!city) return;
+      counts.set(city, (counts.get(city) || 0) + 1);
+    });
+    const profileCities = getProfileCityTokens();
+    const ranked = Array.from(counts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-Hans-CN"))
+      .map(([city]) => city);
+    return unique([...profileCities, ...ranked], 12);
+  }
+
+  function cityIsSelected(city) {
+    const normalized = String(city || "").trim();
+    return Boolean(normalized && splitCityTokens(state.cityPreferences).includes(normalized));
+  }
+
+  function setCityPreferences(cities, { resetMatches = true } = {}) {
+    state.cityPreferences = splitCityTokens(cities);
+    if (resetMatches) {
+      state.matchResults = [];
+      state.matchMeta = null;
+      state.recommendationIds = new Set();
+      state.selectedNodeId = "";
+      state.pathDeckHidden = false;
+    }
+    renderCityPlanner();
+    renderPathDeck();
+    renderDefaultPanel();
+    renderGraph();
+  }
+
+  function addCityPreference(value) {
+    const next = unique([...state.cityPreferences, ...splitCityTokens(value)], 12);
+    setCityPreferences(next);
+  }
+
+  function removeCityPreference(value) {
+    const target = String(value || "").trim();
+    setCityPreferences(state.cityPreferences.filter((item) => item !== target));
+  }
+
+  function renderCityPlanner() {
+    const chips = getEl("knowledgeBaseCityChips");
+    const summary = getEl("knowledgeBaseCitySummary");
+    if (!chips && !summary) return;
+
+    const selected = splitCityTokens(state.cityPreferences);
+    const active = getActiveCityPreferences();
+    const suggestions = unique([...selected, ...state.suggestedCities], 12);
+
+    if (summary) {
+      summary.textContent = selected.length
+        ? `已锁定 ${selected.length} 个城市：${selected.join("、")}`
+        : active.length
+          ? `未手动选择，将使用画像目标城市：${active.join("、")}`
+          : "未选择时不限制城市，优先看画像与岗位能力匹配";
+    }
+
+    if (chips) {
+      chips.innerHTML = suggestions.length
+        ? suggestions.map((city) => `
+            <button type="button" class="kb-city-chip${cityIsSelected(city) ? " is-active" : ""}" data-city="${escapeHtml(city)}">
+              <span>${escapeHtml(city)}</span>
+              ${cityIsSelected(city) ? "<b>已选</b>" : ""}
+            </button>
+          `).join("")
+        : `<span class="kb-city-placeholder">图谱加载后会展示可选城市</span>`;
+    }
   }
 
   function resolveUrl(path) {
@@ -417,6 +517,8 @@
           state.edgeByNode = new Map();
           state.edgeList.forEach((edge) => addEdgeToNodeMap(state.edgeByNode, edge));
           state.baseNodeIds = buildBaseNodeIds(Array.from(state.nodeMap.values()));
+          state.suggestedCities = buildSuggestedCities(nodes);
+          renderCityPlanner();
           return payload;
         })
         .catch((error) => {
@@ -523,6 +625,21 @@
       return expandContext(seeds, { limit: GRAPH_NODE_LIMIT, includeBaseFill: false, relationFilter });
     }
 
+    if (state.selectedNodeId) {
+      const selectedEdges = getEdgesForNode(state.selectedNodeId, relationFilter);
+      const seeds = [
+        state.selectedNodeId,
+        ...buildPromotionTrail(state.selectedNodeId, "out", 4),
+        ...buildPromotionTrail(state.selectedNodeId, "in", 3),
+        ...selectedEdges.map((edge) => getOtherNodeId(edge, state.selectedNodeId))
+      ];
+      return expandContext(seeds, {
+        limit: GRAPH_NODE_LIMIT,
+        includeBaseFill: false,
+        relationFilter
+      });
+    }
+
     if (queryMatches.length) {
       return expandContext(queryMatches.map((node) => node.id), {
         limit: GRAPH_NODE_LIMIT,
@@ -532,9 +649,7 @@
     }
 
     const focusSeeds = unique([
-      state.selectedNodeId,
       ...Array.from(state.recommendationIds),
-      ...buildPromotionTrail(state.selectedNodeId, "out", 4)
     ].filter(Boolean));
 
     if (focusSeeds.length) {
@@ -584,18 +699,78 @@
     }
   }
 
+  function matchSourceLabel() {
+    if (state.matchMeta?.mode === "llm_reranked") {
+      return state.matchMeta.model ? `AI 重排 · ${state.matchMeta.model}` : "AI 重排";
+    }
+    if (state.matchMeta?.mode === "deterministic") return "规则候选 · AI 未配置";
+    return "等待匹配";
+  }
+
+  function pathDeckCardHtml(item, index) {
+    const paths = Array.isArray(item?.pathOptions) ? item.pathOptions : [];
+    const fallback = item?.path ? [{ label: "主路径", text: item.path }] : [];
+    const usable = (paths.length ? paths : fallback).slice(0, 3);
+    return `
+      <button type="button" class="kb-path-deck-card${state.selectedNodeId === item.id ? " is-active" : ""}" data-node-id="${escapeHtml(item.id || "")}">
+        <span class="kb-path-deck-index">${String(index + 1).padStart(2, "0")}</span>
+        <span class="kb-path-deck-main">
+          <strong>${escapeHtml(item.title || "推荐岗位")}</strong>
+          <small>${escapeHtml([item.city, item.level, formatScore(item.overallScore)].filter(Boolean).join(" · "))}</small>
+        </span>
+        <span class="kb-path-deck-lines">
+          ${usable.length ? usable.map((path) => `
+            <span>
+              <b>${escapeHtml(path.label || "路径")}</b>
+              <em>${escapeHtml(path.text || "")}</em>
+            </span>
+          `).join("") : `<span><b>路径</b><em>点击岗位节点后查看图谱关系</em></span>`}
+        </span>
+      </button>
+    `;
+  }
+
+  function renderPathDeck() {
+    const deck = getEl("knowledgeBasePathDeck");
+    if (!deck) return;
+    if (!state.matchResults.length || state.pathDeckHidden) {
+      deck.classList.add("is-hidden");
+      deck.innerHTML = "";
+      return;
+    }
+
+    deck.classList.remove("is-hidden");
+    deck.innerHTML = `
+      <div class="kb-path-deck-head">
+        <div>
+          <span>匹配路径看板</span>
+          <small>宽幅展示晋升、换岗与验证路径；点击卡片可定位到图谱节点。</small>
+        </div>
+        <button type="button" class="kb-path-deck-close" data-path-deck-close>收起</button>
+      </div>
+      <div class="kb-path-deck-track">
+        ${state.matchResults.map((item, index) => pathDeckCardHtml(item, index)).join("")}
+      </div>
+    `;
+  }
+
   function panelRecommendationHtml() {
+    const activeCities = getActiveCityPreferences();
     if (!state.matchResults.length) {
       return `
         <section class="kb-panel-section">
           <h4 class="kb-panel-section-title is-green">匹配推荐</h4>
-          <p class="kb-empty-copy">点击“开始匹配”后，系统会结合画像信号、岗位关系和推荐规则，为你生成 5 个方向。</p>
+          <p class="kb-empty-copy">选择城市后点击“开始匹配”，系统会先用图谱规则筛出候选岗位，再在已配置模型可用时进行 AI 重排，输出 5 条左右的职业路径。</p>
         </section>
       `;
     }
     return `
       <section class="kb-panel-section">
-        <h4 class="kb-panel-section-title is-green">匹配推荐</h4>
+        <div class="kb-panel-title-row">
+          <h4 class="kb-panel-section-title is-green">匹配推荐</h4>
+          <span class="kb-match-source">${escapeHtml(matchSourceLabel())}</span>
+        </div>
+        <p class="kb-match-context">${activeCities.length ? `城市范围：${activeCities.join("、")}` : "城市范围：不限，优先看岗位画像与用户画像的相似度"}</p>
         <div class="kb-recommend-list">
           ${state.matchResults.map((item, index) => `
             <button type="button" class="kb-recommend-card${state.selectedNodeId === item.id ? " is-active" : ""}" data-node-id="${escapeHtml(item.id)}">
@@ -608,6 +783,75 @@
               <p class="kb-recommend-copy">${escapeHtml(item.fitReason || (item.reasonLines || [])[0] || "推荐信号较强")}</p>
             </button>
           `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function gapScoreRows(match) {
+    if (!match) return [];
+    return [
+      { label: "方向", value: match.directionScore },
+      { label: "技能", value: match.skillScore },
+      { label: "能力", value: match.capabilityScore },
+      { label: "经验", value: match.experienceScore },
+      { label: "专业", value: match.majorScore },
+      { label: "城市", value: match.cityScore }
+    ].filter((item) => Number.isFinite(Number(item.value)));
+  }
+
+  function panelGapAnalysisHtml(match, nodeTitle = "") {
+    const title = nodeTitle || match?.title || "目标岗位";
+    if (!match) {
+      return `
+        <section class="kb-panel-section kb-gap-section">
+          <h4 class="kb-panel-section-title is-cyan">画像差距分析</h4>
+          <p class="kb-empty-copy">点击“开始匹配”后，这里会把用户画像与岗位画像逐项对比，输出技能、能力和行动建议。</p>
+        </section>
+      `;
+    }
+
+    const rows = gapScoreRows(match);
+    const missingSkills = unique(match.missingSkills || [], 5);
+    const capabilityGaps = unique(match.capabilityGaps || [], 5);
+    const actions = unique(match.nextActions || [], 4);
+    const gapItems = unique([
+      ...missingSkills.map((item) => `技能证据：${item}`),
+      ...capabilityGaps.map((item) => `能力差距：${item}`)
+    ], 6);
+
+    return `
+      <section class="kb-panel-section kb-gap-section">
+        <h4 class="kb-panel-section-title is-cyan">岗位画像 × 用户画像差距</h4>
+        <p class="kb-gap-brief">${escapeHtml(title)} · 匹配度 ${escapeHtml(formatScore(match.overallScore))} · 置信度 ${escapeHtml(match.confidence || "中")}</p>
+        ${rows.length ? `
+          <div class="kb-gap-bars">
+            ${rows.map((row) => {
+              const score = Math.max(0, Math.min(100, Number(row.value || 0)));
+              const stateClass = score >= 78 ? "is-good" : score >= 58 ? "is-mid" : "is-low";
+              return `
+                <div class="kb-gap-row ${stateClass}">
+                  <span>${escapeHtml(row.label)}</span>
+                  <i><b style="width:${score}%"></b></i>
+                  <strong>${Math.round(score)}%</strong>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : ""}
+        <div class="kb-gap-grid">
+          <div>
+            <span class="kb-gap-label">主要缺口</span>
+            <div class="kb-tag-list">
+              ${gapItems.length ? gapItems.map((item) => `<span class="kb-tag warning">${escapeHtml(item)}</span>`).join("") : `<span class="kb-tag">暂无明显硬缺口</span>`}
+            </div>
+          </div>
+          <div>
+            <span class="kb-gap-label">行动计划</span>
+            <div class="kb-relation-list">
+              ${actions.length ? actions.map((item) => `<div class="kb-gap-action">${escapeHtml(item)}</div>`).join("") : `<p class="kb-empty-copy">继续补充测评、简历或访谈后会生成更具体的行动项。</p>`}
+            </div>
+          </div>
         </div>
       </section>
     `;
@@ -651,23 +895,7 @@
       </section>
 
       ${panelRecommendationHtml()}
-    `;
-  }
-
-  function relationItemHtml(title, items, relationLabel) {
-    if (!items.length) {
-      return `<p class="kb-empty-copy">当前没有可展示的${escapeHtml(title)}</p>`;
-    }
-    return `
-      <div class="kb-relation-list">
-        ${items.map((item) => `
-          <button type="button" class="kb-relation-item" data-node-id="${escapeHtml(item.node.id)}">
-            <span class="kb-relation-name">${escapeHtml(item.node.title)}</span>
-            <span class="kb-relation-meta">${escapeHtml([item.node.level, item.node.city, item.node.cluster].filter(Boolean).join(" · "))}</span>
-            <span class="kb-relation-type">${escapeHtml(relationLabel)} · 置信度 ${escapeHtml(formatPercent(item.edge.confidence))}</span>
-          </button>
-        `).join("")}
-      </div>
+      ${panelGapAnalysisHtml(state.matchResults[0] || null)}
     `;
   }
 
@@ -719,20 +947,14 @@
         </section>
       ` : ""}
 
-      <section class="kb-panel-section">
-        <h4 class="kb-panel-section-title">路径摘要</h4>
-        <p class="kb-empty-copy">${escapeHtml(detail.path || "当前节点暂无更长的路径摘要。")}</p>
-      </section>
+      ${panelGapAnalysisHtml(currentMatch, summary.title || node.title || "")}
 
-      <section class="kb-panel-section">
-        <h4 class="kb-panel-section-title is-green">晋升路径</h4>
-        ${relationItemHtml("晋升路径", detail.relations?.promotion_out || [], "晋升")}
-      </section>
-
-      <section class="kb-panel-section">
-        <h4 class="kb-panel-section-title is-cyan">换岗路径</h4>
-        ${relationItemHtml("换岗路径", detail.relations?.substitution || [], "换岗")}
-      </section>
+      ${currentMatch ? `
+        <section class="kb-panel-section kb-path-side-note">
+          <h4 class="kb-panel-section-title is-cyan">路径查看</h4>
+          <p class="kb-empty-copy">晋升、换岗与验证路径已移到图谱底部的“匹配路径看板”，这里保留岗位画像与差距分析。</p>
+        </section>
+      ` : ""}
 
       ${panelRecommendationHtml()}
     `;
@@ -742,7 +964,7 @@
     const normalizedId = String(nodeId || "").trim();
     if (!normalizedId || !state.nodeMap.has(normalizedId)) return;
     state.selectedNodeId = normalizedId;
-    updateVisualStates(); // 仅更新颜色/类，不重建 simulation，避免节点碰撞抖动
+    renderGraph();
     scheduleViewportFocus(normalizedId);
 
     if (state.detailCache.has(normalizedId)) {
@@ -771,7 +993,7 @@
     state.viewportFocusToken += 1;
     state.selectedNodeId = "";
     renderDefaultPanel();
-    updateVisualStates(); // 仅更新颜色/类，不重建 simulation
+    renderGraph();
   }
 
   function ensureGraphCanvas() {
@@ -844,7 +1066,13 @@
       .map((id) => state.nodeMap.get(id))
       .filter(Boolean)
       .map((node) => ({ ...node }));
-    const displayEdges = state.edgeList.filter((edge) => displayIdSet.has(edge.source) && displayIdSet.has(edge.target) && activeLinkFilter(edge));
+    const displayEdges = state.edgeList
+      .filter((edge) => displayIdSet.has(edgeNodeId(edge.source)) && displayIdSet.has(edgeNodeId(edge.target)) && activeLinkFilter(edge))
+      .map((edge) => ({
+        ...edge,
+        source: edgeNodeId(edge.source),
+        target: edgeNodeId(edge.target)
+      }));
     state.currentDisplayEdges = displayEdges; // 缓存给 updateVisualStates 使用
 
     const selectedId = state.selectedNodeId;
@@ -918,7 +1146,7 @@
       .enter()
       .append("text")
       .attr("class", (d) => {
-        const visible = edgeIsContextual(d, visualContext) && (!queryIds.size || queryIds.size <= 8 || selectedId);
+        const visible = edgeIsContextual(d, visualContext) && (selectedId || (queryIds.size && queryIds.size <= 8));
         return `kb-link-label${visible ? "" : " is-hidden"}`;
       })
       .attr("fill", (d) => edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#80849a") : "#94a3b8")
@@ -1021,6 +1249,7 @@
 
     updateInfoBar(displayNodes, displayEdges);
     renderSearchResults(searchAllNodes(state.searchQuery, DEFAULT_SEARCH_RESULT_LIMIT));
+    renderPathDeck();
   }
 
   /**
@@ -1097,7 +1326,7 @@
       state.graphLayer.linkLabelSel.attr("class", (d) => {
         const visible =
           edgeIsContextual(d, visualContext) &&
-          (!state.queryResultIds.size || state.queryResultIds.size <= 8 || selectedId);
+          (selectedId || (state.queryResultIds.size && state.queryResultIds.size <= 8));
         return `kb-link-label${visible ? "" : " is-hidden"}`;
       });
     }
@@ -1111,31 +1340,43 @@
   async function startMatch({ force = false } = {}) {
     if (!state.profile) return;
     if (state.matchResults.length && !force) {
+      state.pathDeckHidden = false;
+      renderPathDeck();
       renderDefaultPanel();
       renderGraph();
       return;
     }
 
     const button = getEl("knowledgeBaseMatchButton");
+    const cities = getActiveCityPreferences();
     if (button) {
       button.disabled = true;
-      button.textContent = "匹配中...";
+      button.textContent = "AI 匹配中...";
     }
-    setStatus("正在计算匹配结果", "loading");
+    setStatus(cities.length ? `正在匹配 ${cities.join("、")} 的岗位路径` : "正在计算岗位匹配结果", "loading");
 
     try {
       const payload = await fetchJson("/api/career-graph/match", {
         method: "POST",
-        body: JSON.stringify({ profile: state.profile, limit: 5 })
+        body: JSON.stringify({
+          profile: state.profile,
+          cityPreferences: cities,
+          limit: 5
+        })
       });
       state.matchResults = Array.isArray(payload.recommendations) ? payload.recommendations : [];
+      state.matchMeta = {
+        mode: payload.mode || "deterministic",
+        model: payload.model || "",
+        profileEcho: payload.profileEcho || {}
+      };
       state.recommendationIds = new Set(state.matchResults.map((item) => item.id).filter(Boolean));
-      setStatus(`已生成 ${state.matchResults.length} 条推荐`, "ready");
+      setStatus(`${matchSourceLabel()} · ${state.matchResults.length} 条路径`, "ready");
+      renderCityPlanner();
+      state.pathDeckHidden = false;
+      renderPathDeck();
       renderDefaultPanel();
       renderGraph();
-      if (state.matchResults[0]?.id) {
-        await focusNode(state.matchResults[0].id);
-      }
     } catch (error) {
       setStatus("职业匹配失败", "error");
       showToast("职业匹配失败", error.message, "error");
@@ -1150,6 +1391,7 @@
   function resetLayout() {
     state.positions.clear();
     state.searchQuery = "";
+    state.selectedNodeId = "";
     state.relationFilter = "all";
     state.pathOnly = false;
     const searchInput = getEl("knowledgeBaseSearchInput");
@@ -1181,6 +1423,11 @@
     const closeBtn = getEl("knowledgeBasePanelClose");
     const zoomIn = getEl("knowledgeBaseZoomIn");
     const zoomOut = getEl("knowledgeBaseZoomOut");
+    const cityChips = getEl("knowledgeBaseCityChips");
+    const cityInput = getEl("knowledgeBaseCityInput");
+    const cityAdd = getEl("knowledgeBaseCityAdd");
+    const cityClear = getEl("knowledgeBaseCityClear");
+    const pathDeck = getEl("knowledgeBasePathDeck");
 
     if (searchInput) {
       searchInput.addEventListener("input", () => {
@@ -1191,6 +1438,56 @@
 
     if (searchResults) {
       searchResults.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-node-id]");
+        if (!target) return;
+        const nodeId = target.getAttribute("data-node-id");
+        if (nodeId) void focusNode(nodeId);
+      });
+    }
+
+    if (cityChips) {
+      cityChips.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-city]");
+        if (!target) return;
+        const city = target.getAttribute("data-city") || "";
+        if (!city) return;
+        if (cityIsSelected(city)) {
+          removeCityPreference(city);
+        } else {
+          addCityPreference(city);
+        }
+      });
+    }
+
+    if (cityAdd) {
+      cityAdd.addEventListener("click", () => {
+        addCityPreference(cityInput?.value || "");
+        if (cityInput) cityInput.value = "";
+      });
+    }
+
+    if (cityInput) {
+      cityInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        addCityPreference(cityInput.value);
+        cityInput.value = "";
+      });
+    }
+
+    if (cityClear) {
+      cityClear.addEventListener("click", () => {
+        setCityPreferences([]);
+      });
+    }
+
+    if (pathDeck) {
+      pathDeck.addEventListener("click", (event) => {
+        if (event.target.closest("[data-path-deck-close]")) {
+          state.pathDeckHidden = true;
+          renderPathDeck();
+          return;
+        }
         const target = event.target.closest("[data-node-id]");
         if (!target) return;
         const nodeId = target.getAttribute("data-node-id");
@@ -1274,8 +1571,10 @@
         state.profileSignature = nextSignature;
         state.profile = profile;
         state.matchResults = [];
+        state.matchMeta = null;
         state.recommendationIds = new Set();
         state.selectedNodeId = "";
+        state.pathDeckHidden = false;
       } else {
         state.profile = profile;
       }
@@ -1284,6 +1583,9 @@
     bindEvents();
     setStatus("图谱准备中", (state.profile?.missingItems || []).length ? "warning" : "loading");
     await ensureBootstrap();
+    state.suggestedCities = buildSuggestedCities(Array.from(state.nodeMap.values()));
+    renderCityPlanner();
+    renderPathDeck();
     renderDefaultPanel();
     renderGraph();
     setStatus((state.profile?.missingItems || []).length ? "画像待补充" : "图谱已就绪", (state.profile?.missingItems || []).length ? "warning" : "ready");
@@ -1293,11 +1595,14 @@
     bindEvents();
     if (!state.bootstrap) {
       void ensureBootstrap().then(() => {
+        renderCityPlanner();
+        renderPathDeck();
         renderDefaultPanel();
         renderGraph();
       }).catch((error) => showToast("图谱加载失败", error.message, "warning"));
       return;
     }
+    renderPathDeck();
     renderGraph();
   }
 

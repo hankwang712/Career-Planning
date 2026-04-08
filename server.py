@@ -116,6 +116,11 @@ JOB_DETAIL_ONLY_FIELDS = {
     "公司福利",
 }
 
+
+class CareerReportCanceled(RuntimeError):
+    """Raised inside a background report job when the user cancels it."""
+
+
 try:
     from pypdf import PdfReader
 except Exception:  # pragma: no cover - optional dependency
@@ -1710,6 +1715,7 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
 }
 """.strip()
 
+    system_prompt += "如果 profile.target_cities 非空，必须优先选择这些城市内的候选；只有城市内候选不足时，才用其他城市补足。"
     user_payload = {
         "assessment_output": module_outputs.get("assessment") or {},
         "resume_output": module_outputs.get("resume") or {},
@@ -2140,6 +2146,8 @@ def _public_career_report_job(raw_job):
             "finished_at": int(raw_job.get("finished_at") or 0),
             "report_id": str(raw_job.get("report_id") or ""),
             "progress": raw_job.get("progress") if isinstance(raw_job.get("progress"), list) else [],
+            "model": str(raw_job.get("model") or ""),
+            "generation_mode": str(raw_job.get("generation_mode") or ""),
         })
     return job
 
@@ -2545,6 +2553,14 @@ def _find_running_career_report_job(username):
             ):
                 return dict(job)
     return None
+
+
+def _is_career_report_job_cancelled(job_id):
+    with CAREER_REPORT_LOCK:
+        job = CAREER_REPORT_JOBS.get(job_id)
+        if not isinstance(job, dict):
+            return False
+        return bool(job.get("cancel_requested")) or str(job.get("status") or "") == "canceled"
 
 
 def _save_career_report_progress(username, job_id, stage, stage_label, detail, **extra):
@@ -4089,6 +4105,21 @@ def _career_graph_unique_values(items, limit=None):
     return values
 
 
+def _career_graph_city_preferences(*values, limit=8):
+    cities = []
+    for raw in values:
+        if raw is None:
+            continue
+        if isinstance(raw, (list, tuple, set)):
+            cities.extend(_career_graph_city_preferences(*raw, limit=limit))
+            continue
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        cities.extend(part.strip() for part in re.split(r"[,，、;；/|｜\s]+", text) if part and part.strip())
+    return _career_graph_unique_values(cities, limit=limit)
+
+
 def _career_graph_iter_values(value):
     if isinstance(value, dict):
         for item in value.values():
@@ -4271,7 +4302,7 @@ def _career_graph_capability_fit(capabilities, requirements):
     return int(round(weighted)), gaps[:4]
 
 
-def _career_graph_collect_profile_inputs(profile_payload):
+def _career_graph_collect_profile_inputs(profile_payload, city_preferences=None):
     payload = profile_payload if isinstance(profile_payload, dict) else {}
     basics = payload.get("basics") if isinstance(payload.get("basics"), dict) else {}
     assessment = payload.get("assessment") if isinstance(payload.get("assessment"), dict) else {}
@@ -4354,11 +4385,18 @@ def _career_graph_collect_profile_inputs(profile_payload):
             limit=3,
         )
 
+    target_cities = _career_graph_city_preferences(
+        city_preferences,
+        basics.get("target_city"),
+        basics.get("targetCity"),
+    )
+
     return {
         "summary": str(payload.get("summary") or "").strip(),
         "major": str(basics.get("major") or "").strip(),
         "grade": str(basics.get("grade") or basics.get("education_level") or "").strip(),
-        "target_city": str(basics.get("target_city") or basics.get("targetCity") or "").strip(),
+        "target_city": target_cities[0] if target_cities else "",
+        "target_cities": target_cities,
         "direction_terms": direction_terms,
         "skill_terms": skill_terms,
         "work_values": _career_graph_unique_values(
@@ -4542,6 +4580,47 @@ def _career_graph_path_summary(node_id, node_map, adjacency, max_hops=3):
     return " → ".join(titles)
 
 
+def _career_graph_match_path_options(node_id, node_map, adjacency):
+    current_id = str(node_id or "").strip()
+    if not current_id or current_id not in node_map:
+        return []
+
+    current_title = str((node_map.get(current_id) or {}).get("title") or "").strip()
+    options = []
+
+    promotion_path = _career_graph_path_summary(current_id, node_map, adjacency, max_hops=4)
+    if promotion_path and promotion_path != current_title:
+        options.append({"label": "晋升路径", "text": promotion_path})
+
+    substitution_edges = sorted(
+        adjacency.get(current_id, {}).get("substitution") or [],
+        key=lambda item: (
+            -_career_graph_safe_float(item.get("confidence"), 0),
+            -_career_graph_safe_float(item.get("continuity_score"), 0),
+        ),
+    )
+    for edge in substitution_edges[:3]:
+        source_id = str(edge.get("source") or "").strip()
+        other_id = str(edge.get("target") if source_id == current_id else edge.get("source") or "").strip()
+        other_node = node_map.get(other_id) or {}
+        other_title = str(other_node.get("title") or "").strip()
+        if other_title:
+            options.append({"label": "换岗路径", "text": f"{current_title} → {other_title}" if current_title else other_title})
+
+    if not options and current_title:
+        options.append({"label": "验证路径", "text": f"围绕 {current_title} 补齐作品、项目与面试证据"})
+
+    seen = set()
+    deduped = []
+    for item in options:
+        key = str(item.get("label") or "") + "\n" + str(item.get("text") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped[:4]
+
+
 def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
     node_blob = _career_graph_blob(
         node.get("title"),
@@ -4555,7 +4634,11 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
 
     direction_hits = _career_graph_overlap(profile_inputs.get("direction_terms"), node_blob)
     skill_hits = _career_graph_overlap(profile_inputs.get("skill_terms"), node_skill_blob)
-    target_city = str(profile_inputs.get("target_city") or "").strip()
+    target_cities = _career_graph_city_preferences(
+        profile_inputs.get("target_cities") or [],
+        profile_inputs.get("target_city") or "",
+    )
+    target_city = target_cities[0] if target_cities else ""
     city = str(node.get("city") or "").strip()
 
     direction_score = 58 if not profile_inputs.get("direction_terms") else min(100, 44 + len(direction_hits) * 18)
@@ -4581,8 +4664,8 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
         experience_score = min(100, experience_score + 8)
 
     city_score = 62
-    if target_city and city:
-        city_score = 100 if target_city == city else 46
+    if target_cities and city:
+        city_score = 100 if city in target_cities else 42
     elif city:
         city_score = 66
 
@@ -4590,12 +4673,12 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
     capability_score, capability_gaps = _career_graph_capability_fit(profile_inputs.get("capabilities") or {}, requirements)
 
     overall_score = int(round(
-        direction_score * 0.31
-        + skill_score * 0.28
+        direction_score * 0.30
+        + skill_score * 0.26
         + capability_score * 0.17
-        + experience_score * 0.11
-        + major_score * 0.08
-        + city_score * 0.05
+        + experience_score * 0.10
+        + major_score * 0.07
+        + city_score * 0.10
     ))
 
     missing_skills = [skill for skill in node_skills if skill not in skill_hits][:4]
@@ -4604,7 +4687,7 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
         reason_lines.append(f"方向信号命中：{'、'.join(direction_hits[:3])}")
     if skill_hits:
         reason_lines.append(f"技能重合：{'、'.join(skill_hits[:4])}")
-    if target_city and city and target_city == city:
+    if target_cities and city and city in target_cities:
         reason_lines.append(f"目标城市匹配：{city}")
     if not reason_lines:
         reason_lines.append("当前画像信号有限，本次推荐更依赖岗位图谱结构与基础门槛。")
@@ -4612,6 +4695,7 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
         reason_lines.append(f"关键能力缺口：{'、'.join(capability_gaps[:2])}")
 
     path_summary = _career_graph_path_summary(node.get("node_id"), node_map, adjacency, max_hops=3)
+    path_options = _career_graph_match_path_options(node.get("node_id"), node_map, adjacency)
     confidence_inputs = 0
     confidence_inputs += 1 if profile_inputs.get("direction_terms") else 0
     confidence_inputs += 1 if profile_inputs.get("skill_terms") else 0
@@ -4646,6 +4730,7 @@ def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
             "missingSkills": missing_skills,
             "capabilityGaps": capability_gaps,
             "path": path_summary or compact_node.get("title") or "",
+            "pathOptions": path_options,
             "directionLabel": compact_node.get("cluster") or compact_node.get("family") or "",
             "nextActions": next_actions,
         }
@@ -4703,6 +4788,7 @@ def _career_graph_llm_rerank(profile_inputs, candidates, limit=5):
                 "reason_lines": item.get("reasonLines"),
                 "missing_skills": item.get("missingSkills"),
                 "path": item.get("path"),
+                "path_options": item.get("pathOptions") or [],
             }
         )
 
@@ -4718,6 +4804,7 @@ def _career_graph_llm_rerank(profile_inputs, candidates, limit=5):
             "major": profile_inputs.get("major"),
             "grade": profile_inputs.get("grade"),
             "target_city": profile_inputs.get("target_city"),
+            "target_cities": profile_inputs.get("target_cities") or [],
             "direction_terms": profile_inputs.get("direction_terms"),
             "skill_terms": profile_inputs.get("skill_terms"),
             "work_values": profile_inputs.get("work_values"),
@@ -5667,20 +5754,51 @@ def api_resume_profile():
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
-def _build_llm_caller_for_report(base_url, api_key, model):
+def _career_report_console_log(job_id, message, **fields):
+    safe_fields = []
+    for key, value in fields.items():
+        if value is None or value == "":
+            continue
+        safe_fields.append(f"{key}={value}")
+    suffix = f" | {' '.join(safe_fields)}" if safe_fields else ""
+    print(f"[career-report][{job_id[:8]}] {datetime.now().strftime('%H:%M:%S')} {message}{suffix}", flush=True)
+
+
+def _build_llm_caller_for_report(base_url, api_key, model, log=None, cancel_checker=None):
     """Build an LLMCaller for the career report agents."""
     if not (base_url and api_key and model):
         return None
 
     def _caller(messages, system_prompt, max_tokens=3500):
-        return _call_markdown_chat(
-            base_url,
-            api_key,
-            model,
-            messages,
-            system_prompt=system_prompt,
-            max_tokens=max_tokens,
-        )
+        if callable(cancel_checker) and cancel_checker():
+            raise CareerReportCanceled("职业报告生成已被用户取消。")
+        started = time.perf_counter()
+        if callable(log):
+            log(
+                "LLM 调用开始",
+                model=model,
+                max_tokens=max_tokens,
+                messages=len(messages or []),
+                system_chars=len(system_prompt or ""),
+            )
+        try:
+            result = _call_markdown_chat(
+                base_url,
+                api_key,
+                model,
+                messages,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+            )
+        except Exception as exc:
+            if callable(log):
+                log("LLM 调用失败", elapsed=f"{time.perf_counter() - started:.1f}s", error=str(exc)[:160])
+            raise
+        if callable(cancel_checker) and cancel_checker():
+            raise CareerReportCanceled("职业报告生成已被用户取消。")
+        if callable(log):
+            log("LLM 调用完成", elapsed=f"{time.perf_counter() - started:.1f}s", output_chars=len(result or ""))
+        return result
 
     return _caller
 
@@ -5688,16 +5806,43 @@ def _build_llm_caller_for_report(base_url, api_key, model):
 def _run_career_report_job(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm):
     stage_defs = {item["key"]: item["label"] for item in CAREER_REPORT_STAGE_DEFS}
     model_name = str(runtime_llm.get("model") or "") if isinstance(runtime_llm, dict) else ""
+    job_started = time.perf_counter()
+
+    def _log(message, **fields):
+        _career_report_console_log(job_id, message, **fields)
 
     # Build LLM caller for agents
     base_url, api_key, _model = _get_active_provider_and_model()
-    llm_caller = _build_llm_caller_for_report(base_url, api_key, model_name or _model)
+    provider_host = urllib.parse.urlparse(str(base_url or "")).netloc if base_url else ""
+    llm_caller = _build_llm_caller_for_report(
+        base_url,
+        api_key,
+        model_name or _model,
+        log=_log,
+        cancel_checker=lambda: _is_career_report_job_cancelled(job_id),
+    )
     generation_mode = "llm" if llm_caller else "fallback"
+    _log(
+        "后台任务开始",
+        user=username,
+        report_id=report_id,
+        mode=generation_mode,
+        model=model_name or _model or "none",
+        provider=provider_host or "none",
+        roles=len(role_payload or []),
+        focus_role=focus_role_id or "auto",
+    )
+
+    def _ensure_not_cancelled():
+        if _is_career_report_job_cancelled(job_id):
+            raise CareerReportCanceled("职业报告生成已被用户取消。")
 
     # Attach caller to runtime_llm
     runtime_llm_with_caller = dict(runtime_llm or {})
     runtime_llm_with_caller["caller"] = llm_caller
+    runtime_llm_with_caller["logger"] = _log
 
+    _ensure_not_cancelled()
     _update_career_report_job(
         job_id,
         status="running",
@@ -5720,6 +5865,8 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
     )
 
     def _stage_callback(stage_key, stage_label, detail):
+        _ensure_not_cancelled()
+        _log("阶段切换", stage=stage_key, label=stage_label, detail=detail)
         _update_career_report_job(
             job_id,
             status="running",
@@ -5742,6 +5889,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
         )
 
     try:
+        _ensure_not_cancelled()
         bundle = generate_career_report_bundle(
             username=username,
             report_id=report_id,
@@ -5753,24 +5901,27 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             runtime_llm=runtime_llm_with_caller,
             model_name=model_name,
         )
+        _ensure_not_cancelled()
+        _log("编排返回，开始写入报告文件")
         _save_career_report_bundle(username, bundle)
         meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+        final_stage = "report_writer"
         _update_career_report_job(
             job_id,
             status="completed",
             finished_at=int(time.time()),
-            stage="path_planning",
-            stage_label=stage_defs.get("path_planning", "路径规划"),
+            stage=final_stage,
+            stage_label=stage_defs.get(final_stage, "报告合成"),
             stage_detail="报告生成完成",
             message="报告生成完成",
             report_id=str(meta.get("report_id") or report_id),
-            progress=build_stage_progress("path_planning"),
+            progress=build_stage_progress(final_stage),
         )
         _save_career_report_progress(
             username,
             job_id,
-            "path_planning",
-            stage_defs.get("path_planning", "路径规划"),
+            final_stage,
+            stage_defs.get(final_stage, "报告合成"),
             "报告生成完成",
             status="ready",
             model=model_name,
@@ -5782,8 +5933,36 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             summary=str(meta.get("summary") or ""),
         )
         _sync_career_report_tracker_state(username, bundle)
+        _log(
+            "后台任务完成",
+            elapsed=f"{time.perf_counter() - job_started:.1f}s",
+            report_id=str(meta.get("report_id") or report_id),
+            mode=generation_mode,
+        )
+    except CareerReportCanceled as exc:
+        _log("后台任务已取消", elapsed=f"{time.perf_counter() - job_started:.1f}s")
+        _update_career_report_job(
+            job_id,
+            status="canceled",
+            finished_at=int(time.time()),
+            message=str(exc),
+            stage_detail="用户已停止本次生成，旧任务不会写入报告。",
+        )
+        _save_career_report_progress(
+            username,
+            job_id,
+            "report_writer",
+            stage_defs.get("report_writer", "报告合成"),
+            "用户已停止本次生成，旧任务不会写入报告。",
+            status="canceled",
+            error_message="",
+            model=model_name,
+            generation_mode=generation_mode,
+            report_id=report_id,
+        )
     except Exception as exc:
         app.logger.exception("career report generate failed")
+        _log("后台任务失败", elapsed=f"{time.perf_counter() - job_started:.1f}s", error=str(exc)[:220])
         _update_career_report_job(
             job_id,
             status="failed",
@@ -5856,9 +6035,23 @@ def api_career_report_generate_start():
         "finished_at": 0,
         "report_id": report_id,
         "progress": build_stage_progress("industry_analysis"),
+        "model": str(runtime_llm.get("model") or ""),
+        "generation_mode": "llm" if runtime_llm.get("writer") else "fallback",
+        "cancel_requested": False,
     }
     with CAREER_REPORT_LOCK:
         CAREER_REPORT_JOBS[job_id] = job
+
+    _career_report_console_log(
+        job_id,
+        "收到启动请求，任务入队",
+        user=username,
+        report_id=report_id,
+        model=str(runtime_llm.get("model") or "none"),
+        mode="llm" if runtime_llm.get("writer") else "fallback",
+        roles=len(role_payload or []),
+        focus_role=focus_role_id or "auto",
+    )
 
     _save_career_report_progress(
         username,
@@ -5869,7 +6062,7 @@ def api_career_report_generate_start():
         status="queued",
         report_id=report_id,
         model=str(runtime_llm.get("model") or ""),
-        generation_mode="llm",
+        generation_mode="llm" if runtime_llm.get("writer") else "fallback",
         focus_role_id=focus_role_id,
     )
 
@@ -5886,6 +6079,74 @@ def api_career_report_generate_start():
         "job_id": job_id,
         "report_id": report_id,
         "already_running": False,
+    })
+
+
+@app.route("/api/career-report/generate/cancel", methods=["POST"])
+@_login_required
+def api_career_report_generate_cancel():
+    user = _current_user()
+    username = user["username"]
+    payload = request.get_json(silent=True) or {}
+    job_id = str(payload.get("job_id") or request.args.get("job_id") or "").strip()
+    selected = None
+
+    with CAREER_REPORT_LOCK:
+        if job_id:
+            candidate = CAREER_REPORT_JOBS.get(job_id)
+            if isinstance(candidate, dict) and str(candidate.get("username") or "") == username:
+                selected = candidate
+        else:
+            jobs = [
+                item
+                for item in CAREER_REPORT_JOBS.values()
+                if isinstance(item, dict)
+                and str(item.get("username") or "") == username
+                and str(item.get("status") or "") in {"queued", "running"}
+            ]
+            jobs.sort(key=lambda item: int(item.get("created_at") or 0), reverse=True)
+            if jobs:
+                selected = jobs[0]
+
+        if not isinstance(selected, dict):
+            return jsonify({"message": "当前没有可停止的职业报告生成任务。"}), 404
+
+        status = str(selected.get("status") or "")
+        if status not in {"queued", "running"}:
+            return jsonify({
+                "message": "该任务已经结束，无需停止。",
+                "job": _public_career_report_job(dict(selected)),
+            })
+
+        selected["status"] = "canceled"
+        selected["cancel_requested"] = True
+        selected["finished_at"] = int(time.time())
+        selected["message"] = "用户已停止本次生成。"
+        selected["stage_detail"] = "用户已停止本次生成，旧任务不会写入报告。"
+        selected_job = dict(selected)
+
+    _career_report_console_log(
+        str(selected_job.get("job_id") or job_id),
+        "收到停止请求",
+        user=username,
+        stage=str(selected_job.get("stage") or ""),
+    )
+    _save_career_report_progress(
+        username,
+        str(selected_job.get("job_id") or job_id),
+        str(selected_job.get("stage") or "report_writer"),
+        str(selected_job.get("stage_label") or "报告生成"),
+        "用户已停止本次生成，旧任务不会写入报告。",
+        status="canceled",
+        error_message="",
+        model=str(selected_job.get("model") or ""),
+        generation_mode=str(selected_job.get("generation_mode") or ""),
+        report_id=str(selected_job.get("report_id") or ""),
+    )
+
+    return jsonify({
+        "message": "已停止本次职业报告生成。正在进行中的模型请求如果稍后返回，也不会写入报告。",
+        "job": _public_career_report_job(selected_job),
     })
 
 
@@ -5913,6 +6174,15 @@ def api_career_report_generate_status():
 
     state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    report_status = str(report_state.get("status") or "")
+    if not selected and report_status in {"queued", "running"}:
+        report_state.update({
+            "status": "canceled",
+            "stage_detail": "上一次生成任务已不在后台运行，可能是服务重启或任务被中断；请重新启动生成。",
+            "error_message": "",
+        })
+        state["career_report"] = report_state
+        _save_user_state(username, state)
     return jsonify({
         "job": _public_career_report_job(selected),
         "state": _public_career_report_state(report_state),
@@ -6180,6 +6450,7 @@ def api_career_graph_node_detail(node_id):
 def api_career_graph_match():
     payload = request.get_json(silent=True) or {}
     profile_payload = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
+    city_preferences = payload.get("cityPreferences") if isinstance(payload.get("cityPreferences"), list) else payload.get("city_preferences")
     limit = max(1, min(int(payload.get("limit") or 5), 8))
 
     try:
@@ -6190,7 +6461,7 @@ def api_career_graph_match():
         app.logger.exception("career graph match bootstrap failed")
         return jsonify({"message": "职业图谱加载失败。"}), 500
 
-    profile_inputs = _career_graph_collect_profile_inputs(profile_payload)
+    profile_inputs = _career_graph_collect_profile_inputs(profile_payload, city_preferences=city_preferences)
     node_map = graph_cache.get("node_map") or {}
     adjacency = graph_cache.get("adjacency") or {}
 
@@ -6207,11 +6478,19 @@ def api_career_graph_match():
         )
     )
 
-    deterministic_pool = _career_graph_pick_diverse(candidates, max(limit * 3, 12))
+    target_city_set = set(profile_inputs.get("target_cities") or [])
+    if target_city_set:
+        in_city = [item for item in candidates if item.get("city") in target_city_set]
+        out_city = [item for item in candidates if item.get("city") not in target_city_set]
+        selection_candidates = in_city + out_city if len(in_city) < limit else in_city
+    else:
+        selection_candidates = candidates
+
+    deterministic_pool = _career_graph_pick_diverse(selection_candidates, max(limit * 3, 12))
     llm_result = _career_graph_llm_rerank(profile_inputs, deterministic_pool, limit=limit)
     recommendations = llm_result.get("recommendations") if llm_result else deterministic_pool[:limit]
     if not llm_result:
-        recommendations = _career_graph_pick_diverse(candidates, limit)
+        recommendations = _career_graph_pick_diverse(selection_candidates, limit)
 
     return jsonify(
         {
@@ -6220,12 +6499,14 @@ def api_career_graph_match():
             "recommendations": recommendations,
             "profileEcho": {
                 "targetCity": profile_inputs.get("target_city") or "",
+                "targetCities": profile_inputs.get("target_cities") or [],
                 "targetDirection": (profile_inputs.get("direction_terms") or [""])[0],
                 "major": profile_inputs.get("major") or "",
                 "missingItems": profile_inputs.get("missing_items") or [],
             },
             "diagnostics": {
                 "candidateCount": len(candidates),
+                "cityCandidateCount": len([item for item in candidates if item.get("city") in target_city_set]) if target_city_set else len(candidates),
                 "directionSignals": len(profile_inputs.get("direction_terms") or []),
                 "skillSignals": len(profile_inputs.get("skill_terms") or []),
             },

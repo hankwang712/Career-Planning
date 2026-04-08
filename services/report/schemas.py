@@ -13,6 +13,7 @@ CAREER_REPORT_STAGE_DEFS = [
     {"key": "competency_assess",  "label": "能力评估",     "agent": "能力评估官"},
     {"key": "role_match",         "label": "岗位匹配",     "agent": "岗位匹配官"},
     {"key": "path_planning",      "label": "路径规划",     "agent": "路径规划师"},
+    {"key": "report_writer",      "label": "报告合成",     "agent": "报告合成器"},
 ]
 
 # Legacy stage defs kept for backward compatibility with old reports

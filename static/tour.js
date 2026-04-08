@@ -1,6 +1,6 @@
 /**
  * TourGuide — 职业规划智能体使用引导
- * 7步 Spotlight 引导，localStorage 记录完成状态
+ * Spotlight 引导，localStorage 记录完成状态
  */
 (function () {
   'use strict';
@@ -8,38 +8,50 @@
   var STEPS = [
     {
       title: '欢迎使用职业规划智能体',
-      content: '我来带你快速了解各功能模块。<br><br>推荐使用流程：<br><span class="tg-flow"><span class="tg-step-tag">1</span>能力画像<span class="tg-arrow">→</span><span class="tg-step-tag">2</span>岗位探索<span class="tg-arrow">→</span><span class="tg-step-tag">3</span>人岗匹配<span class="tg-arrow">→</span><span class="tg-step-tag">4</span>规划报告</span>',
+      content: '这次引导按当前主页与功能链路重新排序。<br><br>推荐流程：<br><span class="tg-flow"><span class="tg-step-tag">1</span>仪表盘<span class="tg-arrow">→</span><span class="tg-step-tag">2</span>能力画像<span class="tg-arrow">→</span><span class="tg-step-tag">3</span>岗位探索<span class="tg-arrow">→</span><span class="tg-step-tag">4</span>人岗匹配<span class="tg-arrow">→</span><span class="tg-step-tag">5</span>规划报告</span>',
       target: null,
     },
     {
-      title: '① 能力画像 — 从这里开始',
-      content: '上传简历或手动填写基本信息，AI 自动生成你的六维能力雷达图。<br>这是所有后续分析的基础数据来源。',
-      target: '[data-section="profile"]',
-    },
-    {
-      title: '② 岗位探索 — 了解市场',
-      content: '浏览 100+ 热门岗位，查看技能要求和薪资区间，收藏感兴趣的方向，构建岗位画像。',
-      target: '[data-section="jobs"]',
-    },
-    {
-      title: '③ 人岗匹配 — 找到差距',
-      content: '系统将你的能力画像与目标岗位比对，输出匹配度评分和具体差距分析，明确提升重点。',
-      target: '[data-section="matching"]',
-    },
-    {
-      title: '④ 规划报告 — 你的行动方案',
-      content: '整合以上数据后，系统生成专属职业规划报告，包含学习路径、证书建议和里程碑时间线。',
-      target: '[data-section="report"]',
-    },
-    {
-      title: '智能仪表盘 — 查看全局进度',
-      content: '你现在所在的位置。实时显示画像成熟度、匹配情况和待办任务，让你随时掌握整体状态。',
+      title: '① 智能仪表盘 — 先看总览',
+      content: '主页只保留关键状态：画像进度、岗位推荐、匹配度、待办任务和行业快报。先从这里判断下一步最该补什么。',
       target: '[data-section="dashboard"]',
+      section: 'dashboard',
     },
     {
-      title: '行业快报 — 横向浏览重点新闻',
-      content: '主页末尾会展示职业规划与计算机行业快报。使用左右箭头查看新闻截图，点击 More + 加载更多内容。',
+      title: '② 能力画像 — 生成用户画像',
+      content: '这里完成 MBTI、霍兰德、基础信息、简历和访谈输入。系统会把这些内容汇总成后续匹配使用的用户画像。',
+      target: '[data-section="profile"]',
+      section: 'profile',
+    },
+    {
+      title: '③ 岗位探索 — 建立岗位画像',
+      content: '这里看全国招聘版图、城市薪资、岗位列表和技能要求。选择岗位方向后，人岗匹配会更具体。',
+      target: '[data-section="jobs"]',
+      section: 'jobs',
+    },
+    {
+      title: '④ 人岗匹配 — 查看关系与差距',
+      content: '这里使用岗位知识图谱呈现晋升、换岗关系。点击具体岗位后，只聚焦当前岗位相关节点，并显示用户画像与岗位画像差距。',
+      target: '[data-section="matching"]',
+      section: 'matching',
+    },
+    {
+      title: '⑤ 规划报告 — 观察智能体流程',
+      content: '这里不展开报告正文，只用于启动生成和查看多智能体协作状态。完整报告会进入个人中心。',
+      target: '[data-section="report"]',
+      section: 'report',
+    },
+    {
+      title: '⑥ Offer 茶水间 — 复盘与交流',
+      content: '这里保留求职复盘、面试经验和同伴交流，不参与主流程计算，但能沉淀经验信息。',
+      target: '[data-section="forum"]',
+      section: 'forum',
+    },
+    {
+      title: '⑦ 行业快报 — 回到主页末尾',
+      content: '主页末尾展示职业规划与计算机行业快报，左右箭头浏览新闻截图，More + 继续加载。',
       target: '#careerNewsBoard',
+      section: 'dashboard',
     },
   ];
 
@@ -72,10 +84,11 @@
       /* 提示卡片 */
       '#tg-tip {',
       '  position:fixed; z-index:9300;',
-      '  background:#fff; border-radius:14px;',
+      '  background:rgba(255,255,255,0.96); border-radius:14px;',
       '  padding:20px 22px 18px;',
       '  width:308px; max-width:calc(100vw - 32px);',
       '  box-shadow:0 24px 60px rgba(0,0,0,0.28),0 0 0 1px rgba(0,0,0,0.05);',
+      '  backdrop-filter:blur(18px);',
       '  transition:top 0.32s cubic-bezier(.4,0,.2,1),left 0.32s cubic-bezier(.4,0,.2,1);',
       '  pointer-events:all;',
       '}',
@@ -153,14 +166,14 @@
       '  background:linear-gradient(135deg,#2b6cb0,#1a365d);',
       '  color:#fff; border:none; cursor:pointer;',
       '  font-size:18px; font-weight:700;',
-      '  box-shadow:0 4px 20px rgba(109,40,217,0.45);',
+      '  box-shadow:0 10px 28px rgba(26,54,93,0.35);',
       '  display:flex; align-items:center; justify-content:center;',
       '  transition:transform 0.2s,box-shadow 0.2s;',
       '  outline:none;',
       '}',
       '#tg-fab:hover {',
       '  transform:scale(1.1);',
-      '  box-shadow:0 6px 24px rgba(109,40,217,0.6);',
+      '  box-shadow:0 14px 32px rgba(26,54,93,0.42);',
       '}',
       '#tg-fab-tip {',
       '  position:fixed; bottom:82px; right:24px;',
@@ -284,15 +297,43 @@
     hl.style.display = 'block';
     tip.style.transform = '';
 
+    if (step.section && typeof window.showSection === 'function') {
+      try { window.showSection(step.section); } catch (err) {}
+    }
+
     var el = document.querySelector(step.target);
-    if (!el) return;
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!el || !el.getBoundingClientRect) {
+      Object.assign(mt.style, { top: '0', left: '0', right: '0', bottom: '0', width: '', height: '' });
+      mb.style.display = 'none';
+      ml.style.display = 'none';
+      mr.style.display = 'none';
+      hl.style.display = 'none';
+      tip.style.top = '50%';
+      tip.style.left = '50%';
+      tip.style.transform = 'translate(-50%,-50%)';
+      return;
+    }
+    el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
 
     // 延迟一帧确保滚动完成后取正确坐标
     requestAnimationFrame(function () {
       var r = el.getBoundingClientRect();
+      if (r.width < 1 && r.height < 1) {
+        Object.assign(mt.style, { top: '0', left: '0', right: '0', bottom: '0', width: '', height: '' });
+        mb.style.display = 'none';
+        ml.style.display = 'none';
+        mr.style.display = 'none';
+        hl.style.display = 'none';
+        tip.style.top = '50%';
+        tip.style.left = '50%';
+        tip.style.transform = 'translate(-50%,-50%)';
+        return;
+      }
       var pad = 7;
-      var t = r.top - pad, l = r.left - pad, b = r.bottom + pad, ri = r.right + pad;
+      var t = Math.max(0, r.top - pad);
+      var l = Math.max(0, r.left - pad);
+      var b = Math.min(window.innerHeight, r.bottom + pad);
+      var ri = Math.min(window.innerWidth, r.right + pad);
 
       // 四块遮罩
       Object.assign(mt.style, { top: '0', left: '0', right: '0', height: t + 'px', bottom: 'auto', width: '' });

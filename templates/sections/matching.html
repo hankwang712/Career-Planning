@@ -15,6 +15,28 @@
             </div>
         </header>
 
+        <section class="kb-match-preflight" aria-label="人岗匹配前配置">
+            <div class="kb-preflight-main">
+                <span class="kb-preflight-kicker">MATCH SETUP</span>
+                <h3>先确定城市，再让 AI 做岗位匹配</h3>
+                <p>系统会结合测评、简历、访谈、目标方向与城市偏好，从岗位图谱中筛选相关职业，并输出匹配理由、画像差距和可走路径。</p>
+            </div>
+            <div class="kb-city-planner">
+                <div class="kb-city-planner-head">
+                    <div>
+                        <span>城市偏好</span>
+                        <small id="knowledgeBaseCitySummary">未选择时默认读取画像中的目标城市</small>
+                    </div>
+                    <button id="knowledgeBaseCityClear" type="button" class="kb-city-clear">清空</button>
+                </div>
+                <div id="knowledgeBaseCityChips" class="kb-city-chips"></div>
+                <div class="kb-city-input-row">
+                    <input id="knowledgeBaseCityInput" class="kb-city-input" type="text" placeholder="手动输入城市，如 深圳、杭州" autocomplete="off">
+                    <button id="knowledgeBaseCityAdd" type="button" class="kb-city-add">加入城市</button>
+                </div>
+            </div>
+        </section>
+
         <div class="kb-main">
             <div class="kb-graph-area" id="knowledgeBaseArea">
                 <div class="kb-toolbar">
@@ -27,8 +49,8 @@
 
                     <select id="knowledgeBaseRelationFilter" class="kb-domain-select" title="关系视图">
                         <option value="all">全部关系</option>
-                        <option value="promotion">仅看晋升</option>
-                        <option value="substitution">仅看换岗</option>
+                        <option value="promotion">只看晋升</option>
+                        <option value="substitution">只看换岗</option>
                     </select>
 
                     <div class="kb-search-wrap">
@@ -98,6 +120,7 @@
                 </div>
 
                 <div id="knowledgeBaseCanvas" class="kb-graph-canvas"></div>
+                <div id="knowledgeBasePathDeck" class="kb-path-deck is-hidden" aria-live="polite"></div>
 
                 <div id="knowledgeBaseTooltip" class="kb-tooltip">
                     <div id="knowledgeBaseTooltipTitle" class="kb-tooltip-title"></div>

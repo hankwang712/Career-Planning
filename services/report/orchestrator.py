@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from time import perf_counter
 from typing import Any, Callable
 
 from .agents import (
@@ -48,6 +49,7 @@ from .schemas import REPORT_VERSION
 PIPELINE_VERSION = "2026.04"
 
 StageCallback = Callable[[str, str, str], None]
+LogCallback = Callable[[str], None]
 
 
 def _noop_callback(stage_key: str, stage_label: str, detail: str) -> None:
@@ -69,6 +71,25 @@ def _build_llm_caller(runtime_llm: dict[str, Any] | None) -> LLMCaller | None:
             return writer(payload, system_prompt) or ""
         return _wrapped
     return None
+
+
+def _build_logger(runtime_llm: dict[str, Any] | None) -> Callable[..., None]:
+    if isinstance(runtime_llm, dict) and callable(runtime_llm.get("logger")):
+        return runtime_llm["logger"]
+    return lambda message, **fields: None
+
+
+def _run_logged_step(logger: Callable[..., None], label: str, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+    started = perf_counter()
+    logger("Agent 开始", agent=label)
+    try:
+        result = fn()
+    except Exception as exc:
+        logger("Agent 失败", agent=label, elapsed=f"{perf_counter() - started:.1f}s", error=str(exc)[:160])
+        raise
+    markdown_chars = len(str((result or {}).get("markdown") or ""))
+    logger("Agent 完成", agent=label, elapsed=f"{perf_counter() - started:.1f}s", markdown_chars=markdown_chars)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -175,30 +196,43 @@ def generate_career_report_bundle(
     """
     notify = stage_callback or _noop_callback
     llm_caller = _build_llm_caller(runtime_llm)
+    logger = _build_logger(runtime_llm)
     generation_mode = "llm" if llm_caller else "fallback"
+    pipeline_started = perf_counter()
+    shared_pool: dict[str, Any] = {
+        "inputs": {
+            "profile": profile_payload,
+            "roles": role_payload,
+            "focus_role_id": focus_role_id,
+        },
+        "outputs": {},
+        "diagnostics": {
+            "mode": generation_mode,
+            "events": [],
+        },
+    }
+    logger("编排开始", mode=generation_mode, roles=len(role_payload or []), focus_role=focus_role_id or "auto")
 
     # -----------------------------------------------------------------------
-    # 获取新闻上下文：通过 RAG 检索与用户方向相关的 chunk
-    # 流程：读取 news_store.json → 分块(500token/overlap50) → embedding →
-    #       余弦相似度排序 → 取 top_k chunk 格式化为 Markdown
+    # 获取新闻上下文：报告生成主链路不能被 embedding 构建阻塞，因此这里使用
+    # 轻量新闻摘要；深度 RAG 检索仍保留在新闻知识库接口中按需调用。
     # -----------------------------------------------------------------------
     news_context = ""
+    news_started = perf_counter()
+    logger("准备新闻上下文")
     try:
-        from services.news.news_kb import search_news_for_agent, format_rag_context
+        from services.news.news_kb import get_recent_news_context
 
-        # 构建检索 query：结合用户的目标方向、专业、城市
         basics = profile_payload.get("basics") or {}
         _target_dir = str(basics.get("targetDirection") or basics.get("target_direction") or "")
         _major = str(basics.get("major") or "")
         _city = str(basics.get("targetCity") or basics.get("target_city") or "")
-        _rag_query = " ".join(filter(None, [_target_dir, _major, _city, "招聘 就业 行业趋势"]))
-
-        rag_chunks = search_news_for_agent(
-            query=_rag_query,
-            top_k=12,
+        news_context = get_recent_news_context(
+            topics=[item for item in [_target_dir, _major, _city] if item],
+            max_items=12,
             max_age_days=7,
         )
-        news_context = format_rag_context(rag_chunks)
+        logger("新闻上下文完成", elapsed=f"{perf_counter() - news_started:.1f}s", chars=len(news_context or ""))
     except Exception:
         # 回退：直接用 news_payload 里的标题列表
         items = news_payload.get("items") or []
@@ -210,6 +244,8 @@ def generate_career_report_bundle(
             if title:
                 lines.append(f"- {title} [{source}]: {summary}" if summary else f"- {title} [{source}]")
         news_context = "\n".join(lines) if lines else "（无新闻数据）"
+        logger("新闻上下文回退完成", elapsed=f"{perf_counter() - news_started:.1f}s", chars=len(news_context or ""))
+    shared_pool["inputs"]["news_context"] = news_context
 
     # Sort roles, prioritize focus_role_id
     if focus_role_id:
@@ -237,21 +273,51 @@ def generate_career_report_bundle(
     if llm_caller:
         executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="career-report-a")
         try:
-            industry_future = executor.submit(_run_industry_step)
-            resume_future = executor.submit(_run_resume_pass1_step)
+            logger("并行阶段启动", parallel_agents="行业分析师,简历证据分析官")
+            industry_future = executor.submit(
+                _run_logged_step,
+                logger,
+                "行业分析师",
+                _run_industry_step,
+            )
+            resume_future = executor.submit(
+                _run_logged_step,
+                logger,
+                "简历证据分析官-初筛",
+                _run_resume_pass1_step,
+            )
             industry_brief = industry_future.result()
+            shared_pool["outputs"]["industry_analysis"] = industry_brief
 
             # Step B only needs industry_brief + profile. Keep resume pass1 running
             # in parallel when it is slower than industry analysis.
             notify("career_positioning", "职业定位", "正在结合测评与意愿生成职业方向假设...")
-            positioning_output = run_career_positioning_advisor(profile_payload, industry_brief, llm_caller)
+            positioning_output = _run_logged_step(
+                logger,
+                "职业定位顾问",
+                lambda: run_career_positioning_advisor(
+                    profile_payload,
+                    shared_pool["outputs"]["industry_analysis"],
+                    llm_caller,
+                ),
+            )
             resume_evidence_pass1 = resume_future.result()
+            shared_pool["outputs"]["career_positioning"] = positioning_output
+            shared_pool["outputs"]["resume_evidence_pass1"] = resume_evidence_pass1
+            logger("并行阶段汇合")
         finally:
             executor.shutdown(wait=True)
     else:
-        industry_brief = _run_industry_step()
-        resume_evidence_pass1 = _run_resume_pass1_step()
-        positioning_output = _fallback_positioning(profile_payload, role_payload)
+        industry_brief = _run_logged_step(logger, "行业分析师-fallback", _run_industry_step)
+        resume_evidence_pass1 = _run_logged_step(logger, "简历证据分析官-初筛-fallback", _run_resume_pass1_step)
+        positioning_output = _run_logged_step(
+            logger,
+            "职业定位顾问-fallback",
+            lambda: _fallback_positioning(profile_payload, role_payload),
+        )
+        shared_pool["outputs"]["industry_analysis"] = industry_brief
+        shared_pool["outputs"]["resume_evidence_pass1"] = resume_evidence_pass1
+        shared_pool["outputs"]["career_positioning"] = positioning_output
 
     # -------------------------------------------------------------------
     # Step B': 简历证据分析官 — second pass with positioning must_prove
@@ -259,50 +325,90 @@ def generate_career_report_bundle(
     notify("resume_evidence_2", "证据对齐复核", "正在按照职业方向假设复核简历证据...")
     resume_evidence = resume_evidence_pass1  # default to first pass
     if llm_caller and positioning_output.get("hypotheses_for_evidence"):
-        resume_evidence = run_resume_evidence_analyst(profile_payload, positioning_output, llm_caller)
+        resume_evidence = _run_logged_step(
+            logger,
+            "简历证据分析官-复核",
+            lambda: run_resume_evidence_analyst(
+                profile_payload,
+                shared_pool["outputs"]["career_positioning"],
+                llm_caller,
+            ),
+        )
+    else:
+        logger(
+            "Agent 跳过",
+            agent="简历证据分析官-复核",
+            reason="没有定位假设或当前为 fallback",
+        )
+    shared_pool["outputs"]["resume_evidence"] = resume_evidence
 
     # -------------------------------------------------------------------
     # Step C: 能力评估官
     # -------------------------------------------------------------------
     notify("competency_assess", "能力评估", "正在构建就业能力画像...")
     if llm_caller:
-        competency_profile = run_competency_assessor(
-            resume_evidence, positioning_output, profile_payload, llm_caller
+        competency_profile = _run_logged_step(
+            logger,
+            "能力评估官",
+            lambda: run_competency_assessor(
+                shared_pool["outputs"]["resume_evidence"],
+                shared_pool["outputs"]["career_positioning"],
+                profile_payload,
+                llm_caller,
+            ),
         )
     else:
-        competency_profile = _fallback_competency()
+        competency_profile = _run_logged_step(logger, "能力评估官-fallback", _fallback_competency)
+    shared_pool["outputs"]["competency_profile"] = competency_profile
 
     # -------------------------------------------------------------------
     # Step D: 岗位匹配官
     # -------------------------------------------------------------------
     notify("role_match", "岗位匹配", "正在比对能力画像与岗位要求...")
     if llm_caller:
-        match_output = run_role_match_officer(
-            competency_profile, positioning_output, role_payload, industry_brief, llm_caller
+        match_output = _run_logged_step(
+            logger,
+            "岗位匹配官",
+            lambda: run_role_match_officer(
+                shared_pool["outputs"]["competency_profile"],
+                shared_pool["outputs"]["career_positioning"],
+                role_payload,
+                shared_pool["outputs"]["industry_analysis"],
+                llm_caller,
+            ),
         )
     else:
-        match_output = _fallback_match(role_payload)
+        match_output = _run_logged_step(logger, "岗位匹配官-fallback", lambda: _fallback_match(role_payload))
+    shared_pool["outputs"]["role_match"] = match_output
 
     # -------------------------------------------------------------------
     # Step E: 路径规划师
     # -------------------------------------------------------------------
     notify("path_planning", "路径规划", "正在生成时间分层的职业成长路径...")
     if llm_caller:
-        path_plan = run_career_path_planner(
-            positioning_output,
-            match_output,
-            competency_profile,
-            industry_brief,
-            resume_evidence,
-            profile_payload,
-            llm_caller,
+        path_plan = _run_logged_step(
+            logger,
+            "路径规划师",
+            lambda: run_career_path_planner(
+                shared_pool["outputs"]["career_positioning"],
+                shared_pool["outputs"]["role_match"],
+                shared_pool["outputs"]["competency_profile"],
+                shared_pool["outputs"]["industry_analysis"],
+                shared_pool["outputs"]["resume_evidence"],
+                profile_payload,
+                llm_caller,
+            ),
         )
     else:
-        path_plan = _fallback_path_plan()
+        path_plan = _run_logged_step(logger, "路径规划师-fallback", _fallback_path_plan)
+    shared_pool["outputs"]["path_plan"] = path_plan
 
     # -------------------------------------------------------------------
     # Build report bundle
     # -------------------------------------------------------------------
+    notify("report_writer", "报告合成", "正在合成可阅读职业报告并写入报告中心...")
+    report_writer_started = perf_counter()
+    logger("Agent 开始", agent="报告合成器")
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     basics = profile_payload.get("basics") or {}
     target_role_name = (
@@ -440,8 +546,22 @@ def generate_career_report_bundle(
                 },
             },
         },
+        "generation_diagnostics": {
+            "context_pool": {
+                "input_keys": sorted(shared_pool["inputs"].keys()),
+                "output_keys": sorted(shared_pool["outputs"].keys()),
+                "mode": generation_mode,
+            },
+        },
     }
 
+    logger(
+        "Agent 完成",
+        agent="报告合成器",
+        elapsed=f"{perf_counter() - report_writer_started:.1f}s",
+        markdown_chars=len(full_markdown or ""),
+    )
+    logger("编排完成", elapsed=f"{perf_counter() - pipeline_started:.1f}s", mode=generation_mode)
     return bundle
 
 

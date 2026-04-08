@@ -9,7 +9,8 @@
                 </p>
             </div>
             <div class="report-launch-actions">
-                <button id="reportLaunchBtn" type="button" class="report-launch-primary" onclick="window.startCareerReportGeneration ? startCareerReportGeneration() : markReportGenerated('launch')">启动生成</button>
+                <button id="reportLaunchBtn" type="button" class="report-launch-primary" onclick="startCareerReportGeneration()">启动生成</button>
+                <button id="reportCancelBtn" type="button" class="report-launch-danger hidden" onclick="cancelCareerReportGeneration()">停止生成</button>
                 <button type="button" class="report-launch-secondary" onclick="window.openUserCenterPage ? openUserCenterPage('report-workspace') : (window.location.href='/user-center#report-workspace')">查看报告中心</button>
             </div>
         </div>

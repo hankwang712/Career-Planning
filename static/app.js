@@ -574,7 +574,7 @@ async function ensureJobsGeoAssets() {
     jobsGeoAssetsPromise = (async () => {
       await loadScriptOnce("/static/vendor/echarts.min.js?v=20260319-lazy-geo", "echarts");
       await loadScriptOnce("/static/vendor/china.js?v=20260318-geo", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js?v=20260318-rollback-1", "jobs-geo");
+      await loadScriptOnce("/static/jobs-geo.js?v=20260408-geo-salary-ui-v1", "jobs-geo");
     })().catch((error) => {
       jobsGeoAssetsPromise = null;
       throw error;
@@ -594,7 +594,7 @@ async function ensureCareerGraphMatchingAssets() {
       if (!window.d3) {
         await loadScriptOnce("/static/vendor/d3.v7.min.js?v=20260404-kb-v1", "d3");
       }
-      await loadScriptOnce("/static/career-graph-matching.js?v=20260404-kb-v1", "career-graph-matching");
+      await loadScriptOnce("/static/career-graph-matching.js?v=20260408-kb-pathdeck-v1", "career-graph-matching");
       const api = getCareerGraphMatchingApi();
       if (!api) {
         throw new Error("职业图谱模块已加载，但没有成功完成初始化");
@@ -3956,6 +3956,7 @@ window.saveScopedUserState = saveScopedUserState;
 window.fetchManagedLlmConfig = fetchManagedLlmConfig;
 window.fetchActiveLlmRuntimeConfig = fetchActiveLlmRuntimeConfig;
 window.saveManagedLlmConfig = saveManagedLlmConfig;
+window.appState = appState;
 window.userWorkspaceState = userWorkspaceState;
 window.resolveApiUrl = resolveApiUrl;
 window.requestJson = requestJson;
@@ -3968,6 +3969,11 @@ window.openResumeReportModal = openResumeReportModal;
 window.closeResumeReportModal = closeResumeReportModal;
 window.handleResumeReportOverlayClick = handleResumeReportOverlayClick;
 window.jumpResumeReportSection = jumpResumeReportSection;
+window.getCareerReportStateSafe = getCareerReportStateSafe;
+window.startCareerReportGeneration = startCareerReportGeneration;
+window.cancelCareerReportGeneration = cancelCareerReportGeneration;
+window.pollCareerReportJob = pollCareerReportJob;
+window.resumeCareerReportRuntime = resumeCareerReportRuntime;
 
 function readSessionCache(key) {
   let raw = null;
@@ -6017,6 +6023,185 @@ function renderProfilePortraitOutputBoard(boardEl, cards) {
   }).join("");
 }
 
+// ─── 数据来源状态条 ───────────────────────────────────────────────────────────
+function renderProfileSourcePills(el, profile) {
+  if (!el) return;
+  const mbtiDone = Boolean(profile?.assessment?.mbti?.completed);
+  const hollandDone = Boolean(profile?.assessment?.holland?.completed);
+  const assessStatus = mbtiDone && hollandDone ? "complete" : (mbtiDone || hollandDone ? "partial" : "missing");
+
+  const resumeStatus = String(profile?.resume?.status || "");
+  const resumeDone = resumeStatus === "analyzed";
+  const resumePartial = resumeStatus === "uploaded";
+
+  const completionScore = Math.max(0, Math.min(100, Number(profile?.interview?.completionScore || 0)));
+  const interviewProfile = profile?.interview?.profile || null;
+  const interviewDone = Boolean(profile?.interview?.isComplete);
+  const interviewUsable = Boolean(interviewProfile?.summary || interviewProfile?.portrait_ready);
+
+  const pills = [
+    {
+      label: "测评",
+      detail: assessStatus === "complete" ? `MBTI · Holland` : assessStatus === "partial" ? "部分完成" : "未完成",
+      status: assessStatus
+    },
+    {
+      label: "简历",
+      detail: resumeDone ? "已解析" : resumePartial ? "待解析" : "未上传",
+      status: resumeDone ? "complete" : resumePartial ? "partial" : "missing"
+    },
+    {
+      label: "访谈",
+      detail: interviewDone ? "已完成" : completionScore > 0 ? `${completionScore}%` : "未开始",
+      status: interviewDone ? "complete" : interviewUsable ? "partial" : "missing"
+    }
+  ];
+
+  const colorMap = {
+    complete: { pill: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-400", label: "text-emerald-700", detail: "text-emerald-600" },
+    partial:  { pill: "bg-amber-50 border-amber-200",   dot: "bg-amber-400",   label: "text-amber-700",   detail: "text-amber-600"  },
+    missing:  { pill: "bg-slate-50 border-slate-200",   dot: "bg-slate-300",   label: "text-slate-500",   detail: "text-slate-400"  }
+  };
+
+  el.innerHTML = `
+    <div class="flex flex-wrap items-center gap-2 py-3">
+      <span class="text-xs text-slate-400 font-medium mr-1">画像来源</span>
+      ${pills.map((p) => {
+        const c = colorMap[p.status];
+        return `
+          <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${c.pill}">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}"></span>
+            <span class="font-semibold ${c.label}">${escHtml(p.label)}</span>
+            <span class="${c.detail}">${escHtml(p.detail)}</span>
+          </span>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+// ─── 六维能力速览 ─────────────────────────────────────────────────────────────
+function renderProfileCapabilityStrip(el, profile) {
+  if (!el) return;
+  const dims = [
+    { key: "professional",     label: "专业技能", icon: "⚙️" },
+    { key: "learning",         label: "学习能力", icon: "📖" },
+    { key: "communication",    label: "沟通能力", icon: "💬" },
+    { key: "innovation",       label: "创新能力", icon: "💡" },
+    { key: "stress_tolerance", label: "抗压能力", icon: "🧱" },
+    { key: "execution",        label: "执行力",   icon: "🎯" }
+  ];
+
+  const hasAnyCap = dims.some((d) => profile?.capabilities?.[d.key]?.score != null);
+
+  if (!hasAnyCap) {
+    el.innerHTML = `
+      <div class="col-span-full flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-400">
+        <span class="text-lg">📊</span>
+        <span>完成测评与访谈后，六维能力评分会自动出现在这里。</span>
+      </div>
+    `;
+    return;
+  }
+
+  el.innerHTML = dims.map((d) => {
+    const cap = profile?.capabilities?.[d.key];
+    const score = cap?.score ?? null;
+    const inferred = cap?.inferred ?? true;
+    const sources = Array.isArray(cap?.sources) && cap.sources.length ? cap.sources.join(" · ") : "";
+    const pct = score === null ? 0 : score;
+    const barColor = score === null
+      ? "bg-slate-200"
+      : score >= 75 ? "bg-gradient-to-r from-emerald-400 to-teal-400"
+      : score >= 55 ? "bg-gradient-to-r from-sky-400 to-cyan-400"
+      : "bg-gradient-to-r from-amber-400 to-yellow-400";
+    const scoreText = score === null ? "待补充" : `${score}%`;
+    const scoreColor = score === null ? "text-slate-400" : score >= 75 ? "text-emerald-600" : score >= 55 ? "text-sky-600" : "text-amber-600";
+    const tagHtml = score !== null && !inferred
+      ? `<span class="ml-1 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] text-emerald-600">有实证</span>`
+      : score !== null
+        ? `<span class="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">推断</span>`
+        : "";
+
+    return `
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-slate-200 transition">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-base leading-none">${d.icon}</span>
+            <span class="text-sm font-semibold text-slate-700">${escHtml(d.label)}</span>
+            ${tagHtml}
+          </div>
+          <span class="text-sm font-bold ${scoreColor}">${escHtml(scoreText)}</span>
+        </div>
+        <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-2">
+          <div class="h-full rounded-full ${barColor} transition-all duration-500" style="width:${pct}%"></div>
+        </div>
+        ${sources ? `<p class="text-[11px] text-slate-400 leading-4 truncate">来源：${escHtml(sources)}</p>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+// ─── 关键证据 & 信息缺口 ──────────────────────────────────────────────────────
+function renderProfileEvidenceGaps(el, profile) {
+  if (!el) return;
+  const interviewProfile = profile?.interview?.profile || null;
+  const evidenceHighlights = Array.isArray(interviewProfile?.evidence_highlights)
+    ? interviewProfile.evidence_highlights.filter(Boolean).slice(0, 4)
+    : [];
+  const missingFollowups = Array.isArray(interviewProfile?.missing_followups)
+    ? interviewProfile.missing_followups.filter(Boolean).slice(0, 4)
+    : [];
+  const missingItems = Array.isArray(profile?.missingItems)
+    ? profile.missingItems.filter(Boolean).slice(0, 3)
+    : [];
+  const allGaps = [...missingFollowups, ...missingItems].slice(0, 4);
+
+  const hasEvidence = evidenceHighlights.length > 0;
+  const hasGaps = allGaps.length > 0;
+
+  if (!hasEvidence && !hasGaps) return (el.innerHTML = "");
+
+  const evidenceHtml = hasEvidence ? `
+    <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-base">🔍</span>
+        <p class="text-xs font-semibold tracking-[0.15em] text-slate-400 uppercase">关键证据</p>
+      </div>
+      <ul class="space-y-2">
+        ${evidenceHighlights.map((item) => `
+          <li class="flex items-start gap-2 text-sm text-slate-600 leading-5">
+            <span class="mt-0.5 w-4 h-4 flex-shrink-0 rounded-full bg-emerald-100 flex items-center justify-center">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            ${escHtml(item)}
+          </li>
+        `).join("")}
+      </ul>
+    </div>
+  ` : "";
+
+  const gapsHtml = hasGaps ? `
+    <div class="rounded-2xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-base">📋</span>
+        <p class="text-xs font-semibold tracking-[0.15em] text-amber-600 uppercase">信息缺口</p>
+      </div>
+      <ul class="space-y-2">
+        ${allGaps.map((item) => `
+          <li class="flex items-start gap-2 text-sm text-amber-800 leading-5">
+            <span class="mt-0.5 w-4 h-4 flex-shrink-0 rounded-full bg-amber-200 flex items-center justify-center text-[10px] text-amber-700 font-bold">?</span>
+            ${escHtml(item)}
+          </li>
+        `).join("")}
+      </ul>
+      <p class="mt-3 text-[11px] text-amber-600 border-t border-amber-200 pt-2">继续访谈可补齐以上缺口，提升画像置信度。</p>
+    </div>
+  ` : "";
+
+  el.innerHTML = `<div class="grid gap-4 md:grid-cols-2">${evidenceHtml}${gapsHtml}</div>`;
+}
+
 function buildProfilePortraitContext(profile, roles, synthesis) {
   const resumeState = userWorkspaceState.scopedData.resume_profile || null;
   const resumeTraits = buildResumePortraitTraits(resumeState);
@@ -7241,7 +7426,12 @@ function renderProfileWorkspace(profile, roles) {
   if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
   renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis, portraitBrief);
   renderProfilePortraitBriefCard(briefCardEl, portraitState, portraitBrief);
+  // 输入输出链路移至折叠区
   renderProfilePortraitOutputBoard(portraitOutputBoardEl, portraitOutputCards);
+  // 新增：数据来源状态条 / 六维能力速览 / 关键证据&信息缺口
+  renderProfileSourcePills(document.getElementById("profileSourcePills"), profile);
+  renderProfileCapabilityStrip(document.getElementById("profileCapabilityStrip"), profile);
+  renderProfileEvidenceGaps(document.getElementById("profileEvidenceGapsContent"), profile);
   if (archetypeNameEl) archetypeNameEl.textContent = portraitBrief?.title || synthesis.archetype.name;
   if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
   if (archetypeSummaryEl) archetypeSummaryEl.textContent = portraitBrief?.positioning || synthesis.thesis;
@@ -7602,7 +7792,7 @@ const REPORT_AGENT_FLOW = [
   { key: "competency_assess", title: "能力评估官", role: "Competency Assessor", detail: "构建就业能力画像", icon: "radar", x: 950, y: 112, aliases: ["gap_analysis"] },
   { key: "resume_evidence_2", title: "证据复核", role: "Resume Evidence Analyst", detail: "按 must_prove 二次校验", icon: "verify", x: 950, y: 452 },
   { key: "role_match", title: "岗位匹配官", role: "Role Match Officer", detail: "对齐岗位矩阵与差距项", icon: "match", x: 1240, y: 282 },
-  { key: "path_planning", title: "路径规划师", role: "Career Path Planner", detail: "阶段路径与复查节点", icon: "route", x: 1530, y: 282, aliases: ["stage_planning"] },
+  { key: "path_planning", title: "路径规划师", role: "Career Path Planner", detail: "差距驱动行动计划与复查节点", icon: "route", x: 1530, y: 282, aliases: ["stage_planning"] },
   { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic"] }
 ];
 
@@ -7684,8 +7874,8 @@ function renderReportAgentMap(profile, roles) {
   const progressMap = getReportProgressMap(state);
   const status = String(state?.status || "").trim().toLowerCase();
   const activeStage = String(state?.stage || state?.stage_key || "").trim();
-  const completed = appState.reportGenerated || ["ready", "done", "success", "completed"].includes(status);
   const running = ["queued", "running"].includes(status);
+  const completed = !running && (appState.reportGenerated || ["ready", "done", "success", "completed"].includes(status));
   const activeIndex = REPORT_AGENT_FLOW.findIndex((item) => [item.key, ...(item.aliases || [])].includes(activeStage));
   const inputReady = Boolean(
     profile?.assessment?.mbti?.completed
@@ -7759,15 +7949,19 @@ function renderReportWorkspace(profile, roles) {
   const statusHint = document.getElementById("reportStatusHint");
   const generatedTime = document.getElementById("reportGeneratedTime");
   const launchBtn = document.getElementById("reportLaunchBtn");
+  const cancelBtn = document.getElementById("reportCancelBtn");
   const mapEl = document.getElementById("reportAgentMap");
   const missingCount = Array.isArray(profile?.missingItems) ? profile.missingItems.length : 0;
   const focusText = selected?.name ? `当前主线岗位：${selected.name}` : "当前还没有锁定主线岗位";
+  const gapCount = Array.isArray(selected?.ability?.gaps) ? selected.ability.gaps.length : 0;
 
   if (statusTitle) {
     statusTitle.textContent = failed
       ? "多智能体流程启动失败"
       : running
         ? "多智能体正在协作"
+        : status === "canceled"
+          ? "本次生成已停止"
         : appState.reportGenerated
           ? "流程已完成，报告已同步"
           : "等待启动多智能体流程";
@@ -7777,18 +7971,289 @@ function renderReportWorkspace(profile, roles) {
       ? (state?.error_message || "请检查画像输入和模型配置后重试。")
       : running
         ? (state?.stage_detail || "当前只展示 agent 之间的传递状态，报告正文不会在本页展开。")
+        : status === "canceled"
+          ? "旧任务已停止，不会写入报告；可以重新启动一次新的多智能体生成。"
         : missingCount
           ? `${focusText}；仍有 ${missingCount} 项画像信息可补充。`
-          : `${focusText}；可以启动生成，完成后到个人中心阅读完整报告。`;
+          : `${focusText}；路径规划师会把 ${gapCount} 个差距项转成阶段行动计划，完成后到个人中心阅读完整报告。`;
   }
   if (generatedTime) {
     generatedTime.textContent = state?.updated_at || state?.finished_at || state?.created_at || new Date().toLocaleString("zh-CN", { hour12: false });
   }
   if (launchBtn) {
     launchBtn.disabled = running;
-    launchBtn.textContent = running ? "生成中" : "启动生成";
+    launchBtn.textContent = running
+      ? "生成中"
+      : (appState.reportGenerated || failed || status === "canceled")
+        ? "重新生成"
+        : "启动生成";
+  }
+  if (cancelBtn) {
+    cancelBtn.classList.toggle("hidden", !running);
+    cancelBtn.disabled = !running;
   }
   if (mapEl) mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
+}
+
+const CAREER_REPORT_POLL_MS = 1800;
+let careerReportPollTimer = null;
+let careerReportPollJobId = "";
+
+function getCareerReportStateSafe() {
+  return appState.careerReportState || userWorkspaceState.scopedData.career_report || null;
+}
+
+function setScopedCareerReportState(state) {
+  userWorkspaceState.scopedData.career_report = state || null;
+  userWorkspaceState.scopedDataLoaded.career_report = Boolean(state);
+}
+
+function isCareerReportReadyStatus(status) {
+  return ["ready", "done", "success", "completed"].includes(String(status || "").trim().toLowerCase());
+}
+
+function isCareerReportRunningStatus(status) {
+  return ["queued", "running"].includes(String(status || "").trim().toLowerCase());
+}
+
+function applyCareerReportRuntimeState(state) {
+  if (state && typeof state === "object") {
+    appState.careerReportState = state;
+    setScopedCareerReportState(state);
+    if (isCareerReportReadyStatus(state.status)) {
+      appState.reportGenerated = true;
+    } else if (!appState.careerReport) {
+      appState.reportGenerated = false;
+    }
+  }
+  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  updateDashboardMetrics();
+}
+
+function mergeCareerReportStatusPayload(payload) {
+  const state = payload?.state && typeof payload.state === "object" ? payload.state : {};
+  const job = payload?.job && typeof payload.job === "object" ? payload.job : {};
+  const jobStatus = String(job.status || "").trim().toLowerCase();
+  const normalizedJobStatus = jobStatus === "completed" ? "ready" : jobStatus;
+  const merged = {
+    ...state,
+    status: normalizedJobStatus && normalizedJobStatus !== "idle" ? normalizedJobStatus : (state.status || ""),
+    job_id: job.job_id || state.job_id || "",
+    report_id: job.report_id || state.report_id || "",
+    stage: job.stage || state.stage || "",
+    stage_label: job.stage_label || state.stage_label || "",
+    stage_detail: job.stage_detail || job.message || state.stage_detail || "",
+    progress: Array.isArray(job.progress) && job.progress.length ? job.progress : (Array.isArray(state.progress) ? state.progress : []),
+    generated_at: state.generated_at || "",
+    updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    model: job.model || state.model || "",
+    generation_mode: job.generation_mode || state.generation_mode || "",
+    focus_role_id: state.focus_role_id || appState.focusedRoleId || "",
+    title: state.title || "",
+    summary: state.summary || "",
+    error_message: state.error_message || (normalizedJobStatus === "failed" ? job.message || "" : "")
+  };
+  applyCareerReportRuntimeState(merged);
+  return merged;
+}
+
+function buildCareerReportGenerationPayload() {
+  const profile = appState.derivedProfile && typeof appState.derivedProfile === "object"
+    ? appState.derivedProfile
+    : deriveUnifiedProfile();
+  const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+    ? appState.matchingRoles
+    : computeRoleMatches(profile);
+  if (!profile || typeof profile !== "object") return null;
+  if (!Array.isArray(roles) || !roles.length) return null;
+  appState.derivedProfile = profile;
+  appState.matchingRoles = roles;
+  if (!roles.some((item) => item.id === appState.focusedRoleId)) {
+    appState.focusedRoleId = roles[0]?.id || "";
+  }
+  return {
+    profile_snapshot: profile,
+    role_rankings: roles,
+    focus_role_id: String(appState.focusedRoleId || roles[0]?.id || "").trim()
+  };
+}
+
+function stopCareerReportPolling() {
+  if (careerReportPollTimer) {
+    clearTimeout(careerReportPollTimer);
+    careerReportPollTimer = null;
+  }
+  careerReportPollJobId = "";
+}
+
+async function loadCurrentCareerReportForMain() {
+  const payload = await requestJson("/api/career-report/current");
+  if (payload.state) {
+    applyCareerReportRuntimeState(payload.state);
+  }
+  if (payload.data && payload.data.meta) {
+    appState.careerReport = payload.data;
+    appState.reportGenerated = Boolean(payload.data.report_document);
+    appState.careerReportTracker = payload.state?.tracker || appState.careerReportTracker || null;
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+    updateDashboardMetrics();
+  }
+  return payload;
+}
+
+async function syncCareerReportRuntimeStatus(jobId = "") {
+  const suffix = jobId ? `?job_id=${encodeURIComponent(jobId)}` : "";
+  const payload = await requestJson(`/api/career-report/generate/status${suffix}`);
+  return mergeCareerReportStatusPayload(payload);
+}
+
+async function pollCareerReportJob(jobId) {
+  const safeJobId = String(jobId || careerReportPollJobId || "").trim();
+  if (!safeJobId) return null;
+  stopCareerReportPolling();
+  careerReportPollJobId = safeJobId;
+  try {
+    const state = await syncCareerReportRuntimeStatus(safeJobId);
+    const status = String(state.status || "").trim().toLowerCase();
+    if (isCareerReportRunningStatus(status)) {
+      careerReportPollTimer = window.setTimeout(() => {
+        void pollCareerReportJob(safeJobId);
+      }, CAREER_REPORT_POLL_MS);
+      return state;
+    }
+    if (isCareerReportReadyStatus(status)) {
+      stopCareerReportPolling();
+      await loadCurrentCareerReportForMain();
+      showToast("职业报告已生成", "后端多智能体流程已完成，报告已同步到个人中心。", "success", 2200);
+      return state;
+    }
+    if (status === "failed") {
+      stopCareerReportPolling();
+      showToast("职业报告生成失败", state.error_message || state.stage_detail || "请检查模型配置后重试。", "error", 2600);
+    } else if (status === "canceled") {
+      stopCareerReportPolling();
+      showToast("已停止生成", "旧任务不会写入报告，可以重新生成。", "info", 2200);
+    }
+    return state;
+  } catch (error) {
+    stopCareerReportPolling();
+    showToast("同步报告进度失败", error.message || "请稍后重试。", "error", 2400);
+    throw error;
+  }
+}
+
+async function cancelCareerReportGeneration() {
+  const state = getCareerReportStateSafe();
+  const jobId = String(state?.job_id || careerReportPollJobId || "").trim();
+  if (!jobId) {
+    stopCareerReportPolling();
+    applyCareerReportRuntimeState({
+      ...(state || {}),
+      status: "canceled",
+      stage_detail: "已停止本地等待；当前没有找到可取消的后端任务。",
+      updated_at: new Date().toLocaleString("zh-CN", { hour12: false })
+    });
+    showToast("已停止等待", "当前没有找到可取消的后端任务。", "warning", 2000);
+    return;
+  }
+
+  const cancelBtn = document.getElementById("reportCancelBtn");
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = "停止中";
+  }
+  try {
+    const payload = await requestJson("/api/career-report/generate/cancel", {
+      method: "POST",
+      body: { job_id: jobId }
+    });
+    stopCareerReportPolling();
+    const canceledState = mergeCareerReportStatusPayload({
+      job: payload.job || { job_id: jobId, status: "canceled" },
+      state: {
+        ...(getCareerReportStateSafe() || {}),
+        status: "canceled",
+        job_id: jobId,
+        stage_detail: payload.message || "用户已停止本次生成，旧任务不会写入报告。"
+      }
+    });
+    applyCareerReportRuntimeState(canceledState);
+    showToast("已停止生成", "现在可以重新启动一次新的多智能体流程。", "success", 2200);
+  } catch (error) {
+    showToast("停止失败", error.message || "请稍后重试。", "error", 2400);
+  } finally {
+    if (cancelBtn) {
+      cancelBtn.textContent = "停止生成";
+    }
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  }
+}
+
+async function resumeCareerReportRuntime() {
+  if (!isAuthenticatedUser()) return;
+  try {
+    const state = await syncCareerReportRuntimeStatus();
+    const jobId = String(state.job_id || "").trim();
+    if (isCareerReportRunningStatus(state.status) && jobId) {
+      void pollCareerReportJob(jobId);
+    } else if (isCareerReportReadyStatus(state.status)) {
+      void loadCurrentCareerReportForMain().catch(() => {});
+    }
+  } catch (error) {
+    console.warn("career report status sync failed", error);
+  }
+}
+
+async function startCareerReportGeneration() {
+  if (!isAuthenticatedUser()) {
+    showToast("请先登录", "登录后才能启动后端多智能体报告生成。", "warning", 1800);
+    return;
+  }
+  const payload = buildCareerReportGenerationPayload();
+  if (!payload) {
+    showSection("profile");
+    showToast("画像或岗位数据不足", "请先完成画像并生成岗位匹配结果，再启动职业报告。", "warning", 2400);
+    return;
+  }
+
+  const launchBtn = document.getElementById("reportLaunchBtn");
+  if (launchBtn) {
+    launchBtn.disabled = true;
+    launchBtn.textContent = "启动中";
+  }
+  try {
+    const response = await requestJson("/api/career-report/generate/start", {
+      method: "POST",
+      body: payload
+    });
+    const queuedState = {
+      ...(getCareerReportStateSafe() || {}),
+      status: "queued",
+      job_id: response.job_id || "",
+      report_id: response.report_id || "",
+      stage: "industry_analysis",
+      stage_label: "行业分析",
+      stage_detail: "任务已提交到后端，等待多智能体编排",
+      progress: [],
+      updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      focus_role_id: payload.focus_role_id
+    };
+    applyCareerReportRuntimeState(queuedState);
+    showToast("职业报告任务已启动", "现在会轮询后端 agent 流程，不再使用前端假完成。", "success", 2200);
+    await pollCareerReportJob(response.job_id);
+  } catch (error) {
+    if (error.status === 409) {
+      showToast("已有报告任务在运行", "正在同步后端生成进度。", "warning", 1800);
+      const state = await syncCareerReportRuntimeStatus();
+      if (state.job_id) {
+        await pollCareerReportJob(state.job_id);
+      }
+      return;
+    }
+    showToast("职业报告启动失败", error.message || "请稍后重试。", "error", 2600);
+  } finally {
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  }
 }
 
 let unifiedRefreshScheduled = false;
@@ -8016,6 +8481,8 @@ async function initAuth() {
         if (Object.prototype.hasOwnProperty.call(scoped, "career_report")) {
           userWorkspaceState.scopedData.career_report = scoped.career_report ?? null;
           userWorkspaceState.scopedDataLoaded.career_report = true;
+          appState.careerReportState = scoped.career_report ?? null;
+          appState.reportGenerated = isCareerReportReadyStatus(scoped.career_report?.status);
         }
         if (Object.prototype.hasOwnProperty.call(scoped, "profile_portrait")) {
           userWorkspaceState.scopedData.profile_portrait = scoped.profile_portrait ?? null;
@@ -8821,6 +9288,7 @@ document.addEventListener("DOMContentLoaded", function () {
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
     refreshUnifiedExperience();
+    void resumeCareerReportRuntime();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
       const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "forum"];
@@ -9031,12 +9499,29 @@ function renderCommunityForumList() {
       ? `${String(post.content || "").slice(0, 100)}...`
       : String(post.content || "");
     const tags = (post.tags || []).slice(0, 3);
+    const isSystem = post.author?.username === "system";
+    const cardClass = isSystem
+      ? "block w-full rounded-2xl shadow-md p-5 text-left transition hover:shadow-lg group relative overflow-hidden"
+      : "block w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left transition hover:border-amber-200 hover:shadow-md group";
+    const cardStyle = isSystem
+      ? "background:#fffdf7; border:1.5px solid transparent; background-clip:padding-box; box-shadow:0 0 0 1.5px rgba(251,191,36,0.55), 0 4px 16px rgba(251,191,36,0.13);"
+      : "";
+    const authorHtml = isSystem
+      ? `<span class="inline-flex items-center gap-1 font-semibold" style="color:#b45309;">
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#d97706);flex-shrink:0;">
+             <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M5 1l1.12 2.27L9 3.635l-2 1.95.472 2.75L5 7.01 2.528 8.335 3 5.585 1 3.635l2.88-.365L5 1z" fill="#fff"/></svg>
+           </span>
+           官方发起
+         </span>`
+      : `<span class="font-medium text-slate-600">${escHtml(post.author?.display_name || "匿名同学")}</span>`;
     return `
       <button
         type="button"
         onclick="selectCommunityPost('${post.id}')"
-        class="block w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left transition hover:border-amber-200 hover:shadow-md group"
+        class="${cardClass}"
+        ${cardStyle ? `style="${cardStyle}"` : ""}
       >
+        ${isSystem ? `<div style="position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,#f59e0b,#fbbf24,#fde68a,#fbbf24,#f59e0b);opacity:0.9;"></div>` : ""}
         <div class="flex items-start gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-1.5 mb-2">
@@ -9055,9 +9540,9 @@ function renderCommunityForumList() {
             <div>${Number(post.likes || 0)}<span class="block text-[10px]">赞</span></div>
           </div>
         </div>
-        <div class="mt-3 flex items-center justify-between gap-2 text-xs text-slate-400 border-t border-slate-50 pt-3">
+        <div class="mt-3 flex items-center justify-between gap-2 text-xs text-slate-400 border-t ${isSystem ? "border-amber-100" : "border-slate-50"} pt-3">
           <div class="flex items-center gap-2">
-            <span class="font-medium text-slate-600">${escHtml(post.author?.display_name || "匿名同学")}</span>
+            ${authorHtml}
             <span>·</span>
             <span>${formatRelativeTimeCN(post.updated_at || post.created_at)}</span>
             <span>·</span>

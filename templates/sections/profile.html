@@ -713,21 +713,37 @@
             <div id="profilePortraitBriefCard" class="profile-portrait-brief-card"></div>
         </div>
 
-        <section class="profile-portrait-output-shell">
-            <div class="profile-portrait-output-shell-head">
+        <!-- 数据来源状态条 -->
+        <div id="profileSourcePills" class="profile-source-pills-row"></div>
+
+        <!-- 能力速览 -->
+        <section class="profile-capability-strip-section">
+            <div class="profile-capability-strip-head">
                 <div>
-                    <p class="profile-portrait-kicker">输入输出链路</p>
-                    <h4 class="profile-portrait-output-shell-title">前 3 步如何写进人物明信片</h4>
+                    <p class="profile-portrait-kicker">能力速览</p>
+                    <h4 class="profile-capability-strip-title">六维能力评估</h4>
                 </div>
-                <p class="profile-portrait-output-shell-copy">这里会明确展示测评、简历、访谈各自沉淀了什么，以及系统如何把这些内容重写成最终的画像提示词。</p>
+                <p class="profile-capability-strip-copy">基于测评、简历与访谈综合推断，有实证支撑的维度会标注来源，待补充的维度可通过继续访谈提升精度。</p>
             </div>
-            <div id="profilePortraitOutputBoard" class="profile-portrait-output-grid"></div>
+            <div id="profileCapabilityStrip" class="profile-capability-strip-grid"></div>
+        </section>
+
+        <!-- 关键证据 & 信息缺口 -->
+        <section id="profileEvidenceGapsSection" class="profile-evidence-gaps-section">
+            <div id="profileEvidenceGapsContent" class="profile-evidence-gaps-grid"></div>
         </section>
     </section>
 
     <details class="profile-portrait-details mb-6">
         <summary>展开详细依据</summary>
         <div class="profile-portrait-details-body">
+
+            <!-- 输入输出链路（内部管道信息，折叠后可查） -->
+            <div class="mb-6">
+                <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase mb-3">输入输出链路</p>
+                <div id="profilePortraitOutputBoard" class="profile-portrait-output-grid"></div>
+            </div>
+
             <div class="profile-portrait-detail-intro">
                 <div>
                     <p class="profile-portrait-detail-label">当前定位</p>
