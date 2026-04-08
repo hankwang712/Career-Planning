@@ -882,6 +882,40 @@
 
   function buildAssessmentCompareRows(test, previous, current) {
     const meta = getAssessmentHistoryMeta(test);
+    const maxScore = test === "holland"
+      ? 15
+      : Math.max(1, ...meta.dimensions.flatMap((item) => [
+        Number(previous?.scores?.[item.key] || 0),
+        Number(current?.scores?.[item.key] || 0)
+      ]));
+    const visual = `
+      <div class="assessment-history-visual" aria-label="最近两次分数变化图">
+        ${meta.dimensions.map((item) => {
+          const prevValue = Number(previous?.scores?.[item.key] || 0);
+          const currentValue = Number(current?.scores?.[item.key] || 0);
+          const delta = currentValue - prevValue;
+          const deltaClass = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+          const prevWidth = Math.max(4, Math.min(100, Math.round((prevValue / maxScore) * 100)));
+          const currentWidth = Math.max(4, Math.min(100, Math.round((currentValue / maxScore) * 100)));
+          return `
+            <div class="assessment-history-visual-row">
+              <div class="assessment-history-visual-label">${esc(item.label)}</div>
+              <div class="assessment-history-bars">
+                <div class="assessment-history-bar-line previous">
+                  <span class="assessment-history-bar" style="width:${prevWidth}%"></span>
+                  <em>${prevValue}</em>
+                </div>
+                <div class="assessment-history-bar-line current">
+                  <span class="assessment-history-bar" style="width:${currentWidth}%"></span>
+                  <em>${currentValue}</em>
+                </div>
+              </div>
+              <span class="assessment-history-delta ${deltaClass}">${esc(formatAssessmentDelta(delta))}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
     const header = `
       <div class="assessment-history-row header">
         <span>维度</span>
@@ -904,16 +938,24 @@
         </div>
       `;
     }).join("");
-    return header + rows;
+    return visual + `<div class="assessment-history-table">${header}${rows}</div>`;
   }
 
   function updateAssessmentCompareButtons() {
     const mbtiBtn = document.getElementById("mbtiCompareTrigger");
     const hollandBtn = document.getElementById("hollandCompareTrigger");
-    const hasMbtiCompare = Boolean(state.mbti.result?.completed && getAssessmentHistoryPair("mbti"));
-    const hasHollandCompare = Boolean(state.holland.result?.completed && getAssessmentHistoryPair("holland"));
-    if (mbtiBtn) mbtiBtn.classList.toggle("hidden", !hasMbtiCompare);
-    if (hollandBtn) hollandBtn.classList.toggle("hidden", !hasHollandCompare);
+    const mbtiReady = Boolean(state.mbti.result?.completed);
+    const hollandReady = Boolean(state.holland.result?.completed);
+    if (mbtiBtn) {
+      mbtiBtn.classList.toggle("hidden", !mbtiReady);
+      mbtiBtn.disabled = !getAssessmentHistoryPair("mbti");
+      mbtiBtn.title = mbtiBtn.disabled ? "至少完成两次 MBTI 测评后可查看变化" : "";
+    }
+    if (hollandBtn) {
+      hollandBtn.classList.toggle("hidden", !hollandReady);
+      hollandBtn.disabled = !getAssessmentHistoryPair("holland");
+      hollandBtn.title = hollandBtn.disabled ? "至少完成两次霍兰德测评后可查看变化" : "";
+    }
   }
 
   function renderAssessmentHistoryCompareModal() {

@@ -54,25 +54,6 @@
                 <div class="assessment-hero-actions">
                     <button type="button" class="assessment-hero-btn primary" onclick="openAssessmentModal('mbti')">开始 MBTI 测评</button>
                     <button type="button" class="assessment-hero-btn secondary" onclick="openAssessmentModal('holland')">开始霍兰德测评</button>
-                    <button type="button" class="assessment-hero-btn ghost" onclick="openAssessmentModal()">打开测评中心</button>
-                    <button type="button" class="assessment-hero-btn ghost" onclick="window.location.href='/test-runner.html?test=deep'">进入扩展测试中心</button>
-                </div>
-            </div>
-            <div class="assessment-hero-side">
-                <div class="assessment-stat-card">
-                    <span class="assessment-stat-label">MBTI 题量</span>
-                    <strong>93</strong>
-                    <p>5 档倾向评分</p>
-                </div>
-                <div class="assessment-stat-card">
-                    <span class="assessment-stat-label">霍兰德题量</span>
-                    <strong>90</strong>
-                    <p>RIASEC 六维结果</p>
-                </div>
-                <div class="assessment-stat-card wide">
-                    <span class="assessment-stat-label">AI 澄清状态</span>
-                    <strong id="assessmentConfigStatusLabel">未配置</strong>
-                    <p id="assessmentConfigStatusHint">仅在 MBTI 临界维度时调用</p>
                 </div>
             </div>
         </div>
@@ -257,8 +238,8 @@
                     <p class="assessment-extended-copy">适合复测，保留最近相邻记录。</p>
                     <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('deep', true)">开始</button>
-                        <button id="dtDeepResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('deep')" disabled>结果</button>
+                        <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('deep', true)">开始测试</button>
+                        <button id="dtDeepResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('deep')" disabled>查看结果</button>
                     </div>
                 </article>
 
@@ -273,8 +254,8 @@
                     <p class="assessment-extended-copy">用情景选择看角色偏向。</p>
                     <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('friends', true)">开始</button>
-                        <button id="dtFriendsResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('friends')" disabled>结果</button>
+                        <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('friends', true)">开始测试</button>
+                        <button id="dtFriendsResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('friends')" disabled>查看结果</button>
                     </div>
                 </article>
 
@@ -289,8 +270,8 @@
                     <p class="assessment-extended-copy">补充当前主导情绪倾向。</p>
                     <div id="dtIOResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
-                        <button type="button" class="assessment-inline-btn" onclick="openDeepTestRunnerPage('insideout', true)">开始</button>
-                        <button id="dtIOResultBtn" type="button" class="assessment-inline-btn secondary" onclick="openDeepTestResultPage('insideout')" disabled>结果</button>
+                        <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('insideout', true)">开始测试</button>
+                        <button id="dtIOResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('insideout')" disabled>查看结果</button>
                     </div>
                 </article>
             </div>

@@ -15,12 +15,13 @@
         "display_name": "System Admin"
       },
       "created_at": 1775491310,
-      "updated_at": 1775494910,
+      "updated_at": 1775613839,
       "pinned": false,
-      "views": 86,
+      "views": 87,
       "liked_by": [
         "23030134",
-        "24110403"
+        "24110403",
+        "system"
       ],
       "replies": [
         {
@@ -117,7 +118,7 @@
       ],
       "replies": [
         {
-          "id": "reply_mock_interview_two_rounds_1",
+          "id": "reply_mock_interview_two_rounds_",
           "content": "把每个项目拆成“背景、约束、方案、取舍、结果”五段去准备，深挖通常就是沿着取舍和约束继续追问。",
           "created_at": 1775487100,
           "author": {
@@ -126,7 +127,7 @@
           }
         },
         {
-          "id": "reply_mock_interview_two_rounds_2",
+          "id": "reply_mock_interview_two_rounds_",
           "content": "你可以先写一页项目问答卡，把最容易被问的 8 到 10 个问题和自己的回答先写下来，再口头讲几遍。",
           "created_at": 1775491400,
           "author": {
@@ -200,7 +201,7 @@
       "created_at": 1775479200,
       "updated_at": 1775489800,
       "pinned": false,
-      "views": 173,
+      "views": 174,
       "liked_by": [
         "23030134",
         "24151007"
@@ -387,7 +388,7 @@
       ],
       "replies": [
         {
-          "id": "reply_small_company_big_factory_1",
+          "id": "reply_small_company_big_factory_",
           "content": "第一段我更建议选能做出完整结果的岗位，因为这会直接决定你下一段实习有没有内容可讲。",
           "created_at": 1775473400,
           "author": {
@@ -396,7 +397,7 @@
           }
         },
         {
-          "id": "reply_small_company_big_factory_2",
+          "id": "reply_small_company_big_factory_",
           "content": "如果大厂那边的 mentor 很强、转正机制也不错，也不是不能去，关键看你能不能确认工作内容。",
           "created_at": 1775481000,
           "author": {

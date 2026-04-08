@@ -53,7 +53,7 @@
     deep: {
       pageTitle: "深层 MBTI 完整结果",
       sectionTitle: "深层 MBTI 完整结果",
-      sectionHint: "包含四维分布、AI 分析和最近两次测试对比。",
+      sectionHint: "包含四维分布、AI 分析和完整人格解读。",
     },
     friends: {
       pageTitle: "老友记角色完整结果",
@@ -632,58 +632,6 @@
     }).join("");
   }
 
-  function deepHistoryHtml() {
-    if (!Array.isArray(state.historyRuns) || state.historyRuns.length < 2) {
-      return '<p class="tr-muted">至少完成两次深层 MBTI 测试后，才会显示前后对比。</p>';
-    }
-    const prev = state.historyRuns[state.historyRuns.length - 2];
-    const cur = state.historyRuns[state.historyRuns.length - 1];
-    const labels = {
-      IE: ["外向E", "内向I"],
-      SN: ["直觉N", "感觉S"],
-      TF: ["情感F", "思考T"],
-      JP: ["感知P", "判断J"],
-    };
-    const axisTableTitles = {
-      IE: "外向—内向",
-      SN: "直觉—感觉",
-      TF: "情感—思考",
-      JP: "感知—判断",
-    };
-    const row = (axis) => {
-      const p = Number(prev.axisScores?.[axis] || 0);
-      const c = Number(cur.axisScores?.[axis] || 0);
-      const delta = c - p;
-      const pLabel = p >= 0 ? labels[axis][0] : labels[axis][1];
-      const cLabel = c >= 0 ? labels[axis][0] : labels[axis][1];
-      return `
-        <tr>
-          <td>${esc(axisTableTitles[axis] || axis)}</td>
-          <td>${p > 0 ? "+" : ""}${p}（${esc(pLabel)}）</td>
-          <td>${delta > 0 ? "+" : ""}${delta}</td>
-          <td>${c > 0 ? "+" : ""}${c}（${esc(cLabel)}）</td>
-        </tr>`;
-    };
-    return `
-      <p class="tr-muted">上次：${esc(formatDate(prev.savedAt))} ｜ 本次：${esc(formatDate(cur.savedAt))}</p>
-      <table class="tr-history-table">
-        <thead>
-          <tr>
-            <th>维度</th>
-            <th>上次</th>
-            <th>变化</th>
-            <th>本次</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${row("IE")}
-          ${row("SN")}
-          ${row("TF")}
-          ${row("JP")}
-        </tbody>
-      </table>`;
-  }
-
   function getOriginalSpiritAnimalImage(detail, type) {
     const label = String(detail?.spiritAnimal || "").trim();
     if (label) {
@@ -1103,11 +1051,6 @@
             `).join("")}
           </div>
         </article>` : ""}
-
-        <article class="tr-tyt-card">
-          <h3>最近两次测试对比</h3>
-          ${deepHistoryHtml()}
-        </article>
       </div>`;
   }
 

@@ -1,7 +1,6 @@
 *.doc
 *.md
 __pycache__/
-newsnow/
 *.ipynb
 .claude/
 .clawhub/

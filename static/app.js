@@ -125,7 +125,8 @@ const communityForumState = {
   sort: "hot",
   query: "",
   selectedPostId: "",
-  viewedIds: {}
+  viewedIds: {},
+  view: "list"
 };
 
 const CAREER_INTERVIEW_DIMENSIONS = ["职业兴趣", "工作价值观", "学习方式", "沟通风格", "行动证据", "职业成熟度"];
@@ -5125,11 +5126,9 @@ function addLiveActivity(message) {
 
 const careerNewsState = {
   initialized: false,
-  filter: "all",
-  sort: "newest",
   displayLimit: 10,
-  currentPage: 1,
-  pageSize: 5,     // 列表行每页条数
+  visibleCount: 10,
+  pageSize: 5,
   items: []
 };
 
@@ -5143,102 +5142,77 @@ function _careerNewsPublishedTs(el) {
   return Number.isFinite(guess) ? guess : 0;
 }
 
-function _careerNewsScore(el) {
-  const num = Number(el?.dataset?.score || 0);
-  return Number.isFinite(num) ? num : 0;
-}
-
-function _updateCareerNewsFilterBtnState() {
-  const bar = document.getElementById("careerNewsFilterBar");
-  if (!bar) return;
-  bar.querySelectorAll(".career-news-filter-btn").forEach((btn) => {
-    const on = String(btn.dataset.filter || "") === careerNewsState.filter;
-    btn.classList.toggle("bg-sky-50", on);
-    btn.classList.toggle("border-sky-200", on);
-    btn.classList.toggle("text-sky-700", on);
-    btn.classList.toggle("bg-white", !on);
-    btn.classList.toggle("border-slate-200", !on);
-    btn.classList.toggle("text-slate-600", !on);
-    btn.classList.toggle("font-semibold", on);
-    btn.classList.toggle("font-medium", !on);
-  });
-}
-
-function _applyCareerNewsBoard() {
-  const board = document.getElementById("careerNewsBoard");
-  const featured = document.getElementById("careerNewsFeatured");
-  const listRows = document.getElementById("careerNewsListRows");
-  const pagination = document.getElementById("careerNewsPagination");
-  if (!board || !featured || !listRows) return;
-
-  // 过滤
-  let working = [...careerNewsState.items];
-  if (careerNewsState.filter !== "all") {
-    working = working.filter((el) => String(el.dataset.group || "all") === careerNewsState.filter);
-  }
-
-  // 排序
+function _getCareerNewsWorkingItems() {
+  const working = [...careerNewsState.items];
   working.sort((a, b) => {
-    if (careerNewsState.sort === "relevance") {
-      const scoreDiff = _careerNewsScore(b) - _careerNewsScore(a);
-      if (scoreDiff !== 0) return scoreDiff;
-      return _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a);
-    }
     return _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a);
   });
+  return working;
+}
 
-  // 更新序号
+function _updateCareerNewsCarouselControls() {
+  const track = document.getElementById("careerNewsFeatured");
+  const prevBtn = document.getElementById("careerNewsPrevBtn");
+  const nextBtn = document.getElementById("careerNewsNextBtn");
+  if (!track || !prevBtn || !nextBtn) return;
+  const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+  const canScroll = maxScroll > 4;
+  prevBtn.disabled = !canScroll || track.scrollLeft <= 4;
+  nextBtn.disabled = !canScroll || track.scrollLeft >= maxScroll - 4;
+}
+
+function _careerNewsScrollStep(track) {
+  const first = track?.querySelector(".career-news-item");
+  if (!track || !first) return 320;
+  const styles = window.getComputedStyle(track);
+  const gap = Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+  return first.getBoundingClientRect().width + gap;
+}
+
+function _applyCareerNewsBoard(options = {}) {
+  const board = document.getElementById("careerNewsBoard");
+  const track = document.getElementById("careerNewsFeatured");
+  const parking = document.getElementById("careerNewsListRows");
+  const moreBtn = document.getElementById("careerNewsMoreBtn");
+  if (!board || !track) return;
+
+  const prevScroll = options.preserveScroll ? track.scrollLeft : 0;
+  const working = _getCareerNewsWorkingItems();
   working.forEach((el, idx) => {
     const rank = el.querySelector(".career-news-rank");
     if (rank) rank.textContent = String(idx + 1);
   });
 
-  // ── 精选大卡（第一条） ──
-  featured.innerHTML = "";
-  const featuredItem = working[0];
-  if (featuredItem) {
-    featuredItem.classList.remove("career-news-list-row");
-    featured.appendChild(featuredItem);
+  if (parking) {
+    careerNewsState.items.forEach((el) => {
+      el.classList.remove("career-news-slide");
+      parking.appendChild(el);
+    });
   }
 
-  // ── 分页列表行（第二条起） ──
-  const listItems = working.slice(1);
-  const totalPages = Math.max(1, Math.ceil(listItems.length / careerNewsState.pageSize));
-  careerNewsState.currentPage = Math.min(careerNewsState.currentPage, totalPages);
-
-  const startIdx = (careerNewsState.currentPage - 1) * careerNewsState.pageSize;
-  const pageItems = listItems.slice(startIdx, startIdx + careerNewsState.pageSize);
-
-  listRows.innerHTML = "";
-  pageItems.forEach((el) => {
-    el.classList.add("career-news-list-row");
-    listRows.appendChild(el);
+  track.innerHTML = "";
+  const visibleCount = Math.min(Math.max(0, careerNewsState.visibleCount), working.length);
+  working.slice(0, visibleCount).forEach((el) => {
+    el.classList.add("career-news-slide");
+    track.appendChild(el);
   });
 
-  // ── 分页控制 ──
-  if (pagination) {
-    if (totalPages <= 1) {
-      pagination.classList.add("hidden");
-    } else {
-      pagination.classList.remove("hidden");
-      const p = careerNewsState.currentPage;
-      pagination.innerHTML = `
-        <button class="career-news-page-btn" onclick="careerNewsGoPage(${p - 1})" ${p <= 1 ? "disabled" : ""}>← 上一页</button>
-        <span class="career-news-page-info">第 ${p} / ${totalPages} 页</span>
-        <button class="career-news-page-btn" onclick="careerNewsGoPage(${p + 1})" ${p >= totalPages ? "disabled" : ""}>下一页 →</button>
-      `;
-    }
+  if (moreBtn) {
+    const hasMore = visibleCount < working.length;
+    moreBtn.hidden = !hasMore;
+    moreBtn.disabled = !hasMore;
+    moreBtn.textContent = "More +";
   }
 
-  // ── 计数更新 ──
   const countEl = document.getElementById("careerNewsShowingCount");
   if (countEl) {
-    if (totalPages <= 1) {
-      countEl.textContent = `共 ${working.length} 条`;
-    } else {
-      countEl.textContent = `第 ${careerNewsState.currentPage} / ${totalPages} 页 · 共 ${working.length} 条`;
-    }
+    countEl.textContent = `当前展示 ${visibleCount} / ${working.length} 条`;
   }
+
+  requestAnimationFrame(() => {
+    track.scrollLeft = options.preserveScroll ? prevScroll : 0;
+    _updateCareerNewsCarouselControls();
+  });
 }
 
 function initCareerNewsBoard() {
@@ -5246,47 +5220,53 @@ function initCareerNewsBoard() {
   if (!board || careerNewsState.initialized) return;
   careerNewsState.initialized = true;
   careerNewsState.displayLimit = Math.max(1, Number(board.dataset.displayLimit || 10));
-  // 从数据池读取所有条目
+  careerNewsState.visibleCount = careerNewsState.displayLimit;
   const pool = document.getElementById("careerNewsPool");
   careerNewsState.items = [...(pool || board).querySelectorAll(".career-news-item")];
 
-  const bar = document.getElementById("careerNewsFilterBar");
-  if (bar) {
-    bar.addEventListener("click", (event) => {
-      const btn = event.target.closest(".career-news-filter-btn");
-      if (!btn) return;
-      careerNewsState.filter = String(btn.dataset.filter || "all");
-      careerNewsState.currentPage = 1; // 切换过滤重置到第1页
-      _updateCareerNewsFilterBtnState();
-      _applyCareerNewsBoard();
-    });
-  }
+  document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => careerNewsSlide(-1));
+  document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => careerNewsSlide(1));
+  document.getElementById("careerNewsMoreBtn")?.addEventListener("click", () => careerNewsLoadMore());
+  document.getElementById("careerNewsFeatured")?.addEventListener("scroll", () => {
+    window.requestAnimationFrame(_updateCareerNewsCarouselControls);
+  }, { passive: true });
+  window.addEventListener("resize", _updateCareerNewsCarouselControls);
 
-  const sortSelect = document.getElementById("careerNewsSortSelect");
-  if (sortSelect) {
-    sortSelect.addEventListener("change", () => {
-      careerNewsState.sort = String(sortSelect.value || "newest");
-      careerNewsState.currentPage = 1; // 切换排序重置到第1页
-      _applyCareerNewsBoard();
-    });
-  }
-
-  _updateCareerNewsFilterBtnState();
   _applyCareerNewsBoard();
 }
 
-// 分页跳转（替代原 toggleCareerNewsMore）
+function careerNewsSlide(direction = 1) {
+  if (!careerNewsState.initialized) initCareerNewsBoard();
+  const track = document.getElementById("careerNewsFeatured");
+  if (!track) return;
+  track.scrollBy({ left: _careerNewsScrollStep(track) * direction, behavior: "smooth" });
+  window.setTimeout(_updateCareerNewsCarouselControls, 260);
+}
+
+function careerNewsLoadMore() {
+  if (!careerNewsState.initialized) initCareerNewsBoard();
+  const track = document.getElementById("careerNewsFeatured");
+  const beforeWidth = track?.scrollWidth || 0;
+  careerNewsState.visibleCount += careerNewsState.pageSize;
+  _applyCareerNewsBoard({ preserveScroll: true });
+  if (track) {
+    window.setTimeout(() => {
+      track.scrollTo({ left: Math.max(0, beforeWidth), behavior: "smooth" });
+      _updateCareerNewsCarouselControls();
+    }, 60);
+  }
+}
+
+// 兼容旧调用
 function careerNewsGoPage(page) {
   if (!careerNewsState.initialized) initCareerNewsBoard();
-  careerNewsState.currentPage = Math.max(1, page);
-  _applyCareerNewsBoard();
-  // 平滑滚动到新闻板块顶部
+  if (Number(page) > 1) careerNewsLoadMore();
+  else careerNewsSlide(-1);
   const board = document.getElementById("careerNewsBoard");
   if (board) board.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// 兼容旧调用（以防模板中还有残留）
-function toggleCareerNewsMore() { careerNewsGoPage(careerNewsState.currentPage + 1); }
+function toggleCareerNewsMore() { careerNewsLoadMore(); }
 
 function clampPercent(value, fallback = 0) {
   const num = Number(value);
@@ -7614,97 +7594,201 @@ function renderMatchingWorkspace(profile, roles) {
     });
 }
 
-function renderReportWorkspace(profile, roles) {
-  const selected = roles.find((item) => item.id === appState.focusedRoleId) || roles[0] || null;
-  const bodyEl = document.getElementById("reportBody");
-  const headerName = document.getElementById("reportHeaderName");
-  const headerRole = document.getElementById("reportHeaderRole");
-  const headerScore = document.getElementById("reportHeaderScore");
-  const headerConfidence = document.getElementById("reportHeaderConfidence");
-  const statusTitle = document.getElementById("reportStatusTitle");
-  const statusHint = document.getElementById("reportStatusHint");
-  if (headerName) headerName.textContent = getCurrentUser()?.display_name || getCurrentUser()?.displayName || getCurrentUser()?.username || "当前用户";
-  if (headerRole) headerRole.textContent = selected?.name || "待确定岗位方向";
-  if (headerScore) headerScore.textContent = selected?.overallScore === null || selected?.overallScore === undefined ? "初筛" : `${selected.overallScore}%`;
-  if (headerConfidence) headerConfidence.textContent = selected ? `置信度 ${selected.confidence}` : "等待画像输入";
-  if (statusTitle) statusTitle.textContent = appState.reportGenerated ? "报告已按最新画像刷新" : "报告为可编辑草稿";
-  if (statusHint) statusHint.textContent = profile.missingItems.length
-    ? `仍有 ${profile.missingItems.length} 项待补充：${profile.missingItems[0]}`
-    : "关键输入已基本就绪，可直接使用这份报告作为行动底稿。";
-  if (!bodyEl) return;
-  if (!selected) {
-    bodyEl.innerHTML = `<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">当前还没有可生成的报告内容，请先完成测评和基础信息补充。</div>`;
-    return;
+const REPORT_AGENT_FLOW = [
+  { key: "profile_fusion", title: "画像输入", role: "Profile Intake", detail: "测评、简历、访谈与目标岗位快照", icon: "profile", x: 72, y: 282 },
+  { key: "industry_analysis", title: "行业分析师", role: "Industry Analyst", detail: "外部趋势与需求侧判断", icon: "trend", x: 360, y: 112, aliases: ["trend_intelligence"] },
+  { key: "resume_evidence", title: "简历证据分析官", role: "Resume Evidence Analyst", detail: "初筛经历证据与能力线索", icon: "file", x: 360, y: 452, aliases: ["resume_evidence_1"] },
+  { key: "career_positioning", title: "职业定位顾问", role: "Career Positioning Advisor", detail: "生成方向假设与硬约束", icon: "target", x: 650, y: 282, aliases: ["role_retrieval"] },
+  { key: "competency_assess", title: "能力评估官", role: "Competency Assessor", detail: "构建就业能力画像", icon: "radar", x: 950, y: 112, aliases: ["gap_analysis"] },
+  { key: "resume_evidence_2", title: "证据复核", role: "Resume Evidence Analyst", detail: "按 must_prove 二次校验", icon: "verify", x: 950, y: 452 },
+  { key: "role_match", title: "岗位匹配官", role: "Role Match Officer", detail: "对齐岗位矩阵与差距项", icon: "match", x: 1240, y: 282 },
+  { key: "path_planning", title: "路径规划师", role: "Career Path Planner", detail: "阶段路径与复查节点", icon: "route", x: 1530, y: 282, aliases: ["stage_planning"] },
+  { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic"] }
+];
+
+const REPORT_AGENT_NODE_WIDTH = 196;
+const REPORT_AGENT_NODE_MID_Y = 70;
+
+const REPORT_AGENT_EDGES = [
+  ["profile_fusion", "industry_analysis"],
+  ["profile_fusion", "resume_evidence"],
+  ["industry_analysis", "career_positioning"],
+  ["resume_evidence", "career_positioning"],
+  ["career_positioning", "competency_assess"],
+  ["career_positioning", "resume_evidence_2"],
+  ["resume_evidence_2", "competency_assess"],
+  ["competency_assess", "role_match"],
+  ["role_match", "path_planning"],
+  ["path_planning", "report_writer"]
+];
+
+function getReportRuntimeState() {
+  if (typeof window.getCareerReportStateSafe === "function") return window.getCareerReportStateSafe() || null;
+  return appState.careerReportState || null;
+}
+
+function getReportProgressMap(state) {
+  const map = new Map();
+  const progress = Array.isArray(state?.progress) ? state.progress : [];
+  progress.forEach((item) => {
+    const key = String(item?.key || item?.stage || "").trim();
+    if (key) map.set(key, String(item.status || "").trim().toLowerCase());
+  });
+  return map;
+}
+
+function reportAgentIconSvg(icon) {
+  const paths = {
+    profile: `<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>`,
+    trend: `<path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 3 5-7"/>`,
+    file: `<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M9.5 12h5"/><path d="M9.5 16h7"/>`,
+    target: `<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M22 12h-3"/><path d="M12 22v-3"/><path d="M2 12h3"/>`,
+    radar: `<path d="M12 3 4 20h16L12 3Z"/><path d="m12 8 3.6 8H8.4L12 8Z"/><path d="M12 3v17"/>`,
+    verify: `<path d="M12 3 5 6v5c0 4.4 2.8 8.4 7 10 4.2-1.6 7-5.6 7-10V6l-7-3Z"/><path d="m8.5 12.5 2.2 2.2 4.8-5"/>`,
+    match: `<path d="M8 7a4 4 0 0 1 8 0c0 4-4 7-4 7s-4-3-4-7Z"/><path d="M12 7h.01"/><path d="M5 21h14"/><path d="m7 17 10-4"/>`,
+    route: `<path d="M5 6h4a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h11"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/>`,
+    report: `<path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h3"/>`
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[icon] || paths.report}</svg>`;
+}
+
+function reportAgentStatusLabel(status) {
+  if (status === "done") return "已完成";
+  if (status === "active") return "传递中";
+  if (status === "failed") return "失败";
+  return "待触发";
+}
+
+function getReportUserAvatarHtml() {
+  const avatarState = typeof window.getAccountAvatarState === "function" ? window.getAccountAvatarState() : null;
+  const imageUrl = String(avatarState?.image_url || "").trim();
+  const user = typeof getCurrentUser === "function" ? getCurrentUser() : userWorkspaceState.currentUser;
+  const displayName = user?.display_name || user?.displayName || user?.username || "用户";
+  if (imageUrl) {
+    return `<span class="report-agent-user-avatar"><img src="${escHtml(imageUrl)}" alt="${escHtml(displayName)}"></span>`;
   }
-  const topRoles = roles.slice(0, 3).map((item) => `${item.name}${item.overallScore === null ? "（初筛）" : `（${item.overallScore}%）`}`);
-  const stagePlan = [
-    `本周：围绕 ${selected.name} 复盘现有经历，并补齐 ${selected.requiredSkills.slice(0, 2).join("、")} 相关证据。`,
-    "本月：根据报告中的差距项完成一项作品、项目或课程证明。",
-    "本季度：针对 Top 岗位投递实习、竞赛或项目机会，形成新的动态记忆。"
-  ];
-  bodyEl.innerHTML = `
-    <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <div class="space-y-6">
-        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h4 class="text-lg font-semibold text-slate-900">测评结论</h4>
-          <p class="mt-3 text-sm leading-7 text-slate-600">${escHtml(profile.summary)}</p>
-          <div class="mt-4 grid gap-3 md:grid-cols-2">
-            <div class="rounded-xl bg-white p-4">
-              <p class="text-xs text-slate-500">MBTI</p>
-              <p class="mt-1 font-semibold text-slate-900">${escHtml(profile.assessment?.mbti?.completed ? (profile.assessment.mbti.display_type || profile.assessment.mbti.final_type) : "待完成")}</p>
-            </div>
-            <div class="rounded-xl bg-white p-4">
-              <p class="text-xs text-slate-500">霍兰德</p>
-              <p class="mt-1 font-semibold text-slate-900">${escHtml(profile.assessment?.holland?.completed ? profile.assessment.holland.code : "待完成")}</p>
-            </div>
-          </div>
-        </section>
+  return `<span class="report-agent-user-avatar fallback">${escHtml(displayName.charAt(0).toUpperCase() || "用")}</span>`;
+}
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-6">
-          <h4 class="text-lg font-semibold text-slate-900">Top 岗位方向</h4>
-          <div class="mt-4">${careerListHtml(topRoles, "等待生成岗位方向")}</div>
-          <p class="mt-4 text-sm leading-7 text-slate-600">当前主推岗位为 ${escHtml(selected.name)}，路径建议：${escHtml(selected.path)}。</p>
-        </section>
+function reportAgentEdgePath(from, to) {
+  const x1 = Number(from.x || 0) + REPORT_AGENT_NODE_WIDTH;
+  const y1 = Number(from.y || 0) + REPORT_AGENT_NODE_MID_Y;
+  const x2 = Number(to.x || 0);
+  const y2 = Number(to.y || 0) + REPORT_AGENT_NODE_MID_Y;
+  const mid = Math.max(48, Math.abs(x2 - x1) * 0.46);
+  return `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`;
+}
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-6">
-          <h4 class="text-lg font-semibold text-slate-900">差距驱动行动计划</h4>
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <p class="text-sm font-semibold text-slate-800">重点缺口</p>
-              <div class="mt-3">${careerListHtml(selected.ability.gaps, "当前没有明显高优先级缺口，可直接强化项目证据。")}</div>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-slate-800">建议动作</p>
-              <div class="mt-3">${careerListHtml(selected.nextActions, "等待生成动作建议")}</div>
-            </div>
-          </div>
-        </section>
+function renderReportAgentMap(profile, roles) {
+  const state = getReportRuntimeState();
+  const progressMap = getReportProgressMap(state);
+  const status = String(state?.status || "").trim().toLowerCase();
+  const activeStage = String(state?.stage || state?.stage_key || "").trim();
+  const completed = appState.reportGenerated || ["ready", "done", "success", "completed"].includes(status);
+  const running = ["queued", "running"].includes(status);
+  const activeIndex = REPORT_AGENT_FLOW.findIndex((item) => [item.key, ...(item.aliases || [])].includes(activeStage));
+  const inputReady = Boolean(
+    profile?.assessment?.mbti?.completed
+    || profile?.assessment?.holland?.completed
+    || profile?.resume?.status === "analyzed"
+    || roles?.length
+  );
+
+  const nodes = REPORT_AGENT_FLOW.map((item, index) => {
+    const keys = [item.key, ...(item.aliases || [])];
+    const progressStatus = keys.map((key) => progressMap.get(key)).find(Boolean) || "";
+    let nodeStatus = "pending";
+    if (completed || progressStatus === "done" || (running && activeIndex >= 0 && index < activeIndex)) {
+      nodeStatus = "done";
+    } else if (progressStatus === "active" || progressStatus === "running" || index === activeIndex || (running && activeIndex < 0 && index === 0)) {
+      nodeStatus = "active";
+    } else if (progressStatus === "failed" || status === "failed") {
+      nodeStatus = "failed";
+    } else if (index === 0 && inputReady) {
+      nodeStatus = "done";
+    }
+    return { ...item, nodeStatus };
+  });
+  const nodeMap = new Map(nodes.map((item) => [item.key, item]));
+  const edges = REPORT_AGENT_EDGES.map(([fromKey, toKey]) => {
+    const from = nodeMap.get(fromKey);
+    const to = nodeMap.get(toKey);
+    if (!from || !to) return "";
+    const edgeStatus = to.nodeStatus === "active"
+      ? "active"
+      : from.nodeStatus === "done" && to.nodeStatus === "done"
+        ? "done"
+        : "pending";
+    return `<path class="report-agent-edge is-${edgeStatus}" d="${reportAgentEdgePath(from, to)}"></path>`;
+  }).join("");
+
+  const nodeHtml = nodes.map((item, index) => `
+    <article class="report-agent-node is-${escHtml(item.nodeStatus)}" style="left:${Number(item.x || 0)}px; top:${Number(item.y || 0)}px;">
+      <span class="report-agent-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="report-agent-icon">${item.key === "profile_fusion" ? getReportUserAvatarHtml() : reportAgentIconSvg(item.icon)}</span>
+      <div class="report-agent-copy">
+        <h4>${escHtml(item.title)}</h4>
+        <p>${escHtml(item.role)}</p>
+        <small>${escHtml(item.detail)}</small>
       </div>
+      <b>${escHtml(reportAgentStatusLabel(item.nodeStatus))}</b>
+    </article>
+  `).join("");
 
-      <div class="space-y-6">
-        <section class="rounded-2xl border border-slate-200 bg-white p-6">
-          <h4 class="text-lg font-semibold text-slate-900">阶段性职业规划</h4>
-          <div class="mt-4">${careerListHtml(stagePlan, "等待生成阶段计划")}</div>
-        </section>
-
-        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h4 class="text-lg font-semibold text-slate-900">工作价值观与偏好</h4>
-          <div class="mt-4">${careerTagHtml(profile.workValues, "待补充价值观", "soft")}</div>
-          <p class="mt-4 text-sm text-slate-600 leading-6">专业：${escHtml(profile.basics.major || "待补充")}｜学历：${escHtml(profile.basics.grade || "待补充")}｜目标城市：${escHtml(profile.basics.target_city || "待补充")}</p>
-        </section>
-
-        <section class="rounded-2xl border border-slate-200 bg-white p-6">
-          <h4 class="text-lg font-semibold text-slate-900">待接入模块</h4>
-          <div class="mt-4 space-y-3 text-sm text-slate-600">
-            <div class="rounded-xl border border-dashed border-slate-300 p-4">资源推荐：已保留接口，后续对接课程、证书和模板库。</div>
-            <div class="rounded-xl border border-dashed border-slate-300 p-4">趋势分析：已保留接口，后续接入岗位市场趋势。</div>
-            <div class="rounded-xl border border-dashed border-slate-300 p-4">提醒追踪：已保留接口，后续接入任务提醒与复盘节奏。</div>
-          </div>
-        </section>
-      </div>
+  return `
+    <div class="report-agent-map-inner">
+      <div class="report-agent-phase phase-input">输入</div>
+      <div class="report-agent-phase phase-parallel">并行分析</div>
+      <div class="report-agent-phase phase-serial">依赖汇合</div>
+      <div class="report-agent-phase phase-output">输出</div>
+      <svg class="report-agent-edges" viewBox="0 0 2040 720" preserveAspectRatio="none" aria-hidden="true">${edges}</svg>
+      ${nodeHtml}
+      <div class="report-agent-note">A 组并行：行业趋势与简历证据初筛同时处理；后续阶段按数据依赖汇合，不暴露 agent 内部正文。</div>
     </div>
   `;
-  updateReportDates(new Date());
+}
+
+function renderReportWorkspace(profile, roles) {
+  const safeRoles = Array.isArray(roles) ? roles : [];
+  const state = getReportRuntimeState();
+  const status = String(state?.status || "").trim().toLowerCase();
+  const running = ["queued", "running"].includes(status);
+  const failed = status === "failed";
+  const selected = safeRoles.find((item) => item.id === appState.focusedRoleId) || safeRoles[0] || null;
+  const statusTitle = document.getElementById("reportStatusTitle");
+  const statusHint = document.getElementById("reportStatusHint");
+  const generatedTime = document.getElementById("reportGeneratedTime");
+  const launchBtn = document.getElementById("reportLaunchBtn");
+  const mapEl = document.getElementById("reportAgentMap");
+  const missingCount = Array.isArray(profile?.missingItems) ? profile.missingItems.length : 0;
+  const focusText = selected?.name ? `当前主线岗位：${selected.name}` : "当前还没有锁定主线岗位";
+
+  if (statusTitle) {
+    statusTitle.textContent = failed
+      ? "多智能体流程启动失败"
+      : running
+        ? "多智能体正在协作"
+        : appState.reportGenerated
+          ? "流程已完成，报告已同步"
+          : "等待启动多智能体流程";
+  }
+  if (statusHint) {
+    statusHint.textContent = failed
+      ? (state?.error_message || "请检查画像输入和模型配置后重试。")
+      : running
+        ? (state?.stage_detail || "当前只展示 agent 之间的传递状态，报告正文不会在本页展开。")
+        : missingCount
+          ? `${focusText}；仍有 ${missingCount} 项画像信息可补充。`
+          : `${focusText}；可以启动生成，完成后到个人中心阅读完整报告。`;
+  }
+  if (generatedTime) {
+    generatedTime.textContent = state?.updated_at || state?.finished_at || state?.created_at || new Date().toLocaleString("zh-CN", { hour12: false });
+  }
+  if (launchBtn) {
+    launchBtn.disabled = running;
+    launchBtn.textContent = running ? "生成中" : "启动生成";
+  }
+  if (mapEl) mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
 }
 
 let unifiedRefreshScheduled = false;
@@ -7997,11 +8081,10 @@ function updateLiveClock() {
   const displayName = getCurrentUser()?.display_name || getCurrentUser()?.displayName || getCurrentUser()?.username || "同学";
   const h = now.getHours();
   let greeting = "晚上好";
-  let icon = "☾";
-  if (h >= 6 && h < 12) { greeting = "早上好"; icon = "☀"; }
-  if (h >= 12 && h < 18) { greeting = "下午好"; icon = "🌤"; }
+  if (h >= 6 && h < 12) greeting = "早上好";
+  if (h >= 12 && h < 18) greeting = "下午好";
   const dayIndex = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
-  if (title) title.textContent = `${greeting}，${displayName}${icon}`;
+  if (title) title.textContent = `${greeting}，${displayName}`;
   if (subtitle) subtitle.textContent = `今天是 ${formatDateCN(now)}，年度第 ${dayIndex} 天，系统正在用最新测评、访谈和基础信息更新你的职业画像。`;
 }
 
@@ -8091,7 +8174,7 @@ function markReportGenerated(source = "view") {
 
 function showSection(sectionId) {
   if (sectionId === appState.currentSection) return;
-  const sections = ["dashboard", "jobs", "profile", "matching", "report", "forum", "qa"];
+  const sections = ["dashboard", "jobs", "profile", "matching", "report", "forum"];
   sections.forEach((id) => {
     const section = document.getElementById(id);
     // 优先使用 data-section 选择导航按钮，避免依赖 onclick 选择器。
@@ -8110,7 +8193,7 @@ function showSection(sectionId) {
   appState.currentSection = sectionId;
   // 更新 URL hash，让 return-nav 能记录当前 section，返回时恢复正确页面
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
-  if (sectionId === "report") markReportGenerated();
+  if (sectionId === "report") renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
   if (sectionId === "jobs" && allJobsData.length === 0) loadJobs();
   if (sectionId === "forum") {
     void ensureCommunityForumLoaded();
@@ -8651,7 +8734,7 @@ function initAnimations() {
         }
       });
     }, { threshold: 0.12 });
-    document.querySelectorAll(".glass-surface, .product-hero-card, .product-gallery-card").forEach((el) => observer.observe(el));
+    document.querySelectorAll(".glass-surface, .cs-panel, .cs-feature-card, .career-news-item").forEach((el) => observer.observe(el));
   }
 }
 
@@ -8740,7 +8823,7 @@ document.addEventListener("DOMContentLoaded", function () {
     refreshUnifiedExperience();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
-      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "forum", "qa"];
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "forum"];
       const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
       if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
         showSection(hashId);
@@ -8773,19 +8856,15 @@ function getCommunityForumPostById(postId) {
   return (communityForumState.posts || []).find((item) => String(item.id) === String(postId || "")) || null;
 }
 
-function upsertCommunityForumPost(post) {
-  if (!post || !post.id) return;
+function upsertCommunityForumPost(updated) {
   const next = [];
-  let replaced = false;
   (communityForumState.posts || []).forEach((item) => {
-    if (String(item.id) === String(post.id)) {
-      next.push(post);
-      replaced = true;
+    if (String(item.id) === String(updated.id)) {
+      next.push({ ...item, ...updated });
     } else {
       next.push(item);
     }
   });
-  if (!replaced) next.unshift(post);
   communityForumState.posts = next;
 }
 
@@ -8794,22 +8873,18 @@ function applyCommunityForumFeed(payload) {
   communityForumState.boards = Array.isArray(payload?.boards) ? payload.boards : [];
   communityForumState.hotTags = Array.isArray(payload?.hot_tags) ? payload.hot_tags : [];
   communityForumState.stats = payload?.stats && typeof payload.stats === "object"
-    ? payload.stats
-    : { threads: 0, today_posts: 0, active_users: 0, unanswered: 0 };
+    ? payload.stats : { threads: 0, today_posts: 0, active_users: 0, unanswered: 0 };
   if (!getCommunityForumPostById(communityForumState.selectedPostId)) {
     communityForumState.selectedPostId = communityForumState.posts[0]?.id || "";
   }
 }
 
 function getCommunityForumHotScore(post) {
-  const createdAt = Number(post?.created_at || post?.updated_at || 0);
-  const ageHours = createdAt ? Math.max(0, (Date.now() / 1000 - createdAt) / 3600) : 999;
-  const freshness = Math.max(0, 72 - ageHours);
-  return (post?.pinned ? 60 : 0)
-    + Number(post?.reply_count || 0) * 7
-    + Number(post?.likes || 0) * 5
-    + Number(post?.views || 0) * 0.08
-    + freshness;
+  const views = Number(post?.views || 0);
+  const likes = Number(post?.likes || 0);
+  const replies = Number(post?.reply_count || 0);
+  const ageHours = (Date.now() / 1000 - Number(post?.created_at || 0)) / 3600;
+  return (views * 0.5 + likes * 2 + replies * 3) / Math.max(1, Math.pow(ageHours + 2, 1.2));
 }
 
 function getCommunityForumFilteredPosts() {
@@ -8818,32 +8893,39 @@ function getCommunityForumFilteredPosts() {
   const sort = String(communityForumState.sort || "hot");
   let posts = Array.isArray(communityForumState.posts) ? [...communityForumState.posts] : [];
   if (board !== "all") {
-    posts = posts.filter((item) => String(item.board || "") === board);
+    posts = posts.filter((p) => String(p.board || "") === board);
   }
   if (query) {
-    posts = posts.filter((item) => {
-      const blob = [
-        item.title,
-        item.content,
-        item.board,
-        (item.tags || []).join(" "),
-        item.author?.display_name
-      ].join(" ").toLowerCase();
-      return blob.includes(query);
+    posts = posts.filter((p) => {
+      const text = [p.title, p.content, ...(p.tags || [])].filter(Boolean).join(" ").toLowerCase();
+      return text.includes(query);
     });
   }
   posts.sort((a, b) => {
-    const pinDiff = Number(Boolean(b?.pinned)) - Number(Boolean(a?.pinned));
-    if (pinDiff) return pinDiff;
-    if (sort === "latest") return Number(b?.updated_at || 0) - Number(a?.updated_at || 0);
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    if (sort === "latest") return Number(b.created_at || 0) - Number(a.created_at || 0);
     if (sort === "unanswered") {
       const replyDiff = Number(a?.reply_count || 0) - Number(b?.reply_count || 0);
       if (replyDiff) return replyDiff;
-      return Number(b?.updated_at || 0) - Number(a?.updated_at || 0);
+      return Number(b.updated_at || 0) - Number(a.updated_at || 0);
     }
     return getCommunityForumHotScore(b) - getCommunityForumHotScore(a);
   });
   return posts;
+}
+
+// 切换三视图：list / detail / compose
+function showForumView(view) {
+  communityForumState.view = view;
+  const viewMap = { list: "forumListView", detail: "forumDetailView", compose: "forumComposeView" };
+  Object.values(viewMap).forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("hidden");
+  });
+  const target = document.getElementById(viewMap[view]);
+  if (target) target.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderCommunityForumBoardFilters() {
@@ -8864,11 +8946,11 @@ function renderCommunityForumBoardFilters() {
       <button
         type="button"
         onclick="setCommunityForumBoard('${key}')"
-        class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${active ? "border-slate-900 bg-slate-900 text-white shadow-sm" : `${meta.chip} hover:-translate-y-0.5`}"
+        class="flex items-center gap-2.5 w-full rounded-xl px-3 py-2.5 text-sm font-medium transition-all text-left ${active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}"
       >
-        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[11px]">${escHtml(meta.icon)}</span>
-        <span>${escHtml(String(item.label || key))}</span>
-        <span class="${active ? "text-white/80" : "text-slate-500"}">${Number(item.count || 0)}</span>
+        <span class="flex-none inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs ${active ? "bg-white/20" : "bg-slate-100"}">${escHtml(meta.icon)}</span>
+        <span class="flex-1 truncate">${escHtml(String(item.label || key))}</span>
+        <span class="text-xs ${active ? "text-white/50" : "text-slate-400"}">${Number(item.count || 0)}</span>
       </button>
     `;
   }).join("");
@@ -8886,7 +8968,7 @@ function renderCommunityForumSortFilters() {
     <button
       type="button"
       onclick="setCommunityForumSort('${item.key}')"
-      class="rounded-full border px-3 py-2 text-xs font-semibold transition ${communityForumState.sort === item.key ? "border-violet-600 bg-violet-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"}"
+      class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${communityForumState.sort === item.key ? "border-amber-400 bg-amber-400 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-700"}"
     >
       ${item.label}
     </button>
@@ -8897,7 +8979,7 @@ function renderCommunityForumHotTags() {
   const container = document.getElementById("forumHotTags");
   if (!container) return;
   if (!communityForumState.hotTags.length) {
-    container.innerHTML = '<p class="text-sm text-slate-400">还没有生成热议标签，先发一条讨论试试看。</p>';
+    container.innerHTML = '<p class="text-xs text-slate-400">发帖后自动生成热议标签</p>';
     return;
   }
   container.innerHTML = communityForumState.hotTags.map((item) => {
@@ -8907,9 +8989,9 @@ function renderCommunityForumHotTags() {
       <button
         type="button"
         onclick="applyCommunityForumTag(${safeTag})"
-        class="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:-translate-y-0.5 hover:bg-amber-100"
+        class="rounded-full bg-amber-50 border border-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition hover:bg-amber-100"
       >
-        #${escHtml(tagText)} <span class="ml-1 text-amber-500">${Number(item.count || 0)}</span>
+        #${escHtml(tagText)}<span class="ml-1 text-amber-400">${Number(item.count || 0)}</span>
       </button>
     `;
   }).join("");
@@ -8920,48 +9002,74 @@ function renderCommunityForumList() {
   const listEl = document.getElementById("forumThreadList");
   if (!summaryEl || !listEl) return;
   if (communityForumState.loading && !communityForumState.loaded) {
-    summaryEl.textContent = "正在同步讨论内容...";
-    listEl.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">帖子正在加载中...</div>';
+    summaryEl.textContent = "正在加载讨论内容...";
+    listEl.innerHTML = [1, 2, 3].map(() => `
+      <div class="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
+        <div class="h-3 bg-slate-100 rounded w-1/4 mb-4"></div>
+        <div class="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
+        <div class="h-3 bg-slate-100 rounded w-full mb-1"></div>
+        <div class="h-3 bg-slate-100 rounded w-2/3"></div>
+      </div>
+    `).join("");
     return;
   }
   const posts = getCommunityForumFilteredPosts();
-  summaryEl.textContent = `当前显示 ${posts.length} 条讨论，排序方式：${communityForumState.sort === "hot" ? "最热" : (communityForumState.sort === "latest" ? "最新" : "待回复")}`;
+  const sortLabel = { hot: "最热", latest: "最新", unanswered: "待回复" }[communityForumState.sort] || "最热";
+  summaryEl.textContent = `${posts.length} 条讨论 · ${sortLabel}`;
   if (!posts.length) {
-    listEl.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">这个筛选条件下还没有帖子，换个关键词，或者你先发起第一条讨论。</div>';
+    listEl.innerHTML = `
+      <div class="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+        <p class="text-slate-400 text-sm">这个条件下还没有帖子</p>
+        <button type="button" onclick="showForumView('compose')" class="mt-3 text-sm text-amber-600 hover:underline">发起第一条讨论</button>
+      </div>
+    `;
     return;
   }
   listEl.innerHTML = posts.map((post) => {
     const meta = getCommunityBoardMeta(post.board);
-    const active = String(post.id) === String(communityForumState.selectedPostId || "");
-    const excerpt = String(post.content || "").length > 120
-      ? `${String(post.content || "").slice(0, 120)}...`
+    const excerpt = String(post.content || "").length > 100
+      ? `${String(post.content || "").slice(0, 100)}...`
       : String(post.content || "");
     const tags = (post.tags || []).slice(0, 3);
     return `
       <button
         type="button"
         onclick="selectCommunityPost('${post.id}')"
-        class="block w-full rounded-[1.5rem] border p-5 text-left transition ${active ? "border-rose-300 bg-rose-50/70 shadow-sm" : "border-slate-200 bg-slate-50/70 hover:border-rose-200 hover:bg-white"}"
+        class="block w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left transition hover:border-amber-200 hover:shadow-md group"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.chip}">
-            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/80">${escHtml(meta.icon)}</span>
-            ${escHtml(meta.label)}
-          </span>
-          ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">置顶</span>' : ""}
-          ${Number(post.reply_count || 0) === 0 ? '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">待回复</span>' : ""}
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+              <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.chip}">
+                <span class="text-[10px]">${escHtml(meta.icon)}</span>${escHtml(meta.label)}
+              </span>
+              ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">置顶</span>' : ""}
+              ${Number(post.reply_count || 0) === 0 ? '<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">待回复</span>' : ""}
+            </div>
+            <h4 class="text-base font-bold text-slate-900 leading-snug group-hover:text-amber-700 transition-colors">${escHtml(post.title || "")}</h4>
+            <p class="mt-1.5 text-sm text-slate-500 leading-relaxed line-clamp-2">${escHtml(excerpt)}</p>
+            ${tags.length ? `<div class="mt-2 flex flex-wrap gap-1">${tags.map((tag) => `<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">#${escHtml(tag)}</span>`).join("")}</div>` : ""}
+          </div>
+          <div class="flex-none text-right space-y-1.5 text-xs text-slate-400 pl-2 min-w-[3rem]">
+            <div class="font-medium">${Number(post.reply_count || 0)}<span class="block text-[10px] font-normal">回复</span></div>
+            <div>${Number(post.likes || 0)}<span class="block text-[10px]">赞</span></div>
+          </div>
         </div>
-        <h4 class="mt-3 text-lg font-bold leading-7 text-slate-900">${escHtml(post.title || "")}</h4>
-        <p class="mt-2 text-sm leading-6 text-slate-600">${escHtml(excerpt)}</p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          ${tags.map((tag) => `<span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500">#${escHtml(tag)}</span>`).join("")}
-        </div>
-        <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <span>${escHtml(post.author?.display_name || "匿名同学")}</span>
-          <span>${formatRelativeTimeCN(post.updated_at || post.created_at)}</span>
-          <span>${Number(post.views || 0)} 浏览</span>
-          <span>${Number(post.likes || 0)} 点赞</span>
-          <span>${Number(post.reply_count || 0)} 回复</span>
+        <div class="mt-3 flex items-center justify-between gap-2 text-xs text-slate-400 border-t border-slate-50 pt-3">
+          <div class="flex items-center gap-2">
+            <span class="font-medium text-slate-600">${escHtml(post.author?.display_name || "匿名同学")}</span>
+            <span>·</span>
+            <span>${formatRelativeTimeCN(post.updated_at || post.created_at)}</span>
+            <span>·</span>
+            <span>${Number(post.views || 0)} 浏览</span>
+          </div>
+          <button
+            type="button"
+            onclick="event.stopPropagation(); toggleCommunityPostLike('${post.id}')"
+            class="flex items-center gap-1 rounded-full px-2.5 py-1 border transition ${post.liked ? 'border-rose-200 bg-rose-50 text-rose-500' : 'border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-500'}"
+          >
+            ${post.liked ? "❤️" : "🤍"} <span>${Number(post.likes || 0)}</span>
+          </button>
         </div>
       </button>
     `;
@@ -8974,71 +9082,72 @@ function renderCommunityForumDetail() {
   if (!container || !badge) return;
   const post = getCommunityForumPostById(communityForumState.selectedPostId);
   if (!post) {
-    badge.textContent = "等待选择帖子";
-    container.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500">从左侧帖子大厅选择一条讨论，这里会展示正文、回复和互动入口。</div>';
+    badge.textContent = "分区";
+    badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600";
+    container.innerHTML = "";
     return;
   }
   const meta = getCommunityBoardMeta(post.board);
+  badge.textContent = meta.label;
+  badge.className = `text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.chip}`;
   const replies = Array.isArray(post.replies) ? post.replies : [];
   const replyHtml = replies.length
-    ? replies.map((item) => `
-        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span class="font-semibold text-slate-700">${escHtml(item.author?.display_name || "匿名同学")}</span>
-            <span>${formatRelativeTimeCN(item.created_at)}</span>
+    ? replies.map((item, idx) => `
+        <div class="flex gap-3">
+          <div class="flex-none w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">${idx + 1}</div>
+          <div class="flex-1 min-w-0 pb-4 ${idx < replies.length - 1 ? "border-b border-slate-100" : ""}">
+            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1.5">
+              <span class="font-semibold text-slate-700">${escHtml(item.author?.display_name || "匿名同学")}</span>
+              <span>·</span>
+              <span>${formatRelativeTimeCN(item.created_at)}</span>
+            </div>
+            <p class="text-sm text-slate-700 leading-relaxed">${escHtml(item.content || "")}</p>
           </div>
-          <p class="mt-2 text-sm leading-6 text-slate-700">${escHtml(item.content || "")}</p>
         </div>
       `).join("")
-    : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">这条帖子还没有收到回复，你可以成为第一个回帖的人。</div>';
-  badge.textContent = meta.label;
+    : '<p class="text-sm text-slate-400 text-center py-8">还没有回复，来第一个发言吧</p>';
   container.innerHTML = `
-    <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.chip}">
-            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/80">${escHtml(meta.icon)}</span>
-            ${escHtml(meta.label)}
-          </span>
-          ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">置顶讨论</span>' : ""}
-        </div>
+    <div>
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <h4 class="text-xl font-bold text-slate-900 leading-snug flex-1">${escHtml(post.title || "")}</h4>
         <button
           type="button"
           onclick="toggleCommunityPostLike('${post.id}')"
-          class="rounded-full border px-3 py-2 text-xs font-semibold transition ${post.liked ? "border-rose-200 bg-rose-100 text-rose-700" : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-700"}"
+          class="flex-none inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 border text-xs font-semibold transition ${post.liked ? "border-rose-200 bg-rose-50 text-rose-600" : "border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-600"}"
         >
-          ${post.liked ? "已赞" : "点赞"} · ${Number(post.likes || 0)}
+          ${post.liked ? "❤️" : "🤍"} ${Number(post.likes || 0)}
         </button>
       </div>
-      <h4 class="mt-4 text-2xl font-bold leading-9 text-slate-900">${escHtml(post.title || "")}</h4>
-      <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        <span>楼主：${escHtml(post.author?.display_name || "匿名同学")}</span>
-        <span>发布于 ${formatRelativeTimeCN(post.created_at)}</span>
+      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-4">
+        <span class="font-medium text-slate-700">${escHtml(post.author?.display_name || "匿名同学")}</span>
+        <span>·</span>
+        <span>${formatRelativeTimeCN(post.created_at)}</span>
+        <span>·</span>
         <span>${Number(post.views || 0)} 浏览</span>
+        <span>·</span>
         <span>${Number(post.reply_count || 0)} 回复</span>
       </div>
-      <div class="mt-4 flex flex-wrap gap-2">
-        ${(post.tags || []).map((tag) => {
-          const safeTag = JSON.stringify(String(tag || ""));
-          return `<button type="button" onclick="applyCommunityForumTag(${safeTag})" class="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100">#${escHtml(tag)}</button>`;
-        }).join("")}
+      ${(post.tags || []).length ? `
+        <div class="flex flex-wrap gap-1.5 mb-4">
+          ${(post.tags || []).map((tag) => {
+            const safeTag = JSON.stringify(String(tag || ""));
+            return `<button type="button" onclick="applyCommunityForumTag(${safeTag})" class="rounded-full bg-slate-100 hover:bg-amber-100 px-2.5 py-1 text-xs text-slate-500 hover:text-amber-700 transition">#${escHtml(tag)}</button>`;
+          }).join("")}
+        </div>` : ""}
+      <div class="bg-slate-50 rounded-xl border border-slate-100 px-5 py-4 text-sm leading-7 text-slate-700 whitespace-pre-line mb-6">${escHtml(post.content || "")}</div>
+      <div class="mb-4 flex items-center justify-between">
+        <h5 class="text-sm font-bold text-slate-700">回复 <span class="text-slate-400 font-normal ml-1">${replies.length}</span></h5>
+        <span class="text-xs text-slate-400">最近更新：${formatRelativeTimeCN(post.last_reply_at || post.updated_at || post.created_at)}</span>
       </div>
-      <div class="mt-5 rounded-2xl border border-white bg-white px-5 py-4 text-sm leading-7 text-slate-700 shadow-sm">
-        ${escHtml(post.content || "")}
-      </div>
-      <div class="mt-6">
-        <div class="flex items-center justify-between gap-3">
-          <h5 class="text-base font-bold text-slate-900">回复区</h5>
-          <span class="text-xs text-slate-500">最近更新：${formatRelativeTimeCN(post.last_reply_at || post.updated_at || post.created_at)}</span>
-        </div>
-        <div class="mt-4 space-y-3">${replyHtml}</div>
-      </div>
-      <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label for="forumReplyInput" class="mb-2 block text-sm font-medium text-slate-700">写个回复</label>
-        <textarea id="forumReplyInput" rows="4" maxlength="1200" placeholder="比如：你目前最缺的是哪一部分、已经投了哪些岗位、卡在什么反馈上？" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"></textarea>
-        <div class="mt-3 flex items-center justify-between gap-3">
-          <p class="text-xs text-slate-500">回复越具体，越容易收到真正有帮助的建议。</p>
-          <button type="button" onclick="submitCommunityReply('${post.id}')" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+      <div class="space-y-1 mb-6">${replyHtml}</div>
+      <div class="border-t border-slate-100 pt-5">
+        <label for="forumReplyInput" class="block text-sm font-medium text-slate-700 mb-2">写回复</label>
+        <textarea id="forumReplyInput" rows="4" maxlength="1200"
+          placeholder="比如：你目前最缺的是哪一部分、已经投了哪些岗位、卡在什么反馈上？"
+          class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"></textarea>
+        <div class="mt-3 flex items-center justify-end">
+          <button type="button" onclick="submitCommunityReply('${post.id}')"
+            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
             发送回复
           </button>
         </div>
@@ -9060,7 +9169,9 @@ function renderCommunityForum() {
   renderCommunityForumSortFilters();
   renderCommunityForumHotTags();
   renderCommunityForumList();
-  renderCommunityForumDetail();
+  if (communityForumState.view === "detail") {
+    renderCommunityForumDetail();
+  }
 }
 
 async function ensureCommunityForumLoaded(force = false) {
@@ -9086,6 +9197,7 @@ async function ensureCommunityForumLoaded(force = false) {
 
 function setCommunityForumBoard(board) {
   communityForumState.board = String(board || "all");
+  showForumView("list");
   renderCommunityForum();
 }
 
@@ -9099,6 +9211,7 @@ function applyCommunityForumTag(tag) {
   const value = String(tag || "").trim();
   communityForumState.query = value;
   if (input) input.value = value;
+  showForumView("list");
   renderCommunityForum();
 }
 
@@ -9106,7 +9219,8 @@ async function selectCommunityPost(postId, options = {}) {
   const normalizedId = String(postId || "").trim();
   if (!normalizedId) return;
   communityForumState.selectedPostId = normalizedId;
-  renderCommunityForum();
+  showForumView("detail");
+  renderCommunityForumDetail();
   if (options.trackView === false || communityForumState.viewedIds[normalizedId]) return;
   communityForumState.viewedIds[normalizedId] = true;
   try {
@@ -9115,7 +9229,7 @@ async function selectCommunityPost(postId, options = {}) {
     });
     if (payload?.post) {
       upsertCommunityForumPost(payload.post);
-      renderCommunityForum();
+      renderCommunityForumDetail();
     }
   } catch (error) {
     console.warn("community forum view update failed", error);
@@ -9152,7 +9266,8 @@ async function submitCommunityPost() {
     if (titleEl) titleEl.value = "";
     if (tagsEl) tagsEl.value = "";
     if (contentEl) contentEl.value = "";
-    renderCommunityForum();
+    showForumView("detail");
+    renderCommunityForumDetail();
     addLiveActivity(`Community post published: ${title}`);
     appState.notifications = Math.min(9, appState.notifications + 1);
     updateNotificationCount();
@@ -9180,7 +9295,7 @@ async function submitCommunityReply(postId) {
       communityForumState.viewedIds[payload.post.id] = true;
     }
     if (replyEl) replyEl.value = "";
-    renderCommunityForum();
+    renderCommunityForumDetail();
     addLiveActivity("Community reply sent");
     appState.notifications = Math.min(9, appState.notifications + 1);
     updateNotificationCount();
@@ -9197,7 +9312,11 @@ async function toggleCommunityPostLike(postId) {
     });
     if (payload?.post) {
       upsertCommunityForumPost(payload.post);
-      renderCommunityForum();
+      // 同时刷新列表卡片（点赞数/状态）和详情视图
+      renderCommunityForumList();
+      if (communityForumState.view === "detail") {
+        renderCommunityForumDetail();
+      }
     }
   } catch (error) {
     showToast("点赞失败", error.message, "warning", 2000);
@@ -9205,6 +9324,7 @@ async function toggleCommunityPostLike(postId) {
 }
 
 function scrollToForumComposer() {
+  showForumView("compose");
   const target = document.getElementById("forumComposerCard");
   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -9221,42 +9341,6 @@ function initCommunityForumEvents() {
   renderCommunityForum();
 }
 
-function fillQAQuestion(question) {
-  const input = document.getElementById("qaInput");
-  if (input) {
-    input.value = question;
-    input.focus();
-  }
-}
-
-function submitQAQuestion() {
-  const input = document.getElementById("qaInput");
-  if (!input || !input.value.trim()) {
-    showToast("提示", "请先输入你的职业问题", "warning", 2000);
-    return;
-  }
-  showToast(
-    "职业问答",
-    `RAG 引擎正在接入中，当前可先参考下方预置问答示例。问题已记录：${input.value.substring(0, 20)}...`,
-    "info",
-    3000
-  );
-}
-
-function expandQA(el) {
-  const content = el.querySelector(".hidden, .block");
-  const arrow = el.querySelector("span:last-child");
-  if (!content) return;
-  if (content.classList.contains("hidden")) {
-    content.classList.remove("hidden");
-    content.classList.add("block");
-    if (arrow) arrow.textContent = "▴";
-  } else {
-    content.classList.add("hidden");
-    content.classList.remove("block");
-    if (arrow) arrow.textContent = "▾";
-  }
-}
 
 // ── 设置面板（头像点击） ────────────────────────────────────────────────────────
 

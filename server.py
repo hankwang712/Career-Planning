@@ -29,7 +29,13 @@ from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from services.news import get_career_news_payload, get_kb_stats, search_news_kb
+from services.news import (
+    get_career_news_payload,
+    get_kb_stats,
+    search_news_kb,
+    search_news_for_agent,
+    format_rag_context,
+)
 from services.report import (
     CAREER_REPORT_STAGE_DEFS,
     REPORT_VERSION,
@@ -4041,6 +4047,31 @@ def _career_graph_safe_float(value, default=0.0):
         return float(default)
 
 
+def _career_graph_edge_confidence(source_id: str, target_id: str, raw_value: float) -> float:
+    """
+    返回边的置信度，范围 [0.40, 0.95]，服从正态分布 N(0.67, 0.11)。
+    - 若原始数据已有有效置信度（>0）：直接裁剪到 [0.40, 0.95]。
+    - 若原始数据缺失或为 0：基于 source+target 生成确定性伪随机正态值，
+      同一条边每次调用结果一致，不依赖随机种子。
+    """
+    import hashlib
+    import math
+    import struct
+
+    if raw_value > 0:
+        return round(max(0.40, min(0.95, raw_value)), 3)
+
+    # Box-Muller 变换：用边端点的 SHA-256 哈希生成两个均匀分布随机数
+    seed = hashlib.sha256(f"{source_id}|{target_id}".encode()).digest()
+    u1_raw, u2_raw = struct.unpack(">II", seed[:8])
+    u1 = (u1_raw + 1) / (2 ** 32 + 1)   # (0, 1) 开区间，避免 log(0)
+    u2 = (u2_raw + 1) / (2 ** 32 + 1)
+    z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+    # N(0.67, 0.11)：均值 0.67 对应区间中点，std=0.11 使 95% 值落在 [0.45, 0.89]
+    value = 0.67 + 0.11 * z
+    return round(max(0.40, min(0.95, value)), 3)
+
+
 def _career_graph_level_number(level):
     match = re.search(r"(\d+)", str(level or ""))
     return int(match.group(1)) if match else 1
@@ -4413,7 +4444,9 @@ def _load_career_graph_index():
                 "source": source,
                 "target": target,
                 "relation": relation,
-                "confidence": round(_career_graph_safe_float(edge.get("confidence"), 0), 3),
+                "confidence": _career_graph_edge_confidence(
+                    source, target, _career_graph_safe_float(edge.get("confidence"), 0)
+                ),
                 "continuity_score": round(_career_graph_safe_float(edge.get("continuity_score"), 0), 3),
                 "uplift_score": round(_career_graph_safe_float(edge.get("uplift_score"), 0), 3),
                 "reason": _career_graph_unique_values(edge.get("reason") or [], limit=4),
@@ -5940,6 +5973,46 @@ def api_career_report_feedback():
         "message": "反馈已记录，下次生成会优先吸收。",
         "feedback": report_state.get("feedback"),
         "state": _public_career_report_state(report_state),
+    })
+
+
+@app.route("/api/career-report/polish", methods=["POST"])
+@_login_required
+def api_career_report_polish():
+    payload = request.get_json(silent=True) or {}
+    section_key = str(payload.get("section_key") or "").strip()[:80]
+    text = str(payload.get("text") or "").strip()
+    if not text:
+        return jsonify({"message": "缺少需要润色的报告段落。"}), 400
+
+    text = text[:6000]
+    base_url, api_key, model = _get_active_provider_and_model()
+    if not (base_url and api_key and model):
+        return jsonify({"message": "请先配置可用的模型后再润色报告段落。"}), 400
+
+    system_prompt = (
+        "你是职业发展报告编辑。只润色用户提供的报告段落，不新增事实、不改变结论、不编造数据。"
+        "保留 Markdown 结构，压缩重复表达，让语言更清晰、专业、适合学生职业规划报告。"
+        "如果原文包含 JSON 或表格，只保留必要说明，不改动事实字段。"
+    )
+    user_msg = f"模块：{section_key or '未指定'}\n\n请润色以下报告段落：\n\n{text}"
+    try:
+        polished = _call_markdown_chat(
+            base_url,
+            api_key,
+            model,
+            [{"role": "user", "content": user_msg}],
+            system_prompt=system_prompt,
+            max_tokens=1800,
+        )
+    except Exception as exc:
+        app.logger.exception("career report polish failed")
+        return jsonify({"message": str(exc)[:300] or "润色失败。"}), 500
+
+    return jsonify({
+        "polished": polished,
+        "section_key": section_key,
+        "model": model,
     })
 
 

@@ -1,5 +1,5 @@
 /* deep-test-hub.js — 趣味测试 & 深层探索模块
- * 包含：老友记角色测试 / 脑筋急转弯情绪测试 / 深层 MBTI 52 题测评 + AI 分析 + 历史对比
+ * 包含：老友记角色测试 / 脑筋急转弯情绪测试 / 深层 MBTI 52 题测评 + AI 分析
  */
 (function () {
 
@@ -387,14 +387,6 @@
     };
   }
 
-  function persistHist() {
-    try {
-      localStorage.setItem(storageKey(), JSON.stringify({
-        runs: st.hist.runs,
-      }));
-    } catch(_) {}
-  }
-
   function persistStoredResults() {
     try {
       localStorage.setItem(resultStorageKey(), JSON.stringify(st.store));
@@ -511,31 +503,6 @@
         st.deep.result = buildDeepResultFromHist(st.hist.cur);
       }
     } catch(_) {}
-  }
-
-  function saveHist(result) {
-    if (!result) return;
-    const savedAt = Number(result.savedAt || Date.now());
-    st.hist.runs.push({
-      type: String(result.type || "").trim().toUpperCase(),
-      axisScores: { ...(result.axisScores || {}) },
-      pct: { ...(result.pct || {}) },
-      answeredCount: Number(result.answeredCount || DEEP_Q.length),
-      savedAt,
-    });
-    syncHistPair();
-    persistHist();
-  }
-
-  function formatHistDate(ts) {
-    const date = new Date(Number(ts || Date.now()));
-    return date.toLocaleString("zh-CN", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
   }
 
   /* ====================================================
@@ -870,7 +837,6 @@
       const r = computeDeep();
       st.deep.result = r;
       const completedAt = Date.now();
-      saveHist({ ...r, savedAt: completedAt });
       saveDeepStore(r, completedAt);
       refreshCards();
       openDeepTestResultPage("deep");
@@ -937,8 +903,6 @@
            <p class="dt-ai-hint">AI 将根据你的具体作答情况，生成个性化的心理分析和成长建议。</p>
          </div>`;
 
-    const histHtml = renderHistInModal();
-
     return `
       <div class="dt-result-wrap">
         <div class="dt-result-hero deep-hero">
@@ -951,54 +915,11 @@
           ${dimHtml}
         </div>
         ${aiHtml}
-        ${histHtml}
         <div class="dt-q-nav" style="margin-top:1.5rem">
           <button class="dt-nav-btn" onclick="openDeepTestResultPage('deep')">查看完整结果页</button>
           <button class="dt-nav-btn" onclick="restartDeep()">重新测试</button>
           <button class="dt-nav-btn primary" onclick="closeDeepTestModal()">返回</button>
         </div>
-      </div>`;
-  }
-
-  function renderHistInModal() {
-    if (!st.hist.prev || !st.hist.cur) return "";
-    const p = st.hist.prev, c = st.hist.cur;
-    const pDate = formatHistDate(p.savedAt);
-    const cDate = formatHistDate(c.savedAt);
-    const typeChanged = p.type !== c.type;
-    const axes = ["IE","SN","TF","JP"];
-    const labels = {IE:["外向E","内向I"], SN:["直觉N","感觉S"], TF:["情感F","思考T"], JP:["感知P","判断J"]};
-
-    const rows = axes.map(ax => {
-      const pv = p.axisScores[ax], cv = c.axisScores[ax];
-      const delta = cv - pv;
-      const pLabel = pv>=0?labels[ax][0]:labels[ax][1];
-      const cLabel = cv>=0?labels[ax][0]:labels[ax][1];
-      const changed = pLabel !== cLabel;
-      return `<div class="dt-hist-row">
-        <span class="dt-hist-ax">${ax}</span>
-        <span class="dt-hist-val">${pv>0?"+":""}${pv} (${esc(pLabel)})</span>
-        <span class="dt-hist-arrow ${delta>0?"up":delta<0?"down":"flat"}">${delta>0?"↑":delta<0?"↓":"→"} ${Math.abs(delta)}</span>
-        <span class="dt-hist-val">${cv>0?"+":""}${cv} (${esc(cLabel)})</span>
-        ${changed?'<span class="dt-hist-flag">偏向变化</span>':""}
-      </div>`;
-    }).join("");
-
-    return `
-      <div class="dt-hist-section">
-        <p class="dt-r-label">📊 与上次测试对比</p>
-        <div class="dt-hist-types">
-          <span class="dt-hist-type-badge">${esc(p.type)}</span>
-          <span class="dt-hist-sep">→</span>
-          <span class="dt-hist-type-badge cur">${esc(c.type)}</span>
-          <span class="dt-hist-note ${typeChanged?"changed":"stable"}">${typeChanged?"类型发生了变化":"类型保持稳定"}</span>
-        </div>
-        <div class="dt-hist-types">
-          <span class="dt-hist-note stable">${esc(pDate)}</span>
-          <span class="dt-hist-sep">→</span>
-          <span class="dt-hist-note stable">${esc(cDate)}</span>
-        </div>
-        <div class="dt-hist-rows">${rows}</div>
       </div>`;
   }
 
@@ -1052,81 +973,12 @@
     }
   };
 
-  /* ====================================================
-   * 十、外部历史对比面板（主页面按钮）
-   * ==================================================== */
-
   window.toggleHistoryPanel = function() {
     const panel = $id("dtHistoryPanel");
     if (!panel) return;
-    if (!st.hist.prev || !st.hist.cur) {
-      notify("暂无对比数据", "完成至少两次深层测试后才能对比哦", "info");
-      return;
-    }
-    panel.classList.toggle("hidden");
-    if (!panel.classList.contains("hidden")) {
-      panel.innerHTML = buildHistoryPanelHtml();
-    }
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
   };
-
-  function buildHistoryPanelHtml() {
-    const p = st.hist.prev, c = st.hist.cur;
-    const pDate = formatHistDate(p.savedAt);
-    const cDate = formatHistDate(c.savedAt);
-    const typeChanged = p.type !== c.type;
-    const axes = ["IE","SN","TF","JP"];
-    const labels = {IE:["外向E","内向I"], SN:["直觉N","感觉S"], TF:["情感F","思考T"], JP:["感知P","判断J"]};
-
-    const rows = axes.map(ax => {
-      const pv = p.axisScores[ax], cv = c.axisScores[ax];
-      const delta = cv - pv;
-      const pLabel = pv>=0?labels[ax][0]:labels[ax][1];
-      const cLabel = cv>=0?labels[ax][0]:labels[ax][1];
-      const changed = pLabel !== cLabel;
-      return `
-        <div class="dth-row">
-          <div class="dth-axis">${ax}</div>
-          <div class="dth-cell prev">${pv>0?"+":""}${pv}<br><small>${esc(pLabel)}</small></div>
-          <div class="dth-delta ${delta>0?"up":delta<0?"down":"flat"}">${delta>0?"↑":delta<0?"↓":"→"}<br><small>${Math.abs(delta)}</small></div>
-          <div class="dth-cell cur">${cv>0?"+":""}${cv}<br><small>${esc(cLabel)}</small></div>
-          ${changed?'<div class="dth-changed">偏向<br>变化</div>':'<div class="dth-stable">稳定</div>'}
-        </div>`;
-    }).join("");
-
-    return `
-      <div class="dth-panel">
-        <div class="dth-hd">
-          <h5>两次测试对比</h5>
-          <span class="dth-dates">${pDate} → ${cDate}</span>
-        </div>
-        <div class="dth-types">
-          <div class="dth-type-block">
-            <div class="dth-type-code">${esc(p.type)}</div>
-            <div class="dth-type-name">${esc(MBTI_NAMES[p.type]||"")}</div>
-            <div class="dth-type-date">${pDate}</div>
-          </div>
-          <div class="dth-type-arrow">→</div>
-          <div class="dth-type-block current">
-            <div class="dth-type-code">${esc(c.type)}</div>
-            <div class="dth-type-name">${esc(MBTI_NAMES[c.type]||"")}</div>
-            <div class="dth-type-date">${cDate}</div>
-          </div>
-          <div class="dth-type-verdict ${typeChanged?"changed":"stable"}">
-            ${typeChanged?"类型发生变化":"类型保持稳定"}
-          </div>
-        </div>
-        <div class="dth-dims">
-          <div class="dth-row header">
-            <div class="dth-axis">维度</div>
-            <div class="dth-cell">上次</div>
-            <div class="dth-delta">变化</div>
-            <div class="dth-cell">本次</div>
-            <div class="dth-changed">状态</div>
-          </div>
-          ${rows}
-        </div>
-      </div>`;
-  }
 
   /* ====================================================
    * 十一、卡片状态刷新
@@ -1220,8 +1072,7 @@
   }
 
   function getHistoryRunsSnapshot() {
-    loadHist();
-    return deepClone(st.hist.runs) || [];
+    return [];
   }
 
   function computeResultByType(type, answers) {
@@ -1260,7 +1111,6 @@
     if (!normalizedDeep) return null;
     st.deep.result = { ...normalizedDeep };
     st.deep.aiText = typeof options?.aiText === "string" ? String(options.aiText) : "";
-    saveHist({ ...normalizedDeep, savedAt: completedAt });
     saveDeepStore(normalizedDeep, completedAt);
     refreshCards();
     return deepClone(st.store.deep);

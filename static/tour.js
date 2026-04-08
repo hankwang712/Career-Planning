@@ -7,7 +7,7 @@
 
   var STEPS = [
     {
-      title: '欢迎使用职业规划智能体 👋',
+      title: '欢迎使用职业规划智能体',
       content: '我来带你快速了解各功能模块。<br><br>推荐使用流程：<br><span class="tg-flow"><span class="tg-step-tag">1</span>能力画像<span class="tg-arrow">→</span><span class="tg-step-tag">2</span>岗位探索<span class="tg-arrow">→</span><span class="tg-step-tag">3</span>人岗匹配<span class="tg-arrow">→</span><span class="tg-step-tag">4</span>规划报告</span>',
       target: null,
     },
@@ -36,6 +36,11 @@
       content: '你现在所在的位置。实时显示画像成熟度、匹配情况和待办任务，让你随时掌握整体状态。',
       target: '[data-section="dashboard"]',
     },
+    {
+      title: '行业快报 — 横向浏览重点新闻',
+      content: '主页末尾会展示职业规划与计算机行业快报。使用左右箭头查看新闻截图，点击 More + 加载更多内容。',
+      target: '#careerNewsBoard',
+    },
   ];
 
   var current = 0;
@@ -58,8 +63,8 @@
       /* 高亮边框 */
       '#tg-hl {',
       '  position:fixed; z-index:9201; border-radius:10px;',
-      '  border:2px solid rgba(139,92,246,0.9);',
-      '  box-shadow:0 0 0 4px rgba(139,92,246,0.2),0 0 24px rgba(139,92,246,0.35);',
+      '  border:2px solid rgba(43,108,176,0.9);',
+      '  box-shadow:0 0 0 4px rgba(43,108,176,0.18),0 0 24px rgba(43,108,176,0.28);',
       '  pointer-events:none;',
       '  transition:all 0.32s cubic-bezier(.4,0,.2,1);',
       '}',
@@ -81,11 +86,11 @@
       '  height:3px; flex:1; border-radius:2px;',
       '  background:#e5e7eb; transition:background 0.25s;',
       '}',
-      '.tg-dot.tg-done { background:#7c3aed; }',
+      '.tg-dot.tg-done { background:#2b6cb0; }',
 
       /* 步骤标签 */
       '#tg-label {',
-      '  font-size:11px; color:#a78bfa; font-weight:700;',
+      '  font-size:11px; color:#2b6cb0; font-weight:700;',
       '  letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px;',
       '}',
 
@@ -109,7 +114,7 @@
       '.tg-step-tag {',
       '  display:inline-flex; align-items:center; justify-content:center;',
       '  width:16px; height:16px; border-radius:50%;',
-      '  background:#7c3aed; color:#fff; font-size:10px; font-weight:700;',
+      '  background:#2b6cb0; color:#fff; font-size:10px; font-weight:700;',
       '}',
       '.tg-arrow { color:#9ca3af; font-size:12px; }',
 
@@ -117,12 +122,12 @@
       '#tg-acts { display:flex; gap:8px; align-items:center; }',
 
       '.tg-btn-pri {',
-      '  flex:1; background:#7c3aed; color:#fff;',
+      '  flex:1; background:#2b6cb0; color:#fff;',
       '  border:none; border-radius:8px;',
       '  padding:8px 16px; font-size:13px; font-weight:600;',
       '  cursor:pointer; transition:background 0.18s;',
       '}',
-      '.tg-btn-pri:hover { background:#6d28d9; }',
+      '.tg-btn-pri:hover { background:#1a365d; }',
 
       '.tg-btn-sec {',
       '  background:#f3f4f6; color:#6b7280;',
@@ -145,7 +150,7 @@
       '  position:fixed; bottom:28px; right:24px;',
       '  z-index:9100;',
       '  width:46px; height:46px; border-radius:50%;',
-      '  background:linear-gradient(135deg,#7c3aed,#6d28d9);',
+      '  background:linear-gradient(135deg,#2b6cb0,#1a365d);',
       '  color:#fff; border:none; cursor:pointer;',
       '  font-size:18px; font-weight:700;',
       '  box-shadow:0 4px 20px rgba(109,40,217,0.45);',

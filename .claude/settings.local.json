@@ -55,7 +55,14 @@
       "Bash(grep -l \"portrait\\\\|画像\\\\|career.*report\\\\|统一画像\" /c/Users/rog/Desktop/web/templates/sections/*.html)",
       "Bash(git -C /c/Users/rog/Desktop/web log --oneline -5 -- static/user-center.css)",
       "Bash(git -C /c/Users/rog/Desktop/web show 6831d14:static/user-center.css)",
-      "Bash(grep -r \"职业问答\\\\|QA\\\\|qa\" C:UsersrogDesktopweb --include=*.json)"
+      "Bash(grep -r \"职业问答\\\\|QA\\\\|qa\" C:UsersrogDesktopweb --include=*.json)",
+      "Bash(grep -n ^[[:space:]]*-- C:UsersrogDesktopwebstaticstyles.css)",
+      "Bash(grep -n ^[[:space:]]*-- C:UsersrogDesktopwebstaticworkspace-shell.css)",
+      "Bash(grep -n ^[[:space:]]*-- C:UsersrogDesktopwebstaticresume-report.css)",
+      "Bash(find C:UsersrogDesktopweb -name theme* -o -name *theme* -o -name *color*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -E \"\\\\.\\(js|css\\)$\")"
     ],
     "defaultMode": "bypassPermissions"
   }

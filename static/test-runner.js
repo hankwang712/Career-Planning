@@ -11,7 +11,7 @@
     deep: {
       pageTitle: "深层 MBTI 测试作答页",
       sectionTitle: "深层 MBTI · 52 题",
-      sectionHint: "完成 52 题后将进入完整结果页，并保留本次记录用于前后对比。",
+      sectionHint: "完成 52 题后将进入完整结果页，展示四维分布和人格解析。",
       heroTitle: "深层性格探索",
       heroDesc: "五档量表题，更细腻地观察你的四维偏好与变化趋势。",
     },

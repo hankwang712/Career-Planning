@@ -799,12 +799,12 @@
   function renderReportSections4(bundle, sections) {
     const navOrder = ["industry_analysis", "career_positioning", "resume_evidence", "competency_profile", "role_match", "path_plan"];
     const navMeta = {
-      "industry_analysis":  { label: "行业分析",   icon: "📈", anchor: "cr-sec-industry",    kicker: "Industry Analyst",             accentClass: "cr-module-purple" },
-      "career_positioning": { label: "职业定位",   icon: "🎯", anchor: "cr-sec-positioning", kicker: "Career Positioning Advisor",   accentClass: "cr-module-blue" },
-      "resume_evidence":    { label: "简历证据",   icon: "📄", anchor: "cr-sec-resume",       kicker: "Resume Evidence Analyst",      accentClass: "cr-module-amber" },
-      "competency_profile": { label: "能力评估",   icon: "💡", anchor: "cr-sec-competency",   kicker: "Competency Assessor",          accentClass: "cr-module-green" },
-      "role_match":         { label: "岗位匹配",   icon: "🎯", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
-      "path_plan":          { label: "路径规划",   icon: "🛤️", anchor: "cr-sec-path",         kicker: "Career Path Planner",          accentClass: "cr-module-teal" },
+      "industry_analysis":  { label: "行业与需求侧判断", icon: "01", anchor: "cr-sec-industry",    kicker: "Industry Analyst",             accentClass: "cr-module-purple" },
+      "career_positioning": { label: "职业定位假设",     icon: "02", anchor: "cr-sec-positioning", kicker: "Career Positioning Advisor",   accentClass: "cr-module-blue" },
+      "resume_evidence":    { label: "简历证据链",       icon: "03", anchor: "cr-sec-resume",       kicker: "Resume Evidence Analyst",      accentClass: "cr-module-amber" },
+      "competency_profile": { label: "能力评估画像",     icon: "04", anchor: "cr-sec-competency",   kicker: "Competency Assessor",          accentClass: "cr-module-green" },
+      "role_match":         { label: "岗位匹配结论",     icon: "05", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
+      "path_plan":          { label: "阶段学习路径",     icon: "06", anchor: "cr-sec-path",         kicker: "Career Path Planner",          accentClass: "cr-module-teal" },
     };
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -1205,14 +1205,37 @@
       path_plan:          renderPathBody,
     };
 
-    const sectionHtml = navOrder.map((key, idx) => {
-      const sec  = sections[key];
-      const meta = navMeta[key];
+    const availableModules = navOrder
+      .map((key, idx) => ({ key, idx, meta: navMeta[key], section: sections[key] }))
+      .filter((item) => Boolean(item.section));
+
+    const moduleIndexHtml = `
+      <section class="cr4-report-index">
+        <div>
+          <p class="cr4-report-index-kicker">职业报告</p>
+          <h3 class="cr4-report-index-title">报告模块目录</h3>
+          <p class="cr4-report-index-copy">每个模块对应一个独立智能体输出，正文只展示对职业决策有用的结论、证据和下一步动作。</p>
+        </div>
+        <div class="cr4-report-index-tree">
+          <div class="cr4-report-index-root">职业报告</div>
+          ${availableModules.map(({ meta }, index) => `
+            <button type="button" class="cr4-report-index-item" data-report-scroll-target="${meta.anchor}">
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <strong>${esc(meta.label)}</strong>
+              <small>${esc(meta.kicker)}</small>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    const sectionHtml = availableModules.map(({ key, idx, meta, section: sec }) => {
       if (!sec) return "";
       const markdown = String(sec.markdown || "").trim();
       const data     = sec.data || {};
       const renderer = bodyRenderers[key];
       const body     = renderer ? renderer(data) : "";
+      const polishTargetId = `cr4-polish-${key}`;
 
       return `
         <section id="${meta.anchor}" class="cr4-module ${meta.accentClass}">
@@ -1222,9 +1245,13 @@
               <div class="cr4-module-kicker">${esc(meta.kicker)}</div>
               <h3 class="cr4-module-title">${esc(meta.label)}</h3>
             </div>
+            <div class="cr4-module-actions">
+              <button type="button" class="cr4-polish-btn" data-report-polish-section="${esc(key)}" data-report-polish-target="${esc(polishTargetId)}">润色本段</button>
+            </div>
             <div class="cr4-module-num">${String(idx + 1).padStart(2, "0")}</div>
           </div>
           <div class="cr4-module-body">${body}</div>
+          <div id="${polishTargetId}" class="cr4-polish-output hidden"></div>
           ${markdown ? `
             <details class="cr4-module-detail">
               <summary>查看完整分析文本</summary>
@@ -1233,7 +1260,7 @@
         </section>`;
     }).filter(Boolean).join("");
 
-    return `<div class="cr4-report-modules">${sectionHtml}</div>`;
+    return `<div class="cr4-report-modules">${moduleIndexHtml}${sectionHtml}</div>`;
   }
 
   function renderHistoricalNotice() {
@@ -1438,19 +1465,111 @@
     }
   }
 
+  async function polishCareerReportSection(sectionKey, targetId, button) {
+    const key = String(sectionKey || "").trim();
+    const targetIdText = String(targetId || "").trim();
+    const targetSelector = targetIdText ? `#${escapeSelectorId(targetIdText)}` : "";
+    const target = (targetSelector ? button?.closest(".cr4-module")?.querySelector(targetSelector) : null)
+      || document.getElementById(targetIdText);
+    const section = window.appState?.careerReport?.report_document?.sections?.[key] || null;
+    const text = String(section?.markdown || "").trim();
+    if (!key || !text) {
+      toast("暂无可润色内容", "该模块还没有完整正文。", "warning", 1800);
+      return;
+    }
+    const originalText = button?.textContent || "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "润色中";
+    }
+    try {
+      const payload = await requestJsonSafe("/api/career-report/polish", {
+        method: "POST",
+        body: {
+          section_key: key,
+          text
+        }
+      });
+      if (target) {
+        target.classList.remove("hidden");
+        target.innerHTML = `
+          <div class="cr4-polish-output-head">
+            <strong>润色版本</strong>
+            <span>只优化表达，不新增事实</span>
+          </div>
+          <div class="cr4-polish-output-body">${renderMarkdownBasic(payload.polished || "")}</div>
+        `;
+      }
+      toast("润色完成", "已生成该模块的润色版本。", "success", 1800);
+    } catch (error) {
+      toast("润色失败", error.message || "请检查模型配置后重试。", "error", 2200);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || "润色本段";
+      }
+    }
+  }
+
+  function bindReportPolishHandlers(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("[data-report-polish-section]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void polishCareerReportSection(
+          button.dataset.reportPolishSection || "",
+          button.dataset.reportPolishTarget || "",
+          button
+        );
+      });
+    });
+  }
+
+  function bindReportScrollHandlers(root, container) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("[data-report-scroll-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const targetId = String(button.dataset.reportScrollTarget || "").trim();
+        if (!targetId) return;
+        const target = container?.querySelector?.(`#${escapeSelectorId(targetId)}`) || document.getElementById(targetId);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
   // section definitions for nav
   const SECTION_NAV = [
-    { key: "industry_analysis",  label: "行业分析",   icon: "📈", anchor: "cr-sec-industry" },
-    { key: "career_positioning", label: "职业定位",   icon: "🎯", anchor: "cr-sec-positioning" },
-    { key: "resume_evidence",    label: "简历证据",   icon: "📄", anchor: "cr-sec-resume" },
-    { key: "competency_profile", label: "能力评估",   icon: "💡", anchor: "cr-sec-competency" },
-    { key: "role_match",         label: "岗位匹配",   icon: "🔗", anchor: "cr-sec-match" },
-    { key: "path_plan",          label: "路径规划",   icon: "🛤️", anchor: "cr-sec-path" },
+    { key: "industry_analysis",  label: "行业与需求侧判断", icon: "01", anchor: "cr-sec-industry" },
+    { key: "career_positioning", label: "职业定位假设",     icon: "02", anchor: "cr-sec-positioning" },
+    { key: "resume_evidence",    label: "简历证据链",       icon: "03", anchor: "cr-sec-resume" },
+    { key: "competency_profile", label: "能力评估画像",     icon: "04", anchor: "cr-sec-competency" },
+    { key: "role_match",         label: "岗位匹配结论",     icon: "05", anchor: "cr-sec-match" },
+    { key: "path_plan",          label: "阶段学习路径",     icon: "06", anchor: "cr-sec-path" },
   ];
 
   function isModularBundle(bundle) {
     const sections = bundle?.report_document?.sections;
     return sections && !Array.isArray(sections) && typeof sections === "object";
+  }
+
+  function getReportTocItems(bundle) {
+    const sections = bundle?.report_document?.sections;
+    if (sections && !Array.isArray(sections) && typeof sections === "object") {
+      return SECTION_NAV
+        .filter((item) => Boolean(sections[item.key]))
+        .map((item, index) => ({
+          id: item.anchor,
+          title: item.label,
+          kicker: item.icon,
+          index
+        }));
+    }
+    const legacySections = Array.isArray(sections) ? sections : [];
+    return legacySections.map((section, index) => ({
+      id: getReportSectionDomId(section, index),
+      title: section.title || section.kicker || `章节 ${index + 1}`,
+      kicker: section.kicker || "",
+      index
+    }));
   }
 
   function renderReportAside() {
@@ -1472,6 +1591,7 @@
     const roleRankings = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 5) : [];
     const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || window.jobNameMap?.[window.appState?.focusedRoleId] || window.appState?.focusedRoleId || "待识别";
     const isModular = isModularBundle(bundle);
+    const v2 = isModular;
 
     // Build module nav for modular reports
     const moduleNavHtml = isModular ? `
@@ -1619,6 +1739,8 @@
       });
     });
     bindCareerReportFeedbackHandlers(main);
+    bindReportPolishHandlers(main);
+    bindReportScrollHandlers(main, main);
   }
 
   function cycleTrackerStatus(itemType, currentStatus) {
@@ -1694,7 +1816,7 @@
 
     const bundle = window.appState?.careerReport || null;
     const tracker = getCareerReportTracker();
-    const sections = Array.isArray(bundle?.report_document?.sections) ? bundle.report_document.sections : [];
+    const tocItems = getReportTocItems(bundle);
     const metaTitle = document.getElementById("rvMetaTitle");
     const progressFill = document.getElementById("rvProgressFill");
     const progressLabel = document.getElementById("rvProgressLabel");
@@ -1713,10 +1835,10 @@
     if (toc) {
       toc.innerHTML = `
         <div class="report-viewer-toc-label">目录</div>
-        ${sections.map((section, index) => `
-          <button type="button" class="rv-toc-item${index === 0 ? " active" : ""}" data-rv-target="${esc(getReportSectionDomId(section, index))}">
+        ${tocItems.map((section, index) => `
+          <button type="button" class="rv-toc-item${index === 0 ? " active" : ""}" data-rv-target="${esc(section.id)}">
             <span class="rv-toc-num">${String(index + 1).padStart(2, "0")}</span>
-            <span>${esc(section.title || section.kicker || `章节 ${index + 1}`)}</span>
+            <span>${esc(section.title || `章节 ${index + 1}`)}</span>
           </button>
         `).join("")}
       `;
@@ -1743,6 +1865,8 @@
         : renderEmptyReportMain();
       if (bundle && bundle.report_document) {
         bindCareerReportFeedbackHandlers(main);
+        bindReportPolishHandlers(main);
+        bindReportScrollHandlers(main, main);
       }
     }
 

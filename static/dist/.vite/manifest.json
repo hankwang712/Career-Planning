@@ -1,56 +1,56 @@
 {
   "frontend/src/entries/login.js": {
-    "file": "assets/frontend/src/entries/login.js-C5W3nUnL.js",
+    "file": "assets/frontend/src/entries/login.js-CnVaiNc1.js",
     "name": "frontend/src/entries/login.js",
     "src": "frontend/src/entries/login.js",
     "isEntry": true,
     "css": [
-      "assets/login-Mqxx438g.css"
+      "assets/login-B1tX2F-Q.css"
     ]
   },
   "frontend/src/entries/resume-report.js": {
-    "file": "assets/frontend/src/entries/resume-report.js-CQsWbcCp.js",
+    "file": "assets/frontend/src/entries/resume-report.js-BWU-tl62.js",
     "name": "frontend/src/entries/resume-report.js",
     "src": "frontend/src/entries/resume-report.js",
     "isEntry": true,
     "css": [
-      "assets/resume-report-iaYAFw98.css"
+      "assets/resume-report-BbUICQ4r.css"
     ]
   },
   "frontend/src/entries/test-result.js": {
-    "file": "assets/frontend/src/entries/test-result.js-Btn4zFgx.js",
+    "file": "assets/frontend/src/entries/test-result.js-BWB8MwMo.js",
     "name": "frontend/src/entries/test-result.js",
     "src": "frontend/src/entries/test-result.js",
     "isEntry": true,
     "css": [
-      "assets/test-result-DkykMYAf.css"
+      "assets/test-result-zmUb68P3.css"
     ]
   },
   "frontend/src/entries/test-runner.js": {
-    "file": "assets/frontend/src/entries/test-runner.js-BvXZgKyU.js",
+    "file": "assets/frontend/src/entries/test-runner.js-it5jSeNh.js",
     "name": "frontend/src/entries/test-runner.js",
     "src": "frontend/src/entries/test-runner.js",
     "isEntry": true,
     "css": [
-      "assets/test-runner-DcIpTgmr.css"
+      "assets/test-runner-C6OcTfbb.css"
     ]
   },
   "frontend/src/entries/user-center.js": {
-    "file": "assets/frontend/src/entries/user-center.js-DXRWlRwn.js",
+    "file": "assets/frontend/src/entries/user-center.js-4b_eYTYV.js",
     "name": "frontend/src/entries/user-center.js",
     "src": "frontend/src/entries/user-center.js",
     "isEntry": true,
     "css": [
-      "assets/user-center-BULhBtOe.css"
+      "assets/user-center-BU6KUmpn.css"
     ]
   },
   "frontend/src/entries/workspace.js": {
-    "file": "assets/frontend/src/entries/workspace.js-B8iOdCHQ.js",
+    "file": "assets/frontend/src/entries/workspace.js-DpiokFDV.js",
     "name": "frontend/src/entries/workspace.js",
     "src": "frontend/src/entries/workspace.js",
     "isEntry": true,
     "css": [
-      "assets/workspace-BmLKeOQy.css"
+      "assets/workspace-oVPHfB_2.css"
     ]
   }
 }

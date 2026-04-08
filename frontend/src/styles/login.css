@@ -14,10 +14,9 @@ body {
   font-family: "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #0f172a;
   background:
-    radial-gradient(1200px 500px at -5% -10%, rgba(56, 189, 248, 0.22), transparent 60%),
-    radial-gradient(800px 420px at 105% 0%, rgba(167, 139, 250, 0.24), transparent 58%),
-    radial-gradient(900px 500px at 50% 110%, rgba(59, 130, 246, 0.12), transparent 58%),
-    #f1f5f9;
+    radial-gradient(1200px 500px at -5% -10%, rgba(186, 230, 253, 0.12), transparent 60%),
+    radial-gradient(800px 420px at 105% 0%, rgba(186, 230, 253, 0.08), transparent 58%),
+    #F7F8FA;
 }
 
 body.shell-body {
@@ -51,7 +50,7 @@ body.shell-body::before {
   height: 240px;
   top: 100px;
   left: -60px;
-  background: rgba(6, 182, 212, 0.22);
+  background: rgba(186, 230, 253, 0.18);
 }
 
 .ambient-orb.b {
@@ -59,7 +58,7 @@ body.shell-body::before {
   height: 260px;
   top: 180px;
   right: -80px;
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(186, 230, 253, 0.12);
 }
 
 .ambient-orb.c {
@@ -67,7 +66,7 @@ body.shell-body::before {
   height: 220px;
   bottom: 100px;
   left: 28%;
-  background: rgba(14, 165, 233, 0.16);
+  background: rgba(125, 211, 252, 0.10);
 }
 
 .startup-screen {
@@ -79,9 +78,9 @@ body.shell-body::before {
   justify-content: center;
   padding: 1.25rem;
   background:
-    radial-gradient(560px 340px at 15% 10%, rgba(148, 255, 211, 0.28), transparent 60%),
-    radial-gradient(680px 360px at 85% 0%, rgba(147, 197, 253, 0.24), transparent 58%),
-    linear-gradient(145deg, #7ec8ae, #78b8a1 45%, #76c3af);
+    radial-gradient(560px 340px at 15% 10%, rgba(186, 230, 253, 0.15), transparent 60%),
+    radial-gradient(680px 360px at 85% 0%, rgba(186, 230, 253, 0.10), transparent 58%),
+    linear-gradient(145deg, #F7F8FA, #FFFFFF);
 }
 
 .startup-card {

@@ -1,58 +1,42 @@
 <section id="report" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
-    <div class="mb-6">
-        <div class="flex justify-between items-center flex-wrap gap-4">
+    <div class="report-launch-page">
+        <div class="report-launch-hero">
             <div>
-                <h2 class="text-2xl font-bold mb-2">职业生涯发展报告</h2>
-                <p class="text-gray-500">报告内容由统一画像和匹配结果实时生成，缺失信息会明确标注为待补充或待接入</p>
+                <p class="report-launch-kicker">Career Report Pipeline</p>
+                <h2 class="report-launch-title">职业生涯发展报告生成台</h2>
+                <p class="report-launch-copy">
+                    这里仅用于启动与观察多智能体协作状态，不展开任何报告正文。完整报告生成后会同步到个人中心的报告查看器。
+                </p>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button onclick="editReport()" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">说明</button>
-                <button onclick="saveReport()" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">保存草稿</button>
-                <button onclick="exportReport()" class="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-all">导出报告</button>
+            <div class="report-launch-actions">
+                <button id="reportLaunchBtn" type="button" class="report-launch-primary" onclick="window.startCareerReportGeneration ? startCareerReportGeneration() : markReportGenerated('launch')">启动生成</button>
+                <button type="button" class="report-launch-secondary" onclick="window.openUserCenterPage ? openUserCenterPage('report-workspace') : (window.location.href='/user-center#report-workspace')">查看报告中心</button>
             </div>
         </div>
-    </div>
 
-    <div id="reportStatus" class="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-cyan-50 p-4 mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div class="flex items-start gap-3">
-            <span class="text-2xl">📘</span>
+        <div id="reportStatus" class="report-launch-status">
             <div>
-                <p id="reportStatusTitle" class="font-semibold text-sky-900">报告为可编辑草稿</p>
-                <p id="reportStatusHint" class="text-sm text-sky-700">完成更多输入后，报告会自动刷新</p>
+                <p id="reportStatusTitle" class="report-launch-status-title">等待启动多智能体流程</p>
+                <p id="reportStatusHint" class="report-launch-status-copy">报告正文不会在本页展示；这里只显示阶段、传递方向与完成状态。</p>
+            </div>
+            <div class="report-launch-status-meta">
+                <span>更新时间</span>
+                <strong id="reportGeneratedTime">--</strong>
             </div>
         </div>
-        <div class="text-sm text-slate-500">
-            生成时间：<span id="reportGeneratedTime" class="font-medium">2026 年 3 月 21 日 10:00</span>
-        </div>
-    </div>
 
-    <div id="reportContent" class="overflow-hidden rounded-3xl bg-white shadow-sm">
-        <div class="bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-800 px-8 py-7 text-white">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div id="reportAgentPreview" class="report-agent-preview" aria-label="多智能体工作状态预览">
+            <div class="report-agent-preview-head">
                 <div>
-                    <p class="text-xs font-semibold tracking-[0.22em] text-cyan-100 uppercase">Career Report</p>
-                    <h3 class="mt-2 text-3xl font-bold"><span id="reportHeaderName">当前用户</span> 的职业发展规划报告</h3>
-                    <p class="mt-3 text-sm text-cyan-100">
-                        目标岗位：<span id="reportHeaderRole">待确定岗位方向</span>  · 生成日期：<span id="reportHeaderDate">2026 ?3 ?21 ?/span>
-                    </p>
-                    <p class="mt-1 text-xs text-cyan-100/80">有效期 6 个月 · 动态联动版本</p>
+                    <p class="report-launch-kicker">Agent Workflow</p>
+                    <h3>多智能体协作流</h3>
                 </div>
-                <div class="text-right">
-                    <p id="reportHeaderScore" class="text-4xl font-bold">初筛</p>
-                    <p id="reportHeaderConfidence" class="text-sm text-cyan-100">等待画像输入</p>
+                <div class="report-agent-legend">
+                    <span><i class="solid"></i> 已传递</span>
+                    <span><i class="dashed"></i> 当前传递</span>
                 </div>
             </div>
-        </div>
-
-        <div class="p-8">
-            <div id="reportBody"></div>
-        </div>
-
-        <div class="border-t border-slate-200 bg-slate-50 px-8 py-5 text-xs text-slate-500">
-            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <span>生成日期：<span id="reportFooterGeneratedDate">2026 年 3 月 21 日</span></span>
-                <span>建议复查日期：<span id="reportFooterValidDate">2026 年 9 月 21 日</span></span>
-            </div>
+            <div id="reportAgentMap" class="report-agent-map"></div>
         </div>
     </div>
 </section>

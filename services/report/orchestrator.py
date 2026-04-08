@@ -28,10 +28,12 @@ Falls back gracefully when no LLM is configured.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Callable
 
 from .agents import (
+    CAREER_PIPELINE_PROMPT,
     run_industry_analyst,
     run_career_positioning_advisor,
     run_resume_evidence_analyst,
@@ -39,6 +41,7 @@ from .agents import (
     run_role_match_officer,
     run_career_path_planner,
     LLMCaller,
+    PROMPT_SOURCE_MODULE,
 )
 from .schemas import REPORT_VERSION
 
@@ -174,12 +177,30 @@ def generate_career_report_bundle(
     llm_caller = _build_llm_caller(runtime_llm)
     generation_mode = "llm" if llm_caller else "fallback"
 
-    # Get news context for industry analyst
+    # -----------------------------------------------------------------------
+    # 获取新闻上下文：通过 RAG 检索与用户方向相关的 chunk
+    # 流程：读取 news_store.json → 分块(500token/overlap50) → embedding →
+    #       余弦相似度排序 → 取 top_k chunk 格式化为 Markdown
+    # -----------------------------------------------------------------------
     news_context = ""
     try:
-        from services.news.news_kb import get_recent_news_context
-        news_context = get_recent_news_context(max_items=15, max_age_days=7)
+        from services.news.news_kb import search_news_for_agent, format_rag_context
+
+        # 构建检索 query：结合用户的目标方向、专业、城市
+        basics = profile_payload.get("basics") or {}
+        _target_dir = str(basics.get("targetDirection") or basics.get("target_direction") or "")
+        _major = str(basics.get("major") or "")
+        _city = str(basics.get("targetCity") or basics.get("target_city") or "")
+        _rag_query = " ".join(filter(None, [_target_dir, _major, _city, "招聘 就业 行业趋势"]))
+
+        rag_chunks = search_news_for_agent(
+            query=_rag_query,
+            top_k=12,
+            max_age_days=7,
+        )
+        news_context = format_rag_context(rag_chunks)
     except Exception:
+        # 回退：直接用 news_payload 里的标题列表
         items = news_payload.get("items") or []
         lines = []
         for item in items[:15]:
@@ -198,27 +219,38 @@ def generate_career_report_bundle(
         )
 
     # -------------------------------------------------------------------
-    # Step A: 行业分析师 (+ first-pass 简历证据分析官, run in sequence)
+    # Step A: 行业分析师 + 简历证据分析官初筛
+    # 这两步只依赖输入画像/简历，可以并行；后续阶段有明确数据依赖，保持串行。
     # -------------------------------------------------------------------
-    notify("industry_analysis", "行业分析", "正在分析行业趋势与劳动力市场动态...")
-    if llm_caller:
-        industry_brief = run_industry_analyst(profile_payload, news_context, llm_caller)
-    else:
-        industry_brief = _fallback_industry_brief(profile_payload)
+    def _run_industry_step() -> dict[str, Any]:
+        notify("industry_analysis", "行业分析", "正在分析行业趋势与劳动力市场动态...")
+        if llm_caller:
+            return run_industry_analyst(profile_payload, news_context, llm_caller)
+        return _fallback_industry_brief(profile_payload)
 
-    notify("resume_evidence", "简历证据解析", "正在解析简历中的能力证据（第一遍）...")
-    if llm_caller:
-        resume_evidence_pass1 = run_resume_evidence_analyst(profile_payload, None, llm_caller)
-    else:
-        resume_evidence_pass1 = _fallback_resume_evidence(profile_payload)
+    def _run_resume_pass1_step() -> dict[str, Any]:
+        notify("resume_evidence", "简历证据解析", "正在解析简历中的能力证据（第一遍）...")
+        if llm_caller:
+            return run_resume_evidence_analyst(profile_payload, None, llm_caller)
+        return _fallback_resume_evidence(profile_payload)
 
-    # -------------------------------------------------------------------
-    # Step B: 职业定位顾问
-    # -------------------------------------------------------------------
-    notify("career_positioning", "职业定位", "正在结合测评与意愿生成职业方向假设...")
     if llm_caller:
-        positioning_output = run_career_positioning_advisor(profile_payload, industry_brief, llm_caller)
+        executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="career-report-a")
+        try:
+            industry_future = executor.submit(_run_industry_step)
+            resume_future = executor.submit(_run_resume_pass1_step)
+            industry_brief = industry_future.result()
+
+            # Step B only needs industry_brief + profile. Keep resume pass1 running
+            # in parallel when it is slower than industry analysis.
+            notify("career_positioning", "职业定位", "正在结合测评与意愿生成职业方向假设...")
+            positioning_output = run_career_positioning_advisor(profile_payload, industry_brief, llm_caller)
+            resume_evidence_pass1 = resume_future.result()
+        finally:
+            executor.shutdown(wait=True)
     else:
+        industry_brief = _run_industry_step()
+        resume_evidence_pass1 = _run_resume_pass1_step()
         positioning_output = _fallback_positioning(profile_payload, role_payload)
 
     # -------------------------------------------------------------------
@@ -302,6 +334,8 @@ def generate_career_report_bundle(
             "status": "ready",
             "version": REPORT_VERSION,
             "pipeline_version": PIPELINE_VERSION,
+            "prompt_source_module": PROMPT_SOURCE_MODULE,
+            "pipeline_prompt_loaded": bool(CAREER_PIPELINE_PROMPT),
             "model": model_name or "",
             "generation_mode": generation_mode,
             "focus_role_id": focus_role_id,

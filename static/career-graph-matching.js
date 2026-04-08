@@ -39,6 +39,7 @@
     relationFilter: "all",
     layoutMode: "force",
     pathOnly: false,
+    currentDisplayEdges: [],   // 供 updateVisualStates 复用，避免重建 simulation
     queryResultIds: new Set(),
     recommendationIds: new Set(),
     matchResults: [],
@@ -741,7 +742,7 @@
     const normalizedId = String(nodeId || "").trim();
     if (!normalizedId || !state.nodeMap.has(normalizedId)) return;
     state.selectedNodeId = normalizedId;
-    renderGraph();
+    updateVisualStates(); // 仅更新颜色/类，不重建 simulation，避免节点碰撞抖动
     scheduleViewportFocus(normalizedId);
 
     if (state.detailCache.has(normalizedId)) {
@@ -770,7 +771,7 @@
     state.viewportFocusToken += 1;
     state.selectedNodeId = "";
     renderDefaultPanel();
-    renderGraph();
+    updateVisualStates(); // 仅更新颜色/类，不重建 simulation
   }
 
   function ensureGraphCanvas() {
@@ -844,6 +845,7 @@
       .filter(Boolean)
       .map((node) => ({ ...node }));
     const displayEdges = state.edgeList.filter((edge) => displayIdSet.has(edge.source) && displayIdSet.has(edge.target) && activeLinkFilter(edge));
+    state.currentDisplayEdges = displayEdges; // 缓存给 updateVisualStates 使用
 
     const selectedId = state.selectedNodeId;
     const trailIds = new Set(selectedId ? [selectedId, ...buildPromotionTrail(selectedId, "out", 4), ...buildPromotionTrail(selectedId, "in", 3)] : []);
@@ -909,6 +911,7 @@
       .attr("stroke", (d) => edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#d0d0d8") : "#d5dde7")
       .attr("stroke-dasharray", (d) => RELATION_META[d.relation]?.dash || null)
       .attr("marker-end", (d) => `url(#kb-arrow-${d.relation}${edgeIsContextual(d, visualContext) ? "" : "-muted"})`);
+    state.graphLayer.linkSel = links; // 保存供 updateVisualStates 使用
 
     const linkLabels = state.graphLayer.labels.selectAll("text")
       .data(displayEdges)
@@ -921,6 +924,7 @@
       .attr("fill", (d) => edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#80849a") : "#94a3b8")
       .attr("text-anchor", "middle")
       .text((d) => RELATION_META[d.relation]?.label || "");
+    state.graphLayer.linkLabelSel = linkLabels; // 保存供 updateVisualStates 使用
 
     const nodeGroups = state.graphLayer.nodes.selectAll("g")
       .data(displayNodes)
@@ -972,6 +976,7 @@
       .attr("dy", (d) => levelRadius(d.level) + 16)
       .attr("fill", (d) => d.visual.label)
       .text((d) => d.title);
+    state.graphLayer.nodeGroupSel = nodeGroups; // 保存供 updateVisualStates 使用
 
     const tooltip = getEl("knowledgeBaseTooltip");
     const tooltipTitle = getEl("knowledgeBaseTooltipTitle");
@@ -1016,6 +1021,91 @@
 
     updateInfoBar(displayNodes, displayEdges);
     renderSearchResults(searchAllNodes(state.searchQuery, DEFAULT_SEARCH_RESULT_LIMIT));
+  }
+
+  /**
+   * 仅更新节点/边的视觉状态（颜色、CSS类），不重建 simulation 也不重建 DOM。
+   * 用于点击节点、取消选中等操作，避免 500 个节点重新碰撞抖动。
+   */
+  function updateVisualStates() {
+    if (!state.graphLayer || !state.graphLayer.nodeGroupSel || !state.graphLayer.linkSel) {
+      // 图尚未渲染，回退到完整渲染
+      renderGraph();
+      return;
+    }
+
+    const selectedId = state.selectedNodeId;
+    const displayEdges = state.currentDisplayEdges;
+    const trailIds = new Set(
+      selectedId
+        ? [selectedId, ...buildPromotionTrail(selectedId, "out", 4), ...buildPromotionTrail(selectedId, "in", 3)]
+        : []
+    );
+    const selectedContext = buildSelectedContext(displayEdges, selectedId, trailIds);
+    const visualContext = {
+      selectedId,
+      trailIds,
+      queryIds: state.queryResultIds,
+      recommendationIds: state.recommendationIds,
+      promotionIds: selectedContext.promotionIds,
+      transferIds: selectedContext.transferIds,
+    };
+
+    // 1. 更新每个节点的 visualState & visual 数据
+    state.graphLayer.nodeGroupSel.each(function (d) {
+      d.visualState = resolveNodeVisualState(d.id, visualContext);
+      d.visual = nodeVisual(d.visualState);
+    });
+
+    // 2. 更新节点组 CSS 类（控制 opacity/scale 动画）
+    state.graphLayer.nodeGroupSel.attr("class", (d) => {
+      const classes = ["kb-node-group", `is-${d.visualState}`];
+      if (d.visualState === "muted" && selectedId) classes.push("is-dimmed");
+      if (d.visualState === "muted" && state.queryResultIds.size) classes.push("is-faded");
+      if (trailIds.has(d.id)) classes.push("is-path");
+      return classes.join(" ");
+    });
+
+    // 3. 更新外圈（shell）颜色
+    state.graphLayer.nodeGroupSel.select(".kb-node-shell")
+      .attr("fill", (d) => d.visual.shellFill)
+      .attr("stroke", (d) => d.visual.shellStroke)
+      .attr("stroke-width", (d) => (d.visualState === "selected" ? 2.8 : 2.3));
+
+    // 4. 更新内核（core）颜色
+    state.graphLayer.nodeGroupSel.select(".kb-node-core")
+      .attr("fill", (d) => d.visual.coreFill)
+      .attr("stroke", (d) => d.visual.coreStroke);
+
+    // 5. 更新标签颜色
+    state.graphLayer.nodeGroupSel.select(".kb-node-label")
+      .attr("fill", (d) => d.visual.label);
+
+    // 6. 更新边的颜色/可见性
+    state.graphLayer.linkSel
+      .attr("class", (d) => {
+        const classes = ["kb-link-line", `is-${d.relation}`];
+        classes.push(edgeIsContextual(d, visualContext) ? "is-context" : "is-muted");
+        return classes.join(" ");
+      })
+      .attr("stroke", (d) =>
+        edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#d0d0d8") : "#d5dde7"
+      );
+
+    // 7. 更新边标签可见性
+    if (state.graphLayer.linkLabelSel) {
+      state.graphLayer.linkLabelSel.attr("class", (d) => {
+        const visible =
+          edgeIsContextual(d, visualContext) &&
+          (!state.queryResultIds.size || state.queryResultIds.size <= 8 || selectedId);
+        return `kb-link-label${visible ? "" : " is-hidden"}`;
+      });
+    }
+
+    // 8. 让 simulation 静止（如有残余能量），但不重启
+    if (state.simulation && state.simulation.alpha() > 0.01) {
+      state.simulation.alpha(0).stop();
+    }
   }
 
   async function startMatch({ force = false } = {}) {
