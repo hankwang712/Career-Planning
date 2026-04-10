@@ -19,7 +19,11 @@
     eventsBound: false,
     previousBodyOverflow: "",
     feedbackVerdict: "",
-    feedbackNote: ""
+    feedbackNote: "",
+    editorSource: null,
+    editorSelection: null,
+    editorDiff: null,
+    editorConversation: []
   };
 
   const avatarRuntime = {
@@ -390,7 +394,6 @@
       headers,
       credentials: options.credentials || "include"
     };
-
     if (options.body !== undefined) {
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
       init.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
@@ -754,12 +757,12 @@
     return `career-report-section-${raw.replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   }
 
-  function renderReportSections(bundle) {
+  function renderReportSections(bundle, options = {}) {
     const rawSections = bundle?.report_document?.sections;
 
     // v2: sections is an object keyed by module name
     if (rawSections && !Array.isArray(rawSections) && typeof rawSections === "object") {
-      return renderReportSections4(bundle, rawSections);
+      return renderReportSections4(bundle, rawSections, options);
     }
 
     // Legacy: sections is an array
@@ -796,7 +799,9 @@
     `;
   }
 
-  function renderReportSections4(bundle, sections) {
+  function renderReportSections4(bundle, sections, options = {}) {
+    const requestedGroup = String(options.group || "").trim().toLowerCase();
+    const groupConfig = REPORT_WORKSPACE_GROUPS[requestedGroup] || null;
     const navOrder = ["industry_analysis", "career_positioning", "resume_evidence", "competency_profile", "role_match", "path_plan"];
     const navMeta = {
       "industry_analysis":  { label: "行业与需求侧判断", icon: "01", anchor: "cr-sec-industry",    kicker: "Industry Analyst",             accentClass: "cr-module-purple" },
@@ -877,9 +882,107 @@
       return {"S": 96, "A": 85, "B": 70, "C": 55, "D": 35}[String(level).toUpperCase()] || 0;
     }
 
+    function normalizeExplainItem(item) {
+      if (item == null) return null;
+      if (typeof item === "string" || typeof item === "number") {
+        const text = String(item).trim();
+        return text ? { title: text, detail: "", meta: "", validate: "" } : null;
+      }
+      if (typeof item !== "object") return null;
+      const title = String(
+        item.title
+        || item.label
+        || item.name
+        || item.skill
+        || item.competency
+        || item.requirement
+        || item.track
+        || ""
+      ).trim();
+      const detail = String(
+        item.detail
+        || item.summary
+        || item.reason
+        || item.note
+        || item.why_important
+        || item.priority_reason
+        || item.because
+        || ""
+      ).trim();
+      const metaParts = [];
+      if (item.source_type) metaParts.push(`来源：${item.source_type}`);
+      if (item.time_horizon) metaParts.push(`时效：${item.time_horizon}`);
+      if (item.status) metaParts.push(`状态：${item.status}`);
+      if (item.evidence) metaParts.push(String(item.evidence).trim());
+      if (Array.isArray(item.evidence_ids) && item.evidence_ids.length) {
+        metaParts.push(`证据 ID：${item.evidence_ids.join("、")}`);
+      }
+      const validate = String(item.validate || item.validation_action || "").trim();
+      if (!title && !detail && !metaParts.length && !validate) return null;
+      return {
+        title: title || detail || metaParts[0] || "待补充",
+        detail: title ? detail : "",
+        meta: metaParts.join(" · "),
+        validate,
+      };
+    }
+
+    function renderExplainList(items, empty = "暂无补充") {
+      const normalized = (Array.isArray(items) ? items : [items])
+        .map((item) => normalizeExplainItem(item))
+        .filter(Boolean);
+      if (!normalized.length) {
+        return `<p class="cr4-explain-empty">${esc(empty)}</p>`;
+      }
+      return `
+        <ul class="cr4-explain-list">
+          ${normalized.map((item) => `
+            <li>
+              <strong>${esc(item.title)}</strong>
+              ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+              ${item.meta ? `<small>${esc(item.meta)}</small>` : ""}
+              ${item.validate ? `<em>验证：${esc(item.validate)}</em>` : ""}
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    function renderExplainabilityBlock(explainability) {
+      const block = explainability && typeof explainability === "object" ? explainability : {};
+      const judgement = String(block.judgement || "").trim();
+      const because = Array.isArray(block.because) ? block.because : [];
+      const evidence = Array.isArray(block.evidence) ? block.evidence : [];
+      const validate = Array.isArray(block.validate) ? block.validate : [];
+      if (!judgement && !because.length && !evidence.length && !validate.length) return "";
+      return `
+        <section class="cr4-explain">
+          <div class="cr4-explain-head">
+            <p class="cr4-explain-kicker">Explainability</p>
+            <h4>${esc(judgement || "为什么这么判断")}</h4>
+          </div>
+          <div class="cr4-explain-grid">
+            <div class="cr4-explain-card">
+              <span>因为</span>
+              ${renderExplainList(because, "当前未补充原因说明")}
+            </div>
+            <div class="cr4-explain-card">
+              <span>依据</span>
+              ${renderExplainList(evidence, "当前未补充依据来源")}
+            </div>
+            <div class="cr4-explain-card">
+              <span>可验证动作</span>
+              ${renderExplainList(validate, "当前未补充验证动作")}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
     // ── per-section body renderers ────────────────────────────────────────────
 
     function renderIndustryBody(data) {
+      const explainability = data.explainability || {};
       const hotDirs   = Array.isArray(data.hot_directions)   ? data.hot_directions.slice(0, 4)   : [];
       const skillPrios = Array.isArray(data.skill_priorities) ? data.skill_priorities.slice(0, 6) : [];
       const risks      = Array.isArray(data.risk_signals)     ? data.risk_signals.slice(0, 4)     : [];
@@ -895,19 +998,30 @@
         <div class="cr4-card">
           <div class="cr4-card-header"><div class="cr4-card-title">升温方向</div></div>
           ${hotDirs.map((d) => `
-            <div class="cr4-row-item">
-              <span class="cr4-row-label">${esc(d.name || String(d))}</span>
-              <span class="cr4-badge ${d.confidence === "高" ? "cr4-badge-green" : d.confidence === "低" ? "cr4-badge-red" : "cr4-badge-amber"}">${esc(d.confidence || "中")}</span>
+            <div class="cr4-insight-item">
+              <div class="cr4-insight-head">
+                <span class="cr4-row-label">${esc(d.name || String(d))}</span>
+                <span class="cr4-badge ${d.confidence === "高" ? "cr4-badge-green" : d.confidence === "低" ? "cr4-badge-red" : "cr4-badge-amber"}">${esc(d.confidence || "中")}</span>
+              </div>
+              ${(d.summary || d.why_important) ? `<p>${esc(d.summary || d.why_important || "")}</p>` : ""}
+              <div class="cr4-meta-row">
+                ${d.source_type ? `<small>${esc(`来源：${d.source_type}`)}</small>` : ""}
+                ${d.time_horizon ? `<small>${esc(`时效：${d.time_horizon}`)}</small>` : ""}
+              </div>
+              ${d.validation_action ? `<em>${esc(`验证：${d.validation_action}`)}</em>` : ""}
             </div>`).join("")}
         </div>` : "";
 
       const skillList = skillPrios.length ? `
         <div class="cr4-card">
           <div class="cr4-card-header"><div class="cr4-card-title">能力投资优先级</div></div>
-          ${skillPrios.map((s) => skillBar(s.skill || String(s), s.importance === "高" ? 85 : s.importance === "低" ? 40 : 65,
-            s.importance === "高" ? "linear-gradient(90deg,var(--cr4-primary),var(--cr4-primary-light))" :
-            s.importance === "低" ? "linear-gradient(90deg,#94a3b8,#cbd5e1)" :
-            "linear-gradient(90deg,var(--cr4-secondary),#38bdf8)")).join("")}
+          ${skillPrios.map((s) => `
+            ${skillBar(s.skill || String(s), s.importance === "高" ? 85 : s.importance === "低" ? 40 : 65,
+              s.importance === "高" ? "linear-gradient(90deg,var(--cr4-primary),var(--cr4-primary-light))" :
+              s.importance === "低" ? "linear-gradient(90deg,#94a3b8,#cbd5e1)" :
+              "linear-gradient(90deg,var(--cr4-secondary),#38bdf8)")}
+            ${(s.reason || s.priority_reason) ? `<div class="cr4-inline-note">${esc(s.reason || s.priority_reason || "")}</div>` : ""}
+          `).join("")}
         </div>` : "";
 
       const riskList = risks.length ? `
@@ -919,6 +1033,7 @@
         </div>` : "";
 
       return `
+        ${renderExplainabilityBlock(explainability)}
         ${summary ? `<div class="cr4-summary-banner">${esc(summary)}</div>` : ""}
         <div class="cr4-stat-row">${statCards.join("")}</div>
         <div class="cr4-grid-2">${hotList}${skillList}</div>
@@ -926,6 +1041,7 @@
     }
 
     function renderPositioningBody(data) {
+      const explainability = data.explainability || {};
       const tracks      = Array.isArray(data.recommended_tracks)       ? data.recommended_tracks      : [];
       const hyps        = Array.isArray(data.hypotheses_for_evidence)  ? data.hypotheses_for_evidence : [];
       const constraints = Array.isArray(data.constraints_hard)         ? data.constraints_hard        : [];
@@ -935,6 +1051,7 @@
         <div class="cr4-track-card ${i === 0 ? "cr4-track-primary" : ""}">
           <div class="cr4-track-priority">${i === 0 ? "P0 主推荐" : `P${i} 备选`}</div>
           <div class="cr4-track-name">${esc(String(t))}</div>
+          ${hyps[i]?.reason ? `<div class="cr4-track-copy">${esc(hyps[i].reason)}</div>` : ""}
           ${hyps[i] ? `<div class="cr4-track-prove">须证明：${esc((hyps[i].must_prove || []).slice(0, 2).join("、"))}</div>` : ""}
         </div>`).join("");
 
@@ -947,6 +1064,7 @@
         </div>` : "";
 
       return `
+        ${renderExplainabilityBlock(explainability)}
         ${summary ? `<div class="cr4-summary-banner">${esc(summary)}</div>` : ""}
         <div class="cr4-stat-row">
           ${statCard("推荐方向", tracks.length || "—", "条并行假设", "cr4-ac-purple")}
@@ -958,6 +1076,7 @@
     }
 
     function renderResumeBody(data) {
+      const explainability = data.explainability || {};
       const skills  = Array.isArray(data.technical_skills)    ? data.technical_skills.slice(0, 8)   : [];
       const genComp = Array.isArray(data.general_competencies) ? data.general_competencies.slice(0, 6) : [];
       const gaps    = Array.isArray(data.gaps)                 ? data.gaps.slice(0, 4)               : [];
@@ -990,6 +1109,36 @@
           <div class="cr4-gap-grid">
             ${gaps.map((g, i) => gapPill(String(g.claim_in_resume || g.issue || g), i === 0 ? "urgent" : "warn")).join("")}
           </div>
+          <div class="cr4-detail-stack">
+            ${gaps.map((g) => `
+              <div class="cr4-detail-item">
+                <strong>${esc(String(g.claim_in_resume || "证据缺口"))}</strong>
+                ${g.why_it_matters ? `<p>${esc(g.why_it_matters)}</p>` : ""}
+                ${g.suggestion ? `<em>${esc(`建议：${g.suggestion}`)}</em>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        </div>` : "";
+
+      const traceBlock = (skills.length || genComp.length) ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">判断依据回指</div><div class="cr4-card-sub">哪些结论能指回简历</div></div>
+          <div class="cr4-detail-stack">
+            ${skills.slice(0, 3).map((s) => `
+              <div class="cr4-detail-item">
+                <strong>${esc(s.skill || "")}</strong>
+                ${s.note || s.why_counts_as_evidence ? `<p>${esc(s.note || s.why_counts_as_evidence || "")}</p>` : ""}
+                ${Array.isArray(s.evidence_ids) && s.evidence_ids.length ? `<small>${esc(`证据 ID：${s.evidence_ids.join("、")}`)}</small>` : `<small>当前未识别到明确证据 ID</small>`}
+              </div>
+            `).join("")}
+            ${genComp.slice(0, 2).map((g) => `
+              <div class="cr4-detail-item">
+                <strong>${esc(g.competency || "")}</strong>
+                ${g.note || g.why_counts_as_evidence ? `<p>${esc(g.note || g.why_counts_as_evidence || "")}</p>` : ""}
+                ${Array.isArray(g.evidence_ids) && g.evidence_ids.length ? `<small>${esc(`证据 ID：${g.evidence_ids.join("、")}`)}</small>` : `<small>当前未识别到明确证据 ID</small>`}
+              </div>
+            `).join("")}
+          </div>
         </div>` : "";
 
       const hypBlock = hyps.length ? `
@@ -1005,6 +1154,7 @@
         </div>` : "";
 
       return `
+        ${renderExplainabilityBlock(explainability)}
         <div class="cr4-stat-row">
           ${statCard("强证据", strengthCount || "—", "项可追溯", "cr4-ac-green")}
           ${statCard("证据缺口", gapCount || "0", "项待补充", "cr4-ac-amber")}
@@ -1012,10 +1162,12 @@
         </div>
         <div class="cr4-grid-2">${skillBars}${genBars}</div>
         ${gapBlock}
+        ${traceBlock}
         ${hypBlock}`;
     }
 
     function renderCompetencyBody(data) {
+      const explainability = data.explainability || {};
       const dims     = data.dimensions || {};
       const strengths = Array.isArray(data.strengths) ? data.strengths.slice(0, 4) : [];
       const gaps     = Array.isArray(data.gaps)       ? data.gaps.slice(0, 4)      : [];
@@ -1059,17 +1211,42 @@
             </div>`).join("")}
         </div>` : "";
 
+      const dimExplain = Object.entries(dims).length ? `
+        <div class="cr4-card cr4-card-full">
+          <div class="cr4-card-header"><div class="cr4-card-title">维度判断依据</div></div>
+          <div class="cr4-detail-stack">
+            ${Object.entries(dims).slice(0, 6).map(([key, value]) => {
+              const entry = value && typeof value === "object" ? value : {};
+              const reason = String(entry.judgement_reason || "").trim();
+              const evidenceIds = Array.isArray(entry.evidence_ids) && entry.evidence_ids.length
+                ? `证据 ID：${entry.evidence_ids.join("、")}`
+                : "当前缺少明确证据 ID";
+              const label = {"professional_skills":"专业技能","general_ability":"通用能力","communication_collaboration":"沟通协作","learning_agility":"学习力","execution":"执行力","practice_maturity":"实践力"}[key] || key;
+              return `
+                <div class="cr4-detail-item">
+                  <strong>${esc(label)}</strong>
+                  <p>${esc(reason || `当前等级为 ${String(entry.level || "unknown").toUpperCase()}，置信度 ${String(entry.confidence || "low")}`)}</p>
+                  <small>${esc(evidenceIds)}</small>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>` : "";
+
       return `
+        ${renderExplainabilityBlock(explainability)}
         <div class="cr4-stat-row">
           ${statCard("综合能力分", overallScore || "—", "基于证据推算", "cr4-ac-purple")}
           ${statCard("核心优势", strengths.length || "—", "项", "cr4-ac-green")}
           ${statCard("短板项", gaps.length || "0", "项待提升", "cr4-ac-amber")}
         </div>
         <div class="cr4-dim-grid">${dimCards}</div>
-        <div class="cr4-grid-2">${strengthBlock}${gapBlock}</div>`;
+        <div class="cr4-grid-2">${strengthBlock}${gapBlock}</div>
+        ${dimExplain}`;
     }
 
     function renderMatchBody(data) {
+      const explainability = data.explainability || {};
       const fitScore  = Number(data.fit_score || 0);
       const fitBand   = String(data.fit_band || "not_ready");
       const hardFails = Array.isArray(data.hard_failures) ? data.hard_failures.slice(0, 4) : [];
@@ -1123,13 +1300,21 @@
         <div class="cr4-card">
           <div class="cr4-card-header"><div class="cr4-card-title">待补强项</div></div>
           ${gapsArr.map((g) => `
-            <div class="cr4-row-item">
-              <span class="cr4-row-label">${esc(g.requirement || String(g))}</span>
-              <span class="cr4-badge cr4-badge-amber">${esc(g.remediation_type || "待补充")}</span>
+            <div class="cr4-detail-item">
+              <div class="cr4-detail-head">
+                <strong>${esc(g.requirement || String(g))}</strong>
+                <span class="cr4-badge cr4-badge-amber">${esc(g.remediation_type || "待补充")}</span>
+              </div>
+              ${g.reason || g.note ? `<p>${esc(g.reason || g.note || "")}</p>` : ""}
+              <div class="cr4-meta-row">
+                ${g.evidence_basis ? `<small>${esc(`依据：${g.evidence_basis}`)}</small>` : ""}
+                ${g.priority_reason ? `<small>${esc(`优先级：${g.priority_reason}`)}</small>` : ""}
+              </div>
             </div>`).join("")}
         </div>` : "";
 
       return `
+        ${renderExplainabilityBlock(explainability)}
         <div class="cr4-match-layout">
           ${scoreRing}
           <div class="cr4-match-right">
@@ -1140,6 +1325,7 @@
     }
 
     function renderPathBody(data) {
+      const explainability = data.explainability || {};
       const milestones = Array.isArray(data.milestones)    ? data.milestones    : [];
       const visions    = Array.isArray(data.vision_roles)  ? data.vision_roles  : [];
       const contin     = Array.isArray(data.contingency)   ? data.contingency   : [];
@@ -1151,8 +1337,8 @@
           m.horizon || `阶段${i + 1}`,
           m.title || "",
           "",
-          (m.actions || []).slice(0, 2).join("；"),
-          m.metrics || [],
+          [m.reason, (m.actions || []).slice(0, 2).join("；")].filter(Boolean).join(" · "),
+          [...(m.metrics || []), ...(m.linked_gap ? [`关联差距：${m.linked_gap}`] : [])],
           stateClass
         );
       }).join("") : "";
@@ -1182,6 +1368,7 @@
         </div>` : "";
 
       return `
+        ${renderExplainabilityBlock(explainability)}
         <div class="cr4-stat-row">
           ${statCard("里程碑", milestones.length || "—", "个阶段", "cr4-ac-blue")}
           ${statCard("长期角色", visions.length || "—", "个愿景", "cr4-ac-purple")}
@@ -1205,16 +1392,17 @@
       path_plan:          renderPathBody,
     };
 
+    const allowedKeys = groupConfig ? new Set(groupConfig.sectionKeys || []) : null;
     const availableModules = navOrder
       .map((key, idx) => ({ key, idx, meta: navMeta[key], section: sections[key] }))
-      .filter((item) => Boolean(item.section));
+      .filter((item) => Boolean(item.section) && (!allowedKeys || allowedKeys.has(item.key)));
 
     const moduleIndexHtml = `
       <section class="cr4-report-index">
         <div>
           <p class="cr4-report-index-kicker">职业报告</p>
           <h3 class="cr4-report-index-title">报告模块目录</h3>
-          <p class="cr4-report-index-copy">每个模块对应一个独立智能体输出，正文只展示对职业决策有用的结论、证据和下一步动作。</p>
+          <p class="cr4-report-index-copy">每个模块都先展示判断，再展示因为、依据与可验证动作，避免黑箱式职业建议。</p>
         </div>
         <div class="cr4-report-index-tree">
           <div class="cr4-report-index-root">职业报告</div>
@@ -1228,6 +1416,46 @@
         </div>
       </section>
     `;
+
+    const groupHeroHtml = groupConfig ? `
+      <section class="cr4-group-hero">
+        <div class="cr4-group-head">
+          <div class="cr4-group-copy">
+            <p class="cr4-group-kicker">${esc(groupConfig.label || "Report Module")}</p>
+            <h3 class="cr4-group-title">${esc(groupConfig.title || "")}</h3>
+            <p class="cr4-group-summary">${esc(groupConfig.summary || "")}</p>
+            <div class="cr4-group-meta">
+              <span>${esc(bundle?.report_document?.focus_role_name || bundle?.meta?.focus_role_name || "褰撳墠涓荤嚎宀椾綅")}</span>
+              <span>${esc(`鐗堟湰 ${bundle?.meta?.version || "--"}`)}</span>
+              <span>${esc(bundle?.meta?.generated_at || "--")}</span>
+            </div>
+          </div>
+          <button type="button" class="career-report-secondary-btn cr4-group-action" onclick="openCareerReportEditor()">鏅鸿兘娑﹁壊</button>
+        </div>
+        <div class="cr4-group-stat-grid">
+          ${availableModules.map(({ meta, section }) => {
+            const markdown = String(section?.markdown || "").trim();
+            const bodyText = String(section?.data?.industry_summary || section?.data?.user_intent_summary || section?.data?.target_role || section?.data?.fit_band || "").trim();
+            return `
+              <article class="cr4-group-stat">
+                <span>${esc(meta.kicker)}</span>
+                <strong>${esc(meta.label)}</strong>
+                <small>${esc(bodyText || (markdown ? "宸茬敓鎴愭ā鍧楀唴瀹癸紝鍙互缁х画涓嬮捇鏌ョ湅銆?" : "璇ユā鍧楁殏鏃犺緭鍑哄唴瀹广€?"))}</small>
+              </article>
+            `;
+          }).join("")}
+        </div>
+        <div class="cr4-group-module-strip">
+          ${availableModules.map(({ meta }, index) => `
+            <button type="button" class="cr4-group-module-pill" data-report-scroll-target="${meta.anchor}">
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <strong>${esc(meta.label)}</strong>
+              <small>${esc(meta.kicker)}</small>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    ` : "";
 
     const sectionHtml = availableModules.map(({ key, idx, meta, section: sec }) => {
       if (!sec) return "";
@@ -1260,7 +1488,7 @@
         </section>`;
     }).filter(Boolean).join("");
 
-    return `<div class="cr4-report-modules">${moduleIndexHtml}${sectionHtml}</div>`;
+    return `<div class="cr4-report-modules ${groupConfig ? "is-grouped" : ""}">${groupConfig ? groupHeroHtml : moduleIndexHtml}${sectionHtml}</div>`;
   }
 
   function renderHistoricalNotice() {
@@ -1288,6 +1516,821 @@
         </div>
       </section>
       ${renderReportFeedbackCard()}
+    `;
+  }
+
+  function getUserCenterReportViewModeSafe() {
+    return typeof window.getUserCenterReportViewMode === "function"
+      ? String(window.getUserCenterReportViewMode() || "dashboard").trim().toLowerCase()
+      : "report";
+  }
+
+  function getDashboardItemText(item) {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") {
+      return String(
+        item.name
+        || item.skill
+        || item.requirement
+        || item.title
+        || item.label
+        || item.summary
+        || item.text
+        || item.claim_in_resume
+        || item.competency
+        || item.track
+        || ""
+      ).trim();
+    }
+    return "";
+  }
+
+  function normalizeExplainItem(item) {
+    if (item == null) return null;
+    if (typeof item === "string" || typeof item === "number") {
+      const text = String(item).trim();
+      return text ? { title: text, detail: "", meta: "", validate: "" } : null;
+    }
+    if (typeof item !== "object") return null;
+    const title = String(
+      item.title
+      || item.label
+      || item.name
+      || item.skill
+      || item.competency
+      || item.requirement
+      || item.track
+      || getDashboardItemText(item)
+      || ""
+    ).trim();
+    const detail = String(
+      item.detail
+      || item.summary
+      || item.reason
+      || item.note
+      || item.why_important
+      || item.priority_reason
+      || item.because
+      || ""
+    ).trim();
+    const metaParts = [];
+    if (item.source_type) metaParts.push(`来源：${item.source_type}`);
+    if (item.time_horizon) metaParts.push(`时效：${item.time_horizon}`);
+    if (item.status) metaParts.push(`状态：${item.status}`);
+    if (item.evidence) metaParts.push(String(item.evidence).trim());
+    if (Array.isArray(item.evidence_ids) && item.evidence_ids.length) {
+      metaParts.push(`证据 ID：${item.evidence_ids.join("、")}`);
+    }
+    const validate = String(item.validate || item.validation_action || "").trim();
+    if (!title && !detail && !metaParts.length && !validate) return null;
+    return {
+      title: title || detail || metaParts[0] || "待补充",
+      detail: title ? detail : "",
+      meta: metaParts.join(" · "),
+      validate,
+    };
+  }
+
+  function renderDashboardList(title, items, placeholder = "暂无补充") {
+    const normalized = (Array.isArray(items) ? items : [])
+      .map((item) => normalizeExplainItem(item) || {
+        title: getDashboardItemText(item),
+        detail: "",
+        meta: "",
+        validate: "",
+      })
+      .filter((item) => item.title);
+    return `
+      <div class="ucrd-list-block">
+        <div class="ucrd-list-title">${esc(title)}</div>
+        ${normalized.length ? `
+          <ul class="ucrd-list">
+            ${normalized.map((item) => `
+              <li>
+                <strong>${esc(item.title)}</strong>
+                ${item.detail ? `<span>${esc(item.detail)}</span>` : ""}
+                ${item.meta ? `<small>${esc(item.meta)}</small>` : ""}
+                ${item.validate ? `<em>${esc(`验证：${item.validate}`)}</em>` : ""}
+              </li>
+            `).join("")}
+          </ul>
+        ` : `<p class="ucrd-list-empty">${esc(placeholder)}</p>`}
+      </div>
+    `;
+  }
+
+  function renderDashboardItemCluster(title, items, empty = "暂无补充") {
+    const normalized = (Array.isArray(items) ? items : [])
+      .map((item) => normalizeExplainItem(item))
+      .filter(Boolean);
+    return `
+      <div class="ucrd-trace-block">
+        <div class="ucrd-list-title">${esc(title)}</div>
+        ${normalized.length ? normalized.map((item) => `
+          <article class="ucrd-trace-item">
+            <strong>${esc(item.title)}</strong>
+            ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+            ${item.meta ? `<small>${esc(item.meta)}</small>` : ""}
+            ${item.validate ? `<em>${esc(`验证：${item.validate}`)}</em>` : ""}
+          </article>
+        `).join("") : `<p class="ucrd-list-empty">${esc(empty)}</p>`}
+      </div>
+    `;
+  }
+
+  function renderReasonGroup(label, items, empty = "") {
+    const normalized = (Array.isArray(items) ? items : [])
+      .map((item) => normalizeExplainItem(item))
+      .filter(Boolean);
+    if (!normalized.length && !empty) return "";
+    return `
+      <div class="ucrd-mini-group">
+        <span>${esc(label)}</span>
+        ${normalized.length ? `
+          <ul>
+            ${normalized.map((item) => `
+              <li>
+                <strong>${esc(item.title)}</strong>
+                ${item.detail ? `<small>${esc(item.detail)}</small>` : ""}
+              </li>
+            `).join("")}
+          </ul>
+        ` : `<p>${esc(empty)}</p>`}
+      </div>
+    `;
+  }
+
+  function renderFullReportHeader(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const matchOutput = bundle?.match_output || {};
+    const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || meta.focus_role_name || "待识别";
+    const fitScore = Math.max(0, Math.min(100, Number(matchOutput.fit_score || 0)));
+    const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[String(matchOutput.fit_band || "")] || "待评估";
+    return `
+      <section class="ucrd-full-head">
+        <div class="ucrd-full-head-copy">
+          <p class="ucrd-kicker">Complete Report</p>
+          <h2 class="ucrd-full-head-title">${esc(meta.title || "职业规划报告")}</h2>
+          <p class="ucrd-full-head-summary">${formatText(bundle?.report_document?.executive_summary || meta.summary || "完整报告将按模块展开行业判断、能力证据、岗位匹配与路径规划。每个模块先展示判断，再展示因为、依据与可验证动作。")}</p>
+        </div>
+        <div class="ucrd-full-head-meta">
+          <span>主岗位：${esc(focusRole)}</span>
+          <span>匹配：${esc(`${fitScore}% · ${fitBandLabel}`)}</span>
+          <span>版本：${esc(meta.version || "--")}</span>
+          <span>生成时间：${esc(meta.generated_at || "--")}</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function getReportFitTone(fitBand, score = 0) {
+    const normalized = String(fitBand || "").trim().toLowerCase();
+    if (normalized === "strong" || score >= 75) return { label: "较高", tone: "high" };
+    if (normalized === "moderate" || score >= 45) return { label: "中等", tone: "medium" };
+    if (normalized === "weak" || score > 0) return { label: "较低", tone: "low" };
+    return { label: "尚需准备", tone: "blocked" };
+  }
+
+  function normalizeReportDimensions(dimensions) {
+    const labelMap = {
+      professional_skills: "专业技能",
+      general_ability: "通用能力",
+      communication_collaboration: "沟通协作",
+      learning_agility: "学习力",
+      execution: "执行力",
+      practice_maturity: "实践力",
+      user_research: "用户研究",
+      data_analysis: "数据分析",
+      management: "管理能力",
+      ai_application: "AI 应用",
+      planning: "产品规划"
+    };
+    const scoreMap = {
+      strong: 86,
+      high: 86,
+      moderate: 62,
+      medium: 62,
+      basic: 42,
+      low: 42,
+      weak: 28,
+      unknown: 16
+    };
+    const levelLabelMap = {
+      strong: "优势",
+      high: "优势",
+      moderate: "中等",
+      medium: "中等",
+      basic: "待提升",
+      low: "待提升",
+      weak: "短板",
+      unknown: "待补证据"
+    };
+    const rawEntries = Array.isArray(dimensions)
+      ? dimensions.map((item, index) => [item?.key || item?.id || item?.dimension || `dimension_${index}`, item])
+      : Object.entries(dimensions || {});
+    return rawEntries.slice(0, 6).map(([key, value]) => {
+      const level = String(value?.level || value?.status || "unknown").trim().toLowerCase();
+      const score = Math.max(0, Math.min(100, Number(value?.score ?? scoreMap[level] ?? 16)));
+      const confidence = String(value?.confidence || "").trim();
+      const evidenceIds = Array.isArray(value?.evidence_ids) ? value.evidence_ids : [];
+      return {
+        key,
+        label: labelMap[key] || String(value?.label || key).trim(),
+        level,
+        levelLabel: levelLabelMap[level] || "待判断",
+        score,
+        confidence,
+        reason: String(value?.judgement_reason || value?.reason || value?.summary || "").trim(),
+        evidenceIds
+      };
+    });
+  }
+
+  function collectUniqueExplainItems(...sources) {
+    const seen = new Set();
+    const result = [];
+    sources.forEach((source) => {
+      (Array.isArray(source) ? source : []).forEach((item) => {
+        const normalized = normalizeExplainItem(item) || (() => {
+          const title = getDashboardItemText(item);
+          return title ? { title, detail: "", meta: "", validate: "" } : null;
+        })();
+        if (!normalized || !normalized.title) return;
+        const key = `${normalized.title}__${normalized.detail}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        result.push(normalized);
+      });
+    });
+    return result;
+  }
+
+  function renderReportDocChips(items) {
+    const texts = (Array.isArray(items) ? items : [])
+      .map((item) => {
+        if (typeof item === "string" || typeof item === "number") return String(item).trim();
+        const normalized = normalizeExplainItem(item);
+        return normalized ? normalized.title : "";
+      })
+      .filter(Boolean);
+    if (!texts.length) return "";
+    return `
+      <div class="crdoc-chip-row">
+        ${texts.map((text) => `<span class="crdoc-chip">${esc(text)}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  function renderReportDocList(items, emptyText = "暂无补充", limit = 4) {
+    const normalized = collectUniqueExplainItems(items).slice(0, limit);
+    if (!normalized.length) {
+      return `<p class="crdoc-empty">${esc(emptyText)}</p>`;
+    }
+    return `
+      <ul class="crdoc-list">
+        ${normalized.map((item) => `
+          <li class="crdoc-list-item">
+            <strong>${esc(item.title)}</strong>
+            ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+            ${item.meta ? `<small>${esc(item.meta)}</small>` : ""}
+            ${item.validate ? `<em>${esc(`可验证：${item.validate}`)}</em>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    `;
+  }
+
+  function renderCapabilityRadar(entries) {
+    const normalized = Array.isArray(entries) ? entries.slice(0, 6) : [];
+    if (!normalized.length) {
+      return `<div class="crdoc-radar-empty">等待能力画像生成</div>`;
+    }
+    const center = 110;
+    const radius = 74;
+    const levels = [0.25, 0.5, 0.75, 1];
+    const axisCount = normalized.length;
+    const toPoint = (value, index, multiplier = 1) => {
+      const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / axisCount);
+      const currentRadius = radius * multiplier * value;
+      return {
+        x: center + Math.cos(angle) * currentRadius,
+        y: center + Math.sin(angle) * currentRadius
+      };
+    };
+    const polygon = normalized.map((entry, index) => {
+      const point = toPoint(Math.max(0.12, entry.score / 100), index);
+      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+    }).join(" ");
+    const gridPolygons = levels.map((level) => normalized.map((_, index) => {
+      const point = toPoint(1, index, level);
+      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+    }).join(" "));
+    const axes = normalized.map((entry, index) => {
+      const linePoint = toPoint(1, index);
+      const labelPoint = toPoint(1, index, 1.18);
+      const anchor = labelPoint.x < center - 18 ? "end" : labelPoint.x > center + 18 ? "start" : "middle";
+      return `
+        <g>
+          <line x1="${center}" y1="${center}" x2="${linePoint.x.toFixed(1)}" y2="${linePoint.y.toFixed(1)}"></line>
+          <text x="${labelPoint.x.toFixed(1)}" y="${labelPoint.y.toFixed(1)}" text-anchor="${anchor}">${esc(entry.label)}</text>
+        </g>
+      `;
+    }).join("");
+    return `
+      <svg class="crdoc-radar-svg" viewBox="0 0 220 220" aria-hidden="true">
+        <g class="crdoc-radar-grid">
+          ${gridPolygons.map((points) => `<polygon points="${points}"></polygon>`).join("")}
+          ${axes}
+        </g>
+        <polygon class="crdoc-radar-area" points="${polygon}"></polygon>
+        ${normalized.map((entry, index) => {
+          const point = toPoint(Math.max(0.12, entry.score / 100), index);
+          return `<circle class="crdoc-radar-dot" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3.6"></circle>`;
+        }).join("")}
+      </svg>
+    `;
+  }
+
+  function bindReportDocNavigation(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const buttons = Array.from(root.querySelectorAll("[data-report-doc-nav-target]"));
+    const sections = buttons
+      .map((button) => {
+        const targetId = String(button.dataset.reportDocNavTarget || "").trim();
+        if (!targetId) return null;
+        const target = root.querySelector(`#${targetId}`);
+        return target ? { button, target, targetId } : null;
+      })
+      .filter(Boolean);
+    if (!sections.length) return;
+
+    const setActive = (targetId) => {
+      buttons.forEach((button) => {
+        const active = String(button.dataset.reportDocNavTarget || "").trim() === targetId;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    };
+
+    sections.forEach(({ button, target, targetId }) => {
+      button.addEventListener("click", () => {
+        setActive(targetId);
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
+    setActive(sections[0].targetId);
+    if (typeof window.IntersectionObserver !== "function") return;
+
+    const observer = new window.IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible?.target?.id) return;
+      setActive(visible.target.id);
+    }, {
+      threshold: [0.25, 0.45, 0.65],
+      rootMargin: "-18% 0px -52% 0px"
+    });
+
+    sections.forEach(({ target }) => observer.observe(target));
+  }
+
+  function renderReportDashboard(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const reportDocument = bundle?.report_document || {};
+    const dashboardSummary = reportDocument.dashboard_summary || {};
+    const nextActions = reportDocument.next_actions || {};
+    const evidenceHealth = reportDocument.evidence_health || {};
+    const marketSignals = reportDocument.market_signals || {};
+    const roleRankings = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 3) : [];
+    const focusRole = reportDocument.focus_role_name || meta.focus_role_name || tracker?.focus_role_name || "待识别";
+    const fitScore = Math.max(0, Math.min(100, Number(dashboardSummary.fit_score ?? bundle?.match_output?.fit_score ?? 0)));
+    const fitBandLabel = String(dashboardSummary.fit_band_label || "").trim()
+      || ({"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[String(bundle?.match_output?.fit_band || "")] || "待评估");
+    const decisionCards = Array.isArray(dashboardSummary.decision_cards) ? dashboardSummary.decision_cards : [];
+    const thisWeek = Array.isArray(nextActions.this_week) ? nextActions.this_week : [];
+    const next30Days = nextActions.next_30_days || {};
+    const marketHot = Array.isArray(marketSignals.hot_directions) ? marketSignals.hot_directions : [];
+    const marketSkills = Array.isArray(marketSignals.skill_priorities) ? marketSignals.skill_priorities : [];
+    const headlineBecause = Array.isArray(dashboardSummary.headline_because) ? dashboardSummary.headline_because : [];
+    const confidenceSources = Array.isArray(dashboardSummary.confidence_sources) ? dashboardSummary.confidence_sources : [];
+    const actionItems = Array.isArray(nextActions.action_items) ? nextActions.action_items : [];
+    const priorityLogic = Array.isArray(nextActions.priority_logic) ? nextActions.priority_logic : [];
+    const evidenceTrace = Array.isArray(evidenceHealth.evidence_trace) ? evidenceHealth.evidence_trace : [];
+    const signalCards = Array.isArray(marketSignals.signal_cards) ? marketSignals.signal_cards : [];
+    const headline = String(dashboardSummary.headline || meta.summary || reportDocument.executive_summary || "").trim() || `当前建议优先围绕 ${focusRole} 推进。`;
+    const rationale = String(dashboardSummary.rationale || reportDocument.executive_summary || meta.summary || "").trim();
+
+    const roleBars = roleRankings.length
+      ? roleRankings.map((role) => {
+          const score = Math.max(0, Math.min(100, Number(role?.overall_score ?? role?.overallScore ?? 0)));
+          const fitSummary = String(role?.fit_summary || role?.summary || "").trim();
+          const because = Array.isArray(role?.because) ? role.because : [];
+          const requiredSkills = Array.isArray(role?.required_skills) ? role.required_skills.slice(0, 4) : [];
+          return `
+            <article class="ucrd-role-row">
+              <div class="ucrd-role-row-head">
+                <strong>${esc(role?.name || role?.title || "候选岗位")}</strong>
+                <span>${score}%</span>
+              </div>
+              <div class="ucrd-role-bar"><i style="width:${score}%"></i></div>
+              ${fitSummary ? `<p>${esc(fitSummary)}</p>` : ""}
+              ${because.length ? `<div class="ucrd-role-because">${because.map((item) => `<small>${esc(item)}</small>`).join("")}</div>` : ""}
+              ${requiredSkills.length ? `<div class="ucrd-role-tags">${requiredSkills.map((item) => `<span>${esc(item)}</span>`).join("")}</div>` : ""}
+            </article>
+          `;
+        }).join("")
+      : `<p class="ucrd-list-empty">候选岗位对比会在匹配结果生成后显示。</p>`;
+
+    return `
+      <div class="ucrd-dashboard">
+        <section class="ucrd-hero">
+          <div class="ucrd-hero-copy">
+            <p class="ucrd-kicker">Decision Cockpit</p>
+            <h2 class="ucrd-hero-title">${esc(headline)}</h2>
+            <p class="ucrd-hero-summary">${formatText(rationale || `当前主线岗位是 ${focusRole}，建议先围绕差距补强和证据补齐再推进求职动作。`)}</p>
+            ${headlineBecause.length ? `
+              <div class="ucrd-hero-because">
+                <span>因为</span>
+                <ul>
+                  ${headlineBecause.map((item) => `<li>${esc(item)}</li>`).join("")}
+                </ul>
+              </div>
+            ` : ""}
+            <div class="ucrd-hero-meta">
+              <span>主岗位：${esc(focusRole)}</span>
+              <span>匹配判断：${esc(fitBandLabel)}</span>
+              <span>生成时间：${esc(meta.generated_at || "--")}</span>
+              <span>版本：${esc(meta.version || "--")}</span>
+            </div>
+            ${confidenceSources.length ? `<div class="ucrd-source-strip">${confidenceSources.map((item) => `<small>${esc(item)}</small>`).join("")}</div>` : ""}
+          </div>
+          <div class="ucrd-hero-side">
+            <div class="ucrd-score-pod">
+              <strong>${fitScore}%</strong>
+              <span>${esc(fitBandLabel)}</span>
+            </div>
+            <button type="button" class="career-report-primary-btn" data-user-center-report-view="report">查看完整报告</button>
+          </div>
+        </section>
+
+        <section class="ucrd-section">
+          <div class="ucrd-section-head">
+            <div>
+              <p class="ucrd-kicker">Role Comparison</p>
+              <h3>候选岗位对比</h3>
+            </div>
+          </div>
+          <div class="ucrd-role-grid">${roleBars}</div>
+        </section>
+
+        <div class="ucrd-grid">
+          <section class="ucrd-panel">
+            <div class="ucrd-section-head">
+              <div>
+                <p class="ucrd-kicker">Decision Logic</p>
+                <h3>为什么推荐 / 为什么暂缓</h3>
+              </div>
+            </div>
+            <div class="ucrd-decision-grid">
+              ${decisionCards.map((card) => `
+                <article class="ucrd-decision-card ${esc(card?.tone || "neutral")}">
+                  <span class="ucrd-decision-label">${esc(card?.label || "判断")}</span>
+                  <h4>${esc(card?.title || "待补充")}</h4>
+                  <p>${esc(card?.summary || "")}</p>
+                  ${Array.isArray(card?.items) && card.items.length ? `
+                    <ul>
+                      ${card.items.map((item) => `<li>${esc(getDashboardItemText(item))}</li>`).join("")}
+                    </ul>
+                  ` : ""}
+                  ${renderReasonGroup("因为", card?.because)}
+                  ${renderReasonGroup("依据", card?.evidence)}
+                  ${renderReasonGroup("可验证动作", card?.validate)}
+                </article>
+              `).join("")}
+            </div>
+          </section>
+
+          <section class="ucrd-panel">
+            <div class="ucrd-section-head">
+              <div>
+                <p class="ucrd-kicker">Evidence Health</p>
+                <h3>核心差距与证据健康</h3>
+              </div>
+            </div>
+            <p class="ucrd-panel-summary">${esc(String(evidenceHealth.summary || "证据健康度将在报告完成后汇总。"))}</p>
+            <div class="ucrd-list-grid">
+              ${renderDashboardList("硬门槛缺口", evidenceHealth.hard_failures, "当前未发现明确硬门槛")}
+              ${renderDashboardList("待补强技能", evidenceHealth.skill_gaps, "暂未识别到明确补强项")}
+              ${renderDashboardList("简历证据缺失", evidenceHealth.evidence_gaps, "当前简历证据已覆盖核心判断")}
+              ${renderDashboardList("缺失输入项", evidenceHealth.missing_inputs, "当前没有明显缺失输入")}
+            </div>
+            ${renderDashboardItemCluster("判断依据回指", evidenceTrace, "等待证据映射生成")}
+          </section>
+        </div>
+
+        <div class="ucrd-grid">
+          <section class="ucrd-panel">
+            <div class="ucrd-section-head">
+              <div>
+                <p class="ucrd-kicker">Action Plan</p>
+                <h3>下一阶段行动计划</h3>
+              </div>
+            </div>
+            <div class="ucrd-action-grid">
+              <article class="ucrd-action-card">
+                <span>本周先做什么</span>
+                ${thisWeek.length ? `<ul>${thisWeek.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<p>等待短期计划生成。</p>`}
+              </article>
+              <article class="ucrd-action-card">
+                <span>30 天目标</span>
+                <strong>${esc(String(next30Days.title || "建立短期推进主线"))}</strong>
+                ${Array.isArray(next30Days.tasks) && next30Days.tasks.length ? `<ul>${next30Days.tasks.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<p>等待阶段任务同步。</p>`}
+              </article>
+              <article class="ucrd-action-card">
+                <span>失败后的 B 计划</span>
+                <p>${esc(String(nextActions.plan_b || "先保留次优岗位探索，同时继续补项目和证据。"))}</p>
+                ${Array.isArray(nextActions.checkpoints) && nextActions.checkpoints.length ? `
+                  <div class="ucrd-checkpoints">
+                    ${nextActions.checkpoints.map((item) => `<small>${esc(item.label || "复查节点")} · ${esc(item.summary || "")}</small>`).join("")}
+                  </div>
+                ` : ""}
+              </article>
+            </div>
+            ${priorityLogic.length ? `<div class="ucrd-source-strip">${priorityLogic.map((item) => `<small>${esc(item)}</small>`).join("")}</div>` : ""}
+            ${renderDashboardItemCluster("行动建议为什么这样排", actionItems, "等待阶段动作生成")}
+          </section>
+
+          <section class="ucrd-panel">
+            <div class="ucrd-section-head">
+              <div>
+                <p class="ucrd-kicker">Market Signals</p>
+                <h3>行业信号与能力投资</h3>
+              </div>
+            </div>
+            ${marketSignals.overview ? `<p class="ucrd-panel-summary">${esc(marketSignals.overview)}</p>` : ""}
+            <div class="ucrd-list-grid">
+              ${renderDashboardList("热门方向", marketHot, "等待行业热点判断")}
+              ${renderDashboardList("能力优先级", marketSkills, "等待能力投资建议")}
+              ${renderDashboardList("风险信号", marketSignals.risk_signals, "当前未识别明显风险")}
+              ${renderDashboardList("验证动作", marketSignals.verification_actions, "等待验证动作建议")}
+            </div>
+            ${renderDashboardItemCluster("趋势判断依据", signalCards, "等待趋势依据生成")}
+          </section>
+        </div>
+
+        <div class="ucrd-feedback">
+          ${renderReportFeedbackCard()}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderReportDashboardV2(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const reportDocument = bundle?.report_document || {};
+    const dashboardSummary = reportDocument.dashboard_summary || {};
+    const nextActions = reportDocument.next_actions || {};
+    const next30Days = nextActions.next_30_days || {};
+    const evidenceHealth = reportDocument.evidence_health || {};
+    const marketSignals = reportDocument.market_signals || {};
+    const industryStory = reportDocument.industry_story || {};
+    const roleCards = Array.isArray(reportDocument.role_cards) ? reportDocument.role_cards : [];
+    const planBoard = reportDocument.plan_board || {};
+    const explainabilitySummary = reportDocument.explainability_summary || {};
+    const competencyProfile = bundle?.competency_profile || {};
+    const matchOutput = bundle?.match_output || {};
+    const pathPlan = bundle?.path_plan || {};
+    const explainabilityOverview = reportDocument.explainability_overview || {};
+    const focusRole = reportDocument.focus_role_name || meta.focus_role_name || tracker?.focus_role_name || "待识别";
+    const fitScore = Math.max(0, Math.min(100, Number(dashboardSummary.fit_score ?? matchOutput.fit_score ?? 0)));
+    const fitBandLabel = String(dashboardSummary.fit_band_label || "").trim()
+      || ({"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[String(matchOutput.fit_band || "")] || "待评估");
+    const dimensions = normalizeReportDimensions(competencyProfile.dimensions);
+    const headline = String(dashboardSummary.headline || meta.summary || reportDocument.executive_summary || "").trim() || `当前建议优先围绕 ${focusRole} 推进。`;
+    const rationale = String(dashboardSummary.rationale || reportDocument.executive_summary || meta.summary || "").trim()
+      || `先围绕 ${focusRole} 解决硬门槛和证据缺口，再推进求职动作。`;
+    const headlineBecause = Array.isArray(dashboardSummary.headline_because) ? dashboardSummary.headline_because : (Array.isArray(explainabilitySummary.headline_because) ? explainabilitySummary.headline_because : []);
+    const strengths = collectUniqueExplainItems(evidenceHealth.strengths, competencyProfile.strengths);
+    const gaps = collectUniqueExplainItems(
+      evidenceHealth.hard_failures,
+      evidenceHealth.skill_gaps,
+      evidenceHealth.evidence_gaps,
+      evidenceHealth.missing_inputs,
+      matchOutput.partial_gaps
+    );
+    const roles = (roleCards.length
+      ? roleCards.map((item) => ({
+          name: item?.role_name || "",
+          overall_score: item?.fit_score || 0,
+          fit_summary: item?.fit_summary || "",
+          required_skills: Array.isArray(item?.required_skills) ? item.required_skills : [],
+          because: Array.isArray(item?.why_fit) ? item.why_fit : [],
+          hard_gaps: Array.isArray(item?.hard_gaps) ? item.hard_gaps : [],
+          partial_gaps: Array.isArray(item?.partial_gaps) ? item.partial_gaps : [],
+          switch_path: item?.switch_path || "",
+          promotion_path: item?.promotion_path || ""
+        }))
+      : (Array.isArray(bundle?.role_rankings) ? [...bundle.role_rankings] : []))
+      .sort((left, right) => {
+        const leftName = String(left?.name || left?.title || "").trim();
+        const rightName = String(right?.name || right?.title || "").trim();
+        const leftFocus = leftName && focusRole && leftName.includes(focusRole);
+        const rightFocus = rightName && focusRole && rightName.includes(focusRole);
+        if (leftFocus && !rightFocus) return -1;
+        if (!leftFocus && rightFocus) return 1;
+        return Number(right?.overall_score || 0) - Number(left?.overall_score || 0);
+      })
+      .slice(0, 3);
+    const signals = (Array.isArray(marketSignals.signal_cards) && marketSignals.signal_cards.length
+      ? marketSignals.signal_cards
+      : Array.isArray(industryStory.highlight_items) && industryStory.highlight_items.length
+        ? industryStory.highlight_items.map((item) => ({
+            title: item?.title || "",
+            summary: item?.summary || "",
+            source_type: item?.source || "",
+            time_horizon: item?.published_label || "",
+            validation_action: item?.topic || ""
+          }))
+        : collectUniqueExplainItems(marketSignals.hot_directions)).slice(0, 3);
+    const milestones = Array.isArray(pathPlan.milestones) ? pathPlan.milestones : [];
+    const actionItems = Array.isArray(planBoard.action_items) && planBoard.action_items.length ? planBoard.action_items.slice(0, 4) : (Array.isArray(nextActions.action_items) ? nextActions.action_items.slice(0, 4) : []);
+    const planHorizons = Array.isArray(planBoard.horizons) ? planBoard.horizons : [];
+    const shortPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "short_term")?.items)
+      ? planHorizons.find((item) => item?.key === "short_term").items
+      : (Array.isArray(nextActions.this_week) ? nextActions.this_week.map((item) => ({ title: item })) : []);
+    const mediumPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "mid_term")?.items)
+      ? planHorizons.find((item) => item?.key === "mid_term").items
+      : (Array.isArray(next30Days.tasks) ? next30Days.tasks.map((item) => ({ title: item })) : []);
+    const longPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "long_term")?.items)
+      ? planHorizons.find((item) => item?.key === "long_term").items
+      : (Array.isArray(nextActions.checkpoints) ? nextActions.checkpoints : []);
+    const decisionCards = Array.isArray(dashboardSummary.decision_cards) ? dashboardSummary.decision_cards : [];
+    const sectionHead = (index, kicker, title, copy) => `
+      <div class="crdoc-section-head">
+        <span class="crdoc-section-index">${esc(index)}</span>
+        <div>
+          <p class="crdoc-section-kicker">${esc(kicker)}</p>
+          <h3>${esc(title)}</h3>
+          ${copy ? `<p>${esc(copy)}</p>` : ""}
+        </div>
+      </div>
+    `;
+
+    const dimensionRows = dimensions.length
+      ? dimensions.map((entry) => `
+          <article class="crdoc-dimension-row">
+            <div class="crdoc-dimension-head">
+              <strong>${esc(entry.label)}</strong>
+              <span class="crdoc-level-pill ${esc(entry.level)}">${esc(entry.levelLabel)}</span>
+            </div>
+            <div class="crdoc-progress"><i style="width:${entry.score}%"></i></div>
+            ${entry.reason ? `<p>${esc(entry.reason)}</p>` : ""}
+          </article>
+        `).join("")
+      : `<p class="crdoc-empty">等待能力维度生成。</p>`;
+
+    return `
+      <div class="crdoc-page">
+        <section class="crdoc-hero">
+          <div class="crdoc-hero-copy">
+            <p class="crdoc-kicker">Career Report</p>
+            <h2>${esc(meta.title || "职业发展报告")}</h2>
+            <p class="crdoc-hero-summary">${esc(headline)}</p>
+            <p class="crdoc-hero-body">${esc(rationale)}</p>
+            ${headlineBecause.length ? `<div class="crdoc-why-block"><span>为什么会得出这个结论</span>${renderReportDocList(headlineBecause.map((item) => ({ title: item })), "等待结论依据", 4)}</div>` : ""}
+            ${renderReportDocChips(dashboardSummary.confidence_sources)}
+          </div>
+          <aside class="crdoc-hero-aside">
+            <div class="crdoc-stat-card"><span>当前主岗位</span><strong>${esc(focusRole)}</strong></div>
+            <div class="crdoc-stat-card"><span>匹配判断</span><strong>${esc(`${fitScore}%`)}</strong><small>${esc(fitBandLabel)}</small></div>
+            <div class="crdoc-stat-card"><span>生成时间</span><strong>${esc(meta.generated_at || "--")}</strong><small>版本 ${esc(meta.version || "--")}</small></div>
+            <button type="button" class="career-report-primary-btn crdoc-hero-cta" data-user-center-report-view="report">查看完整报告</button>
+          </aside>
+        </section>
+
+        <nav class="crdoc-nav" aria-label="报告段落导航">
+          <button type="button" class="crdoc-nav-btn active" data-report-doc-nav-target="reportDocSection-position" aria-pressed="true">① 当前定位</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-trends" aria-pressed="false">② 行业趋势</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-targets" aria-pressed="false">③ 目标岗位对比</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-path" aria-pressed="false">④ 职业路径图</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-plan" aria-pressed="false">⑤ 提升计划</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-summary" aria-pressed="false">⑥ 关键判断</button>
+        </nav>
+
+        <section id="reportDocSection-position" class="crdoc-section">
+          ${sectionHead("01", "Current Position", "你现在的定位", "判断、原因、证据回指放在同一屏里。")}
+          <div class="crdoc-position-grid">
+            <article class="crdoc-card">
+              <div class="crdoc-card-topline"><span class="crdoc-card-label">当前判断</span><span class="crdoc-card-meta">${esc(focusRole)}</span></div>
+              <h4>${esc(headline)}</h4>
+              <p>${esc(rationale)}</p>
+              <div class="crdoc-two-col">
+                <div class="crdoc-mini-card"><span>已证实的优势</span>${renderReportDocList(strengths, "当前更像是证据不足，不建议把未验证优势当结论。", 4)}</div>
+                <div class="crdoc-mini-card"><span>优先补强项</span>${renderReportDocList(gaps, "当前没有额外缺口提示。", 4)}</div>
+              </div>
+            </article>
+            <article class="crdoc-card">
+              <div class="crdoc-card-topline"><span class="crdoc-card-label">能力画像</span><span class="crdoc-card-meta">每个维度都附判断理由</span></div>
+              <div class="crdoc-radar-wrap">${renderCapabilityRadar(dimensions)}<div class="crdoc-dimension-list">${dimensionRows}</div></div>
+            </article>
+          </div>
+          <article class="crdoc-card">
+            <div class="crdoc-card-topline"><span class="crdoc-card-label">判断依据回指</span></div>
+            ${renderReportDocList(evidenceHealth.evidence_trace, "当前这份报告的主要限制是输入证据还不够完整。", 4)}
+          </article>
+        </section>
+
+        <section id="reportDocSection-trends" class="crdoc-section">
+          ${sectionHead("02", "Industry Trends", "行业趋势（与你相关）", "把趋势结论、来源类型、时效性和验证动作放在一起。")}
+          ${industryStory.narrative ? `
+            <article class="crdoc-card">
+              <div class="crdoc-card-topline">
+                <span class="crdoc-card-label">行业现状</span>
+                <span class="crdoc-card-meta">${esc(industryStory.snapshot_label || "本地热点快照")}</span>
+              </div>
+              <h4>${esc(industryStory.refresh_rule || "本地热点语料快照")}</h4>
+              <p>${esc(industryStory.narrative)}</p>
+            </article>
+          ` : ""}
+          <div class="crdoc-trend-grid">
+            ${signals.length ? signals.map((item, index) => {
+              const normalized = normalizeExplainItem(item) || { title: getDashboardItemText(item), detail: "", validate: "" };
+              const raw = typeof item === "object" && item ? item : {};
+              return `
+                <article class="crdoc-trend-card">
+                  <div class="crdoc-card-topline"><span class="crdoc-card-label">${esc(index === 0 ? "优先关注" : index === 1 ? "重点观察" : "持续跟进")}</span><span class="crdoc-card-meta">${esc(String(raw.time_horizon || "趋势观察"))}</span></div>
+                  <h4>${esc(normalized.title)}</h4>
+                  ${(raw.summary || raw.why_important || normalized.detail) ? `<p>${esc(raw.summary || raw.why_important || normalized.detail || "")}</p>` : ""}
+                  <div class="crdoc-fact-row"><span>来源</span><strong>${esc(String(raw.source_type || "综合判断"))}</strong></div>
+                  ${(normalized.validate || raw.validation_action) ? `<div class="crdoc-meaning-box"><span>你可以怎么验证</span><p>${esc(normalized.validate || raw.validation_action || "")}</p></div>` : ""}
+                </article>
+              `;
+            }).join("") : `<article class="crdoc-card"><p class="crdoc-empty">等待行业趋势生成。</p></article>`}
+          </div>
+          <div class="crdoc-two-col">
+            <article class="crdoc-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">能力投资优先级</span></div>${renderReportDocList(marketSignals.skill_priorities, "等待能力投资建议。", 4)}</article>
+            <article class="crdoc-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">风险与验证</span></div>${renderReportDocList(marketSignals.risk_signals, "当前未识别明确风险。", 3)}${renderReportDocList(marketSignals.verification_actions, "等待验证动作。", 3)}</article>
+          </div>
+        </section>
+
+        <section id="reportDocSection-targets" class="crdoc-section">
+          ${sectionHead("03", "Target Roles", "目标岗位对比", "不只给总分，还拆成为什么进入候选和还差什么。")}
+          <div class="crdoc-target-grid-main">
+            ${roles.length ? roles.map((role, index) => {
+              const score = Math.max(0, Math.min(100, Number(role?.overall_score ?? role?.overallScore ?? 0)));
+              return `
+                <article class="crdoc-target-card ${esc(getReportFitTone(index === 0 ? matchOutput.fit_band : "", score).tone)}">
+                  <div class="crdoc-target-head"><div><h4>${esc(role?.name || role?.title || "候选岗位")}</h4><span>${esc(index === 0 ? "当前主线" : `候选方向 ${index + 1}`)}</span></div><div class="crdoc-target-score"><strong>${score}</strong><small>分</small></div></div>
+                  <div class="crdoc-target-bar"><i style="width:${score}%"></i></div>
+                  ${role?.fit_summary ? `<p class="crdoc-target-summary">${esc(role.fit_summary)}</p>` : ""}
+                  ${Array.isArray(role?.required_skills) && role.required_skills.length ? `<div class="crdoc-chip-row">${role.required_skills.slice(0, 4).map((skill) => `<span class="crdoc-chip crdoc-chip--blue">${esc(skill)}</span>`).join("")}</div>` : ""}
+                  <div class="crdoc-two-col">
+                    <div class="crdoc-mini-card"><span>${esc(index === 0 ? "为什么推荐" : "为什么会进入候选")}</span>${renderReportDocList(index === 0 ? collectUniqueExplainItems(matchOutput.why_match, role?.because) : role?.because, "当前还缺少明确支持项", 3)}</div>
+                    <div class="crdoc-mini-card"><span>${esc(index === 0 ? "还差什么" : "关键要求")}</span>${renderReportDocList(index === 0 ? collectUniqueExplainItems(role?.partial_gaps, role?.hard_gaps, matchOutput.partial_gaps, matchOutput.hard_failures) : collectUniqueExplainItems(role?.hard_gaps, role?.partial_gaps, Array.isArray(role?.required_skills) ? role.required_skills.map((skill) => ({ title: skill, detail: "该岗位的高频硬要求" })) : []), "当前没有额外门槛提示", 3)}</div>
+                  </div>
+                </article>
+              `;
+            }).join("") : `<article class="crdoc-card"><p class="crdoc-empty">等待岗位匹配结果生成。</p></article>`}
+          </div>
+        </section>
+
+        <section id="reportDocSection-path" class="crdoc-section">
+          ${sectionHead("04", "Career Path", "职业路径图", "让用户看到推荐这条路的前提条件、里程碑和风险。")}
+          <div class="crdoc-path-grid">
+            <div class="crdoc-timeline">
+              <article class="crdoc-timeline-card done"><div class="crdoc-timeline-dot"></div><div class="crdoc-timeline-body"><div class="crdoc-card-topline"><span class="crdoc-card-label">当前判断</span><span class="crdoc-card-meta">${esc(meta.generated_at || "--")}</span></div><h4>${esc(focusRole)}</h4><p>${esc(rationale)}</p></div></article>
+              ${milestones.length ? milestones.map((item, index) => `<article class="crdoc-timeline-card ${index === 0 ? "current" : ""}"><div class="crdoc-timeline-dot"></div><div class="crdoc-timeline-body"><div class="crdoc-card-topline"><span class="crdoc-card-label">${esc(index === 0 ? "下一步" : index === 1 ? "中期" : "长期")}</span><span class="crdoc-card-meta">${esc(String(item?.horizon || "--"))}</span></div><h4>${esc(String(item?.title || "阶段目标"))}</h4>${item?.reason ? `<p>${esc(item.reason)}</p>` : ""}${renderReportDocList((Array.isArray(item?.actions) ? item.actions : []).map((action) => ({ title: action, detail: item?.priority_reason || item?.linked_gap || "" })), "等待阶段动作", 4)}</div></article>`).join("") : `<article class="crdoc-timeline-card"><div class="crdoc-timeline-dot"></div><div class="crdoc-timeline-body"><p class="crdoc-empty">等待路径规划生成。</p></div></article>`}
+            </div>
+            <div class="crdoc-stack">
+              <article class="crdoc-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">路径推荐理由</span></div>${renderReportDocList(pathPlan.path_rationale, "等待路径解释。", 4)}</article>
+              <article class="crdoc-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">前提条件与风险</span></div>${renderReportDocList(pathPlan.dependencies?.must_resolve_hard_failures, "当前未标出必须先解决的硬门槛。", 3)}${renderReportDocList(pathPlan.path_risks, "当前未标出显性路径风险。", 3)}${renderReportDocList(pathPlan.contingency, "当前没有 B 计划提示。", 3)}</article>
+            </div>
+          </div>
+        </section>
+
+        <section id="reportDocSection-plan" class="crdoc-section">
+          ${sectionHead("05", "Action Plan", "提升计划", "每条建议都要说明它对应哪个判断，以及为什么排在前面。")}
+          <div class="crdoc-plan-grid">
+            <article class="crdoc-plan-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">短期（0-30 天）</span><span class="crdoc-card-meta">先补硬门槛</span></div>${renderReportDocList(shortPlanActions, "等待短期动作。", 4)}${Array.isArray(nextActions.priority_logic) && nextActions.priority_logic.length ? `<div class="crdoc-meaning-box"><span>为什么先做这些</span><p>${esc(nextActions.priority_logic[0])}</p></div>` : ""}</article>
+            <article class="crdoc-plan-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">中期（1-6 个月）</span><span class="crdoc-card-meta">${esc(String(milestones[1]?.horizon || "能力沉淀"))}</span></div>${renderReportDocList(mediumPlanActions, "等待中期动作。", 4)}</article>
+            <article class="crdoc-plan-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">长期（6-12 个月）</span><span class="crdoc-card-meta">${esc(String(milestones[2]?.horizon || "形成路径闭环"))}</span></div>${renderReportDocList(longPlanActions, "等待长期动作。", 4)}${nextActions.plan_b ? `<div class="crdoc-meaning-box"><span>如果主线受阻</span><p>${esc(String(nextActions.plan_b))}</p></div>` : ""}</article>
+          </div>
+          <article class="crdoc-card"><div class="crdoc-card-topline"><span class="crdoc-card-label">行动建议与闭环说明</span></div><div class="crdoc-action-detail-grid">${actionItems.length ? actionItems.map((item) => `<article class="crdoc-mini-card"><span>${esc(String(item?.window || "行动建议"))}</span><h4>${esc(String(item?.title || "待补充"))}</h4>${item?.reason ? `<p>${esc(item.reason)}</p>` : ""}${item?.linked_judgement ? `<small>${esc(`对应判断：${item.linked_judgement}`)}</small>` : ""}${item?.priority_reason ? `<em>${esc(`优先级原因：${item.priority_reason}`)}</em>` : ""}</article>`).join("") : `<p class="crdoc-empty">等待行动建议生成。</p>`}</div></article>
+        </section>
+
+        <section id="reportDocSection-summary" class="crdoc-section">
+          ${sectionHead("06", "Key Judgements", "关键判断", "把“是什么”后面的“为什么”直接写出来，帮助用户建立信任。")}
+          <div class="crdoc-insight-grid">
+            <article class="crdoc-insight-card breakthrough"><div class="crdoc-card-topline"><span class="crdoc-card-label">最快突破口</span></div><p class="crdoc-insight-summary">${esc(String(decisionCards.find((card) => card?.tone === "positive")?.title || actionItems[0]?.title || "先把最影响投递通过率的硬门槛补齐。"))}</p>${renderReportDocList((decisionCards.find((card) => card?.tone === "positive")?.because || [actionItems[0]?.priority_reason || actionItems[0]?.reason || "优先解决最影响投递反馈的问题。"]).map((item) => ({ title: item })), "等待原因说明", 3)}</article>
+            <article class="crdoc-insight-card risk"><div class="crdoc-card-topline"><span class="crdoc-card-label">最需要警惕的风险</span></div><p class="crdoc-insight-summary">${esc(String(decisionCards.find((card) => card?.tone === "risk")?.title || explainabilityOverview.match?.judgement || "不要在证据不足时直接相信岗位匹配结论。"))}</p>${renderReportDocList((decisionCards.find((card) => card?.tone === "risk")?.because || explainabilityOverview.match?.because || []).map((item) => ({ title: item })), "等待原因说明", 3)}</article>
+            <article class="crdoc-insight-card strength"><div class="crdoc-card-topline"><span class="crdoc-card-label">${esc(strengths.length ? "当前已能保留的优势" : "当前最值得保留的基础")}</span></div><p class="crdoc-insight-summary">${esc(strengths[0]?.title || decisionCards.find((card) => card?.tone === "neutral")?.title || explainabilityOverview.positioning?.judgement || "当前最有价值的不是盲目扩岗位，而是保持主线聚焦。")}</p>${renderReportDocList((strengths.length ? [strengths[0]] : (decisionCards.find((card) => card?.tone === "neutral")?.because || explainabilityOverview.positioning?.because || []).map((item) => ({ title: item }))), "等待原因说明", 3)}</article>
+          </div>
+          <div class="crdoc-feedback-wrap">${renderReportFeedbackCard()}</div>
+        </section>
+      </div>
     `;
   }
 
@@ -1321,50 +2364,51 @@
     const historical = Boolean(window.appState?.careerReportViewingHistorical);
     const status = String(state?.status || "").trim().toLowerCase();
 
-    if (!bundle && status !== "queued" && status !== "running" && status !== "failed") {
+    if (status === "queued" || status === "running") {
       host.innerHTML = `
-        <div class="career-report-banner-main">
+        <div class="career-report-banner-main running">
           <div>
-            <h3 class="career-report-banner-title">职业报告中心已恢复</h3>
-            <p class="career-report-banner-copy">后端报告接口已接回。现在可以基于当前画像和岗位匹配结果重新生成完整职业报告。</p>
+            <h3 class="career-report-banner-title">职业报告正在生成</h3>
+            <p class="career-report-banner-copy">${formatText(state?.stage_detail || state?.summary || "后台正在按阶段生成职业报告，请稍候。")}</p>
           </div>
           <div class="career-report-banner-meta">
-            <span>状态：待生成</span>
+            <span>阶段：${esc(state?.stage_label || "编排中")}</span>
+            <span>主岗位：${esc(bundle?.report_document?.focus_role_name || bundle?.meta?.focus_role_name || state?.focus_role_id || "待识别")}</span>
           </div>
         </div>
       `;
       return;
     }
 
-    const toneClass = status === "failed" ? "failed" : (status === "queued" || status === "running" ? "running" : "");
-    const title = status === "failed"
-      ? "职业报告生成失败"
-      : (status === "queued" || status === "running")
-        ? "职业报告正在生成"
-        : historical
-          ? "当前正在查看历史报告版本"
-          : "当前报告已同步到最新版本";
-    const copy = status === "failed"
-      ? (state?.error_message || "请检查画像输入和模型配置后重试。")
-      : (status === "queued" || status === "running")
-        ? (state?.stage_detail || state?.summary || "后台正在按阶段生成职业报告，请稍候。")
-        : (bundle?.report_document
-          ? "报告已生成并加载新版式正文。请向下滚动阅读摘要与章节，或使用「全屏查看」。"
-          : (bundle?.meta?.summary || state?.summary || "当前展示的是已完成的职业报告。"));
+    if (status === "failed") {
+      host.innerHTML = `
+        <div class="career-report-banner-main failed">
+          <div>
+            <h3 class="career-report-banner-title">职业报告生成失败</h3>
+            <p class="career-report-banner-copy">${formatText(state?.error_message || "请检查画像输入和模型配置后重试。")}</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
 
-    host.innerHTML = `
-      <div class="career-report-banner-main ${toneClass}">
-        <div>
-          <h3 class="career-report-banner-title">${esc(title)}</h3>
-          <p class="career-report-banner-copy">${formatText(copy)}</p>
+    if (historical) {
+      host.innerHTML = `
+        <div class="career-report-banner-main">
+          <div>
+            <h3 class="career-report-banner-title">当前正在查看历史版本</h3>
+            <p class="career-report-banner-copy">当前页面只读，任务勾选和进度同步不会写回服务端。</p>
+          </div>
+          <div class="career-report-banner-meta">
+            <span>版本：${esc(bundle?.meta?.version || "--")}</span>
+            <span>时间：${esc(bundle?.meta?.generated_at || "--")}</span>
+          </div>
         </div>
-        <div class="career-report-banner-meta">
-          <span>阶段：${esc(state?.stage_label || "已完成")}</span>
-          <span>主岗位：${esc(bundle?.report_document?.focus_role_name || state?.tracker?.focus_role_name || state?.focus_role_id || "待识别")}</span>
-          <span>版本：${esc(bundle?.meta?.version || state?.tracker?.report_version || "--")}</span>
-        </div>
-      </div>
-    `;
+      `;
+      return;
+    }
+
+    host.innerHTML = "";
   }
 
   function renderReportFeedbackCard() {
@@ -1546,6 +2590,28 @@
     { key: "path_plan",          label: "阶段学习路径",     icon: "06", anchor: "cr-sec-path" },
   ];
 
+  const REPORT_WORKSPACE_GROUPS = {
+    trends: {
+      label: "\u884c\u4e1a\u8d8b\u52bf",
+      title: "\u884c\u4e1a\u5224\u65ad\u4e0e\u5f53\u524d\u804c\u4e1a\u5b9a\u4f4d",
+      summary: "\u5148\u770b\u884c\u4e1a\u666f\u6c14\u5ea6\u3001\u5c97\u4f4d\u9700\u6c42\u53d8\u5316\u548c\u4f60\u5f53\u524d\u9002\u5408\u7684\u5207\u5165\u65b9\u5411\uff0c\u907f\u514d\u76f4\u63a5\u628a\u62a5\u544a\u53d8\u6210\u4e00\u6574\u9875\u5806\u5b57\u3002",
+      sectionKeys: ["industry_analysis", "career_positioning"]
+    },
+    matching: {
+      label: "\u5c97\u4f4d\u5339\u914d",
+      title: "\u8bc1\u636e\u3001\u80fd\u529b\u4e0e\u76ee\u6807\u5c97\u4f4d\u7684\u5339\u914d\u5224\u65ad",
+      summary: "\u628a\u7b80\u5386\u8bc1\u636e\u3001\u80fd\u529b\u753b\u50cf\u548c\u76ee\u6807\u5c97\u4f4d\u8981\u6c42\u62c6\u5f00\u5bf9\u7167\uff0c\u6e05\u6670\u770b\u5230\u5f53\u524d\u5dee\u8ddd\u3001\u4f18\u52bf\u4e0e\u9700\u8981\u8865\u8bc1\u7684\u70b9\u3002",
+      sectionKeys: ["resume_evidence", "competency_profile", "role_match"]
+    },
+    plan: {
+      label: "\u89c4\u5212\u8def\u5f84",
+      title: "\u5206\u9636\u6bb5\u8865\u9f50\u80fd\u529b\u5e76\u5f62\u6210\u6267\u884c\u8def\u7ebf",
+      summary: "\u628a\u957f\u671f\u76ee\u6807\u62c6\u6210\u8fd1\u671f\u52a8\u4f5c\u3001\u9636\u6bb5\u76ee\u6807\u548c\u91cc\u7a0b\u7891\uff0c\u4fbf\u4e8e\u540e\u7eed\u7ee7\u7eed\u7f16\u8f91\u3001\u68c0\u67e5\u548c\u5bfc\u51fa\u3002",
+      sectionKeys: ["path_plan"]
+    }
+  };
+  window.CAREER_REPORT_WORKSPACE_GROUPS = REPORT_WORKSPACE_GROUPS;
+
   function isModularBundle(bundle) {
     const sections = bundle?.report_document?.sections;
     return sections && !Array.isArray(sections) && typeof sections === "object";
@@ -1579,25 +2645,33 @@
     const state = getCareerReportStateSafe();
     const status = String(state?.status || "").trim().toLowerCase();
     const generating = status === "queued" || status === "running";
-    if (generating) {
+    const viewMode = getUserCenterReportViewModeSafe();
+    if (generating || viewMode !== "report") {
+      aside.innerHTML = "";
+      aside.classList.add("career-report-aside--hidden");
+      return;
+    }
+    aside.classList.remove("career-report-aside--hidden");
+
+    const bundle = window.appState?.careerReport || null;
+    if (!bundle?.report_document) {
       aside.innerHTML = "";
       return;
     }
-
-    const bundle = window.appState?.careerReport || null;
     const tracker = getCareerReportTracker();
     const progress = Array.isArray(state?.progress) ? state.progress : getDefaultStageProgress();
-    const outline = Array.isArray(bundle?.report_document?.outline) ? bundle.report_document.outline : [];
     const roleRankings = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 5) : [];
     const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || window.jobNameMap?.[window.appState?.focusedRoleId] || window.appState?.focusedRoleId || "待识别";
     const isModular = isModularBundle(bundle);
-    const v2 = isModular;
+    const matchOutput = bundle?.match_output || {};
+    const fitScore = Number(matchOutput.fit_score || bundle?.role_rankings?.[0]?.overall_score || 0);
+    const fitBand = String(matchOutput.fit_band || "");
+    const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || "--";
 
-    // Build module nav for modular reports
     const moduleNavHtml = isModular ? `
       <section class="career-report-side-card">
-        <p class="career-report-side-kicker">Report Modules</p>
-        <h3 class="career-report-side-title">报告模块</h3>
+        <p class="career-report-side-kicker">Contents</p>
+        <h3 class="career-report-side-title">章节目录</h3>
         <nav class="cr4-module-nav">
           ${SECTION_NAV.map((sec) => {
             const hasData = Boolean(bundle?.report_document?.sections?.[sec.key]?.markdown);
@@ -1614,29 +2688,23 @@
       </section>
     ` : "";
 
-    // v2: show match score if available
-    const matchOutput = bundle?.match_output || {};
-    const fitScore = Number(matchOutput.fit_score || bundle?.role_rankings?.[0]?.overall_score || 0);
-    const fitBand = String(matchOutput.fit_band || "");
-    const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || "--";
-
     aside.innerHTML = `
       <section class="career-report-side-card primary">
-        <p class="career-report-side-kicker">Current Snapshot</p>
-        <h3 class="career-report-side-title">${esc(bundle?.meta?.title || "职业报告待生成")}</h3>
-        <p class="career-report-side-copy">${formatText(bundle?.meta?.summary || "先锁定一条主线岗位，再用最新画像生成完整职业规划报告。")}</p>
+        <p class="career-report-side-kicker">Snapshot</p>
+        <h3 class="career-report-side-title">${esc(bundle?.meta?.title || "职业报告")}</h3>
+        <p class="career-report-side-copy">${formatText(bundle?.report_document?.executive_summary || bundle?.meta?.summary || "完整报告将围绕当前主岗位展开。")}</p>
         <div class="career-report-side-metrics">
           <article>
-            <span>主线岗位</span>
+            <span>主岗位</span>
             <strong>${esc(focusRole)}</strong>
           </article>
           <article>
-            <span>${v2 ? "人岗契合" : "报告版本"}</span>
-            <strong>${v2 ? esc(`${fitScore}% · ${fitBandLabel}`) : esc(bundle?.meta?.version || tracker?.report_version || "--")}</strong>
+            <span>匹配判断</span>
+            <strong>${esc(`${fitScore}% · ${fitBandLabel}`)}</strong>
           </article>
           <article>
-            <span>完成度</span>
-            <strong>${esc(`${Math.max(0, Math.min(100, Number(tracker?.completion_rate || 0)))}%`)}</strong>
+            <span>版本</span>
+            <strong>${esc(bundle?.meta?.version || tracker?.report_version || "--")}</strong>
           </article>
         </div>
       </section>
@@ -1656,24 +2724,6 @@
           }).join("")}
         </div>
       </section>
-      ${!v2 ? `
-      <section class="career-report-side-card">
-        <p class="career-report-side-kicker">Outline</p>
-        <h3 class="career-report-side-title">章节导航</h3>
-        <div class="career-report-outline-list">
-          ${outline.length ? outline.map((item, index) => `
-            <button type="button" class="career-report-outline-btn" data-report-scroll-target="${esc(getReportSectionDomId(item, index))}">
-              <strong>${esc(item.title || item.kicker || `章节 ${index + 1}`)}</strong>
-              <span>${esc(item.summary || item.kicker || "")}</span>
-            </button>
-          `).join("") : `
-            <div class="career-report-stage-item">
-              <strong>等待报告生成</strong>
-              <span>生成完成后这里会出现完整章节导航。</span>
-            </div>
-          `}
-        </div>
-      </section>` : ""}
       <section class="career-report-side-card">
         <p class="career-report-side-kicker">Top Roles</p>
         <h3 class="career-report-side-title">当前候选岗位</h3>
@@ -1685,6 +2735,7 @@
           `).join("")}
         </div>
       </section>
+      ${renderReportFeedbackCard()}
     `;
 
     aside.querySelectorAll("[data-report-scroll-target]").forEach((button) => {
@@ -1727,20 +2778,38 @@
       return;
     }
 
-    main.innerHTML = `
-      ${renderHistoricalNotice()}
-      ${renderReportMagazineLayout(bundle, tracker)}
-      ${renderReportSections(bundle)}
-    `;
+    const viewMode = getUserCenterReportViewModeSafe();
+    const activeGroup = typeof window.getUserCenterReportModule === "function"
+      ? String(window.getUserCenterReportModule() || "trends").trim().toLowerCase()
+      : "trends";
+    main.innerHTML = viewMode === "report"
+      ? `
+        ${renderHistoricalNotice()}
+        ${renderFullReportHeader(bundle, tracker)}
+        ${renderReportSections(bundle, { group: activeGroup })}
+      `
+      : `
+        ${renderHistoricalNotice()}
+        ${renderReportDashboardV2(bundle, tracker)}
+      `;
 
     main.querySelectorAll("[data-report-action='back-latest']").forEach((button) => {
       button.addEventListener("click", () => {
         void window.restoreLatestCareerReportView();
       });
     });
+    main.querySelectorAll("[data-user-center-report-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        window.setUserCenterReportViewMode?.(button.dataset.userCenterReportView || "report");
+      });
+    });
     bindCareerReportFeedbackHandlers(main);
-    bindReportPolishHandlers(main);
-    bindReportScrollHandlers(main, main);
+    if (viewMode === "report") {
+      bindReportPolishHandlers(main);
+      bindReportScrollHandlers(main, main);
+    } else {
+      bindReportDocNavigation(main);
+    }
   }
 
   function cycleTrackerStatus(itemType, currentStatus) {
@@ -1861,7 +2930,7 @@
 
     if (main) {
       main.innerHTML = bundle && bundle.report_document
-        ? `${renderHistoricalNotice()}${renderReportMagazineLayout(bundle, tracker)}${renderReportSections(bundle)}`
+        ? `${renderHistoricalNotice()}${renderFullReportHeader(bundle, tracker)}${renderReportSections(bundle)}`
         : renderEmptyReportMain();
       if (bundle && bundle.report_document) {
         bindCareerReportFeedbackHandlers(main);
@@ -1899,6 +2968,7 @@
     renderReportAside();
     renderReportMain();
     renderReportViewer();
+    window.applyUserCenterReportReaderGate?.();
   }
 
   function openReportViewer() {
@@ -1922,6 +2992,493 @@
     if (!overlay) return;
     overlay.classList.add("hidden");
     document.body.style.overflow = reportRuntime.previousBodyOverflow;
+  }
+
+  function renderReportEditorSectionMap(source) {
+    const host = document.getElementById("reportEditorSectionMap");
+    if (!host) return;
+    const items = Array.isArray(source?.section_map) ? source.section_map : [];
+    host.innerHTML = items.length
+      ? items.map((item, index) => `
+          <button type="button" class="report-editor-section-item" data-editor-scroll-index="${index}">
+            <strong>${esc(item?.label || `章节 ${index + 1}`)}</strong>
+            <small>${esc(String(item?.markdown || "").slice(0, 60) || "点击快速定位")}</small>
+          </button>
+        `).join("")
+      : `<div class="report-editor-section-item active"><strong>暂无章节</strong><small>等待源文稿加载</small></div>`;
+
+    host.querySelectorAll("[data-editor-scroll-index]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.editorScrollIndex || 0);
+        const textarea = document.getElementById("reportEditorTextarea");
+        const section = items[index];
+        if (!textarea || !section) return;
+        const label = String(section.label || "").trim();
+        const anchor = label ? `## ${label}` : "";
+        const position = anchor ? textarea.value.indexOf(anchor) : -1;
+        if (position >= 0) {
+          textarea.focus();
+          textarea.setSelectionRange(position, position);
+        }
+      });
+    });
+  }
+
+  function renderReportEditorSnapshotList(source) {
+    const host = document.getElementById("reportEditorSnapshotList");
+    if (!host) return;
+    const reportId = String(source?.report_id || window.appState?.careerReport?.meta?.report_id || "").trim();
+    const snapshots = Array.isArray(window.appState?.careerReport?.draft_snapshots) ? window.appState.careerReport.draft_snapshots : [];
+    const activeSnapshotId = String(source?.snapshot_id || "").trim();
+    const activeFormal = !activeSnapshotId;
+    const formalTitle = esc(window.appState?.careerReport?.meta?.title || "正式职业报告");
+    host.innerHTML = `
+      <button type="button" class="report-editor-snapshot-item${activeFormal ? " active" : ""}" data-editor-source-report="${esc(reportId)}">
+        <strong>${formalTitle}</strong>
+        <small>正式报告基线</small>
+      </button>
+      ${snapshots.map((snapshot) => `
+        <button type="button" class="report-editor-snapshot-item${String(snapshot?.snapshot_id || "") === activeSnapshotId ? " active" : ""}" data-editor-source-snapshot="${esc(snapshot?.snapshot_id || "")}">
+          <strong>${esc(snapshot?.title || snapshot?.label || "编辑快照")}</strong>
+          <small>${esc(snapshot?.updated_at || snapshot?.created_at || "--")}</small>
+        </button>
+      `).join("")}
+    `;
+    host.querySelector("[data-editor-source-report]")?.addEventListener("click", () => {
+      void openCareerReportEditor({ reportId, snapshotId: "" });
+    });
+    host.querySelectorAll("[data-editor-source-snapshot]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const snapshotId = String(button.dataset.editorSourceSnapshot || "").trim();
+        if (!snapshotId) return;
+        void openCareerReportEditor({ reportId, snapshotId });
+      });
+    });
+  }
+
+  function clipReportEditorText(value, limit = 180) {
+    const text = String(value || "").trim().replace(/\s+/g, " ");
+    if (!text) return "";
+    if (text.length <= limit) return text;
+    return `${text.slice(0, Math.max(0, limit - 3))}...`;
+  }
+
+  function appendReportEditorMessage(role, label, body, tone = role) {
+    const next = {
+      role: String(role || "system"),
+      tone: String(tone || role || "system"),
+      label: String(label || role || "System"),
+      body: String(body || "").trim()
+    };
+    reportRuntime.editorConversation = [
+      ...(Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : []),
+      next
+    ].slice(-10);
+  }
+
+  function renderReportEditorChatLog() {
+    const host = document.getElementById("reportEditorChatLog");
+    if (!host) return;
+    const messages = Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : [];
+    if (!messages.length) {
+      const selectionText = clipReportEditorText(reportRuntime.editorSelection?.text || "", 120);
+      const hint = selectionText
+        ? `\u5df2\u9009\u4e2d\u5185\u5bb9\uff1a${selectionText}\u3002\u5728\u53f3\u4fa7\u8f93\u5165\u4f60\u5e0c\u671b AI \u600e\u4e48\u4fee\uff0c\u7cfb\u7edf\u4f1a\u5148\u751f\u6210 diff \u5efa\u8bae\uff0c\u4e0d\u4f1a\u81ea\u52a8\u8986\u76d6\u6b63\u6587\u3002`
+        : "\u5148\u5728\u5de6\u4fa7\u9009\u4e2d\u9700\u8981\u4fee\u6539\u7684\u51e0\u884c\uff0c\u6216\u8005\u76f4\u63a5\u5bf9\u6574\u7bc7\u62a5\u544a\u53d1\u8d77\u6da6\u8272\u3002";
+      host.innerHTML = `
+        <div class="report-editor-chat-item system">
+          <span class="report-editor-chat-role">Workflow</span>
+          <p>${esc(hint)}</p>
+        </div>
+      `;
+      return;
+    }
+    host.innerHTML = messages.map((item) => `
+      <div class="report-editor-chat-item ${esc(item?.tone || item?.role || "system")}">
+        <span class="report-editor-chat-role">${esc(item?.label || item?.role || "System")}</span>
+        <p>${esc(item?.body || "")}</p>
+      </div>
+    `).join("");
+    host.scrollTop = host.scrollHeight;
+  }
+
+  function renderReportEditorCheckPanel(checkResult) {
+    const panel = document.getElementById("reportEditorCheckPanel");
+    if (!panel) return;
+    const result = checkResult && typeof checkResult === "object" ? checkResult : null;
+    const issues = Array.isArray(result?.issues) ? result.issues : [];
+    if (!result) {
+      panel.classList.add("hidden");
+      panel.innerHTML = "";
+      return;
+    }
+    const statusLabel = result.status === "pass"
+      ? "\u901a\u8fc7"
+      : `\u5f85\u5904\u7406 ${issues.length} \u9879`;
+    panel.classList.remove("hidden");
+    panel.innerHTML = `
+      <div class="report-editor-diff-head">
+        <div>
+          <p class="report-editor-kicker">Completeness Check</p>
+          <h3 class="report-editor-title">\u5185\u5bb9\u5b8c\u6574\u6027\u4e0e\u53ef\u89e3\u91ca\u6027\u68c0\u67e5</h3>
+        </div>
+        <span>${esc(statusLabel)}</span>
+      </div>
+      ${issues.length ? issues.map((item) => `
+        <div class="report-editor-check-item">
+          <strong>${esc(item?.type || "issue")}</strong>
+          <div>${esc(item?.message || "\u5b58\u5728\u5f85\u5904\u7406\u95ee\u9898")}</div>
+        </div>
+      `).join("") : `
+        <div class="report-editor-check-item">
+          <strong>\u68c0\u67e5\u901a\u8fc7</strong>
+          <div>\u5f53\u524d\u62a5\u544a\u7ed3\u6784\u5b8c\u6574\uff0c\u5173\u952e\u5224\u65ad\u4e0e\u8bc1\u636e\u94fe\u8def\u5df2\u8fbe\u5230\u57fa\u672c\u8981\u6c42\u3002</div>
+        </div>
+      `}
+    `;
+  }
+
+  function renderReportEditorDiffPanel() {
+    const panel = document.getElementById("reportEditorDiffPanel");
+    if (!panel) return;
+    const diff = reportRuntime.editorDiff;
+    if (!diff || !Array.isArray(diff.diff_blocks) || !diff.diff_blocks.length) {
+      panel.classList.add("hidden");
+      panel.innerHTML = "";
+      return;
+    }
+    panel.classList.remove("hidden");
+    panel.innerHTML = `
+      <div class="report-editor-diff-head">
+        <div>
+          <p class="report-editor-kicker">Diff Review</p>
+          <h3 class="report-editor-title">AI \u6da6\u8272\u63d0\u6848</h3>
+          <p class="report-editor-meta">\u53f3\u4fa7\u662f\u5efa\u8bae\u7248\uff0c\u5de6\u4fa7\u662f\u539f\u6587\u3002\u4f60\u786e\u8ba4\u540e\u518d Keep All \u5199\u56de\u6b63\u6587\u3002</p>
+        </div>
+        <div class="report-editor-actions">
+          <button type="button" class="career-report-secondary-btn" id="reportEditorUndoBtn">Undo</button>
+          <button type="button" class="career-report-primary-btn" id="reportEditorKeepAllBtn">Keep All</button>
+        </div>
+      </div>
+      <div class="report-editor-diff-compare">
+        <div class="report-editor-diff-card original">
+          <span>Original</span>
+          <pre>${esc(String(diff.original || ""))}</pre>
+        </div>
+        <div class="report-editor-diff-card revised">
+          <span>Suggested</span>
+          <pre>${esc(String(diff.proposed || ""))}</pre>
+        </div>
+      </div>
+      ${diff.diff_blocks.map((block) => {
+        const type = String(block?.type || "equal");
+        const label = type === "add"
+          ? "\u65b0\u589e"
+          : type === "delete"
+            ? "\u5220\u9664"
+            : "\u4fdd\u7559";
+        return `
+          <div class="report-editor-diff-block ${esc(type)}">
+            <strong>${esc(label)}</strong>
+            <pre>${esc(Array.isArray(block?.lines) ? block.lines.join("\n") : "")}</pre>
+          </div>
+        `;
+      }).join("")}
+    `;
+    panel.querySelector("#reportEditorUndoBtn")?.addEventListener("click", () => {
+      clearCareerReportEditorDiff();
+    });
+    panel.querySelector("#reportEditorKeepAllBtn")?.addEventListener("click", () => {
+      applyCareerReportEditorDiff();
+    });
+  }
+
+  function updateCareerReportEditorSelectionInfo() {
+    const textarea = document.getElementById("reportEditorTextarea");
+    const info = document.getElementById("reportEditorSelectionInfo");
+    if (!textarea || !info) return;
+    const start = Number(textarea.selectionStart || 0);
+    const end = Number(textarea.selectionEnd || 0);
+    const length = Math.max(0, end - start);
+    reportRuntime.editorSelection = length > 0
+      ? { start, end, text: textarea.value.slice(start, end) }
+      : null;
+    info.textContent = length > 0
+      ? `\u5df2\u9009\u4e2d ${length} \u4e2a\u5b57\u7b26\uff0c\u53ef\u4ee5\u53ea\u9488\u5bf9\u5f53\u524d\u7247\u6bb5\u53d1\u8d77 AI \u6da6\u8272\u3002`
+      : "\u672a\u9009\u4e2d\u6587\u672c\uff0c\u53d1\u8d77\u6da6\u8272\u65f6\u4f1a\u9ed8\u8ba4\u9488\u5bf9\u6574\u7bc7\u62a5\u544a\u3002";
+    renderReportEditorChatLog();
+  }
+
+  function clearCareerReportEditorDiff(options = {}) {
+    const hadDiff = Boolean(reportRuntime.editorDiff);
+    reportRuntime.editorDiff = null;
+    renderReportEditorDiffPanel();
+    if (!options.silent && hadDiff) {
+      appendReportEditorMessage("assistant", "Undo", "\u5df2\u64a4\u9500\u5f53\u524d\u6da6\u8272\u63d0\u6848\uff0c\u6b63\u6587\u672a\u53d1\u751f\u53d8\u5316\u3002");
+    }
+    renderReportEditorChatLog();
+  }
+
+  function applyCareerReportEditorDiff() {
+    const textarea = document.getElementById("reportEditorTextarea");
+    const diff = reportRuntime.editorDiff;
+    if (!textarea || !diff) return;
+    if (diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)) {
+      textarea.value = `${textarea.value.slice(0, diff.selection.start)}${diff.proposed}${textarea.value.slice(diff.selection.end)}`;
+      const cursor = diff.selection.start + String(diff.proposed || "").length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    } else {
+      textarea.value = String(diff.proposed || "");
+      textarea.focus();
+      textarea.setSelectionRange(0, 0);
+    }
+    clearCareerReportEditorDiff({ silent: true });
+    appendReportEditorMessage("assistant", "Applied", "\u5df2\u5c06\u5f53\u524d AI \u5efa\u8bae\u5199\u56de\u7f16\u8f91\u533a\uff0c\u4f60\u53ef\u4ee5\u7ee7\u7eed\u4fee\u6539\u6216\u76f4\u63a5\u5bfc\u51fa DOCX\u3002");
+    updateCareerReportEditorSelectionInfo();
+    renderReportEditorChatLog();
+  }
+
+  async function loadCareerReportEditorSource(options = {}) {
+    const reportId = String(options.reportId || window.appState?.careerReport?.meta?.report_id || "").trim();
+    const snapshotId = String(options.snapshotId || "").trim();
+    if (!reportId && !window.appState?.careerReport?.report_document) {
+      throw new Error("\u5f53\u524d\u6ca1\u6709\u53ef\u7f16\u8f91\u7684\u804c\u4e1a\u62a5\u544a\u3002");
+    }
+    const url = new URL(resolveUrl("/api/career-report/source"), window.location.origin);
+    if (reportId) url.searchParams.set("report_id", reportId);
+    if (snapshotId) url.searchParams.set("snapshot_id", snapshotId);
+    const payload = await requestJsonSafe(`${url.pathname}${url.search}`);
+    reportRuntime.editorSource = payload;
+    reportRuntime.editorDiff = null;
+    reportRuntime.editorConversation = [];
+    reportRuntime.editorSelection = null;
+    if (payload?.bundle && payload.bundle.meta) {
+      window.appState.careerReport = payload.bundle;
+      window.appState.reportReady = Boolean(payload.bundle.report_document);
+      window.appState.reportGenerated = Boolean(payload.bundle.report_document);
+    }
+    const titleEl = document.getElementById("reportEditorTitle");
+    const metaEl = document.getElementById("reportEditorMeta");
+    const textarea = document.getElementById("reportEditorTextarea");
+    const promptInput = document.getElementById("reportEditorPromptInput");
+    if (titleEl) titleEl.textContent = payload?.title || "\u804c\u4e1a\u62a5\u544a";
+    if (metaEl) {
+      metaEl.textContent = payload?.source_type === "formal_report"
+        ? `\u6b63\u5f0f\u62a5\u544a | report_id ${payload?.report_id || "--"}`
+        : `\u7f16\u8f91\u5feb\u7167 | snapshot_id ${payload?.snapshot_id || "--"}`;
+    }
+    if (textarea) textarea.value = String(payload?.markdown || "");
+    if (promptInput) promptInput.value = "";
+    renderReportEditorSnapshotList(payload);
+    renderReportEditorSectionMap(payload);
+    renderReportEditorCheckPanel(payload?.completeness_check || null);
+    renderReportEditorDiffPanel();
+    updateCareerReportEditorSelectionInfo();
+    renderReportEditorChatLog();
+    return payload;
+  }
+
+  async function openCareerReportEditor(options = {}) {
+    const overlay = document.getElementById("reportEditorOverlay");
+    if (!overlay) return;
+    if (!window.appState?.careerReport?.report_document) {
+      toast("\u6682\u65e0\u5b8c\u6574\u62a5\u544a", "\u8bf7\u5148\u751f\u6210\u804c\u4e1a\u62a5\u544a\uff0c\u518d\u8fdb\u5165\u5b8c\u6574\u62a5\u544a\u7684\u6da6\u8272\u4e0e\u7f16\u8f91\u89c6\u56fe\u3002", "warning", 2200);
+      return;
+    }
+    await loadCareerReportEditorSource(options);
+    reportRuntime.previousBodyOverflow = document.body.style.overflow || "";
+    document.body.style.overflow = "hidden";
+    overlay.classList.remove("hidden");
+  }
+
+  function closeCareerReportEditor() {
+    const overlay = document.getElementById("reportEditorOverlay");
+    if (!overlay) return;
+    overlay.classList.add("hidden");
+    document.body.style.overflow = reportRuntime.previousBodyOverflow;
+  }
+
+  async function checkCareerReportEditorCompleteness() {
+    const source = reportRuntime.editorSource || {};
+    const textarea = document.getElementById("reportEditorTextarea");
+    const payload = await requestJsonSafe("/api/career-report/snapshot/check", {
+      method: "POST",
+      body: {
+        report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
+        snapshot_id: source.snapshot_id || "",
+        markdown: textarea?.value || ""
+      }
+    });
+    if (source && typeof source === "object") {
+      source.completeness_check = payload?.completeness_check || null;
+    }
+    renderReportEditorCheckPanel(payload?.completeness_check || null);
+    appendReportEditorMessage("assistant", "Check", "\u5b8c\u6574\u6027\u68c0\u67e5\u5df2\u66f4\u65b0\uff0c\u53ef\u4ee5\u6839\u636e\u4e0b\u65b9\u95ee\u9898\u9879\u7ee7\u7eed\u8865\u5145\u6216\u4fee\u6539\u3002");
+    renderReportEditorChatLog();
+    toast("\u68c0\u67e5\u5b8c\u6210", "\u5df2\u66f4\u65b0\u5f53\u524d\u6587\u7a3f\u7684\u5b8c\u6574\u6027\u4e0e\u53ef\u89e3\u91ca\u6027\u68c0\u67e5\u7ed3\u679c\u3002", "success", 1800);
+  }
+
+  async function polishCareerReportEditorSelection() {
+    const source = reportRuntime.editorSource || {};
+    const textarea = document.getElementById("reportEditorTextarea");
+    const promptInput = document.getElementById("reportEditorPromptInput");
+    if (!textarea) return;
+    const selection = reportRuntime.editorSelection;
+    const targetText = selection?.text || textarea.value || "";
+    const instruction = String(promptInput?.value || "").trim();
+    if (!String(targetText).trim()) {
+      toast("\u6682\u65e0\u53ef\u6da6\u8272\u5185\u5bb9", "\u8bf7\u5148\u9009\u62e9\u4e00\u6bb5\u6b63\u6587\uff0c\u6216\u786e\u4fdd\u7f16\u8f91\u533a\u91cc\u5df2\u6709\u62a5\u544a\u5185\u5bb9\u3002", "warning", 1800);
+      return;
+    }
+    const selectionLabel = selection
+      ? `\u9009\u4e2d\u7247\u6bb5\uff1a${clipReportEditorText(selection.text, 96)}`
+      : "\u5f53\u524d\u6309\u6574\u7bc7\u62a5\u544a\u8fdb\u884c\u6da6\u8272";
+    appendReportEditorMessage(
+      "user",
+      "Prompt",
+      instruction
+        ? `${instruction}\n${selectionLabel}`
+        : `\u8bf7\u5e2e\u6211\u91cd\u5199\u8fd9\u90e8\u5206\uff0c\u4f46\u4e0d\u8981\u65b0\u589e\u4e8b\u5b9e\u3002\n${selectionLabel}`,
+      "user"
+    );
+    renderReportEditorChatLog();
+    const payload = await requestJsonSafe("/api/career-report/polish", {
+      method: "POST",
+      body: {
+        section_key: source.section_map?.[0]?.key || "",
+        selection: selection?.text || "",
+        text: selection ? "" : textarea.value,
+        instruction
+      }
+    });
+    reportRuntime.editorDiff = {
+      original: payload?.original || targetText,
+      proposed: payload?.proposed || payload?.polished || "",
+      diff_blocks: Array.isArray(payload?.diff_blocks) ? payload.diff_blocks : [],
+      selection: selection ? { start: selection.start, end: selection.end } : null
+    };
+    appendReportEditorMessage(
+      "assistant",
+      "AI Draft",
+      selection
+        ? "\u5df2\u751f\u6210\u5f53\u524d\u9009\u4e2d\u7247\u6bb5\u7684\u6da6\u8272\u5efa\u8bae\uff0c\u8bf7\u5148\u5bf9\u7167\u53f3\u4fa7 diff\uff0c\u518d\u9009\u62e9 Keep All \u6216 Undo\u3002"
+        : "\u5df2\u751f\u6210\u6574\u7bc7\u62a5\u544a\u7684\u6da6\u8272\u5efa\u8bae\uff0c\u8bf7\u5148\u5bf9\u7167 diff \u518d\u51b3\u5b9a\u662f\u5426\u5199\u56de\u6b63\u6587\u3002"
+    );
+    renderReportEditorDiffPanel();
+    renderReportEditorChatLog();
+    toast("\u6da6\u8272\u63d0\u6848\u5df2\u751f\u6210", "\u8bf7\u5148\u68c0\u67e5 diff\uff0c\u518d\u51b3\u5b9a\u662f\u5426\u4f7f\u7528 Keep All \u5199\u56de\u6b63\u6587\u3002", "success", 1800);
+  }
+
+  async function saveCareerReportEditorSnapshot() {
+    const source = reportRuntime.editorSource || {};
+    const textarea = document.getElementById("reportEditorTextarea");
+    const markdown = String(textarea?.value || "").trim();
+    if (!markdown) {
+      toast("\u65e0\u6cd5\u4fdd\u5b58", "\u5f53\u524d\u7f16\u8f91\u533a\u4e3a\u7a7a\u3002", "warning", 1800);
+      return;
+    }
+    const label = source?.snapshot_id
+      ? String(source?.title || "\u7f16\u8f91\u5feb\u7167").trim()
+      : `\u7f16\u8f91\u5feb\u7167 ${new Date().toLocaleString("zh-CN")}`;
+    const payload = await requestJsonSafe("/api/career-report/snapshot/save", {
+      method: "POST",
+      body: {
+        report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
+        snapshot_id: source.snapshot_id || "",
+        source: source.source_type === "formal_report" ? "manual" : (source.source_type || "manual"),
+        title: label,
+        markdown,
+        diff_blocks: reportRuntime.editorDiff?.diff_blocks || []
+      }
+    });
+    reportRuntime.editorSource = {
+      ...(reportRuntime.editorSource || {}),
+      ...(payload?.snapshot || {}),
+      report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
+      source_type: payload?.snapshot?.snapshot_id ? "snapshot" : (payload?.snapshot?.source || "manual")
+    };
+    if (window.appState?.careerReport) {
+      window.appState.careerReport.draft_snapshots = Array.isArray(payload?.draft_snapshots) ? payload.draft_snapshots : [];
+    }
+    clearCareerReportEditorDiff({ silent: true });
+    appendReportEditorMessage("assistant", "Snapshot", `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`);
+    renderReportEditorSnapshotList(reportRuntime.editorSource);
+    renderReportEditorSectionMap(reportRuntime.editorSource);
+    renderReportEditorChatLog();
+    window.renderUserCenterDashboard?.();
+    toast("\u5feb\u7167\u5df2\u4fdd\u5b58", `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`, "success", 1800);
+  }
+
+  function exportCareerReportSource(format = "docx") {
+    const source = reportRuntime.editorSource || {};
+    if (source?.source_type !== "formal_report" && !source?.snapshot_id) {
+      toast("\u8bf7\u5148\u4fdd\u5b58\u5feb\u7167", "\u672a\u4fdd\u5b58\u7684\u7f16\u8f91\u5185\u5bb9\u4e0d\u80fd\u76f4\u63a5\u5bfc\u51fa\uff0c\u8bf7\u5148\u4fdd\u5b58\u4e3a\u7f16\u8f91\u5feb\u7167\u3002", "warning", 2200);
+      return;
+    }
+    const url = new URL(resolveUrl("/api/career-report/export"), window.location.origin);
+    url.searchParams.set("format", String(format || "docx").trim().toLowerCase());
+    url.searchParams.set("report_id", source.report_id || window.appState?.careerReport?.meta?.report_id || "");
+    if (source?.snapshot_id) {
+      url.searchParams.set("snapshot_id", source.snapshot_id);
+    }
+    const anchor = document.createElement("a");
+    anchor.href = url.toString();
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer";
+    toast("\u5f00\u59cb\u5bfc\u51fa", `\u6b63\u5728\u5bfc\u51fa ${String(format || "docx").toUpperCase()} \u6587\u6863\u3002`, "success", 1800);
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
+  function bindCareerReportEditorEvents() {
+    if (reportRuntime.editorEventsBound) return;
+    reportRuntime.editorEventsBound = true;
+    const textarea = document.getElementById("reportEditorTextarea");
+    const promptInput = document.getElementById("reportEditorPromptInput");
+    const runPolish = () => {
+      void polishCareerReportEditorSelection().catch((error) => {
+        toast("\u6da6\u8272\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+      });
+    };
+    textarea?.addEventListener("select", updateCareerReportEditorSelectionInfo);
+    textarea?.addEventListener("keyup", updateCareerReportEditorSelectionInfo);
+    textarea?.addEventListener("mouseup", updateCareerReportEditorSelectionInfo);
+    document.getElementById("reportEditorCheckBtn")?.addEventListener("click", () => {
+      void checkCareerReportEditorCompleteness().catch((error) => {
+        toast("\u68c0\u67e5\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+      });
+    });
+    document.getElementById("reportEditorPolishBtn")?.addEventListener("click", runPolish);
+    document.getElementById("reportEditorPromptSendBtn")?.addEventListener("click", runPolish);
+    document.getElementById("reportEditorClearPromptBtn")?.addEventListener("click", () => {
+      if (promptInput) {
+        promptInput.value = "";
+        promptInput.focus();
+      }
+      appendReportEditorMessage("system", "Prompt", "\u5df2\u6e05\u7a7a\u5f53\u524d\u6da6\u8272\u6307\u4ee4\u3002", "system");
+      renderReportEditorChatLog();
+    });
+    promptInput?.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        runPolish();
+      }
+    });
+    document.getElementById("reportEditorSaveBtn")?.addEventListener("click", () => {
+      void saveCareerReportEditorSnapshot().catch((error) => {
+        toast("\u4fdd\u5b58\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+      });
+    });
+    document.getElementById("reportEditorExportDocxBtn")?.addEventListener("click", () => {
+      exportCareerReportSource("docx");
+    });
+    document.getElementById("reportEditorOverlay")?.addEventListener("click", (event) => {
+      if (event.target?.id === "reportEditorOverlay") {
+        closeCareerReportEditor();
+      }
+    });
   }
 
   async function fetchCareerReportVersion(reportId) {
@@ -2032,7 +3589,8 @@
       toast("暂无可导出报告", "请先生成完整职业报告。", "warning", 1800);
       return;
     }
-    const exportFormat = String(format || "html").trim().toLowerCase() === "md" ? "md" : "html";
+    const normalized = String(format || "html").trim().toLowerCase();
+    const exportFormat = normalized === "md" ? "md" : normalized === "docx" ? "docx" : "html";
     const reportId = String(window.appState?.careerReport?.meta?.report_id || "").trim();
     const url = new URL(resolveUrl("/api/career-report/export"), window.location.origin);
     url.searchParams.set("format", exportFormat);
@@ -2378,6 +3936,7 @@
       logoutBtn.addEventListener("click", () => {
         stopCareerReportPolling();
         closeReportViewer();
+        closeCareerReportEditor();
       });
       logoutBtn.dataset.restorationBound = "1";
     }
@@ -2385,6 +3944,7 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closeReportViewer();
+        closeCareerReportEditor();
       }
     });
   }
@@ -2394,6 +3954,7 @@
     ensurePlanFunctionsWrapped();
     primeCareerReportStateFromBootstrap();
     bindGlobalRestorationEvents();
+    bindCareerReportEditorEvents();
 
     await loadAccountAvatarState(false);
     loadCareerPlans();
@@ -2436,8 +3997,11 @@
   window.fetchCareerReportVersion = fetchCareerReportVersion;
   window.restoreLatestCareerReportView = restoreLatestCareerReportView;
   window.startCareerReportGeneration = startCareerReportGeneration;
+  window.renderCareerReportPanels = renderCareerReportPanels;
   window.openReportViewer = openReportViewer;
   window.closeReportViewer = closeReportViewer;
+  window.openCareerReportEditor = openCareerReportEditor;
+  window.closeCareerReportEditor = closeCareerReportEditor;
   window.saveReport = saveReport;
   window.exportReport = exportReport;
   window.setCareerReportFocusRole = setCareerReportFocusRole;

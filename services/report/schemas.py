@@ -71,7 +71,7 @@ def empty_report_state() -> dict[str, Any]:
         "focus_role_id": "",
         "title": "",
         "summary": "",
-        "export_formats": ["html", "md"],
+        "export_formats": ["html", "md", "docx"],
         "tracker": None,
         "feedback": None,
     }

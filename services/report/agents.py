@@ -17,6 +17,7 @@ System prompts are project-local Python constants from:
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 from typing import Any, Callable
@@ -45,20 +46,137 @@ PROMPT_SOURCE_MODULE = prompt_texts.PROMPT_SOURCE_MODULE
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _extract_json_block(text: str) -> dict[str, Any]:
-    """Extract the last JSON code block from LLM output."""
-    matches = re.findall(r"```json\s*([\s\S]*?)```", text, re.IGNORECASE)
-    if not matches:
+def _try_parse_json_object(raw: str) -> dict[str, Any]:
+    text = str(raw or "").strip()
+    if not text:
         return {}
-    raw = matches[-1].strip()
     try:
-        return json.loads(raw)
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
     except json.JSONDecodeError:
-        cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
+        cleaned = re.sub(r",\s*([}\]])", r"\1", text)
         try:
-            return json.loads(cleaned)
+            data = json.loads(cleaned)
+            return data if isinstance(data, dict) else {}
         except json.JSONDecodeError:
             return {}
+
+
+def _find_balanced_json_objects(text: str) -> list[str]:
+    source = str(text or "")
+    if not source:
+        return []
+    matches: list[str] = []
+    start = -1
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index, char in enumerate(source):
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+            continue
+        if char == "}":
+            if depth <= 0:
+                continue
+            depth -= 1
+            if depth == 0 and start >= 0:
+                matches.append(source[start:index + 1])
+                start = -1
+    return matches
+
+
+def _extract_json_block(text: str) -> dict[str, Any]:
+    """Extract the last valid JSON object from LLM output."""
+    source = str(text or "")
+    if not source.strip():
+        return {}
+
+    candidates: list[str] = []
+    candidates.extend(re.findall(r"```json\s*([\s\S]*?)```", source, re.IGNORECASE))
+    candidates.extend(re.findall(r"```(?:javascript|js)?\s*([\s\S]*?)```", source, re.IGNORECASE))
+    candidates.extend(_find_balanced_json_objects(source))
+    candidates.append(source)
+
+    seen: set[str] = set()
+    for raw in reversed(candidates):
+        candidate = str(raw or "").strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        parsed = _try_parse_json_object(candidate)
+        if parsed:
+            return parsed
+    return {}
+
+
+def _coerce_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        result: list[str] = []
+        for item in value:
+            result.extend(_coerce_text_list(item))
+        deduped: list[str] = []
+        for item in result:
+            if item and item not in deduped:
+                deduped.append(item)
+        return deduped
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                parsed = ast.literal_eval(text)
+            except (ValueError, SyntaxError):
+                parsed = None
+            if isinstance(parsed, (list, tuple, set)):
+                return _coerce_text_list(list(parsed))
+        return [text]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _canonical_text(value: Any) -> str:
+    return re.sub(r"\s+", "", str(value or "").strip().lower())
+
+
+def _normalize_target_role(value: Any, role_payload: list[dict[str, Any]]) -> str:
+    role_names = [
+        str(role.get("name") or role.get("title") or "").strip()
+        for role in (role_payload or [])
+        if isinstance(role, dict) and str(role.get("name") or role.get("title") or "").strip()
+    ]
+    requested = _coerce_text_list(value)
+
+    if requested:
+        for item in requested:
+            canonical = _canonical_text(item)
+            if not canonical:
+                continue
+            for role_name in role_names:
+                if _canonical_text(role_name) == canonical:
+                    return role_name
+        return requested[0]
+
+    return role_names[0] if role_names else ""
 
 
 def _safe_call(llm: LLMCaller, messages: list[dict], system_prompt: str, max_tokens: int = 4096) -> str:
@@ -388,14 +506,15 @@ def run_role_match_officer(
 
     raw = _safe_call(llm, [{"role": "user", "content": user_msg}], SYSTEM_PROMPT_ROLE_MATCH, 5120)
     data = _extract_json_block(raw)
+    target_role = _normalize_target_role(data.get("target_role"), role_payload)
 
     return {
         "markdown": raw,
-        "target_role": str(data.get("target_role") or (role_payload[0].get("name") if role_payload else "")),
+        "target_role": target_role,
         "fit_score": int(data.get("fit_score") or 0),
         "fit_band": str(data.get("fit_band") or "not_ready"),
-        "hard_failures": data.get("hard_failures") or [],
-        "partial_gaps": data.get("partial_gaps") or [],
+        "hard_failures": data.get("hard_failures") if isinstance(data.get("hard_failures"), list) else _coerce_text_list(data.get("hard_failures")),
+        "partial_gaps": data.get("partial_gaps") if isinstance(data.get("partial_gaps"), list) else [],
         "weights_rationale": str(data.get("weights_rationale") or ""),
         "consistency_with_user_tracks": str(data.get("consistency_with_user_tracks") or "unknown"),
         "raw_json": data,

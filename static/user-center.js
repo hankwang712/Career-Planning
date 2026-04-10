@@ -7,12 +7,16 @@ const USER_CENTER_ROLE_FILTERS = {
   expected: "期望",
   left: "离职"
 };
+const USER_CENTER_REPORT_VIEW_MODES = ["dashboard", "report"];
+const USER_CENTER_REPORT_WORKSPACE_MODES = ["library", "detail"];
+const USER_CENTER_REPORT_MODULES = ["trends", "matching", "plan"];
 
 const userCenterState = {
   activeSection: USER_CENTER_DEFAULT_SECTION,
-  roleFilter: "all",
-  /** 个人中心：是否在下方「职业报告正文」区域展开全文（默认 false，需点击运行记录） */
-  reportReaderExpanded: false,
+  reportViewMode: "dashboard",
+  reportWorkspaceMode: "library",
+  reportModule: "trends",
+  roleBoardExpanded: false,
   cropper: {
     fileName: "",
     image: null,
@@ -45,9 +49,37 @@ function clipUserCenterText(value, limit = 64) {
   return `${text.slice(0, Math.max(0, limit - 1))}…`;
 }
 
+function normalizeUserCenterTargetRoleName(value) {
+  const text = String(value || "").trim();
+  if (!text || (text.startsWith("[") && text.endsWith("]"))) return "";
+  return text;
+}
+
 function normalizeUserCenterSection(sectionId) {
   const normalized = String(sectionId || "").trim().replace(/^#/, "");
   return USER_CENTER_SECTIONS.includes(normalized) ? normalized : USER_CENTER_DEFAULT_SECTION;
+}
+
+function normalizeUserCenterReportViewMode(viewMode) {
+  const normalized = String(viewMode || "").trim().toLowerCase();
+  return USER_CENTER_REPORT_VIEW_MODES.includes(normalized) ? normalized : "dashboard";
+}
+
+function normalizeUserCenterReportWorkspaceMode(mode) {
+  const normalized = String(mode || "").trim().toLowerCase();
+  return USER_CENTER_REPORT_WORKSPACE_MODES.includes(normalized) ? normalized : "library";
+}
+
+function normalizeUserCenterReportModule(moduleKey) {
+  const normalized = String(moduleKey || "").trim().toLowerCase();
+  return USER_CENTER_REPORT_MODULES.includes(normalized) ? normalized : "trends";
+}
+
+function getUserCenterReportModuleConfig(moduleKey = "") {
+  const modules = window.CAREER_REPORT_WORKSPACE_GROUPS && typeof window.CAREER_REPORT_WORKSPACE_GROUPS === "object"
+    ? window.CAREER_REPORT_WORKSPACE_GROUPS
+    : {};
+  return modules[normalizeUserCenterReportModule(moduleKey)] || null;
 }
 
 function setUserCenterPasswordMessage(message, tone = "info") {
@@ -90,9 +122,6 @@ async function submitUserCenterPassword(event) {
 function switchUserCenterSection(sectionId, options = {}) {
   const nextSection = normalizeUserCenterSection(sectionId);
   userCenterState.activeSection = nextSection;
-  if (nextSection === "report-workspace" && !options.keepReportReaderExpanded) {
-    userCenterState.reportReaderExpanded = false;
-  }
 
   document.querySelectorAll(".uc-nav-link[data-target]").forEach((button) => {
     button.classList.toggle("active", button.dataset.target === nextSection);
@@ -114,6 +143,55 @@ function switchUserCenterSection(sectionId, options = {}) {
   if (nextSection === "account-center") {
     renderUserCenterIdentity();
   }
+
+  syncUserCenterSidebarSubnav();
+}
+
+function syncUserCenterSidebarSubnav() {
+  const subnav = document.getElementById("ucReportWorkspaceSubnav");
+  if (!subnav) return;
+  const hasReport = Boolean(window.appState?.reportReady && window.appState?.careerReport?.report_document);
+  const shouldShow = userCenterState.activeSection === "report-workspace"
+    && normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail"
+    && hasReport;
+  subnav.classList.toggle("hidden", !shouldShow);
+  subnav.querySelectorAll("[data-uc-report-module]").forEach((button) => {
+    const moduleKey = String(button.dataset.ucReportModule || "").trim().toLowerCase();
+    const isEditor = moduleKey === "editor";
+    const active = !isEditor && normalizeUserCenterReportModule(userCenterState.reportModule) === moduleKey
+      && normalizeUserCenterReportViewMode(userCenterState.reportViewMode) === "report";
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function applyUserCenterReportWorkspaceMode() {
+  const mode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
+  const libraryShell = document.getElementById("userCenterReportLibraryShell");
+  const detailShell = document.getElementById("userCenterReportDetailShell");
+  if (libraryShell) libraryShell.classList.toggle("hidden", mode !== "library");
+  if (detailShell) detailShell.classList.toggle("hidden", mode !== "detail");
+  syncUserCenterSidebarSubnav();
+}
+
+function setUserCenterReportWorkspaceMode(mode, options = {}) {
+  userCenterState.reportWorkspaceMode = normalizeUserCenterReportWorkspaceMode(mode);
+  applyUserCenterReportWorkspaceMode();
+  if (options.renderLibrary !== false) {
+    renderUserCenterReportLibrary();
+  }
+  if (options.renderPanels !== false && userCenterState.reportWorkspaceMode === "detail" && typeof window.renderCareerReportPanels === "function" && userCenterState.activeSection === "report-workspace") {
+    window.renderCareerReportPanels();
+  }
+  if (options.renderOverview !== false) {
+    renderUserCenterReportOverview();
+    renderUserCenterReportRunList();
+  }
+}
+
+function openUserCenterReportLibrary() {
+  switchUserCenterSection("report-workspace", { updateHash: true });
+  setUserCenterReportWorkspaceMode("library");
 }
 
 function getUserCenterSelectedJobs() {
@@ -259,7 +337,7 @@ function buildUserCenterTargetRoles() {
 
   pushRole({
     id: tracker?.focus_role_id || reportData?.meta?.focus_role_id || appState?.focusedRoleId || "",
-    name: tracker?.focus_role_name || reportData?.meta?.focus_role_name || "",
+    name: tracker?.focus_role_name || reportData?.meta?.focus_role_name || normalizeUserCenterTargetRoleName(reportData?.match_output?.target_role) || "",
     isFocus: true,
     score: tracker?.completion_rate || reportData?.meta?.confidence || 0,
     meta: tracker?.generated_at || tracker?.last_synced_at || reportData?.meta?.generated_at || "",
@@ -342,29 +420,71 @@ function removeUserCenterRole(roleId) {
   renderUserCenterTargetRoles();
 }
 
+function setUserCenterReportViewMode(viewMode, options = {}) {
+  userCenterState.reportViewMode = normalizeUserCenterReportViewMode(viewMode);
+  applyUserCenterReportReaderGate();
+  syncUserCenterSidebarSubnav();
+  if (options.renderPanels !== false && typeof window.renderCareerReportPanels === "function" && userCenterState.activeSection === "report-workspace") {
+    window.renderCareerReportPanels();
+  }
+  if (options.renderOverview !== false) {
+    renderUserCenterReportOverview();
+  }
+}
+
+function setUserCenterReportModule(moduleKey, options = {}) {
+  userCenterState.reportModule = normalizeUserCenterReportModule(moduleKey);
+  syncUserCenterSidebarSubnav();
+  if (options.renderPanels !== false && typeof window.renderCareerReportPanels === "function" && userCenterState.activeSection === "report-workspace") {
+    window.renderCareerReportPanels();
+  }
+}
+
+async function openUserCenterReportDetail(reportId = "") {
+  switchUserCenterSection("report-workspace", { updateHash: true });
+  setUserCenterReportWorkspaceMode("detail", { renderPanels: false });
+  const safeReportId = String(reportId || "").trim();
+  const pack = typeof window.getCareerReportVersionList === "function" ? window.getCareerReportVersionList() : { canonicalReportId: "" };
+  const canonical = String(pack.canonicalReportId || "").trim();
+  if (safeReportId) {
+    if (canonical && safeReportId === canonical) {
+      await window.restoreLatestCareerReportView?.();
+    } else {
+      await window.fetchCareerReportVersion?.(safeReportId);
+    }
+  } else if (!window.appState?.careerReport?.report_document) {
+    await window.restoreLatestCareerReportView?.();
+  }
+  renderUserCenterDashboard();
+}
+
 function renderUserCenterTargetRoles() {
   const container = document.getElementById("userCenterTargetRoles");
   if (!container) return;
   const roles = buildUserCenterTargetRoles();
-  const filter = String(userCenterState.roleFilter || "all").trim();
-  const visibleRoles = filter === "all" ? roles : roles.filter((item) => item.status === filter);
   const actionableRoleIds = new Set((Array.isArray(appState?.matchingRoles) ? appState.matchingRoles : []).map((item) => String(item?.id || "")));
+  const expanded = Boolean(userCenterState.roleBoardExpanded);
+  const visibleRoles = expanded ? roles : roles.slice(0, 3);
 
-  if (!visibleRoles.length) {
-    container.innerHTML = `<span class="uc-role-strip-empty">${USER_CENTER_ROLE_FILTERS[filter] || "当前筛选"}下暂无岗位</span>`;
+  if (!roles.length) {
+    container.innerHTML = `<span class="uc-role-strip-empty">当前暂无可追踪岗位</span>`;
     return;
   }
 
-  container.innerHTML = visibleRoles.map((item) => {
+  const roleHtml = visibleRoles.map((item) => {
     const roleId = String(item.id || "").trim();
     const isActionable = Boolean(roleId && actionableRoleIds.has(roleId) && typeof setCareerReportFocusRole === "function");
     const isCustom = String(item.source || "").toLowerCase() === "custom";
+    const score = Number(item.score || 0);
     return `
       <div class="uc-role-chip${item.isFocus ? " active" : ""}${isCustom ? " custom" : ""}">
-        ${isActionable
-          ? `<button type="button" class="uc-role-chip-main" data-focus-role-id="${escHtml(roleId)}" title="设为当前报告主岗位">${escHtml(item.name)}</button>`
-          : `<span class="uc-role-chip-main static">${escHtml(item.name)}</span>`
-        }
+        <div class="uc-role-chip-stack">
+          ${isActionable
+            ? `<button type="button" class="uc-role-chip-main" data-focus-role-id="${escHtml(roleId)}" title="设为当前报告主岗位">${escHtml(item.name)}</button>`
+            : `<span class="uc-role-chip-main static">${escHtml(item.name)}</span>`
+          }
+          <span class="uc-role-chip-meta">${score > 0 ? `${score}%` : "待验证"}</span>
+        </div>
         <button type="button" class="uc-role-chip-status" data-role-status-id="${escHtml(roleId)}" title="点击切换状态">
           ${escHtml(getUserCenterRoleStatusLabel(item.status))}
         </button>
@@ -376,11 +496,22 @@ function renderUserCenterTargetRoles() {
     `;
   }).join("");
 
+  const toggleHtml = roles.length > 3
+    ? `
+      <button type="button" class="uc-role-chip uc-role-chip-expand" data-role-board-toggle="true">
+        ${expanded ? "收起" : `查看全部 (${roles.length})`}
+      </button>
+    `
+    : "";
+
+  container.innerHTML = roleHtml + toggleHtml;
+
   container.querySelectorAll(".uc-role-chip-main[data-focus-role-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const roleId = String(button.dataset.focusRoleId || "").trim();
       if (!roleId || typeof setCareerReportFocusRole !== "function") return;
       setCareerReportFocusRole(roleId);
+      setUserCenterReportWorkspaceMode("detail", { renderPanels: false });
       switchUserCenterSection("report-workspace", { updateHash: true });
       renderUserCenterDashboard();
     });
@@ -403,42 +534,204 @@ function renderUserCenterTargetRoles() {
       removeUserCenterRole(roleId);
     });
   });
+
+  container.querySelectorAll("[data-role-board-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      userCenterState.roleBoardExpanded = !userCenterState.roleBoardExpanded;
+      renderUserCenterTargetRoles();
+    });
+  });
 }
 
 function applyUserCenterReportReaderGate() {
   const onUserCenter = typeof isUserCenterPage === "function" && isUserCenterPage();
-  if (!onUserCenter || userCenterState.activeSection !== "report-workspace") return;
+  if (!onUserCenter) return;
 
-  const main = document.getElementById("careerReportMain");
-  const banner = document.getElementById("careerReportStatusBanner");
-  const aside = document.getElementById("careerReportAside");
-  const layout = main?.closest(".career-report-layout");
-  if (!main || !banner) return;
+  const viewMode = normalizeUserCenterReportViewMode(userCenterState.reportViewMode);
+  const workspaceMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
+  const layout = document.querySelector("#report-workspace .career-report-layout");
+  const viewerBtn = document.getElementById("userCenterOpenReportBtn");
+  const editorBtn = document.getElementById("userCenterOpenEditorBtn");
+  const switchButtons = document.querySelectorAll("[data-user-center-report-view]");
+  const workbench = document.querySelector("#report-workspace .uc-report-workbench");
 
-  if (!userCenterState.reportReaderExpanded) {
-    banner.innerHTML = `
-      <div class="uc-report-reader-gate-banner">
-        <p>请先在上方<strong>报告运行记录</strong>中点选一条版本，下方才会展开完整正文与侧栏目录。</p>
-      </div>`;
-    main.innerHTML = `
-      <div class="uc-report-reader-placeholder">
-        <p class="uc-report-reader-placeholder-title">职业报告正文尚未展开</p>
-        <p class="uc-report-reader-placeholder-copy">默认不展示全文，避免与上方摘要重复占屏。点选「报告运行记录」中的任意一行后，这里会加载该版本的章节化正文。</p>
-      </div>`;
-    if (aside) {
-      aside.innerHTML = "";
-      aside.classList.add("uc-report-aside-collapsed");
-    }
-    if (layout) layout.classList.add("uc-report-layout-gated");
-    return;
+  if (layout) {
+    layout.classList.toggle("career-report-layout--dashboard", viewMode === "dashboard");
+    layout.classList.toggle("career-report-layout--report", viewMode === "report");
   }
-
-  if (aside) aside.classList.remove("uc-report-aside-collapsed");
-  if (layout) layout.classList.remove("uc-report-layout-gated");
+  if (workbench) {
+    workbench.dataset.reportView = viewMode;
+  }
+  if (viewerBtn) {
+    viewerBtn.classList.toggle("hidden", workspaceMode !== "detail" || viewMode !== "report");
+    viewerBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+  }
+  if (editorBtn) {
+    editorBtn.classList.toggle("hidden", workspaceMode !== "detail");
+    editorBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+  }
+  switchButtons.forEach((button) => {
+    const active = String(button.dataset.userCenterReportView || "").trim() === viewMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function setUserCenterReportReaderExpanded(value) {
-  userCenterState.reportReaderExpanded = Boolean(value);
+  setUserCenterReportViewMode(Boolean(value) ? "report" : "dashboard");
+}
+
+function getUserCenterReportTone(roleName) {
+  const text = String(roleName || "").trim();
+  if (!text) return "general";
+  if (/Java|后端|开发|工程师|算法|NLP|大模型|AI/i.test(text)) return "tech";
+  if (/数据|分析|BI|数仓/i.test(text)) return "data";
+  if (/内容|编辑|新媒体|运营/i.test(text)) return "content";
+  if (/项目|管理|产品|管培/i.test(text)) return "strategy";
+  return "general";
+}
+
+function renderUserCenterReportIcon(roleName) {
+  const tone = getUserCenterReportTone(roleName);
+  if (tone === "tech") {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 7 4 12l4 5M16 7l4 5-4 5M14 4l-4 16"></path>
+      </svg>
+    `;
+  }
+  if (tone === "data") {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 19V9M12 19V5M19 19v-7"></path>
+        <path d="M3 19h18"></path>
+      </svg>
+    `;
+  }
+  if (tone === "content") {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="3" width="16" height="18" rx="2"></rect>
+        <path d="M8 8h8M8 12h8M8 16h5"></path>
+      </svg>
+    `;
+  }
+  if (tone === "strategy") {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 19V5"></path>
+        <path d="M6 6h9l-1.6 3L15 12H6"></path>
+        <circle cx="18" cy="17" r="2"></circle>
+      </svg>
+    `;
+  }
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="4" width="14" height="16" rx="2"></rect>
+      <path d="M8 8h8M8 12h8M8 16h5"></path>
+    </svg>
+  `;
+}
+
+function renderUserCenterMetaIcon(type) {
+  if (type === "time") {
+    return `
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.5"></circle>
+        <path d="M8 5.2V8l2 1.3"></path>
+      </svg>
+    `;
+  }
+  if (type === "version") {
+    return `
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="3" y="3" width="10" height="10" rx="1.5"></rect>
+        <path d="M6 6h4v4H6z"></path>
+      </svg>
+    `;
+  }
+  return `
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3 8h10"></path>
+      <path d="M9 4l4 4-4 4"></path>
+    </svg>
+  `;
+}
+
+function renderUserCenterReportLibrary() {
+  const host = document.getElementById("userCenterReportLibrary");
+  if (!host) return;
+  const pack = typeof window.getCareerReportVersionList === "function"
+    ? window.getCareerReportVersionList()
+    : { versions: [], reportState: null, canonicalReportId: "" };
+  const { versions, reportState, canonicalReportId } = pack;
+  const cards = Array.isArray(versions) ? versions : [];
+  const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
+    ? `
+      <article class="uc-report-library-card uc-report-library-card--pending">
+        <div class="uc-report-library-card-top">
+          <div class="uc-report-library-card-mark tone-general">
+            ${renderUserCenterReportIcon("")}
+          </div>
+          <div class="uc-report-library-card-head">
+            <div class="uc-report-library-meta">
+              <span class="uc-report-library-badge">生成中</span>
+              <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${escHtml(reportState.stage_label || "任务编排中")}</span>
+            </div>
+            <h4>新的正式职业报告正在生成</h4>
+          </div>
+        </div>
+        <p class="uc-report-library-title">${escHtml(reportState.stage_detail || "系统正在串联多智能体分析与报告写作。")}</p>
+      </article>
+    `
+    : "";
+
+  if (!cards.length && !pendingCard) {
+    host.innerHTML = `
+      <article class="uc-report-library-empty">
+        <p>当前还没有正式职业报告。先生成一份正式报告，卡片库会按岗位方向和生成时间保存历史版本。</p>
+      </article>
+    `;
+    return;
+  }
+
+  host.innerHTML = pendingCard + cards.map((item) => {
+    const rid = String(item?.report_id || "").trim();
+    const isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
+    const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别";
+    const titleRaw = String(item?.title || "").trim();
+    const version = escHtml(item?.version || "--");
+    const generatedAt = escHtml(item?.generated_at || "--");
+    const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
+    const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
+    const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
+    return `
+      <button type="button" class="uc-report-library-card${isLatest ? " latest" : ""}" data-report-library-id="${escHtml(rid)}" ${!rid ? "disabled" : ""}>
+        <div class="uc-report-library-card-top">
+          <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
+            ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
+          </div>
+          <div class="uc-report-library-card-head">
+            <div class="uc-report-library-meta">
+              <span class="uc-report-library-badge${isLatest ? "" : " muted"}">${isLatest ? "最新" : "历史"}</span>
+              <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${generatedAt}</span>
+            </div>
+            <h4>${escHtml(focusRoleRaw)}</h4>
+          </div>
+        </div>
+        <p class="uc-report-library-title">${escHtml(subtitle)}</p>
+        <div class="uc-report-library-foot">
+          <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
+        </div>
+      </button>
+    `;
+  }).join("");
+
+  host.querySelectorAll("[data-report-library-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void openUserCenterReportDetail(button.dataset.reportLibraryId || "");
+    });
+  });
 }
 
 function renderUserCenterReportRunList() {
@@ -446,6 +739,7 @@ function renderUserCenterReportRunList() {
   if (!host) return;
   const pack = typeof window.getCareerReportVersionList === "function" ? window.getCareerReportVersionList() : { versions: [], reportState: null, canonicalReportId: "" };
   const { versions, reportState, canonicalReportId } = pack;
+  const reportData = appState?.careerReport || null;
   const selectedId = String(appState?.careerReport?.meta?.report_id || "").trim();
 
   let pendingBlock = "";
@@ -485,25 +779,60 @@ function renderUserCenterReportRunList() {
         <div class="uc-report-run-main">
           ${badge}
           <strong>${title}</strong>
-          <span class="uc-report-run-sub">主目标：${role}</span>
+          <span class="uc-report-run-sub">主岗位：${role}</span>
         </div>
         <span class="uc-report-run-time">${when}</span>
       </button>
     `;
   }).join("");
 
-  host.innerHTML = pendingBlock + rows;
+  const snapshots = Array.isArray(reportData?.draft_snapshots) ? reportData.draft_snapshots : [];
+  const snapshotRows = snapshots.map((snapshot) => `
+    <button type="button" class="uc-report-run-row uc-report-run-row--snapshot" data-report-snapshot-id="${escHtml(snapshot?.snapshot_id || "")}" ${!snapshot?.snapshot_id ? "disabled" : ""}>
+      <div class="uc-report-run-main">
+        <span class="uc-report-run-badge muted">快照</span>
+        <strong>${escHtml(snapshot?.title || snapshot?.label || "编辑快照")}</strong>
+        <span class="uc-report-run-sub">${escHtml(snapshot?.updated_at || snapshot?.created_at || "--")}</span>
+      </div>
+      <span class="uc-report-run-time">编辑</span>
+    </button>
+  `).join("");
+
+  host.innerHTML = `
+    ${pendingBlock}
+    <div class="uc-report-run-group">
+      <div class="uc-report-run-group-title">正式版本</div>
+      ${rows || `<div class="uc-report-runs-empty"><p>当前没有正式报告版本。</p></div>`}
+    </div>
+    <div class="uc-report-run-group">
+      <div class="uc-report-run-group-title">编辑快照</div>
+      <button type="button" class="uc-report-run-row uc-report-run-row--create" id="userCenterCreateSnapshotBtn">
+        <div class="uc-report-run-main">
+          <span class="uc-report-run-badge muted">新建</span>
+          <strong>基于当前正式报告创建编辑快照</strong>
+          <span class="uc-report-run-sub">进入完整报告全貌，支持手动编辑与 AI 润色</span>
+        </div>
+        <span class="uc-report-run-time">打开</span>
+      </button>
+      ${snapshotRows || `<div class="uc-report-runs-empty"><p>当前报告还没有编辑快照。</p></div>`}
+    </div>
+  `;
 
   host.querySelectorAll(".uc-report-run-row[data-report-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-report-id") || "";
       if (!id) return;
-      userCenterState.reportReaderExpanded = true;
-      if (canonicalReportId && id === canonicalReportId) {
-        void window.restoreLatestCareerReportView();
-        return;
-      }
-      void window.fetchCareerReportVersion(id);
+      void openUserCenterReportDetail(id);
+    });
+  });
+  host.querySelector("#userCenterCreateSnapshotBtn")?.addEventListener("click", () => {
+    window.openCareerReportEditor?.();
+  });
+  host.querySelectorAll("[data-report-snapshot-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const snapshotId = String(btn.dataset.reportSnapshotId || "").trim();
+      if (!snapshotId) return;
+      window.openCareerReportEditor?.({ snapshotId });
     });
   });
 }
@@ -520,16 +849,32 @@ function renderUserCenterReportOverview() {
   const scoped = window.userWorkspaceState?.scopedData?.career_report;
   const listTracker = scoped?.tracker || displayTracker;
   const versions = Array.isArray(listTracker?.versions) ? listTracker.versions : [];
+  const dashboardSummary = reportData?.report_document?.dashboard_summary || {};
+  const matchOutput = reportData?.match_output || {};
 
   const focusRole = displayTracker?.focus_role_name
     || reportData?.meta?.focus_role_name
+    || reportData?.report_document?.focus_role_name
+    || normalizeUserCenterTargetRoleName(reportData?.match_output?.target_role)
     || buildUserCenterTargetRoles()[0]?.name
     || "待识别";
   const updatedAt = reportData?.meta?.generated_at
     || displayTracker?.generated_at
     || displayTracker?.last_synced_at
     || "--";
-  const completion = Math.max(0, Math.min(100, Number(displayTracker?.completion_rate ?? appState?.score ?? appState?.profileCompletion ?? 0)));
+  const fitScore = Number(dashboardSummary?.fit_score ?? matchOutput?.fit_score);
+  const fitBand = String(dashboardSummary?.fit_band_label || "").trim()
+    || ({
+      strong: "强匹配",
+      moderate: "中等匹配",
+      weak: "弱匹配",
+      not_ready: "尚需准备"
+    }[String(matchOutput?.fit_band || "").trim()] || "");
+  const progressText = reportState?.status === "running" || reportState?.status === "queued"
+    ? `${Math.max(0, Math.min(100, Number(displayTracker?.completion_rate || 0)))}% · 生成中`
+    : Number.isFinite(fitScore) && fitScore >= 0 && fitBand
+      ? `${Math.round(fitScore)}% · ${fitBand}`
+      : fitBand || `${Math.max(0, Math.min(100, Number(displayTracker?.completion_rate ?? appState?.score ?? appState?.profileCompletion ?? 0)))}%`;
 
   const focusEl = document.getElementById("userCenterFocusRole");
   const updatedEl = document.getElementById("userCenterUpdatedAt");
@@ -540,35 +885,46 @@ function renderUserCenterReportOverview() {
   const sublineEl = document.getElementById("userCenterReportSubline");
   const viewerBtn = document.getElementById("userCenterOpenReportBtn");
   const generateBtn = document.getElementById("userCenterGenerateReportBtn");
+  const heroSublineEl = document.getElementById("userCenterReportSubline");
   const versionCount = Number(versions.length || (reportData?.report_document ? 1 : 0));
+  const viewMode = normalizeUserCenterReportViewMode(userCenterState.reportViewMode);
+  const workspaceMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
 
   if (focusEl) focusEl.textContent = focusRole;
   if (updatedEl) updatedEl.textContent = updatedAt;
-  if (completionEl) completionEl.textContent = `${completion}%`;
+  if (completionEl) completionEl.textContent = progressText;
   if (versionEl) versionEl.textContent = String(versionCount);
-  if (viewerBtn) viewerBtn.disabled = !Boolean(appState?.reportReady && reportData?.report_document);
+  if (viewerBtn) {
+    viewerBtn.disabled = !Boolean(appState?.reportReady && reportData?.report_document);
+    viewerBtn.classList.toggle("hidden", viewMode !== "report");
+  }
   if (generateBtn) {
     generateBtn.disabled = Boolean(reportState?.status === "running" || reportState?.status === "queued");
     generateBtn.textContent = reportState?.status === "running" || reportState?.status === "queued"
       ? "生成中..."
       : appState?.reportReady ? "重新生成职业报告" : "生成职业报告";
   }
+  if (heroSublineEl) {
+    heroSublineEl.textContent = workspaceMode === "library"
+      ? "先从正式报告卡片库进入，再下钻每一份报告的详情、编辑快照与导出。"
+      : "当前已进入报告详情页，先看概览视图，再下钻完整报告、编辑快照和导出。";
+  }
 
   if (sublineEl) {
     const title = reportData?.meta?.title || displayTracker?.report_title || "职业规划报告";
-    const at = reportData?.meta?.generated_at || displayTracker?.generated_at || "--";
-    sublineEl.textContent = `${title} · 生成时间 ${at}`;
+    const statusTag = appState?.careerReportViewingHistorical ? "历史只读" : viewMode === "report" ? "完整报告" : "概览视图";
+    sublineEl.textContent = `${title} · ${statusTag} · 生成时间 ${updatedAt}`;
   }
 
   if (historyEl) {
     historyEl.textContent = appState?.careerReportViewingHistorical
-      ? "当前为历史版本，计划状态与同步不会在服务端更新，直至回到最新版本。"
-      : "";
+      ? "当前为历史版本，计划状态与同步不会写回服务端。"
+      : dashboardSummary?.headline || "";
   }
   if (switchHintEl) {
     switchHintEl.textContent = versionCount > 1
-      ? `当前共 ${versionCount} 份报告，可在左侧「报告运行记录」中点击切换查看。`
-      : "当前仅 1 份报告。后续每次重新生成会自动新增版本，可在左侧运行记录切换查看。";
+      ? `当前共 ${versionCount} 份报告，右侧可切换版本；当前视图为${viewMode === "report" ? "完整报告" : "决策摘要"}。`
+      : `当前仅 1 份报告；默认先看${viewMode === "report" ? "完整报告" : "决策摘要"}，后续重新生成会自动新增版本。`;
   }
 }
 
@@ -789,19 +1145,45 @@ function bindUserCenterEvents() {
       switchUserCenterSection(button.dataset.target, { updateHash: true });
     });
   });
-
-  document.querySelectorAll(".uc-filter-chip[data-role-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      userCenterState.roleFilter = String(button.dataset.roleFilter || "all");
-      document.querySelectorAll(".uc-filter-chip[data-role-filter]").forEach((item) => {
-        item.classList.toggle("active", item === button);
-      });
-      renderUserCenterTargetRoles();
+  document.querySelectorAll("[data-uc-report-module]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const moduleKey = String(button.dataset.ucReportModule || "").trim().toLowerCase();
+      if (moduleKey === "editor") {
+        if (!window.appState?.careerReport?.report_document && typeof window.restoreLatestCareerReportView === "function") {
+          await window.restoreLatestCareerReportView();
+        }
+        if (!window.appState?.careerReport?.report_document) {
+          showToast("鏆傛棤瀹屾暣鎶ュ憡", "璇峰厛鐢熸垚鑱屼笟鎶ュ憡鍐嶈繘鍏ユ櫤鑳芥鼎鑹层€?", "warning", 2200);
+          return;
+        }
+        setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
+        setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
+        renderUserCenterDashboard();
+        window.openCareerReportEditor?.();
+        return;
+      }
+      if (!window.appState?.careerReport?.report_document && typeof window.restoreLatestCareerReportView === "function") {
+        await window.restoreLatestCareerReportView();
+      }
+      if (!window.appState?.careerReport?.report_document) {
+        showToast("鏆傛棤瀹屾暣鎶ュ憡", "璇峰厛鐢熸垚鑱屼笟鎶ュ憡鍐嶆煡鐪嬬粨鏋溿€?", "warning", 2200);
+        return;
+      }
+      switchUserCenterSection("report-workspace", { updateHash: true });
+      setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
+      setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
+      setUserCenterReportModule(moduleKey, { renderPanels: false });
+      renderUserCenterDashboard();
     });
   });
 
   const addRoleButton = document.getElementById("userCenterTargetRoleAddBtn");
   addRoleButton?.addEventListener("click", promptAddUserCenterTargetRole);
+  document.querySelectorAll("[data-user-center-report-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setUserCenterReportViewMode(button.dataset.userCenterReportView || "dashboard");
+    });
+  });
 
   const avatarUploadBtn = document.getElementById("userCenterAvatarUploadBtn");
   const avatarInput = document.getElementById("userCenterAvatarInput");
@@ -870,20 +1252,24 @@ function handleUserCenterUrlChange() {
   const reportIdOpen = String(url.searchParams.get("report_id") || "").trim();
   const initialSection = reportIdOpen ? "report-workspace" : hashSection;
 
-  switchUserCenterSection(initialSection, { updateHash: false, keepReportReaderExpanded: Boolean(reportIdOpen) });
+  switchUserCenterSection(initialSection, { updateHash: false });
+  if (!reportIdOpen && initialSection === "report-workspace") {
+    setUserCenterReportWorkspaceMode("library", { renderPanels: false, renderOverview: false });
+  }
 
   if (focusRoleId) {
     appState.focusedRoleId = String(focusRoleId);
     if (typeof renderReportWorkspace === "function") {
       renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
     }
-    switchUserCenterSection("report-workspace", { updateHash: false, keepReportReaderExpanded: Boolean(reportIdOpen) });
+    switchUserCenterSection("report-workspace", { updateHash: false });
     url.searchParams.delete("focus_role");
   }
 
   if (reportIdOpen) {
-    userCenterState.reportReaderExpanded = true;
-    switchUserCenterSection("report-workspace", { updateHash: false, keepReportReaderExpanded: true });
+    setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
+    setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
+    switchUserCenterSection("report-workspace", { updateHash: false });
     const pack = typeof window.getCareerReportVersionList === "function" ? window.getCareerReportVersionList() : { canonicalReportId: "" };
     const canonical = String(pack.canonicalReportId || "").trim();
     if (canonical && reportIdOpen === canonical) {
@@ -909,6 +1295,8 @@ function handleUserCenterUrlChange() {
     }
   } else if (action === "generate") {
     switchUserCenterSection("report-workspace", { updateHash: false });
+    setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
+    setUserCenterReportViewMode("dashboard", { renderPanels: false, renderOverview: false });
     url.searchParams.delete("action");
     window.history.replaceState({}, "", url.toString());
     void startCareerReportGeneration();
@@ -916,33 +1304,39 @@ function handleUserCenterUrlChange() {
     return;
   }
 
+  if (!reportIdOpen && hashSection === "report-workspace") {
+    setUserCenterReportWorkspaceMode("library", { renderPanels: false, renderOverview: false });
+    setUserCenterReportViewMode(userCenterState.reportViewMode || "dashboard", { renderPanels: false, renderOverview: false });
+  }
   window.history.replaceState({}, "", url.toString());
   renderUserCenterDashboard();
 }
 
 function renderUserCenterDashboard() {
-  const reportState = typeof getCareerReportStateSafe === "function" ? getCareerReportStateSafe() : null;
-  if (reportState?.status === "running" || reportState?.status === "queued") {
-    userCenterState.reportReaderExpanded = true;
-  }
+  renderUserCenterReportLibrary();
   renderUserCenterReportRunList();
-  if (!userCenterState.reportReaderExpanded) {
-    const firstRun = document.querySelector("#userCenterReportRuns .uc-report-run-row[data-report-id]");
-    if (firstRun) firstRun.click();
-  }
   renderUserCenterTargetRoles();
   renderUserCenterReportOverview();
   renderUserCenterIdentity();
   if (typeof _updateLifeProgress === "function") _updateLifeProgress();
   if (typeof _updatePlanStats === "function") _updatePlanStats();
+  applyUserCenterReportWorkspaceMode();
   applyUserCenterReportReaderGate();
+  syncUserCenterSidebarSubnav();
 }
 
 window.switchUserCenterSection = switchUserCenterSection;
+window.openUserCenterReportLibrary = openUserCenterReportLibrary;
+window.openUserCenterReportDetail = openUserCenterReportDetail;
 window.handleUserCenterUrlChange = handleUserCenterUrlChange;
 window.renderUserCenterDashboard = renderUserCenterDashboard;
 window.applyUserCenterReportReaderGate = applyUserCenterReportReaderGate;
 window.setUserCenterReportReaderExpanded = setUserCenterReportReaderExpanded;
+window.setUserCenterReportViewMode = setUserCenterReportViewMode;
+window.setUserCenterReportModule = setUserCenterReportModule;
+window.getUserCenterReportViewMode = () => normalizeUserCenterReportViewMode(userCenterState.reportViewMode);
+window.getUserCenterReportWorkspaceMode = () => normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
+window.getUserCenterReportModule = () => normalizeUserCenterReportModule(userCenterState.reportModule);
 window.submitUserCenterPassword = submitUserCenterPassword;
 
 document.addEventListener("DOMContentLoaded", () => {

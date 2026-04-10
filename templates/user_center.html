@@ -23,7 +23,7 @@
 
       .career-report-layout {
         display: grid;
-        grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: 16px;
         align-items: start;
       }
@@ -557,21 +557,604 @@
         line-height: 1;
       }
 
+      .report-editor-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1250;
+        background: rgba(2, 6, 23, 0.78);
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+      }
+
+      .report-editor-overlay.hidden {
+        display: none;
+      }
+
+      .report-editor-shell {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      .report-editor-sidebar {
+        border-right: 1px solid rgba(148, 163, 184, 0.18);
+        background: #ffffff;
+        overflow-y: auto;
+        padding: 20px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .report-editor-sidebar-head,
+      .report-editor-sidebar-section,
+      .report-editor-panel,
+      .report-editor-surface,
+      .report-editor-assistant-head,
+      .report-editor-chat-log,
+      .report-editor-prompt-card {
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+      }
+
+      .report-editor-sidebar-head,
+      .report-editor-sidebar-section,
+      .report-editor-panel {
+        padding: 16px;
+      }
+
+      .report-editor-sidebar-label,
+      .report-editor-kicker {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .report-editor-snapshot-list,
+      .report-editor-section-map {
+        display: grid;
+        gap: 10px;
+      }
+
+      .report-editor-snapshot-item,
+      .report-editor-section-item {
+        width: 100%;
+        text-align: left;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #ffffff;
+        color: #0f172a;
+      }
+
+      .report-editor-snapshot-item.active,
+      .report-editor-section-item.active {
+        border-color: rgba(29, 78, 216, 0.4);
+        background: rgba(239, 246, 255, 0.88);
+      }
+
+      .report-editor-snapshot-item small,
+      .report-editor-section-item small {
+        display: block;
+        margin-top: 4px;
+        color: #64748b;
+      }
+
+      .report-editor-main {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+        grid-template-areas:
+          "toolbar toolbar"
+          "surface assistant-head"
+          "surface chat"
+          "surface prompt"
+          "surface diff"
+          "surface check";
+        grid-template-rows: auto auto minmax(160px, 1fr) auto auto auto;
+        gap: 16px;
+        padding: 20px;
+        overflow: hidden;
+      }
+
+      .report-editor-toolbar,
+      .report-editor-selection-bar,
+      .report-editor-diff-head,
+      .report-editor-assistant-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .report-editor-toolbar {
+        grid-area: toolbar;
+        padding: 4px 0 0;
+      }
+
+      .report-editor-title {
+        margin: 4px 0 0;
+        font-size: 1.4rem;
+      }
+
+      .report-editor-meta {
+        margin: 8px 0 0;
+        color: #64748b;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .report-editor-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      .report-editor-surface {
+        grid-area: surface;
+        min-height: 0;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .report-editor-selection-bar {
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        color: #64748b;
+        font-size: 0.84rem;
+      }
+
+      .report-editor-assistant-head {
+        grid-area: assistant-head;
+        padding: 14px 16px;
+      }
+
+      .report-editor-assistant-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .report-editor-assistant-copy strong {
+        color: #0f172a;
+        font-size: 0.98rem;
+      }
+
+      .report-editor-assistant-copy p,
+      .report-editor-assistant-note {
+        margin: 0;
+        color: #64748b;
+        font-size: 0.84rem;
+        line-height: 1.6;
+      }
+
+      .report-editor-close-btn {
+        min-height: 2rem;
+        padding: 0 0.9rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: #ffffff;
+        color: #0f172a;
+      }
+
+      .report-editor-textarea {
+        width: 100%;
+        height: 100%;
+        min-height: 420px;
+        border: 0;
+        outline: none;
+        resize: none;
+        padding: 18px 18px 22px;
+        font: 14px/1.7 "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+        color: #0f172a;
+        background: #fbfdff;
+      }
+
+      .report-editor-chat-log {
+        grid-area: chat;
+        min-height: 0;
+        overflow: auto;
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .report-editor-chat-item {
+        display: grid;
+        gap: 6px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #f8fafc;
+      }
+
+      .report-editor-chat-item.user {
+        border-color: rgba(59, 130, 246, 0.28);
+        background: rgba(239, 246, 255, 0.92);
+      }
+
+      .report-editor-chat-item.assistant {
+        border-color: rgba(34, 197, 94, 0.22);
+        background: rgba(240, 253, 244, 0.92);
+      }
+
+      .report-editor-chat-item.system {
+        border-style: dashed;
+      }
+
+      .report-editor-chat-role {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .report-editor-chat-item p {
+        margin: 0;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.65;
+      }
+
+      .report-editor-prompt-card {
+        grid-area: prompt;
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .report-editor-prompt-label {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .report-editor-prompt-input {
+        width: 100%;
+        min-height: 92px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: #fbfdff;
+        padding: 12px 14px;
+        color: #0f172a;
+        resize: vertical;
+        font: 14px/1.65 "Segoe UI", "PingFang SC", sans-serif;
+      }
+
+      .report-editor-prompt-input:focus {
+        outline: none;
+        border-color: rgba(59, 130, 246, 0.36);
+        box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.55);
+      }
+
+      .report-editor-prompt-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .report-editor-panel {
+        min-height: 0;
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        overflow: auto;
+      }
+
+      .report-editor-panel.hidden {
+        display: none;
+      }
+
+      #reportEditorCheckPanel {
+        grid-area: check;
+      }
+
+      #reportEditorDiffPanel {
+        grid-area: diff;
+      }
+
+      .report-editor-check-item,
+      .report-editor-diff-block {
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 12px 14px;
+        background: #f8fafc;
+      }
+
+      .report-editor-check-item strong,
+      .report-editor-diff-block strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .report-editor-diff-compare {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .report-editor-diff-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #f8fafc;
+      }
+
+      .report-editor-diff-card.original {
+        border-color: rgba(249, 115, 22, 0.24);
+        background: rgba(255, 247, 237, 0.92);
+      }
+
+      .report-editor-diff-card.revised {
+        border-color: rgba(34, 197, 94, 0.24);
+        background: rgba(240, 253, 244, 0.92);
+      }
+
+      .report-editor-diff-card span {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .report-editor-diff-block.add {
+        border-color: rgba(22, 163, 74, 0.22);
+        background: rgba(240, 253, 244, 0.92);
+      }
+
+      .report-editor-diff-block.delete {
+        border-color: rgba(220, 38, 38, 0.22);
+        background: rgba(254, 242, 242, 0.92);
+      }
+
+      .report-editor-diff-block.equal {
+        background: #f8fafc;
+      }
+
+      .report-editor-diff-block pre,
+      .report-editor-diff-card pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font: 13px/1.65 "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+        color: #334155;
+      }
+
+      .uc-report-library-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1rem;
+        margin-top: 0.85rem;
+      }
+
+      .uc-report-library-card,
+      .uc-report-library-empty {
+        display: grid;
+        gap: 0.75rem;
+        width: 100%;
+        min-height: 176px;
+        padding: 1rem;
+        text-align: left;
+        border-radius: 1rem;
+        border: 1px solid rgba(203, 213, 225, 0.92);
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+      }
+
+      .uc-report-library-card {
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+
+      .uc-report-library-card:hover:not(:disabled) {
+        transform: translateY(-2px);
+        border-color: rgba(37, 99, 235, 0.38);
+        box-shadow: 0 18px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      .uc-report-library-card.latest {
+        border-color: rgba(37, 99, 235, 0.44);
+      }
+
+      .uc-report-library-card--pending {
+        grid-column: 1 / -1;
+      }
+
+      .uc-report-library-card-top {
+        display: grid;
+        grid-template-columns: 3.25rem minmax(0, 1fr);
+        gap: 0.9rem;
+        align-items: start;
+      }
+
+      .uc-report-library-card-head {
+        display: grid;
+        gap: 0.35rem;
+        min-width: 0;
+      }
+
+      .uc-report-library-card-head h4 {
+        margin: 0;
+        font-size: 1.08rem;
+        line-height: 1.25;
+        color: #0f172a;
+      }
+
+      .uc-report-library-card-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(191, 219, 254, 0.85);
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #2563eb;
+      }
+
+      .uc-report-library-card-mark svg,
+      .uc-report-library-chip svg,
+      .uc-report-library-link svg,
+      .uc-report-library-meta-item svg {
+        width: 1.05rem;
+        height: 1.05rem;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+
+      .uc-report-library-card-mark.tone-tech {
+        color: #1d4ed8;
+        border-color: rgba(147, 197, 253, 0.9);
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      }
+
+      .uc-report-library-card-mark.tone-data {
+        color: #0f766e;
+        border-color: rgba(153, 246, 228, 0.9);
+        background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+      }
+
+      .uc-report-library-card-mark.tone-content {
+        color: #9333ea;
+        border-color: rgba(221, 214, 254, 0.92);
+        background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+      }
+
+      .uc-report-library-card-mark.tone-strategy {
+        color: #c2410c;
+        border-color: rgba(254, 215, 170, 0.95);
+        background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      }
+
+      .uc-report-library-card-mark.tone-general {
+        color: #475569;
+        border-color: rgba(226, 232, 240, 0.95);
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      }
+
+      .uc-report-library-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .uc-report-library-meta span,
+      .uc-report-library-foot span {
+        font-size: 0.8rem;
+        color: #64748b;
+      }
+
+      .uc-report-library-meta-item,
+      .uc-report-library-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+      }
+
+      .uc-report-library-title {
+        margin: 0;
+        min-height: 0;
+        color: #475569;
+        line-height: 1.45;
+        font-size: 0.88rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .uc-report-library-foot {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        margin-top: auto;
+        padding-top: 0.7rem;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .uc-report-library-chip {
+        min-height: 1.85rem;
+        padding: 0 0.65rem;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.79rem;
+        font-weight: 700;
+      }
+
+      .uc-report-library-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.55rem;
+        padding: 0 0.55rem;
+        border-radius: 999px;
+        background: rgba(29, 78, 216, 0.1);
+        color: #1d4ed8;
+        font-size: 0.72rem;
+        font-weight: 800;
+      }
+
+      .uc-report-library-badge.muted {
+        background: rgba(148, 163, 184, 0.18);
+        color: #475569;
+      }
+
       @media (max-width: 1100px) {
         .career-report-layout {
           grid-template-columns: 1fr;
         }
 
-        .report-viewer-shell {
+        .report-viewer-shell,
+        .report-editor-shell {
           grid-template-columns: 1fr;
         }
 
-        .report-viewer-sidebar {
+        .report-viewer-sidebar,
+        .report-editor-sidebar {
           display: none;
         }
 
-        .report-viewer-main {
+        .report-viewer-main,
+        .report-editor-main {
           padding: 24px 18px 32px;
+        }
+
+        .report-editor-main {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "toolbar"
+            "surface"
+            "assistant-head"
+            "chat"
+            "prompt"
+            "diff"
+            "check";
+          grid-template-rows: auto minmax(360px, 1fr) auto minmax(180px, auto) auto auto auto;
+        }
+
+        .report-editor-diff-compare {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -594,10 +1177,18 @@
             </a>
 
             <nav class="uc-nav" aria-label="个人中心导航">
-                <button type="button" class="uc-nav-link active" data-target="report-workspace">
+                <div class="uc-nav-group">
+                    <button type="button" class="uc-nav-link active" data-target="report-workspace" data-nav-group="report">
                     <span class="uc-nav-icon">📄</span>
                     <span>职业报告</span>
-                </button>
+                    </button>
+                    <div id="ucReportWorkspaceSubnav" class="uc-nav-subnav hidden" aria-label="report subnav">
+                        <button type="button" class="uc-nav-subitem" data-uc-report-module="trends">琛屼笟瓒嬪娍</button>
+                        <button type="button" class="uc-nav-subitem" data-uc-report-module="matching">宀椾綅鍖归厤</button>
+                        <button type="button" class="uc-nav-subitem" data-uc-report-module="plan">璺緞瑙勫垝</button>
+                        <button type="button" class="uc-nav-subitem" data-uc-report-module="editor">鏅鸿兘娑﹁壊</button>
+                    </div>
+                </div>
                 <button type="button" class="uc-nav-link" data-target="plan-workspace">
                     <span class="uc-nav-icon">🧭</span>
                     <span>学习路径</span>
@@ -634,7 +1225,7 @@
                         <span id="notificationCount" class="topbar-count">3</span>
                     </button>
                     <button id="logoutBtn" type="button" onclick="logout()" class="topbar-text-btn">退出</button>
-                    <button type="button" class="topbar-avatar-btn" onclick="window.switchUserCenterSection?.('report-workspace', { updateHash: true })" title="职业报告" aria-label="打开职业报告">
+                    <button type="button" class="topbar-avatar-btn" onclick="window.openUserCenterReportLibrary?.()" title="职业报告" aria-label="打开职业报告">
                         <span id="currentUserAvatar">人</span>
                     </button>
                 </div>
@@ -643,122 +1234,114 @@
             <main class="uc-content">
                 <section id="report-workspace" class="uc-section active">
                     <div class="uc-section-shell">
-
-                        <!-- ══ 列表视图（默认入口） ══ -->
-                        <div id="ucRptListView">
-                            <!-- 顶部操作栏 -->
-                            <section class="uc-surface">
-                                <div class="uc-section-head">
+                        <section class="uc-surface uc-report-hero-surface">
+                            <div class="uc-section-head">
+                                <div>
+                                    <p class="uc-section-kicker">Career Report</p>
+                                    <h2 class="uc-section-title">职业报告中心</h2>
+                                    <p id="userCenterReportSubline" class="uc-section-subline">先选择一份正式报告。</p>
+                                </div>
+                                <div class="uc-section-actions uc-report-header-actions">
+                                    <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成职业报告</button>
+                                </div>
+                            </div>
+                        </section>
+                        <div id="userCenterReportLibraryShell" class="uc-report-library-shell">
+                            <section class="uc-surface uc-report-library-surface">
+                                <div class="uc-block-head">
                                     <div>
-                                        <p class="uc-section-kicker">Career Report</p>
-                                        <h2 class="uc-section-title">职业报告</h2>
-                                        <p id="userCenterReportSubline" class="uc-section-subline">选择一份报告查看详情，或生成新报告。</p>
+                                        <p class="uc-section-kicker">Formal Reports</p>
+                                        <h3 class="uc-block-title">正式职业报告</h3>
+                                        <p class="uc-block-copy">按岗位方向和生成时间查看正式报告。</p>
                                     </div>
-                                    <div class="uc-section-actions">
-                                        <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="startCareerReportGeneration()">生成新报告</button>
+                                </div>
+                                <div id="userCenterReportLibrary" class="uc-report-library-grid" aria-live="polite"></div>
+                            </section>
+                        </div>
+
+                        <div id="userCenterReportDetailShell" class="uc-report-detail-shell hidden">
+                            <section class="uc-surface uc-report-workbench">
+                                <div class="uc-block-head uc-report-workbench-head">
+                                    <div>
+                                        <div class="uc-report-detail-backline">
+                                            <button type="button" class="uc-back-mini-btn" onclick="window.openUserCenterReportLibrary?.()">← 返回报告卡片库</button>
+                                        </div>
+                                        <p class="uc-section-kicker">Report Detail</p>
+                                        <h3 class="uc-block-title">报告详情页</h3>
+                                        <p class="uc-block-copy">默认先看概览视图，再切换完整报告。右侧保留正式版本与编辑快照，完整报告支持编辑、润色、完整性检查与导出。</p>
+                                    </div>
+                                    <div class="uc-report-toolbar">
+                                        <div class="uc-report-view-switch" role="tablist" aria-label="职业报告视图切换">
+                                            <button type="button" class="uc-report-view-btn active" data-user-center-report-view="dashboard" aria-pressed="true">概览视图</button>
+                                            <button type="button" class="uc-report-view-btn" data-user-center-report-view="report" aria-pressed="false">完整报告</button>
+                                        </div>
+                                        <button id="userCenterOpenEditorBtn" type="button" class="career-report-secondary-btn" onclick="openCareerReportEditor()">编辑与导出</button>
+                                        <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="openReportViewer()">全屏查看</button>
+                                    </div>
+                                </div>
+                                <div class="career-report-shell">
+                                    <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
+                                    <div class="career-report-layout career-report-layout--dashboard">
+                                        <aside id="careerReportAside" class="career-report-aside"></aside>
+                                        <div id="careerReportMain" class="career-report-main"></div>
                                     </div>
                                 </div>
                             </section>
 
-                            <!-- 报告版本卡片列表 -->
-                            <div id="ucRptCards" class="uc-rpt-card-grid" role="list" aria-label="职业报告版本列表">
-                                <div class="uc-rpt-card-empty">
-                                    <span class="uc-rpt-card-empty-icon">📄</span>
-                                    <p>暂无报告记录</p>
-                                    <p class="uc-rpt-card-empty-sub">先在主界面完善能力画像并锁定目标岗位，再回来生成报告</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ══ 详情视图（点击报告后展开） ══ -->
-                        <div id="ucRptDetailView" class="hidden">
-                            <!-- 返回按钮栏 -->
-                            <div class="uc-rpt-back-bar">
-                                <button type="button" class="uc-rpt-back-btn" onclick="ucRptShowList()">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    返回报告列表
-                                </button>
-                                <div class="uc-rpt-back-title" id="ucRptDetailTitle">职业规划报告</div>
-                                <div class="uc-section-actions" style="margin-left:auto;">
-                                    <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="openReportViewer()">全屏查看</button>
-                                </div>
-                            </div>
-
-                            <!-- 运行记录 + 概览 -->
                             <div class="uc-report-top">
-                                <section class="uc-surface uc-report-runs-panel">
-                                    <div class="uc-block-head">
-                                        <div>
-                                            <h3 class="uc-block-title">版本历史</h3>
-                                            <p class="uc-block-copy">点击切换查看不同时间点的报告内容。</p>
+                                <section class="uc-surface uc-report-summary uc-report-summary-surface">
+                                    <div class="uc-report-summary-grid">
+                                        <div class="uc-report-summary-main">
+                                            <p class="uc-section-kicker">Report Snapshot</p>
+                                            <h3 class="uc-block-title">报告概览</h3>
+                                            <p class="uc-block-copy">这里用于快速确认当前选中的是哪份正式报告、主推荐岗位、时间与匹配判断。</p>
+                                            <div class="uc-summary-metrics">
+                                                <article>
+                                                    <span>当前主岗位</span>
+                                                    <strong id="userCenterFocusRole">待识别</strong>
+                                                </article>
+                                                <article>
+                                                    <span>生成 / 更新时间</span>
+                                                    <strong id="userCenterUpdatedAt">--</strong>
+                                                </article>
+                                                <article>
+                                                    <span>匹配判断</span>
+                                                    <strong id="userCenterCompletionRate">0%</strong>
+                                                </article>
+                                                <article>
+                                                    <span>版本数</span>
+                                                    <strong id="userCenterVersionCount">0</strong>
+                                                </article>
+                                            </div>
+                                            <p id="userCenterReportHistory" class="uc-summary-hint" aria-hidden="true"></p>
+                                            <p id="userCenterReportSwitchHint" class="uc-summary-hint"></p>
                                         </div>
                                     </div>
-                                    <div id="userCenterReportRuns" class="uc-report-runs" role="list" aria-label="职业报告版本列表"></div>
                                 </section>
 
-                                <section class="uc-surface uc-report-summary">
+                                <section class="uc-surface uc-report-runs-panel">
                                     <div class="uc-block-head compact">
                                         <div>
-                                            <p class="uc-section-kicker">Report Summary</p>
-                                            <h3 class="uc-block-title">当前报告概览</h3>
+                                            <p class="uc-section-kicker">Versions & Drafts</p>
+                                            <h3 class="uc-block-title">正式版本与编辑快照</h3>
+                                            <p class="uc-block-copy">正式版本在上，编辑快照在下。切换历史正式版只读；编辑快照进入可编辑视图。</p>
                                         </div>
                                     </div>
-                                    <div class="uc-summary-metrics">
-                                        <article>
-                                            <span>当前主岗位</span>
-                                            <strong id="userCenterFocusRole">待识别</strong>
-                                        </article>
-                                        <article>
-                                            <span>生成 / 更新时间</span>
-                                            <strong id="userCenterUpdatedAt">--</strong>
-                                        </article>
-                                        <article>
-                                            <span>完成度</span>
-                                            <strong id="userCenterCompletionRate">0%</strong>
-                                        </article>
-                                        <article>
-                                            <span>版本数</span>
-                                            <strong id="userCenterVersionCount">0</strong>
-                                        </article>
-                                    </div>
-                                    <p id="userCenterReportHistory" class="uc-summary-hint" aria-hidden="true"></p>
-                                    <p id="userCenterReportSwitchHint" class="uc-summary-hint"></p>
+                                    <div id="userCenterReportRuns" class="uc-report-runs" role="list" aria-label="职业报告版本与快照列表"></div>
                                 </section>
                             </div>
 
-                            <!-- 目标岗位追踪 -->
                             <section class="uc-surface uc-role-strip-surface">
                                 <div class="uc-role-strip-line">
-                                    <div class="uc-role-strip-label">目标岗位追踪</div>
+                                    <div class="uc-role-strip-copy">
+                                        <div class="uc-role-strip-label">目标岗位追踪</div>
+                                        <p class="uc-block-copy">辅助区默认只展示最值得跟踪的 3 个候选岗位，可继续展开查看全部。</p>
+                                    </div>
                                     <div id="userCenterTargetRoles" class="uc-role-strip-list" aria-live="polite">
                                         <span class="uc-role-strip-empty">正在加载岗位追踪...</span>
                                     </div>
                                     <div class="uc-role-strip-actions">
                                         <button id="userCenterTargetRoleAddBtn" type="button" class="uc-filter-chip">+ 添加岗位</button>
-                                        <button type="button" class="uc-filter-chip active" data-role-filter="all">全部</button>
-                                        <button type="button" class="uc-filter-chip" data-role-filter="employed">在职</button>
-                                        <button type="button" class="uc-filter-chip" data-role-filter="reapply">再投</button>
-                                        <button type="button" class="uc-filter-chip" data-role-filter="expected">期望</button>
-                                        <button type="button" class="uc-filter-chip" data-role-filter="left">离职</button>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <!-- 报告正文阅读器 -->
-                            <section class="uc-surface">
-                                <div class="uc-block-head">
-                                    <div>
-                                        <p class="uc-section-kicker">Report Reader</p>
-                                        <h3 class="uc-block-title">职业报告正文</h3>
-                                        <p class="uc-block-subtitle">版式参考职业发展报告：上方为摘要与双栏要点，下方为完整章节（每章含小标题与卡片）。生成中时本区域仅显示进度。</p>
-                                        <p class="uc-block-copy">左侧为目录与岗位追踪；正文支持滚动阅读，也可使用「全屏查看」。</p>
-                                    </div>
-                                </div>
-                                <div class="career-report-shell">
-                                    <div id="careerReportStatusBanner" class="career-report-status-banner"></div>
-                                    <div class="career-report-layout">
-                                        <aside id="careerReportAside" class="career-report-aside"></aside>
-                                        <div id="careerReportMain" class="career-report-main"></div>
                                     </div>
                                 </div>
                             </section>
@@ -1228,6 +1811,69 @@
         </div>
     </div>
 
+    <div id="reportEditorOverlay" class="report-editor-overlay hidden" role="dialog" aria-modal="true" aria-label="职业报告编辑器">
+        <div class="report-editor-shell">
+            <aside class="report-editor-sidebar">
+                <div class="report-editor-sidebar-head">
+                    <p class="uc-section-kicker">Editable Source</p>
+                    <h3 class="uc-block-title">完整报告全貌</h3>
+                    <p class="uc-block-copy">可切换正式报告与编辑快照，支持手动编辑、AI 润色 diff、完整性检查和 DOCX 导出。</p>
+                </div>
+                <div id="reportEditorSnapshotList" class="report-editor-snapshot-list"></div>
+                <div class="report-editor-sidebar-section">
+                    <p class="report-editor-sidebar-label">章节地图</p>
+                    <div id="reportEditorSectionMap" class="report-editor-section-map"></div>
+                </div>
+            </aside>
+
+            <section class="report-editor-main">
+                <div class="report-editor-toolbar">
+                    <div>
+                        <p class="report-editor-kicker">Markdown Source</p>
+                        <h3 id="reportEditorTitle" class="report-editor-title">职业报告</h3>
+                        <p id="reportEditorMeta" class="report-editor-meta">正在加载源文稿…</p>
+                    </div>
+                    <div class="report-editor-actions">
+                        <button type="button" class="career-report-secondary-btn" id="reportEditorCheckBtn">完整性检查</button>
+                        <button type="button" class="career-report-secondary-btn" id="reportEditorPolishBtn">AI 润色选中段落</button>
+                        <button type="button" class="career-report-secondary-btn" id="reportEditorExportDocxBtn">导出 DOCX</button>
+                        <button type="button" class="career-report-primary-btn" id="reportEditorSaveBtn">保存编辑快照</button>
+                    </div>
+                </div>
+
+                <div class="report-editor-surface">
+                    <div class="report-editor-selection-bar">
+                        <span id="reportEditorSelectionInfo">未选择文本，默认可润色整篇。</span>
+                        <button type="button" class="report-editor-close-btn" onclick="closeCareerReportEditor()" aria-label="关闭报告编辑器">关闭</button>
+                    </div>
+                    <textarea id="reportEditorTextarea" class="report-editor-textarea" spellcheck="false"></textarea>
+                </div>
+
+                <div class="report-editor-assistant-head">
+                    <div class="report-editor-assistant-copy">
+                        <strong>AI 润色审阅台</strong>
+                        <p>左侧选中需要重写的几行，右侧写给 AI 的修改要求，再决定是否 Keep All。</p>
+                    </div>
+                    <p class="report-editor-assistant-note">保留原结论，不自动覆盖，先看建议再提交。</p>
+                </div>
+
+                <div id="reportEditorChatLog" class="report-editor-chat-log"></div>
+
+                <div class="report-editor-prompt-card">
+                    <p class="report-editor-prompt-label">对 AI 说你想怎么改</p>
+                    <textarea id="reportEditorPromptInput" class="report-editor-prompt-input" rows="3" placeholder="例如：语气更专业一些，但不要增加事实；或只压缩重复表达并保留 Markdown 结构。"></textarea>
+                    <div class="report-editor-prompt-actions">
+                        <button type="button" class="career-report-primary-btn" id="reportEditorPromptSendBtn">发送润色请求</button>
+                        <button type="button" class="career-report-secondary-btn" id="reportEditorClearPromptBtn">清空指令</button>
+                    </div>
+                </div>
+
+                <div id="reportEditorCheckPanel" class="report-editor-panel hidden"></div>
+                <div id="reportEditorDiffPanel" class="report-editor-panel hidden"></div>
+            </section>
+        </div>
+    </div>
+
     {% include "partials/settings_panel.html" %}
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
@@ -1235,8 +1881,8 @@
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}?v=20260402-news-board-fix-v1"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20260401-app-hotfix-v2"></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260402-restoration-v1"></script>
-    <script src="{{ url_for('static', filename='user-center.js') }}?v=20260401-user-center-v3"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260409-restoration-v2"></script>
+    <script src="{{ url_for('static', filename='user-center.js') }}?v=20260409-user-center-v5"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20260402-learning-path-fusion-v1"></script>
     <style>
       /* ── 报告列表视图 ── */

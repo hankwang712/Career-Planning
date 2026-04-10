@@ -1,5 +1,790 @@
 [
   {
+    "id": "cbb1d83ea59eeb87",
+    "title": "OpenAI releases a new safety blueprint to address the rise in child sexual exploitation",
+    "url": "https://techcrunch.com/2026/04/08/openai-releases-a-new-safety-blueprint-to-address-the-rise-in-child-sexual-exploitation/",
+    "summary": "OpenAI's new Child Safety Blueprint aims to tackle the alarming rise in child sexual exploitati…",
+    "content": "OpenAI releases a new safety blueprint to address the rise in child sexual exploitation | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;font-style:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;text-decoration:inherit} /*# sourceURL=https://techcrunch.com/wp-include",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-08T23:23:44+08:00",
+    "published_label": "04-08 23:23",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:36:15.720305"
+  },
+  {
+    "id": "0b9bb1e3525231b3",
+    "title": "Meta is reentering the AI race with a new model called Muse Spark",
+    "url": "https://www.theverge.com/tech/908769/meta-muse-spark-ai-model-launch-rollout",
+    "summary": "Meta Superintelligence Labs is launching its first model since Mark Zuckerberg spent billions o…",
+    "content": "Meta is reentering the AI race with a new model called Muse Spark | The Verge Skip to main content The homepage The Verge The Verge logo. The Verge The Verge logo. Tech Reviews Science Entertainment AI Policy Hamburger Navigation Button The homepage The Verge The Verge logo. Hamburger Navigation Button Navigation Drawer The Verge The Verge logo. <path d=\"m231.196 17.897-.302 9.071c-10.592-.726-13.618 1.996-13.618 10.885V39h-9.078V18.441h9.078v5.866c2.724-4.777 6.416-6.954 13.92-6.41ZM15.131 54.786h9.078V19.71h-9.078v35.075Zm44.968-36.828c-6.355 0-10.228 2.842-12.286 5.986V4.593H0v8.466h39.34V39h8.654c0-7.438 4.298-12.697 9.563-12.697 4.54 0 6.597 2.237 6.597 10.28v18.203h9.078V33.318c0-10.28-5.265-15.36-13.133-15.36ZM95.807 47.83c-5.507 0-9.078-3.326-9.683-8.829H77.59c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.15 3.447-3.268 5.261-7.989 5.261Zm-.363-29.692a19.226 19.226 0 0 0-9.32 2.177l4.357 6.168c1.634-.846 3.39-1.27 5.266-1.21 5.084 0 7.686 3.327 8.049 7.68H95.02v6.048h17.31c.121-.907.182-1.754.182-2.66.06-13.184-8.655-18.203-17.068-18.203ZM185.32 47.83c-5.507 0-9.078-3.326-9.683-8.829h-8.534c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.21 3.447-3.328 5.261-7.989 5.261Zm-.302-29.692a19.226 19.226 0 0 0-9.321 2.177l4.358 6.168c1.634-.846 3.389-1.27 5.265-1.21 5.084 0 7.687 3.327 8.05 7.68h-8.776v6.048h17.31c.121-.907.181-1.754.181-2.66.061-13.184-8.655-18.203-17.067-18.203ZM291.416 47.83c-5.507 0-9.078-3.326-9.683-8.829h-8.534c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.21 3.447-3.328 5.261-7.989 5.261Zm-.484-29.692a19.225 19.225 0 0 0-9.32 2.177l4.357 6.168c1.635-.846 3.39-1.27 5.266-1.21 5.084 0 7.686 3.327 8.049 7.68h-8.775v6.048h17.309c.121-.907.182-1.754.182-2.66.06-13.184-8.655-18.203-17.068-18.203ZM117.172.299 133.5 39h9.926L130.971 8.221h16.099V.36L117.172.3Zm48.418.06L146.888 47.71l-2.784 7.076h9.502L176.06.36h-10.47Zm83.461 53.58c3.873 0 7.081-1.089 9.32-2.963l-3.631-5.745c-1.15.484-2.421.665-3.692.665-4.963 0-7.808-2.963-8.776-6.894h-8.897c1.211 8.406 7.263 14.937 15.676 1",
+    "source": "The Verge / 科技职场",
+    "topic": "科技职场",
+    "published_at": "2026-04-09T00:12:54+08:00",
+    "published_label": "04-09 00:12",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:36:10.190217"
+  },
+  {
+    "id": "19d693386db65810",
+    "title": "GitHub 将使用 Free、Pro 和 Pro+ 用户的 Copilot 交互数据来训练 AI 模型",
+    "url": "https://www.infoq.cn/article/Uw8eC56IOdyLm4aL294q?utm_source=rss&utm_medium=article",
+    "summary": "点击查看原文>",
+    "content": "GitHub 将使用 Free、Pro 和 Pro+ 用户的 Copilot 交互数据来训练 AI 模型 - InfoQ @charset \"UTF-8\";@font-face{font-family:desgin-iconfont;src:url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff2?t=1687949736607) format(\"woff2\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff?t=1687949736607) format(\"woff\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.ttf?t=1687949736607) format(\"truetype\")}.desgin-iconfont{font-family:desgin-iconfont!important;font-size:16px;font-style:normal;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}@font-face{font-family:BEBAS;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.eot) format(\"embedded-opentype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.svg) format(\"svg\")}@font-face{font-family:alibaba;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.eot) format(\"embedded-opentype\")}@font-face{font-family:sourcehansans;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/sourcehansans/SourceHanSansSC-Regular.otf) format(\"opentype\")}[gk-modal-layer]{background-color:#0000009e}html{color:#353535;-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;font-family:Helvetica Neue,PingFang SC,Verdana,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,sans-serif;font-weight:400}html.borderbox *,html.borderbox :after,html.borderbox :before{box-sizing:border-box}article,aside,blockquote,body,button,code,dd,details,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hr,input,legend,li,menu,nav,ol,p,pre,section,td,textarea,th,ul{margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,menu,nav,section{display:block}audio,canvas,video{display:inline-block}body,button,input,select,textarea{font:400 1em/1.8 PingFang SC,Lantinghei SC,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,Helvetica,sans-serif}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}table{border-collapse:collapse;border-spacing:0}b,h1,h2,h3,h4,h5,h6{font-size:100%;font-weight:400}fieldset,img{border:0}blockquote{border-left:1px solid #1abc9c;color:#999;font-weight:400;margin:1em 3em 1em 2em;padding-left:1em;position:relative}@media only screen and (ma",
+    "source": "InfoQ / 技术趋势",
+    "topic": "技术趋势",
+    "published_at": "2026-04-09T01:00:00+08:00",
+    "published_label": "04-09 01:00",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:36:04.648602"
+  },
+  {
+    "id": "6082c3d76b93191d",
+    "title": "5 Burning Questions About Elon Musk’s Terafab Chip Partnership with Intel",
+    "url": "https://www.wired.com/story/5-burning-questions-about-elon-musks-terafab-chip-partnership-with-intel/",
+    "summary": "Intel’s role in Elon Musk’s ambitious chip venture is still murky, raising questions about what…",
+    "content": "5 Burning Questions About Elon Musk’s Terafab Chip Partnership with Intel | WIRED .dZoWtJ{margin:0;}/*!sc*/ .cNCRRJ{margin:0;margin-top:3rem;}/*!sc*/ data-styled.g1[id=\"BaseWrap-sc-SkJtP\"]{content:\"dZoWtJ,cNCRRJ,\"}/*!sc*/ .kmTrdu{margin:0;--type-token:consumptionEditorial.hed-standard;text-transform:none;font-family:WiredDisplay,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:-0.01326315810805873em;line-break:auto;line-height:1.0526315789473684em;font-size:38px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ @media (min-width: 768px){.kmTrdu{font-size:44px;line-height:1.0909090909090908em;}}/*!sc*/ @media (min-width: 1024px){.kmTrdu{font-size:54px;line-height:1.037037037037037em;}}/*!sc*/ .kmTrdu a{color:inherit;}/*!sc*/ .hieunh{margin:0;--type-token:consumptionEditorial.description-core;text-transform:none;font-family:Apercu,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.006000000238418579em;line-break:auto;line-height:1.4em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .hieunh a{color:inherit;}/*!sc*/ .iQbGEh{margin:0;--type-token:globalEditorial.context-tertiary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size:11px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .iQbGEh a{color:inherit;}/*!sc*/ .dfgfZR{margin:0;--type-token:utility.button-utility;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.10000000397364299em;line-break:auto;line-height:1.3300000031789143em;font-size:12px;font-weight:700;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ .dfgfZR a{color:inherit;}/*!sc*/ .fUtEc{margin:0;--type-token:consumptionEditorial.subhed-aux-primary;text-transform:none;font-family:ProximaNova,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.2em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .fUtEc a{color:inherit;}/*!sc*/ .evIlna{margin:0;text-align:left;--type-token:discovery.subhed-section-primary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.06615384725423959em;line-break:auto;line-height:1.2307692307692308em;font-size:13px;font-weight:400;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ @media (min-width: 768px){.evIlna{font-size:13px;line-height:1.2307692307692308em;}}/*!sc*/ .evIlna a{color:inherit;}/*!sc*/ .dIQmse{margin:0;--type-token:globalEditorial.tags;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size",
+    "source": "Wired / AI 与工作",
+    "topic": "AI 与工作",
+    "published_at": "2026-04-09T01:13:33+08:00",
+    "published_label": "04-09 01:13",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:59.738281"
+  },
+  {
+    "id": "e83a0472dd0e1841",
+    "title": "To beat Altman in court, Musk offers to give all damages to OpenAI nonprofit",
+    "url": "https://arstechnica.com/tech-policy/2026/04/to-beat-altman-in-court-musk-offers-to-give-all-damages-to-open-ai-nonprofit/",
+    "summary": "Musk won’t seek a “single dollar” in OpenAI suit after asking to pocket up to $134 billion.",
+    "content": "To beat Altman in court, Musk offers to give all damages to OpenAI nonprofit - Ars Technica :root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6p",
+    "source": "Ars Technica / 开发与行业",
+    "topic": "开发与行业",
+    "published_at": "2026-04-09T01:37:06+08:00",
+    "published_label": "04-09 01:37",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:54.139741"
+  },
+  {
+    "id": "f4b3ae93c9adfc61",
+    "title": "Meta’s New AI Model Gives Mark Zuckerberg a Seat at the Big Kid’s Table",
+    "url": "https://www.wired.com/story/muse-spark-meta-open-source-closed-source/",
+    "summary": "Muse Spark is Meta’s first model since its AI reboot, and the benchmarks suggest formidable per…",
+    "content": "Meta’s New AI Model Gives Mark Zuckerberg a Seat at the Big Kid’s Table | WIRED .dZoWtJ{margin:0;}/*!sc*/ .cNCRRJ{margin:0;margin-top:3rem;}/*!sc*/ data-styled.g1[id=\"BaseWrap-sc-SkJtP\"]{content:\"dZoWtJ,cNCRRJ,\"}/*!sc*/ .kmTrdu{margin:0;--type-token:consumptionEditorial.hed-standard;text-transform:none;font-family:WiredDisplay,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:-0.01326315810805873em;line-break:auto;line-height:1.0526315789473684em;font-size:38px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ @media (min-width: 768px){.kmTrdu{font-size:44px;line-height:1.0909090909090908em;}}/*!sc*/ @media (min-width: 1024px){.kmTrdu{font-size:54px;line-height:1.037037037037037em;}}/*!sc*/ .kmTrdu a{color:inherit;}/*!sc*/ .hieunh{margin:0;--type-token:consumptionEditorial.description-core;text-transform:none;font-family:Apercu,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.006000000238418579em;line-break:auto;line-height:1.4em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .hieunh a{color:inherit;}/*!sc*/ .iQbGEh{margin:0;--type-token:globalEditorial.context-tertiary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size:11px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .iQbGEh a{color:inherit;}/*!sc*/ .dfgfZR{margin:0;--type-token:utility.button-utility;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.10000000397364299em;line-break:auto;line-height:1.3300000031789143em;font-size:12px;font-weight:700;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ .dfgfZR a{color:inherit;}/*!sc*/ .fUtEc{margin:0;--type-token:consumptionEditorial.subhed-aux-primary;text-transform:none;font-family:ProximaNova,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.2em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .fUtEc a{color:inherit;}/*!sc*/ .evIlna{margin:0;text-align:left;--type-token:discovery.subhed-section-primary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.06615384725423959em;line-break:auto;line-height:1.2307692307692308em;font-size:13px;font-weight:400;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ @media (min-width: 768px){.evIlna{font-size:13px;line-height:1.2307692307692308em;}}/*!sc*/ .evIlna a{color:inherit;}/*!sc*/ .dIQmse{margin:0;--type-token:globalEditorial.tags;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size:1",
+    "source": "Wired / AI 与工作",
+    "topic": "AI 与工作",
+    "published_at": "2026-04-09T02:51:09+08:00",
+    "published_label": "04-09 02:51",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:52.800287"
+  },
+  {
+    "id": "c10fa08fe5546941",
+    "title": "Meta debuts the Muse Spark model in a ‘ground-up overhaul’ of its AI",
+    "url": "https://techcrunch.com/2026/04/08/meta-debuts-the-muse-spark-model-in-a-ground-up-overhaul-of-its-ai/",
+    "summary": "This is the first model Meta has released under its Superintelligence Labs, led by former Scale…",
+    "content": "Meta debuts the Muse Spark model in a &#039;ground-up overhaul&#039; of its AI | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T02:53:19+08:00",
+    "published_label": "04-09 02:53",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:47.226120"
+  },
+  {
+    "id": "dd6263926000f66a",
+    "title": "OpenAI made economic proposals — here’s what DC thinks of them",
+    "url": "https://www.theverge.com/column/908880/openai-made-economic-proposals-heres-what-dc-thinks-of-them",
+    "summary": "Happy ceasefire day and welcome to Regulator, a newsletter for Verge subscribers about Big Tech…",
+    "content": "OpenAI made economic proposals — here’s what DC thinks of them | The Verge Skip to main content The homepage The Verge The Verge logo. The Verge The Verge logo. Tech Reviews Science Entertainment AI Policy Hamburger Navigation Button The homepage The Verge The Verge logo. <path d=\"m231.196 17.897-.302 9.071c-10.592-.726-13.618 1.996-13.618 10.885V39h-9.078V18.441h9.078v5.866c2.724-4.777 6.416-6.954 13.92-6.41ZM15.131 54.786h9.078V19.71h-9.078v35.075Zm44.968-36.828c-6.355 0-10.228 2.842-12.286 5.986V4.593H0v8.466h39.34V39h8.654c0-7.438 4.298-12.697 9.563-12.697 4.54 0 6.597 2.237 6.597 10.28v18.203h9.078V33.318c0-10.28-5.265-15.36-13.133-15.36ZM95.807 47.83c-5.507 0-9.078-3.326-9.683-8.829H77.59c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.15 3.447-3.268 5.261-7.989 5.261Zm-.363-29.692a19.226 19.226 0 0 0-9.32 2.177l4.357 6.168c1.634-.846 3.39-1.27 5.266-1.21 5.084 0 7.686 3.327 8.049 7.68H95.02v6.048h17.31c.121-.907.182-1.754.182-2.66.06-13.184-8.655-18.203-17.068-18.203ZM185.32 47.83c-5.507 0-9.078-3.326-9.683-8.829h-8.534c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.21 3.447-3.328 5.261-7.989 5.261Zm-.302-29.692a19.226 19.226 0 0 0-9.321 2.177l4.358 6.168c1.634-.846 3.389-1.27 5.265-1.21 5.084 0 7.687 3.327 8.05 7.68h-8.776v6.048h17.31c.121-.907.181-1.754.181-2.66.061-13.184-8.655-18.203-17.067-18.203ZM291.416 47.83c-5.507 0-9.078-3.326-9.683-8.829h-8.534c.847 9.676 7.202 16.51 18.157 16.51 8.473 0 13.254-3.81 15.736-9.555l-7.687-3.387c-1.21 3.447-3.328 5.261-7.989 5.261Zm-.484-29.692a19.225 19.225 0 0 0-9.32 2.177l4.357 6.168c1.635-.846 3.39-1.27 5.266-1.21 5.084 0 7.686 3.327 8.049 7.68h-8.775v6.048h17.309c.121-.907.182-1.754.182-2.66.06-13.184-8.655-18.203-17.068-18.203ZM117.172.2",
+    "source": "The Verge / 科技职场",
+    "topic": "科技职场",
+    "published_at": "2026-04-09T04:14:00+08:00",
+    "published_label": "04-09 04:14",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:41.695051"
+  },
+  {
+    "id": "5407f22e4b8f2195",
+    "title": "Canva doubles down on AI and marketing automation with Simtheory, Ortto acquisitions",
+    "url": "https://techcrunch.com/2026/04/08/canva-doubles-down-on-ai-and-marketing-automation-with-simtheory-ortto-acquisitions/",
+    "summary": "Canva says the acquisitions add strengths in agentic AI, data infrastructure, marketing automat…",
+    "content": "Canva doubles down on AI and marketing automation with Simtheory, Ortto acquisitions | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;f",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T05:00:00+08:00",
+    "published_label": "04-09 05:00",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:36.218870"
+  },
+  {
+    "id": "4e51ca41b9aca064",
+    "title": "大前端性能优化新范式：AI 火焰图在亿级 App 中的落地｜QCon北京",
+    "url": "https://www.infoq.cn/article/xJZRwpf2uuMA3UaS2SWm?utm_source=rss&utm_medium=article",
+    "summary": "点击查看原文>",
+    "content": "大前端性能优化新范式：AI 火焰图在亿级 App 中的落地｜QCon北京 - InfoQ @charset \"UTF-8\";@font-face{font-family:desgin-iconfont;src:url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff2?t=1687949736607) format(\"woff2\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff?t=1687949736607) format(\"woff\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.ttf?t=1687949736607) format(\"truetype\")}.desgin-iconfont{font-family:desgin-iconfont!important;font-size:16px;font-style:normal;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}@font-face{font-family:BEBAS;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.eot) format(\"embedded-opentype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.svg) format(\"svg\")}@font-face{font-family:alibaba;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.eot) format(\"embedded-opentype\")}@font-face{font-family:sourcehansans;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/sourcehansans/SourceHanSansSC-Regular.otf) format(\"opentype\")}[gk-modal-layer]{background-color:#0000009e}html{color:#353535;-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;font-family:Helvetica Neue,PingFang SC,Verdana,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,sans-serif;font-weight:400}html.borderbox *,html.borderbox :after,html.borderbox :before{box-sizing:border-box}article,aside,blockquote,body,button,code,dd,details,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hr,input,legend,li,menu,nav,ol,p,pre,section,td,textarea,th,ul{margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,menu,nav,section{display:block}audio,canvas,video{display:inline-block}body,button,input,select,textarea{font:400 1em/1.8 PingFang SC,Lantinghei SC,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,Helvetica,sans-serif}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}table{border-collapse:collapse;border-spacing:0}b,h1,h2,h3,h4,h5,h6{font-size:100%;font-weight:400}fieldset,img{border:0}blockquote{border-left:1px solid #1abc9c;color:#999;font-weight:400;margin:1em 3em 1em 2em;padding-left:1em;position:relative}@media only screen and (max-width:640px){b",
+    "source": "InfoQ / 技术趋势",
+    "topic": "技术趋势",
+    "published_at": "2026-04-09T18:00:00+08:00",
+    "published_label": "04-09 18:00",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:30.745599"
+  },
+  {
+    "id": "2ee35bc3731e56e5",
+    "title": "直播预告丨“先锋直播间”将推出大学生就业创业专题首场直播 - 华声在线",
+    "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5OQXpsZjRKdm9RWDYxa2hLb0VpQnhTVEY1cG9qZF9pdFhNbFNaeVBIYnhZMUNEYjlpWElwTU04OGdqZmdWUXVseTBmYkQxbWx2TGZheDFvNVVHQkQ1NU9R?oc=5",
+    "summary": "直播预告丨“先锋直播间”将推出大学生就业创业专题首场直播 华声在线",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 求职就业",
+    "topic": "求职就业",
+    "published_at": "2026-02-27T16:00:00+08:00",
+    "published_label": "02-27 16:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:35:25.858942"
+  },
+  {
+    "id": "0c5d5388e95b20a5",
+    "title": "励志书院举办“精准对接促就业，凝心聚力赢未来”就业动员暨企业专场宣讲会 - 西安交通大学新闻网",
+    "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE55NzJMR2dKQnR0dmVaTGJteWFvTW80N2c1LWFqNHRhSll4aUl5clc3bzNGVU1pelZidnd2SDdxdXVBTy1nQkVwc3JGLTV6Q3JDaUdvbXVLejU?oc=5",
+    "summary": "励志书院举办“精准对接促就业，凝心聚力赢未来”就业动员暨企业专场宣讲会 西安交通大学新闻网",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 职业规划",
+    "topic": "职业规划",
+    "published_at": "2026-03-13T15:00:00+08:00",
+    "published_label": "03-13 15:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:35:21.631067"
+  },
+  {
+    "id": "8f23771881e3aa6e",
+    "title": "@文山大学生 寒假实习通道已开启，快来攒经验 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTFBRV0kyMVBHRGtjcnQtRTA1dFNRMlZWNXZhSDNMOHQ1NVg1WmFMRFV5c1FKd3g4RTFrX0wzN3RXTTBmMl9KUDU0V0RBbmZSZ2kydzVXa3kwTlVlc2JXYkM0VWc0NUZvbDFObHVvelhVOGMwZjRMeVB0Uw?oc=5",
+    "summary": "@文山大学生 寒假实习通道已开启，快来攒经验 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 求职就业",
+    "topic": "求职就业",
+    "published_at": "2026-03-25T07:54:29+08:00",
+    "published_label": "03-25 07:54",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:35:19.728205"
+  },
+  {
+    "id": "3fb71564c72d2ff9",
+    "title": "抓住“金三银四”求职窗口期-腾讯新闻 - QQ News",
+    "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTE9qdi1qcFQwdjhmQjVZUzg3cFR2TmZ0RTkxU1U5QW1qdDZHZjd6WXlPRDNhUnEzX1pOOFlUaXBXSlJTYnZjUU5zZzhjOTJpUUxfVDhoOFB3?oc=5",
+    "summary": "抓住“金三银四”求职窗口期-腾讯新闻 QQ News",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 职业规划",
+    "topic": "职业规划",
+    "published_at": "2026-03-26T15:00:00+08:00",
+    "published_label": "03-26 15:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:35:17.845340"
+  },
+  {
+    "id": "7de89678c3a75d52",
+    "title": "@毕业生：春风送岗，“川e就”平台邀你赴约 - 四川新闻",
+    "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE9CLTBmODVWeVowUUVnc2VoR2lqWTBkemxPUUwyeXFvNXp3WDNGZmVGaENRYTIwTTA1aWE4SzY5M0h5UDRreGZJNzczV1JJQVVrUWhmUlZJVGpjYklSYm91cmFUUQ?oc=5",
+    "summary": "@毕业生：春风送岗，“川e就”平台邀你赴约 四川新闻",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 求职就业",
+    "topic": "求职就业",
+    "published_at": "2026-04-08T18:00:21+08:00",
+    "published_label": "04-08 18:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:35:15.414586"
+  },
+  {
+    "id": "3398b02ee69fa936",
+    "title": "Dyson Spot+Scrub Ai Robot Vacuum Review (2026)",
+    "url": "https://www.wired.com/review/dyson-spot-scrub-ai/",
+    "summary": "The Spot+Scrub Ai is Dyson's first robot mop, and it does the job. But the built-in AI didn’t b…",
+    "content": "Dyson Spot+Scrub Ai Robot Vacuum Review (2026) | WIRED .dZoWtJ{margin:0;}/*!sc*/ .cNCRRJ{margin:0;margin-top:3rem;}/*!sc*/ data-styled.g1[id=\"BaseWrap-sc-SkJtP\"]{content:\"dZoWtJ,cNCRRJ,\"}/*!sc*/ .iQbGEh{margin:0;--type-token:globalEditorial.context-tertiary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size:11px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .iQbGEh a{color:inherit;}/*!sc*/ .kmTrdu{margin:0;--type-token:consumptionEditorial.hed-standard;text-transform:none;font-family:WiredDisplay,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:-0.01326315810805873em;line-break:auto;line-height:1.0526315789473684em;font-size:38px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ @media (min-width: 768px){.kmTrdu{font-size:44px;line-height:1.0909090909090908em;}}/*!sc*/ @media (min-width: 1024px){.kmTrdu{font-size:54px;line-height:1.037037037037037em;}}/*!sc*/ .kmTrdu a{color:inherit;}/*!sc*/ .fnNNmA{margin:0;--type-token:consumptionEditorial.subhed-aux-secondary;text-transform:none;font-family:Apercu,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.25em;font-size:16px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .fnNNmA a{color:inherit;}/*!sc*/ .kiAfmv{margin:0;--type-token:globalEditorial.numerical-small;text-transform:uppercase;font-family:Apercu,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.3300000031789143em;font-size:12px;font-weight:700;overflow-wrap:normal;color:rgba(117,117,117,1);}/*!sc*/ .kiAfmv a{color:inherit;}/*!sc*/ .dfgfZR{margin:0;--type-token:utility.button-utility;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.10000000397364299em;line-break:auto;line-height:1.3300000031789143em;font-size:12px;font-weight:700;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ .dfgfZR a{color:inherit;}/*!sc*/ .fUtEc{margin:0;--type-token:consumptionEditorial.subhed-aux-primary;text-transform:none;font-family:ProximaNova,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.2em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .fUtEc a{color:inherit;}/*!sc*/ .eXFcsJ{margin:0;--type-token:consumptionEditorial.body-core;text-transform:none;font-family:BreveText,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.005684210673758858em;line-break:auto;line-height:1.4736842105263157em;font-size:19px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .eXFcsJ a{color:inherit;}/*!sc*/ .hcyBfD{margin:0;margin-bottom:0.25rem;text-a",
+    "source": "Wired / AI 与工作",
+    "topic": "AI 与工作",
+    "published_at": "2026-04-08T19:00:00+08:00",
+    "published_label": "04-08 19:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:13.260905"
+  },
+  {
+    "id": "9700974f21a7dc9a",
+    "title": "Astropad’s Workbench reimagines remote desktop for AI agents, not IT support",
+    "url": "https://techcrunch.com/2026/04/08/astropads-workbench-reimagines-remote-desktop-for-ai-agents-not-it-support/",
+    "summary": "Astropad’s Workbench lets users remotely monitor and control AI agents on Mac Minis from iPhone…",
+    "content": "Astropad&#039;s Workbench reimagines remote desktop for AI agents, not IT support | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;font-style:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;text-decoration:inherit} /*# sourceURL=htt",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T00:01:09+08:00",
+    "published_label": "04-09 00:01",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:07.703021"
+  },
+  {
+    "id": "bdbfa91980580481",
+    "title": "Anthropic’s New Product Aims to Handle the Hard Part of Building AI Agents",
+    "url": "https://www.wired.com/story/anthropic-launches-claude-managed-agents/",
+    "summary": "Amid rapid enterprise growth, Anthropic is trying to lower the barrier to entry for businesses…",
+    "content": "Anthropic’s New Product Aims to Handle the Hard Part of Building AI Agents | WIRED .dZoWtJ{margin:0;}/*!sc*/ .cNCRRJ{margin:0;margin-top:3rem;}/*!sc*/ data-styled.g1[id=\"BaseWrap-sc-SkJtP\"]{content:\"dZoWtJ,cNCRRJ,\"}/*!sc*/ .kmTrdu{margin:0;--type-token:consumptionEditorial.hed-standard;text-transform:none;font-family:WiredDisplay,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:-0.01326315810805873em;line-break:auto;line-height:1.0526315789473684em;font-size:38px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ @media (min-width: 768px){.kmTrdu{font-size:44px;line-height:1.0909090909090908em;}}/*!sc*/ @media (min-width: 1024px){.kmTrdu{font-size:54px;line-height:1.037037037037037em;}}/*!sc*/ .kmTrdu a{color:inherit;}/*!sc*/ .hieunh{margin:0;--type-token:consumptionEditorial.description-core;text-transform:none;font-family:Apercu,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.006000000238418579em;line-break:auto;line-height:1.4em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .hieunh a{color:inherit;}/*!sc*/ .iQbGEh{margin:0;--type-token:globalEditorial.context-tertiary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-size:11px;font-weight:400;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .iQbGEh a{color:inherit;}/*!sc*/ .dfgfZR{margin:0;--type-token:utility.button-utility;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.10000000397364299em;line-break:auto;line-height:1.3300000031789143em;font-size:12px;font-weight:700;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ .dfgfZR a{color:inherit;}/*!sc*/ .fUtEc{margin:0;--type-token:consumptionEditorial.subhed-aux-primary;text-transform:none;font-family:ProximaNova,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:normal;line-break:auto;line-height:1.2em;font-size:20px;font-weight:700;overflow-wrap:normal;color:rgba(26,26,26,1);}/*!sc*/ .fUtEc a{color:inherit;}/*!sc*/ .evIlna{margin:0;text-align:left;--type-token:discovery.subhed-section-primary;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.06615384725423959em;line-break:auto;line-height:1.2307692307692308em;font-size:13px;font-weight:400;overflow-wrap:normal;color:rgba(0,0,0,1);}/*!sc*/ @media (min-width: 768px){.evIlna{font-size:13px;line-height:1.2307692307692308em;}}/*!sc*/ .evIlna a{color:inherit;}/*!sc*/ .dIQmse{margin:0;--type-token:globalEditorial.tags;text-transform:uppercase;font-family:WiredMono,helvetica,sans-serif;font-feature-settings:normal;font-style:normal;letter-spacing:0.04500000043348833em;line-break:auto;line-height:1.4545454545454546em;font-siz",
+    "source": "Wired / AI 与工作",
+    "topic": "AI 与工作",
+    "published_at": "2026-04-09T01:00:00+08:00",
+    "published_label": "04-09 01:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:35:02.208293"
+  },
+  {
+    "id": "a75adb3eab9b7cce",
+    "title": "Meta's Superintelligence Lab unveils its first public model, Muse Spark",
+    "url": "https://arstechnica.com/ai/2026/04/metas-superintelligence-lab-unveils-its-first-public-model-muse-spark/",
+    "summary": "Meta touts strong benchmarks but admits \"performance gaps\" in agentic and coding systems.",
+    "content": "Meta&#039;s Superintelligence Lab unveils its first public model, Muse Spark - Ars Technica Skip to content Ars Technica home <path fill=",
+    "source": "Ars Technica / 开发与行业",
+    "topic": "开发与行业",
+    "published_at": "2026-04-09T03:59:10+08:00",
+    "published_label": "04-09 03:59",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:56.624622"
+  },
+  {
+    "id": "64c1abcf53e8e2c3",
+    "title": "AWS boss explains why investing billions in both Anthropic and OpenAI is an OK conflict",
+    "url": "https://techcrunch.com/2026/04/08/aws-boss-explains-why-investing-billions-in-both-anthropic-and-openai-is-an-ok-conflict/",
+    "summary": "AWS has an ingrained culture of handling competition, he explained, because the cloud giant als…",
+    "content": "AWS boss explains why investing billions in both Anthropic and OpenAI is an OK conflict | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;font-style:inherit;font-weight:inherit;letter-spacing:inherit;l",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T04:09:14+08:00",
+    "published_label": "04-09 04:09",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:55.250493"
+  },
+  {
+    "id": "754500618b370571",
+    "title": "Poke makes using AI agents as easy as sending a text",
+    "url": "https://techcrunch.com/2026/04/08/poke-makes-ai-agents-as-easy-as-sending-a-text/",
+    "summary": "Poke brings AI agents to everyday users via text message by handling tasks and automations with…",
+    "content": "Poke makes using AI agents as easy as sending a text | TechCrunch .wp-block-tc23-author-card{--c-author-card-image-size:80px;align-items:center;display:flex;gap:var(--wp--custom--spacing--24)}@media (min-width:48em){.wp-block-tc23-author-card{--c-author-card-image-size:122px}}.wp-block-tc23-author-card-image,.wp-block-tc23-author-card-image img.wp-block-tc_author-card__image{height:var(--c-author-card-image-size);width:var(--c-author-card-image-size)}.wp-block-tc23-author-card-image img.wp-block-tc_author-card__image{border-radius:50%;max-width:none;-o-object-fit:cover;object-fit:cover}.wp-block-tc23-author-card__info{display:block}.wp-block-tc23-author-card__info>*{margin-top:0}.wp-block-tc23-author-card-name{flex:1;font",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T05:05:13+08:00",
+    "published_label": "04-09 05:05",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:49.750219"
+  },
+  {
+    "id": "c9a7f0197e2c439c",
+    "title": "WireGuard VPN developer can’t ship software updates after Microsoft locks account",
+    "url": "https://techcrunch.com/2026/04/08/wireguard-vpn-developer-cant-ship-software-updates-after-microsoft-locks-account/",
+    "summary": "The popular open source VPN maker is the second high-profile developer to say Microsoft locked…",
+    "content": "WireGuard VPN developer can&#039;t ship software updates after Microsoft locks account | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;font-style:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inh",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T05:50:41+08:00",
+    "published_label": "04-09 05:50",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:44.272762"
+  },
+  {
+    "id": "c0fde06a9c300f74",
+    "title": "英特尔联手 SambaNova 推出异构 AI 推理硬件解决方案，结合三种处理器",
+    "url": "https://www.ithome.com/0/937/233.htm",
+    "summary": "IT之家 4 月 9 日消息，Intel 英特尔与 AI 推理芯片企业 SambaNova 美国当地时间 8 日宣布携手推出面向推理工作负载的异构硬件解决方案。该系统将于 2026 年下半年…",
+    "content": "英特尔联手 SambaNova 推出异构 AI 推理硬件解决方案，结合三种处理器 - IT之家 首页 IT圈 最会买 设置 日夜间 随系统 浅色 深色 主题色 黑色 投稿 订阅 RSS订阅 收藏IT之家 软媒应用 App客户端 要知App 软媒魔方 业界 手机 电脑 测评 视频 AI 苹果 iPhone 鸿蒙 软件 智车 数码 学院 游戏 直播 5G 微软 Win10 Win11 专题 搜索 首页 &gt; 智能时代 &gt; 人工智能 英特尔联手 SambaNova 推出异构 AI 推理硬件解决方案，结合三种处理器 2026/4/9 8:41:01 来源： IT之家 作者： 溯波（实习） 责编： 溯波 评论： IT之家 4 月 9 日消息，Intel 英特尔与 AI 推理芯片企业 SambaNova 美国当地时间 8 日宣布携手推出面向推理工作负载的异构硬件解决方案。该系统将于 2026 年下半年向企业、云服务供应商、主权人工智能提供。 这套异构方案结合了用于预填充的 GPU、用于解码的 SambaNova SN50 RDU、用于主机头节点和“动作”的英特尔至强 Xeon 6 处理器， 通过为每个步骤选用最合适的硬件化解现有仅 GPU 方案的不足 。 SambaNova 表示，相比基于 Arm 的服务器 CPU，英特尔至强 6 拥有 150% 以上的 LLVM 编译速度；同时该处理器向量数据库性能较现有 x86 竞品提升多达 70%，这加速了端到端编程代理工作流，使开发者能够更快地将想法落地为生产准备的智能体。 相关阅读： 《 SambaNova 发布第五代 RDU AI 芯片，与英特尔达成多年期合作 》 广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。 投诉水文 我要纠错 下载IT之家APP，签到赚金币兑豪礼 相关文章 关键词： 英特尔 ， SambaNova ， AI推理 消息称英特尔将向 CEO 陈立武旗下初创公司 SambaNova 再投 1500 万美元 SambaNova 发布第五代 RDU AI 芯片，与英特尔达成多年期合作 英特尔上线 AI 客服 Ask Intel：秒回保修等信息，搞不定转接人工坐席 算力航母：英特尔展示 18A 工艺 AI 芯片，背面供电 + 垂直堆叠解决能耗瓶颈 消息称英特尔最快 2026 年 1 月收购 SambaNova，当前总价（含债务）约 16 亿美元 消息称英特尔已签署收购 AI 芯片企业 SambaNova 意向书 软媒旗下网站： IT之家 最会买 - 返利返现优惠券 iPhone之家 Win7之家 Win10之家 Win11之家 软媒旗下软件： 软媒手机APP应用 魔方 最会买 要知 关于IT之家 | 联系我们 | 加入软媒 | WAP版 | 网站地图 | Archiver IT之家，软媒旗下科技门户网站 - 爱科技，爱这里。 Copyright &copy; RuanMei.com , All Rights Reserved. 青岛软媒网络科技有限公司 版权所有",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-09T08:41:01+08:00",
+    "published_label": "04-09 08:41",
+    "relevance_score": 3,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:38.750266"
+  },
+  {
+    "id": "0566de131c80c67d",
+    "title": "TigerFS：将 PostgreSQL 数据库挂载为文件系统，面向开发者与 AI 智能体",
+    "url": "https://www.infoq.cn/article/r5EHCug4069tix7kDGLf?utm_source=rss&utm_medium=article",
+    "summary": "点击查看原文>",
+    "content": "TigerFS：将 PostgreSQL 数据库挂载为文件系统，面向开发者与 AI 智能体 - InfoQ @charset \"UTF-8\";@font-face{font-family:desgin-iconfont;src:url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff2?t=1687949736607) format(\"woff2\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff?t=1687949736607) format(\"woff\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.ttf?t=1687949736607) format(\"truetype\")}.desgin-iconfont{font-family:desgin-iconfont!important;font-size:16px;font-style:normal;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}@font-face{font-family:BEBAS;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.eot) format(\"embedded-opentype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.svg) format(\"svg\")}@font-face{font-family:alibaba;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.eot) format(\"embedded-opentype\")}@font-face{font-family:sourcehansans;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/sourcehansans/SourceHanSansSC-Regular.otf) format(\"opentype\")}[gk-modal-layer]{background-color:#0000009e}html{color:#353535;-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;font-family:Helvetica Neue,PingFang SC,Verdana,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,sans-serif;font-weight:400}html.borderbox *,html.borderbox :after,html.borderbox :before{box-sizing:border-box}article,aside,blockquote,body,button,code,dd,details,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hr,input,legend,li,menu,nav,ol,p,pre,section,td,textarea,th,ul{margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,menu,nav,section{display:block}audio,canvas,video{display:inline-block}body,button,input,select,textarea{font:400 1em/1.8 PingFang SC,Lantinghei SC,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,Helvetica,sans-serif}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}table{border-collapse:collapse;border-spacing:0}b,h1,h2,h3,h4,h5,h6{font-size:100%;font-weight:400}fieldset,img{border:0}blockquote{border-left:1px solid #1abc9c;color:#999;font-weight:400;margin:1em 3em 1em 2em;padding-left:1em;position:relative}@media only screen and (max-width",
+    "source": "InfoQ / 技术趋势",
+    "topic": "技术趋势",
+    "published_at": "2026-04-09T19:00:00+08:00",
+    "published_label": "04-09 19:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:34.123233"
+  },
+  {
+    "id": "1317246550553d92",
+    "title": "Atlassian launches visual AI tools and third-party agents in Confluence",
+    "url": "https://techcrunch.com/2026/04/08/atlassian-confluence-visual-ai-tools-agents/",
+    "summary": "Confluence users can now create visual assets within the software in addition to new third-part…",
+    "content": "Atlassian launches visual AI tools and third-party agents in Confluence | TechCrunch .wp-block-tc23-author-card{--c-author-card-image-size:80px;align-items:center;display:flex;gap:var(--wp--custom--spacing--24)}@media (min-width:48em){.wp-block-tc23-author-card{--c-author-card-image-size:122px}}.wp-block-tc23-author-card-image,.wp-block-tc23-author-card-image img.wp-block-tc_author-card__image{heig",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-08T21:00:00+08:00",
+    "published_label": "04-08 21:00",
+    "relevance_score": 4,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:29.202609"
+  },
+  {
+    "id": "edecc30ba493d7d4",
+    "title": "Anthropic limits access to Mythos, its new cybersecurity AI model",
+    "url": "https://arstechnica.com/ai/2026/04/anthropic-limits-access-to-mythos-its-new-cybersecurity-ai-model/",
+    "summary": "A select group of customers is testing the Claude Mythos Preview.",
+    "content": "Anthropic limits access to Mythos, its new cybersecurity AI model - Ars Technica :root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -",
+    "source": "Ars Technica / 开发与行业",
+    "topic": "开发与行业",
+    "published_at": "2026-04-08T21:34:17+08:00",
+    "published_label": "04-08 21:34",
+    "relevance_score": 4,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:23.743883"
+  },
+  {
+    "id": "fbc47a53eaa952ad",
+    "title": "Developer of VeraCrypt encryption software says Windows users may face boot-up issues after Microsoft locked his account",
+    "url": "https://techcrunch.com/2026/04/08/veracrypt-encryption-software-windows-microsoft-lock-boot-issues/",
+    "summary": "The maker of the popular open source file encryption software VeraCrypt said Microsoft locked h…",
+    "content": "Developer of VeraCrypt encryption software says Windows users may face boot-up issues after Microsoft locked his account | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-si",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-08T23:21:13+08:00",
+    "published_label": "04-08 23:21",
+    "relevance_score": 4,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:22.254833"
+  },
+  {
+    "id": "10e71fb92502e927",
+    "title": "Claude Code史诗级负优化！大厂AI主管批思考深度暴跌，官方回应被开发者怼爆：菜成AI“玩具”",
+    "url": "https://www.infoq.cn/article/mqW0bszWH0fC8oBDcsax?utm_source=rss&utm_medium=article",
+    "summary": "点击查看原文>",
+    "content": "Claude Code史诗级负优化！大厂AI主管批思考深度暴跌，官方回应被开发者怼爆：菜成AI“玩具” - InfoQ @charset \"UTF-8\";@font-face{font-family:desgin-iconfont;src:url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff2?t=1687949736607) format(\"woff2\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.woff?t=1687949736607) format(\"woff\"),url(//at.alicdn.com/t/c/font_4048882_wmtfea2ydp.ttf?t=1687949736607) format(\"truetype\")}.desgin-iconfont{font-family:desgin-iconfont!important;font-size:16px;font-style:normal;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}@font-face{font-family:BEBAS;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.eot) format(\"embedded-opentype\"),url(https://static001.geekbang.org/static/font/bebas/BEBAS.svg) format(\"svg\")}@font-face{font-family:alibaba;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff2) format(\"woff2\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.woff) format(\"woff\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.ttf) format(\"truetype\"),url(https://static001.geekbang.org/static/font/alibaba/AlibabaPuHuiTi-3-95-ExtraBold.eot) format(\"embedded-opentype\")}@font-face{font-family:sourcehansans;font-style:normal;font-weight:400;src:url(https://static001.geekbang.org/static/font/sourcehansans/SourceHanSansSC-Regular.otf) format(\"opentype\")}[gk-modal-layer]{background-color:#0000009e}html{color:#353535;-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;font-family:Helvetica Neue,PingFang SC,Verdana,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,sans-serif;font-weight:400}html.borderbox *,html.borderbox :after,html.borderbox :before{box-sizing:border-box}article,aside,blockquote,body,button,code,dd,details,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hr,input,legend,li,menu,nav,ol,p,pre,section,td,textarea,th,ul{margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,menu,nav,section{display:block}audio,canvas,video{display:inline-block}body,button,input,select,textarea{font:400 1em/1.8 PingFang SC,Lantinghei SC,Microsoft Yahei,Hiragino Sans GB,Microsoft Sans Serif,WenQuanYi Micro Hei,Helvetica,sans-serif}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}table{border-collapse:collapse;border-spacing:0}b,h1,h2,h3,h4,h5,h6{font-size:100%;font-weight:400}fieldset,img{border:0}blockquote{border-left:1px solid #1abc9c;color:#999;font-weight:400;margin:1em 3em 1em 2em;padding-left:1em;position:relative}@media only screen and (max",
+    "source": "InfoQ / 技术趋势",
+    "topic": "技术趋势",
+    "published_at": "2026-04-09T00:13:24+08:00",
+    "published_label": "04-09 00:13",
+    "relevance_score": 4,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:16.776565"
+  },
+  {
+    "id": "f7241a20d019cad4",
+    "title": "Hack-for-hire group caught targeting Android devices and iCloud backups",
+    "url": "https://techcrunch.com/2026/04/08/hack-for-hire-group-caught-targeting-android-devices-and-icloud-backups/",
+    "summary": "Security researchers exposed a spying campaign by a hack-for-hire group that used Android spywa…",
+    "content": "Hack-for-hire group caught targeting Android devices and iCloud backups | TechCrunch .wp-block-post-title{box-sizing:border-box;word-break:break-word}.wp-block-post-title :where(a){display:inline-block;font-family:inherit;font-size:inherit;font-style:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;text-decoration",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-09T02:51:20+08:00",
+    "published_label": "04-09 02:51",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:11.849787"
+  },
+  {
+    "id": "16ef866a4e871d3a",
+    "title": "RationalFX 报告 2026Q1 全球科技裁员近 8 万人，约 47.9% 归因 AI 技术实施",
+    "url": "https://www.ithome.com/0/937/284.htm",
+    "summary": "IT之家 4 月 9 日消息，Nikkei Asia 昨日（4 月 8 日）发布博文，报道称 2026 年第 1 季度全球科技行业裁员近 8 万人，美国占比 76.7%， 其中近半数归因于…",
+    "content": "RationalFX 报告 2026Q1 全球科技裁员近 8 万人，约 47.9% 归因 AI 技术实施 - IT之家 首页 IT圈 最会买 设置 日夜间 随系统 浅色 深色 主题色 黑色 投稿 订阅 RSS订阅 收藏IT之家 软媒应用 App客户端 要知App 软媒魔方 业界 手机 电脑 测评 视频 AI 苹果 iPhone 鸿蒙 软件 智车 数码 学院 游戏 直播 5G 微软 Win10 Win11 专题 搜索 首页 &gt; 智能时代 &gt; 人工智能 RationalFX 报告 2026Q1 全球科技裁员近 8 万人，约 47.9% 归因 AI 技术实施 2026/4/9 10:25:13 来源： IT之家 作者： 故渊 责编： 故渊 评论： IT之家 4 月 9 日消息，Nikkei Asia 昨日（4 月 8 日）发布博文，报道称 2026 年第 1 季度全球科技行业裁员近 8 万人，美国占比 76.7%， 其中近半数归因于 AI 实施与自动化。 该媒体基于 RationalFX 分析数据，显示自 2026 年 1 月 1 日至 4 月 1 日期间，全球科技行业裁员总数达 78557 人，其中美国市场占比高达 76.7%。 报告还指出约 37638 个岗位削减（占比约 47.9%），直接或间接归因于 AI 技术的实施与工作流自动化。 IT之家附上相关图表如下： 针对这一现象，IT 服务巨头 Cognizant 的首席 AI 官 Babak Hodjat 提出了不同观点。他认为，当前的裁员潮可能并非完全基于 AI 带来的实际生产力提升，更多是源于企业对技术能力的预期。 Hodjat 指出， 部分公司可能将 AI 作为财务调整的借口，用以掩盖过度招聘或规模调整的真实原因。 他预测，AI 对劳动力市场的真实冲击将在未来 6 个月至 1 年内显现，届时企业将真正看到生产力实质性的变化。 面对就业市场的动荡，Hodjat 特别指出了应届毕业生的困境。他认为， 即将走出校门的毕业生因缺乏领域专业知识，在就业市场中面临巨大挑战。 他呼吁企业承担起培训责任， 帮助新员工在工作中学习有效应用 AI 技术，从而适应新的就业环境。 广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。 投诉水文 我要纠错 下载IT之家APP，签到赚金币兑豪礼 相关文章 关键词： AI ， 工作 ， 裁员 今年美国科技行业裁员规模创 2023 年以来新高，开年至今已裁逾 5 万人 AI 豪赌烧钱无底洞，甲骨文裁员数千人应对 职场人定心丸：北京发布典型仲裁案例，AI 替代岗位≠合法解雇 科技行业裁员潮与 AI 豪言反差鲜明，Meta 项目时薪从 21 美元降至 16 美元 Meta 人工智能部门大裁员 20%！约 600 人一夜被裁 消息称亚马逊拟裁掉至多 15% 人力资源员工，AI 投资加速人力成本削减 软媒旗下网站： IT之家 最会买 - 返利返现优惠券 iPhone之家 Win7之家 Win10之家 Win11之家 软媒旗下软件： 软媒手机APP应用 魔方 最会买 要知 关于IT之家 | 联系我们 | 加入软媒 | WAP版 | 网站地图 | Archiver IT之家，软媒旗下科技门户网站 - 爱科技，爱这里。 Copyright &copy; RuanMei.com , All Rights Reserved. 青岛软媒网络科技有限公司 版权所有",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-09T10:25:13+08:00",
+    "published_label": "04-09 10:25",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:06.279606"
+  },
+  {
+    "id": "835a266305c1516c",
+    "title": "MiniMax 发布面向 AI Agent 的命令行工具“MMX-CLI”，跑通自动化工作流",
+    "url": "https://www.ithome.com/0/937/310.htm",
+    "summary": "IT之家 4 月 9 日消息，今日，MiniMax 宣布发布一个面向 AI Agent 的命令行工具 ——MMX-CLI。 据 MiniMax 介绍，接入 MMX-CLI 后，Agent 可…",
+    "content": "MiniMax 发布面向 AI Agent 的命令行工具“MMX-CLI”，跑通自动化工作流 - IT之家 首页 IT圈 最会买 设置 日夜间 随系统 浅色 深色 主题色 黑色 投稿 订阅 RSS订阅 收藏IT之家 软媒应用 App客户端 要知App 软媒魔方 业界 手机 电脑 测评 视频 AI 苹果 iPhone 鸿蒙 软件 智车 数码 学院 游戏 直播 5G 微软 Win10 Win11 专题 搜索 首页 &gt; 智能时代 &gt; 人工智能 MiniMax 发布面向 AI Agent 的命令行工具“MMX-CLI”，跑通自动化工作流 2026/4/9 11:21:16 来源： IT之家 作者： 浩渺 责编： 浩渺 评论： 感谢IT之家网友 Domado 、 若怡 的线索投递！ IT之家 4 月 9 日消息，今日，MiniMax 宣布发布一个面向 AI Agent 的命令行工具 ——MMX-CLI。 据 MiniMax 介绍，接入 MMX-CLI 后，Agent 可以在 Claude Code 、OpenClaw 等环境中原生调用 MiniMax 最新的 编程、视频生成、语音合成、音乐创作 等全模态模型，无需适配繁琐接口，也无需额外编写 MCP Server。一个 Agent 可以独立跑通“资料搜集 — 生成文案 — 合成语音旁白 — 配图配乐 — 视频制作”这样的完整自动化工作流。 普通命令行工具是给人用的，给 Agent 用会出很多问题，比如输出里混着噪音、错误只能靠读英文判断、缺参数会卡死、长任务会一直占着等等。为了保障 Agent 在自动化运行中的稳定性和解析的准确性，团队在 MMX-CLI 的底层设计上做了针对 agent 的专门优化： 输出隔离与纯数据模式 ：让 Agent 拿到的结果是干净的，不被进度条和彩色字符干扰。进度条、模型状态等人类友好的提示信息划归 stderr，stdout 仅输出干净的文件路径或 JSON 数据。结合 [--quiet] 与 [--output] json，可彻底切断交互式界面，防止 转义字符 干扰 Agent 解析； 语义化状态码（Exit Code） ：失败的时候返回一个数字代号，Agent 不需要读英文报错就知道是哪种错、该不该重试。鉴权失败、参数错误、超时、网络异常都设置了独立的退出码，Agent 仅通过读取状态码即可判断并执行重试逻辑； 非阻塞与异步任务控制 ：参数不全时直接退出而不是傻等输入，长耗时任务可以一键转后台，让 Agent 同时做别的事。MMX CLI 让 Agent 在非交互式环境中，参数缺失直接报错退出，避免任务挂起等待输入；针对长耗时任务，[--async] 支持一键开启异步模式，满足 Agent 并行处理多任务的需求。 仅需两行代码，即可完成 MMX-CLI 的安装和调用。同时，MMX-CLI 无缝接入 MiniMax Token Plan， 可以显示套餐用量 。MMX-CLI 是 MiniMax 在 Agent 基础设施这条线上的第一件工具。 广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。 投诉水文 我要纠错 下载IT之家APP，签到赚金币兑豪礼 相关文章 关键词： MiniMax MiniMax 发布全球首个支持全模态模型的订阅计划 Token Plan MiniMax 平台将在高峰时段实施动态限流：M2.7 模型受欢迎程度超预期 MiniMax 发布新一代 Agent 大模型 M2.7，首次展示模型自我进化路径 绿联 NAS 私有云与 MiniMax 深度合作，首发开箱即用的 OpenClaw 龙虾应用 MiniMax 为 OpenClaw“小龙虾”推出新技能，实现定制音色、创作完整歌曲 OpenRouter：中国 AI 模型 2 月全球 token 用量首超美国，MiniMax 等四款大模型霸榜前五 软媒旗下网站： IT之家 最会买 - 返利返现优惠券 iPhone之家 Win7之家 Win10之家 Win11之家 软媒旗下软件： 软媒手机APP应用 魔方 最会买 要知 关于IT之家 | 联系我们 | 加入软媒 | WAP版 | 网站地图 | Archiver IT之家，软媒旗下科技门户网站 - 爱科技，爱这里。 Copyright &copy; RuanMei.com , All Rights Reserved. 青岛软媒网络科技有限公司 版权所有",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-09T11:21:16+08:00",
+    "published_label": "04-09 11:21",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:34:01.654617"
+  },
+  {
+    "id": "d23264d8bd1abb5d",
+    "title": "2026春招新观察|近300家企业进南财“抢人”，学生求职更注重发展空间 - 紫牛新闻",
+    "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTFBtelQzQWJpaEE2d0YwQkJXcFdRM2NlemhkZ0NWeXl2MXNURjhuZjhKLTdwdVpuYjZuanBrMDBxQVBBVFZ5WU9JNm1RdnpPdndNLVZsXzB6bTc2UWlldmx1ekE1QWNxOTlO?oc=5",
+    "summary": "2026春招新观察|近300家企业进南财“抢人”，学生求职更注重发展空间 紫牛新闻",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 求职就业",
+    "topic": "求职就业",
+    "published_at": "2026-03-14T15:00:00+08:00",
+    "published_label": "03-14 15:00",
+    "relevance_score": 5,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:33:57.018681"
+  },
+  {
+    "id": "5d03c27db74d41be",
+    "title": "“京彩就业”中国社会科学院大学2026届毕业生春季线下专场双选会2 - thepaper.cn",
+    "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTFBvUW9QMkp2Nkh5Qm9tc19fQVFiWWxsb1FVaDFWYi1Rd2pkb1dBdzN6TEU4emplQW1RTjU5cTNNVUIwbnlzejN5ZjlKRWNiTGxkXzB4QzJ6ODBfb3l6OHc?oc=5",
+    "summary": "“京彩就业”中国社会科学院大学2026届毕业生春季线下专场双选会2 thepaper.cn",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 求职就业",
+    "topic": "求职就业",
+    "published_at": "2026-04-02T20:17:00+08:00",
+    "published_label": "04-02 20:17",
+    "relevance_score": 5,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:33:55.156216"
+  },
+  {
+    "id": "095a745f6d143eac",
+    "title": "上海开年首场大型招聘会：AI岗位数量与薪酬双增长 - 第一财经",
+    "url": "https://news.google.com/rss/articles/CBMiU0FVX3lxTFBZb2NGd1k5ZUlOT1N6WjlSQ1JrN0JHcnpWRmlWWTFOYjhIOVlaSnNpUWxLZVZjYmo4clJDemZnNUpzVGM0akZoY21yM3JxQmUwcy1J?oc=5",
+    "summary": "上海开年首场大型招聘会：AI岗位数量与薪酬双增长 第一财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 职业规划",
+    "topic": "职业规划",
+    "published_at": "2026-03-03T15:43:57+08:00",
+    "published_label": "03-03 15:43",
+    "relevance_score": 6,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:53.317477"
+  },
+  {
+    "id": "d99ec16eecd009ee",
+    "title": "知乎上线“求职数据通”工具 用AI帮助毕业生精准择业 - QQ News",
+    "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFAxQ2Y4Mkk5RjhwUmV0LVBRc1h6TExVMUFsalU4RWJHQ2MwelVKZkN1SE1wRFNxZS1NajRrWDdfTExvbWdNZ3dBcEo4c0RNenNJbHI3MGJB?oc=5",
+    "summary": "知乎上线“求职数据通”工具 用AI帮助毕业生精准择业 QQ News",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 职业规划",
+    "topic": "职业规划",
+    "published_at": "2026-03-31T15:00:00+08:00",
+    "published_label": "03-31 15:00",
+    "relevance_score": 6,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:51.518452"
+  },
+  {
+    "id": "df1455eb092789a2",
+    "title": "堡垒之夜裁员：游戏追逐科技潮流的代价 - games.gg",
+    "url": "https://news.google.com/rss/articles/CBMimgJBVV95cUxQdmp2Vi1KWVA4cklFX0w5akJ6Q3hFVVkyMnd1ZkY2S3RPdFRIU3pkNXo5N0lBSXY0Z2tkc1ljcjJWdmo4UTVvS05Eb0l2T1MzaXZod2hxaDlycnJMS3FscnpWZURuSGNMTDVKUXlLcDlTZWk4eWhDTXNNMkhXXy1Sc1EyemNEWXVUWWllYkloRElreVRHRVZ6S0JjcGlva20yZTJIWmxhVjF1R01fZGhvM1FSVkVtRVBmNlJoaTZsR1hzTk52WDZ5N19YbWg4R0xRWE1hZXA3NE1PNVRLMV9iU3poMTU0eUJOOV93YlJqMFV0MWxDQUxkQ0dOaEhWeVV5aXdQOVVRai1oLXhiczNEVEpxQ2ltUHlFV0E?oc=5",
+    "summary": "堡垒之夜裁员：游戏追逐科技潮流的代价 games.gg",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-01T15:00:00+08:00",
+    "published_label": "04-01 15:00",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:33:49.674982"
+  },
+  {
+    "id": "015307da59c965c9",
+    "title": "有关软件工程岗位消亡的说法被严重夸大 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxQeWxUdW52TW5lMy1lODdkMDl2QTVhMWc0N2Z6cDdLaFh3QTk2NmJUWVJXbzdxa19YV29xRmFzOGRWcTZoZi1PODZVQllhOWdoN21TUk9EYmU1Yk16bUdtVDFhR0NRc3Nua0dySVBoUU44Z1BlSGYwcE1ORmxaUlBPd1JYNU91ZXBQNUE?oc=5",
+    "summary": "有关软件工程岗位消亡的说法被严重夸大 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 程序员就业",
+    "topic": "程序员就业",
+    "published_at": "2026-04-08T22:44:01+08:00",
+    "published_label": "04-08 22:44",
+    "relevance_score": 3,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:33:47.855223"
+  },
+  {
+    "id": "fde17efd63d9ace6",
+    "title": "春季校招来了！4780个岗位助力学子“毕业即就业” - tlfw.net",
+    "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBoNURSZ045V0xFV1RfSzhsazRUX0RycmlReGpDNTZEVHpZWHdoX1FVbUZpS0JnNnFNVjVoc1ktUnJibnZVUm5GWlJGSGxTaEM1M2FQWDNLS0ItdG43NjJ5bGlMX00?oc=5",
+    "summary": "春季校招来了！4780个岗位助力学子“毕业即就业” tlfw.net",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 职业规划",
+    "topic": "职业规划",
+    "published_at": "2026-04-09T11:40:51+08:00",
+    "published_label": "04-09 11:40",
+    "relevance_score": 7,
+    "match_tags": [
+      "career"
+    ],
+    "stored_at": "2026-04-09T12:33:46.029125"
+  },
+  {
+    "id": "095162a5a631c501",
+    "title": "DeepSeek V4编程会是重点 新招聘泄露玄机：Claude来战 - 17173",
+    "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE13Tmkxc3B5N3VQSDVJN0J5ZnpKc1BvZ1VlMzdUN1hBUXppX2FlbkswWWkzc1dJTHpYQUZvVHZtbWZiT2RLMXo1OTFKT1NhTTNOdVEwM1ZKOVBQc0xBdFJBMFd5M3E?oc=5",
+    "summary": "DeepSeek V4编程会是重点 新招聘泄露玄机：Claude来战 17173",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / AI 与计算机岗位",
+    "topic": "AI 与计算机岗位",
+    "published_at": "2026-03-18T15:00:00+08:00",
+    "published_label": "03-18 15:00",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:44.187213"
+  },
+  {
+    "id": "0128e3ec368b0003",
+    "title": "今年美国科技行业裁员规模创 2023 年以来新高，开年至今已裁逾 5 万人 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQN3lxUkh6MVdlZjhDWWs0akh1YWZhZWVVOU0tWTJHWlR5UTBnVXZudnN6QWNEUjJGWUk4ZzRyeUtpUVg3U3hjZklsaTgxYWwxZ2FLaDVpQmN4OFdXeWZnYTk1cFRjV0UwdUVGYU5KMDBlNDRwbm5jaEtsN3c5c3pIME9nZ1dRSXJLckE3aGdn?oc=5",
+    "summary": "今年美国科技行业裁员规模创 2023 年以来新高，开年至今已裁逾 5 万人 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-03T08:18:00+08:00",
+    "published_label": "04-03 08:18",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:42.357638"
+  },
+  {
+    "id": "0c5f80013e85f47e",
+    "title": "今年美国科技行业裁员规模创2023 年以来新高，开年至今已裁逾5 万人- 产业链 - 光通信Pro",
+    "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTE5IVFVhcTRkeF92TllsWENvREJzR29pTnpRc0ZlRWIwREJlQTRzel9nNTNBTmJnQU5TV2VvanFQYmlHUzhnemdkb0NOekIySDc2emNtS2tn?oc=5",
+    "summary": "今年美国科技行业裁员规模创2023 年以来新高，开年至今已裁逾5 万人- 产业链 光通信Pro",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-03T08:56:24+08:00",
+    "published_label": "04-03 08:56",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:40.522911"
+  },
+  {
+    "id": "c9fee72596ecea92",
+    "title": "AI 尚未“取代”工程师，美国科技岗位空缺今年迎来快速反弹 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMiiAJBVV95cUxOUHBqd0w0QjJIQzhGZnJhYTJ3ak90clZDV3pOX2Vtc2RJOUxYeGlWdWxoaUE2MjlLdUN5MFBpOHVhdWRrcWR2MXNaam5KQlFhTDk3X1J3b0tVdVdfc2ZGV0VXU2xZTm9xVVM5YlZCTUFIQWxVODBQa3J4Sm5FREpBdGpNZlVHbmhqTnQ5VGZJckRHVUVCUVU1cWNzTzE1THdacFM2ZVRGSVRONDNVMFdpNkhxU0E2OXBUV05sT1JONm1PaHRDY0pBanc2TUFMeVJhQTVWSHl0N19IQnA5T3lsVjRibVhsaFFHcDVaUDRRZFd1N0xZYjg5cm9EV1dIYkVmNmtsVUtpaE0?oc=5",
+    "summary": "AI 尚未“取代”工程师，美国科技岗位空缺今年迎来快速反弹 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / AI 与计算机岗位",
+    "topic": "AI 与计算机岗位",
+    "published_at": "2026-04-06T15:42:19+08:00",
+    "published_label": "04-06 15:42",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:38.672861"
+  },
+  {
+    "id": "47358a1b8f99ac7f",
+    "title": "《给他爱5》开发者谈求职困境：20年资历已不再足够 - 17173",
+    "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFA4UU1nM1Y2R3FLeTYteFk0OGJQNUtyUklUY2UwS21iTjYyQmZkUWg0UDAxSFNjZXc3UzVNRndfZzB1Z0VfUVlYNzBDQlJaMUMxSms3QVVSOU5RVmZCbEZzc3lzUmpudw?oc=5",
+    "summary": "《给他爱5》开发者谈求职困境：20年资历已不再足够 17173",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 程序员就业",
+    "topic": "程序员就业",
+    "published_at": "2026-04-07T11:03:36+08:00",
+    "published_label": "04-07 11:03",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:36.830362"
+  },
+  {
+    "id": "5828765e72a1a950",
+    "title": "AI尚未取代工程师！科技岗位今年暴涨：空缺超6.7万 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxNOE9KeEJaTDhuYmxqaHNfVVhwVTVnSFVqdWdUUGZpSlpFR3VhR2k4SUpMWGhqYjJXY29VVVpzSjdCVDJHMTJvb1RIb0lRckZkRFFWcE1rdEdGVXFuemhleFpod1BEVXBrcm1qU1NTN1RvU20yNlBCeTNCaTJiTWR0SVJzMUVkdw?oc=5",
+    "summary": "AI尚未取代工程师！科技岗位今年暴涨：空缺超6.7万 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / AI 与计算机岗位",
+    "topic": "AI 与计算机岗位",
+    "published_at": "2026-04-08T15:41:00+08:00",
+    "published_label": "04-08 15:41",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:34.955618"
+  },
+  {
+    "id": "53f7765a1d114f2d",
+    "title": "2026Q1全球科技裁员近8万人，约47.9%归因于AI技术实施 - 新浪财经",
+    "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxObzNmc2Jtc1FpVVpfRFI1aXY5ZU1vM3IyTHJ4VTd6Qk1XbXhaWjNUOTB0VkFGWDVET3JnVFhaeFR5VHkxczdOOG16RHMzclBWS3RIdlhOdVRabmVSM21ISnZWY2pac2VQd3VxVXVRWlVQaTBJQ1l2N2xFbDFqUXU4M05UbFdIaVZZbTFxbFNQSkxWdmVEbDBLT2hPSUVlM0Q1OUtLS09DOA?oc=5",
+    "summary": "2026Q1全球科技裁员近8万人，约47.9%归因于AI技术实施 新浪财经",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-09T11:31:42+08:00",
+    "published_label": "04-09 11:31",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:33.095343"
+  },
+  {
+    "id": "d06a5d2b88bdfa3a",
+    "title": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI - 驱动之家",
+    "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE84V1RMWEo1VHdnYmJER0prOUlUb2xfalFUS1pwMnJ4OTh0S25HWXp1bHJZbFBfbVU4eUV6ZWxGNnpiT3hmZlpOaEQ3ZkRxQTZiNXR6a3cwRTE?oc=5",
+    "summary": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI 驱动之家",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-09T09:39:00+08:00",
+    "published_label": "04-09 09:39",
+    "relevance_score": 5,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:31.236778"
+  },
+  {
+    "id": "362b610f5fad4557",
+    "title": "科技行业掀大规模裁员潮！员工成AI训练燃料：被裁前最后一刻还在帮助公司优化AI - 凤凰网",
+    "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE4yRV9PYlFVYUhOcFlzUzh1WWxZTUlSZkh0S0EyS1g1MTJ2X1otYUtkZXRGZFJHcjlJUEkzR0dGdk5mT2hZSHdvNw?oc=5",
+    "summary": "科技行业掀大规模裁员潮！员工成AI训练燃料：被裁前最后一刻还在帮助公司优化AI 凤凰网",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / 科技行业变化",
+    "topic": "科技行业变化",
+    "published_at": "2026-04-08T20:00:39+08:00",
+    "published_label": "04-08 20:00",
+    "relevance_score": 7,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:29.386015"
+  },
+  {
+    "id": "a1d67229fd1ceac9",
+    "title": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位 - 品玩",
+    "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE9oT3ZHQzQ4Y0ktMXMxekdPVTd6N2ppenpVUEJtbkppX2RyTmdMTkV1eUNYWHdHTUVjSXpha3Zzd2RrcHNCMmxWcw?oc=5",
+    "summary": "淘天开启2027届实习生招聘：岗位全面拥抱AI，新增3类AI岗位 品玩",
+    "content": "html,body{height:100%;overflow:hidden}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:rgba(0,0,0,0.87);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;margin:0;text-size-adjust:100%}textarea{font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif}a{text-decoration:none;color:#2962ff}img{border:none}*{-webkit-tap-highlight-color:transparent}#apps-debug-tracers{display:none}.MCcOAc{bottom:0;left:0;position:absolute;right:0;top:0;overflow:hidden;z-index:1}.MCcOAc>.pGxpHc{flex-shrink:0;flex-grow:0}.IqBfM>.HLlAHb{align-items:center;display:flex;height:60px;position:absolute;right:16px;top:0;z-index:9999}.VUoKZ{display:none;position:absolute;top:0;left:0;right:0;height:3px;z-index:1001}.TRHLAc{position:absolute;top:0;left:0;width:25%;height:100%;background:#68e;transform:scaleX(0)}.TRHLAc{transform-origin:0 0}.mIM26c .VUoKZ{display:block}.mIM26c .TRHLAc{animation:boqChromeapiPageProgressAnimation 1s infinite;animation-timing-function:cubic-bezier(.4,0,1,1);animation-delay:.1s}.ghyPEc .VUoKZ{position:fixed}@keyframes boqChromeapiPageProgressAnimation{0%{transform:scaleX(0)}50%{transform:scaleX(5)}100%{transform:scaleX(5) translateX(100%)}}.zQTmif{height:100%}.MCcOAc{display:flex;flex-direction:column}.IqBfM{bottom:auto;height:100%;right:auto;width:auto}.kFwPee{height:100%}.ydMMEb{width:100%}.SSPGKf{display:block;overflow-y:hidden;z-index:1}.eejsDc{overflow-y:auto;-webkit-overflow-scrolling:touch}:root{--boq-chrometransition-background:#eee;--boq-chrometransition-active-background-opacity:0.8}.KL4X6e{background:var(--boq-chrometransition-background);bottom:0;left:0;opacity:0;position:absolute;right:0;top:0}.TuA45b{opacity:var(--boq-chrometransition-active-background-opacity)}body{--gn-c-background:var(--gm3-sys-color-background,#fff);--gn-c-error:var(--gm3-sys-color-error,#b3261e);--gn-c-error-container:var(--gm3-sys-color-error-container,#f9dedc);--gn-c-inverse-on-surface:var(--gm3-sys-color-inverse-on-surface,#f2f2f2);--gn-c-inverse-primary:var(--gm3-sys-color-inverse-primary,#a8c7fa);--gn-c-inverse-surface:var(--gm3-sys-color-inverse-surface,#303030);--gn-c-on-background:var(--gm3-sys-color-on-background,#1f1f1f);--gn-c-on-error:var(--gm3-sys-color-on-error,#fff);--gn-c-on-error-container:var(--gm3-sys-color-on-error-container,#8c1d18);--gn-c-on-primary:var(--gm3-sys-color-on-primary,#fff);--gn-c-on-primary-container:var(--gm3-sys-color-on-primary-container,#0842a0);--gn-c-on-primary-fixed:var(--gm3-sys-color-on-primary-fixed,#041e49);--gn-c-on-primary-fixed-variant:var(--gm3-sys-color-on-primary-fixed-variant,#0842a0);--gn-c-on-secondary:var(--gm3-sys-color-on-secondary,#fff);--gn-c-on-secondary-container:var(--gm3-sys-color-on-secondary-container,#004a77);--gn-c-on-secondary-fixed:var(--gm3-sys-color-on-secondary-fixed,#001d35);--gn-c-on-secondary-fixed-variant:var(--gm3-sys-color-on-secondary-fixed-variant,#004a77);--gn-c-on-surface:var(--gm3-sys-color-on-surface,#1f1f1f);--gn-c-on-surface-variant:var(--g",
+    "source": "Google News / AI 与计算机岗位",
+    "topic": "AI 与计算机岗位",
+    "published_at": "2026-03-18T21:58:45+08:00",
+    "published_label": "03-18 21:58",
+    "relevance_score": 8,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-09T12:33:25.544748"
+  },
+  {
     "id": "4db4834766419b80",
     "title": "OpenAI’s Fidji Simo Is Taking Medical Leave Amid an Executive Shake-Up",
     "url": "https://www.wired.com/story/openais-fidji-simo-is-taking-a-leave-of-absence/",

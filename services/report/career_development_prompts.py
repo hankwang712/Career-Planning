@@ -58,6 +58,7 @@ SYSTEM_PROMPT_INDUSTRY_ANALYST = """\
 - **区分对象**：同一「行业」内不同细分（ToB/ToC、平台/垂直、软硬结合等）结论可能相反，需分情况说明。
 - **可检验预测**：给出「若未来 12–24 个月出现 X 现象，则说明原先判断需修正」的**反证条件**，避免不可证伪的空话。
 - **与学生场景对齐**：优先解释「对校招/实习/项目选题意味着什么」，而不是只讲产业宏大叙事。
+- **解释义务**：每条趋势结论尽量补齐「来源类型、时效范围、为什么重要、用户如何验证」四个说明，让下游报告能直接展示“因为”和“依据”。
 
 ---
 
@@ -108,6 +109,42 @@ SYSTEM_PROMPT_INDUSTRY_ANALYST = """\
 ### 6. 局限与声明
 
 - 说明知识截止日期、推断链条中薄弱的一环、以及你不应被误用的场景（例如不做薪资承诺、不做个别公司内推承诺）。
+
+### 7. 机器可读摘要（供后续模块引用）
+
+用 JSON 代码块输出（合法 JSON，无注释）：
+
+```json
+{
+  "analysis_context": {
+    "target_industry": "...",
+    "target_role": "...",
+    "target_region": "...",
+    "time_frame": "..."
+  },
+  "core_trends": ["..."],
+  "trend_signals": [
+    {
+      "name": "...",
+      "source_type": "招聘信号|行业报告|头部公司动作|用户提供材料",
+      "time_horizon": "短期窗口|近1-3年|长期结构",
+      "why_it_matters": "...",
+      "validation_action": "..."
+    }
+  ],
+  "skill_priority": [
+    {
+      "skill": "...",
+      "priority": "高|中|低",
+      "reason": "...",
+      "priority_reason": "..."
+    }
+  ],
+  "validation_advice": ["..."],
+  "confidence_level": "高|中|低",
+  "major_risk_note": "..."
+}
+```
 
 ---
 
@@ -179,6 +216,7 @@ SYSTEM_PROMPT_CAREER_POSITIONING = """\
 2. **生成定位假设**：给出 2–4 个「主方向 + 备选方向」组合；每个方向用**同一套标准**描述：适配理由、摩擦点、需要证据补强之处。
 3. **区分「意愿」与「适配」**：用户强烈想做的方向若与证据或市场摩擦大，需**共情 + 清晰揭示张力**，并提供折中路线（如「主修 A + 副修/项目证明 B」）。
 4. **连接下游**：为简历证据分析官、能力评估官、岗位匹配官预留**可检验的命题**（例如「若能在项目中证明 X，则方向 Y 可信度上升」）。
+5. **解释义务**：主推荐必须同时说明「为什么推荐它」「为什么不是另一条优先」「这个排序依赖哪些前提，一旦前提变化如何重排」。
 
 ---
 
@@ -233,9 +271,13 @@ SYSTEM_PROMPT_CAREER_POSITIONING = """\
 {
   "recommended_tracks": ["...", "..."],
   "hypotheses_for_evidence": [
-    { "track": "...", "must_prove": ["...", "..."] }
+    { "track": "...", "must_prove": ["...", "..."], "reason": "..." }
+  ],
+  "track_reasons": [
+    { "track": "...", "because": ["...", "..."], "why_not_other_tracks": ["..."] }
   ],
   "constraints_hard": ["..."],
+  "decision_rules": ["当出现什么信息时，需要调整推荐顺序"],
   "user_intent_summary": "..."
 }
 ```
@@ -354,16 +396,16 @@ SYSTEM_PROMPT_RESUME_EVIDENCE = """\
 ```json
 {
   "technical_skills": [
-    { "skill": "...", "evidence_ids": ["E1", "E2"], "strength": "strong|medium|weak" }
+    { "skill": "...", "evidence_ids": ["E1", "E2"], "strength": "strong|medium|weak", "quote_or_fact": "...", "why_counts_as_evidence": "..." }
   ],
   "general_competencies": [
-    { "competency": "沟通协作|问题解决|领导力|学习能力|执行力|...", "evidence_ids": ["..."], "strength": "strong|medium|weak" }
+    { "competency": "沟通协作|问题解决|领导力|学习能力|执行力|...", "evidence_ids": ["..."], "strength": "strong|medium|weak", "quote_or_fact": "...", "why_counts_as_evidence": "..." }
   ],
   "hypothesis_support": [
     { "track": "...", "status": "supported|partial|unsupported|unknown", "notes": "..." }
   ],
   "gaps": [
-    { "claim_in_resume": "...", "issue": "no_metrics|unclear_role|unverifiable|..." }
+    { "claim_in_resume": "...", "issue": "no_metrics|unclear_role|unverifiable|...", "why_it_matters": "...", "suggestion": "...", "evidence_hint": "..." }
   ]
 }
 ```
@@ -488,12 +530,12 @@ SYSTEM_PROMPT_COMPETENCY_ASSESSOR = """\
 {
   "profile_version": "1.0",
   "dimensions": {
-    "professional_skills": { "level": "S|A|B|C|D|unknown", "confidence": "high|medium|low", "evidence_ids": [] },
-    "general_ability": { "level": "...", "confidence": "...", "evidence_ids": [] },
-    "communication_collaboration": { "level": "...", "confidence": "...", "evidence_ids": [] },
-    "learning_agility": { "level": "...", "confidence": "...", "evidence_ids": [] },
-    "execution": { "level": "...", "confidence": "...", "evidence_ids": [] },
-    "practice_maturity": { "level": "...", "confidence": "...", "evidence_ids": [] }
+    "professional_skills": { "level": "S|A|B|C|D|unknown", "confidence": "high|medium|low", "evidence_ids": [], "judgement_reason": "..." },
+    "general_ability": { "level": "...", "confidence": "...", "evidence_ids": [], "judgement_reason": "..." },
+    "communication_collaboration": { "level": "...", "confidence": "...", "evidence_ids": [], "judgement_reason": "..." },
+    "learning_agility": { "level": "...", "confidence": "...", "evidence_ids": [], "judgement_reason": "..." },
+    "execution": { "level": "...", "confidence": "...", "evidence_ids": [], "judgement_reason": "..." },
+    "practice_maturity": { "level": "...", "confidence": "...", "evidence_ids": [], "judgement_reason": "..." }
   },
   "strengths": ["..."],
   "gaps": [
@@ -562,6 +604,7 @@ SYSTEM_PROMPT_ROLE_MATCH = """\
 3. **量化或分档**：给出整体契合度（0–100 或档位），并**拆解**到子维度；必须写清**权重依据**（随岗位类型变化）。
 4. **差距分析**：每条差距对应：**为何影响录用**、**补齐路径**（学习/项目/实习）、**粗略时间量级**（规划参考，非承诺）。
 5. **解释义务**：用简短逻辑链回答「为什么现在匹配」「为什么暂时不够匹配」。
+6. **证据回指**：每一项“已具备 / 尚缺”判断，都尽量说明它来自 JD 要求、能力画像还是简历证据缺口。
 
 ---
 
@@ -622,10 +665,19 @@ SYSTEM_PROMPT_ROLE_MATCH = """\
   "fit_band": "strong|moderate|weak|not_ready",
   "hard_failures": ["..."],
   "partial_gaps": [
-    { "requirement": "...", "gap_id": "G1", "remediation_type": "course|project|internship|cert|portfolio|other" }
+    {
+      "requirement": "...",
+      "gap_id": "G1",
+      "remediation_type": "course|project|internship|cert|portfolio|other",
+      "reason": "...",
+      "evidence_basis": "...",
+      "priority_reason": "..."
+    }
   ],
   "weights_rationale": "简短说明",
-  "consistency_with_user_tracks": "aligned|partial|tension|unknown"
+  "consistency_with_user_tracks": "aligned|partial|tension|unknown",
+  "why_match": ["...", "..."],
+  "why_not_yet": ["...", "..."]
 }
 ```
 
@@ -689,6 +741,7 @@ SYSTEM_PROMPT_CAREER_PATH_PLANNER = """\
 3. **与匹配结果对齐**：把岗位匹配官的 `partial_gaps` 与 `hard_failures` 映射进各阶段行动；硬门槛未过则先写「达标前置阶段」。
 4. **行业与需求校准**：引用行业分析师结论说明「为何此时机合理或需谨慎」；若有矛盾，**显式解释**优先级（通常：**硬门槛 > 个人约束 > 趋势机会**）。
 5. **评估与迭代**：为每个阶段设计**回顾周期、观测指标、调整触发条件**。
+6. **解释义务**：每个阶段动作尽量写明它在解决哪个差距、为什么优先做、以及若不做会带来什么风险。
 
 ---
 
@@ -749,13 +802,23 @@ SYSTEM_PROMPT_CAREER_PATH_PLANNER = """\
 {
   "vision_roles": ["长期角色A", "..."],
   "milestones": [
-    { "horizon": "0-3m", "title": "...", "actions": ["..."], "metrics": ["..."] }
+    {
+      "horizon": "0-3m",
+      "title": "...",
+      "actions": ["..."],
+      "metrics": ["..."],
+      "linked_gap": "G1|某个硬门槛",
+      "priority_reason": "...",
+      "reason": "..."
+    }
   ],
   "contingency": ["..."],
   "dependencies": {
     "must_resolve_hard_failures": ["..."],
     "parallel_exploration_tracks": ["..."]
-  }
+  },
+  "path_rationale": ["..."],
+  "path_risks": ["..."]
 }
 ```
 

@@ -1,6 +1,6 @@
 {
   "assessment_hub": {
-    "savedAt": 1775664618998,
+    "savedAt": 1775783658807,
     "mbti": {
       "currentIndex": 0,
       "answers": {},
@@ -195,99 +195,103 @@
     }
   },
   "career_report": {
-    "status": "queued",
-    "job_id": "1143ac1de22a4639b1cdbdcb1f662c19",
-    "stage": "industry_analysis",
-    "stage_label": "行业分析",
-    "stage_detail": "任务已创建，等待后台编排",
+    "status": "ready",
+    "job_id": "1ed95cbdb4144b98af053a8d30c2d404",
+    "stage": "report_writer",
+    "stage_label": "报告合成",
+    "stage_detail": "报告生成完成",
     "progress": [
       {
         "key": "industry_analysis",
         "label": "行业分析",
         "agent": "行业分析师",
-        "status": "active"
+        "status": "done"
       },
       {
         "key": "resume_evidence",
         "label": "简历证据解析",
         "agent": "简历证据分析官",
-        "status": "pending"
+        "status": "done"
       },
       {
         "key": "career_positioning",
         "label": "职业定位",
         "agent": "职业定位顾问",
-        "status": "pending"
+        "status": "done"
       },
       {
         "key": "resume_evidence_2",
         "label": "证据对齐复核",
         "agent": "简历证据分析官(复核)",
-        "status": "pending"
+        "status": "done"
       },
       {
         "key": "competency_assess",
         "label": "能力评估",
         "agent": "能力评估官",
-        "status": "pending"
+        "status": "done"
       },
       {
         "key": "role_match",
         "label": "岗位匹配",
         "agent": "岗位匹配官",
-        "status": "pending"
+        "status": "done"
       },
       {
         "key": "path_planning",
         "label": "路径规划",
         "agent": "路径规划师",
-        "status": "pending"
+        "status": "done"
+      },
+      {
+        "key": "report_writer",
+        "label": "报告合成",
+        "agent": "报告合成器",
+        "status": "active"
       }
     ],
     "error_message": "",
-    "generated_at": "2026-03-30 22:35:07",
-    "report_id": "report-75c6931f2188",
+    "generated_at": "2026-04-09 20:11:00",
+    "report_id": "report-8adb5b52792d",
     "model": "deepseek-chat",
     "generation_mode": "llm",
     "focus_role_id": "java_backend",
-    "title": "内容创作/编辑规划报告",
-    "summary": "当前画像显示你更接近“分析研判型”，现阶段最值得优先验证的职业方向是 内容创作/编辑。",
+    "title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
+    "summary": "智能科学与技术专业背景，希望从事AI产品运营，价值观强调策略、落地、推进和解决问题，目标城市杭州，倾向于在技术应用层面发挥商业价值。",
     "export_formats": [
       "html",
-      "md"
+      "md",
+      "docx"
     ],
     "tracker": {
-      "report_id": "report-a347cbeb7a73",
-      "report_title": "内容创作/编辑规划报告",
-      "report_version": "2026.03-v1",
-      "focus_role_id": "content_editor",
-      "focus_role_name": "内容创作/编辑",
-      "generated_at": "2026-03-30 22:35:07",
+      "report_id": "report-8adb5b52792d",
+      "report_title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
+      "report_version": "2026.04-v3",
+      "focus_role_id": "java_backend",
+      "focus_role_name": "Java 后端开发",
+      "generated_at": "2026-04-09 20:11:00",
       "last_synced_at": "2026-04-02 03:03:16",
       "completion_rate": 0,
       "completed_count": 0,
       "doing_count": 0,
-      "total_count": 7,
-      "next_focus": "先补核心能力证据",
+      "total_count": 4,
+      "next_focus": "完成首个AI产品运营分析项目",
       "ability_summary": {
         "improved_count": 0,
-        "declined_count": 7,
-        "stable_count": 0
+        "declined_count": 0,
+        "stable_count": 6
       },
       "plan_items": [
         {
-          "id": "short-early",
-          "phase": "短期 · 起步期",
-          "title": "先补核心能力证据",
-          "objective": "围绕 内容创作/编辑 先建立一轮可被证明的能力证据。",
-          "focus_points": [
-            "专业技能",
-            "学习能力",
-            "沟通协作"
-          ],
+          "id": "short-1",
+          "phase": "0-3m",
+          "title": "完成首个AI产品运营分析项目",
+          "objective": "",
+          "focus_points": [],
           "signals": [
-            "优先解决低置信与待补证判断",
-            "建立第一轮职业定位依据"
+            "报告获得业内人士认可",
+            "能清晰讲解项目逻辑",
+            "掌握基础数据查询"
           ],
           "status": "pending",
           "started_at": "",
@@ -297,92 +301,56 @@
           "is_phase": true
         },
         {
-          "id": "short-advance",
-          "phase": "短期 · 进阶期",
-          "title": "收束主线并稳定目标方向",
-          "objective": "让目标岗位从兴趣判断，逐步转为有证据支撑的方向判断。",
-          "focus_points": [
-            "内容创作/编辑",
-            "写作",
-            "策划"
-          ],
-          "signals": [
-            "减少定位摇摆",
-            "增强岗位适配度稳定性"
-          ],
+          "id": "t-0",
+          "phase": "0-3m",
+          "title": "学习AI产品运营知识体系",
+          "objective": "学习AI产品运营知识体系",
+          "focus_points": [],
+          "signals": [],
+          "parent_phase": "short-1",
           "status": "pending",
           "started_at": "",
           "completed_at": "",
           "note": "",
           "updated_at": "",
-          "is_phase": true
+          "is_task": true
         },
         {
-          "id": "long-early",
-          "phase": "长期 · 初期阶段",
-          "title": "从岗位适配走向路径适配",
-          "objective": "不只判断是否能进入目标岗位，还要判断长期是否适合沿这条路径发展。",
-          "focus_points": [
-            "表达自由",
-            "内容影响",
-            "职业环境匹配"
-          ],
-          "signals": [
-            "稳定输出",
-            "工作价值观与环境更一致"
-          ],
+          "id": "t-1",
+          "phase": "0-3m",
+          "title": "完成一份深度产品运营策略分析报告",
+          "objective": "完成一份深度产品运营策略分析报告",
+          "focus_points": [],
+          "signals": [],
+          "parent_phase": "short-1",
           "status": "pending",
           "started_at": "",
           "completed_at": "",
           "note": "",
           "updated_at": "",
-          "is_phase": true
+          "is_task": true
         },
         {
-          "id": "long-late",
-          "phase": "长期 · 进阶阶段",
-          "title": "建立动态复盘机制",
-          "objective": "随着画像、岗位需求与行业趋势变化，周期性复查职业路径是否仍然成立。",
-          "focus_points": [
-            "技能缺口主要集中在目标岗位的核心工具与方法论层面。",
-            "定期复核趋势变化",
-            "复盘能力增量"
-          ],
-          "signals": [
-            "保持职业规划可迭代",
-            "及时修正过时假设"
-          ],
+          "id": "t-2",
+          "phase": "0-3m",
+          "title": "掌握SQL和Python数据分析基础",
+          "objective": "掌握SQL和Python数据分析基础",
+          "focus_points": [],
+          "signals": [],
+          "parent_phase": "short-1",
           "status": "pending",
           "started_at": "",
           "completed_at": "",
           "note": "",
           "updated_at": "",
-          "is_phase": true
+          "is_task": true
         }
       ],
       "checkpoints": [
         {
           "id": "checkpoint-item",
           "label": "阶段复查",
-          "summary": "每次画像输入有明显更新后，重新生成并对比新版报告。",
-          "status": "pending",
-          "completed_at": "",
-          "note": "",
-          "updated_at": ""
-        },
-        {
-          "id": "checkpoint-item",
-          "label": "趋势复查",
-          "summary": "结合行业快照，观察目标岗位是否出现明显需求变化。",
-          "status": "pending",
-          "completed_at": "",
-          "note": "",
-          "updated_at": ""
-        },
-        {
-          "id": "checkpoint-item",
-          "label": "证据复查",
-          "summary": "优先判断低置信结论是否已被新的经历、项目或访谈补证。",
+          "summary": "定期复盘并更新报告",
           "status": "pending",
           "completed_at": "",
           "note": "",
@@ -391,368 +359,52 @@
       ],
       "ability_growth": [
         {
-          "key": "professional",
+          "key": "professional_skills",
           "label": "专业技能",
-          "baseline_score": 60,
-          "current_score": 34,
-          "delta": -26,
-          "baseline_sources": [
-            "MBTI",
-            "Holland",
-            "基础信息",
-            "简历"
-          ],
-          "current_sources": [
-            "基础信息",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 60,
-              "at": "2026-04-01 12:30:11",
-              "event": "profile_sync"
-            },
-            {
-              "score": 34,
-              "at": "2026-04-01 12:50:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 60,
-              "at": "2026-04-01 12:50:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 34,
-              "at": "2026-04-01 12:53:20",
-              "event": "profile_sync"
-            },
-            {
-              "score": 60,
-              "at": "2026-04-01 12:53:21",
-              "event": "profile_sync"
-            },
-            {
-              "score": 34,
-              "at": "2026-04-01 13:22:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 60,
-              "at": "2026-04-01 13:22:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 34,
-              "at": "2026-04-01 13:51:54",
-              "event": "profile_sync"
-            }
-          ]
+          "baseline_score": null,
+          "current_score": null,
+          "delta": null,
+          "baseline_sources": [],
+          "current_sources": [],
+          "history": []
         },
         {
-          "key": "learning",
-          "label": "学习能力",
-          "baseline_score": 56,
-          "current_score": 0,
-          "delta": -56,
-          "baseline_sources": [
-            "MBTI",
-            "Holland",
-            "访谈"
-          ],
-          "current_sources": [
-            "访谈"
-          ],
-          "history": [
-            {
-              "score": 56,
-              "at": "2026-04-01 12:30:11",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:50:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 56,
-              "at": "2026-04-01 12:50:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:53:20",
-              "event": "profile_sync"
-            },
-            {
-              "score": 56,
-              "at": "2026-04-01 12:53:21",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:22:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 56,
-              "at": "2026-04-01 13:22:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:51:54",
-              "event": "profile_sync"
-            }
-          ]
+          "key": "general_ability",
+          "label": "通用能力",
+          "baseline_score": null,
+          "current_score": null,
+          "delta": null,
+          "baseline_sources": [],
+          "current_sources": [],
+          "history": []
         },
         {
-          "key": "communication",
+          "key": "communication_collaboration",
           "label": "沟通协作",
-          "baseline_score": 35,
-          "current_score": 21,
-          "delta": -14,
-          "baseline_sources": [
-            "Holland",
-            "访谈",
-            "简历"
-          ],
-          "current_sources": [
-            "访谈",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 85,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 85,
-              "at": "2026-04-01 19:33:24",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:33:25",
-              "event": "profile_sync"
-            },
-            {
-              "score": 85,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 85,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            }
-          ]
+          "baseline_score": null,
+          "current_score": null,
+          "delta": null,
+          "baseline_sources": [],
+          "current_sources": [],
+          "history": []
         },
         {
-          "key": "innovation",
-          "label": "创新表达",
-          "baseline_score": 35,
-          "current_score": 0,
-          "delta": -35,
-          "baseline_sources": [
-            "MBTI",
-            "Holland",
-            "访谈",
-            "简历"
-          ],
-          "current_sources": [
-            "访谈",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 35,
-              "at": "2026-04-01 12:30:11",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:50:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 35,
-              "at": "2026-04-01 12:50:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:53:20",
-              "event": "profile_sync"
-            },
-            {
-              "score": 35,
-              "at": "2026-04-01 12:53:21",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:22:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 35,
-              "at": "2026-04-01 13:22:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:51:54",
-              "event": "profile_sync"
-            }
-          ]
-        },
-        {
-          "key": "stress_tolerance",
-          "label": "抗压韧性",
-          "baseline_score": 25,
-          "current_score": 0,
-          "delta": -25,
-          "baseline_sources": [
-            "MBTI",
-            "访谈",
-            "简历"
-          ],
-          "current_sources": [
-            "访谈",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 25,
-              "at": "2026-04-01 12:30:11",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:50:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 25,
-              "at": "2026-04-01 12:50:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 12:53:20",
-              "event": "profile_sync"
-            },
-            {
-              "score": 25,
-              "at": "2026-04-01 12:53:21",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:22:58",
-              "event": "profile_sync"
-            },
-            {
-              "score": 25,
-              "at": "2026-04-01 13:22:59",
-              "event": "profile_sync"
-            },
-            {
-              "score": 0,
-              "at": "2026-04-01 13:51:54",
-              "event": "profile_sync"
-            }
-          ]
-        },
-        {
-          "key": "internship",
-          "label": "实践积累",
-          "baseline_score": 42,
-          "current_score": 21,
-          "delta": -21,
-          "baseline_sources": [
-            "MBTI",
-            "Holland",
-            "基础信息",
-            "访谈"
-          ],
-          "current_sources": [
-            "基础信息",
-            "访谈",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 31,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:33:24",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:33:25",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            },
-            {
-              "score": 21,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            }
-          ]
+          "key": "learning_agility",
+          "label": "学习能力",
+          "baseline_score": null,
+          "current_score": null,
+          "delta": null,
+          "baseline_sources": [],
+          "current_sources": [],
+          "history": []
         },
         {
           "key": "execution",
           "label": "执行交付",
-          "baseline_score": 43,
+          "baseline_score": null,
           "current_score": 31,
-          "delta": -12,
-          "baseline_sources": [
-            "MBTI",
-            "基础信息",
-            "访谈",
-            "简历"
-          ],
+          "delta": null,
+          "baseline_sources": [],
           "current_sources": [
             "基础信息",
             "访谈",
@@ -800,9 +452,43 @@
               "event": "profile_sync"
             }
           ]
+        },
+        {
+          "key": "practice_maturity",
+          "label": "实践积累",
+          "baseline_score": null,
+          "current_score": null,
+          "delta": null,
+          "baseline_sources": [],
+          "current_sources": [],
+          "history": []
         }
       ],
       "versions": [
+        {
+          "report_id": "report-8adb5b52792d",
+          "title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
+          "version": "2026.04-v3",
+          "generated_at": "2026-04-09 20:11:00",
+          "focus_role_id": "java_backend",
+          "focus_role_name": "Java 后端开发"
+        },
+        {
+          "report_id": "report-438a04f38e32",
+          "title": "智能科学与技术专业 · ['Java后端开发', '数据分析师', '新媒体运营'] · 职业生涯发展报告",
+          "version": "2026.04-v3",
+          "generated_at": "2026-04-09 13:02:00",
+          "focus_role_id": "java_backend",
+          "focus_role_name": "内容创作/编辑"
+        },
+        {
+          "report_id": "report-ef851f2fa501",
+          "title": "工商管理 · ['内容创作/编辑', '销售管培生', '项目管理助理'] · 职业生涯发展报告",
+          "version": "2026.04-v3",
+          "generated_at": "2026-04-09 12:53:43",
+          "focus_role_id": "content_editor",
+          "focus_role_name": "内容创作/编辑"
+        },
         {
           "report_id": "report-a347cbeb7a73",
           "title": "内容创作/编辑规划报告",
@@ -818,56 +504,47 @@
     "version": 3,
     "plans": [
       {
-        "id": "report_short-early",
-        "title": "先补核心能力证据",
-        "summary": "围绕 内容创作/编辑 先建立一轮可被证明的能力证据。",
+        "id": "report_short-1",
+        "title": "完成首个AI产品运营分析项目",
+        "summary": "",
         "phase_key": "short",
         "source": "report",
-        "role": "内容创作/编辑",
-        "timeline": "短期 · 起步期",
-        "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-08T15:23:33.666Z",
+        "role": "Java 后端开发",
+        "timeline": "0-3m",
+        "report_id": "report-8adb5b52792d",
+        "created_at": "2026-04-10T01:14:44.646Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
-            "id": "short-early_objective",
-            "title": "围绕 内容创作/编辑 先建立一轮可被证明的能力证据。",
+            "id": "t-0",
+            "title": "学习AI产品运营知识体系",
             "note": "",
-            "tag": "阶段目标",
-            "deadline": "",
-            "xp": 40,
-            "done": true
-          },
-          {
-            "id": "short-early_focus_0",
-            "title": "推进 专业技能",
-            "note": "",
-            "tag": "技能",
+            "tag": "实践",
             "deadline": "",
             "xp": 20,
             "done": true
           },
           {
-            "id": "short-early_focus_1",
-            "title": "推进 学习能力",
+            "id": "t-1",
+            "title": "完成一份深度产品运营策略分析报告",
             "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "short-early_focus_2",
-            "title": "推进 沟通协作",
-            "note": "",
-            "tag": "技能",
+            "tag": "实践",
             "deadline": "",
             "xp": 20,
             "done": false
           },
           {
-            "id": "short-early_signal_0",
-            "title": "优先解决低置信与待补证判断",
+            "id": "t-2",
+            "title": "掌握SQL和Python数据分析基础",
+            "note": "",
+            "tag": "实践",
+            "deadline": "",
+            "xp": 20,
+            "done": false
+          },
+          {
+            "id": "short-1_signal_0",
+            "title": "报告获得业内人士认可",
             "note": "",
             "tag": "验证",
             "deadline": "",
@@ -875,8 +552,17 @@
             "done": false
           },
           {
-            "id": "short-early_signal_1",
-            "title": "建立第一轮职业定位依据",
+            "id": "short-1_signal_1",
+            "title": "能清晰讲解项目逻辑",
+            "note": "",
+            "tag": "验证",
+            "deadline": "",
+            "xp": 16,
+            "done": false
+          },
+          {
+            "id": "short-1_signal_2",
+            "title": "掌握基础数据查询",
             "note": "",
             "tag": "验证",
             "deadline": "",
@@ -886,243 +572,21 @@
         ]
       },
       {
-        "id": "report_short-advance",
-        "title": "收束主线并稳定目标方向",
-        "summary": "让目标岗位从兴趣判断，逐步转为有证据支撑的方向判断。",
-        "phase_key": "mid",
-        "source": "report",
-        "role": "内容创作/编辑",
-        "timeline": "短期 · 进阶期",
-        "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-08T15:23:33.666Z",
-        "updated_at": "2026-04-02 03:03:16",
-        "items": [
-          {
-            "id": "short-advance_objective",
-            "title": "让目标岗位从兴趣判断，逐步转为有证据支撑的方向判断。",
-            "note": "",
-            "tag": "阶段目标",
-            "deadline": "",
-            "xp": 40,
-            "done": true
-          },
-          {
-            "id": "short-advance_focus_0",
-            "title": "推进 内容创作/编辑",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "short-advance_focus_1",
-            "title": "推进 写作",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "short-advance_focus_2",
-            "title": "推进 策划",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "short-advance_signal_0",
-            "title": "减少定位摇摆",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          },
-          {
-            "id": "short-advance_signal_1",
-            "title": "增强岗位适配度稳定性",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "report_long-early",
-        "title": "从岗位适配走向路径适配",
-        "summary": "不只判断是否能进入目标岗位，还要判断长期是否适合沿这条路径发展。",
-        "phase_key": "long",
-        "source": "report",
-        "role": "内容创作/编辑",
-        "timeline": "长期 · 初期阶段",
-        "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-08T15:23:33.666Z",
-        "updated_at": "2026-04-02 03:03:16",
-        "items": [
-          {
-            "id": "long-early_objective",
-            "title": "不只判断是否能进入目标岗位，还要判断长期是否适合沿这条路径发展。",
-            "note": "",
-            "tag": "阶段目标",
-            "deadline": "",
-            "xp": 40,
-            "done": false
-          },
-          {
-            "id": "long-early_focus_0",
-            "title": "推进 表达自由",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "long-early_focus_1",
-            "title": "推进 内容影响",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "long-early_focus_2",
-            "title": "推进 职业环境匹配",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "long-early_signal_0",
-            "title": "稳定输出",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": true
-          },
-          {
-            "id": "long-early_signal_1",
-            "title": "工作价值观与环境更一致",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": true
-          }
-        ]
-      },
-      {
-        "id": "report_long-late",
-        "title": "建立动态复盘机制",
-        "summary": "随着画像、岗位需求与行业趋势变化，周期性复查职业路径是否仍然成立。",
-        "phase_key": "long",
-        "source": "report",
-        "role": "内容创作/编辑",
-        "timeline": "长期 · 进阶阶段",
-        "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-08T15:23:33.666Z",
-        "updated_at": "2026-04-02 03:03:16",
-        "items": [
-          {
-            "id": "long-late_objective",
-            "title": "随着画像、岗位需求与行业趋势变化，周期性复查职业路径是否仍然成立。",
-            "note": "",
-            "tag": "阶段目标",
-            "deadline": "",
-            "xp": 40,
-            "done": true
-          },
-          {
-            "id": "long-late_focus_0",
-            "title": "推进 技能缺口主要集中在目标岗位的核心工具与方法论层面。",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "long-late_focus_1",
-            "title": "推进 定期复核趋势变化",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "long-late_focus_2",
-            "title": "推进 复盘能力增量",
-            "note": "",
-            "tag": "技能",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "long-late_signal_0",
-            "title": "保持职业规划可迭代",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": true
-          },
-          {
-            "id": "long-late_signal_1",
-            "title": "及时修正过时假设",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "report_review_report-a347cbeb7a73",
+        "id": "report_review_report-8adb5b52792d",
         "title": "路径复查与动态回看",
         "summary": "把需要周期性回看的复查节点统一放到长期阶段里。",
         "phase_key": "long",
         "source": "report",
-        "role": "内容创作/编辑",
+        "role": "Java 后端开发",
         "timeline": "长期阶段 · 复查节点",
-        "report_id": "report-a347cbeb7a73",
-        "created_at": "2026-04-08T15:23:33.666Z",
+        "report_id": "report-8adb5b52792d",
+        "created_at": "2026-04-10T01:14:44.646Z",
         "updated_at": "2026-04-02 03:03:16",
         "items": [
           {
             "id": "checkpoint_0_阶段复查",
             "title": "阶段复查",
-            "note": "每次画像输入有明显更新后，重新生成并对比新版报告。",
-            "tag": "复查",
-            "deadline": "",
-            "xp": 18,
-            "done": false
-          },
-          {
-            "id": "checkpoint_1_趋势复查",
-            "title": "趋势复查",
-            "note": "结合行业快照，观察目标岗位是否出现明显需求变化。",
-            "tag": "复查",
-            "deadline": "",
-            "xp": 18,
-            "done": false
-          },
-          {
-            "id": "checkpoint_2_证据复查",
-            "title": "证据复查",
-            "note": "优先判断低置信结论是否已被新的经历、项目或访谈补证。",
+            "note": "定期复盘并更新报告",
             "tag": "复查",
             "deadline": "",
             "xp": 18,
@@ -1158,17 +622,18 @@
       }
     ],
     "progress": {
-      "streak": 2,
+      "streak": 1,
       "best_streak": 2,
-      "xp": 338,
-      "last_checkin": "2026-04-07",
+      "xp": 368,
+      "last_checkin": "2026-04-09",
       "active_days": {
         "2026-04-02": true,
         "2026-04-06": true,
-        "2026-04-07": true
+        "2026-04-07": true,
+        "2026-04-09": true
       }
     },
-    "updated_at": "2026-04-08T15:23:33.666Z"
+    "updated_at": "2026-04-10T01:14:44.646Z"
   },
   "profile_portrait": {
     "status": "ready",

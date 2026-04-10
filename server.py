@@ -14,6 +14,7 @@ import re
 import shutil
 import threading
 import time
+import difflib
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -24,7 +25,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import random
 
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, has_request_context, jsonify, redirect, render_template, request, send_file, session, url_for
 from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -43,6 +44,12 @@ from services.report import (
     empty_report_job,
     empty_report_state,
     generate_career_report_bundle,
+)
+from services.report.exporters import (
+    export_markdown_to_docx_bytes,
+    render_markdown_export_html,
+    render_report_html,
+    render_report_markdown,
 )
 from services.report.enhancements import (
     CAREER_FEEDBACK_VERSION,
@@ -513,11 +520,16 @@ def _save_providers(providers):
     with APP_DATA_LOCK:
         _write_json_file(LLM_PROVIDERS_FILE, {"providers": normalized})
     return normalized
-def _get_active_provider_and_model():
-    """Read provider/model from session and fall back to the first configured provider."""
-    selection = session.get("llm_selection") or {}
-    provider_id = str(selection.get("provider_id") or "").strip()
-    model = str(selection.get("model") or "").strip()
+def _get_active_provider_and_model(selection=None):
+    """Read provider/model from an explicit selection or the current session."""
+    if isinstance(selection, dict):
+        active_selection = selection
+    elif has_request_context():
+        active_selection = session.get("llm_selection") or {}
+    else:
+        active_selection = {}
+    provider_id = str(active_selection.get("provider_id") or "").strip()
+    model = str(active_selection.get("model") or "").strip()
 
     providers = _load_providers()
     provider = None
@@ -2024,6 +2036,18 @@ def _career_report_user_dir(username):
     return os.path.join(CAREER_REPORT_DIR, safe_name)
 
 
+CAREER_REPORT_EXPORT_FORMATS = ["html", "md", "docx"]
+
+
+def _career_report_export_formats(raw_formats=None):
+    ordered = []
+    for item in list(raw_formats or []) + CAREER_REPORT_EXPORT_FORMATS:
+        fmt = str(item or "").strip().lower()
+        if fmt in {"html", "md", "docx"} and fmt not in ordered:
+            ordered.append(fmt)
+    return ordered or list(CAREER_REPORT_EXPORT_FORMATS)
+
+
 def _career_report_file_paths(username):
     base_dir = _career_report_user_dir(username)
     return {
@@ -2032,6 +2056,8 @@ def _career_report_file_paths(username):
         "html": os.path.join(base_dir, "latest.html"),
         "md": os.path.join(base_dir, "latest.md"),
         "job": os.path.join(base_dir, "current_job.json"),
+        "versions_dir": os.path.join(base_dir, "versions"),
+        "drafts_dir": os.path.join(base_dir, "drafts"),
     }
 
 
@@ -2042,16 +2068,314 @@ def _read_career_report_bundle(username):
     return payload if isinstance(payload, dict) else {}
 
 
+def _read_career_report_bundle_by_id(username, report_id=""):
+    safe_report_id = str(report_id or "").strip()
+    paths = _career_report_file_paths(username)
+    with APP_DATA_LOCK:
+        if not safe_report_id:
+            payload = _read_json_file(paths["json"], {})
+            return payload if isinstance(payload, dict) else {}
+
+        archive_path = os.path.join(paths["versions_dir"], f"{safe_report_id}.json")
+        if os.path.isfile(archive_path):
+            payload = _read_json_file(archive_path, {})
+            return payload if isinstance(payload, dict) else {}
+
+        latest = _read_json_file(paths["json"], {})
+        latest_id = str((latest.get("meta") or {}).get("report_id") or "").strip()
+        if latest_id == safe_report_id:
+            return latest if isinstance(latest, dict) else {}
+    return {}
+
+
+def _clip_career_report_text(value, limit=140):
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if len(text) <= limit:
+        return text
+    return f"{text[:max(0, limit - 1)]}…"
+
+
+def _career_report_section_title(section_id, section):
+    if not isinstance(section, dict):
+        return str(section_id or "章节")
+    return str(
+        section.get("label")
+        or section.get("title")
+        or section.get("kicker")
+        or section_id
+        or "章节"
+    ).strip() or "章节"
+
+
+def _build_career_report_section_map(bundle, markdown_text=""):
+    report_document = bundle.get("report_document") if isinstance(bundle, dict) else {}
+    report_document = report_document if isinstance(report_document, dict) else {}
+    sections = report_document.get("sections")
+    result = []
+    if isinstance(sections, dict):
+        ordered_keys = [
+            "industry_analysis",
+            "career_positioning",
+            "resume_evidence",
+            "competency_profile",
+            "role_match",
+            "path_plan",
+        ]
+        seen = set()
+        for key in ordered_keys + list(sections.keys()):
+            if key in seen:
+                continue
+            seen.add(key)
+            section = sections.get(key)
+            if not isinstance(section, dict):
+                continue
+            result.append({
+                "key": str(key),
+                "label": _career_report_section_title(key, section),
+                "markdown": str(section.get("markdown") or "").strip(),
+            })
+        return result
+    if isinstance(sections, list):
+        for index, section in enumerate(sections):
+            if not isinstance(section, dict):
+                continue
+            result.append({
+                "key": str(section.get("id") or f"section-{index + 1}"),
+                "label": _career_report_section_title(section.get("id") or f"section-{index + 1}", section),
+                "markdown": str(section.get("markdown") or section.get("summary") or "").strip(),
+            })
+        return result
+
+    source_text = str(markdown_text or report_document.get("markdown") or "").strip()
+    if not source_text:
+        return []
+
+    current = None
+    for raw_line in source_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            if current:
+                result.append(current)
+            label = line[3:].strip()
+            current = {"key": f"section-{len(result) + 1}", "label": label or "章节", "markdown": ""}
+            continue
+        if current is None:
+            continue
+        current["markdown"] = f"{current['markdown']}\n{raw_line}".strip()
+    if current:
+        result.append(current)
+    return result
+
+
+def _normalize_career_report_snapshot(raw_snapshot, bundle=None, report_id=""):
+    raw = raw_snapshot if isinstance(raw_snapshot, dict) else {}
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    base_bundle = bundle if isinstance(bundle, dict) else {}
+    meta = base_bundle.get("meta") if isinstance(base_bundle.get("meta"), dict) else {}
+    markdown = str(raw.get("markdown") or "").strip()
+    normalized = {
+        "snapshot_id": str(raw.get("snapshot_id") or f"snapshot-{uuid.uuid4().hex[:10]}").strip(),
+        "based_on_report_id": str(raw.get("based_on_report_id") or report_id or meta.get("report_id") or "").strip(),
+        "source": str(raw.get("source") or "manual").strip() or "manual",
+        "label": str(raw.get("label") or raw.get("title") or "编辑快照").strip() or "编辑快照",
+        "title": str(raw.get("title") or raw.get("label") or "编辑快照").strip() or "编辑快照",
+        "focus_role_name": str(raw.get("focus_role_name") or meta.get("focus_role_name") or "").strip(),
+        "created_at": str(raw.get("created_at") or timestamp).strip(),
+        "updated_at": str(raw.get("updated_at") or raw.get("created_at") or timestamp).strip(),
+        "markdown": markdown,
+        "section_map": raw.get("section_map") if isinstance(raw.get("section_map"), list) else _build_career_report_section_map(base_bundle, markdown),
+        "diff_blocks": raw.get("diff_blocks") if isinstance(raw.get("diff_blocks"), list) else [],
+        "completeness_check": raw.get("completeness_check") if isinstance(raw.get("completeness_check"), dict) else None,
+    }
+    normalized["summary"] = str(raw.get("summary") or _clip_career_report_text(markdown, 180)).strip()
+    normalized["has_diff"] = bool(normalized["diff_blocks"])
+    return normalized
+
+
+def _public_career_report_snapshot(raw_snapshot, include_content=False):
+    snapshot = _normalize_career_report_snapshot(raw_snapshot)
+    public_data = {
+        "snapshot_id": snapshot["snapshot_id"],
+        "based_on_report_id": snapshot["based_on_report_id"],
+        "source": snapshot["source"],
+        "label": snapshot["label"],
+        "title": snapshot["title"],
+        "focus_role_name": snapshot["focus_role_name"],
+        "created_at": snapshot["created_at"],
+        "updated_at": snapshot["updated_at"],
+        "summary": snapshot["summary"],
+        "has_diff": snapshot["has_diff"],
+    }
+    if include_content:
+        public_data.update({
+            "markdown": snapshot["markdown"],
+            "section_map": snapshot["section_map"],
+            "diff_blocks": snapshot["diff_blocks"],
+            "completeness_check": snapshot["completeness_check"],
+        })
+    return public_data
+
+
+def _career_report_snapshot_dir(paths, report_id):
+    safe_report_id = re.sub(r"[^0-9A-Za-z_.-]", "_", str(report_id or "").strip())
+    return os.path.join(paths["drafts_dir"], safe_report_id)
+
+
+def _list_career_report_snapshots(username, report_id):
+    safe_report_id = str(report_id or "").strip()
+    if not safe_report_id:
+        return []
+    paths = _career_report_file_paths(username)
+    snapshot_dir = _career_report_snapshot_dir(paths, safe_report_id)
+    if not os.path.isdir(snapshot_dir):
+        return []
+    summaries = []
+    with APP_DATA_LOCK:
+        for name in os.listdir(snapshot_dir):
+            if not name.lower().endswith(".json"):
+                continue
+            payload = _read_json_file(os.path.join(snapshot_dir, name), {})
+            if not isinstance(payload, dict):
+                continue
+            summaries.append(_public_career_report_snapshot(payload))
+    summaries.sort(key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+    return summaries
+
+
+def _read_career_report_snapshot(username, report_id, snapshot_id):
+    safe_report_id = str(report_id or "").strip()
+    safe_snapshot_id = str(snapshot_id or "").strip()
+    if not safe_snapshot_id:
+        return None
+    paths = _career_report_file_paths(username)
+    candidates = []
+    if safe_report_id:
+        candidates.append(os.path.join(_career_report_snapshot_dir(paths, safe_report_id), f"{safe_snapshot_id}.json"))
+    else:
+        drafts_root = paths["drafts_dir"]
+        if os.path.isdir(drafts_root):
+            for child in os.listdir(drafts_root):
+                candidates.append(os.path.join(drafts_root, child, f"{safe_snapshot_id}.json"))
+    with APP_DATA_LOCK:
+        for path in candidates:
+            if not os.path.isfile(path):
+                continue
+            payload = _read_json_file(path, {})
+            if isinstance(payload, dict) and payload:
+                return payload
+    return None
+
+
+def _save_career_report_snapshot(username, report_id, snapshot):
+    safe_report_id = str(report_id or "").strip()
+    if not safe_report_id:
+        raise ValueError("缺少 report_id")
+    paths = _career_report_file_paths(username)
+    snapshot_dir = _career_report_snapshot_dir(paths, safe_report_id)
+    normalized = _normalize_career_report_snapshot(snapshot, report_id=safe_report_id)
+    os.makedirs(snapshot_dir, exist_ok=True)
+    target_path = os.path.join(snapshot_dir, f"{normalized['snapshot_id']}.json")
+    with APP_DATA_LOCK:
+        _write_json_file(target_path, normalized)
+    return normalized
+
+
+def _build_career_report_diff_blocks(original_text, proposed_text):
+    original_lines = str(original_text or "").splitlines()
+    proposed_lines = str(proposed_text or "").splitlines()
+    matcher = difflib.SequenceMatcher(a=original_lines, b=proposed_lines)
+    blocks = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "replace":
+            if i1 != i2:
+                blocks.append({"type": "delete", "lines": original_lines[i1:i2]})
+            if j1 != j2:
+                blocks.append({"type": "add", "lines": proposed_lines[j1:j2]})
+            continue
+        blocks.append({
+            "type": "equal" if tag == "equal" else ("delete" if tag == "delete" else "add"),
+            "lines": original_lines[i1:i2] if tag != "insert" else proposed_lines[j1:j2],
+        })
+    return [block for block in blocks if block.get("lines")]
+
+
+def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=None):
+    safe_bundle = bundle if isinstance(bundle, dict) else {}
+    report_document = safe_bundle.get("report_document") if isinstance(safe_bundle.get("report_document"), dict) else {}
+    section_map = []
+    if isinstance(snapshot, dict) and isinstance(snapshot.get("section_map"), list):
+        section_map = snapshot.get("section_map") or []
+    if not section_map:
+        section_map = _build_career_report_section_map(safe_bundle, markdown_text)
+    issues = []
+
+    required_sections = {
+        "industry_analysis": "行业现状",
+        "career_positioning": "当前定位",
+        "role_match": "目标岗位对比",
+        "path_plan": "职业路径",
+    }
+    section_keys = {str(item.get("key") or "").strip() for item in section_map if isinstance(item, dict)}
+    for key, label in required_sections.items():
+        if key not in section_keys:
+            issues.append({"level": "warning", "type": "missing_section", "message": f"缺少“{label}”章节。"})
+
+    markdown_value = str(markdown_text or report_document.get("markdown") or "").strip()
+    if len(markdown_value) < 600:
+        issues.append({"level": "warning", "type": "content_length", "message": "完整报告正文偏短，建议补充行业、差距和行动计划说明。"})
+
+    explainability_summary = report_document.get("explainability_summary") if isinstance(report_document.get("explainability_summary"), dict) else {}
+    because_items = explainability_summary.get("headline_because") if isinstance(explainability_summary.get("headline_because"), list) else []
+    evidence_items = []
+    if isinstance(snapshot, dict):
+        completeness = snapshot.get("completeness_check")
+        if isinstance(completeness, dict):
+            evidence_items = completeness.get("evidence_trace") if isinstance(completeness.get("evidence_trace"), list) else []
+    if not evidence_items:
+        evidence_health = report_document.get("evidence_health") if isinstance(report_document.get("evidence_health"), dict) else {}
+        evidence_items = evidence_health.get("evidence_trace") if isinstance(evidence_health.get("evidence_trace"), list) else []
+
+    if not because_items:
+        issues.append({"level": "warning", "type": "explainability", "message": "关键判断缺少“为什么”的解释链。"})
+    if not evidence_items:
+        issues.append({"level": "warning", "type": "evidence_trace", "message": "当前报告缺少简历证据回指，用户很难验证判断来源。"})
+
+    plan_board = report_document.get("plan_board") if isinstance(report_document.get("plan_board"), dict) else {}
+    action_items = plan_board.get("action_items") if isinstance(plan_board.get("action_items"), list) else []
+    if not action_items:
+        next_actions = report_document.get("next_actions") if isinstance(report_document.get("next_actions"), dict) else {}
+        action_items = next_actions.get("action_items") if isinstance(next_actions.get("action_items"), list) else []
+    if not action_items:
+        issues.append({"level": "warning", "type": "action_plan", "message": "行动计划为空，无法形成从差距到执行的闭环。"})
+
+    return {
+        "status": "pass" if not issues else "attention",
+        "issue_count": len(issues),
+        "issues": issues,
+        "section_count": len(section_map),
+        "markdown_chars": len(markdown_value),
+        "headline_because": because_items[:4],
+        "evidence_trace": evidence_items[:4],
+    }
+
+
 def _save_career_report_bundle(username, bundle):
     paths = _career_report_file_paths(username)
     os.makedirs(paths["dir"], exist_ok=True)
-    payload = bundle if isinstance(bundle, dict) else {}
-    report_document = payload.get("report_document") if isinstance(payload.get("report_document"), dict) else {}
-    markdown_text = str(report_document.get("markdown") or "")
-    html_text = str(report_document.get("html") or "")
+    payload = dict(bundle) if isinstance(bundle, dict) else {}
+    report_document = dict(payload.get("report_document") or {}) if isinstance(payload.get("report_document"), dict) else {}
+    payload["report_document"] = report_document
+    markdown_text = str(report_document.get("markdown") or "").strip()
+    if not markdown_text:
+        markdown_text = render_report_markdown(payload).strip()
+        report_document["markdown"] = markdown_text
+    html_text = str(report_document.get("html") or "").strip()
+    if not html_text:
+        html_text = render_report_html(payload).strip()
+        report_document["html"] = html_text
     new_meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
     new_report_id = str(new_meta.get("report_id") or "").strip()
-    versions_dir = os.path.join(paths["dir"], "versions")
+    versions_dir = paths["versions_dir"]
     with APP_DATA_LOCK:
         existing = _read_json_file(paths["json"], {})
         if (
@@ -2123,7 +2447,7 @@ def _public_career_report_state(raw_state):
             "focus_role_id": str(raw_state.get("focus_role_id") or ""),
             "title": str(raw_state.get("title") or ""),
             "summary": str(raw_state.get("summary") or ""),
-            "export_formats": raw_state.get("export_formats") if isinstance(raw_state.get("export_formats"), list) else ["html", "md"],
+            "export_formats": _career_report_export_formats(raw_state.get("export_formats")),
             "tracker": raw_state.get("tracker") if isinstance(raw_state.get("tracker"), dict) else None,
             "feedback": _normalize_career_report_feedback(raw_state.get("feedback")),
         })
@@ -2159,14 +2483,23 @@ def _public_career_report_bundle(raw_bundle):
     public_document = dict(document)
     public_document.pop("markdown", None)
     public_document.pop("html", None)
+    report_id = str(meta.get("report_id") or "").strip()
     return {
         "meta": meta,
+        "industry_brief": bundle.get("industry_brief") if isinstance(bundle.get("industry_brief"), dict) else {},
+        "positioning_output": bundle.get("positioning_output") if isinstance(bundle.get("positioning_output"), dict) else {},
+        "resume_evidence": bundle.get("resume_evidence") if isinstance(bundle.get("resume_evidence"), dict) else {},
+        "competency_profile": bundle.get("competency_profile") if isinstance(bundle.get("competency_profile"), dict) else {},
+        "match_output": bundle.get("match_output") if isinstance(bundle.get("match_output"), dict) else {},
+        "path_plan": bundle.get("path_plan") if isinstance(bundle.get("path_plan"), dict) else {},
         "profile_snapshot": bundle.get("profile_snapshot") if isinstance(bundle.get("profile_snapshot"), dict) else {},
         "role_rankings": bundle.get("role_rankings") if isinstance(bundle.get("role_rankings"), list) else [],
         "gap_map": bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {},
+        "career_path": bundle.get("career_path") if isinstance(bundle.get("career_path"), dict) else {},
         "phase_plan": bundle.get("phase_plan") if isinstance(bundle.get("phase_plan"), dict) else {},
         "trend_brief": bundle.get("trend_brief") if isinstance(bundle.get("trend_brief"), dict) else {},
         "report_document": public_document,
+        "draft_snapshots": _list_career_report_snapshots(meta.get("username") or meta.get("user") or "", report_id) if report_id and (meta.get("username") or meta.get("user")) else [],
         "generation_diagnostics": bundle.get("generation_diagnostics") if isinstance(bundle.get("generation_diagnostics"), dict) else {},
     }
 
@@ -2522,7 +2855,7 @@ def _sync_career_report_tracker_state(username, bundle, current_capabilities=Non
                 "focus_role_id": str(meta.get("focus_role_id") or report_state.get("focus_role_id") or ""),
                 "title": str(meta.get("title") or report_state.get("title") or ""),
                 "summary": str(meta.get("summary") or report_state.get("summary") or ""),
-                "export_formats": ["html", "md"],
+                "export_formats": list(CAREER_REPORT_EXPORT_FORMATS),
             }
         )
 
@@ -2582,7 +2915,7 @@ def _save_career_report_progress(username, job_id, stage, stage_label, detail, *
             "focus_role_id": str(extra.get("focus_role_id") or report_state.get("focus_role_id") or ""),
             "title": str(extra.get("title") or report_state.get("title") or ""),
             "summary": str(extra.get("summary") or report_state.get("summary") or ""),
-            "export_formats": ["html", "md"],
+            "export_formats": list(CAREER_REPORT_EXPORT_FORMATS),
         }
     )
     state["career_report"] = report_state
@@ -5805,23 +6138,40 @@ def _build_llm_caller_for_report(base_url, api_key, model, log=None, cancel_chec
 
 def _run_career_report_job(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm):
     stage_defs = {item["key"]: item["label"] for item in CAREER_REPORT_STAGE_DEFS}
-    model_name = str(runtime_llm.get("model") or "") if isinstance(runtime_llm, dict) else ""
+    runtime_llm_payload = dict(runtime_llm or {}) if isinstance(runtime_llm, dict) else {}
+    model_name = str(runtime_llm_payload.get("model") or "").strip()
     job_started = time.perf_counter()
+    generation_mode = "fallback"
 
     def _log(message, **fields):
         _career_report_console_log(job_id, message, **fields)
 
-    # Build LLM caller for agents
-    base_url, api_key, _model = _get_active_provider_and_model()
-    provider_host = urllib.parse.urlparse(str(base_url or "")).netloc if base_url else ""
-    llm_caller = _build_llm_caller_for_report(
-        base_url,
-        api_key,
-        model_name or _model,
-        log=_log,
-        cancel_checker=lambda: _is_career_report_job_cancelled(job_id),
-    )
-    generation_mode = "llm" if llm_caller else "fallback"
+    # Build LLM caller for agents from the request-time snapshot.
+    base_url = str(runtime_llm_payload.get("base_url") or "").strip()
+    api_key = str(runtime_llm_payload.get("api_key") or "").strip()
+    selection_snapshot = runtime_llm_payload.get("selection") if isinstance(runtime_llm_payload.get("selection"), dict) else None
+    _model = model_name
+    llm_caller = None
+    provider_host = urllib.parse.urlparse(base_url).netloc if base_url else ""
+    try:
+        if not (base_url and api_key and _model):
+            fallback_base_url, fallback_api_key, fallback_model = _get_active_provider_and_model(selection_snapshot)
+            base_url = base_url or str(fallback_base_url or "").strip()
+            api_key = api_key or str(fallback_api_key or "").strip()
+            _model = _model or str(fallback_model or "").strip()
+            provider_host = urllib.parse.urlparse(base_url).netloc if base_url else ""
+        model_name = _model
+        llm_caller = _build_llm_caller_for_report(
+            base_url,
+            api_key,
+            model_name,
+            log=_log,
+            cancel_checker=lambda: _is_career_report_job_cancelled(job_id),
+        )
+    except Exception as exc:
+        app.logger.exception("career report llm init failed")
+        _log("LLM init failed, continuing with fallback", error=str(exc)[:220])
+    generation_mode = "llm" if (llm_caller or callable(runtime_llm_payload.get("writer"))) else "fallback"
     _log(
         "后台任务开始",
         user=username,
@@ -5838,7 +6188,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             raise CareerReportCanceled("职业报告生成已被用户取消。")
 
     # Attach caller to runtime_llm
-    runtime_llm_with_caller = dict(runtime_llm or {})
+    runtime_llm_with_caller = dict(runtime_llm_payload)
     runtime_llm_with_caller["caller"] = llm_caller
     runtime_llm_with_caller["logger"] = _log
 
@@ -6013,11 +6363,21 @@ def api_career_report_generate_start():
         or PORTRAIT_PROMPT_PIPELINE_VERSION
     ).strip()
 
-    base_url, api_key, model = _get_active_provider_and_model()
+    selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
+    base_url, api_key, model = _get_active_provider_and_model(selection_snapshot)
     runtime_llm = {
         "writer": _build_report_markdown_writer(base_url, api_key, model),
         "model": model or "",
-    } if (base_url and api_key and model) else {"writer": None, "model": ""}
+        "base_url": str(base_url or ""),
+        "api_key": str(api_key or ""),
+        "selection": dict(selection_snapshot),
+    } if (base_url and api_key and model) else {
+        "writer": None,
+        "model": str(model or ""),
+        "base_url": str(base_url or ""),
+        "api_key": str(api_key or ""),
+        "selection": dict(selection_snapshot),
+    }
 
     job_id = uuid.uuid4().hex
     report_id = f"report-{uuid.uuid4().hex[:12]}"
@@ -6251,7 +6611,8 @@ def api_career_report_feedback():
 def api_career_report_polish():
     payload = request.get_json(silent=True) or {}
     section_key = str(payload.get("section_key") or "").strip()[:80]
-    text = str(payload.get("text") or "").strip()
+    text = str(payload.get("selection") or payload.get("text") or "").strip()
+    instruction = str(payload.get("instruction") or "").strip()[:500]
     if not text:
         return jsonify({"message": "缺少需要润色的报告段落。"}), 400
 
@@ -6265,7 +6626,8 @@ def api_career_report_polish():
         "保留 Markdown 结构，压缩重复表达，让语言更清晰、专业、适合学生职业规划报告。"
         "如果原文包含 JSON 或表格，只保留必要说明，不改动事实字段。"
     )
-    user_msg = f"模块：{section_key or '未指定'}\n\n请润色以下报告段落：\n\n{text}"
+    extra_instruction = f"\n\n用户额外要求：{instruction}" if instruction else ""
+    user_msg = f"模块：{section_key or '未指定'}{extra_instruction}\n\n请润色以下报告段落：\n\n{text}"
     try:
         polished = _call_markdown_chat(
             base_url,
@@ -6280,9 +6642,12 @@ def api_career_report_polish():
         return jsonify({"message": str(exc)[:300] or "润色失败。"}), 500
 
     return jsonify({
-        "polished": polished,
         "section_key": section_key,
         "model": model,
+        "original": text,
+        "proposed": polished,
+        "polished": polished,
+        "diff_blocks": _build_career_report_diff_blocks(text, polished),
     })
 
 
@@ -6312,6 +6677,125 @@ def api_career_report_version():
     return jsonify({
         "data": _public_career_report_bundle(bundle),
         "tracker": tracker,
+    })
+
+
+@app.route("/api/career-report/source", methods=["GET"])
+@_login_required
+def api_career_report_source():
+    user = _current_user()
+    report_id = str(request.args.get("report_id") or "").strip()
+    snapshot_id = str(request.args.get("snapshot_id") or "").strip()
+    bundle = _read_career_report_bundle_by_id(user["username"], report_id)
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "未找到对应的职业报告。"}), 404
+
+    resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
+    if snapshot_id:
+        snapshot = _read_career_report_snapshot(user["username"], resolved_report_id, snapshot_id)
+        if not isinstance(snapshot, dict) or not snapshot:
+            return jsonify({"message": "未找到对应的编辑快照。"}), 404
+        normalized = _normalize_career_report_snapshot(snapshot, bundle=bundle, report_id=resolved_report_id)
+        completeness = normalized.get("completeness_check") if isinstance(normalized.get("completeness_check"), dict) else _run_career_report_completeness_check(bundle, normalized.get("markdown"), normalized)
+        return jsonify({
+            "report_id": resolved_report_id,
+            "snapshot_id": normalized["snapshot_id"],
+            "source_type": normalized.get("source") or "snapshot",
+            "title": normalized.get("title") or normalized.get("label") or "编辑快照",
+            "markdown": normalized.get("markdown") or "",
+            "section_map": normalized.get("section_map") or [],
+            "diff_blocks": normalized.get("diff_blocks") or [],
+            "completeness_check": completeness,
+            "export_formats": list(CAREER_REPORT_EXPORT_FORMATS),
+            "bundle": _public_career_report_bundle(bundle),
+        })
+
+    report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+    markdown_text = str(report_document.get("markdown") or render_report_markdown(bundle)).strip()
+    return jsonify({
+        "report_id": resolved_report_id,
+        "snapshot_id": "",
+        "source_type": "formal_report",
+        "title": str(report_document.get("title") or (bundle.get("meta") or {}).get("title") or "职业发展报告").strip() or "职业发展报告",
+        "markdown": markdown_text,
+        "section_map": _build_career_report_section_map(bundle, markdown_text),
+        "diff_blocks": [],
+        "completeness_check": _run_career_report_completeness_check(bundle, markdown_text),
+        "export_formats": list(CAREER_REPORT_EXPORT_FORMATS),
+        "bundle": _public_career_report_bundle(bundle),
+    })
+
+
+@app.route("/api/career-report/snapshot/save", methods=["POST"])
+@_login_required
+def api_career_report_snapshot_save():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    report_id = str(payload.get("report_id") or "").strip()
+    bundle = _read_career_report_bundle_by_id(user["username"], report_id)
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "未找到对应的职业报告。"}), 404
+
+    resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
+    markdown_text = str(payload.get("markdown") or "").strip()
+    if not markdown_text:
+        return jsonify({"message": "缺少快照 Markdown 内容。"}), 400
+
+    section_map = _build_career_report_section_map(bundle, markdown_text)
+    completeness_check = _run_career_report_completeness_check(bundle, markdown_text)
+    snapshot = _save_career_report_snapshot(
+        user["username"],
+        resolved_report_id,
+        {
+            "snapshot_id": str(payload.get("snapshot_id") or "").strip(),
+            "based_on_report_id": resolved_report_id,
+            "source": str(payload.get("source") or "manual").strip() or "manual",
+            "label": str(payload.get("label") or payload.get("title") or "编辑快照").strip() or "编辑快照",
+            "title": str(payload.get("title") or payload.get("label") or "编辑快照").strip() or "编辑快照",
+            "focus_role_name": str(payload.get("focus_role_name") or (bundle.get("meta") or {}).get("focus_role_name") or "").strip(),
+            "markdown": markdown_text,
+            "section_map": section_map,
+            "diff_blocks": payload.get("diff_blocks") if isinstance(payload.get("diff_blocks"), list) else [],
+            "completeness_check": completeness_check,
+        },
+    )
+    return jsonify({
+        "message": "编辑快照已保存。",
+        "snapshot": _public_career_report_snapshot(snapshot, include_content=True),
+        "draft_snapshots": _list_career_report_snapshots(user["username"], resolved_report_id),
+    })
+
+
+@app.route("/api/career-report/snapshot/check", methods=["POST"])
+@_login_required
+def api_career_report_snapshot_check():
+    user = _current_user()
+    payload = request.get_json(silent=True) or {}
+    report_id = str(payload.get("report_id") or "").strip()
+    snapshot_id = str(payload.get("snapshot_id") or "").strip()
+    bundle = _read_career_report_bundle_by_id(user["username"], report_id)
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return jsonify({"message": "未找到对应的职业报告。"}), 404
+
+    resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
+    snapshot = None
+    if snapshot_id:
+        snapshot = _read_career_report_snapshot(user["username"], resolved_report_id, snapshot_id)
+        if not isinstance(snapshot, dict) or not snapshot:
+            return jsonify({"message": "未找到对应的编辑快照。"}), 404
+
+    markdown_text = str(payload.get("markdown") or "").strip()
+    if not markdown_text:
+        if isinstance(snapshot, dict):
+            markdown_text = str(snapshot.get("markdown") or "").strip()
+        else:
+            report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+            markdown_text = str(report_document.get("markdown") or render_report_markdown(bundle)).strip()
+
+    return jsonify({
+        "report_id": resolved_report_id,
+        "snapshot_id": snapshot_id,
+        "completeness_check": _run_career_report_completeness_check(bundle, markdown_text, snapshot),
     })
 
 
@@ -6400,20 +6884,54 @@ def api_career_report_tracker_item():
 def api_career_report_export():
     user = _current_user()
     export_format = str(request.args.get("format") or "html").strip().lower()
-    if export_format not in {"html", "md"}:
-        return jsonify({"message": "仅支持导出 html 或 md 格式。"}), 400
-    paths = _career_report_file_paths(user["username"])
-    target_path = paths["html"] if export_format == "html" else paths["md"]
-    if not os.path.exists(target_path):
+    if export_format not in {"html", "md", "docx"}:
+        return jsonify({"message": "仅支持 html / md / docx 导出。"}), 400
+
+    report_id = str(request.args.get("report_id") or "").strip()
+    snapshot_id = str(request.args.get("snapshot_id") or "").strip()
+    bundle = _read_career_report_bundle_by_id(user["username"], report_id)
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
         return jsonify({"message": "当前还没有可导出的职业规划报告。"}), 404
-    with open(target_path, "r", encoding="utf-8") as fp:
-        content = fp.read()
-    mimetype = "text/html; charset=utf-8" if export_format == "html" else "text/markdown; charset=utf-8"
-    filename = f"career-report-{user['username']}.{export_format}"
-    return app.response_class(
-        content,
-        mimetype=mimetype,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+
+    resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
+    source_label = str((bundle.get("meta") or {}).get("title") or "career-report").strip() or "career-report"
+    if snapshot_id:
+        snapshot = _read_career_report_snapshot(user["username"], resolved_report_id, snapshot_id)
+        if not isinstance(snapshot, dict) or not snapshot:
+            return jsonify({"message": "未找到对应的编辑快照。"}), 404
+        normalized = _normalize_career_report_snapshot(snapshot, bundle=bundle, report_id=resolved_report_id)
+        markdown_text = str(normalized.get("markdown") or "").strip()
+        source_label = str(normalized.get("title") or normalized.get("label") or source_label).strip() or source_label
+    else:
+        report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+        markdown_text = str(report_document.get("markdown") or render_report_markdown(bundle)).strip()
+
+    filename_base = secure_filename(source_label) or f"career-report-{resolved_report_id or user['username']}"
+    if export_format == "md":
+        return app.response_class(
+            markdown_text,
+            mimetype="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.md"'},
+        )
+    if export_format == "html":
+        html_text = render_markdown_export_html(markdown_text, title=source_label) if snapshot_id else render_report_html(bundle)
+        return app.response_class(
+            html_text,
+            mimetype="text/html; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.html"'},
+        )
+
+    try:
+        docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=filename_base)
+    except Exception as exc:
+        app.logger.exception("career report docx export failed")
+        return jsonify({"message": str(exc)[:500] or "DOCX 导出失败。"}), 500
+
+    return send_file(
+        io.BytesIO(docx_bytes),
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=True,
+        download_name=f"{filename_base}.docx",
     )
 
 
