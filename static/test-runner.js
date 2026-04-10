@@ -5,6 +5,7 @@
     friends: `${TYT_ASSET_BASE}/miniGames/friends.png`,
     insideout: `${TYT_ASSET_BASE}/miniGames/insideOut.png`,
     deep: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
+    sbti: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
   };
 
   const META = {
@@ -28,6 +29,13 @@
       sectionHint: "完成 14 题后将进入完整结果页，展示主导情绪与特质分布。",
       heroTitle: "你是哪种情绪？",
       heroDesc: "通过情绪选择题识别你当前主导的情感风格。",
+    },
+    sbti: {
+      pageTitle: "SBTI 人格扩展作答页",
+      sectionTitle: "SBTI 人格扩展 · 30 题 + 补充题",
+      sectionHint: "完成主问题后将进入完整结果页，展示人格代号、匹配度与 15 维画像反馈。",
+      heroTitle: "SBTI 人格扩展",
+      heroDesc: "完整题库与完整匹配逻辑已并入扩展测试中心，点击选项会自动跳到下一题。",
     },
   };
 
@@ -91,17 +99,37 @@
     else window.history.pushState({}, "", url.toString());
   }
 
+  function visibleQuestions() {
+    if (!Array.isArray(state.questions) || !state.questions.length) return [];
+    if (state.testType !== "sbti") return state.questions;
+    const list = [...state.questions];
+    const specialIndex = list.findIndex((q) => String(q?.id || "") === "drink_gate_q1");
+    if (specialIndex !== -1 && Number(state.answers.drink_gate_q1) === 3) {
+      const hubCore = core();
+      const conditional = hubCore?.getSbtiConditionalQuestion?.();
+      if (conditional) list.splice(specialIndex + 1, 0, conditional);
+    }
+    return list;
+  }
+
   function totalCount() {
-    return Array.isArray(state.questions) ? state.questions.length : 0;
+    return visibleQuestions().length;
   }
 
   function answeredCount() {
-    return Object.keys(state.answers || {}).length;
+    const list = visibleQuestions();
+    return list.reduce((count, item) => {
+      const key = state.testType === "sbti" ? String(item.id || "") : Number(item.id);
+      return state.answers[key] !== undefined ? count + 1 : count;
+    }, 0);
   }
 
   function currentQuestion() {
-    if (!Array.isArray(state.questions) || !state.questions.length) return null;
-    return state.questions[state.idx] || null;
+    const list = visibleQuestions();
+    if (!list.length) return null;
+    const safeIdx = Math.max(0, Math.min(state.idx, list.length - 1));
+    state.idx = safeIdx;
+    return list[safeIdx] || null;
   }
 
   function coverForType(type) {
@@ -142,7 +170,10 @@
     if (heroTitleEl) heroTitleEl.textContent = meta.heroTitle;
     if (heroDescEl) heroDescEl.textContent = meta.heroDesc;
     if (coverEl) coverEl.src = coverForType(state.testType);
-    if (metaLineEl) metaLineEl.textContent = `总题数：${total} 题 ｜ 来源：trueyouteller 题库与素材`;
+    if (metaLineEl) {
+      const sourceText = state.testType === "sbti" ? "SBTI 完整题库与匹配逻辑" : "trueyouteller 题库与素材";
+      metaLineEl.textContent = `总题数：${total} 题 ｜ 来源：${sourceText}`;
+    }
 
     document.title = `${meta.pageTitle} | 职业规划智能体`;
   }
@@ -169,18 +200,21 @@
     root.className = "ts-options";
     if (!question) return;
 
-    const qId = Number(question.id);
+    const qId = state.testType === "sbti" ? String(question.id || "") : Number(question.id);
     const selectedValue = state.answers[qId];
     const isDeep = state.testType === "deep";
+    const isSbti = state.testType === "sbti";
     const options = isDeep
       ? (core()?.getLikertAnswers?.() || [])
-      : (Array.isArray(question.opts) ? question.opts : []);
+      : isSbti
+        ? (Array.isArray(question.options) ? question.options : [])
+        : (Array.isArray(question.opts) ? question.opts : []);
 
     root.classList.add(isDeep ? "ts-options-likert" : "ts-options-grid");
 
-    options.forEach((item) => {
-      const value = isDeep ? Number(item.value) : String(item.v);
-      const label = isDeep ? String(item.label || "") : String(item.t || "");
+    options.forEach((item, idx) => {
+      const value = isDeep ? Number(item.value) : isSbti ? (idx + 1) : String(item.v);
+      const label = isDeep ? String(item.label || "") : isSbti ? String(item || "") : String(item.t || "");
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ts-option";
@@ -188,6 +222,9 @@
       btn.textContent = label;
       btn.addEventListener("click", () => {
         state.answers[qId] = value;
+        if (isSbti && qId === "drink_gate_q1" && Number(value) !== 3) {
+          delete state.answers.drink_gate_q2;
+        }
         renderQuestion();
         if (state.idx < totalCount() - 1) {
           window.setTimeout(() => {
@@ -230,7 +267,8 @@
         : "点击选项后会自动进入下一题，也可手动点击“下一题”。";
     }
 
-    const answeredCurrent = state.answers[Number(q.id)] !== undefined;
+    const questionKey = state.testType === "sbti" ? String(q.id || "") : Number(q.id);
+    const answeredCurrent = state.answers[questionKey] !== undefined;
     if (prevBtn) prevBtn.disabled = state.idx <= 0 || state.submitting;
     if (nextBtn) nextBtn.disabled = state.idx >= total - 1 || !answeredCurrent || state.submitting;
     if (submitBtn) {
@@ -295,6 +333,9 @@
       if (state.testType === "deep" && !result.completed) {
         throw new Error("深层 MBTI 作答未完成");
       }
+      if (state.testType === "sbti" && !result.code) {
+        throw new Error("SBTI 结果生成失败");
+      }
       const saved = c.saveResultByType(state.testType, result, {
         completedAt: Date.now(),
         answers: { ...state.answers },
@@ -339,11 +380,12 @@
     }
 
     const nextBtn = document.getElementById("tsNextBtn");
-    if (nextBtn) {
+      if (nextBtn) {
       nextBtn.addEventListener("click", () => {
         const q = currentQuestion();
         if (!q) return;
-        if (state.answers[Number(q.id)] === undefined) return;
+        const key = state.testType === "sbti" ? String(q.id || "") : Number(q.id);
+        if (state.answers[key] === undefined) return;
         if (state.idx < totalCount() - 1) {
           state.idx += 1;
           renderQuestion();

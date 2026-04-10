@@ -466,6 +466,22 @@
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
+.uc-report-library-card {
+    align-content: stretch;
+}
+
+.uc-report-library-card-main {
+    display: grid;
+    gap: 0.9rem;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
 .uc-report-library-card--pending {
     grid-column: 1 / -1;
 }
@@ -570,6 +586,8 @@
     margin-top: auto;
     padding-top: 0.8rem;
     border-top: 1px solid #e2e8f0;
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
 .uc-report-library-chip {
@@ -586,6 +604,39 @@
     color: #1d4ed8;
     font-size: 0.84rem;
     font-weight: 800;
+}
+
+.uc-report-library-card.active {
+    border-color: rgba(37, 99, 235, 0.58);
+    box-shadow: 0 18px 40px rgba(37, 99, 235, 0.12);
+}
+
+.uc-report-library-card.is-deleting {
+    opacity: 0.72;
+}
+
+.uc-report-library-delete-btn {
+    min-height: 1.9rem;
+    padding: 0 0.78rem;
+    border-radius: 999px;
+    border: 1px solid rgba(248, 113, 113, 0.28);
+    background: rgba(255, 241, 242, 0.96);
+    color: #be123c;
+    font-size: 0.78rem;
+    font-weight: 800;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+}
+
+.uc-report-library-delete-btn:hover:not(:disabled) {
+    border-color: rgba(225, 29, 72, 0.4);
+    background: #ffe4e6;
+    color: #9f1239;
+    transform: translateY(-1px);
+}
+
+.uc-report-library-delete-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
 }
 
 .uc-section-subline {
@@ -2717,6 +2768,15 @@
 }
 
 .user-center-page .topbar-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.72rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
     background: #eef2ff;
     color: #1e3a8a;
     border: 1px solid rgba(37, 99, 235, 0.14);
@@ -2725,10 +2785,30 @@
 .user-center-page .topbar-icon-btn,
 .user-center-page .topbar-text-btn,
 .user-center-page .topbar-avatar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0 0.72rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
     background: #ffffff;
     color: #334155;
     border: 1px solid rgba(203, 213, 225, 0.92);
     box-shadow: none;
+}
+
+.user-center-page .topbar-icon-btn {
+    gap: 0.35rem;
+}
+
+.user-center-page .topbar-avatar-btn {
+    width: 2rem;
+    min-width: 2rem;
+    padding: 0;
 }
 
 .user-center-page .topbar-icon-btn:hover,
@@ -4041,4 +4121,1133 @@
     .crdoc-hero { padding: 1rem; }
     .crdoc-nav { border-radius: 1.1rem; }
     .crdoc-nav-btn { flex: 0 0 auto; }
+}
+
+/* Career Report Refresh */
+.career-report-shell {
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.04), transparent 36%),
+        linear-gradient(180deg, #f7f8fa 0, #ffffff 240px);
+    border-radius: 24px;
+}
+
+.career-report-main,
+.career-report-main * {
+    font-family: "PingFang SC", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.career-report-main {
+    min-width: 0;
+}
+
+.career-report-main > .crdoc-page,
+.career-report-main > .crdoc-full-head,
+.career-report-main > .ucrd-full-head,
+.career-report-main > .cr4-report-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding-left: 32px;
+    padding-right: 32px;
+}
+
+.career-report-main > .crdoc-page {
+    display: grid;
+    gap: 48px;
+    padding-top: 12px;
+    padding-bottom: 40px;
+}
+
+.career-report-main .crdoc-reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.career-report-main .crdoc-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.career-report-main .crdoc-hero,
+.career-report-main .crdoc-full-head {
+    position: sticky;
+    top: 10px;
+    z-index: 14;
+    border: none;
+    border-radius: 0;
+    padding: 0 0 16px;
+    margin: 0;
+    background: linear-gradient(180deg, rgba(247, 248, 250, 0.92), rgba(255, 255, 255, 0.82));
+    backdrop-filter: blur(18px);
+    box-shadow: none;
+}
+
+.career-report-main .crdoc-header-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 420px);
+    gap: 24px;
+    align-items: start;
+    padding: 20px 0 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.career-report-main .crdoc-header-copy {
+    display: grid;
+    grid-template-columns: 4px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.career-report-main .crdoc-header-bar {
+    display: block;
+    width: 4px;
+    min-height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.career-report-main .crdoc-kicker,
+.career-report-main .ucrd-kicker,
+.career-report-main .crdoc-card-label,
+.career-report-main .crdoc-section-kicker,
+.career-report-main .crdoc-target-mini-title,
+.career-report-main .crdoc-inline-title {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9ca3af;
+}
+
+.career-report-main .crdoc-hero h2,
+.career-report-main .ucrd-full-head-title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.4;
+    font-weight: 800;
+    color: #111827;
+}
+
+.career-report-main .crdoc-hero-summary,
+.career-report-main .ucrd-full-head-summary {
+    margin: 8px 0 0;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.career-report-main .crdoc-hero-body {
+    margin: 8px 0 0;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.career-report-main .crdoc-header-evidence {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.career-report-main .crdoc-header-evidence > span {
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.career-report-main .crdoc-header-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.career-report-main .crdoc-header-info-card {
+    display: grid;
+    gap: 6px;
+    min-height: 100%;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f3f4f6;
+}
+
+.career-report-main .crdoc-header-info-card span,
+.career-report-main .crdoc-header-info-card small {
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.career-report-main .crdoc-header-info-card strong {
+    color: #111827;
+    font-size: 17px;
+    line-height: 1.3;
+    font-weight: 800;
+}
+
+.career-report-main .crdoc-header-info-card.danger strong {
+    color: #ef4444;
+    font-size: 30px;
+    line-height: 1;
+}
+
+.career-report-main .crdoc-header-info-card.warn strong {
+    color: #f59e0b;
+}
+
+.career-report-main .crdoc-header-info-card.success strong {
+    color: #10b981;
+}
+
+.uc-report-view-switch {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f3f4f6;
+}
+
+.uc-report-view-btn {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.uc-report-view-btn:hover {
+    background: #e5e7eb;
+}
+
+.uc-report-view-btn.active {
+    background: #ffffff;
+    color: #6366f1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.career-report-primary-btn,
+.career-report-secondary-btn {
+    min-height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.career-report-primary-btn {
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 6px 16px rgba(99, 102, 241, 0.22);
+}
+
+.career-report-primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(99, 102, 241, 0.22);
+}
+
+.career-report-secondary-btn {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+}
+
+.career-report-secondary-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.career-report-main .crdoc-nav {
+    position: sticky;
+    top: 128px;
+    z-index: 10;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: rgba(243, 244, 246, 0.92);
+    backdrop-filter: blur(14px);
+    overflow-x: auto;
+}
+
+.career-report-main .crdoc-nav-btn {
+    min-height: 36px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 8px;
+    color: #6b7280;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-nav-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.career-report-main .crdoc-nav-btn.active {
+    background: #ffffff;
+    color: #6366f1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.career-report-main .crdoc-section {
+    display: grid;
+    gap: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    scroll-margin-top: 196px;
+}
+
+.career-report-main .crdoc-section-head {
+    display: grid;
+    gap: 10px;
+    align-items: start;
+}
+
+.career-report-main .crdoc-section-index {
+    width: auto;
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #9ca3af;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-section-title-group {
+    display: grid;
+    gap: 8px;
+}
+
+.career-report-main .crdoc-section-title-row {
+    display: grid;
+    grid-template-columns: 3px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.career-report-main .crdoc-section-accent {
+    display: block;
+    width: 3px;
+    min-height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.career-report-main .crdoc-section-head h3,
+.career-report-main .crdoc-card h4,
+.career-report-main .crdoc-plan-card h4,
+.career-report-main .crdoc-target-card h4,
+.career-report-main .crdoc-step-card h4 {
+    margin: 0;
+    color: #111827;
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-section-head > p,
+.career-report-main .crdoc-section-title-group > p,
+.career-report-main .crdoc-card > p,
+.career-report-main .crdoc-target-summary,
+.career-report-main .crdoc-insight-summary,
+.career-report-main .crdoc-inline-note,
+.career-report-main .crdoc-step-card p,
+.career-report-main .crdoc-cap-card p,
+.career-report-main .crdoc-trend-card > p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.career-report-main .crdoc-card,
+.career-report-main .crdoc-plan-card,
+.career-report-main .crdoc-trend-card,
+.career-report-main .crdoc-target-card,
+.career-report-main .crdoc-insight-card,
+.career-report-main .crdoc-alert-card,
+.career-report-main .career-report-side-card,
+.career-report-main .crdoc-step-card,
+.career-report-main .crdoc-cap-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.career-report-main .crdoc-card:hover,
+.career-report-main .crdoc-plan-card:hover,
+.career-report-main .crdoc-trend-card:hover,
+.career-report-main .crdoc-target-card:hover,
+.career-report-main .crdoc-insight-card:hover,
+.career-report-main .career-report-side-card:hover,
+.career-report-main .crdoc-step-card:hover,
+.career-report-main .crdoc-cap-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 12px 20px rgba(17, 24, 39, 0.06);
+}
+
+.career-report-main .crdoc-card,
+.career-report-main .crdoc-plan-card,
+.career-report-main .crdoc-trend-card,
+.career-report-main .crdoc-target-card,
+.career-report-main .crdoc-insight-card,
+.career-report-main .crdoc-alert-card {
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+}
+
+.career-report-main .crdoc-position-grid,
+.career-report-main .crdoc-path-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+    gap: 18px;
+}
+
+.career-report-main .crdoc-role-grid,
+.career-report-main .crdoc-trend-grid,
+.career-report-main .crdoc-plan-grid-4,
+.career-report-main .crdoc-insight-grid-3 {
+    display: grid;
+    gap: 18px;
+}
+
+.career-report-main .crdoc-role-grid,
+.career-report-main .crdoc-trend-grid,
+.career-report-main .crdoc-insight-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.career-report-main .crdoc-plan-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.career-report-main .crdoc-two-col,
+.career-report-main .crdoc-header-meta-grid,
+.career-report-main .crdoc-cap-grid,
+.career-report-main .crdoc-target-layout {
+    display: grid;
+    gap: 16px;
+}
+
+.career-report-main .crdoc-two-col,
+.career-report-main .crdoc-cap-grid,
+.career-report-main .crdoc-target-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.career-report-main .crdoc-card-topline,
+.career-report-main .crdoc-target-head,
+.career-report-main .crdoc-cap-head,
+.career-report-main .crdoc-step-card-head,
+.career-report-main .crdoc-fact-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.career-report-main .crdoc-card-meta,
+.career-report-main .crdoc-step-card-head small,
+.career-report-main .crdoc-fact-row span {
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.career-report-main .crdoc-empty-state {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 13px;
+    line-height: 1.7;
+    text-align: center;
+}
+
+.career-report-main .crdoc-issue-list,
+.career-report-main .crdoc-chip-cloud,
+.career-report-main .crdoc-task-list,
+.career-report-main .crdoc-stack {
+    display: grid;
+    gap: 12px;
+}
+
+.career-report-main .crdoc-issue-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.career-report-main .crdoc-issue-item {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.career-report-main .crdoc-issue-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 7px;
+    border-radius: 999px;
+    background: #9ca3af;
+}
+
+.career-report-main .crdoc-issue-item.warn .crdoc-issue-dot {
+    background: #f59e0b;
+}
+
+.career-report-main .crdoc-issue-item.danger .crdoc-issue-dot {
+    background: #ef4444;
+}
+
+.career-report-main .crdoc-issue-item strong,
+.career-report-main .crdoc-task-item strong,
+.career-report-main .crdoc-inline-evidence strong {
+    display: block;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.career-report-main .crdoc-issue-item p,
+.career-report-main .crdoc-task-item p,
+.career-report-main .crdoc-inline-evidence p {
+    margin: 2px 0 0;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.career-report-main .crdoc-inline-stack {
+    display: grid;
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px solid #f3f4f6;
+}
+
+.career-report-main .crdoc-inline-evidence {
+    padding: 12px 14px;
+    border: 1px solid #eef2f7;
+    border-radius: 10px;
+    background: #fafafa;
+}
+
+.career-report-main .crdoc-cap-card {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+}
+
+.career-report-main .crdoc-status-pill,
+.career-report-main .crdoc-time-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-status-pill.pending {
+    background: #f3f4f6;
+    color: #9ca3af;
+}
+
+.career-report-main .crdoc-status-pill.verified {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+}
+
+.career-report-main .crdoc-status-pill.failed {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+}
+
+.career-report-main .crdoc-time-pill {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+}
+
+.career-report-main .crdoc-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: #eef2f7;
+    overflow: hidden;
+}
+
+.career-report-main .crdoc-progress i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+    transform-origin: left center;
+    animation: crdocBarIn 0.8s ease both;
+}
+
+.career-report-main .crdoc-progress.is-pending {
+    background: repeating-linear-gradient(90deg, #e5e7eb 0 8px, #f7f8fa 8px 16px);
+}
+
+.career-report-main .crdoc-progress.is-pending i {
+    background: #cbd5e1;
+}
+
+.career-report-main .crdoc-trend-timeline {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.career-report-main .crdoc-trend-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #9ca3af;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.career-report-main .crdoc-trend-step i {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #d1d5db;
+    box-shadow: 0 0 0 4px #f3f4f6;
+}
+
+.career-report-main .crdoc-trend-step::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 14px;
+    right: -8px;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.career-report-main .crdoc-trend-step:last-child::after {
+    display: none;
+}
+
+.career-report-main .crdoc-trend-step.active {
+    color: #6366f1;
+}
+
+.career-report-main .crdoc-trend-step.active i {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.career-report-main .crdoc-trend-step em {
+    font-style: normal;
+}
+
+.career-report-main .crdoc-accordion {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f9fafb;
+    overflow: hidden;
+}
+
+.career-report-main .crdoc-accordion summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-accordion summary::-webkit-details-marker {
+    display: none;
+}
+
+.career-report-main .crdoc-accordion p {
+    margin: 0;
+    padding: 0 14px 14px;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.career-report-main .crdoc-accordion.muted {
+    background: #f3f4f6;
+}
+
+.career-report-main .crdoc-cloud-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-cloud-chip i {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.career-report-main .crdoc-cloud-chip.warn {
+    background: #fff7ed;
+    border-color: rgba(245, 158, 11, 0.24);
+    color: #b45309;
+}
+
+.career-report-main .crdoc-cloud-chip.warn i {
+    background: #f59e0b;
+}
+
+.career-report-main .crdoc-risk-note {
+    padding: 12px;
+    border-radius: 10px;
+}
+
+.career-report-main .crdoc-target-score strong {
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 800;
+}
+
+.career-report-main .crdoc-target-score.low strong {
+    color: #ef4444;
+}
+
+.career-report-main .crdoc-target-score.medium strong {
+    color: #f59e0b;
+}
+
+.career-report-main .crdoc-target-score.high strong {
+    color: #10b981;
+}
+
+.career-report-main .crdoc-skill-system {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.career-report-main .crdoc-skill-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-skill-chip.owned {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.career-report-main .crdoc-skill-chip.missing-core {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.career-report-main .crdoc-skill-chip.missing {
+    border: 1px dashed #d1d5db;
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.career-report-main .crdoc-missing-rail {
+    padding: 14px;
+    border-left: 3px solid #f59e0b;
+    border-radius: 10px;
+    background: #fff7ed;
+}
+
+.career-report-main .crdoc-step-flow {
+    display: grid;
+    gap: 18px;
+}
+
+.career-report-main .crdoc-step-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 16px;
+}
+
+.career-report-main .crdoc-step-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 36px;
+    bottom: -18px;
+    border-left: 1px dashed #d1d5db;
+}
+
+.career-report-main .crdoc-step-item.current::after {
+    border-left-color: rgba(99, 102, 241, 0.45);
+}
+
+.career-report-main .crdoc-step-node {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.career-report-main .crdoc-step-node span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-step-item.current .crdoc-step-node span {
+    border: none;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #ffffff;
+}
+
+.career-report-main .crdoc-step-card {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+}
+
+.career-report-main .crdoc-tip-card {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+}
+
+.career-report-main .crdoc-stage-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.career-report-main .crdoc-stage-node {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.career-report-main .crdoc-stage-node::before {
+    content: "";
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e5e7eb;
+}
+
+.career-report-main .crdoc-stage-node.active::before {
+    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.career-report-main .crdoc-stage-node span {
+    position: absolute;
+    left: 10px;
+    top: -18px;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-task-item {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.career-report-main .crdoc-task-check {
+    width: 16px;
+    height: 16px;
+    margin-top: 4px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 5px;
+    background: #ffffff;
+}
+
+.career-report-main .crdoc-alert-card {
+    border-left: 3px solid #ef4444;
+    background: #fef2f2;
+}
+
+.career-report-main .crdoc-insight-card {
+    position: relative;
+    padding-top: 0;
+    overflow: hidden;
+}
+
+.career-report-main .crdoc-insight-topline {
+    height: 4px;
+    margin: 0 -18px;
+}
+
+.career-report-main .crdoc-insight-card.breakthrough .crdoc-insight-topline {
+    background: #ef4444;
+}
+
+.career-report-main .crdoc-insight-card.risk .crdoc-insight-topline {
+    background: #f59e0b;
+}
+
+.career-report-main .crdoc-insight-card.strength .crdoc-insight-topline {
+    background: #10b981;
+}
+
+.career-report-main .career-report-side-card {
+    margin: 0;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.career-report-feedback-actions {
+    gap: 10px;
+}
+
+.career-report-feedback-pill {
+    min-height: 38px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.career-report-feedback-pill.active {
+    border-color: transparent;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #ffffff;
+}
+
+.career-report-feedback-input {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.career-report-feedback-input:focus {
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+
+.career-report-feedback-submit {
+    width: 100%;
+}
+
+.career-report-main a,
+.career-report-main em {
+    color: #6366f1;
+}
+
+.career-report-main a:hover {
+    color: #4f46e5;
+}
+
+@keyframes crdocBarIn {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+@media (max-width: 1180px) {
+    .career-report-main > .crdoc-page,
+    .career-report-main > .crdoc-full-head,
+    .career-report-main > .ucrd-full-head,
+    .career-report-main > .cr4-report-shell {
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    .career-report-main .crdoc-header-main,
+    .career-report-main .crdoc-position-grid,
+    .career-report-main .crdoc-path-grid,
+    .career-report-main .crdoc-role-grid,
+    .career-report-main .crdoc-trend-grid,
+    .career-report-main .crdoc-plan-grid-4,
+    .career-report-main .crdoc-insight-grid-3 {
+        grid-template-columns: 1fr;
+    }
+
+    .career-report-main .crdoc-header-meta-grid,
+    .career-report-main .crdoc-cap-grid,
+    .career-report-main .crdoc-two-col,
+    .career-report-main .crdoc-target-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .career-report-main .crdoc-nav {
+        top: 164px;
+    }
+}
+
+@media (max-width: 820px) {
+    .career-report-main > .crdoc-page,
+    .career-report-main > .crdoc-full-head,
+    .career-report-main > .ucrd-full-head,
+    .career-report-main > .cr4-report-shell {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .career-report-main .crdoc-hero,
+    .career-report-main .crdoc-full-head {
+        top: 0;
+    }
+
+    .career-report-main .crdoc-nav {
+        top: 154px;
+    }
+
+    .career-report-feedback-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .career-report-shell {
+        border-radius: 18px;
+    }
+
+    .career-report-main .crdoc-page {
+        gap: 36px;
+    }
+
+    .career-report-main .crdoc-hero h2,
+    .career-report-main .ucrd-full-head-title {
+        font-size: 24px;
+    }
+
+    .career-report-main .crdoc-section-head h3,
+    .career-report-main .crdoc-card h4,
+    .career-report-main .crdoc-plan-card h4,
+    .career-report-main .crdoc-target-card h4,
+    .career-report-main .crdoc-step-card h4 {
+        font-size: 16px;
+    }
+
+    .career-report-main .crdoc-card,
+    .career-report-main .crdoc-plan-card,
+    .career-report-main .crdoc-trend-card,
+    .career-report-main .crdoc-target-card,
+    .career-report-main .crdoc-insight-card,
+    .career-report-main .crdoc-alert-card,
+    .career-report-main .career-report-side-card,
+    .career-report-main .crdoc-step-card,
+    .career-report-main .crdoc-cap-card {
+        padding: 16px;
+    }
+
+    .career-report-main .crdoc-stage-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .career-report-main .crdoc-stage-node span {
+        position: static;
+        margin-bottom: 8px;
+    }
+
+    .career-report-main .crdoc-nav {
+        top: 142px;
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+.career-report-main .cr4-report-shell,
+.career-report-main .cr4-report-index,
+.career-report-main .cr4-group-hero,
+.career-report-main .cr4-module,
+.career-report-main .cr4-card,
+.career-report-main .cr4-stat-card,
+.career-report-main .cr4-dim-card,
+.career-report-main .cr4-report-index-item,
+.career-report-main .cr4-group-module-pill {
+    border-color: #e5e7eb;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.career-report-main .cr4-module:hover,
+.career-report-main .cr4-card:hover,
+.career-report-main .cr4-report-index-item:hover,
+.career-report-main .cr4-group-module-pill:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+.career-report-main .cr4-report-shell,
+.career-report-main .cr4-report-index,
+.career-report-main .cr4-group-hero,
+.career-report-main .cr4-module {
+    border-radius: 16px;
+}
+
+.career-report-main .cr4-kicker,
+.career-report-main .cr4-report-index-kicker,
+.career-report-main .cr4-group-kicker,
+.career-report-main .cr4-module-index {
+    color: #9ca3af;
+}
+
+.career-report-main .cr4-report-index-title,
+.career-report-main .cr4-group-title,
+.career-report-main .cr4-module-title,
+.career-report-main .cr4-card-title {
+    color: #111827;
+}
+
+.career-report-main .cr4-report-index-copy,
+.career-report-main .cr4-group-summary,
+.career-report-main .cr4-module-summary,
+.career-report-main .cr4-inline-note,
+.career-report-main .cr4-detail-item p,
+.career-report-main .cr4-detail-item small {
+    color: #6b7280;
+}
+
+.career-report-main .cr4-progress-bar {
+    background: #eef2f7;
+}
+
+.career-report-main .cr4-progress-fill {
+    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
 }

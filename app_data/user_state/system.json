@@ -1,6 +1,6 @@
 {
   "assessment_hub": {
-    "savedAt": 1775783658807,
+    "savedAt": 1775840907708,
     "mbti": {
       "currentIndex": 0,
       "answers": {},
@@ -195,11 +195,14 @@
     }
   },
   "career_report": {
-    "status": "ready",
-    "job_id": "1ed95cbdb4144b98af053a8d30c2d404",
+    "status": "canceled",
+    "job_id": "2474345cf3b549179272e617dc3e093c",
+    "report_id": "report-c3372f2a5ab4",
+    "generated_at": "",
     "stage": "report_writer",
     "stage_label": "报告合成",
-    "stage_detail": "报告生成完成",
+    "stage_detail": "用户已停止本次生成，旧任务不会写入报告。",
+    "error_message": "",
     "progress": [
       {
         "key": "industry_analysis",
@@ -250,350 +253,22 @@
         "status": "active"
       }
     ],
-    "error_message": "",
-    "generated_at": "2026-04-09 20:11:00",
-    "report_id": "report-8adb5b52792d",
     "model": "deepseek-chat",
     "generation_mode": "llm",
     "focus_role_id": "java_backend",
-    "title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
-    "summary": "智能科学与技术专业背景，希望从事AI产品运营，价值观强调策略、落地、推进和解决问题，目标城市杭州，倾向于在技术应用层面发挥商业价值。",
+    "title": "",
+    "summary": "",
     "export_formats": [
       "html",
       "md",
       "docx"
     ],
-    "tracker": {
-      "report_id": "report-8adb5b52792d",
-      "report_title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
-      "report_version": "2026.04-v3",
-      "focus_role_id": "java_backend",
-      "focus_role_name": "Java 后端开发",
-      "generated_at": "2026-04-09 20:11:00",
-      "last_synced_at": "2026-04-02 03:03:16",
-      "completion_rate": 0,
-      "completed_count": 0,
-      "doing_count": 0,
-      "total_count": 4,
-      "next_focus": "完成首个AI产品运营分析项目",
-      "ability_summary": {
-        "improved_count": 0,
-        "declined_count": 0,
-        "stable_count": 6
-      },
-      "plan_items": [
-        {
-          "id": "short-1",
-          "phase": "0-3m",
-          "title": "完成首个AI产品运营分析项目",
-          "objective": "",
-          "focus_points": [],
-          "signals": [
-            "报告获得业内人士认可",
-            "能清晰讲解项目逻辑",
-            "掌握基础数据查询"
-          ],
-          "status": "pending",
-          "started_at": "",
-          "completed_at": "",
-          "note": "",
-          "updated_at": "",
-          "is_phase": true
-        },
-        {
-          "id": "t-0",
-          "phase": "0-3m",
-          "title": "学习AI产品运营知识体系",
-          "objective": "学习AI产品运营知识体系",
-          "focus_points": [],
-          "signals": [],
-          "parent_phase": "short-1",
-          "status": "pending",
-          "started_at": "",
-          "completed_at": "",
-          "note": "",
-          "updated_at": "",
-          "is_task": true
-        },
-        {
-          "id": "t-1",
-          "phase": "0-3m",
-          "title": "完成一份深度产品运营策略分析报告",
-          "objective": "完成一份深度产品运营策略分析报告",
-          "focus_points": [],
-          "signals": [],
-          "parent_phase": "short-1",
-          "status": "pending",
-          "started_at": "",
-          "completed_at": "",
-          "note": "",
-          "updated_at": "",
-          "is_task": true
-        },
-        {
-          "id": "t-2",
-          "phase": "0-3m",
-          "title": "掌握SQL和Python数据分析基础",
-          "objective": "掌握SQL和Python数据分析基础",
-          "focus_points": [],
-          "signals": [],
-          "parent_phase": "short-1",
-          "status": "pending",
-          "started_at": "",
-          "completed_at": "",
-          "note": "",
-          "updated_at": "",
-          "is_task": true
-        }
-      ],
-      "checkpoints": [
-        {
-          "id": "checkpoint-item",
-          "label": "阶段复查",
-          "summary": "定期复盘并更新报告",
-          "status": "pending",
-          "completed_at": "",
-          "note": "",
-          "updated_at": ""
-        }
-      ],
-      "ability_growth": [
-        {
-          "key": "professional_skills",
-          "label": "专业技能",
-          "baseline_score": null,
-          "current_score": null,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [],
-          "history": []
-        },
-        {
-          "key": "general_ability",
-          "label": "通用能力",
-          "baseline_score": null,
-          "current_score": null,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [],
-          "history": []
-        },
-        {
-          "key": "communication_collaboration",
-          "label": "沟通协作",
-          "baseline_score": null,
-          "current_score": null,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [],
-          "history": []
-        },
-        {
-          "key": "learning_agility",
-          "label": "学习能力",
-          "baseline_score": null,
-          "current_score": null,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [],
-          "history": []
-        },
-        {
-          "key": "execution",
-          "label": "执行交付",
-          "baseline_score": null,
-          "current_score": 31,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [
-            "基础信息",
-            "访谈",
-            "简历"
-          ],
-          "history": [
-            {
-              "score": 61,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:33:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 61,
-              "at": "2026-04-01 19:33:24",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:33:25",
-              "event": "profile_sync"
-            },
-            {
-              "score": 61,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:34:16",
-              "event": "profile_sync"
-            },
-            {
-              "score": 61,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            },
-            {
-              "score": 31,
-              "at": "2026-04-01 19:42:34",
-              "event": "profile_sync"
-            }
-          ]
-        },
-        {
-          "key": "practice_maturity",
-          "label": "实践积累",
-          "baseline_score": null,
-          "current_score": null,
-          "delta": null,
-          "baseline_sources": [],
-          "current_sources": [],
-          "history": []
-        }
-      ],
-      "versions": [
-        {
-          "report_id": "report-8adb5b52792d",
-          "title": "智能科学与技术专业 · Java 后端开发 · 职业生涯发展报告",
-          "version": "2026.04-v3",
-          "generated_at": "2026-04-09 20:11:00",
-          "focus_role_id": "java_backend",
-          "focus_role_name": "Java 后端开发"
-        },
-        {
-          "report_id": "report-438a04f38e32",
-          "title": "智能科学与技术专业 · ['Java后端开发', '数据分析师', '新媒体运营'] · 职业生涯发展报告",
-          "version": "2026.04-v3",
-          "generated_at": "2026-04-09 13:02:00",
-          "focus_role_id": "java_backend",
-          "focus_role_name": "内容创作/编辑"
-        },
-        {
-          "report_id": "report-ef851f2fa501",
-          "title": "工商管理 · ['内容创作/编辑', '销售管培生', '项目管理助理'] · 职业生涯发展报告",
-          "version": "2026.04-v3",
-          "generated_at": "2026-04-09 12:53:43",
-          "focus_role_id": "content_editor",
-          "focus_role_name": "内容创作/编辑"
-        },
-        {
-          "report_id": "report-a347cbeb7a73",
-          "title": "内容创作/编辑规划报告",
-          "version": "2026.03-v1",
-          "generated_at": "2026-03-30 22:35:07",
-          "focus_role_id": "content_editor",
-          "focus_role_name": "内容创作/编辑"
-        }
-      ]
-    }
+    "tracker": null,
+    "feedback": null
   },
   "career_plans": {
     "version": 3,
     "plans": [
-      {
-        "id": "report_short-1",
-        "title": "完成首个AI产品运营分析项目",
-        "summary": "",
-        "phase_key": "short",
-        "source": "report",
-        "role": "Java 后端开发",
-        "timeline": "0-3m",
-        "report_id": "report-8adb5b52792d",
-        "created_at": "2026-04-10T01:14:44.646Z",
-        "updated_at": "2026-04-02 03:03:16",
-        "items": [
-          {
-            "id": "t-0",
-            "title": "学习AI产品运营知识体系",
-            "note": "",
-            "tag": "实践",
-            "deadline": "",
-            "xp": 20,
-            "done": true
-          },
-          {
-            "id": "t-1",
-            "title": "完成一份深度产品运营策略分析报告",
-            "note": "",
-            "tag": "实践",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "t-2",
-            "title": "掌握SQL和Python数据分析基础",
-            "note": "",
-            "tag": "实践",
-            "deadline": "",
-            "xp": 20,
-            "done": false
-          },
-          {
-            "id": "short-1_signal_0",
-            "title": "报告获得业内人士认可",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          },
-          {
-            "id": "short-1_signal_1",
-            "title": "能清晰讲解项目逻辑",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          },
-          {
-            "id": "short-1_signal_2",
-            "title": "掌握基础数据查询",
-            "note": "",
-            "tag": "验证",
-            "deadline": "",
-            "xp": 16,
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "report_review_report-8adb5b52792d",
-        "title": "路径复查与动态回看",
-        "summary": "把需要周期性回看的复查节点统一放到长期阶段里。",
-        "phase_key": "long",
-        "source": "report",
-        "role": "Java 后端开发",
-        "timeline": "长期阶段 · 复查节点",
-        "report_id": "report-8adb5b52792d",
-        "created_at": "2026-04-10T01:14:44.646Z",
-        "updated_at": "2026-04-02 03:03:16",
-        "items": [
-          {
-            "id": "checkpoint_0_阶段复查",
-            "title": "阶段复查",
-            "note": "定期复盘并更新报告",
-            "tag": "复查",
-            "deadline": "",
-            "xp": 18,
-            "done": false
-          }
-        ]
-      },
       {
         "id": "plan_1775043425509",
         "title": "我的职业规划 2026/4/1",
@@ -633,7 +308,7 @@
         "2026-04-09": true
       }
     },
-    "updated_at": "2026-04-10T01:14:44.646Z"
+    "updated_at": "2026-04-10T07:44:32.156Z"
   },
   "profile_portrait": {
     "status": "ready",
@@ -797,20 +472,26 @@
       }
     }
   },
+  "account_avatar": {
+    "source": "uploaded",
+    "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAFoAWgDASIAAhEBAxEB/8QAHQABAAEEAwEAAAAAAAAAAAAAAAgEBgcJAQMFAv/EAEMQAAEDAwIDBQUGAggFBQAAAAABAgMEBQYHEQgSIRMxQVFhInGBkaEUI0JSscEyYhUWJDM0Q3KSF2OCwtElJjVTov/EABwBAQACAgMBAAAAAAAAAAAAAAAFBgQHAgMIAf/EADoRAAIBAgMFBgUDAwQCAwAAAAABAgMEBRExBhIhQVEHE2FxkaEiQoGx0TJSwRQVI2JyguE0Q9Li8P/aAAwDAQACEQMRAD8AtwAHsUoQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABcGDZndsDyKmyC0TOa+F20kaL0lZ4tVAW+CGxHZ7DcVqKteUlKSWWfgZFK6rUFu05ZIAAmTHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPtsMz12ZE92/k1VKqGy3ioRXQWqrkRO9WQOXb5IcZTjH9TyCTehRA9JcayJrUc6w3BEXuX7M/ZfoU89rudNulRb6mLbv54nJ+qHFVqcuCkvU+7rXIpQfTmPb/Exye9DspqSqrJWw0lNLNI5dmsjYrlVfchzbSWbPh0gzFgXCvqpnDY6p9rbZ6J/Xt65eRdv9H8X0M/4VwRYPamNnzG71d3nTZeSHaGJPRU6qvzQquJ7a4NhbcalXekuUfif4X1Zm0cPuK3FRyXiQgax715WMVy+SJuVsdgvsyI6Gy18iL3K2meu/wBDZrYdHtM8ajay04bbY1am3M+FHuX4u3LnhtNrp0RsFupo0b3I2JqbfQptx2r0k8re2bXjLL7JkhDBJfNP2NT1Ta7nRJzVluqoE85YXN/VClNm+qeRaW4XYZa3PKS3PhkarWU74Gvkm9Gptv8AE1y5vcMduuV3K4YnbZLfaZ51fS073brG3y+e5b9ltqKu0cZTlbunFfNnnF+CeS4mBe2cbRpKeb6czwgAW4wQAADIGiOl9RqxnVLjqOfHRR/fVsrU6siTv29V7jK/Ezw3WHTfHqTK8LbU/ZGSJDWRyv5+XdOj99vPp8UMpcFWCQ2TAqjMJ4/7Ve5VRjlbsqQs6In+7mUzDqribc40+veMqiK+rpXdn03+8b7TfqiGmMa21uLfaSMKU8qFOSjJcnyk35cvIsFvh0J2jcl8T4r+DVqDvrqKpt1ZNQVcT4poHujex7VRUVF27lOg3MmpLNFf0AAPoAAAAAAAAAAAAAAAAAAAAAAAAAAAABU2+3V11rIqC20ktTUTORkccbVc5yqvToh8lJRW9J5IJZ6FMXHiOnmZ51VpR4tYKqucve9jFRjfe5eiEmtGuDSJYob9qi5XK7Z8dtidtt4/eO/YlRYsesmM2+O1WC101BSRJs2KCNGN9/TxNZ4/2k2lhJ0MOj3s1z+Vfy/ZeJMW2ETqfFVeS9yIuFcDV4qo4avN8ihpEd1fS0yc70TyV3d8jM+O8JujNhYztcedcpG9VdWSLIir7lMyA1diG2WNYi33ldxXSPwr2/kmaVhb0tI5+fEty26dYJZ+lsxK10/Tl9inanQ9llrtkTeWO3UzUTwSJqfsVQK9UuKtV5zk35tsylGMdEdC0FCqbLRwbJ/y0OmoslnqmLHU2qkkavejoWr+xWg4KclxTPuSLNvGjumF+a5LphFpmVybcy07UcnuU78X0s09wxP/AG3idvo3+MjIU51+JdYMl4hdyp9y6st3pvPL0zOHdQT3t1ZnCIiJsibIcgGGdgKO83Smslqq7vVu5YaOF0z19GpuVhbuodlqMiwa+WSkXaasopYo+u3VU6HdbxhOrGNR5RbWflnxOMm1FtGt7VfUq96n5dWX661MjoVkc2kgV3swxIvRqJ9V9VLMO+upKigrJ6KridFNBI6ORjk2VrkXZUU6D1xaW9G1oQo0ElCKSWXQo05SnJylqAAd5xBy1qvcjU71XY4Oyn/xEX+tv6h8EDZ9ozao7LpZjFvYzlVlthc9Ntvbc1Fd9VUvQt/T9Udg9hVFRUW3wbKn+hC4DyJfTlVuqk5auTfuXqkkoJLoR24guFqk1DqJstwx0VHfHN5p4XezHVKn0a5fMhhlWDZZhVc+35NY6qhljXZVkjXlX1R3cqG1g8y/43Yspt8lqyG1U1fSyps6KeNHp7+viXfZ3tBvMHpxtrmPeUlpxykl4PmvB+pHXeF07hucHk/Y1OAk9xB8KL8UpZsw09jlqLcxVfU0P8T4G/mavi308CMSoqLsqbKhu/B8atMctlc2cs1zXNPo0Vy4t5209yojgAEqdIB9cj+Xn5F5fPboVtssV6vVQyltNqqquWRUa1sUTnbqvd3HGU4wW9J5IJN8EUKIqrsibqpnnTLhGzPUDGHZLWXCGzsmaq0kVRG5Xy9OjlRO5DIGgHCTUw1dPl2ptM1rY+WWntjk3VXd6LJ9OhLqOOOGNsUTGsYxEa1rU2RETuRDU+1vaF/TT/pcHkm1+qeq8lyfi/QnLHC99b9deSNUeXYrdsKyGtxq9w9nV0Uiseng5PByei9545mbi4qoarWy69ijd4oYGOc3xVI0MMmycIu6l/YUbqqspTjFvzaIivBUqsoLRMAAkTqAAAAAAAAAABUUFDV3Otgt9DA+aoqHpHGxibq5yrsiIh8bUVm9BqV2LYte8yvdNj2P0T6qsqno1jWp0RPFyr4InmT+0K4d8d0otsVxr4Y67IpWffVTk3bFv+FieHvPjh00Kt+lWOsuNzpYpMirmI6om23WJqpukaeW3iZlNB7a7aVMVqSsbGWVFcG18/8A9ei56ss+H4eqKVSovi+3/YABrclgAAAAAAAAAAAAAAAAACM/EFwpNzW4VGZ4JJFTXOVFkqqR6bMqX/mav4V2+ZDK/Y/ecZuc1nvtvno6uBytfHKxWr703709TbKY81b0TxDVq0vp7tSMguLGr9mr427SRu9fNPQ2Xst2g1sMUbTEfjpLgn80V/KXr06ERe4XGtnUpcJezNZgL11R0nynSm+vtF/pXLC5V+z1TU+7mb5ov7FlG87a6o3lKNe3kpRlxTRW5wlTk4yWTByiqioqd6HAO84mzrQq6tvGkeLViORypboonL/MxOVfqhfhG/gnzeC8YHVYhLL/AGqzTq9jFX/Jf1RU/wCrmJIHlTaOylh+K3FCS0k2vJvNezLraVFVoRkugABCmQfE0MVRDJTzMR8crVY9q9ytVNlQ1ycR+mK6eanVdvttOv2C5r9qomtTfZHL1YnnspseLavuneJ5LkVuye92uOrrbW1zabtE3a3fxVPFfItWyW0j2bu5VpJyhKLTS5vl78+jZhX1p/VwUVwaIcaScH2T5lBBe8yqHWW3SJzNh5d55G+78Px+RJnGOGfR7FmMWnxaOsmaiIs1Y7tXO96d30MpIiNRERNkTuQ5GL7ZYti8251XCH7YvJe3F/UULChQXBZvqy2U0z0/SPskw20cn5fsjNv0PTteM47Y02s9joaP1ggaxfmiHpgrk7qvUW7Oba8WzLUIrikD5e5GMc93c1FVT6LK1kzWnwHTi9ZFNIjXx0zooN/GV6crP/0qC1t53daFCms5SaS83wE5KEXJ6I14aw3xuR6m5Hdo3K6OWvlSNVXf2EcqJ9CzTsnmfUTyVEi7uker196rudZ63taCtaEKEdIpL0WRRpyc5OT5gAHecQAAAAAAAAAS54N9FoZmf8UchpEeiKrLZHI3uVF6ydfopHbSbAq3UfO7ZjFIxVZPKj6h23RkTer1+SKbObLaKGw2qks1tgbDS0cLYYmNTZEa1NkNY9pG0TsbZYbbvKdRZy8I9P8Al9kyYwm17yffS0WnmVoANEFlAAAAAAAAAAAAAAAAAAAAAAAALcz3Acc1Gx+fHckoWTwTNVGP29uJ3g5q96Ka8dZtF8j0hv76O4ROntk71WirWp7MjfJfJyeRsxLfznB8f1Bx2qxvI6Jk9PUNVGuVqc0TvBzV8FQuOye1tfZ2vuT+KjJ/FHp4rx+5gX1jG7jmuElozVSDIWsmjmQ6Q5C633GN01vncq0VY1PZlb5L5OTyMenoy0u6F/QjcW8lKElmmip1KcqUnCayaMl8Pupi6YaiUV1qFctvq1SlrGtX8Dl6O+C/ubJaSqp66lirKSVskM7Ekje1d0c1U3RTUeS34UeIiGlig01za4crUXktlVK7on/Lcq/RV9xrTtF2YnfQWKWkc5wWUktXHr9Ofh5ExhV4qT7mej0Jfg4RUciOaqKi9UVDk0aWMAAAAAAAAAEKuNHViO83iDTiz1DZKW3Kk1a5q7os3g34ddzNfETr9atLrJNZbVUsnyOrjVsMTV37Bqp/eO8vRDX1XVtVcqyavrp3zVFQ90kj3LurnKu6qba7OdmJ1Kyxe6jlGP6M+b/d5Ll4+RB4teJR7iD4vU6AAbrK8AAAAAAAAAADspoJKqoipoWq6SV7WNaniqrsiBvJZsEyeB/AForPcs+rYU56132WkVU6oxvVy/FdiVJamlmNRYjp7YrBFE2Naajj50RNt3qm6qvr1LrPKu0eJyxfFK109G8l5LgvYutpRVCjGAB8vkZG1XyPa1qeLl2Q86pybHaNdqq+0ES9ejqhifuQ8YSnwiszvbS1PTB5EWXYtM/s4sitznL4JUs/8nowVdLVJzU1TFKnmx6O/QSpTh+qLX0Caeh3AA4H0AAAAAAAAAAAAAAAAAAAAAtzPcDx/UXHKnHMho2SwzsVGPVu7on+Dmr4Khrt1i0cyPSLIX225RPmt8zlWjrUb7ErPXyd6GzUt/OMFxzUKwT47ktAyopp2qiLts+N3g5q96L7i47J7W19nK25P4qMtY9PFePhzMC+sY3cc1wkjVSfTHvjekkbla5q7oqLsqKZc1r4dMr0prpK2nhkuNhkcvY1cbVVY08pE8F9TEJ6IsMQtsUoK4tZqUH0+z6PwKrVpToy3JrJkpNBeLeqsMdNieo8klVRIrYqevROaSJO5Ef4uT1JmUlVT11NFWUkzZYJ2JJG9q7o5qpuiopqnw+xVGTZPbLDSsV0lbUsiTbyVeptQsdpp7DZqKy0v9zQwMp4/wDS1Nk/Q0l2kYRh+G3NOrardnUzcktOGXHLlmyw4TXq1oOM+KWhXAA1mTABhvWriTsWjt2p7FU2OquFbUU/2hOzejWNbuqJuq+4wRkXHNmtY1Y8bx6gt6L3SS7yuT4L0LVhmxmMYtSjXoUsoS0baS/PsYVbELeg3GT4omnXXGgtlO+ruNZDTQsTd0ksiMaie9SM2s/GLZrTT1Ng01cldXrvE6uc1eyiXuVW/m9/cRYzTVfPtQJu1yfI6qpYi7thR6sib7mJ0LRNkYD2aW9pJV8Tn3kl8q/T9Xq/YibnF5TW7RWXjzK683q6ZDcZrtea6Wrq6h3NJLK7dyqUIBtGEI04qMVkkQrbbzYAByAAAAAAAAAAL30VsP8AWXVLHLQqbtkrWPd036M9v/tLIM38HttbX6zUUzm7rRU0s6ei7cv/AHETj1w7TC7istVCXrlwO+2hv1ox8UbBmtaxqMamyNTZEPieVIIJJlTdI2K7bz2Tc7D4mZ2sMkf52q35oeUVrxLsa4dYdbM+y/MLrGuRV9HQQ1UkMFLTzuiY2NrlRN+XbdfeYxnrayqf2lTVzTOX8UkiuX6nu6kUjqDUDI6JzVasN0qWbKnlI4ts9Z4XaW1taU428FFbq0XgUetOc5tzefE7GVE8buaOaRrvNHKinr2zN8ysz2vtWVXal5O5sVbI1vyRdjxAZtSjTqrKpFNeKzOtScdGZpxri41jx9scM94gucMa/wAFXA1VVPLmTZfqZmwnjksNZyU+cY/NQvVURZ6Re0Z71auyp81IYArWIbF4JiKe/QUX1j8L9uHsZlLELilpLPz4m0zDdT8Fz6Bs2MZFSVTnf5POjZU/6F6l1GpO3XS42iqZXWuunpJ413bJDIrHJ8UM/aW8Yua4tLDbczal7tjdmrIvSoYnnv8Ai93Q1xjPZjc26dXDZ94v2vhL6PR+xLW+MQn8NZZePIncCztPNWMJ1Ot6V2L3eOV6InaU715Zo18lavX49xeJrC4tq1pUdGvFxktU1kyYjOM1vReaAAOk5AAAAAAA6Zqulp3I2epijVe5HvRFX5mMOJHUa+aaaczXjHqRZKypmbStl2VUgRyKvOvy+pr5uea5deKx9fcskuU00i8yuWpenX0TfoXnZnYe42jt3dd6oQTyXDNtrwzWRG3mIxtJbmWbNrTXNciOaqKi9yocmsfD9dNUMIqIprRlNVJHGv8AcVL1ljcnkqKu/wBSZWh3EzjmqMcdlvCx2y/oiJ2LnbMnXzYq/p3nHHtg8RwSm7hZVKa1cdV5rp6n22xOlcPdfB+Jm4AFIJE6aukpa+mko62minglarXxyMRzXIvgqL0UjjqtwaYzkjqi8YHUpaK96q9aVyb073eSfk+G6ehJQEpheM32C1e9sqji+a5PzWjOmtb07iO7UWZEHh34Z83w7UpuRZrbooKW1xudTvZKj2yyL0Tbx6d5L4A7ccxy6x+5V1dZZpJcNMkcba2haw3IAAEMZBB3jmp0bqFaajxfbkb3+CPUjWZ940rp9t1eWhR2/wBgoYo9t+5XJzfuYCPUOx8JU8CtlL9qfrxRTb9p3M8uoABZDEAAAAAAAAAAAAAAABIngggZLqjWyL/FFbXqi/8AUhHYkDwU1PZatSwq9W9tb5E2379lToVza9N4HdZftZl2H/kw8yeoAPLpcjWrxH2l1m1lySnWJWJLU/aE3Tv505t/qYzJGcbmOS2/Umjv7Wr2NyoWN32/zGKqL9FaRzPVGzN0rzB7aqv2JfVLJ+6KXeQ7uvOPiAATpjAAAAAAHo2LIL1jVwiuthudRRVULkcySF6tVF+BMTQ7i+ob+6mxjUjs6OuVEjiuCdI5V7k5/wAq+vcQqOUVUXdF2Ugcd2bsdoKW5cx+JaSWq/K8HwMm2u6trLOD4dDblFLFPG2aGRr2PRHNc1d0VPND7IH8PfE/dMCqKfFcxqJa2wvdysmcqvlplXbbZV72+ngTltN2t18t0F1tVXHU0tSxHxyxu3RyKeedodm7vZ247qus4P8ATJaP8Pqi1Wt3Tu45x15oqwAV4ygAACjutrtl4oZaC8UcFVSyJ95HM1HNVPXcxJNoBw9ZTLVW6itdC6paq9q2jquV8a+5q9DJOe2u53rDLzabLMsVdVUckUD0XZUeqdOvh5EPeHfRrV2wat0N3u9nrbdR0D5HVk00mzZGqipy9/tbqqKXDZ62lKyuLqF66MqazUU8t55Z9V5cM+JgXU8qkIOnvJ8+haPELw91Wj9XDc7ZUyVljrXqyKR6e1C78rv/ACYeoq6rttXFXUNQ+Cogcj45GO2c1ydyopO7jVq6eDSZlNK3eSoro0jXbu26r9CBRubYnFLjGsIjWvOMk3HPqlzf2IDEaMLevu09NSfHDLxCR6kW5MVyeojiv9FGiMeq7fa2J4p/Mnihn41N45f7li18o7/aKh0NXRSpLG5q7dU8PcvcbLdINS7bqnhdHkdE9jahWpHVwovWKVE6oav2+2Vjg9ZX1pH/AAzfFftl08ny9OhMYZeuvHu5/qXui9wAa5JYAAAHDnIxqvXuam6nJ4Wc3qLHcPvF6lfytpKOWRF9Uaux2Uqcq1SNOOraXqfJPdTbNcmu9+XI9WsluPOj2pXSQsVO7lYvKn0QsE7quolq6qaqmer3yvc9zl71VVOk9cWVvG0tqdvHSMUvRZFGqT7ybk+YABknAAAAAAAAAAAAAAAAGY+E26Mt2tdmie/lSsbLB7/YVf2MOF0aY3r+r2oFgu/NypBXxcy+SK7ZfopG4zbf1mHV6C+aEl9cnkdtvPu6sZdGjacD4hlZPCyeNd2yNRzV9FQ+zyZoXgjvxsYs+8aa0l+gh55LNV8z1RP4Y5ERHL82oQRNrOc41TZhiN2xuqYjmV9LJEiL+bb2V+exqzvVqqrHdqyz1sbmT0cz4Xo5Nl3auxvbsvxJV8PqWMnxpvNeUv8AvP1K1jNHdqqp1/gogAbPIcAAAAAAAAAGb+HbiFuOl12jsl+qZajG6l+0rF3ctMq/jYnl5oYQBg4lhtti1tK1uo5xl7eK6NHZRrToTU4PijbbbbjRXeggudunbNTVMaSRSNXdHNVN0UqSD3Clr/JilyjwHLK1XWmtkRKSeV/+GkXojd17mqTga5r2o5qoqKm6Knih5n2iwCvs9eO2q8YvjGXVfnqi32l1G6p78deZyACAMoAAAwBxo2OtumlTK+kjV7LbVtmmRE3VGKm2/uQgQbabzZ7df7XU2a7UrKikq41imiem6OavehBLXHhbybA6+e9YnSTXSxSuc9qRNV0lMn5XJ4p6m5OzjaS0oW7wq5luyzbi3o8+WfX7kBi1pOUu/gs1zMBma+FbVGpwLUOmtNVUq203tyU07XL7LHr/AAv9Ophp9HVxvWOSlla5F22ViopfmmejWoee3miWyWGrjpe2a59dJG5kMaIu6rzGycdhZXGH1aV7JRpyT4t6dH5p8URFs6kKsZU1xRs0B0UNO+kooKaSVZHRRtYr173Kid53nlNrJ5IuwAB8AMD8Y+YNxzSp9oimRlTe6hlMxE7+RF5nfDZFQzwQQ40s1S+6ixYzTTc9PZYUa7Zenau/iT4Fv2Gw3+5Y3STXww+N/wDHT3yMDEq3dW8ur4EeAAeliogAAAAAAAAAAAAAAAAAA+4ZXQysmYqo6NyORU8FRT4AazBtH0jyWLLtOLBfY5Ees9Gxr9vB7U2VF9ehd5GDgdzV1xxa6YVUy7yWyb7TAir17N/RfgionzJPnlXaPDnhWKV7V6KTy8nxXsy62lXvqMZ+AIJ8ZunDsbzqPMqGnVtFfW7yqidGzt7/AJpt8idhj/XLTWm1R0/r7A/2aqJq1NJIibq2VnVE+O23xMzZDGv7HilOvN/BL4ZeT5/R5M67+3/qaLitVxRrJBUXChqbZXVFurInRz00jopGOTZWuRdlQpz07FqSzWhTtAAD6AAAAAAAAADlrnMcj2OVrmruip3opOvhP1yTNrGmEZHVN/pi2MRtO5y9aiFP1VO75EEz2MSyi64ZkNFktmmWOqoZUkZsuyO82r6KVzajZ+ltDYyt5cJrjF9H+HozLs7p2tTe5cza8C0tLtQrVqZh9Fk9rkaqysRtRHv1ilRPaapdp5juKFS1qyo1llKLya8UXCMlOKlHRgAHScgcOa16crmoqL4KhyADyZ8Txiqn+01OPW6WVF3530zFdv79j0oYIKdiRwQsjanRGsaiJ9DsBzlUnNZSbZ8SS0AAOB9AAAPEzXJ6HDcVueS3CVjIqGmfKnMuyOft7Lfi7ZPiatskvlZkt+r7/XvV89fO+d6qviqkrONnVKLsqXTG11Lu0VW1Vw5e7l/Axfim/wAEIgm/OzXBXY2Er6qspVdP9q09Xx9Cs4vcd5VVKOkfuAAbJIgAAAAAAAAAAAAAAAAAAAAAyVw96gv071Ntl0kl5aOqf9kqkVeisf0RV9yqi/A2VRvbIxsjF3a5Eci+aKajGuVjkc1dlRd0U2E8KmqbNQNPobVcKlHXaxtbTTo5fakjRNmP9enevmah7T8Ec4wxWktPhl5fK/49Cdwa5yboS80ZsABpgsBCrjF0ZfZbuupVhpF+xV70bXsYnSOX8/ud+pF42y5DYLZk9mq7FeKVlRSVkbo5GPTdNlTv95rd1r0iu2kmWzWmoZJLbplWSiqVTpJGvgq+adym9+zzahX9usMuZf5IL4c/mj0819itYrZ91PvoLg9fBmPAAbOIcAAAAFRRUFbcp20tvpJqmZ3cyJiucvwQ+NqKzeg1KcFVXWu5WuTsrjQVFM/8ssatX6lKIyUlnF5oNZagAH0GZuGbWZ+l+XsoLrV8lhur2x1fMvsxO32ST028fQ2GQTxVMLKiCRHxyNRzHIu6Ki9ymo0mvwha4JfrazTbI6lPt1Cz+wSvd1mj/J70/Q1J2j7Md9D+72sfiX60ua5S+mj8PInMJvN19xP6fgk+ADSpYQAAAAAAAAAWpqbqBatNcQrcousiJ2DFSCPfrLKv8LULlrKumoKWWtrJmxQwsV8j3LsjWp3qa9eJTW2fVTKnUNoqnf1etrlZStTumdv1lX3+HoWrZLZyptDfKDX+KPGb8Onm/wAswr67VrTz+Z6GL8ryS4ZfkVfkd0lc+pr5nSuVV323XoieiJ0PJAPTFOnGjBU4LJJZJeCKg25PNgAHM+AAAAAAAAAAAAAAAAAAAAAAv3RbU6v0qzikyCnc51JI5Ia2JF2SSJV6/FO9CwgY93a0r6hO2rrOMlk0cqc5U5KcdUbaLJebdkNqpb1aKllRSVkTZYpGruitVNyuIT8JWvSY3Ws05yqsRttqnf2CZ69IZVXq1V8l6bevvJroqORHNXdF6op5g2iwGvs/eytqvGOsX1X56+JcrS5jdU1Na8zktHU3TXH9UcYqMcvkKJz+1DO1qc8MidzkX9i7gQ9vcVbWrGtRluyi801yZ3yipxcZaM1eapaW5HpXkctjvlO5Ylcq01SiexOzwVF8/NCzDaZqJpti+pthlsWS0LJWuRexmRPvIX7dHNU1/axaFZdpHc3/AG+mfU2iR+1NXxtVWO8mu8neh6C2R21oY5BW101GuvSXivHqvQq99h8rZ78OMfsY0ABfSMBK/gRobRUXLJKqemikroY4ezc9qKrGqq78u/cRQMscNGo0enep1DU10/Z264/2OqVV9lqOXo5fcv6lc2tsqt/gtehQ/VlmvHJp5fXIy7GpGlcRlLQn/k2BYdmNE+gyPHaKtiem274kR6e5ydU+CkVdW+C2soI6i96Z1bquNN3/ANGzLs9E8mO8fcu3vJjxyMmjbLE5HMe1HNcncqL3KfR57wbaTEsCqb1rUe7zi+MX9P5WTLTcWlK5WU19eZqVutpudjrpbZd6KakqoHK2SKVvK5qoUZsx1X0MwvVe3PiutEymuLWr2FdCxO0Yvr5oQS1Y0OzTSa4OjvNGs9ue5ewr4UVYnp4Iq+C+im9NmttbLH0qUvgrftfP/a+flqVu7w+pa/EuMev5MdlbZrvcLBdKa8WqpfT1VJI2WKRi7KiopRAuUoxnFxks0yPTaeaNk+g+str1cxWOp52RXejakddT79Ud+dPRTJ5q1001Hv8Apjk9PkVjqHN5HIlRDv7M0e/Vqmx/TbUfHdTsbhyHHqpr0ciJPDv7UEm3VrkPO22uyc8CuHcW6zoTfD/S+j/gteHXyuYbkv1L3LrABRCSAAABw5zWNVzlRERN1VfBDkjHxVcQy4tDPp1iM/8A6pOzlrqhq9adi/hT+Zf0UlMGwi5xu7jaWy4vV8kubZ03FeFvB1JlpcVvEQtykm04wqvY6jT2bhVRL/G5P8tq+XmRSPp73yPdJI5XOcu6qveqnyemsEwW2wK0jaW601fNvqyn3NxO5qOcwACXOgAAAAAAAAAAAAAAAAAAAAAAAAAAA+mPdG5HscrXNXdFReqKTS4XeJCO/wAFPp7m9a1lxhbyUNXK7bt2onRi/wAybdPMhWdkE81NMyop5XRyxOR7HtXZWuRd0VFILaDALbaG0dvX4Nfplzi/x1XMybW6naz34/VG3LvBFfhz4p6e7Q02FajViR1rUSKluD12SbwRr/JfUlMx7XtR7HI5rk3RUXoqHm3GcFu8CuXbXccnyfJrqn/+yLbb3ELmG/Bn0UV3s1rv9BLa7zQw1dLM1WvilajkVCtBFxlKDUovJo7mk+DIba08HFbRPnyHTDmqYXOdJJbXr7Uad/3a+KehF242q5WipfSXSgnpZo1VrmSxq1UX4m2stzKNPMKzOJYslxuirt0255I9np7nJsps3Au0q6sYKhiMe9ivmXCX15P2ZEXOEQqPepPJ+xqsOUVWqjmrsqLuik9r9wV6T3ed09DPdbWiqqpHTTNVqf72uX6nbivBppTj1bHXV7rheVjdzJFWSN7P5MRq/Uuj7TME7rfW/n03ePrnl7kd/aLjey4epcnDJkGQZHpDaKzIkkdPGjoI5ZE2WSJq7NX5dPgZWOihoaO2UkVBb6aOnpoGoyOKNuzWtTwRDvNEYhcwvLupcU47sZSbS6ZvQstKDpwUW88kCgvdis+SW2a0Xy3w1lJO3lkilajkVCvBiwnKnJSg8mjm0msmQe144TLnif2nKcAY+utKbyS0aIqy06d6qn5kI2PY+Nyse1WuauyoqbKim3NURU2VN0Uj1rVwk4/ncs2QYbJFZ7w/d74tvuJ3eqfhX1Tp6G3tle0XcStMYfDlP/5fn16kFe4Tn8dv6fggeX5pFq7kekmRx3a0zOlo5HIlZRq72JmfsvkpT5ho5qRg074sgxWtiiYqok7Gc8bk80c3fZOnjsWYqKi7KnVDa0lZYzbOnnGpTkuOTTXsQi7y3nnxTRtJ031KxrU/Hob/AI7VtejkRJ4FX7yB/i1yF2GrXTnUzKNML9FfMbrXM5XIs1O5V7Kdv5XJ4k+NGdfsT1ct7IoJG0N5jT7+hkcm6r4qz8zfqaF2s2JuMCm7i2TnQ684+D/PqWaxxGFytyfCX3MpAAoZJgsXUHRXTvUv77J7FHJVImzaqJVZKnvcnf7lL6BkW11Xs6irW83GS5p5M4zhGot2azRDbPeBu5UjZKzAcgSsRN1SlrERr/cjk6Ec8uwDL8FrXUOUWKpoXouyOexeR3qju5TaqefeseseR0jqG+2mlr6d3fHPGj0+vcbBwftLxGzahfJVY9dJeuj+q+pFV8IpVONP4X7GpkEoeKTh1xfA7MmdYeslJA+oSKehV3NGzm7lYq9U6+akXjc+C4zbY7aK7tc918MnqmtUyv3FvO2n3c9QACVOkAAAAAAAAAAAAAAAAAAAAAAAAAAA5a5zHI5jla5F3RUXZUJH6D8WN1w1KfF88fLcLOitjiqv4paZO7r+ZqfMjeCMxbB7PGrd295DNcnzT6p8juoV6lvLfps2x47ktiyy1w3rHbnDXUU6bslidui+novoemavNONWs00vubbhjN0eyNV+9pnrzRSp5K39yZWlPFtg+cshtuSObYrs5EarZXfcyO/ld4e5TRW0OwN/g7dW2Xe0uq/UvNfyvYslridKv8M+EjPIOunqIKqJs9NMyWN6btexyKip70OwoTWXBkmAAAAAAAAAAAAdc9PBUxrFUwRysXva9qORfgpZ970a0vyHmW64TbJXOXdXJFyr9Ni9DhVRE3VTvoXVe2e9Qm4vwbX2OMoRnwkszFE3C5olK9XphlOzf8LHuRP1PqPRPRDTqNcqksdJbUoF7b7W+ZzVj29d/oduqfEPp/pfDJT1lwZXXTlVY6Kncjnb/wAy/hQhBqzrpmmrNav9LVa09tY9XQUMTlSNnkq+a+qmwdnsF2h2hydavUhQercpcV0Sz4/Yi7q4tLXhGKcvJEjrpxxY5QZdLbqLHZ6yxQr2aVbHokj1T8TWr02967mUcb4ltHckhjfDl1PSSv23hq0WJzV8t16L8FNbRyiqnVC9XXZpg9enGNJyg0tU88/Fp/xkRsMXrxbcsmbXbdmGK3f/AOLyG31XTf7qdrv0U9Xtof8A7Wf7kNSLKqpj/u6iVv8ApeqFdHk2Qwt5Ir3WtTySZ3lt5kBV7J+P+K69Y/iRkxxv90Pc2uTVtJTxrLPVRRsb3uc9ERC1r7q7ppjSKt5zO1wOT8Hbo53+1OprHqb5eaz/ABV1qpeu/tSuXr8yjfJJIu8j3OXzVdzst+yimnncXLa8I5e7b+x8njb+SHuSH4n+Im16mxQ4jiTZHWmlmSaSpenL270RUTZO/l95HYA2ZhGE22C2sbO1WUV11b5tkPXrzuJupPUAAkjqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAByiqnVFOAAZAwDXTUjTmWJtjyCZ9FGvWjnXnicnlsvVPgqEkcK45MerGMp83x+eil7lnpF5419eVV3T5qQuBW8W2RwjGG53FJKX7o8H9ctfrmZdC+r2/CMuHRm0DGNaNMsthZLaMvt6uem/ZzSpG5Pg7YvGCqpqliSU1RHK1eqKxyOT6Go9rlaqOaqoqdUVPA96159mtlcjrVlNzp+XuRtQ7ZPgq7FEvOymDbdpcZeEln7r8ElTxt/+yHobVwa2LdxLa1W5rWMzmsla1e6VGu/Y9uHi81ohRUW800m/i+BF/cg6nZdi0X8FSD+rX8GSsZoPVM2GA15TcXWtEq7pe6ePpt7ECIeNXcS+ttc5V/r5WwtXvbE1iJ+gp9l2LSfx1IL6v8AAeM0FombJHPYxOZ7kanmq7Hh3nPMMx6J096ye20jW9/PUN3+SdTWjc9VNRrwituOZ3WZHbqqfaFbv8ti26mtrK1/PWVU07vOR6uX6kta9lE887m5WX+mP8t/wdE8bXyQ9SeOacZmmWOukprCypvtQ1F5XQt5IlX/AFL1+hHXUfiy1Mzhz6W11iWG3uRWrDRr7b0/meu67+7YwkC7YVsNg2FNTjT35LnPj7aexHV8SuK/BvJeB2TzzVMrp6iV8sj15nPeu6qvmqnWAW9JJZIwQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADlEVV2QGaOH/RWpzS5x5NfoHx2ajejmNc3b7Q9F6In8qeIKNje3uH4LdO0ac5LXLRPp5kjb4ZVuIb+iKXWTQO74DUyXexskrrJK5VbytV0lP6P2709TEABkbD4vdYxhaq3bzknln1y6+JxxKhC3rbsNAAC4mAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcoiquyIZu0V4erjmE0OQ5XFJSWdjuZsLkVstRt7+5vr4gFI29xi6wfDVO0e7KT3c+aXh4kjhlvCvVynyJc2+30dqoobdb6dkFPTsRkcbE2RqIADzlKTm3KTzbLYllwR/9k=",
+    "file_name": "2.png",
+    "updated_at": "2026/4/8 15:47:45"
+  },
   "resume_profile": {
-    "file_name": "1775230300_-.pdf",
+    "file_name": "1775807800_-.pdf",
     "file_size": 1965622,
     "file_type": "pdf",
-    "storage_path": "C:\\Users\\rog\\Desktop\\web\\app_data\\user_uploads\\system\\1775230300_-.pdf",
-    "uploaded_at": 1775230300,
-    "analyzed_at": 1775230407,
+    "storage_path": "C:\\Users\\rog\\Desktop\\web\\app_data\\user_uploads\\system\\1775807800_-.pdf",
+    "uploaded_at": 1775807800,
+    "analyzed_at": 1775808003,
     "status": "analyzed",
     "analysis_meta": {
       "running": false,
-      "job_id": "51fecdc5b048496eb4868b0899d96170",
+      "job_id": "020fb500d9cf4f1ca62129123e17bdda",
       "stage": "done",
       "stage_detail": "简历分析完成",
-      "stage_updated_at": 1775230407,
+      "stage_updated_at": 1775808003,
       "file_type": "pdf",
       "page_count": 1,
       "char_count": 2342,
@@ -818,21 +499,21 @@
       "text_sources": [
         "ocr:chi_sim+eng"
       ],
-      "parsed_at": 1775230407,
-      "job_description_length": 0,
-      "analysis_mode": "resume_review",
+      "parsed_at": 1775808003,
+      "job_description_length": 94,
+      "analysis_mode": "job_match",
       "model": "deepseek-chat",
       "resume_keyword_count": 24,
-      "job_keyword_count": 0
+      "job_keyword_count": 11
     },
     "profile": {
-      "confidence": 0.85,
-      "candidate_summary": "Sime，已提取 1 段经历和 3 个项目，当前优势更偏向 NLP-大模型算法工程师，如果你还没确定职业方向，可以优先尝试 AI 产品运营、后端开发、算法 / AI 应用。",
+      "confidence": 0.55,
+      "candidate_summary": "Sime，已提取 1 段经历，当前能力重点是 NLP-大模型算法工程师，与“目标岗位”岗位已命中 0 个关键词，仍有 10 个待补强。",
       "basics": {
         "name": "Sime",
         "major": "智能科学与技术专业",
         "grade": "学士",
-        "target_city": "",
+        "target_city": "上海 / 中国",
         "target_direction": "AI 产品运营"
       },
       "roles_detected": [
@@ -852,7 +533,7 @@
           "project": "基于深度学习的光伏发电日前功率预测",
           "role": "",
           "impact": "深度学习、PCMCI、BiLSTM、TCN、GAF-SE-ResNet50、小波分解、交叉注意力",
-          "evidence": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据."
+          "evidence": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景下超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据."
         },
         {
           "project": "基于深度学习的带钢表面缺陷轻量化检测",
@@ -863,7 +544,7 @@
         {
           "project": "VLM 辅助的儿童神母病理诊断",
           "role": "",
-          "impact": "多模态大语言模型、QwenVL-8B、LORA、PRMF",
+          "impact": "VLM、QwenVL-8B、LORA、PRMF",
           "evidence": "项目与浙江大学附属儿童医院合作，聚焦儿童神母细胞瘤疾病研究.利用少量“儿童神母细胞病理图像-镜下所见文本描述”(1500 对)对多模态大语言模型 (QwenVL-8B) 进行 LORA 微调.基于微调后的模型生成无标注 Patch 级图像的镜下所见描述, 结合 PRMF 方法融合“图像-文本”两模态信息并生成最终诊断分类输出。项目构建的分类框架较多个基线模型在 F1 指标上实现6~9%的提升."
         }
       ],
@@ -881,7 +562,7 @@
           "page_no": 1
         },
         {
-          "quote": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据.",
+          "quote": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景下超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据.",
           "page_no": 1
         },
         {
@@ -895,9 +576,14 @@
       ],
       "uncertainty_layer": [
         {
-          "item": "未提供目标岗位",
-          "reason": "当前无法做定向岗位匹配，本次分析更偏向通用竞争力和职业方向判断。",
-          "needed_evidence": "如后续确定岗位，可补充 JD 再做针对性匹配。"
+          "item": "JD 关键词缺口",
+          "reason": "岗位要求中的部分关键词尚未在简历结构化结果中命中。",
+          "needed_evidence": "补充对应项目、职责或成果证据。"
+        },
+        {
+          "item": "岗位标题缺失",
+          "reason": "岗位描述未解析出明确岗位名称。",
+          "needed_evidence": "补充标准化 JD 标题或岗位级别。"
         }
       ],
       "capability_scores": {
@@ -905,7 +591,7 @@
         "learning": 95,
         "execution": 52,
         "communication": 51,
-        "matching": 85
+        "matching": 40
       },
       "capability_layer": [
         {
@@ -917,12 +603,12 @@
           "boundary": "基于简历文本推断，未经过面试验证。"
         },
         {
-          "dimension": "方向建议",
-          "conclusion": "当前更适合优先探索：AI 产品运营、后端开发、算法 / AI 应用。",
-          "reasoning": "综合经历标题、项目主题、技能栈和高频动作词进行归纳。",
-          "evidence": "来自简历中的角色、项目与技能关键词。",
-          "confidence": 0.85,
-          "boundary": "未结合具体 JD，因此这是方向性判断，不是定向录用结论。"
+          "dimension": "岗位匹配度",
+          "conclusion": "当前已命中 0 个岗位关键词，仍有 10 个待补强。",
+          "reasoning": "对结构化简历关键词与结构化 JD 关键词做归一化比对。",
+          "evidence": "关键词交集与缺口列表。",
+          "confidence": 0.4,
+          "boundary": "仅代表文本命中，不等于真实深度。"
         },
         {
           "dimension": "沟通协作",
@@ -935,40 +621,63 @@
       ],
       "style_layer": []
     },
-    "analysis_result": "# 简历诊断报告\n\n## 30秒结论\n\n**最突出优势**：顶尖的学术背景（专业排名第1）、扎实的科研项目经历（覆盖能源、工业、医疗三大领域并均有高质量论文/专利产出），以及一段与专业高度相关的头部企业算法实习经历。\n\n**最明显短板**：简历格式混乱，信息组织逻辑不清，关键的个人基础信息（如姓名、求职意向）缺失，且所有经历描述均为技术细节堆砌，缺乏对个人角色、贡献和商业/应用价值的清晰提炼。\n\n**优先尝试的职业方向**：\n1.  **人工智能算法工程师/研究员**：最直接的路径，可投递互联网大厂、AI公司或大型企业的AI Lab，主攻计算机视觉、时序预测或多模态方向。\n2.  **技术型产品经理（AI方向）**：凭借深厚的技术功底和对AI应用落地的理解（尤其在工业、医疗场景），可向AI产品/解决方案岗位转型。\n3.  **科研深造（直博/硕士）**：简历已具备极强的科研潜力证明，申请国内外顶尖院校的AI相关专业研究生是绝佳选择。\n\n---\n\n## 详细诊断\n\n### 优势\n1.  **卓越的学术硬指标**：专业排名第1（1/685），高绩点（4.48/5.00），多次获得高级别奖学金，这是通过任何简历筛选环节的强力通行证。\n2.  **完整且高质量的科研项目闭环**：三个项目分别对应“能源-工业-医疗”三大高价值领域，且均以**论文录用/专利授权**为成果终点。这证明了从问题定义、方法创新到成果输出的全流程能力，远超普通课程项目或竞赛。\n3.  **前沿技术探索与落地结合**：项目涉及Mamba、VLM、因果推断等前沿技术，同时在实习中处理了OCR、RAG等工业界常见任务，显示了“追新”与“务实”的平衡。\n4.  **丰富的竞赛荣誉**：多项国家级数学建模、数据挖掘竞赛奖项，佐证了出色的建模、分析和解决问题的能力。\n\n### 风险\n1.  **简历可读性极差**：当前格式混乱，有乱码（如“三| Sime”、“P| . — -一”），信息分段不清晰，严重干扰阅读，会给HR/面试官留下极不专业的初印象。\n2.  **缺乏个人定位与求职意向**：整份简历没有明确的姓名、求职意向或自我总结。读者无法快速了解“你是谁”、“你想找什么工作”，导致优势无法被有效聚焦。\n3.  **经历描述“见事不见人”**：项目描述过于侧重技术方案细节，但弱化了**“你”的具体贡献**和**项目产生的实际价值**。例如，“本人贡献”部分仍使用“提出...”、“承担...”等模糊表述，缺乏量化的、体现个人主动性和影响力的证据。\n4.  **实习经历价值挖掘不足**：在知名企业的实习经历，其描述仍停留在任务列表层面。未突出**解决了什么业务痛点**（如识别准确率/效率提升多少？）、**带来了什么业务价值**（如节省多少人力成本？），以及与科研项目能力的衔接。\n\n### 建议\n1.  **明确职业目标**：在投递前，需要根据目标岗位（如算法工程师、研究员、产品经理）调整简历侧重点。当前简历更适合研发岗，若投产品岗，需大幅增加对业务、用户和价值的描述。\n2.  **深化个人故事线**：将分散的项目和实习经历，串联成一条清晰的个人能力成长叙事线。例如：从“理论建模（数学竞赛）” -> “前沿算法探索（科研项目）” -> “工业场景落地（实习）”。\n3.  **补充非技术能力证据**：简历中全是“硬技能”，需要适当补充能体现沟通、协作、项目管理（如作为项目负责人如何协调团队）等软实力的例子，使形象更立体。\n\n---\n\n## 简历优化建议（可立即执行）\n\n1.  **彻底重构格式与结构**：\n    *   使用标准简历模板，从上至下按 **个人信息 -> 教育背景 -> 工作/实习经历 -> 科研项目 -> 竞赛荣誉 -> 技能** 清晰排列。\n    *   确保姓名、电话、邮箱、求职意向置于最醒目位置。删除所有乱码和无关符号。\n\n2.  **为每段经历增加“价值导向”的概要**：\n    *   在每段项目/实习经历开头，用 **一行粗体** 总结其核心目标与价值。例如：\n        *   **科研项目**：“为提升光伏电站并网效率，提出一种融合因果推断的预测模型，误差降低7.5%。”\n        *   **实习经历**：“为提升财税单据处理自动化水平，主导开发OCR结构化提取方案，适配XX家银行格式。”\n\n3.  **量化贡献与成果，使用“STAR”原则改写描述**：\n    *   将“提出创新点”、“参与撰写”等模糊描述，改为“**独立提出并验证了XX结构改进方案，使模型在XX数据集上mIoU提升X%**”、“**负责论文核心章节（方法论与实验）的撰写，最终稿件获同行评审高分（4/5）**”。\n    *   实习经历需补充业务指标：如“**通用化方案使新银行回单适配开发周期从X天缩短至X小时**”、“**RAG优化使相关文档召回准确率从X%提升至X%**”。\n\n4.  **增设“专业技能”模块**：\n    *   将简历中散落的技能系统化归类，例如：\n        *   **编程语言**：Python (熟练), C (掌握)\n        *   **算法/领域**：深度学习、计算机视觉、时序预测、多模态大模型\n        *   **框架/工具**：PyTorch, LoRA, Mamba, RAG, Prompt Engineering\n        *   **语言**：英语六级 (CET-6 516)，具备阅读撰写英文学术论文能力\n\n5.  **补充“个人总结”或“求职意向”部分（可选但强烈推荐）**：\n    *   用2-3句话概括你的核心竞争力和职业方向。例如：“具备扎实AI理论基础与丰富科研创新经验的智能科学与技术专业毕业生，在CV、时序预测及多模态方向有项目实践与论文产出，并拥有头部企业算法落地经验。寻求AI算法工程师职位，致力于将前沿技术解决工业实际问题。”\n\n6.  **检查并统一细节**：\n    *   确保时间、奖项名称、期刊会议名称书写规范、无误。\n    *   将“推免排名，1/685”改为更通用的“专业排名：1/685 (前0.15%)”。\n    *   将竞赛奖项按级别（国际、国家、省级）或时间倒序重新排列，确保逻辑清晰。",
-    "analysis_html": "<h2>简历诊断报告</h2><h3>30秒结论</h3><p><strong>最突出优势</strong>：顶尖的学术背景（专业排名第1）、扎实的科研项目经历（覆盖能源、工业、医疗三大领域并均有高质量论文/专利产出），以及一段与专业高度相关的头部企业算法实习经历。</p><p><strong>最明显短板</strong>：简历格式混乱，信息组织逻辑不清，关键的个人基础信息（如姓名、求职意向）缺失，且所有经历描述均为技术细节堆砌，缺乏对个人角色、贡献和商业/应用价值的清晰提炼。</p><p><strong>优先尝试的职业方向</strong>：</p><p>1.  <strong>人工智能算法工程师/研究员</strong>：最直接的路径，可投递互联网大厂、AI公司或大型企业的AI Lab，主攻计算机视觉、时序预测或多模态方向。</p><p>2.  <strong>技术型产品经理（AI方向）</strong>：凭借深厚的技术功底和对AI应用落地的理解（尤其在工业、医疗场景），可向AI产品/解决方案岗位转型。</p><p>3.  <strong>科研深造（直博/硕士）</strong>：简历已具备极强的科研潜力证明，申请国内外顶尖院校的AI相关专业研究生是绝佳选择。</p><p>---</p><h3>详细诊断</h3><h4>优势</h4><p>1.  <strong>卓越的学术硬指标</strong>：专业排名第1（1/685），高绩点（4.48/5.00），多次获得高级别奖学金，这是通过任何简历筛选环节的强力通行证。</p><p>2.  <strong>完整且高质量的科研项目闭环</strong>：三个项目分别对应“能源-工业-医疗”三大高价值领域，且均以<strong>论文录用/专利授权</strong>为成果终点。这证明了从问题定义、方法创新到成果输出的全流程能力，远超普通课程项目或竞赛。</p><p>3.  <strong>前沿技术探索与落地结合</strong>：项目涉及Mamba、VLM、因果推断等前沿技术，同时在实习中处理了OCR、RAG等工业界常见任务，显示了“追新”与“务实”的平衡。</p><p>4.  <strong>丰富的竞赛荣誉</strong>：多项国家级数学建模、数据挖掘竞赛奖项，佐证了出色的建模、分析和解决问题的能力。</p><h4>风险</h4><p>1.  <strong>简历可读性极差</strong>：当前格式混乱，有乱码（如“三| Sime”、“P| . — -一”），信息分段不清晰，严重干扰阅读，会给HR/面试官留下极不专业的初印象。</p><p>2.  <strong>缺乏个人定位与求职意向</strong>：整份简历没有明确的姓名、求职意向或自我总结。读者无法快速了解“你是谁”、“你想找什么工作”，导致优势无法被有效聚焦。</p><p>3.  <strong>经历描述“见事不见人”</strong>：项目描述过于侧重技术方案细节，但弱化了<strong>“你”的具体贡献</strong>和<strong>项目产生的实际价值</strong>。例如，“本人贡献”部分仍使用“提出...”、“承担...”等模糊表述，缺乏量化的、体现个人主动性和影响力的证据。</p><p>4.  <strong>实习经历价值挖掘不足</strong>：在知名企业的实习经历，其描述仍停留在任务列表层面。未突出<strong>解决了什么业务痛点</strong>（如识别准确率/效率提升多少？）、<strong>带来了什么业务价值</strong>（如节省多少人力成本？），以及与科研项目能力的衔接。</p><h4>建议</h4><p>1.  <strong>明确职业目标</strong>：在投递前，需要根据目标岗位（如算法工程师、研究员、产品经理）调整简历侧重点。当前简历更适合研发岗，若投产品岗，需大幅增加对业务、用户和价值的描述。</p><p>2.  <strong>深化个人故事线</strong>：将分散的项目和实习经历，串联成一条清晰的个人能力成长叙事线。例如：从“理论建模（数学竞赛）” -&gt; “前沿算法探索（科研项目）” -&gt; “工业场景落地（实习）”。</p><p>3.  <strong>补充非技术能力证据</strong>：简历中全是“硬技能”，需要适当补充能体现沟通、协作、项目管理（如作为项目负责人如何协调团队）等软实力的例子，使形象更立体。</p><p>---</p><h3>简历优化建议（可立即执行）</h3><p>1.  <strong>彻底重构格式与结构</strong>：</p><ul><li>使用标准简历模板，从上至下按 <strong>个人信息 -&gt; 教育背景 -&gt; 工作/实习经历 -&gt; 科研项目 -&gt; 竞赛荣誉 -&gt; 技能</strong> 清晰排列。</li><li>确保姓名、电话、邮箱、求职意向置于最醒目位置。删除所有乱码和无关符号。</li></ul><p>2.  <strong>为每段经历增加“价值导向”的概要</strong>：</p><ul><li>在每段项目/实习经历开头，用 <strong>一行粗体</strong> 总结其核心目标与价值。例如：</li><li><strong>科研项目</strong>：“为提升光伏电站并网效率，提出一种融合因果推断的预测模型，误差降低7.5%。”</li><li><strong>实习经历</strong>：“为提升财税单据处理自动化水平，主导开发OCR结构化提取方案，适配XX家银行格式。”</li></ul><p>3.  <strong>量化贡献与成果，使用“STAR”原则改写描述</strong>：</p><ul><li>将“提出创新点”、“参与撰写”等模糊描述，改为“<strong>独立提出并验证了XX结构改进方案，使模型在XX数据集上mIoU提升X%</strong>”、“<strong>负责论文核心章节（方法论与实验）的撰写，最终稿件获同行评审高分（4/5）</strong>”。</li><li>实习经历需补充业务指标：如“<strong>通用化方案使新银行回单适配开发周期从X天缩短至X小时</strong>”、“<strong>RAG优化使相关文档召回准确率从X%提升至X%</strong>”。</li></ul><p>4.  <strong>增设“专业技能”模块</strong>：</p><ul><li>将简历中散落的技能系统化归类，例如：</li><li><strong>编程语言</strong>：Python (熟练), C (掌握)</li><li><strong>算法/领域</strong>：深度学习、计算机视觉、时序预测、多模态大模型</li><li><strong>框架/工具</strong>：PyTorch, LoRA, Mamba, RAG, Prompt Engineering</li><li><strong>语言</strong>：英语六级 (CET-6 516)，具备阅读撰写英文学术论文能力</li></ul><p>5.  <strong>补充“个人总结”或“求职意向”部分（可选但强烈推荐）</strong>：</p><ul><li>用2-3句话概括你的核心竞争力和职业方向。例如：“具备扎实AI理论基础与丰富科研创新经验的智能科学与技术专业毕业生，在CV、时序预测及多模态方向有项目实践与论文产出，并拥有头部企业算法落地经验。寻求AI算法工程师职位，致力于将前沿技术解决工业实际问题。”</li></ul><p>6.  <strong>检查并统一细节</strong>：</p><ul><li>确保时间、奖项名称、期刊会议名称书写规范、无误。</li><li>将“推免排名，1/685”改为更通用的“专业排名：1/685 (前0.15%)”。</li><li>将竞赛奖项按级别（国际、国家、省级）或时间倒序重新排列，确保逻辑清晰。</li></ul>",
-    "job_description": "",
+    "analysis_result": "好的，候选人。我是你的面试官兼职业导师。我将以顶尖科技公司技术招聘委员会核心成员的视角，对你的简历进行一次彻底的“代码审查”和“战略重构”。\n\n---\n\n### **Step 1: 第一印象与初步诊断**\n\n*   **目标定位判断**：基于你的简历，你是一名**极其优秀的应届本科生**，目标岗位是**AI/算法/数据科学相关的研究或应用开发岗**。你的学术背景（专业第一、高绩点）、科研项目（顶会/顶刊论文、专利）和竞赛奖项（数模国奖）构成了非常强大的“硬通货”。结合你提供的JD，你的定位是**具备强大技术落地和项目推进潜力的AI算法人才**。\n*   **30秒定论**：**留下深入研究**。你的学术和科研履历在应届生中属于顶尖水平，足以让你通过任何公司的简历筛选。然而，你的简历在“从研究者到工程师/项目推进者”的叙事转换上存在明显短板，这可能会影响你在业务团队面试中的评价。\n\n---\n\n### **Step 2: 地毯式深度审计与指导**\n\n我将严格遵循 **“批判-解析-建议”三位一体模型** 对你的简历进行审计。\n\n#### **A. 整体审计**\n\n*   ❓ **职业故事线**：简历呈现了清晰的“学术研究者”路径，但实习经历（税友）的描述过于技术化，与“项目推进”、“协调沟通”的JD要求关联较弱。从顶级科研到企业实习的转变逻辑未被阐明。\n*   🤔 **负面影响**：招聘官会看到一位优秀的“学生研究员”，但不确定你是否能快速适应企业快节奏、跨团队协作的项目环境。你可能会被贴上“只适合研究院”的标签。\n*   💡 **建议**：在个人摘要或实习经历中，主动构建一个“研究驱动，落地为本”的故事线。例如：“在顶尖学术研究中锤炼了扎实的AI算法与问题建模能力，并渴望在真实的商业场景中，将前沿技术转化为可落地的产品功能，协调资源推动项目产生实际业务价值。”\n\n*   ❓ **关键词与技术栈匹配度**：简历技术关键词（PCMCI, Mamba, LORA, RAG）非常前沿且专业，与AI算法岗高度匹配。但JD中要求的“**项目推进**”、“**协调跨团队**”、“**AI辅助工具**”等软技能关键词几乎完全缺失。\n*   🤔 **负面影响**：对于强调“协调推进”的岗位，你的简历看起来像一份纯技术报告，无法证明你具备所需的软技能，可能导致在后续面试中被重点拷问。\n*   💡 **建议**：必须在实习和项目经历中，有意识地植入能体现“推进”、“协调”、“沟通”的动词和成果。将“协助开发”改为“主导/负责了XX模块的开发，并与前后端、测试团队协作，确保按期上线”。\n\n*   ❓ **一致性检查**：时间线上存在一处明显矛盾。你的实习时间为“2025.04-2025.08”，而当前时间是2026年4月。这是一段未来的实习经历。\n*   🤔 **负面影响**：这会立即引发对简历真实性的严重质疑，是足以让招聘官直接关闭简历的“致命伤”。\n*   💡 **建议**：**请立即核实并修正所有时间信息**。如果这是笔误，请更正为正确的时间段（例如2024.04-2024.08）。确保所有日期逻辑正确。\n\n*   ❓ **无效内容过滤**：整体项目质量很高，没有“玩具项目”。但“获奖情况”罗列了6个竞赛奖项，略显堆砌。\n*   🤔 **负面影响**：过多的同类奖项罗列会稀释你的核心优势，让人感觉你在“凑篇幅”。\n*   💡 **建议**：保留最高级别的2-3个奖项（如美赛M奖、泰迪杯一等奖），其余可简化为“获得多项国家级数学建模与数据挖掘竞赛奖项”。把空间留给更重要的项目描述。\n\n#### **B. 模块化审计**\n\n**[ ] 个人摘要/简介**\n*   ❓ **问题**：简历缺失“个人摘要”部分。这是一个严重的战略失误。\n*   🤔 **负面影响**：招聘官需要自己从大量信息中总结你的核心卖点。在快节奏的筛选中，你可能因为“没有一眼看到亮点”而被错过，或者被错误归类。\n*   💡 **建议**：在简历最顶部增加一个3行以内的个人摘要。**公式**：`[你的定位] + [最硬核的学术/技术标签] + [与目标岗位相关的核心能力/经验]`。\n    *   **示例**：“杭州电子科技大学智能科学与技术专业排名第1的应届毕业生，拥有顶会/顶刊论文发表及发明专利授权。在深度学习、时间序列预测、计算机视觉及多模态大模型领域具备扎实的研究与工程落地经验，并具备在商业项目中协调推进AI功能上线的实践经验。”\n\n**[ ] 工作/项目经历**\n我们将运用清单对每段经历进行拷问。\n\n**1. 税友软件集团实习 - NLP/大模型算法工程师**\n*   ❓ **叙事框架与“所以呢？”**：描述是任务清单（“开发优化...”、“协助开发...”、“负责...”），缺乏成果和价值体现。例如，“提升多源数据的统一识别与适配能力”——所以呢？带来了什么好处？\n*   🤔 **负面影响**：这让你看起来像一个被动的任务执行者，而非能主动创造价值的贡献者。完全无法体现JD要求的“项目推进”能力。\n*   💡 **建议**：运用STAR模型和量化思维重写。\n    *   **修改前**：“开发并优化基于华为云OCR的银行回单识别服务...提升多源数据的统一识别与适配能力。”\n    *   **修改后**：“**主导**了银行回单自动化识别系统的优化项目。通过引入NLP实体对齐技术，设计了一套通用结构化处理方案，将**回单字段识别准确率从X%提升至Y%**，并**将新银行格式的适配开发周期从3人日缩短至0.5人日**，显著提升了财务处理效率。”\n    *   **修改前**：“协助开发税务AI助手‘税友小二’，优化RAG检索模块...”\n    *   **修改后**：“**负责**税务AI助手核心RAG检索模块的迭代。通过结合MonkeyOCR与Prompt工程优化文档切片策略，**将相关税务政策条文的召回准确率提升了Z%**，**使AI助手的首次回答准确率获得显著改善**，并**与产品、前端团队紧密协作，确保了该功能在V1.2版本的顺利上线**。”\n\n**2. 光伏发电预测项目（负责人）**\n*   ❓ **技术洞察与决策**：描述提到了“提出基于PCMCI的特征因果权重机制”、“构建混合集成学习模型”，但未体现你作为**负责人**在技术选型、方案决策中的思考和权衡。\n*   🤔 **负面影响**：削弱了你作为“负责人”的领导力和技术判断力，听起来更像是一个方案的实现者。\n*   💡 **建议**：增加一两个体现代入感和决策点的描述。\n    *   **示例补充**：“在模型选型阶段，**对比了纯Transformer与CNN+RNN混合架构的优劣**。针对光伏数据兼具长周期趋势与短期扰动的特点，**我主导决策**采用后者并进行定制化改进（如引入GAF-SE-ResNet50捕捉周期结构），最终在保证精度的同时降低了模型训练成本。”\n\n**3. 带钢表面缺陷检测项目（核心成员）**\n*   ❓ **隐性软技能展示**：“分析...提出...推动...承担...”这些动词用得很好，体现了主动性和ownership。这是亮点，可以加强。\n*   💡 **建议**：可以进一步明确你的“推动”产生了什么团队效果。例如：“提出的工业适应性改进思路被团队采纳，并**主导了该模块的代码实现与实验验证**，最终推动整体方案落地。”\n\n**4. 儿童神母病理诊断项目（核心成员）**\n*   ❓ **影响力的证明**：“F1指标上实现6~9%的提升”——这是一个很好的量化指标！但缺少业务层面的价值解读。\n*   💡 **建议**：为这个技术指标加上业务价值的“帽子”。“在数据稀缺的医疗场景下，通过创新性的多模态融合框架，**将神母细胞瘤亚型分类的F1分数提升了6-9个百分点**，为后续辅助医生诊断、减少误判提供了更可靠的技术原型。”\n\n**[ ] 技术技能**\n*   ❓ **技术前瞻性与学习能力**：简历中充满了最前沿的AI技术（Mamba, LORA, VLM），这本身就体现了极强的学习能力。但**未明确呼应JD中“熟练掌握AI辅助工具”的要求**。\n*   🤔 **负面影响**：可能会被误认为你只关注底层模型，不善于利用工具提效。\n*   💡 **建议**：在技能部分或实习经历中，明确加入对AI辅助工具的使用。\n    *   **示例**：“熟练使用ChatGPT/GitHub Copilot等AI编程助手进行代码构思、调试和文档生成，提升开发效率。” 或在实习描述中加入：“在开发过程中，**积极利用AI代码生成工具，将部分重复性代码的编写效率提升了约30%**。”\n\n---\n\n### **Step 3: 战略性修改蓝图**\n\n1.  **影响力叙事工具箱**：你已经有了很好的基础，现在需要从“研究者叙事”转向“工程师/推进者叙事”。\n    *   **针对JD的黄金公式**：“为达成[业务目标，如‘提升回单处理效率’]，我[主导/协调了XX行动，并解决了XX技术难点]，通过与[协作团队，如产品、测试]紧密沟通，最终[带来了可量化的业务/技术成果]，并推动了项目在[时间点]成功上线。”\n    *   **“修改前 vs 修改后”对比示例**：\n        *   **前**：“协助开发税务AI助手‘税友小二’，优化RAG检索模块以提升内容召回准确性。”\n        *   **后**：“**主导**税务AI助手RAG模块的精准化升级项目。为提升问答准确性，我分析了现有召回瓶颈，**提出了**结合专用OCR与Prompt工程的切片优化方案。**协调**数据标注团队获取测试集，**推动**方案在两周内完成开发与AB测试，最终**将关键政策条文的召回准确率提升15%**，并**确保**该优化随季度版本稳定发布。”\n\n2.  **挖掘隐藏亮点的启发式提问**：\n    *   在税友的实习中，你优化的RAG模块，上线后用户（可能是内部客服或纳税人）的反馈有什么积极变化？有否减少人工介入的次数？\n    *   作为项目负责人，你是如何分配任务、组织会议、跟踪进度的？有没有遇到组员意见分歧，你是如何协调解决的？\n    *   在科研项目中，除了发表论文，你的算法或代码有没有被其他同学或后续项目复用？这体现了你的工作产生了超越项目本身的影响。\n\n3.  **影响力思维训练**：你已经会量化技术指标（RMSE, F1）。现在需要为这些技术指标赋予业务意义。\n    *   **思考路径**：“F1提升6-9%” -> 这在医疗诊断中意味着什么？ -> “可能意味着对某种易混淆亚型的诊断错误率降低了XX%” -> “这能为临床医生提供更有价值的参考，潜在降低医疗风险”。\n    *   **行动**：为你每一个项目的技术成果，都尝试用一句话说明它的“外在价值”。\n\n---\n\n### **Step 4: 重构与展示：修改后的简历范本**\n\n```markdown\n# 三 | Sime\n联系电话: 13758043472 | 电子邮箱: lichenlei@hdu.edu.cn | 出生年月: 2003.11\n\n## 个人摘要\n杭州电子科技大学智能科学与技术专业排名第1（1/685）的应届毕业生，拥有SCI一区TOP期刊论文与CCF-C会议论文发表经历，以及国家发明专利授权。在时间序列预测、计算机视觉及多模态大模型等AI领域具备扎实的研究与算法实现能力，并拥有在大型企业将AI技术落地、协调推进项目上线的实践经验，致力于将前沿算法转化为实际业务价值。\n\n## 教育背景\n**杭州电子科技大学** | 自动化学院（人工智能学院） | 智能科学与技术专业\n2022.09 - 2026.06（预计）\n- 学分绩点: 4.48/5.00 | 推免排名: 1/685\n- 英语能力: CET-4 (550分)、CET-6 (516分)\n- 核心课程: Python算法设计(A)、机器学习(A)、深度学习(A)、电路与电子学(A)\n\n## 工作经历\n**税友软件集团股份有限公司** (大型财税数字服务企业) | NLP-大模型算法工程师实习\n[请修正为正确的实习时间，例如：2024.04 - 2024.08]\n- **银行回单智能识别项目**：主导回单自动化处理系统的优化，通过设计融合NLP实体对齐的通用结构化方案，将字段识别准确率提升至[量化指标，例如：98.5%]，并将新银行格式的适配开发周期缩短[量化指标，例如：80%]，显著提升财务运营效率。\n- **税务AI助手“税友小二”RAG模块升级**：负责核心检索模块的精准化迭代。通过优化文档切片与Prompt工程，将关键政策条文召回准确率提升[量化指标，例如：15%]，有效提升了AI助手的首次回答满意度。全程与产品、前端及测试团队协作，确保功能按期上线。\n- **AI工具提效**：在日常开发中积极使用ChatGPT/Copilot等工具进行代码构思与生成，提升[量化指标，例如：约30%]的基础代码开发效率。\n\n## 科研与项目经历\n**基于深度学习的光伏发电日前功率预测** | 项目负责人\n2023.12 - 2024.12\n- 聚焦光伏功率预测以服务电网调度，提出融合因果推断与多尺度特征融合的混合模型。作为负责人，主导技术路线规划，在模型选型中权衡不同架构优劣，决策采用定制化的CNN+RNN混合模型以平衡精度与成本。\n- **成果**：所提方法在跨站点场景下RMSE降低7.5%，R²提升2.4%；以第一作者授权国家发明专利1项，并以第一作者在SCI一区TOP期刊《Renewable Energy》(IF=9.1)发表论文1篇。\n\n**基于Mamba的带钢表面缺陷轻量化检测** | 核心成员 (国家级大创项目)\n2024.06 - 2025.06\n- 针对工业实时检测需求，分析原始Mamba架构局限，提出并推动实现了局部-全局交互的并行Mamba编码器改进方案，以弥补其空间建模不足，本人主导了该核心模块的实现与验证。\n- **成果**：模型在精度与速度间取得优越平衡；以第二作者身份投稿论文被CCF-C类会议PRCV 2025接收（评审得分4/5）。\n\n**VLM辅助的儿童神母细胞瘤病理诊断** | 核心成员 (与浙大儿院合作)\n2024.07 - 2025.03\n- 在少样本医疗数据场景下，参与提出利用微调后的VLM生成文本描述以增强图像特征的创新思路，并探索多模态融合策略。\n- **成果**：构建的分类框架F1分数较基线模型提升6-9%，为辅助诊断提供了新思路；相关论文已投稿至期刊《Computer Methods and Programs in Biomedicine》(IF=4.9)，专利已公开。\n\n## 获奖情况\n- 浙江省政府奖学金、专业一等奖学金、优秀共青团员\n- （国际级）美国大学生数学建模竞赛国际一等奖（M奖）\n- （国家级）泰迪杯数据挖掘挑战赛一等奖\n- （国家级）Mathorcup高校数学建模挑战赛二等奖\n- [其他奖项可酌情精简列出]\n```\n\n---\n\n### **Step 5: 最终裁决与行动清单**\n\n1.  **整体评价**：你的原始简历是一份**顶尖的“学术成绩单”**，但修改目标是将其转化为一份**卓越的“职业能力说明书”**。通过重构，我们强化了你的**项目推进能力、跨团队协作意识以及技术成果的业务影响力**叙事，使你不仅能打动研究院，更能征服业务部门的面试官。\n\n2.  **核心风险点**：\n    *   **时间信息矛盾**：未来时间的实习经历是简历的“一票否决项”，必须立即修正。\n    *   **价值叙事缺失**：原简历的实习描述未能将技术工作与业务价值、个人主动性挂钩，这是你从“学生”到“职场人”形象转变的最大障碍。\n\n3.  **下一步行动清单**：\n    *   **[首要任务]：修正与填充**。立即修正所有时间错误，并认真思考、补充修改版简历中所有的 `[量化指标]` 和 `[请修正...]` 部分。这是让你的简历从“框架”变为“成品”的关键一步。\n    *   **[第二任务]：故事演练**。针对税友的实习经历，按照我们提供的“针对JD的黄金公式”，准备一个2分钟的口头陈述，重点突出你“协调推进”和“产生结果”的过程。\n    *   **[长期建议]：建立价值记录本**。在未来的学习和工作中，每完成一项任务，都问自己三个问题：1）我的工作为谁解决了什么问题？2）如何证明它有效？（数据或反馈）3）我在这个过程中展现了哪些超越编码的能力？（沟通、协调、决策）。持续记录，这将成为你未来简历取之不尽的宝藏。",
+    "analysis_html": "<p>好的，候选人。我是你的面试官兼职业导师。我将以顶尖科技公司技术招聘委员会核心成员的视角，对你的简历进行一次彻底的“代码审查”和“战略重构”。</p><p>---</p><h4><strong>Step 1: 第一印象与初步诊断</strong></h4><ul><li><strong>目标定位判断</strong>：基于你的简历，你是一名<strong>极其优秀的应届本科生</strong>，目标岗位是<strong>AI/算法/数据科学相关的研究或应用开发岗</strong>。你的学术背景（专业第一、高绩点）、科研项目（顶会/顶刊论文、专利）和竞赛奖项（数模国奖）构成了非常强大的“硬通货”。结合你提供的JD，你的定位是<strong>具备强大技术落地和项目推进潜力的AI算法人才</strong>。</li><li><strong>30秒定论</strong>：<strong>留下深入研究</strong>。你的学术和科研履历在应届生中属于顶尖水平，足以让你通过任何公司的简历筛选。然而，你的简历在“从研究者到工程师/项目推进者”的叙事转换上存在明显短板，这可能会影响你在业务团队面试中的评价。</li></ul><p>---</p><h4><strong>Step 2: 地毯式深度审计与指导</strong></h4><p>我将严格遵循 <strong>“批判-解析-建议”三位一体模型</strong> 对你的简历进行审计。</p><p>#### <strong>A. 整体审计</strong></p><ul><li>❓ <strong>职业故事线</strong>：简历呈现了清晰的“学术研究者”路径，但实习经历（税友）的描述过于技术化，与“项目推进”、“协调沟通”的JD要求关联较弱。从顶级科研到企业实习的转变逻辑未被阐明。</li><li>🤔 <strong>负面影响</strong>：招聘官会看到一位优秀的“学生研究员”，但不确定你是否能快速适应企业快节奏、跨团队协作的项目环境。你可能会被贴上“只适合研究院”的标签。</li><li>💡 <strong>建议</strong>：在个人摘要或实习经历中，主动构建一个“研究驱动，落地为本”的故事线。例如：“在顶尖学术研究中锤炼了扎实的AI算法与问题建模能力，并渴望在真实的商业场景中，将前沿技术转化为可落地的产品功能，协调资源推动项目产生实际业务价值。”</li></ul><ul><li>❓ <strong>关键词与技术栈匹配度</strong>：简历技术关键词（PCMCI, Mamba, LORA, RAG）非常前沿且专业，与AI算法岗高度匹配。但JD中要求的“<strong>项目推进</strong>”、“<strong>协调跨团队</strong>”、“<strong>AI辅助工具</strong>”等软技能关键词几乎完全缺失。</li><li>🤔 <strong>负面影响</strong>：对于强调“协调推进”的岗位，你的简历看起来像一份纯技术报告，无法证明你具备所需的软技能，可能导致在后续面试中被重点拷问。</li><li>💡 <strong>建议</strong>：必须在实习和项目经历中，有意识地植入能体现“推进”、“协调”、“沟通”的动词和成果。将“协助开发”改为“主导/负责了XX模块的开发，并与前后端、测试团队协作，确保按期上线”。</li></ul><ul><li>❓ <strong>一致性检查</strong>：时间线上存在一处明显矛盾。你的实习时间为“2025.04-2025.08”，而当前时间是2026年4月。这是一段未来的实习经历。</li><li>🤔 <strong>负面影响</strong>：这会立即引发对简历真实性的严重质疑，是足以让招聘官直接关闭简历的“致命伤”。</li><li>💡 <strong>建议</strong>：<strong>请立即核实并修正所有时间信息</strong>。如果这是笔误，请更正为正确的时间段（例如2024.04-2024.08）。确保所有日期逻辑正确。</li></ul><ul><li>❓ <strong>无效内容过滤</strong>：整体项目质量很高，没有“玩具项目”。但“获奖情况”罗列了6个竞赛奖项，略显堆砌。</li><li>🤔 <strong>负面影响</strong>：过多的同类奖项罗列会稀释你的核心优势，让人感觉你在“凑篇幅”。</li><li>💡 <strong>建议</strong>：保留最高级别的2-3个奖项（如美赛M奖、泰迪杯一等奖），其余可简化为“获得多项国家级数学建模与数据挖掘竞赛奖项”。把空间留给更重要的项目描述。</li></ul><p>#### <strong>B. 模块化审计</strong></p><p><strong>[ ] 个人摘要/简介</strong></p><ul><li>❓ <strong>问题</strong>：简历缺失“个人摘要”部分。这是一个严重的战略失误。</li><li>🤔 <strong>负面影响</strong>：招聘官需要自己从大量信息中总结你的核心卖点。在快节奏的筛选中，你可能因为“没有一眼看到亮点”而被错过，或者被错误归类。</li><li>💡 <strong>建议</strong>：在简历最顶部增加一个3行以内的个人摘要。<strong>公式</strong>：<code>[你的定位] + [最硬核的学术/技术标签] + [与目标岗位相关的核心能力/经验]</code>。</li><li><strong>示例</strong>：“杭州电子科技大学智能科学与技术专业排名第1的应届毕业生，拥有顶会/顶刊论文发表及发明专利授权。在深度学习、时间序列预测、计算机视觉及多模态大模型领域具备扎实的研究与工程落地经验，并具备在商业项目中协调推进AI功能上线的实践经验。”</li></ul><p><strong>[ ] 工作/项目经历</strong></p><p>我们将运用清单对每段经历进行拷问。</p><p><strong>1. 税友软件集团实习 - NLP/大模型算法工程师</strong></p><ul><li>❓ <strong>叙事框架与“所以呢？”</strong>：描述是任务清单（“开发优化...”、“协助开发...”、“负责...”），缺乏成果和价值体现。例如，“提升多源数据的统一识别与适配能力”——所以呢？带来了什么好处？</li><li>🤔 <strong>负面影响</strong>：这让你看起来像一个被动的任务执行者，而非能主动创造价值的贡献者。完全无法体现JD要求的“项目推进”能力。</li><li>💡 <strong>建议</strong>：运用STAR模型和量化思维重写。</li><li><strong>修改前</strong>：“开发并优化基于华为云OCR的银行回单识别服务...提升多源数据的统一识别与适配能力。”</li><li><strong>修改后</strong>：“<strong>主导</strong>了银行回单自动化识别系统的优化项目。通过引入NLP实体对齐技术，设计了一套通用结构化处理方案，将<strong>回单字段识别准确率从X%提升至Y%</strong>，并<strong>将新银行格式的适配开发周期从3人日缩短至0.5人日</strong>，显著提升了财务处理效率。”</li><li><strong>修改前</strong>：“协助开发税务AI助手‘税友小二’，优化RAG检索模块...”</li><li><strong>修改后</strong>：“<strong>负责</strong>税务AI助手核心RAG检索模块的迭代。通过结合MonkeyOCR与Prompt工程优化文档切片策略，<strong>将相关税务政策条文的召回准确率提升了Z%</strong>，<strong>使AI助手的首次回答准确率获得显著改善</strong>，并<strong>与产品、前端团队紧密协作，确保了该功能在V1.2版本的顺利上线</strong>。”</li></ul><p><strong>2. 光伏发电预测项目（负责人）</strong></p><ul><li>❓ <strong>技术洞察与决策</strong>：描述提到了“提出基于PCMCI的特征因果权重机制”、“构建混合集成学习模型”，但未体现你作为<strong>负责人</strong>在技术选型、方案决策中的思考和权衡。</li><li>🤔 <strong>负面影响</strong>：削弱了你作为“负责人”的领导力和技术判断力，听起来更像是一个方案的实现者。</li><li>💡 <strong>建议</strong>：增加一两个体现代入感和决策点的描述。</li><li><strong>示例补充</strong>：“在模型选型阶段，<strong>对比了纯Transformer与CNN+RNN混合架构的优劣</strong>。针对光伏数据兼具长周期趋势与短期扰动的特点，<strong>我主导决策</strong>采用后者并进行定制化改进（如引入GAF-SE-ResNet50捕捉周期结构），最终在保证精度的同时降低了模型训练成本。”</li></ul><p><strong>3. 带钢表面缺陷检测项目（核心成员）</strong></p><ul><li>❓ <strong>隐性软技能展示</strong>：“分析...提出...推动...承担...”这些动词用得很好，体现了主动性和ownership。这是亮点，可以加强。</li><li>💡 <strong>建议</strong>：可以进一步明确你的“推动”产生了什么团队效果。例如：“提出的工业适应性改进思路被团队采纳，并<strong>主导了该模块的代码实现与实验验证</strong>，最终推动整体方案落地。”</li></ul><p><strong>4. 儿童神母病理诊断项目（核心成员）</strong></p><ul><li>❓ <strong>影响力的证明</strong>：“F1指标上实现6~9%的提升”——这是一个很好的量化指标！但缺少业务层面的价值解读。</li><li>💡 <strong>建议</strong>：为这个技术指标加上业务价值的“帽子”。“在数据稀缺的医疗场景下，通过创新性的多模态融合框架，<strong>将神母细胞瘤亚型分类的F1分数提升了6-9个百分点</strong>，为后续辅助医生诊断、减少误判提供了更可靠的技术原型。”</li></ul><p><strong>[ ] 技术技能</strong></p><ul><li>❓ <strong>技术前瞻性与学习能力</strong>：简历中充满了最前沿的AI技术（Mamba, LORA, VLM），这本身就体现了极强的学习能力。但<strong>未明确呼应JD中“熟练掌握AI辅助工具”的要求</strong>。</li><li>🤔 <strong>负面影响</strong>：可能会被误认为你只关注底层模型，不善于利用工具提效。</li><li>💡 <strong>建议</strong>：在技能部分或实习经历中，明确加入对AI辅助工具的使用。</li><li><strong>示例</strong>：“熟练使用ChatGPT/GitHub Copilot等AI编程助手进行代码构思、调试和文档生成，提升开发效率。” 或在实习描述中加入：“在开发过程中，<strong>积极利用AI代码生成工具，将部分重复性代码的编写效率提升了约30%</strong>。”</li></ul><p>---</p><h4><strong>Step 3: 战略性修改蓝图</strong></h4><p>1.  <strong>影响力叙事工具箱</strong>：你已经有了很好的基础，现在需要从“研究者叙事”转向“工程师/推进者叙事”。</p><ul><li><strong>针对JD的黄金公式</strong>：“为达成[业务目标，如‘提升回单处理效率’]，我[主导/协调了XX行动，并解决了XX技术难点]，通过与[协作团队，如产品、测试]紧密沟通，最终[带来了可量化的业务/技术成果]，并推动了项目在[时间点]成功上线。”</li><li><strong>“修改前 vs 修改后”对比示例</strong>：</li><li><strong>前</strong>：“协助开发税务AI助手‘税友小二’，优化RAG检索模块以提升内容召回准确性。”</li><li><strong>后</strong>：“<strong>主导</strong>税务AI助手RAG模块的精准化升级项目。为提升问答准确性，我分析了现有召回瓶颈，<strong>提出了</strong>结合专用OCR与Prompt工程的切片优化方案。<strong>协调</strong>数据标注团队获取测试集，<strong>推动</strong>方案在两周内完成开发与AB测试，最终<strong>将关键政策条文的召回准确率提升15%</strong>，并<strong>确保</strong>该优化随季度版本稳定发布。”</li></ul><p>2.  <strong>挖掘隐藏亮点的启发式提问</strong>：</p><ul><li>在税友的实习中，你优化的RAG模块，上线后用户（可能是内部客服或纳税人）的反馈有什么积极变化？有否减少人工介入的次数？</li><li>作为项目负责人，你是如何分配任务、组织会议、跟踪进度的？有没有遇到组员意见分歧，你是如何协调解决的？</li><li>在科研项目中，除了发表论文，你的算法或代码有没有被其他同学或后续项目复用？这体现了你的工作产生了超越项目本身的影响。</li></ul><p>3.  <strong>影响力思维训练</strong>：你已经会量化技术指标（RMSE, F1）。现在需要为这些技术指标赋予业务意义。</p><ul><li><strong>思考路径</strong>：“F1提升6-9%” -&gt; 这在医疗诊断中意味着什么？ -&gt; “可能意味着对某种易混淆亚型的诊断错误率降低了XX%” -&gt; “这能为临床医生提供更有价值的参考，潜在降低医疗风险”。</li><li><strong>行动</strong>：为你每一个项目的技术成果，都尝试用一句话说明它的“外在价值”。</li></ul><p>---</p><h4><strong>Step 4: 重构与展示：修改后的简历范本</strong></h4><pre><code># 三 | Sime\n联系电话: 13758043472 | 电子邮箱: lichenlei@hdu.edu.cn | 出生年月: 2003.11\n\n## 个人摘要\n杭州电子科技大学智能科学与技术专业排名第1（1/685）的应届毕业生，拥有SCI一区TOP期刊论文与CCF-C会议论文发表经历，以及国家发明专利授权。在时间序列预测、计算机视觉及多模态大模型等AI领域具备扎实的研究与算法实现能力，并拥有在大型企业将AI技术落地、协调推进项目上线的实践经验，致力于将前沿算法转化为实际业务价值。\n\n## 教育背景\n**杭州电子科技大学** | 自动化学院（人工智能学院） | 智能科学与技术专业\n2022.09 - 2026.06（预计）\n- 学分绩点: 4.48/5.00 | 推免排名: 1/685\n- 英语能力: CET-4 (550分)、CET-6 (516分)\n- 核心课程: Python算法设计(A)、机器学习(A)、深度学习(A)、电路与电子学(A)\n\n## 工作经历\n**税友软件集团股份有限公司** (大型财税数字服务企业) | NLP-大模型算法工程师实习\n[请修正为正确的实习时间，例如：2024.04 - 2024.08]\n- **银行回单智能识别项目**：主导回单自动化处理系统的优化，通过设计融合NLP实体对齐的通用结构化方案，将字段识别准确率提升至[量化指标，例如：98.5%]，并将新银行格式的适配开发周期缩短[量化指标，例如：80%]，显著提升财务运营效率。\n- **税务AI助手“税友小二”RAG模块升级**：负责核心检索模块的精准化迭代。通过优化文档切片与Prompt工程，将关键政策条文召回准确率提升[量化指标，例如：15%]，有效提升了AI助手的首次回答满意度。全程与产品、前端及测试团队协作，确保功能按期上线。\n- **AI工具提效**：在日常开发中积极使用ChatGPT/Copilot等工具进行代码构思与生成，提升[量化指标，例如：约30%]的基础代码开发效率。\n\n## 科研与项目经历\n**基于深度学习的光伏发电日前功率预测** | 项目负责人\n2023.12 - 2024.12\n- 聚焦光伏功率预测以服务电网调度，提出融合因果推断与多尺度特征融合的混合模型。作为负责人，主导技术路线规划，在模型选型中权衡不同架构优劣，决策采用定制化的CNN+RNN混合模型以平衡精度与成本。\n- **成果**：所提方法在跨站点场景下RMSE降低7.5%，R²提升2.4%；以第一作者授权国家发明专利1项，并以第一作者在SCI一区TOP期刊《Renewable Energy》(IF=9.1)发表论文1篇。\n\n**基于Mamba的带钢表面缺陷轻量化检测** | 核心成员 (国家级大创项目)\n2024.06 - 2025.06\n- 针对工业实时检测需求，分析原始Mamba架构局限，提出并推动实现了局部-全局交互的并行Mamba编码器改进方案，以弥补其空间建模不足，本人主导了该核心模块的实现与验证。\n- **成果**：模型在精度与速度间取得优越平衡；以第二作者身份投稿论文被CCF-C类会议PRCV 2025接收（评审得分4/5）。\n\n**VLM辅助的儿童神母细胞瘤病理诊断** | 核心成员 (与浙大儿院合作)\n2024.07 - 2025.03\n- 在少样本医疗数据场景下，参与提出利用微调后的VLM生成文本描述以增强图像特征的创新思路，并探索多模态融合策略。\n- **成果**：构建的分类框架F1分数较基线模型提升6-9%，为辅助诊断提供了新思路；相关论文已投稿至期刊《Computer Methods and Programs in Biomedicine》(IF=4.9)，专利已公开。\n\n## 获奖情况\n- 浙江省政府奖学金、专业一等奖学金、优秀共青团员\n- （国际级）美国大学生数学建模竞赛国际一等奖（M奖）\n- （国家级）泰迪杯数据挖掘挑战赛一等奖\n- （国家级）Mathorcup高校数学建模挑战赛二等奖\n- [其他奖项可酌情精简列出]</code></pre><p>---</p><h4><strong>Step 5: 最终裁决与行动清单</strong></h4><p>1.  <strong>整体评价</strong>：你的原始简历是一份<strong>顶尖的“学术成绩单”</strong>，但修改目标是将其转化为一份<strong>卓越的“职业能力说明书”</strong>。通过重构，我们强化了你的<strong>项目推进能力、跨团队协作意识以及技术成果的业务影响力</strong>叙事，使你不仅能打动研究院，更能征服业务部门的面试官。</p><p>2.  <strong>核心风险点</strong>：</p><ul><li><strong>时间信息矛盾</strong>：未来时间的实习经历是简历的“一票否决项”，必须立即修正。</li><li><strong>价值叙事缺失</strong>：原简历的实习描述未能将技术工作与业务价值、个人主动性挂钩，这是你从“学生”到“职场人”形象转变的最大障碍。</li></ul><p>3.  <strong>下一步行动清单</strong>：</p><ul><li><strong>[首要任务]：修正与填充</strong>。立即修正所有时间错误，并认真思考、补充修改版简历中所有的 <code>[量化指标]</code> 和 <code>[请修正...]</code> 部分。这是让你的简历从“框架”变为“成品”的关键一步。</li><li><strong>[第二任务]：故事演练</strong>。针对税友的实习经历，按照我们提供的“针对JD的黄金公式”，准备一个2分钟的口头陈述，重点突出你“协调推进”和“产生结果”的过程。</li><li><strong>[长期建议]：建立价值记录本</strong>。在未来的学习和工作中，每完成一项任务，都问自己三个问题：1）我的工作为谁解决了什么问题？2）如何证明它有效？（数据或反馈）3）我在这个过程中展现了哪些超越编码的能力？（沟通、协调、决策）。持续记录，这将成为你未来简历取之不尽的宝藏。</li></ul>",
+    "job_description": "工作地点：上海 岗位职责： 1. 负责智能体开放 2. 协调跨团队推进项目落地。 任职要求： 1. 具备数据分析和项目开放能力。 2. 有项目推进或活动执行经历。 3.熟练掌握AI辅助工具",
     "matcher": {
-      "analysis_mode": "resume_review",
+      "analysis_mode": "job_match",
       "resume_keywords": [
         "深度学习",
         "光伏发电预测",
-        "带钢缺陷检测",
-        "病理诊断",
+        "带钢表面缺陷检测",
+        "儿童神母病理诊断",
         "NLP",
         "大模型",
+        "OCR",
+        "RAG",
         "数学建模",
         "奖学金",
         "专利",
-        "论文发表",
+        "论文",
         "Python",
         "C",
         "机器学习",
-        "电路与电子学",
+        "CET-4",
+        "CET-6",
         "华为云 OCR",
         "MonkeyOCR",
-        "RAG",
         "Prompt 工程",
         "NLP-大模型算法工程师",
         "PCMCI",
         "BiLSTM",
-        "TCN",
-        "GAF-SE-ResNet50",
-        "小波分解"
+        "TCN"
       ],
-      "job_keywords": [],
+      "job_keywords": [
+        "数据分析",
+        "项目推进",
+        "智能体开放",
+        "协调跨团队推进项目落地",
+        "数据分析和项目开放能力",
+        "项目推进或活动执行经历",
+        "熟练掌握AI辅助工具",
+        "具备数据分析和项目开放能力。",
+        "有项目推进或活动执行经历。",
+        "负责智能体开放",
+        "协调跨团队推进项目落地。"
+      ],
       "matched_keywords": [],
-      "missing_keywords": [],
+      "missing_keywords": [
+        "数据分析",
+        "项目推进",
+        "智能体开放",
+        "协调跨团队推进项目落地",
+        "数据分析和项目开放能力",
+        "项目推进或活动执行经历",
+        "熟练掌握AI辅助工具",
+        "具备数据分析和项目开放能力。",
+        "有项目推进或活动执行经历。",
+        "负责智能体开放"
+      ],
       "recommended_directions": [
         "AI 产品运营",
         "后端开发",
@@ -979,15 +688,15 @@
         "headline": "NLP-大模型算法工程师",
         "experience_count": 1,
         "project_count": 3,
-        "skill_count": 5
+        "skill_count": 6
       },
       "job_overview": {
         "job_title": "",
         "company_name": "",
-        "location": "",
-        "employment_type": ""
+        "location": "上海 / 中国",
+        "employment_type": "Not Specified"
       },
-      "analysis_markdown": "# 简历诊断报告\n\n## 30秒结论\n\n**最突出优势**：顶尖的学术背景（专业排名第1）、扎实的科研项目经历（覆盖能源、工业、医疗三大领域并均有高质量论文/专利产出），以及一段与专业高度相关的头部企业算法实习经历。\n\n**最明显短板**：简历格式混乱，信息组织逻辑不清，关键的个人基础信息（如姓名、求职意向）缺失，且所有经历描述均为技术细节堆砌，缺乏对个人角色、贡献和商业/应用价值的清晰提炼。\n\n**优先尝试的职业方向**：\n1.  **人工智能算法工程师/研究员**：最直接的路径，可投递互联网大厂、AI公司或大型企业的AI Lab，主攻计算机视觉、时序预测或多模态方向。\n2.  **技术型产品经理（AI方向）**：凭借深厚的技术功底和对AI应用落地的理解（尤其在工业、医疗场景），可向AI产品/解决方案岗位转型。\n3.  **科研深造（直博/硕士）**：简历已具备极强的科研潜力证明，申请国内外顶尖院校的AI相关专业研究生是绝佳选择。\n\n---\n\n## 详细诊断\n\n### 优势\n1.  **卓越的学术硬指标**：专业排名第1（1/685），高绩点（4.48/5.00），多次获得高级别奖学金，这是通过任何简历筛选环节的强力通行证。\n2.  **完整且高质量的科研项目闭环**：三个项目分别对应“能源-工业-医疗”三大高价值领域，且均以**论文录用/专利授权**为成果终点。这证明了从问题定义、方法创新到成果输出的全流程能力，远超普通课程项目或竞赛。\n3.  **前沿技术探索与落地结合**：项目涉及Mamba、VLM、因果推断等前沿技术，同时在实习中处理了OCR、RAG等工业界常见任务，显示了“追新”与“务实”的平衡。\n4.  **丰富的竞赛荣誉**：多项国家级数学建模、数据挖掘竞赛奖项，佐证了出色的建模、分析和解决问题的能力。\n\n### 风险\n1.  **简历可读性极差**：当前格式混乱，有乱码（如“三| Sime”、“P| . — -一”），信息分段不清晰，严重干扰阅读，会给HR/面试官留下极不专业的初印象。\n2.  **缺乏个人定位与求职意向**：整份简历没有明确的姓名、求职意向或自我总结。读者无法快速了解“你是谁”、“你想找什么工作”，导致优势无法被有效聚焦。\n3.  **经历描述“见事不见人”**：项目描述过于侧重技术方案细节，但弱化了**“你”的具体贡献**和**项目产生的实际价值**。例如，“本人贡献”部分仍使用“提出...”、“承担...”等模糊表述，缺乏量化的、体现个人主动性和影响力的证据。\n4.  **实习经历价值挖掘不足**：在知名企业的实习经历，其描述仍停留在任务列表层面。未突出**解决了什么业务痛点**（如识别准确率/效率提升多少？）、**带来了什么业务价值**（如节省多少人力成本？），以及与科研项目能力的衔接。\n\n### 建议\n1.  **明确职业目标**：在投递前，需要根据目标岗位（如算法工程师、研究员、产品经理）调整简历侧重点。当前简历更适合研发岗，若投产品岗，需大幅增加对业务、用户和价值的描述。\n2.  **深化个人故事线**：将分散的项目和实习经历，串联成一条清晰的个人能力成长叙事线。例如：从“理论建模（数学竞赛）” -> “前沿算法探索（科研项目）” -> “工业场景落地（实习）”。\n3.  **补充非技术能力证据**：简历中全是“硬技能”，需要适当补充能体现沟通、协作、项目管理（如作为项目负责人如何协调团队）等软实力的例子，使形象更立体。\n\n---\n\n## 简历优化建议（可立即执行）\n\n1.  **彻底重构格式与结构**：\n    *   使用标准简历模板，从上至下按 **个人信息 -> 教育背景 -> 工作/实习经历 -> 科研项目 -> 竞赛荣誉 -> 技能** 清晰排列。\n    *   确保姓名、电话、邮箱、求职意向置于最醒目位置。删除所有乱码和无关符号。\n\n2.  **为每段经历增加“价值导向”的概要**：\n    *   在每段项目/实习经历开头，用 **一行粗体** 总结其核心目标与价值。例如：\n        *   **科研项目**：“为提升光伏电站并网效率，提出一种融合因果推断的预测模型，误差降低7.5%。”\n        *   **实习经历**：“为提升财税单据处理自动化水平，主导开发OCR结构化提取方案，适配XX家银行格式。”\n\n3.  **量化贡献与成果，使用“STAR”原则改写描述**：\n    *   将“提出创新点”、“参与撰写”等模糊描述，改为“**独立提出并验证了XX结构改进方案，使模型在XX数据集上mIoU提升X%**”、“**负责论文核心章节（方法论与实验）的撰写，最终稿件获同行评审高分（4/5）**”。\n    *   实习经历需补充业务指标：如“**通用化方案使新银行回单适配开发周期从X天缩短至X小时**”、“**RAG优化使相关文档召回准确率从X%提升至X%**”。\n\n4.  **增设“专业技能”模块**：\n    *   将简历中散落的技能系统化归类，例如：\n        *   **编程语言**：Python (熟练), C (掌握)\n        *   **算法/领域**：深度学习、计算机视觉、时序预测、多模态大模型\n        *   **框架/工具**：PyTorch, LoRA, Mamba, RAG, Prompt Engineering\n        *   **语言**：英语六级 (CET-6 516)，具备阅读撰写英文学术论文能力\n\n5.  **补充“个人总结”或“求职意向”部分（可选但强烈推荐）**：\n    *   用2-3句话概括你的核心竞争力和职业方向。例如：“具备扎实AI理论基础与丰富科研创新经验的智能科学与技术专业毕业生，在CV、时序预测及多模态方向有项目实践与论文产出，并拥有头部企业算法落地经验。寻求AI算法工程师职位，致力于将前沿技术解决工业实际问题。”\n\n6.  **检查并统一细节**：\n    *   确保时间、奖项名称、期刊会议名称书写规范、无误。\n    *   将“推免排名，1/685”改为更通用的“专业排名：1/685 (前0.15%)”。\n    *   将竞赛奖项按级别（国际、国家、省级）或时间倒序重新排列，确保逻辑清晰。"
+      "analysis_markdown": "好的，候选人。我是你的面试官兼职业导师。我将以顶尖科技公司技术招聘委员会核心成员的视角，对你的简历进行一次彻底的“代码审查”和“战略重构”。\n\n---\n\n### **Step 1: 第一印象与初步诊断**\n\n*   **目标定位判断**：基于你的简历，你是一名**极其优秀的应届本科生**，目标岗位是**AI/算法/数据科学相关的研究或应用开发岗**。你的学术背景（专业第一、高绩点）、科研项目（顶会/顶刊论文、专利）和竞赛奖项（数模国奖）构成了非常强大的“硬通货”。结合你提供的JD，你的定位是**具备强大技术落地和项目推进潜力的AI算法人才**。\n*   **30秒定论**：**留下深入研究**。你的学术和科研履历在应届生中属于顶尖水平，足以让你通过任何公司的简历筛选。然而，你的简历在“从研究者到工程师/项目推进者”的叙事转换上存在明显短板，这可能会影响你在业务团队面试中的评价。\n\n---\n\n### **Step 2: 地毯式深度审计与指导**\n\n我将严格遵循 **“批判-解析-建议”三位一体模型** 对你的简历进行审计。\n\n#### **A. 整体审计**\n\n*   ❓ **职业故事线**：简历呈现了清晰的“学术研究者”路径，但实习经历（税友）的描述过于技术化，与“项目推进”、“协调沟通”的JD要求关联较弱。从顶级科研到企业实习的转变逻辑未被阐明。\n*   🤔 **负面影响**：招聘官会看到一位优秀的“学生研究员”，但不确定你是否能快速适应企业快节奏、跨团队协作的项目环境。你可能会被贴上“只适合研究院”的标签。\n*   💡 **建议**：在个人摘要或实习经历中，主动构建一个“研究驱动，落地为本”的故事线。例如：“在顶尖学术研究中锤炼了扎实的AI算法与问题建模能力，并渴望在真实的商业场景中，将前沿技术转化为可落地的产品功能，协调资源推动项目产生实际业务价值。”\n\n*   ❓ **关键词与技术栈匹配度**：简历技术关键词（PCMCI, Mamba, LORA, RAG）非常前沿且专业，与AI算法岗高度匹配。但JD中要求的“**项目推进**”、“**协调跨团队**”、“**AI辅助工具**”等软技能关键词几乎完全缺失。\n*   🤔 **负面影响**：对于强调“协调推进”的岗位，你的简历看起来像一份纯技术报告，无法证明你具备所需的软技能，可能导致在后续面试中被重点拷问。\n*   💡 **建议**：必须在实习和项目经历中，有意识地植入能体现“推进”、“协调”、“沟通”的动词和成果。将“协助开发”改为“主导/负责了XX模块的开发，并与前后端、测试团队协作，确保按期上线”。\n\n*   ❓ **一致性检查**：时间线上存在一处明显矛盾。你的实习时间为“2025.04-2025.08”，而当前时间是2026年4月。这是一段未来的实习经历。\n*   🤔 **负面影响**：这会立即引发对简历真实性的严重质疑，是足以让招聘官直接关闭简历的“致命伤”。\n*   💡 **建议**：**请立即核实并修正所有时间信息**。如果这是笔误，请更正为正确的时间段（例如2024.04-2024.08）。确保所有日期逻辑正确。\n\n*   ❓ **无效内容过滤**：整体项目质量很高，没有“玩具项目”。但“获奖情况”罗列了6个竞赛奖项，略显堆砌。\n*   🤔 **负面影响**：过多的同类奖项罗列会稀释你的核心优势，让人感觉你在“凑篇幅”。\n*   💡 **建议**：保留最高级别的2-3个奖项（如美赛M奖、泰迪杯一等奖），其余可简化为“获得多项国家级数学建模与数据挖掘竞赛奖项”。把空间留给更重要的项目描述。\n\n#### **B. 模块化审计**\n\n**[ ] 个人摘要/简介**\n*   ❓ **问题**：简历缺失“个人摘要”部分。这是一个严重的战略失误。\n*   🤔 **负面影响**：招聘官需要自己从大量信息中总结你的核心卖点。在快节奏的筛选中，你可能因为“没有一眼看到亮点”而被错过，或者被错误归类。\n*   💡 **建议**：在简历最顶部增加一个3行以内的个人摘要。**公式**：`[你的定位] + [最硬核的学术/技术标签] + [与目标岗位相关的核心能力/经验]`。\n    *   **示例**：“杭州电子科技大学智能科学与技术专业排名第1的应届毕业生，拥有顶会/顶刊论文发表及发明专利授权。在深度学习、时间序列预测、计算机视觉及多模态大模型领域具备扎实的研究与工程落地经验，并具备在商业项目中协调推进AI功能上线的实践经验。”\n\n**[ ] 工作/项目经历**\n我们将运用清单对每段经历进行拷问。\n\n**1. 税友软件集团实习 - NLP/大模型算法工程师**\n*   ❓ **叙事框架与“所以呢？”**：描述是任务清单（“开发优化...”、“协助开发...”、“负责...”），缺乏成果和价值体现。例如，“提升多源数据的统一识别与适配能力”——所以呢？带来了什么好处？\n*   🤔 **负面影响**：这让你看起来像一个被动的任务执行者，而非能主动创造价值的贡献者。完全无法体现JD要求的“项目推进”能力。\n*   💡 **建议**：运用STAR模型和量化思维重写。\n    *   **修改前**：“开发并优化基于华为云OCR的银行回单识别服务...提升多源数据的统一识别与适配能力。”\n    *   **修改后**：“**主导**了银行回单自动化识别系统的优化项目。通过引入NLP实体对齐技术，设计了一套通用结构化处理方案，将**回单字段识别准确率从X%提升至Y%**，并**将新银行格式的适配开发周期从3人日缩短至0.5人日**，显著提升了财务处理效率。”\n    *   **修改前**：“协助开发税务AI助手‘税友小二’，优化RAG检索模块...”\n    *   **修改后**：“**负责**税务AI助手核心RAG检索模块的迭代。通过结合MonkeyOCR与Prompt工程优化文档切片策略，**将相关税务政策条文的召回准确率提升了Z%**，**使AI助手的首次回答准确率获得显著改善**，并**与产品、前端团队紧密协作，确保了该功能在V1.2版本的顺利上线**。”\n\n**2. 光伏发电预测项目（负责人）**\n*   ❓ **技术洞察与决策**：描述提到了“提出基于PCMCI的特征因果权重机制”、“构建混合集成学习模型”，但未体现你作为**负责人**在技术选型、方案决策中的思考和权衡。\n*   🤔 **负面影响**：削弱了你作为“负责人”的领导力和技术判断力，听起来更像是一个方案的实现者。\n*   💡 **建议**：增加一两个体现代入感和决策点的描述。\n    *   **示例补充**：“在模型选型阶段，**对比了纯Transformer与CNN+RNN混合架构的优劣**。针对光伏数据兼具长周期趋势与短期扰动的特点，**我主导决策**采用后者并进行定制化改进（如引入GAF-SE-ResNet50捕捉周期结构），最终在保证精度的同时降低了模型训练成本。”\n\n**3. 带钢表面缺陷检测项目（核心成员）**\n*   ❓ **隐性软技能展示**：“分析...提出...推动...承担...”这些动词用得很好，体现了主动性和ownership。这是亮点，可以加强。\n*   💡 **建议**：可以进一步明确你的“推动”产生了什么团队效果。例如：“提出的工业适应性改进思路被团队采纳，并**主导了该模块的代码实现与实验验证**，最终推动整体方案落地。”\n\n**4. 儿童神母病理诊断项目（核心成员）**\n*   ❓ **影响力的证明**：“F1指标上实现6~9%的提升”——这是一个很好的量化指标！但缺少业务层面的价值解读。\n*   💡 **建议**：为这个技术指标加上业务价值的“帽子”。“在数据稀缺的医疗场景下，通过创新性的多模态融合框架，**将神母细胞瘤亚型分类的F1分数提升了6-9个百分点**，为后续辅助医生诊断、减少误判提供了更可靠的技术原型。”\n\n**[ ] 技术技能**\n*   ❓ **技术前瞻性与学习能力**：简历中充满了最前沿的AI技术（Mamba, LORA, VLM），这本身就体现了极强的学习能力。但**未明确呼应JD中“熟练掌握AI辅助工具”的要求**。\n*   🤔 **负面影响**：可能会被误认为你只关注底层模型，不善于利用工具提效。\n*   💡 **建议**：在技能部分或实习经历中，明确加入对AI辅助工具的使用。\n    *   **示例**：“熟练使用ChatGPT/GitHub Copilot等AI编程助手进行代码构思、调试和文档生成，提升开发效率。” 或在实习描述中加入：“在开发过程中，**积极利用AI代码生成工具，将部分重复性代码的编写效率提升了约30%**。”\n\n---\n\n### **Step 3: 战略性修改蓝图**\n\n1.  **影响力叙事工具箱**：你已经有了很好的基础，现在需要从“研究者叙事”转向“工程师/推进者叙事”。\n    *   **针对JD的黄金公式**：“为达成[业务目标，如‘提升回单处理效率’]，我[主导/协调了XX行动，并解决了XX技术难点]，通过与[协作团队，如产品、测试]紧密沟通，最终[带来了可量化的业务/技术成果]，并推动了项目在[时间点]成功上线。”\n    *   **“修改前 vs 修改后”对比示例**：\n        *   **前**：“协助开发税务AI助手‘税友小二’，优化RAG检索模块以提升内容召回准确性。”\n        *   **后**：“**主导**税务AI助手RAG模块的精准化升级项目。为提升问答准确性，我分析了现有召回瓶颈，**提出了**结合专用OCR与Prompt工程的切片优化方案。**协调**数据标注团队获取测试集，**推动**方案在两周内完成开发与AB测试，最终**将关键政策条文的召回准确率提升15%**，并**确保**该优化随季度版本稳定发布。”\n\n2.  **挖掘隐藏亮点的启发式提问**：\n    *   在税友的实习中，你优化的RAG模块，上线后用户（可能是内部客服或纳税人）的反馈有什么积极变化？有否减少人工介入的次数？\n    *   作为项目负责人，你是如何分配任务、组织会议、跟踪进度的？有没有遇到组员意见分歧，你是如何协调解决的？\n    *   在科研项目中，除了发表论文，你的算法或代码有没有被其他同学或后续项目复用？这体现了你的工作产生了超越项目本身的影响。\n\n3.  **影响力思维训练**：你已经会量化技术指标（RMSE, F1）。现在需要为这些技术指标赋予业务意义。\n    *   **思考路径**：“F1提升6-9%” -> 这在医疗诊断中意味着什么？ -> “可能意味着对某种易混淆亚型的诊断错误率降低了XX%” -> “这能为临床医生提供更有价值的参考，潜在降低医疗风险”。\n    *   **行动**：为你每一个项目的技术成果，都尝试用一句话说明它的“外在价值”。\n\n---\n\n### **Step 4: 重构与展示：修改后的简历范本**\n\n```markdown\n# 三 | Sime\n联系电话: 13758043472 | 电子邮箱: lichenlei@hdu.edu.cn | 出生年月: 2003.11\n\n## 个人摘要\n杭州电子科技大学智能科学与技术专业排名第1（1/685）的应届毕业生，拥有SCI一区TOP期刊论文与CCF-C会议论文发表经历，以及国家发明专利授权。在时间序列预测、计算机视觉及多模态大模型等AI领域具备扎实的研究与算法实现能力，并拥有在大型企业将AI技术落地、协调推进项目上线的实践经验，致力于将前沿算法转化为实际业务价值。\n\n## 教育背景\n**杭州电子科技大学** | 自动化学院（人工智能学院） | 智能科学与技术专业\n2022.09 - 2026.06（预计）\n- 学分绩点: 4.48/5.00 | 推免排名: 1/685\n- 英语能力: CET-4 (550分)、CET-6 (516分)\n- 核心课程: Python算法设计(A)、机器学习(A)、深度学习(A)、电路与电子学(A)\n\n## 工作经历\n**税友软件集团股份有限公司** (大型财税数字服务企业) | NLP-大模型算法工程师实习\n[请修正为正确的实习时间，例如：2024.04 - 2024.08]\n- **银行回单智能识别项目**：主导回单自动化处理系统的优化，通过设计融合NLP实体对齐的通用结构化方案，将字段识别准确率提升至[量化指标，例如：98.5%]，并将新银行格式的适配开发周期缩短[量化指标，例如：80%]，显著提升财务运营效率。\n- **税务AI助手“税友小二”RAG模块升级**：负责核心检索模块的精准化迭代。通过优化文档切片与Prompt工程，将关键政策条文召回准确率提升[量化指标，例如：15%]，有效提升了AI助手的首次回答满意度。全程与产品、前端及测试团队协作，确保功能按期上线。\n- **AI工具提效**：在日常开发中积极使用ChatGPT/Copilot等工具进行代码构思与生成，提升[量化指标，例如：约30%]的基础代码开发效率。\n\n## 科研与项目经历\n**基于深度学习的光伏发电日前功率预测** | 项目负责人\n2023.12 - 2024.12\n- 聚焦光伏功率预测以服务电网调度，提出融合因果推断与多尺度特征融合的混合模型。作为负责人，主导技术路线规划，在模型选型中权衡不同架构优劣，决策采用定制化的CNN+RNN混合模型以平衡精度与成本。\n- **成果**：所提方法在跨站点场景下RMSE降低7.5%，R²提升2.4%；以第一作者授权国家发明专利1项，并以第一作者在SCI一区TOP期刊《Renewable Energy》(IF=9.1)发表论文1篇。\n\n**基于Mamba的带钢表面缺陷轻量化检测** | 核心成员 (国家级大创项目)\n2024.06 - 2025.06\n- 针对工业实时检测需求，分析原始Mamba架构局限，提出并推动实现了局部-全局交互的并行Mamba编码器改进方案，以弥补其空间建模不足，本人主导了该核心模块的实现与验证。\n- **成果**：模型在精度与速度间取得优越平衡；以第二作者身份投稿论文被CCF-C类会议PRCV 2025接收（评审得分4/5）。\n\n**VLM辅助的儿童神母细胞瘤病理诊断** | 核心成员 (与浙大儿院合作)\n2024.07 - 2025.03\n- 在少样本医疗数据场景下，参与提出利用微调后的VLM生成文本描述以增强图像特征的创新思路，并探索多模态融合策略。\n- **成果**：构建的分类框架F1分数较基线模型提升6-9%，为辅助诊断提供了新思路；相关论文已投稿至期刊《Computer Methods and Programs in Biomedicine》(IF=4.9)，专利已公开。\n\n## 获奖情况\n- 浙江省政府奖学金、专业一等奖学金、优秀共青团员\n- （国际级）美国大学生数学建模竞赛国际一等奖（M奖）\n- （国家级）泰迪杯数据挖掘挑战赛一等奖\n- （国家级）Mathorcup高校数学建模挑战赛二等奖\n- [其他奖项可酌情精简列出]\n```\n\n---\n\n### **Step 5: 最终裁决与行动清单**\n\n1.  **整体评价**：你的原始简历是一份**顶尖的“学术成绩单”**，但修改目标是将其转化为一份**卓越的“职业能力说明书”**。通过重构，我们强化了你的**项目推进能力、跨团队协作意识以及技术成果的业务影响力**叙事，使你不仅能打动研究院，更能征服业务部门的面试官。\n\n2.  **核心风险点**：\n    *   **时间信息矛盾**：未来时间的实习经历是简历的“一票否决项”，必须立即修正。\n    *   **价值叙事缺失**：原简历的实习描述未能将技术工作与业务价值、个人主动性挂钩，这是你从“学生”到“职场人”形象转变的最大障碍。\n\n3.  **下一步行动清单**：\n    *   **[首要任务]：修正与填充**。立即修正所有时间错误，并认真思考、补充修改版简历中所有的 `[量化指标]` 和 `[请修正...]` 部分。这是让你的简历从“框架”变为“成品”的关键一步。\n    *   **[第二任务]：故事演练**。针对税友的实习经历，按照我们提供的“针对JD的黄金公式”，准备一个2分钟的口头陈述，重点突出你“协调推进”和“产生结果”的过程。\n    *   **[长期建议]：建立价值记录本**。在未来的学习和工作中，每完成一项任务，都问自己三个问题：1）我的工作为谁解决了什么问题？2）如何证明它有效？（数据或反馈）3）我在这个过程中展现了哪些超越编码的能力？（沟通、协调、决策）。持续记录，这将成为你未来简历取之不尽的宝藏。"
     },
     "structured_resume": {
       "uuid": "",
@@ -1027,7 +736,7 @@
       "projects": [
         {
           "project_name": "基于深度学习的光伏发电日前功率预测",
-          "description": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据.",
+          "description": "项目聚焦光伏发电功率预测服务电网调度，建模真实光电站历史发电与局部气象数据并融合对应数值天气预报(时间跨度 1 年).提出基于 PCMCI 的特征因果权重机制把握关键特征, 构建混合集成学习模型(BiLSTM, TCN, GAF-SE-ResNet50)全面建模多维时间序列的全局趋势，局部扰动与周期结构。继而利用小波分解构建预测时刻的局部气象波动特征，设计多源信息的交叉注意力融合优化功率预测初步值。提出的方法在跨站点场景下超越 SOTA 模型降低RMSE 达 7.5%，提升 R² 超过 2.4%，为电站运营与电网调度提供决策依据.",
           "technologies_used": [
             "深度学习",
             "PCMCI",
@@ -1058,7 +767,7 @@
           "project_name": "VLM 辅助的儿童神母病理诊断",
           "description": "项目与浙江大学附属儿童医院合作，聚焦儿童神母细胞瘤疾病研究.利用少量“儿童神母细胞病理图像-镜下所见文本描述”(1500 对)对多模态大语言模型 (QwenVL-8B) 进行 LORA 微调.基于微调后的模型生成无标注 Patch 级图像的镜下所见描述, 结合 PRMF 方法融合“图像-文本”两模态信息并生成最终诊断分类输出。项目构建的分类框架较多个基线模型在 F1 指标上实现6~9%的提升.",
           "technologies_used": [
-            "多模态大语言模型",
+            "VLM",
             "QwenVL-8B",
             "LORA",
             "PRMF"
@@ -1086,31 +795,42 @@
           "skill_name": "深度学习"
         },
         {
-          "category": "其他",
-          "skill_name": "电路与电子学"
+          "category": "英语",
+          "skill_name": "CET-4"
+        },
+        {
+          "category": "英语",
+          "skill_name": "CET-6"
         }
       ],
       "research_work": [
+        {
+          "title": "基于因果推断和多尺度特征融合的光伏发电日前预测方法",
+          "publication": "国家发明专利",
+          "date": null,
+          "link": null,
+          "description": "以第一作者授权 1 篇国家发明专利"
+        },
         {
           "title": "PMWC:A Hybrid Framework Integrating Causal Inference and Multi-scale Feature Fusion for Day-ahead Photovoltaic Power Forecasting",
           "publication": "Renewable Energy",
           "date": null,
           "link": null,
-          "description": "以第一作者向 Renewable Energy(IF 9.1，SCI 1 区 TOP)期刊投稿，论文已录用."
+          "description": "以第一作者向 Renewable Energy(SCI 1 区 TOP)期刊投稿，论文已录用"
         },
         {
           "title": "PLGMNet: Parallel Local-Global Mamba Network for Real-Time Steel Surface Defect Detection",
           "publication": "PRCV2025",
           "date": null,
           "link": null,
-          "description": "以第二作者身份投稿论文已被 PRCV2025 会议(CCF-C)接收，同行评审打分 5,5,4,4,4/5."
+          "description": "以第二作者身份投稿论文已被 PRCV2025 会议(CCF-C)接收"
         },
         {
           "title": "MMLNB:Multi-Modal Learning for Neuroblastoma Subtyping Classification Assisted with Textual Description Generation",
           "publication": "Computer Methods and Programs in Biomedicine",
           "date": null,
           "link": null,
-          "description": "已向 Computer Methods and Programs in Biomedicine(IF 4.9)期刊投稿，相关专利已公开."
+          "description": "已向 Computer Methods and Programs in Biomedicine期刊投稿，相关专利已公开"
         }
       ],
       "achievements": [
@@ -1138,14 +858,21 @@
       "extracted_keywords": [
         "深度学习",
         "光伏发电预测",
-        "带钢缺陷检测",
-        "病理诊断",
+        "带钢表面缺陷检测",
+        "儿童神母病理诊断",
         "NLP",
         "大模型",
+        "OCR",
+        "RAG",
         "数学建模",
         "奖学金",
         "专利",
-        "论文发表"
+        "论文",
+        "Python",
+        "C",
+        "机器学习",
+        "CET-4",
+        "CET-6"
       ]
     },
     "structured_job": {
@@ -1158,17 +885,24 @@
         "description": ""
       },
       "location": {
-        "city": "",
+        "city": "上海",
         "state": "",
-        "country": "",
-        "remote_status": ""
+        "country": "中国",
+        "remote_status": "Not Specified"
       },
       "date_posted": "",
-      "employment_type": "",
-      "job_summary": "",
-      "key_responsibilities": [],
+      "employment_type": "Not Specified",
+      "job_summary": "负责智能体开放 协调跨团队推进项目落地。 具备数据分析和项目开放能力。",
+      "key_responsibilities": [
+        "负责智能体开放",
+        "协调跨团队推进项目落地。"
+      ],
       "qualifications": {
-        "required": [],
+        "required": [
+          "具备数据分析和项目开放能力。",
+          "有项目推进或活动执行经历。",
+          "熟练掌握AI辅助工具"
+        ],
         "preferred": []
       },
       "compensation_and_benefits": {
@@ -1180,14 +914,16 @@
         "apply_link": "",
         "contact_email": ""
       },
-      "extracted_keywords": []
+      "extracted_keywords": [
+        "数据分析",
+        "项目推进",
+        "智能体开放",
+        "协调跨团队推进项目落地",
+        "数据分析和项目开放能力",
+        "项目推进或活动执行经历",
+        "熟练掌握AI辅助工具"
+      ]
     },
     "error_message": ""
-  },
-  "account_avatar": {
-    "source": "uploaded",
-    "image_url": "data:image/jpeg;base64,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",
-    "file_name": "2.png",
-    "updated_at": "2026/4/8 15:47:45"
   }
 }

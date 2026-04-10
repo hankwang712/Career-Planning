@@ -62,7 +62,11 @@
       "Bash(find C:UsersrogDesktopweb -name theme* -o -name *theme* -o -name *color*)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/)",
       "Bash(xargs grep:*)",
-      "Bash(grep -E \"\\\\.\\(js|css\\)$\")"
+      "Bash(grep -E \"\\\\.\\(js|css\\)$\")",
+      "Bash(npm run:*)",
+      "Bash(echo \"BUILD_EXIT:$?\")",
+      "Bash(npx vite:*)",
+      "Bash(echo \"EXIT:$?\")"
     ],
     "defaultMode": "bypassPermissions"
   }

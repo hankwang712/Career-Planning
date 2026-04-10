@@ -250,20 +250,119 @@
       compatible:["厌恶","愤怒"] },
   };
 
+  // ——— SBTI 人格扩展测试 ———
+  const SBTI_DIMENSIONS = {
+    S1: { name: "S1 自尊自信" }, S2: { name: "S2 自我清晰度" }, S3: { name: "S3 核心价值" },
+    E1: { name: "E1 依恋安全感" }, E2: { name: "E2 情感投入度" }, E3: { name: "E3 边界与依赖" },
+    A1: { name: "A1 世界观倾向" }, A2: { name: "A2 规则与灵活度" }, A3: { name: "A3 人生意义感" },
+    Ac1: { name: "Ac1 动机导向" }, Ac2: { name: "Ac2 决策风格" }, Ac3: { name: "Ac3 执行模式" },
+    So1: { name: "So1 社交主动性" }, So2: { name: "So2 人际边界感" }, So3: { name: "So3 表达与真实度" },
+  };
+
+  const SBTI_QUESTIONS = [
+    { id: "q1", dim: "S1", text: "我不够好，周围的人都比我优秀", options: ["确实", "有时", "不是"] },
+    { id: "q2", dim: "S1", text: "我会因为别人的优秀而明显怀疑自己", options: ["经常", "偶尔", "基本不会"] },
+    { id: "q3", dim: "S2", text: "我很清楚真正的自己是什么样的", options: ["不认同", "中立", "认同"] },
+    { id: "q4", dim: "S2", text: "我内心有真正追求的东西", options: ["不认同", "中立", "认同"] },
+    { id: "q5", dim: "S3", text: "我一定要不断往上爬、变得更厉害", options: ["不认同", "中立", "认同"] },
+    { id: "q6", dim: "S3", text: "外人的评价对我来说无所谓", options: ["不认同", "中立", "认同"] },
+    { id: "q7", dim: "E1", text: "对象超过 5 小时没回消息时，你会怎么想？", options: ["更容易怀疑", "在怀疑和信任之间摇摆", "倾向先信任"] },
+    { id: "q8", dim: "E1", text: "我在感情里经常担心被对方抛弃", options: ["是的", "偶尔", "不是"] },
+    { id: "q9", dim: "E2", text: "我对待每一份感情都是认真的", options: ["并没有", "也许", "是的"] },
+    { id: "q10", dim: "E2", text: "遇到很优秀且契合的对象，你会？", options: ["保持克制", "介于两者之间", "会非常投入"] },
+    { id: "q11", dim: "E3", text: "恋爱后对象非常黏人时，你更接近？", options: ["那很爽", "都行", "更想保留独立空间"] },
+    { id: "q12", dim: "E3", text: "我在关系里很重视个人空间", options: ["不太认同", "看情况", "非常认同"] },
+    { id: "q13", dim: "A1", text: "大多数人是善良的", options: ["不太认同", "也许吧", "认同"] },
+    { id: "q14", dim: "A1", text: "陌生人突然示好时，你更接近？", options: ["先警惕", "先观察", "先接纳"] },
+    { id: "q15", dim: "A2", text: "规则和自由冲突时，你通常？", options: ["优先自由", "看场景", "优先规则"] },
+    { id: "q16", dim: "A2", text: "我喜欢打破常规，不喜欢被束缚", options: ["认同", "中立", "不认同"] },
+    { id: "q17", dim: "A3", text: "我做事通常有目标", options: ["不认同", "中立", "认同"] },
+    { id: "q18", dim: "A3", text: "我会觉得很多事情没有真正意义", options: ["认同", "不确定", "不认同"] },
+    { id: "q19", dim: "Ac1", text: "我做事更为取得成果，而不是只为避免风险", options: ["不认同", "中立", "认同"] },
+    { id: "q20", dim: "Ac1", text: "面对卡住的任务，你更像？", options: ["先拖一拖", "再观察一下", "尽快想办法推进"] },
+    { id: "q21", dim: "Ac2", text: "我做决定比较果断，不喜欢犹豫", options: ["不认同", "中立", "认同"] },
+    { id: "q22", dim: "Ac2", text: "在信息不完整时，我通常？", options: ["继续犹豫", "边想边定", "先定再迭代"] },
+    { id: "q23", dim: "Ac3", text: "别人说你执行力强，你更接近哪句？", options: ["被逼到最后才强", "有时", "事情就该被推进"] },
+    { id: "q24", dim: "Ac3", text: "我做事常常有计划", options: ["计划常被打断", "有时能完成", "很讨厌被打乱"] },
+    { id: "q25", dim: "So1", text: "在陌生社交场景中，你更接近？", options: ["慢热", "有人聊就聊", "主动打开场子"] },
+    { id: "q26", dim: "So1", text: "朋友带了新朋友来，你通常？", options: ["天然有距离", "看情况", "会主动热情聊"] },
+    { id: "q27", dim: "So2", text: "我和人相处有明显边界感", options: ["认同", "中立", "不认同"] },
+    { id: "q28", dim: "So2", text: "我渴望和信任的人关系很亲密", options: ["认同", "中立", "不认同"] },
+    { id: "q29", dim: "So3", text: "很多时候我会把真实负面看法收起来", options: ["较少", "看关系", "较多"] },
+    { id: "q30", dim: "So3", text: "我在不同人面前会表现出不同的自己", options: ["不认同", "中立", "认同"] },
+  ];
+
+  const SBTI_SPECIAL_QUESTIONS = [
+    { id: "drink_gate_q1", special: true, text: "您平时有什么爱好？", options: ["吃喝拉撒", "艺术爱好", "饮酒", "健身"] },
+    { id: "drink_gate_q2", special: true, text: "您对饮酒的态度是？", options: ["小酌怡情", "习惯大量饮酒"] },
+  ];
+
+  const SBTI_TYPE_PATTERNS = [
+    { code: "CTRL", pattern: "HHH-HMH-MHH-HHH-MHM" }, { code: "ATM-er", pattern: "HHH-HHM-HHH-HMH-MHL" },
+    { code: "Dior-s", pattern: "MHM-MMH-MHM-HMH-LHL" }, { code: "BOSS", pattern: "HHH-HMH-MMH-HHH-LHL" },
+    { code: "THAN-K", pattern: "MHM-HMM-HHM-MMH-MHL" }, { code: "OH-NO", pattern: "HHL-LMH-LHH-HHM-LHL" },
+    { code: "GOGO", pattern: "HHM-HMH-MMH-HHH-MHM" }, { code: "SEXY", pattern: "HMH-HHL-HMM-HMM-HLH" },
+    { code: "LOVE-R", pattern: "MLH-LHL-HLH-MLM-MLH" }, { code: "MUM", pattern: "MMH-MHL-HMM-LMM-HLL" },
+    { code: "FAKE", pattern: "HLM-MML-MLM-MLM-HLH" }, { code: "OJBK", pattern: "MMH-MMM-HML-LMM-MML" },
+    { code: "MALO", pattern: "MLH-MHM-MLH-MLH-LMH" }, { code: "JOKE-R", pattern: "LLH-LHL-LML-LLL-MLM" },
+    { code: "WOC!", pattern: "HHL-HMH-MMH-HHM-LHH" }, { code: "THIN-K", pattern: "HHL-HMH-MLH-MHM-LHH" },
+    { code: "SHIT", pattern: "HHL-HLH-LMM-HHM-LHH" }, { code: "ZZZZ", pattern: "MHL-MLH-LML-MML-LHM" },
+    { code: "POOR", pattern: "HHL-MLH-LMH-HHH-LHL" }, { code: "MONK", pattern: "HHL-LLH-LLM-MML-LHM" },
+    { code: "IMSB", pattern: "LLM-LMM-LLL-LLL-MLM" }, { code: "SOLO", pattern: "LML-LLH-LHL-LML-LHM" },
+    { code: "FUCK", pattern: "MLL-LHL-LLM-MLL-HLH" }, { code: "DEAD", pattern: "LLL-LLM-LML-LLL-LHM" },
+    { code: "IMFW", pattern: "LLH-LHL-LML-LLL-MLL" },
+  ];
+
+  const SBTI_TYPE_NAMES = {
+    "CTRL": "拿捏者", "ATM-er": "送钱者", "Dior-s": "雕丝", "BOSS": "领导者", "THAN-K": "感恩者",
+    "OH-NO": "哦不人", "GOGO": "行人", "SEXY": "尤物", "LOVE-R": "多情者", "MUM": "妈妈",
+    "FAKE": "伪人", "OJBK": "无所谓人", "MALO": "吗喽", "JOKE-R": "小丑", "WOC!": "握草人",
+    "THIN-K": "思考者", "SHIT": "愤世者", "ZZZZ": "装死者", "POOR": "贫困者", "MONK": "僧人",
+    "IMSB": "傻者", "SOLO": "孤儿", "FUCK": "草者", "DEAD": "死者", "IMFW": "废物",
+    "HHHH": "傻乐者", "DRUNK": "酒鬼",
+  };
+
+  const SBTI_DIMENSION_ORDER = ["S1", "S2", "S3", "E1", "E2", "E3", "A1", "A2", "A3", "Ac1", "Ac2", "Ac3", "So1", "So2", "So3"];
+
+  const SBTI_DIMENSION_FEEDBACK = {
+    S1: { L: "自我评价偏苛刻，容易先否定自己。", M: "自信会波动，受情境影响较大。", H: "自我评价更稳定，不易被外界扰动。" },
+    S2: { L: "内在方向感较弱，容易迷茫。", M: "有方向，但会阶段性摇摆。", H: "对自己的目标与边界较清晰。" },
+    S3: { L: "更偏稳态与舒适。", M: "成长与稳定并重。", H: "有较强进取与突破驱动力。" },
+    E1: { L: "关系中的不安感偏高。", M: "信任与怀疑并存。", H: "关系安全感较强。" },
+    E2: { L: "投入偏谨慎保守。", M: "投入与自保并行。", H: "投入深度较高。" },
+    E3: { L: "更偏亲密黏性。", M: "亲密与空间可调。", H: "个人边界与独立感更强。" },
+    A1: { L: "更偏防御性视角。", M: "保持观察，不轻易下结论。", H: "更倾向相信善意与合作。" },
+    A2: { L: "灵活与自由优先。", M: "规则与变通平衡。", H: "秩序与流程优先。" },
+    A3: { L: "意义感较弱，容易空转。", M: "意义感阶段性起伏。", H: "方向感与意义感较稳定。" },
+    Ac1: { L: "以避险为主。", M: "推进与避险并重。", H: "以成果导向与推进为主。" },
+    Ac2: { L: "决策偏慢，犹豫较多。", M: "决策速度适中。", H: "决策果断度较高。" },
+    Ac3: { L: "执行常依赖截止压力。", M: "执行稳定性中等。", H: "执行推进感更强。" },
+    So1: { L: "社交启动慢热。", M: "社交弹性中等。", H: "更愿意主动社交。" },
+    So2: { L: "更偏关系融合。", M: "边界感可调。", H: "边界意识较强。" },
+    So3: { L: "表达更直接。", M: "表达会考虑场景。", H: "擅长分层表达真实想法。" },
+  };
+
+  const SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION = SBTI_SPECIAL_QUESTIONS[0];
+  const SBTI_CONDITIONAL_SPECIAL_QUESTION = SBTI_SPECIAL_QUESTIONS[1];
+  const SBTI_HIDDEN_RESULT_TRIGGER_ID = "drink_gate_q2";
+
   /* ====================================================
    * 二、状态与存储
    * ==================================================== */
 
   const HISTORY_KEY_PREFIX = "dp_deeptest_hist_v2_";
   const RESULT_KEY_PREFIX = "dp_deeptest_result_v1_";
+  const SBTI_PROFILE_KEY = "sbti_profile";
+  const SBTI_LEGACY_PROFILE_KEY = "sbti_profile_v1";
   const HISTORY_LIMIT = 12;
 
   const st = {
-    modal: null,   // 'friends' | 'insideout' | 'deep'
+    modal: null,   // 'friends' | 'insideout' | 'deep' | 'sbti'
     friends:  { idx: 0, ans: {}, result: null },
     insideout:{ idx: 0, ans: {}, result: null },
     deep:     { idx: 0, ans: {}, result: null, aiText: null, aiLoading: false },
-    store:    { friends: null, insideout: null, deep: null },
+    sbti:     { idx: 0, ans: {}, result: null },
+    store:    { friends: null, insideout: null, deep: null, sbti: null },
     hist:     { runs: [], prev: null, cur: null },
   };
 
@@ -284,6 +383,29 @@
 
   function resultStorageKey() {
     return RESULT_KEY_PREFIX + resolveCurrentUsername();
+  }
+
+  function getSbtiProfile() {
+    try {
+      const currentRaw = localStorage.getItem(SBTI_PROFILE_KEY);
+      if (currentRaw) {
+        const currentParsed = JSON.parse(currentRaw);
+        if (currentParsed && typeof currentParsed === "object") return currentParsed;
+      }
+    } catch (_) {}
+    try {
+      const legacyRaw = localStorage.getItem(SBTI_LEGACY_PROFILE_KEY);
+      if (!legacyRaw) return null;
+      const legacyParsed = JSON.parse(legacyRaw);
+      if (!legacyParsed || typeof legacyParsed !== "object") return null;
+      try {
+        localStorage.setItem(SBTI_PROFILE_KEY, JSON.stringify(legacyParsed));
+        localStorage.removeItem(SBTI_LEGACY_PROFILE_KEY);
+      } catch (_) {}
+      return legacyParsed;
+    } catch (_) {
+      return null;
+    }
   }
 
   function normalizeDeepResult(raw) {
@@ -337,6 +459,33 @@
           ? detailRaw.compatible.map(v => String(v || "").trim()).filter(Boolean).slice(0, 8)
           : [],
       },
+    };
+  }
+
+  function normalizeSbtiResult(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const rawCode = String(raw.code || "").trim();
+    const code = rawCode === "OG8K" ? "OJBK" : rawCode;
+    if (!code) return null;
+    const levels = raw.levels && typeof raw.levels === "object" ? raw.levels : {};
+    const rawScores = raw.rawScores && typeof raw.rawScores === "object" ? raw.rawScores : {};
+    const normalizedLevels = {};
+    const normalizedRawScores = {};
+    SBTI_DIMENSION_ORDER.forEach((key) => {
+      const level = String(levels[key] || "").trim().toUpperCase();
+      normalizedLevels[key] = ["L", "M", "H"].includes(level) ? level : "M";
+      normalizedRawScores[key] = Number(rawScores[key] || 0);
+    });
+    return {
+      code,
+      title: String(raw.title || `${code}（${SBTI_TYPE_NAMES[code] || code}）`),
+      match: Number(raw.match || 0),
+      badge: String(raw.badge || ""),
+      mode: String(raw.mode || "你的主类型"),
+      summary: String(raw.summary || "已生成人格扩展画像。"),
+      levels: normalizedLevels,
+      rawScores: normalizedRawScores,
+      completedAt: Number(raw.completedAt || Date.now()),
     };
   }
 
@@ -444,24 +593,46 @@
     persistStoredResults();
   }
 
+  function saveSbtiStore(result, completedAt) {
+    const normalized = normalizeSbtiResult(result);
+    if (!normalized) return;
+    st.store.sbti = normalized;
+    st.sbti.result = { ...normalized };
+    try {
+      localStorage.setItem(SBTI_PROFILE_KEY, JSON.stringify(normalized));
+      localStorage.removeItem(SBTI_LEGACY_PROFILE_KEY);
+    } catch (_) {}
+    persistStoredResults();
+  }
+
   function loadStoredResults() {
-    st.store = { friends: null, insideout: null, deep: null };
+    st.store = { friends: null, insideout: null, deep: null, sbti: null };
     try {
       const raw = localStorage.getItem(resultStorageKey());
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      st.store.friends = normalizeGameResult(data?.friends, FRIENDS_RESULTS);
-      st.store.insideout = normalizeGameResult(data?.insideout, IO_RESULTS);
-      const deepResult = normalizeDeepResult(data?.deep?.result);
-      st.store.deep = deepResult
-        ? {
-            result: deepResult,
-            completedAt: Number(data?.deep?.completedAt || Date.now()),
-            aiText: String(data?.deep?.aiText || ""),
-          }
-        : null;
+      if (raw) {
+        const data = JSON.parse(raw);
+        st.store.friends = normalizeGameResult(data?.friends, FRIENDS_RESULTS);
+        st.store.insideout = normalizeGameResult(data?.insideout, IO_RESULTS);
+        const deepResult = normalizeDeepResult(data?.deep?.result);
+        st.store.deep = deepResult
+          ? {
+              result: deepResult,
+              completedAt: Number(data?.deep?.completedAt || Date.now()),
+              aiText: String(data?.deep?.aiText || ""),
+            }
+          : null;
+        st.store.sbti = normalizeSbtiResult(data?.sbti);
+      }
     } catch(_) {
-      st.store = { friends: null, insideout: null, deep: null };
+      st.store = { friends: null, insideout: null, deep: null, sbti: null };
+    }
+
+    if (!st.store.sbti) {
+      const legacySbti = normalizeSbtiResult(getSbtiProfile());
+      if (legacySbti) {
+        st.store.sbti = legacySbti;
+        persistStoredResults();
+      }
     }
 
     if (st.store.friends) {
@@ -481,6 +652,9 @@
     }
     if (st.store.deep?.aiText) {
       st.deep.aiText = String(st.store.deep.aiText || "");
+    }
+    if (st.store.sbti) {
+      st.sbti.result = { ...st.store.sbti };
     }
   }
 
@@ -580,6 +754,106 @@
     return result;
   }
 
+  function shuffleSbtiQuestions(items) {
+    const cloned = Array.isArray(items) ? [...items] : [];
+    for (let i = cloned.length - 1; i > 0; i -= 1) {
+      const ri = Math.floor(Math.random() * (i + 1));
+      [cloned[i], cloned[ri]] = [cloned[ri], cloned[i]];
+    }
+    return cloned;
+  }
+
+  function getSbtiQuestionSet() {
+    const stored = Array.isArray(st.sbti.order) && st.sbti.order.length ? st.sbti.order : [];
+    const base = stored.length
+      ? stored.map((id) => SBTI_QUESTIONS.find((item) => item.id === id)).filter(Boolean)
+      : SBTI_QUESTIONS;
+    const list = [...base];
+    const insertIndex = list.findIndex((item) => item.id === SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION.id);
+    if (insertIndex === -1) {
+      const fallbackInsertAt = Math.min(list.length, Math.max(1, Number(st.sbti.insertAt || 1)));
+      list.splice(fallbackInsertAt, 0, SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION);
+    }
+    const specialIndex = list.findIndex((item) => item.id === SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION.id);
+    if (specialIndex !== -1 && Number(st.sbti.ans[SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION.id]) === 3) {
+      list.splice(specialIndex + 1, 0, SBTI_CONDITIONAL_SPECIAL_QUESTION);
+    }
+    return list;
+  }
+
+  function computeSbtiFromAnswers(answers) {
+    const nextAnswers = {};
+    Object.entries(answers || {}).forEach(([k, v]) => {
+      const key = String(k || "").trim();
+      const score = Number(v);
+      if (!key || !Number.isFinite(score)) return;
+      nextAnswers[key] = score;
+    });
+
+    const rawScores = Object.fromEntries(Object.keys(SBTI_DIMENSIONS).map((key) => [key, 0]));
+    SBTI_QUESTIONS.forEach((q) => {
+      rawScores[q.dim] += Number(nextAnswers[q.id] || 0);
+    });
+
+    const scoreToLevel = (score) => {
+      if (score <= 3) return "L";
+      if (score === 4) return "M";
+      return "H";
+    };
+    const levelToWeight = (level) => ({ L: 1, M: 2, H: 3 }[level] || 1);
+    const splitPattern = (pattern) => String(pattern || "").replace(/-/g, "").split("");
+
+    const levels = Object.fromEntries(Object.entries(rawScores).map(([key, value]) => [key, scoreToLevel(value)]));
+    const userPattern = SBTI_DIMENSION_ORDER.map((key) => levelToWeight(levels[key]));
+
+    const ranked = SBTI_TYPE_PATTERNS.map((tp) => {
+      const pattern = splitPattern(tp.pattern).map(levelToWeight);
+      let distance = 0;
+      let exact = 0;
+      pattern.forEach((weight, idx) => {
+        const delta = Math.abs(userPattern[idx] - weight);
+        distance += delta;
+        if (delta === 0) exact += 1;
+      });
+      return {
+        code: tp.code,
+        distance,
+        exact,
+        similarity: Math.max(0, Math.round((1 - distance / 30) * 100)),
+      };
+    }).sort((a, b) => (a.distance - b.distance) || (b.exact - a.exact) || (b.similarity - a.similarity));
+
+    const best = ranked[0] || { code: "HHHH", similarity: 0, exact: 0 };
+    let finalCode = best.code;
+    let mode = "你的主类型";
+    let summary = "维度命中度较高，当前结果可视为你的第一人格画像。";
+
+    if (Number(nextAnswers[SBTI_HIDDEN_RESULT_TRIGGER_ID]) === 2) {
+      finalCode = "DRUNK";
+      mode = "隐藏人格已激活";
+      summary = "饮酒补充题触发隐藏人格分支。";
+    } else if (best.similarity < 60) {
+      finalCode = "HHHH";
+      mode = "系统强制兜底";
+      summary = "标准人格库最高匹配较低，已落入兜底人格。";
+    }
+
+    const finalName = SBTI_TYPE_NAMES[finalCode] || finalCode;
+    return {
+      code: finalCode,
+      title: `${finalCode}（${finalName}）`,
+      match: finalCode === "DRUNK" ? 100 : Number(best.similarity || 0),
+      badge: finalCode === "DRUNK"
+        ? "匹配度 100% · 隐藏分支"
+        : `匹配度 ${Number(best.similarity || 0)}% · 命中 ${Number(best.exact || 0)}/15`,
+      mode,
+      summary,
+      levels,
+      rawScores,
+      completedAt: Date.now(),
+    };
+  }
+
   /* ====================================================
    * 四、工具函数
    * ==================================================== */
@@ -596,7 +870,7 @@
 
   function sanitizeTestType(raw) {
     const v = String(raw || "").trim().toLowerCase();
-    return ["friends", "insideout", "deep"].includes(v) ? v : "deep";
+    return ["friends", "insideout", "deep", "sbti"].includes(v) ? v : "deep";
   }
 
   function resultPageUrl(type) {
@@ -620,6 +894,16 @@
     const safeType = sanitizeTestType(type);
     closeDeepTestModal();
     window.location.href = resultPageUrl(safeType);
+  };
+
+  window.openSBTITestPage = function() {
+    closeDeepTestModal();
+    window.location.href = runnerPageUrl("sbti", true);
+  };
+
+  window.openSBTIResultPage = function() {
+    closeDeepTestModal();
+    window.location.href = resultPageUrl("sbti");
   };
 
   /* ====================================================
@@ -984,6 +1268,16 @@
    * 十一、卡片状态刷新
    * ==================================================== */
 
+  function buildSbtiResultText(profile) {
+    if (!profile) return "";
+    const code = esc(profile.code || "SBTI");
+    const title = esc(profile.title || profile.code || "已生成画像");
+    const match = Number(profile.match || 0);
+    const mode = esc(profile.mode || "你的主类型");
+    const matchText = match > 0 ? (`匹配度 ${match}%`) : "已生成";
+    return `<span class="dt-deep-type">${code}</span><span class="dt-deep-name">${matchText}</span><span class="dt-card-chip done">${mode}</span>`;
+  }
+
   function refreshCards() {
     function applyStatus(el, done) {
       if (!el) return;
@@ -1047,6 +1341,23 @@
         applyResultButtonState("dtDeepResultBtn", false);
       }
     }
+
+    // SBTI
+    const sbtiStatus = $id("dtSBTIStatus");
+    const sbtiResult = $id("dtSBTIResult");
+    if (sbtiStatus && sbtiResult) {
+      const profile = st.store?.sbti || normalizeSbtiResult(getSbtiProfile());
+      if (profile && profile.completedAt) {
+        applyStatus(sbtiStatus, true);
+        sbtiResult.innerHTML = buildSbtiResultText(profile);
+        sbtiResult.classList.remove("hidden");
+        applyResultButtonState("dtSBTIResultBtn", true);
+      } else {
+        applyStatus(sbtiStatus, false);
+        sbtiResult.classList.add("hidden");
+        applyResultButtonState("dtSBTIResultBtn", false);
+      }
+    }
   }
 
   function deepClone(value) {
@@ -1061,6 +1372,19 @@
     const safeType = sanitizeTestType(type);
     if (safeType === "friends") return deepClone(FRIENDS_Q) || [];
     if (safeType === "insideout") return deepClone(IO_Q) || [];
+    if (safeType === "sbti") {
+      if (!Array.isArray(st.sbti.order) || !st.sbti.order.length) {
+        const shuffled = shuffleSbtiQuestions(SBTI_QUESTIONS);
+        st.sbti.order = shuffled.map((item) => item.id);
+        st.sbti.insertAt = Math.floor(Math.random() * shuffled.length) + 1;
+      }
+      const ordered = st.sbti.order
+        .map((id) => SBTI_QUESTIONS.find((item) => item.id === id))
+        .filter(Boolean);
+      const insertAt = Math.min(ordered.length, Math.max(1, Number(st.sbti.insertAt || 1)));
+      const visible = [...ordered.slice(0, insertAt), SBTI_ALWAYS_INCLUDED_SPECIAL_QUESTION, ...ordered.slice(insertAt)];
+      return deepClone(visible) || [];
+    }
     return deepClone(DEEP_Q) || [];
   }
 
@@ -1068,6 +1392,7 @@
     loadStoredResults();
     const safeType = sanitizeTestType(type);
     if (safeType === "deep") return deepClone(st.store.deep) || null;
+    if (safeType === "sbti") return deepClone(st.store.sbti) || null;
     return deepClone(st.store[safeType]) || null;
   }
 
@@ -1079,6 +1404,7 @@
     const safeType = sanitizeTestType(type);
     if (safeType === "friends") return computeFriendsFromAnswers(answers);
     if (safeType === "insideout") return computeIOFromAnswers(answers);
+    if (safeType === "sbti") return computeSbtiFromAnswers(answers);
     return computeDeepFromAnswers(answers);
   }
 
@@ -1107,6 +1433,14 @@
       refreshCards();
       return deepClone(st.store.insideout);
     }
+    if (safeType === "sbti") {
+      const normalizedSbti = normalizeSbtiResult(result) || normalizeSbtiResult(computeSbtiFromAnswers(options?.answers || {}));
+      if (!normalizedSbti) return null;
+      st.sbti.result = { ...normalizedSbti };
+      saveSbtiStore(normalizedSbti, completedAt);
+      refreshCards();
+      return deepClone(st.store.sbti);
+    }
     const normalizedDeep = normalizeDeepResult(result);
     if (!normalizedDeep) return null;
     st.deep.result = { ...normalizedDeep };
@@ -1120,6 +1454,7 @@
     sanitizeTestType,
     getQuestionsByType,
     getLikertAnswers: () => deepClone(DEEP_ANSWERS) || [],
+    getSbtiConditionalQuestion: () => deepClone(SBTI_CONDITIONAL_SPECIAL_QUESTION) || null,
     getResultPageUrl: resultPageUrl,
     getRunnerPageUrl: runnerPageUrl,
     getStoredResultByType,

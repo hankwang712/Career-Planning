@@ -229,9 +229,14 @@
             <div class="assessment-extended-grid compact">
                 <article class="assessment-extended-card compact accent-deep">
                     <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
-                            <h5 class="assessment-extended-title">深层 MBTI</h5>
+                        <div class="assessment-extended-head-main">
+                            <span class="assessment-extended-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M12 3l7 4v10l-7 4-7-4V7z"></path><path d="M12 7v10"></path><path d="M8 9.5l4 2.5 4-2.5"></path></svg>
+                            </span>
+                            <div>
+                                <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
+                                <h5 class="assessment-extended-title">深层 MBTI</h5>
+                            </div>
                         </div>
                         <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
                     </div>
@@ -245,9 +250,14 @@
 
                 <article class="assessment-extended-card compact accent-friends">
                     <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">老友记测试 · 10 题</p>
-                            <h5 class="assessment-extended-title">老友记角色</h5>
+                        <div class="assessment-extended-head-main">
+                            <span class="assessment-extended-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M4 18v-1.5A3.5 3.5 0 0 1 7.5 13H10"></path><path d="M14 18v-1.5A3.5 3.5 0 0 1 17.5 13H20"></path><circle cx="8" cy="9" r="2.5"></circle><circle cx="16" cy="9" r="2.5"></circle><path d="M9.5 18h5"></path></svg>
+                            </span>
+                            <div>
+                                <p class="assessment-result-kicker">老友记测试 · 10 题</p>
+                                <h5 class="assessment-extended-title">老友记角色</h5>
+                            </div>
                         </div>
                         <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
                     </div>
@@ -261,9 +271,14 @@
 
                 <article class="assessment-extended-card compact accent-insideout">
                     <div class="assessment-extended-card-head">
-                        <div>
-                            <p class="assessment-result-kicker">情绪测试 · 14 题</p>
-                            <h5 class="assessment-extended-title">头脑特工队</h5>
+                        <div class="assessment-extended-head-main">
+                            <span class="assessment-extended-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M12 21c4.2 0 7-3 7-6.8C19 9 15.7 5 12 3 8.3 5 5 9 5 14.2 5 18 7.8 21 12 21z"></path><path d="M9 12c.7-.8 1.7-1.2 3-1.2s2.3.4 3 1.2"></path><path d="M9.5 15.5c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1"></path></svg>
+                            </span>
+                            <div>
+                                <p class="assessment-result-kicker">情绪测试 · 14 题</p>
+                                <h5 class="assessment-extended-title">头脑特工队</h5>
+                            </div>
                         </div>
                         <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
                     </div>
@@ -272,6 +287,27 @@
                     <div class="assessment-extended-actions compact">
                         <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('insideout', true)">开始测试</button>
                         <button id="dtIOResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('insideout')" disabled>查看结果</button>
+                    </div>
+                </article>
+
+                <article class="assessment-extended-card compact accent-sbti">
+                    <div class="assessment-extended-card-head">
+                        <div class="assessment-extended-head-main">
+                            <span class="assessment-extended-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.9.9-4.2 4.1 1 5.7L12 16.8 6.7 19l1-5.7-4.2-4.1 5.9-.9z"></path></svg>
+                            </span>
+                            <div>
+                                <p class="assessment-result-kicker">SBTI · 完整版题库</p>
+                                <h5 class="assessment-extended-title">SBTI 人格扩展</h5>
+                            </div>
+                        </div>
+                        <span id="dtSBTIStatus" class="assessment-status-chip">未开始</span>
+                    </div>
+                    <p class="assessment-extended-copy">完整题库与完整匹配逻辑，点击选项自动跳题，结果会回写到当前页面。</p>
+                    <div id="dtSBTIResult" class="assessment-extended-result hidden"></div>
+                    <div class="assessment-extended-actions compact">
+                        <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('sbti', true)">开始测试</button>
+                        <button id="dtSBTIResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('sbti')" disabled>查看结果</button>
                     </div>
                 </article>
             </div>

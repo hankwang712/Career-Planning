@@ -25,6 +25,11 @@ const appState = {
   weights: { "特质匹配": 30, "能力匹配": 40, "专业匹配": 15, "意愿匹配": 15 }
 };
 
+const DASHBOARD_PORTRAIT_ASSETS = {
+  male: "/app_data/man.png",
+  female: "/app_data/woman.png"
+};
+
 // 岗位数据（从 /api/jobs 加载）
 let allJobsData = [];
 let filteredJobsData = [];
@@ -812,6 +817,7 @@ const resumeTaskState = {
   analyzeTimer: null,
   analyzeFrameIndex: 0,
   analyzeStartedAt: 0,
+  lastLoadingStageIndex: -1,
   forceInputView: false,
   jobInputExpanded: false,
   deckIndices: {},
@@ -863,7 +869,10 @@ function setResumeLoadingStage(stage) {
     done: 3,
     failed: 3
   };
-  const activeIndex = typeof stage === "number" ? stage : (stageMap[String(stage || "").trim()] ?? 0);
+  const parsedIndex = typeof stage === "number" ? stage : (stageMap[String(stage || "").trim()] ?? 0);
+  const safeIndex = Math.max(0, Math.min(3, Number(parsedIndex || 0)));
+  const activeIndex = Math.max(resumeTaskState.lastLoadingStageIndex, safeIndex);
+  resumeTaskState.lastLoadingStageIndex = activeIndex;
   document.querySelectorAll(".resume-judge-loading-step").forEach((node) => {
     const index = Number(node.dataset.stepIndex || 0);
     node.classList.toggle("active", index === activeIndex);
@@ -927,20 +936,17 @@ function startAnalyzeProgressTicker() {
   stopAnalyzeProgressTicker();
   resumeTaskState.analyzeStartedAt = Date.now();
   resumeTaskState.analyzeFrameIndex = 0;
+  resumeTaskState.lastLoadingStageIndex = -1;
   setResumeProgress("analyze", 100, "正在启动简历分析 · 0s", true);
   setResumeLoadingText("系统正在提取简历文本并组织诊断结构，请稍候。");
   setResumeLoadingStage("queued");
-  const stages = ["提取简历文本", "结构化简历", "理解岗位文本", "生成分析结论"];
   resumeTaskState.analyzeTimer = setInterval(() => {
     if (!resumeTaskState.analyzeInFlight) return;
     const elapsedSec = Math.max(0, Math.floor((Date.now() - resumeTaskState.analyzeStartedAt) / 1000));
-    // 顺序推进，到最后一步后锁定，不回绕
-    const stageIndex = Math.min(resumeTaskState.analyzeFrameIndex, stages.length - 1);
-    const stage = stages[stageIndex];
-    resumeTaskState.analyzeFrameIndex += 1;
+    const stageLabels = ["提取简历文本", "结构化简历", "理解岗位文本", "生成分析结论"];
+    const stage = stageLabels[Math.max(0, resumeTaskState.lastLoadingStageIndex)];
     setResumeProgress("analyze", 100, `${stage} · ${elapsedSec}s`, true);
-    setResumeLoadingText(`${stage}，预计很快完成。`);
-    setResumeLoadingStage(stageIndex);
+    setResumeLoadingText(`${stage} · 已运行 ${elapsedSec}s`);
   }, 900);
 }
 
@@ -1495,146 +1501,6 @@ function resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDire
   ]);
 }
 
-function resumeJudgeScoreOverviewHtml(profile, matcher, analysisMode, recommendedDirections) {
-  const scores = [
-    {
-      label: "综合评分",
-      value: `${resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections)}%`,
-      tone: "primary"
-    },
-    {
-      label: "岗位匹配",
-      value: `${resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections)}%`,
-      tone: ""
-    },
-    {
-      label: "故事线",
-      value: `${resumeJudgeStoryScore(profile, matcher)}%`,
-      tone: "warm"
-    },
-    {
-      label: "技术深度",
-      value: `${resumeJudgeTechScore(profile)}%`,
-      tone: "success"
-    },
-    {
-      label: "格式规范",
-      value: `${resumeJudgeFormatScore(profile, matcher)}%`,
-      tone: ""
-    }
-  ];
-  return `
-    <div class="resume-judge-score-grid">
-      ${scores.map((item) => `
-        <article class="resume-judge-score-card ${escHtml(item.tone || "")}">
-          <span class="resume-judge-score-value">${escHtml(item.value)}</span>
-          <span class="resume-judge-score-label">${escHtml(item.label)}</span>
-        </article>
-      `).join("")}
-    </div>
-  `;
-}
-
-function resumeJudgePanelsHtml(reportHtml) {
-  if (!reportHtml) return "";
-  if (typeof document === "undefined") return reportHtml;
-  const shell = document.createElement("div");
-  shell.innerHTML = reportHtml;
-  const sections = Array.from(shell.querySelectorAll(".resume-report-section"));
-  sections.forEach((section, index) => {
-    section.classList.add("resume-judge-tab-panel");
-    section.dataset.sectionIndex = String(index + 1);
-    if (index === 0) section.classList.add("active");
-  });
-  return shell.innerHTML;
-}
-
-function resumeJudgeStepLabel(title, index) {
-  const defaults = ["第一印象", "深度审计", "修改蓝图", "简历范本", "最终裁决"];
-  return defaults[index] || title || `章节 ${index + 1}`;
-}
-
-function resumeJudgeTabsHtml(titles) {
-  if (!titles.length) return "";
-  return titles.map((title, index) => `
-    <button type="button" class="resume-judge-tab-btn ${index === 0 ? "active" : ""}" data-section-index="${index + 1}" onclick="switchResumeJudgeTab(${index + 1})">
-      ${String(index + 1).padStart(2, "0")} ${escHtml(resumeJudgeStepLabel(title, index))}
-    </button>
-  `).join("");
-}
-
-function resumeJudgeSidebarHtml(profile, matcher, analysisMode, recommendedDirections, titles) {
-  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
-  const focusTags = analysisMode === "resume_review"
-    ? previewTagValues(recommendedDirections, 4)
-    : previewTagValues(matcher?.matched_keywords || [], 4);
-  return `
-    <aside class="resume-judge-side">
-      <div class="resume-judge-side-card">
-        <p class="resume-judge-side-kicker">分析概览</p>
-        <p class="resume-judge-side-title">${escHtml(profile?.candidate_summary || "等待生成候选人摘要")}</p>
-        <div class="resume-judge-side-list">
-          <div class="resume-judge-side-row"><span>角色</span><strong>${escHtml(overview.headline || "待识别")}</strong></div>
-          <div class="resume-judge-side-row"><span>经历</span><strong>${Number(overview.experience_count || 0)} 段</strong></div>
-          <div class="resume-judge-side-row"><span>项目</span><strong>${Number(overview.project_count || 0)} 个</strong></div>
-          <div class="resume-judge-side-row"><span>章节</span><strong>${titles.length || 1} 个</strong></div>
-        </div>
-      </div>
-      <div class="resume-judge-side-card">
-        <p class="resume-judge-side-kicker">关键焦点</p>
-        <div class="resume-judge-side-tags">
-          ${focusTags.length ? focusTags.map((item) => `<span class="resume-judge-side-tag">${escHtml(item)}</span>`).join("") : `<span class="resume-judge-side-tag muted">等待生成关键词</span>`}
-        </div>
-      </div>
-    </aside>
-  `;
-}
-
-function resumeJudgeDashboardHtml(state, profile, matcher, analysisMode, recommendedDirections) {
-  const hasReport = state?.status === "analyzed" && (String(state?.analysis_result || "").trim() || String(state?.analysis_html || "").trim());
-  const reportHtml = hasReport ? resumeDetailedReportHtml(state) : "";
-  const titles = hasReport ? extractResumeReportTitles(reportHtml) : [];
-  const modeLabel = analysisMode === "resume_review" ? "简历诊断报告" : "岗位匹配报告";
-  const panelsHtml = hasReport ? resumeJudgePanelsHtml(reportHtml) : "";
-  const subtitle = state?.analyzed_at
-    ? `最近生成于 ${formatUnixTime(state.analyzed_at)}`
-    : "完成匹配后，这里会生成完整报告。";
-  return `
-    <div id="resumeJudgeShell" class="resume-judge-shell">
-      <section class="resume-judge-hero">
-        <div class="resume-judge-hero-main">
-          <div class="resume-judge-hero-top">
-            <div>
-              <span class="resume-judge-badge">诊断报告</span>
-              <h4 class="resume-judge-title">${escHtml(modeLabel)}</h4>
-              <p class="resume-judge-copy">${escHtml(profile?.candidate_summary || "系统已根据当前简历生成结构化分析结果。")}</p>
-            </div>
-            <div class="resume-judge-actions">
-              <button type="button" class="resume-judge-action-btn primary" onclick="openResumeReportPage()">查看独立页</button>
-              <button type="button" class="resume-judge-action-btn" onclick="analyzeResumeMatch()">重新匹配</button>
-            </div>
-          </div>
-          <p class="resume-judge-meta">${escHtml(subtitle)}</p>
-          ${resumeJudgeScoreOverviewHtml(profile, matcher, analysisMode, recommendedDirections)}
-        </div>
-      </section>
-
-      <div class="resume-judge-tabbar">
-        ${resumeJudgeTabsHtml(titles)}
-      </div>
-
-      <div class="resume-judge-layout">
-        <div class="resume-judge-main">
-          <div class="resume-judge-panels">
-            ${panelsHtml}
-          </div>
-        </div>
-        ${resumeJudgeSidebarHtml(profile, matcher, analysisMode, recommendedDirections, titles)}
-      </div>
-    </div>
-  `;
-}
-
 function switchResumeJudgeTab(index) {
   const shell = document.getElementById("resumeJudgeShell");
   if (!shell) return;
@@ -1645,6 +1511,19 @@ function switchResumeJudgeTab(index) {
   shell.querySelectorAll(".resume-judge-tab-panel, .resume-hj-panel").forEach((panel) => {
     panel.classList.toggle("active", Number(panel.dataset.sectionIndex || 0) === safeIndex);
   });
+}
+
+function switchResumeJudgeEvidenceView(view) {
+  const structured = document.getElementById("resumeJudgeStructuredResumeView");
+  const raw = document.getElementById("resumeJudgeRawResumeView");
+  const tabStructured = document.getElementById("resumeJudgeEvidenceTabStructured");
+  const tabRaw = document.getElementById("resumeJudgeEvidenceTabRaw");
+  if (!structured || !raw || !tabStructured || !tabRaw) return;
+  const isRaw = String(view || "") === "raw";
+  structured.classList.toggle("hidden", isRaw);
+  raw.classList.toggle("hidden", !isRaw);
+  tabStructured.classList.toggle("active", !isRaw);
+  tabRaw.classList.toggle("active", isRaw);
 }
 
 function openResumeReportPage() {
@@ -3076,55 +2955,121 @@ function resumeJudgeRiskItems(detailSection, matcher, profile) {
 
 function resumeJudgeModuleAuditItems(state, profile, matcher) {
   const structured = state?.structured_resume && typeof state.structured_resume === "object" ? state.structured_resume : {};
-  const educationCount = Array.isArray(structured.education) ? structured.education.length : 0;
-  const experienceCount = Array.isArray(structured.experiences) ? structured.experiences.length : 0;
-  const projectCount = Array.isArray(structured.projects) ? structured.projects.length : 0;
-  const skillCount = Array.isArray(structured.skills) ? structured.skills.length : 0;
-  return [
+  const education = Array.isArray(structured.education) ? structured.education : [];
+  const experiences = Array.isArray(structured.experiences) ? structured.experiences : [];
+  const projects = Array.isArray(structured.projects) ? structured.projects : [];
+  const skills = Array.isArray(structured.skills) ? structured.skills : [];
+  const research = Array.isArray(structured.research_work) ? structured.research_work : [];
+
+  const educationDetails = education.map((item) => {
+    const parts = [resumePlainText(item.institution), resumePlainText(item.field_of_study), resumePlainText(item.degree)].filter(Boolean);
+    const dateRange = [resumePlainText(item.start_date), resumePlainText(item.end_date)].filter(Boolean).join(" - ");
+    return {
+      main: parts.join(" · "),
+      meta: [dateRange, item.grade ? resumePlainText(item.grade) : ""].filter(Boolean).join(" | "),
+      desc: []
+    };
+  });
+
+  const experienceDetails = experiences.map((item) => {
+    const dateRange = [resumePlainText(item.start_date), resumePlainText(item.end_date)].filter(Boolean).join(" - ");
+    const descItems = Array.isArray(item.description) ? item.description : [];
+    return {
+      main: [resumePlainText(item.company), resumePlainText(item.job_title)].filter(Boolean).join(" | "),
+      meta: dateRange,
+      desc: descItems.slice(0, 2).map((d) => shortenResumeText(resumePlainText(d), 90)).filter(Boolean)
+    };
+  });
+
+  const projectDetails = projects.map((item) => {
+    const dateRange = [resumePlainText(item.start_date), resumePlainText(item.end_date)].filter(Boolean).join(" - ");
+    return {
+      main: resumePlainText(item.project_name),
+      meta: dateRange,
+      desc: item.description ? [shortenResumeText(resumePlainText(item.description), 90)] : []
+    };
+  });
+
+  const skillsByCategory = skills.reduce((acc, item) => {
+    const cat = resumePlainText(item.category || "其他");
+    if (!acc[cat]) acc[cat] = [];
+    const skillName = resumePlainText(item.skill_name);
+    if (skillName) acc[cat].push(skillName);
+    return acc;
+  }, {});
+  const skillDetails = Object.entries(skillsByCategory).map(([cat, items]) => ({
+    main: cat,
+    meta: items.join("、"),
+    desc: []
+  }));
+
+  const items = [
     {
       title: "教育背景",
-      text: educationCount
-        ? `已识别 ${educationCount} 段教育信息。学术项较强，建议把排名、绩点、论文与专利放在更靠前的位置。`
-        : "当前没有识别到清晰教育信息，建议补齐学校、专业、时间与核心成绩。"
+      text: education.length
+        ? `已识别 ${education.length} 段教育信息。学术项较强，建议把排名、绩点、论文与专利放在更靠前的位置。`
+        : "当前没有识别到清晰教育信息，建议补齐学校、专业、时间与核心成绩。",
+      details: educationDetails
     },
     {
       title: "实习经历",
-      text: experienceCount
-        ? `已识别 ${experienceCount} 段实习/工作经历。当前最大的短板通常在于业务背景、个人贡献和结果量化表达不足。`
-        : "当前没有识别到稳定的实习或工作经历模块，建议至少补一段真实项目或实习经历。"
+      text: experiences.length
+        ? `已识别 ${experiences.length} 段实习/工作经历。当前最大的短板通常在于业务背景、个人贡献和结果量化表达不足。`
+        : "当前没有识别到稳定的实习或工作经历模块，建议至少补一段真实项目或实习经历。",
+      details: experienceDetails
     },
     {
       title: "项目经历",
-      text: projectCount
-        ? `已识别 ${projectCount} 个项目。项目题材足够强，但需要再向“业务价值、技术决策、可验证结果”三件事收口。`
-        : "项目经历过少，难以支撑岗位判断，建议补齐 2 到 3 个高质量项目。"
+      text: projects.length
+        ? `已识别 ${projects.length} 个项目。项目题材足够强，但需要再向"业务价值、技术决策、可验证结果"三件事收口。`
+        : "项目经历过少，难以支撑岗位判断，建议补齐 2 到 3 个高质量项目。",
+      details: projectDetails
     },
     {
       title: "技能模块",
-      text: skillCount
-        ? `已识别 ${skillCount} 项技能。建议按“语言 / 框架 / 技术方向 / 工具”分组，而不是一行平铺。`
-        : "技能项过少，建议拆出独立“专业技能”模块并做分组呈现。"
+      text: skills.length
+        ? `已识别 ${skills.length} 项技能。建议按"语言 / 框架 / 技术方向 / 工具"分组，而不是一行平铺。`
+        : '技能项过少，建议拆出独立"专业技能"模块并做分组呈现。',
+      details: skillDetails
     }
   ];
+
+  if (research.length) {
+    const researchDetails = research.map((item) => ({
+      main: resumePlainText(item.title),
+      meta: resumePlainText(item.publication || item.description || ""),
+      desc: []
+    }));
+    items.push({
+      title: "论文 / 专利",
+      text: `已识别 ${research.length} 项学术成果。学术背景是竞争优势，建议在简历顶部或教育模块后单独列出。`,
+      details: researchDetails
+    });
+  }
+
+  return items;
 }
 
 function resumeJudgeEvidenceAuditItems(profile) {
-  const evidence = Array.isArray(profile?.evidence_spans) ? profile.evidence_spans.slice(0, 4) : [];
+  const evidence = Array.isArray(profile?.evidence_spans) ? profile.evidence_spans : [];
   if (!evidence.length) {
     return [{
       quote: "等待生成证据片段",
-      note: "分析完成后，这里会引用简历原文并指出每条描述还缺什么。"
+      note: "分析完成后，这里会引用简历原文并指出每条描述还缺什么。",
+      tags: []
     }];
   }
   return evidence.map((item) => {
     const quote = String(item?.quote || "").trim();
+    const tags = [];
     const notes = [];
-    if (!/\d/.test(quote)) notes.push("建议补充量化结果");
-    if (/负责|协助|参与/.test(quote)) notes.push("动词偏弱，建议改成主导 / 设计 / 实现");
-    if (!notes.length) notes.push("建议补充业务背景或边界条件");
+    if (!/\d/.test(quote)) { notes.push("建议补充量化结果"); tags.push("缺数据"); }
+    if (/负责|协助|参与/.test(quote)) { notes.push("动词偏弱，建议改成主导 / 设计 / 实现"); tags.push("动词弱"); }
+    if (!notes.length) { notes.push("建议补充业务背景或边界条件"); tags.push("缺背景"); }
     return {
       quote,
-      note: notes.join("；")
+      note: notes.join("；"),
+      tags
     };
   });
 }
@@ -3310,13 +3255,32 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
   const subtitle = state?.analyzed_at
     ? `最近生成于 ${formatUnixTime(state.analyzed_at)}`
     : "等待分析";
+  const overallScore = resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections);
+  const matchScore = resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections);
+  const projectScore = averageResumeScores([resumeJudgeStoryScore(profile, matcher), resumeJudgeTechScore(profile)]);
+  const formatScore = resumeJudgeFormatScore(profile, matcher);
+  const riskLevel = (() => {
+    if (matchScore < 35 || overallScore < 65 || riskItems.length >= 4) return { label: "高", tone: "danger", desc: "建议先补强再推进" };
+    if (matchScore < 60 || overallScore < 78 || riskItems.length >= 2) return { label: "中", tone: "warn", desc: "可推进但需重点追问" };
+    return { label: "低", tone: "success", desc: "风险可控，可直接推进" };
+  })();
   const scoreCards = [
-    ["综合评分", `${resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections)}%`],
-    ["岗位匹配", `${resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections)}%`],
-    ["故事线", `${resumeJudgeStoryScore(profile, matcher)}%`],
-    ["技术深度", `${resumeJudgeTechScore(profile)}%`],
-    ["格式规范", `${resumeJudgeFormatScore(profile, matcher)}%`]
+    { label: "综合匹配", value: `${overallScore}%`, tone: "primary", desc: "整体进入下一轮潜力" },
+    { label: "岗位命中", value: `${matchScore}%`, tone: matchScore < 45 ? "danger" : (matchScore < 70 ? "warn" : "success"), desc: "JD 关键词贴合程度" },
+    { label: "项目相关性", value: `${projectScore}%`, tone: projectScore >= 75 ? "success" : "brand", desc: "项目与目标方向一致性" },
+    { label: "风险等级", value: riskLevel.label, tone: riskLevel.tone, desc: riskLevel.desc }
   ];
+  const textSources = Array.isArray(state?.analysis_meta?.text_sources) ? state.analysis_meta.text_sources : [];
+  const sourceTags = [
+    textSources[0] || (state?.analysis_meta?.ocr_used ? "OCR 提取" : "文本解析"),
+    state?.analysis_meta?.ocr_used ? "中文+英文识别" : "结构化解析",
+    "自动识别角色"
+  ];
+  const diagnosisText = conclusionItems[2] || profile?.candidate_summary || verdict.reason;
+  const highlights = (resumeFlattenBlocks(strengthGroup?.blocks || []).slice(0, 4).length
+    ? resumeFlattenBlocks(strengthGroup?.blocks || []).slice(0, 4)
+    : (Array.isArray(profile?.project_highlights) ? profile.project_highlights.slice(0, 4).map((item) => item?.highlight || item?.project || "") : [])
+  ).filter(Boolean);
 
   return `
     <div id="resumeJudgeShell" class="resume-hj-shell">
@@ -3337,9 +3301,10 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
         </div>
         <div class="resume-hj-score-grid">
           ${scoreCards.map((item) => `
-            <article class="resume-hj-score-card">
-              <div class="resume-hj-score-value">${item[1]}</div>
-              <div class="resume-hj-score-label">${item[0]}</div>
+            <article class="resume-hj-score-card ${item.tone || ""}">
+              <div class="resume-hj-score-value">${escHtml(item.value)}</div>
+              <div class="resume-hj-score-label">${escHtml(item.label)}</div>
+              <div class="resume-hj-score-desc">${escHtml(item.desc)}</div>
             </article>
           `).join("")}
         </div>
@@ -3350,60 +3315,73 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
       </div>
 
       <section class="resume-hj-panel active" data-section-index="1">
-        <div class="resume-hj-intro-grid">
-          <div class="resume-hj-stack">
-            <article class="resume-hj-card">
-              <h4 class="resume-hj-card-title"><span class="resume-hj-chip">30</span>30 秒定论</h4>
-              <div class="resume-hj-verdict ${verdict.tone}">
-                <div class="resume-hj-verdict-top">
-                  <span class="resume-hj-verdict-icon">${verdict.icon}</span>
-                  <div>
-                    <div class="resume-hj-verdict-title">${escHtml(verdict.title)}</div>
-                    <div class="resume-hj-verdict-role">${escHtml(verdict.role)}</div>
-                  </div>
+        <section class="resume-hj-decision-grid">
+          <article class="resume-hj-card resume-hj-decision-card ${verdict.tone}">
+            <p class="resume-hj-decision-kicker">候选人匹配结论</p>
+            <h4 class="resume-hj-decision-title">${escHtml(verdict.title)}</h4>
+            <p class="resume-hj-decision-role">${escHtml(verdict.role || "方向识别中")}</p>
+            <p class="resume-hj-decision-summary">${escHtml(verdict.summary || profile?.candidate_summary || "系统正在汇总候选人画像结论。")}</p>
+            <p class="resume-hj-decision-copy">${escHtml(verdict.reason)}</p>
+            <div class="resume-hj-tag-row">
+              ${sourceTags.filter(Boolean).map((tag) => `<span class="resume-hj-tag">${escHtml(tag)}</span>`).join("")}
+            </div>
+          </article>
+          <article class="resume-hj-card resume-hj-decision-side">
+            <h4 class="resume-hj-side-title">快速扫描</h4>
+            <div class="resume-hj-stat-list">
+              ${quickStats.map((item) => `
+                <div class="resume-hj-stat-row">
+                  <span>${item[0]}</span>
+                  <strong>${escHtml(String(item[1]))}</strong>
                 </div>
-                <p class="resume-hj-verdict-copy">${escHtml(verdict.reason)}</p>
-              </div>
+              `).join("")}
+            </div>
+            <article class="resume-hj-alert-card ${riskLevel.tone}">
+              <p class="resume-hj-alert-title">风险预警</p>
+              <p class="resume-hj-alert-copy">${escHtml(riskLevel.desc)}</p>
             </article>
+          </article>
+        </section>
 
-            <article class="resume-hj-card">
-              <h4 class="resume-hj-card-title">初步诊断要点</h4>
-              <div class="resume-hj-point-list">
-                ${conclusionItems.slice(0, 4).map((item, index) => `
-                  <div class="resume-hj-point ${index === 1 ? "danger" : index === 0 ? "success" : "brand"}">
-                    <p>${escHtml(item)}</p>
-                  </div>
-                `).join("") || `<div class="resume-hj-point brand"><p>${escHtml(profile?.candidate_summary || "等待生成初步诊断。")}</p></div>`}
-              </div>
-            </article>
-          </div>
-
+        <section class="resume-hj-analysis-grid">
           <div class="resume-hj-stack">
             <article class="resume-hj-card">
-              <h4 class="resume-hj-side-title">快速扫描</h4>
-              <div class="resume-hj-stat-list">
-                ${quickStats.map((item) => `
-                  <div class="resume-hj-stat-row">
-                    <span>${item[0]}</span>
-                    <strong>${escHtml(String(item[1]))}</strong>
-                  </div>
-                `).join("")}
-              </div>
+              <h4 class="resume-hj-card-title">初步诊断</h4>
+              <p class="resume-hj-card-copy">${escHtml(diagnosisText)}</p>
             </article>
             <article class="resume-hj-card">
-              <h4 class="resume-hj-side-title">关键风险</h4>
+              <h4 class="resume-hj-card-title">优势亮点</h4>
+              <div class="resume-hj-tag-row">
+                ${highlights.length ? highlights.map((item) => `<span class="resume-hj-tag success">${escHtml(item)}</span>`).join("") : `<span class="resume-hj-tag">等待提炼优势亮点</span>`}
+              </div>
+            </article>
+            <article class="resume-hj-card danger">
+              <h4 class="resume-hj-card-title">关键短板</h4>
               <div class="resume-hj-risk-list">
                 ${riskItems.map((item) => `<div class="resume-hj-risk-item">${escHtml(item)}</div>`).join("")}
               </div>
             </article>
           </div>
-        </div>
+          <aside class="resume-hj-side-sticky">
+            <article class="resume-hj-card">
+              <h4 class="resume-hj-side-title">决策辅助栏</h4>
+              <div class="resume-hj-action-list">
+                ${questionItems.slice(0, 3).map((item, index) => `
+                  <div class="resume-hj-action-item">
+                    <span>${String(index + 1).padStart(2, "0")}</span>
+                    <p>${escHtml(item)}</p>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+          </aside>
+        </section>
       </section>
 
       <section class="resume-hj-panel" data-section-index="2">
         <div class="resume-hj-stack">
           <article class="resume-hj-card">
-            <h4 class="resume-hj-card-title"><span class="resume-hj-dot brand"></span>整体层面审计</h4>
+            <h4 class="resume-hj-card-title"><span class="resume-hj-dot brand"></span>证据分析（结论 → 原因 → 证据）</h4>
             <div class="resume-hj-audit-grid">
               <div class="resume-hj-subcard">
                 <p class="resume-hj-subcard-title">优势</p>
@@ -3418,6 +3396,30 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
                 </div>
               </div>
             </div>
+            ${(() => {
+              const caps = profile?.capability_scores && typeof profile.capability_scores === "object" ? profile.capability_scores : null;
+              if (!caps) return "";
+              const labels = { communication: "表达沟通", execution: "执行落地", stress_resilience: "抗压韧性", innovation: "创新思维", collaboration: "协作配合", leadership: "领导潜力" };
+              const entries = Object.entries(labels).map(([key, label]) => [label, Number(caps[key] || 0)]);
+              return `
+                <div class="resume-hj-cap-section">
+                  <p class="resume-hj-subcard-title" style="margin-bottom:0.7rem">能力维度评分</p>
+                  <div class="resume-hj-cap-grid">
+                    ${entries.map(([label, score]) => `
+                      <div class="resume-hj-cap-item">
+                        <div class="resume-hj-cap-head">
+                          <span>${escHtml(label)}</span>
+                          <strong>${score}</strong>
+                        </div>
+                        <div class="resume-hj-cap-track">
+                          <div class="resume-hj-cap-fill" style="width:${Math.min(100, score)}%"></div>
+                        </div>
+                      </div>
+                    `).join("")}
+                  </div>
+                </div>
+              `;
+            })()}
           </article>
 
           <article class="resume-hj-card">
@@ -3426,7 +3428,19 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
               ${moduleAuditItems.map((item) => `
                 <article class="resume-hj-module-card">
                   <p class="resume-hj-module-title">${escHtml(item.title)}</p>
+                  <p class="resume-hj-module-status ${item.details && item.details.length >= 2 ? "strong" : (item.details && item.details.length ? "weak" : "pending")}">${item.details && item.details.length >= 2 ? "强证据" : (item.details && item.details.length ? "弱证据" : "待补证")}</p>
                   <p class="resume-hj-module-copy">${escHtml(item.text)}</p>
+                  ${item.details && item.details.length ? `
+                    <div class="resume-hj-module-details">
+                      ${item.details.map((d) => `
+                        <div class="resume-hj-module-detail-item">
+                          <div class="resume-hj-detail-main">${escHtml(d.main)}</div>
+                          ${d.meta ? `<div class="resume-hj-detail-meta">${escHtml(d.meta)}</div>` : ""}
+                          ${d.desc && d.desc.length ? d.desc.map((line) => `<div class="resume-hj-detail-desc">· ${escHtml(line)}</div>`).join("") : ""}
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : ""}
                 </article>
               `).join("")}
             </div>
@@ -3434,10 +3448,15 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
 
           <article class="resume-hj-card">
             <h4 class="resume-hj-card-title"><span class="resume-hj-dot danger"></span>证据片段拷问</h4>
+            <p class="resume-hj-card-copy" style="margin-bottom:0.9rem">系统从简历原文提取了以下 ${evidenceAuditItems.length} 条描述，逐一指出待改进的方向。</p>
             <div class="resume-hj-evidence-audit">
-              ${evidenceAuditItems.map((item) => `
+              ${evidenceAuditItems.map((item, idx) => `
                 <article class="resume-hj-evidence-card">
-                  <p class="resume-hj-evidence-quote">${escHtml(shortenResumeText(item.quote, 180))}</p>
+                  <div class="resume-hj-evidence-head">
+                    <span class="resume-hj-evidence-idx">${String(idx + 1).padStart(2, "0")}</span>
+                    ${item.tags && item.tags.length ? item.tags.map((tag) => `<span class="resume-hj-evidence-tag">${escHtml(tag)}</span>`).join("") : ""}
+                  </div>
+                  <p class="resume-hj-evidence-quote">${escHtml(item.quote)}</p>
                   <p class="resume-hj-evidence-note">${escHtml(item.note)}</p>
                 </article>
               `).join("")}
@@ -3508,13 +3527,19 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
       <section class="resume-hj-panel" data-section-index="4">
         <article class="resume-hj-card">
           <div class="resume-hj-card-head">
-            <h4 class="resume-hj-card-title">重写后的完整简历范本</h4>
+            <h4 class="resume-hj-card-title">原始证据 / 简历原文</h4>
             <button type="button" class="resume-hj-copy-btn" onclick="copyResumeCodeBlock('resumeJudgeFullResume')">复制全文</button>
           </div>
-          <div class="resume-hj-code-shell">
-            <pre id="resumeJudgeFullResume" class="resume-hj-code-pre"><code>${escHtml(templateText)}</code></pre>
+          <div class="resume-hj-evidence-tabs">
+            <button type="button" id="resumeJudgeEvidenceTabStructured" class="resume-hj-evidence-tab active" onclick="switchResumeJudgeEvidenceView('structured')">结构化视图</button>
+            <button type="button" id="resumeJudgeEvidenceTabRaw" class="resume-hj-evidence-tab" onclick="switchResumeJudgeEvidenceView('raw')">原文视图</button>
           </div>
-          <p class="resume-hj-footnote">如果模型没有单独返回完整改写版，这里会用结构化简历信息自动拼装成一份可继续修改的范本。</p>
+          <div class="resume-hj-code-shell">
+            <pre id="resumeJudgeStructuredResumeView" class="resume-hj-code-pre"><code>${escHtml(templateText)}</code></pre>
+            <pre id="resumeJudgeRawResumeView" class="resume-hj-code-pre hidden"><code>${escHtml(String(state?.analysis_result || "暂无原文视图内容。").trim() || "暂无原文视图内容。")}</code></pre>
+            <pre id="resumeJudgeFullResume" class="hidden"><code>${escHtml(templateText)}</code></pre>
+          </div>
+          <p class="resume-hj-footnote">结构化视图用于快速判断；原文视图用于逐行核对证据与表达。</p>
         </article>
       </section>
 
@@ -8352,6 +8377,55 @@ function animateCounter(el, target, suffix = "", duration = 500) {
   requestAnimationFrame(frame);
 }
 
+function getRelockReturnTarget() {
+  try {
+    const url = new URL(window.location.href);
+    const raw = String(url.searchParams.get("return_to") || "").trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) {
+      const parsed = new URL(raw);
+      if (parsed.origin !== window.location.origin) return "";
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return raw.startsWith("/") ? raw : `/${raw.replace(/^\/+/, "")}`;
+  } catch (_) {
+    return "";
+  }
+}
+
+function shouldForceRelock() {
+  try {
+    const url = new URL(window.location.href);
+    return ["1", "true", "yes"].includes(String(url.searchParams.get("force_lock") || "").trim().toLowerCase());
+  } catch (_) {
+    return false;
+  }
+}
+
+function consumeRelockParams() {
+  try {
+    const url = new URL(window.location.href);
+    let changed = false;
+    if (url.searchParams.has("force_lock")) {
+      url.searchParams.delete("force_lock");
+      changed = true;
+    }
+    if (url.searchParams.has("return_to")) {
+      url.searchParams.delete("return_to");
+      changed = true;
+    }
+    if (changed) window.history.replaceState({}, "", url.toString());
+  } catch (_) {}
+}
+
+function redirectAfterUnlock() {
+  const target = getRelockReturnTarget();
+  if (!target) return false;
+  consumeRelockParams();
+  window.location.href = target;
+  return true;
+}
+
 function fillSuperUser() {
   const u = document.getElementById("loginUsername");
   const p = document.getElementById("loginPassword");
@@ -8381,6 +8455,7 @@ function switchAuthTab(tab) {
 
 function lockApp() {
   userWorkspaceState.currentUser = null;
+  userWorkspaceState.authReadyPromise = null;
   document.body.classList.add("auth-locked");
   const startup = document.getElementById("startupScreen");
   const label = document.getElementById("currentUserLabel");
@@ -8406,6 +8481,7 @@ function unlockAppForUser(user) {
   addLiveActivity(`User signed in: ${user.username}`);
   showToast("登录成功", `欢迎回来，${user.display_name || user.displayName || user.username}。`, "success", 1800);
   emitAuthStateChange();
+  if (redirectAfterUnlock()) return;
 }
 
 async function handleLogin(event) {
@@ -8418,7 +8494,11 @@ async function handleLogin(event) {
       method: "POST",
       body: { username, password }
     });
-    showAuthMessage("登录成功，正在进入你的独立空间……", "success");
+    if (shouldForceRelock()) {
+      showAuthMessage("解锁成功，正在返回上一界面……", "success");
+    } else {
+      showAuthMessage("登录成功，正在进入你的独立空间……", "success");
+    }
     window.setTimeout(() => window.location.reload(), 180);
   } catch (error) {
     showAuthMessage(error.message || "用户名或密码错误。", "error");
@@ -8452,6 +8532,14 @@ async function initAuth() {
         payload = await requestJson("/api/auth/status");
       }
       if (payload.authenticated && payload.user) {
+        if (shouldForceRelock()) {
+          lockApp();
+          switchAuthTab("login");
+          fillSuperUser();
+          showAuthMessage("请输入密码解锁后，再返回上一次界面。", "warning");
+          emitAuthStateChange();
+          return null;
+        }
         unlockAppForUser(payload.user);
         const llm = payload.llm || {};
         const scoped = payload.scoped_data || {};
@@ -8536,10 +8624,47 @@ function updateReportDates(baseDate = new Date()) {
   if (footerYear) footerYear.textContent = String(baseDate.getFullYear());
 }
 
+function normalizeGenderLabel(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (!v) return "";
+  if (/^(m|male|man|boy|男|男性|先生)$/i.test(v) || v.includes("男")) return "male";
+  if (/^(f|female|woman|girl|女|女性|女士)$/i.test(v) || v.includes("女")) return "female";
+  return "";
+}
+
+function resolveDashboardPortraitGender() {
+  const basicsGender = appState.derivedProfile?.basics?.gender;
+  const interviewGender = careerInterviewState?.profileBasics?.gender;
+  const userGender = getCurrentUser()?.gender;
+  return normalizeGenderLabel(basicsGender || interviewGender || userGender || "");
+}
+
+function updateDashboardPortraitVisual() {
+  const imageEl = document.getElementById("dashboardPortraitImage");
+  const badgeEl = document.getElementById("dashboardPortraitBadge");
+  const toneEl = document.getElementById("dashboardPortraitTone");
+  const visualEl = document.getElementById("dashboardPortraitVisual");
+  if (!imageEl) return;
+  const gender = resolveDashboardPortraitGender();
+  const isFemale = gender === "female";
+  const src = isFemale ? DASHBOARD_PORTRAIT_ASSETS.female : DASHBOARD_PORTRAIT_ASSETS.male;
+  if (imageEl.getAttribute("src") !== src) imageEl.setAttribute("src", src);
+  imageEl.setAttribute("alt", isFemale ? "女性职业画像" : "男性职业画像");
+  if (badgeEl) badgeEl.textContent = isFemale ? "女性画像" : "男性画像";
+  if (toneEl) toneEl.textContent = isFemale
+    ? "系统结合测评和基础信息，匹配当前女性人物画像。"
+    : "系统结合测评和基础信息，匹配当前男性人物画像。";
+  if (visualEl) {
+    visualEl.classList.toggle("is-female", isFemale);
+    visualEl.classList.toggle("is-male", !isFemale);
+  }
+}
+
 function updateLiveClock() {
   const now = new Date();
   const clockEl = document.getElementById("liveClock");
   if (clockEl) clockEl.textContent = formatClock(now);
+  updateDashboardPortraitVisual();
   const greetingKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
   if (appState.lastGreetingKey === greetingKey) return;
   appState.lastGreetingKey = greetingKey;
@@ -8606,6 +8731,7 @@ function updateTaskPanels(explored) {
 function updateDashboardMetrics() {
   const roles = Array.isArray(appState.matchingRoles) ? appState.matchingRoles : [];
   const profile = appState.derivedProfile;
+  updateDashboardPortraitVisual();
   const topRoleData = roles[0];
   const explored = roles.slice(0, 3).length;
   const topRate = topRoleData?.overallScore || topRoleData?.trait?.score || 0;

@@ -672,19 +672,54 @@
     `;
   }
 
+  function buildTopicMetrics(sub) {
+    const bullets = Array.isArray(sub?.bulletItems) ? sub.bulletItems.length : 0;
+    const orders = Array.isArray(sub?.orderedItems) ? sub.orderedItems.length : 0;
+    const text = stripMarkdown(sub?.markdown || "");
+    const chars = text.length;
+    return [
+      { label: "要点", value: String(bullets || orders || 0) },
+      { label: "信息密度", value: chars > 180 ? "高" : chars > 80 ? "中" : "轻" },
+      { label: "阅读方式", value: bullets || orders ? "列表" : "段落" },
+    ];
+  }
+
+  function renderTopicSummary(sub) {
+    const source = sub.bulletItems.length ? sub.bulletItems : sub.orderedItems;
+    const first = source[0] || stripMarkdown(sub.markdown || "").slice(0, 88);
+    return first ? `<p class="rr-topic-summary">${inlineMarkdown(first)}</p>` : "";
+  }
+
   function renderSubsectionBody(section) {
     return `
-      ${section.leadHtml ? `<div class="rr-markdown-body">${section.leadHtml}</div>` : ""}
+      ${section.leadHtml ? `<div class="rr-module-lead rr-markdown-body">${section.leadHtml}</div>` : ""}
       <div class="rr-topic-grid">
-        ${section.subsections.map((sub) => {
+        ${section.subsections.map((sub, index) => {
           const tone = getSectionTone(sub.title);
           const items = sub.bulletItems.length ? sub.bulletItems : sub.orderedItems;
+          const metrics = buildTopicMetrics(sub);
           const bodyHtml = items.length
-            ? `<ul class="rr-compact-list">${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`
+            ? `<ul class="rr-compact-list rr-topic-points">${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`
             : `<div class="rr-markdown-body">${sub.html}</div>`;
           return `
             <section id="${esc(sub.id)}" class="rr-topic-card ${esc(tone)}" data-rr-anchor="topic">
-              <h4 class="rr-topic-title">${esc(sub.title)}</h4>
+              <div class="rr-topic-head">
+                <div class="rr-topic-head-main">
+                  <span class="rr-topic-index">${String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h4 class="rr-topic-title">${esc(sub.title)}</h4>
+                    ${renderTopicSummary(sub)}
+                  </div>
+                </div>
+                <div class="rr-topic-metrics">
+                  ${metrics.map((metric) => `
+                    <span class="rr-topic-metric">
+                      <small>${esc(metric.label)}</small>
+                      <strong>${esc(metric.value)}</strong>
+                    </span>
+                  `).join("")}
+                </div>
+              </div>
               <div class="rr-topic-body">${bodyHtml}</div>
             </section>
           `;
@@ -699,19 +734,57 @@
       return `<div class="rr-markdown-body">${section.leadHtml || section.html}</div>`;
     }
     return `
+      <div class="rr-action-overview">
+        <div class="rr-action-overview-card">
+          <span>行动数量</span>
+          <strong>${items.length}</strong>
+        </div>
+        <div class="rr-action-overview-card">
+          <span>执行风格</span>
+          <strong>逐项推进</strong>
+        </div>
+        <div class="rr-action-overview-card">
+          <span>适用场景</span>
+          <strong>面试前复盘</strong>
+        </div>
+      </div>
       <ol class="rr-action-list">
-        ${items.map((item, index) => `
-          <li id="${esc(`${section.id}-item-${index + 1}`)}" class="rr-action-item" data-rr-anchor="topic">
-            <span class="rr-action-index">${index + 1}</span>
-            <div class="rr-action-copy rr-markdown-body">${fallbackMarkdownToHtml(item)}</div>
-          </li>
-        `).join("")}
+        ${items.map((item, index) => {
+          const parsed = extractLabelValue(item);
+          const title = parsed?.label || `动作 ${index + 1}`;
+          const body = parsed?.body || stripMarkdown(item);
+          return `
+            <li id="${esc(`${section.id}-item-${index + 1}`)}" class="rr-action-item" data-rr-anchor="topic">
+              <span class="rr-action-index">${index + 1}</span>
+              <div class="rr-action-copy">
+                <div class="rr-action-card-head">
+                  <strong class="rr-action-card-title">${esc(title)}</strong>
+                  <span class="rr-action-card-tag">建议动作</span>
+                </div>
+                <div class="rr-action-card-body rr-markdown-body">${fallbackMarkdownToHtml(body)}</div>
+              </div>
+            </li>
+          `;
+        }).join("")}
       </ol>
     `;
   }
 
   function renderGenericBody(section) {
-    return `<div class="rr-markdown-body">${section.html || section.leadHtml}</div>`;
+    const summaryItems = section.bulletItems.length ? section.bulletItems.slice(0, 3) : [];
+    return `
+      ${summaryItems.length ? `
+        <div class="rr-generic-summary-grid">
+          ${summaryItems.map((item, index) => `
+            <article class="rr-generic-summary-card">
+              <small>重点 ${index + 1}</small>
+              <p>${inlineMarkdown(item)}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+      <div class="rr-markdown-body">${section.html || section.leadHtml}</div>
+    `;
   }
 
   function renderActiveSection(section, doc) {
@@ -725,13 +798,27 @@
     else if (section.subsections.length) body = renderSubsectionBody(section);
     else if (section.orderedItems.length >= 2 || /建议|优化|行动/.test(section.title)) body = renderActionBody(section);
 
+    const sectionMetrics = [
+      { label: "小节数", value: String(section.subsections.length || 0) },
+      { label: "行动项", value: String(section.orderedItems.length || 0) },
+      { label: "关键信号", value: String(section.bulletItems.length || 0) },
+    ];
+
     root.innerHTML = `
       <section class="rr-panel">
-        <header class="rr-panel-head">
+        <header class="rr-panel-head rr-panel-head-rich">
           <div>
             <p class="rr-panel-kicker">Section ${String(section.index).padStart(2, "0")} / ${String((doc.sections || []).length).padStart(2, "0")}</p>
             <h3 class="rr-panel-title">${esc(section.title)}</h3>
             ${sectionIntro}
+          </div>
+          <div class="rr-panel-metrics">
+            ${sectionMetrics.map((metric) => `
+              <article class="rr-panel-metric-card">
+                <small>${esc(metric.label)}</small>
+                <strong>${esc(metric.value)}</strong>
+              </article>
+            `).join("")}
           </div>
         </header>
         <div class="rr-panel-body">${body}</div>

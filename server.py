@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import random
 
-from flask import Flask, has_request_context, jsonify, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, has_request_context, jsonify, redirect, render_template, request, send_file, send_from_directory, session, url_for
 from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -2088,6 +2088,190 @@ def _read_career_report_bundle_by_id(username, report_id=""):
     return {}
 
 
+def _summarize_career_report_bundle(bundle):
+    if not isinstance(bundle, dict):
+        return None
+
+    meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    report_id = str(meta.get("report_id") or "").strip()
+    if not report_id:
+        return None
+
+    document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+    gap_map = bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {}
+    focus_role_name = (
+        str(document.get("focus_role_name") or "")
+        or str(meta.get("focus_role_name") or "")
+        or str(gap_map.get("focus_role_name") or "")
+    ).strip()
+
+    return {
+        "report_id": report_id,
+        "title": str(meta.get("title") or document.get("title") or "职业规划报告").strip() or "职业规划报告",
+        "version": str(meta.get("version") or "").strip(),
+        "generated_at": str(meta.get("generated_at") or "").strip(),
+        "focus_role_id": str(meta.get("focus_role_id") or "").strip(),
+        "focus_role_name": focus_role_name,
+    }
+
+
+def _list_career_report_version_summaries(username, include_latest=True, lock=True):
+    paths = _career_report_file_paths(username)
+
+    def _collect():
+        items = []
+
+        if include_latest:
+            latest_bundle = _read_json_file(paths["json"], {})
+            summary = _summarize_career_report_bundle(latest_bundle)
+            if summary:
+                items.append(summary)
+
+        versions_dir = paths["versions_dir"]
+        if os.path.isdir(versions_dir):
+            for name in os.listdir(versions_dir):
+                if not name.lower().endswith(".json"):
+                    continue
+                payload = _read_json_file(os.path.join(versions_dir, name), {})
+                summary = _summarize_career_report_bundle(payload)
+                if summary:
+                    items.append(summary)
+
+        deduped = []
+        seen = set()
+        for item in sorted(
+            items,
+            key=lambda value: (str(value.get("generated_at") or ""), str(value.get("report_id") or "")),
+            reverse=True,
+        ):
+            report_id = str(item.get("report_id") or "").strip()
+            if not report_id or report_id in seen:
+                continue
+            seen.add(report_id)
+            deduped.append(item)
+        return deduped
+
+    if not lock:
+        return _collect()
+    with APP_DATA_LOCK:
+        return _collect()
+
+
+def _prepare_career_report_bundle_payload(bundle):
+    payload = dict(bundle) if isinstance(bundle, dict) else {}
+    report_document = dict(payload.get("report_document") or {}) if isinstance(payload.get("report_document"), dict) else {}
+    payload["report_document"] = report_document
+
+    markdown_text = str(report_document.get("markdown") or "").strip()
+    if not markdown_text:
+        markdown_text = render_report_markdown(payload).strip()
+        report_document["markdown"] = markdown_text
+
+    html_text = str(report_document.get("html") or "").strip()
+    if not html_text:
+        html_text = render_report_html(payload).strip()
+        report_document["html"] = html_text
+
+    return payload, markdown_text, html_text
+
+
+def _write_current_career_report_files(paths, payload, markdown_text="", html_text=""):
+    _write_json_file(paths["json"], payload)
+
+    if markdown_text:
+        with open(paths["md"], "w", encoding="utf-8") as fp:
+            fp.write(markdown_text)
+    elif os.path.isfile(paths["md"]):
+        os.remove(paths["md"])
+
+    if html_text:
+        with open(paths["html"], "w", encoding="utf-8") as fp:
+            fp.write(html_text)
+    elif os.path.isfile(paths["html"]):
+        os.remove(paths["html"])
+
+    _write_json_file(paths["job"], {
+        "report_id": str(payload.get("meta", {}).get("report_id") or ""),
+        "generated_at": str(payload.get("meta", {}).get("generated_at") or ""),
+        "title": str(payload.get("meta", {}).get("title") or ""),
+    })
+
+
+def _remove_current_career_report_files(paths):
+    for key in ("json", "html", "md", "job"):
+        target = paths.get(key)
+        if target and os.path.isfile(target):
+            os.remove(target)
+
+
+def _delete_career_report_version(username, report_id):
+    safe_report_id = str(report_id or "").strip()
+    if not safe_report_id:
+        raise ValueError("缺少 report_id")
+
+    paths = _career_report_file_paths(username)
+    deleted_current = False
+    replacement_report_id = ""
+    replacement_title = ""
+
+    with APP_DATA_LOCK:
+        latest_bundle = _read_json_file(paths["json"], {})
+        latest_id = str((latest_bundle.get("meta") or {}).get("report_id") or "").strip()
+        archive_path = os.path.join(paths["versions_dir"], f"{safe_report_id}.json")
+
+        if latest_id == safe_report_id:
+            deleted_current = True
+            replacement_candidates = []
+            if os.path.isdir(paths["versions_dir"]):
+                for name in os.listdir(paths["versions_dir"]):
+                    if not name.lower().endswith(".json"):
+                        continue
+                    candidate_path = os.path.join(paths["versions_dir"], name)
+                    payload = _read_json_file(candidate_path, {})
+                    summary = _summarize_career_report_bundle(payload)
+                    if summary:
+                        replacement_candidates.append((summary, payload, candidate_path))
+
+            replacement_candidates.sort(
+                key=lambda item: (str(item[0].get("generated_at") or ""), str(item[0].get("report_id") or "")),
+                reverse=True,
+            )
+
+            if replacement_candidates:
+                summary, replacement_bundle, replacement_path = replacement_candidates[0]
+                replacement_report_id = str(summary.get("report_id") or "").strip()
+                replacement_title = str(summary.get("title") or "").strip()
+                if os.path.isfile(replacement_path):
+                    os.remove(replacement_path)
+                prepared_bundle, markdown_text, html_text = _prepare_career_report_bundle_payload(replacement_bundle)
+                _write_current_career_report_files(paths, prepared_bundle, markdown_text, html_text)
+            else:
+                _remove_current_career_report_files(paths)
+        elif os.path.isfile(archive_path):
+            os.remove(archive_path)
+        else:
+            raise FileNotFoundError("未找到对应的职业报告版本。")
+
+        snapshot_dir = _career_report_snapshot_dir(paths, safe_report_id)
+        if os.path.isdir(snapshot_dir):
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
+
+    current_bundle = _read_career_report_bundle(username)
+    if isinstance(current_bundle, dict) and current_bundle.get("meta"):
+        _sync_career_report_tracker_state(username, current_bundle)
+    else:
+        state = _load_user_state(username)
+        state["career_report"] = empty_report_state()
+        _save_user_state(username, state)
+
+    return {
+        "deleted_current": deleted_current,
+        "deleted_report_id": safe_report_id,
+        "replacement_report_id": replacement_report_id,
+        "replacement_title": replacement_title,
+    }
+
+
 def _clip_career_report_text(value, limit=140):
     text = re.sub(r"\s+", " ", str(value or "").strip())
     if len(text) <= limit:
@@ -2362,17 +2546,7 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
 def _save_career_report_bundle(username, bundle):
     paths = _career_report_file_paths(username)
     os.makedirs(paths["dir"], exist_ok=True)
-    payload = dict(bundle) if isinstance(bundle, dict) else {}
-    report_document = dict(payload.get("report_document") or {}) if isinstance(payload.get("report_document"), dict) else {}
-    payload["report_document"] = report_document
-    markdown_text = str(report_document.get("markdown") or "").strip()
-    if not markdown_text:
-        markdown_text = render_report_markdown(payload).strip()
-        report_document["markdown"] = markdown_text
-    html_text = str(report_document.get("html") or "").strip()
-    if not html_text:
-        html_text = render_report_html(payload).strip()
-        report_document["html"] = html_text
+    payload, markdown_text, html_text = _prepare_career_report_bundle_payload(bundle)
     new_meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
     new_report_id = str(new_meta.get("report_id") or "").strip()
     versions_dir = paths["versions_dir"]
@@ -2390,18 +2564,7 @@ def _save_career_report_bundle(username, bundle):
                 archive_path = os.path.join(versions_dir, f"{old_id}.json")
                 if not os.path.isfile(archive_path):
                     _write_json_file(archive_path, existing)
-        _write_json_file(paths["json"], payload)
-        if markdown_text:
-            with open(paths["md"], "w", encoding="utf-8") as fp:
-                fp.write(markdown_text)
-        if html_text:
-            with open(paths["html"], "w", encoding="utf-8") as fp:
-                fp.write(html_text)
-        _write_json_file(paths["job"], {
-            "report_id": str(payload.get("meta", {}).get("report_id") or ""),
-            "generated_at": str(payload.get("meta", {}).get("generated_at") or ""),
-            "title": str(payload.get("meta", {}).get("title") or ""),
-        })
+        _write_current_career_report_files(paths, payload, markdown_text, html_text)
     return payload
 
 
@@ -2586,7 +2749,7 @@ def _normalize_tracker_capability_payload(raw_items):
     return payload
 
 
-def _build_career_report_tracker(bundle, existing_tracker=None, current_capabilities=None):
+def _build_career_report_tracker(bundle, existing_tracker=None, current_capabilities=None, version_summaries=None):
     if not isinstance(bundle, dict):
         return None
 
@@ -2844,6 +3007,8 @@ def _sync_career_report_tracker_state(username, bundle, current_capabilities=Non
     state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
     tracker = _build_career_report_tracker(bundle, report_state.get("tracker"), current_capabilities)
+    if isinstance(tracker, dict):
+        tracker["versions"] = _list_career_report_version_summaries(username)[:6]
     meta = bundle.get("meta") if isinstance(bundle, dict) and isinstance(bundle.get("meta"), dict) else {}
 
     if meta and str(report_state.get("status") or "") not in {"running", "queued"}:
@@ -4357,6 +4522,25 @@ def index():
     )
 
 
+@app.route("/app_data/<path:filename>")
+def app_data_asset(filename):
+    safe_name = str(filename or "").strip()
+    if not safe_name:
+        return jsonify({"message": "文件不存在"}), 404
+    normalized = os.path.normpath(safe_name).replace("\\", "/")
+    if normalized.startswith("../") or "/../" in normalized:
+        return jsonify({"message": "非法路径"}), 400
+    full_path = os.path.abspath(os.path.join(APP_DATA_DIR, normalized))
+    app_data_root = os.path.abspath(APP_DATA_DIR)
+    if not (full_path == app_data_root or full_path.startswith(app_data_root + os.sep)):
+        return jsonify({"message": "非法路径"}), 400
+    if not os.path.isfile(full_path):
+        return jsonify({"message": "文件不存在"}), 404
+    directory = os.path.dirname(full_path)
+    name = os.path.basename(full_path)
+    return send_from_directory(directory, name, conditional=True)
+
+
 @app.route("/user-center")
 @app.route("/user-center.html")
 def user_center_page():
@@ -4387,6 +4571,14 @@ def test_runner_page():
     if not _current_user():
         return redirect(url_for("index"))
     return render_template("test_runner.html")
+
+
+@app.route("/sbti")
+@app.route("/sbti.html")
+def sbti_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("sbti.html")
 
 
 def _career_graph_safe_float(value, default=0.0):
@@ -6651,11 +6843,43 @@ def api_career_report_polish():
     })
 
 
-@app.route("/api/career-report/version", methods=["GET"])
+@app.route("/api/career-report/version", methods=["GET", "DELETE"])
 @_login_required
 def api_career_report_version():
     """按 report_id 读取已归档或当前 latest 的报告正文，不写入用户状态。"""
     user = _current_user()
+    if request.method == "DELETE":
+        payload = request.get_json(silent=True) or {}
+        report_id = str(payload.get("report_id") or request.args.get("report_id") or "").strip()
+        if not report_id:
+            return jsonify({"message": "缺少 report_id"}), 400
+        try:
+            result = _delete_career_report_version(user["username"], report_id)
+        except FileNotFoundError as exc:
+            return jsonify({"message": str(exc) or "未找到对应的职业报告版本。"}), 404
+        except ValueError as exc:
+            return jsonify({"message": str(exc) or "删除职业报告失败。"}), 400
+
+        bundle = _read_career_report_bundle(user["username"])
+        state = _load_user_state(user["username"])
+        report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else empty_report_state()
+        data = _public_career_report_bundle(bundle) if isinstance(bundle, dict) and bundle.get("meta") else None
+
+        message = "该职业报告卡片已删除。"
+        if result.get("replacement_report_id"):
+            replacement_title = str(result.get("replacement_title") or "上一份正式报告").strip()
+            message = f"已删除当前卡片，并切换到 {replacement_title}。"
+        elif result.get("deleted_current"):
+            message = "已删除当前职业报告，卡片库已回到空状态。"
+
+        return jsonify({
+            "message": message,
+            "deleted_report_id": result.get("deleted_report_id") or report_id,
+            "replacement_report_id": result.get("replacement_report_id") or "",
+            "data": data,
+            "state": _public_career_report_state(report_state),
+        })
+
     report_id = str(request.args.get("report_id") or "").strip()
     if not report_id:
         return jsonify({"message": "缺少 report_id"}), 400

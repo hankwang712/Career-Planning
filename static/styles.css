@@ -2548,12 +2548,14 @@ body.auth-locked footer {
 }
 
 .assessment-extended-grid.compact {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .assessment-extended-card {
     display: grid;
+    grid-template-rows: auto auto auto 1fr auto;
     gap: 0.72rem;
+    min-height: 100%;
     padding: 1rem;
     border-radius: 1.1rem;
     border: 1px solid rgba(148, 163, 184, 0.16);
@@ -2585,11 +2587,71 @@ body.auth-locked footer {
         linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(167, 139, 250, 0.08));
 }
 
+.assessment-extended-card.accent-sbti {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 245, 255, 0.94)),
+        linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(79, 70, 229, 0.06));
+}
+
 .assessment-extended-card-head {
     display: flex;
     justify-content: space-between;
     gap: 0.8rem;
     align-items: flex-start;
+}
+
+.assessment-extended-head-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.72rem;
+    min-width: 0;
+}
+
+.assessment-extended-head-main > div {
+    min-width: 0;
+}
+
+.assessment-extended-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.88rem;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.86);
+    color: #1d4ed8;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.assessment-extended-icon svg {
+    width: 1.12rem;
+    height: 1.12rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.assessment-extended-card.accent-deep .assessment-extended-icon {
+    color: #1d4ed8;
+    background: rgba(239, 246, 255, 0.96);
+}
+
+.assessment-extended-card.accent-friends .assessment-extended-icon {
+    color: #c2410c;
+    background: rgba(255, 247, 237, 0.96);
+}
+
+.assessment-extended-card.accent-insideout .assessment-extended-icon {
+    color: #0369a1;
+    background: rgba(239, 246, 255, 0.96);
+}
+
+.assessment-extended-card.accent-sbti .assessment-extended-icon {
+    color: #7c3aed;
+    background: rgba(245, 243, 255, 0.98);
 }
 
 .assessment-extended-title {
@@ -2601,6 +2663,7 @@ body.auth-locked footer {
 
 .assessment-extended-copy {
     margin: 0;
+    min-height: 2.65rem;
     color: #475569;
     font-size: 0.84rem;
     line-height: 1.55;
@@ -2609,9 +2672,12 @@ body.auth-locked footer {
 .assessment-extended-result {
     display: inline-flex;
     align-items: center;
+    align-content: center;
     flex-wrap: wrap;
     gap: 0.45rem;
     width: fit-content;
+    max-width: 100%;
+    min-height: 2.5rem;
     padding: 0.5rem 0.72rem;
     border-radius: 0.9rem;
     background: rgba(15, 23, 42, 0.05);
@@ -10009,7 +10075,7 @@ body.auth-locked footer {
 
 .resume-hj-score-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.85rem;
 }
 
@@ -10019,6 +10085,26 @@ body.auth-locked footer {
     border: 1px solid #e4e7ec;
     background: #ffffff;
     text-align: center;
+}
+
+.resume-hj-score-card.primary {
+    border-color: rgba(66, 99, 235, 0.3);
+    background: linear-gradient(180deg, #eef4ff 0%, #ffffff 100%);
+}
+
+.resume-hj-score-card.warn {
+    border-color: rgba(245, 158, 11, 0.36);
+    background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
+}
+
+.resume-hj-score-card.danger {
+    border-color: rgba(239, 68, 68, 0.34);
+    background: linear-gradient(180deg, #fff6f6 0%, #ffffff 100%);
+}
+
+.resume-hj-score-card.success {
+    border-color: rgba(16, 185, 129, 0.32);
+    background: linear-gradient(180deg, #f2fff8 0%, #ffffff 100%);
 }
 
 .resume-hj-score-value {
@@ -10032,6 +10118,12 @@ body.auth-locked footer {
     margin-top: 0.45rem;
     font-size: 0.78rem;
     color: #667085;
+}
+
+.resume-hj-score-desc {
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
+    color: #94a3b8;
 }
 
 .resume-hj-tabs {
@@ -10079,6 +10171,131 @@ body.auth-locked footer {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
     gap: 1rem;
+}
+
+.resume-hj-decision-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+    gap: 1rem;
+}
+
+.resume-hj-analysis-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.resume-hj-decision-card {
+    border-left: 4px solid #4263eb;
+}
+
+.resume-hj-decision-card.success {
+    border-left-color: #16a34a;
+}
+
+.resume-hj-decision-card.danger {
+    border-left-color: #ef4444;
+}
+
+.resume-hj-decision-kicker {
+    margin: 0;
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 700;
+}
+
+.resume-hj-decision-title {
+    margin: 0.45rem 0 0;
+    font-size: 1.5rem;
+    line-height: 1.9rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.resume-hj-decision-role {
+    margin: 0.45rem 0 0;
+    color: #3656d4;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.resume-hj-decision-summary,
+.resume-hj-decision-copy {
+    margin: 0.65rem 0 0;
+    color: #475467;
+    font-size: 0.9rem;
+    line-height: 1.65rem;
+}
+
+.resume-hj-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+}
+
+.resume-hj-tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.7rem;
+    padding: 0 0.62rem;
+    border-radius: 999px;
+    border: 1px solid #dbe3ee;
+    background: #f8fafc;
+    color: #475467;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.resume-hj-tag.success {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.1);
+    color: #047857;
+}
+
+.resume-hj-alert-card {
+    margin-top: 0.9rem;
+    border-radius: 0.9rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 0.85rem;
+}
+
+.resume-hj-alert-card.warn {
+    border-color: rgba(245, 158, 11, 0.36);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.resume-hj-alert-card.danger {
+    border-color: rgba(239, 68, 68, 0.34);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.resume-hj-alert-card.success {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.resume-hj-alert-title {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #111827;
+}
+
+.resume-hj-alert-copy {
+    margin: 0.3rem 0 0;
+    font-size: 0.84rem;
+    color: #475467;
+}
+
+.resume-hj-side-sticky {
+    position: sticky;
+    top: 1rem;
+    align-self: start;
 }
 
 .resume-hj-stack {
@@ -10348,6 +10565,61 @@ body.auth-locked footer {
     color: #475467;
 }
 
+.resume-hj-module-status {
+    margin: 0.2rem 0 0.55rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #dbe3ee;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    background: #f8fafc;
+}
+
+.resume-hj-module-status.strong {
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #047857;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.resume-hj-module-status.weak {
+    border-color: rgba(245, 158, 11, 0.34);
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.resume-hj-module-status.pending {
+    border-color: rgba(239, 68, 68, 0.34);
+    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.resume-hj-evidence-tabs {
+    display: inline-flex;
+    border: 1px solid #dbe3ee;
+    border-radius: 0.85rem;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.resume-hj-evidence-tab {
+    border: 0;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    min-height: 2rem;
+    padding: 0 0.9rem;
+}
+
+.resume-hj-evidence-tab.active {
+    background: #ffffff;
+    color: #3656d4;
+}
+
 .resume-hj-module-copy,
 .resume-hj-blueprint-copy,
 .resume-hj-quant-copy,
@@ -10485,8 +10757,14 @@ body.auth-locked footer {
     }
 
     .resume-hj-intro-grid,
+    .resume-hj-decision-grid,
+    .resume-hj-analysis-grid,
     .resume-hj-final-grid {
         grid-template-columns: 1fr;
+    }
+
+    .resume-hj-side-sticky {
+        position: static;
     }
 }
 
@@ -12804,15 +13082,113 @@ nav.gradient-bg .nav-action-strip .action-icon {
 
 .cs-hero-visual {
     border: 1px solid var(--cs-border);
-    border-radius: 8px;
-    background: var(--cs-surface-strong);
+    border-radius: 10px;
+    background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
     box-shadow: var(--cs-shadow);
+    padding: 1rem;
 }
 
-.cs-hero-visual svg {
+.cs-hero-portrait.is-female {
+    background: linear-gradient(145deg, #ffffff 0%, #fff9fb 100%);
+}
+
+.cs-hero-portrait.plain,
+.cs-hero-portrait.plain.is-female {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+.cs-hero-portrait.plain img {
+    display: block;
+    width: min(100%, 360px);
+    height: auto;
+    margin-left: auto;
+    filter: none;
+}
+
+.cs-portrait-shell {
+    border: 1px solid rgba(203, 213, 225, 0.78);
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 0.9rem;
+    display: grid;
+    gap: 0.72rem;
+}
+
+.cs-portrait-headline {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.cs-portrait-kicker {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.cs-portrait-sub {
+    margin: 0;
+    color: #475569;
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.cs-portrait-frame {
+    border: 1px solid rgba(203, 213, 225, 0.65);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.94), rgba(241, 245, 249, 0.92));
+    min-height: 248px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.cs-portrait-frame img {
     display: block;
     width: 100%;
+    max-width: 320px;
     height: auto;
+    max-height: 280px;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.12));
+}
+
+.cs-portrait-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+}
+
+.cs-portrait-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.7rem;
+    border: 1px solid rgba(191, 219, 254, 0.94);
+    border-radius: 999px;
+    background: rgba(239, 246, 255, 0.92);
+    padding: 0 0.62rem;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.cs-hero-portrait.is-female .cs-portrait-badge {
+    border-color: rgba(251, 207, 232, 0.94);
+    background: rgba(253, 242, 248, 0.92);
+    color: #be185d;
+}
+
+.cs-portrait-hint {
+    color: #94a3b8;
+    font-size: 0.68rem;
+    line-height: 1.35;
 }
 
 .cs-section {
@@ -13439,6 +13815,10 @@ nav.gradient-bg .nav-action-strip .action-icon {
         max-width: 420px;
     }
 
+    .cs-portrait-frame {
+        min-height: 220px;
+    }
+
     .career-news-track .career-news-item {
         flex-basis: calc((100% - 3rem) / 3);
     }
@@ -13825,6 +14205,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
 
 #profile .assessment-extended-card {
     align-content: start;
+    grid-template-rows: auto auto auto 1fr auto;
 }
 
 #profile .assessment-extended-actions.compact {
@@ -13832,13 +14213,16 @@ nav.gradient-bg .nav-action-strip .action-icon {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.65rem;
-    margin-top: 0.25rem;
+    margin-top: auto;
     padding-top: 0.75rem;
     border-top: 1px solid var(--cs-border, #e2e8f0);
 }
 
 #profile .assessment-card-action {
     min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
     border: 1px solid transparent;
     padding: 0 0.85rem;

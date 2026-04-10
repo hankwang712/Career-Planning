@@ -3949,6 +3949,725 @@
     });
   }
 
+  function getReportUiText(value, fallback = "") {
+    const text = value == null ? "" : String(value).trim();
+    return text || fallback;
+  }
+
+  function normalizeReportDocItems(items) {
+    return (Array.isArray(items) ? items : [])
+      .map((item) => {
+        const normalized = normalizeExplainItem(item);
+        if (normalized) return normalized;
+        if (typeof item === "string" && item.trim()) {
+          return { title: item.trim(), detail: "", validate: "" };
+        }
+        if (item && typeof item === "object") {
+          const title = getReportUiText(item.title || item.label || item.name || item.requirement || item.summary);
+          if (!title) return null;
+          return {
+            title,
+            detail: getReportUiText(item.detail || item.reason || item.note || item.summary || item.why_important),
+            validate: getReportUiText(item.validate || item.validation_action || item.how_to_validate)
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  function renderReportUiSectionHead(index, kicker, title, copy) {
+    return `
+      <div class="crdoc-section-head">
+        <span class="crdoc-section-index">${esc(index)}</span>
+        <div class="crdoc-section-title-group">
+          <div class="crdoc-section-title-row">
+            <span class="crdoc-section-accent" aria-hidden="true"></span>
+            <div>
+              <p class="crdoc-section-kicker">${esc(kicker)}</p>
+              <h3>${esc(title)}</h3>
+            </div>
+          </div>
+          ${copy ? `<p>${esc(copy)}</p>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function getReportIssueTone(item, fallback = "muted") {
+    const severity = getReportUiText(item?.severity || item?.priority || item?.type).toLowerCase();
+    if (severity.includes("high") || severity.includes("critical") || severity.includes("urgent")) return "danger";
+    if (severity.includes("medium") || severity.includes("warn") || severity.includes("partial")) return "warn";
+    return fallback;
+  }
+
+  function renderReportIssueList(items, emptyText) {
+    const normalized = normalizeReportDocItems(items).slice(0, 5);
+    if (!normalized.length) {
+      return `<p class="crdoc-empty-state">${esc(emptyText)}</p>`;
+    }
+    return `
+      <ul class="crdoc-issue-list">
+        ${normalized.map((item) => `
+          <li class="crdoc-issue-item ${getReportIssueTone(item)}">
+            <span class="crdoc-issue-dot" aria-hidden="true"></span>
+            <div>
+              <strong>${esc(item.title)}</strong>
+              ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+            </div>
+          </li>
+        `).join("")}
+      </ul>
+    `;
+  }
+
+  function renderReportChipCloud(items, variant = "") {
+    const normalized = normalizeReportDocItems(items).slice(0, 10);
+    if (!normalized.length) {
+      return `<p class="crdoc-empty-state">\u6682\u65e0\u53ef\u5c55\u793a\u9879</p>`;
+    }
+    return `
+      <div class="crdoc-chip-cloud">
+        ${normalized.map((item) => `
+          <span class="crdoc-cloud-chip${variant ? ` ${variant}` : ""}">
+            <i aria-hidden="true"></i>
+            ${esc(item.title)}
+          </span>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderReportTaskList(items, emptyText) {
+    const normalized = normalizeReportDocItems(items).slice(0, 5);
+    if (!normalized.length) {
+      return `<p class="crdoc-empty-state">${esc(emptyText)}</p>`;
+    }
+    return `
+      <div class="crdoc-task-list">
+        ${normalized.map((item) => `
+          <div class="crdoc-task-item">
+            <span class="crdoc-task-check" aria-hidden="true"></span>
+            <div>
+              <strong>${esc(item.title)}</strong>
+              ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderReportMetricCard(label, value, meta, tone = "") {
+    return `
+      <article class="crdoc-header-info-card${tone ? ` ${tone}` : ""}">
+        <span>${esc(label)}</span>
+        <strong>${esc(value)}</strong>
+        ${meta ? `<small>${esc(meta)}</small>` : ""}
+      </article>
+    `;
+  }
+
+  function renderReportTrendTimeline(activeStep) {
+    const labels = ["\u73b0\u5728", "\u91cd\u70b9\u9700\u8981", "\u8fd11-3\u5e74", "\u8fd11-5\u5e74"];
+    return `
+      <div class="crdoc-trend-timeline">
+        ${labels.map((label, index) => `
+          <span class="crdoc-trend-step${index <= activeStep ? " active" : ""}">
+            <i aria-hidden="true"></i>
+            <em>${esc(label)}</em>
+          </span>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function getReportRoleScoreTone(score) {
+    if (score >= 60) return "high";
+    if (score >= 44) return "medium";
+    return "low";
+  }
+
+  function renderReportFullHeaderMeta(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const matchOutput = bundle?.match_output || {};
+    const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || meta.focus_role_name || "\u5f85\u8bc6\u522b";
+    const fitScore = Math.max(0, Math.min(100, Number(matchOutput.fit_score || 0)));
+    const fitBandLabel = {
+      strong: "\u9ad8\u5339\u914d",
+      moderate: "\u4e2d\u7b49\u5339\u914d",
+      weak: "\u4f4e\u5339\u914d",
+      not_ready: "\u5c1a\u9700\u51c6\u5907"
+    }[String(matchOutput.fit_band || "")] || "\u5f85\u8bc4\u4f30";
+    return `
+      <div class="crdoc-header-meta-grid">
+        ${renderReportMetricCard("\u76ee\u6807\u5c97\u4f4d", focusRole, "\u5f53\u524d\u62a5\u544a\u4e3b\u7ebf")}
+        ${renderReportMetricCard("\u5339\u914d\u5ea6", `${fitScore}%`, fitBandLabel, fitScore < 44 ? "danger" : fitScore < 60 ? "warn" : "success")}
+        ${renderReportMetricCard("\u751f\u6210\u65f6\u95f4", meta.generated_at || "--", `v${meta.version || "--"}`)}
+      </div>
+    `;
+  }
+
+  function buildReportDashboardUiData(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const reportDocument = bundle?.report_document || {};
+    const dashboardSummary = reportDocument.dashboard_summary || {};
+    const nextActions = reportDocument.next_actions || {};
+    const next30Days = nextActions.next_30_days || {};
+    const evidenceHealth = reportDocument.evidence_health || {};
+    const marketSignals = reportDocument.market_signals || {};
+    const industryStory = reportDocument.industry_story || {};
+    const roleCards = Array.isArray(reportDocument.role_cards) ? reportDocument.role_cards : [];
+    const planBoard = reportDocument.plan_board || {};
+    const explainabilitySummary = reportDocument.explainability_summary || {};
+    const competencyProfile = bundle?.competency_profile || {};
+    const matchOutput = bundle?.match_output || {};
+    const pathPlan = bundle?.path_plan || {};
+    const explainabilityOverview = reportDocument.explainability_overview || {};
+    const focusRole = reportDocument.focus_role_name || meta.focus_role_name || tracker?.focus_role_name || "\u5f85\u8bc6\u522b";
+    const fitScore = Math.max(0, Math.min(100, Number(dashboardSummary.fit_score ?? matchOutput.fit_score ?? 0)));
+    const fitBandLabel = getReportUiText(dashboardSummary.fit_band_label) || ({
+      strong: "\u9ad8\u5339\u914d",
+      moderate: "\u4e2d\u7b49\u5339\u914d",
+      weak: "\u4f4e\u5339\u914d",
+      not_ready: "\u5c1a\u9700\u51c6\u5907"
+    }[String(matchOutput.fit_band || "")] || "\u5f85\u8bc4\u4f30");
+    const dimensions = normalizeReportDimensions(competencyProfile.dimensions);
+    const headline = getReportUiText(
+      dashboardSummary.headline || meta.summary || reportDocument.executive_summary,
+      `\u73b0\u9636\u6bb5\u5efa\u8bae\u56f4\u7ed5 ${focusRole} \u96c6\u4e2d\u8865\u8db3\u5173\u952e\u8bc1\u636e\u548c\u7f3a\u53e3\u3002`
+    );
+    const rationale = getReportUiText(
+      dashboardSummary.rationale || reportDocument.executive_summary || meta.summary,
+      `\u5148\u89e3\u51b3 ${focusRole} \u5bf9\u5e94\u7684\u786c\u95e8\u69db\u548c\u8bc1\u636e\u7f3a\u53e3\uff0c\u518d\u63a8\u8fdb\u6295\u9012\u548c\u8def\u5f84\u9009\u62e9\u3002`
+    );
+    const headlineBecause = Array.isArray(dashboardSummary.headline_because)
+      ? dashboardSummary.headline_because
+      : (Array.isArray(explainabilitySummary.headline_because) ? explainabilitySummary.headline_because : []);
+    const strengths = collectUniqueExplainItems(evidenceHealth.strengths, competencyProfile.strengths);
+    const gaps = collectUniqueExplainItems(
+      evidenceHealth.hard_failures,
+      evidenceHealth.skill_gaps,
+      evidenceHealth.evidence_gaps,
+      evidenceHealth.missing_inputs,
+      matchOutput.partial_gaps
+    );
+    const roles = (roleCards.length
+      ? roleCards.map((item) => ({
+          name: item?.role_name || "",
+          overall_score: item?.fit_score || 0,
+          fit_summary: item?.fit_summary || "",
+          required_skills: Array.isArray(item?.required_skills) ? item.required_skills : [],
+          because: Array.isArray(item?.why_fit) ? item.why_fit : [],
+          hard_gaps: Array.isArray(item?.hard_gaps) ? item.hard_gaps : [],
+          partial_gaps: Array.isArray(item?.partial_gaps) ? item.partial_gaps : []
+        }))
+      : (Array.isArray(bundle?.role_rankings) ? [...bundle.role_rankings] : []))
+      .sort((left, right) => Number(right?.overall_score || 0) - Number(left?.overall_score || 0))
+      .slice(0, 3);
+    const signals = (Array.isArray(marketSignals.signal_cards) && marketSignals.signal_cards.length
+      ? marketSignals.signal_cards
+      : Array.isArray(industryStory.highlight_items) && industryStory.highlight_items.length
+        ? industryStory.highlight_items.map((item) => ({
+            title: item?.title || "",
+            summary: item?.summary || "",
+            source_type: item?.source || "",
+            time_horizon: item?.published_label || "",
+            validation_action: item?.topic || ""
+          }))
+        : collectUniqueExplainItems(marketSignals.hot_directions)).slice(0, 3);
+    const milestones = Array.isArray(pathPlan.milestones) ? pathPlan.milestones : [];
+    const actionItems = Array.isArray(planBoard.action_items) && planBoard.action_items.length
+      ? planBoard.action_items.slice(0, 6)
+      : (Array.isArray(nextActions.action_items) ? nextActions.action_items.slice(0, 6) : []);
+    const planHorizons = Array.isArray(planBoard.horizons) ? planBoard.horizons : [];
+    const shortPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "short_term")?.items)
+      ? planHorizons.find((item) => item?.key === "short_term").items
+      : (Array.isArray(nextActions.this_week) ? nextActions.this_week.map((item) => ({ title: item })) : []);
+    const mediumPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "mid_term")?.items)
+      ? planHorizons.find((item) => item?.key === "mid_term").items
+      : (Array.isArray(next30Days.tasks) ? next30Days.tasks.map((item) => ({ title: item })) : []);
+    const longPlanActions = Array.isArray(planHorizons.find((item) => item?.key === "long_term")?.items)
+      ? planHorizons.find((item) => item?.key === "long_term").items
+      : (Array.isArray(nextActions.checkpoints) ? nextActions.checkpoints : []);
+    const decisionCards = Array.isArray(dashboardSummary.decision_cards) ? dashboardSummary.decision_cards : [];
+    return {
+      bundle,
+      tracker,
+      meta,
+      reportDocument,
+      nextActions,
+      evidenceHealth,
+      marketSignals,
+      industryStory,
+      competencyProfile,
+      matchOutput,
+      pathPlan,
+      explainabilityOverview,
+      focusRole,
+      fitScore,
+      fitBandLabel,
+      dimensions,
+      headline,
+      rationale,
+      headlineBecause,
+      strengths,
+      gaps,
+      roles,
+      signals,
+      milestones,
+      actionItems,
+      shortPlanActions,
+      mediumPlanActions,
+      longPlanActions,
+      decisionCards
+    };
+  }
+
+  function renderReportDashboardHero(data) {
+    return `
+      <section class="crdoc-hero crdoc-reveal is-visible">
+        <div class="crdoc-header-main">
+          <div class="crdoc-header-copy">
+            <span class="crdoc-header-bar" aria-hidden="true"></span>
+            <div>
+              <p class="crdoc-kicker">Career Report</p>
+              <h2>${esc(data.meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
+              <p class="crdoc-hero-summary">${esc(data.headline)}</p>
+              <p class="crdoc-hero-body">${esc(data.rationale)}</p>
+              ${data.headlineBecause.length ? `
+                <div class="crdoc-header-evidence">
+                  <span>\u4e3a\u4ec0\u4e48\u662f\u8fd9\u4e2a\u7ed3\u8bba</span>
+                  ${renderReportChipCloud(data.headlineBecause.map((item) => ({ title: item })), "muted")}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          ${renderReportFullHeaderMeta(data.bundle, data.tracker)}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardPositionSection(data) {
+    const issueItems = normalizeReportDocItems(data.gaps).slice(0, 4);
+    const evidenceTrace = normalizeReportDocItems(data.evidenceHealth.evidence_trace).slice(0, 3);
+    const dimensionCards = data.dimensions.length
+      ? data.dimensions.map((entry, index) => {
+          const pending = String(entry.level || "").toLowerCase() === "unknown";
+          const failed = !pending && Number(entry.score || 0) < 58;
+          const statusText = pending ? "\u5f85\u9a8c\u8bc1" : failed ? "\u672a\u901a\u8fc7" : "\u5df2\u9a8c\u8bc1";
+          const statusClass = pending ? "pending" : failed ? "failed" : "verified";
+          return `
+            <article class="crdoc-cap-card ${statusClass} crdoc-reveal" style="transition-delay:${Math.min(index, 5) * 60}ms">
+              <div class="crdoc-cap-head">
+                <strong>${esc(entry.label)}</strong>
+                <span class="crdoc-status-pill ${statusClass}">${pending ? `<i aria-hidden="true">&#128274;</i>` : ""}${esc(statusText)}</span>
+              </div>
+              <div class="crdoc-progress ${pending ? "is-pending" : ""}">
+                <i style="width:${Math.max(12, pending ? 32 : entry.score)}%"></i>
+              </div>
+              <p>${esc(getReportUiText(entry.reason, pending ? "\u9700\u8981\u589e\u52a0\u66f4\u660e\u786e\u7684\u8bc1\u636e\u6216\u9879\u76ee\u8f93\u51fa\u518d\u5b8c\u6210\u5224\u65ad\u3002" : failed ? "\u8fd9\u4e2a\u7ef4\u5ea6\u8fd8\u4e0d\u8db3\u4ee5\u652f\u6491\u5f53\u524d\u76ee\u6807\u5c97\u4f4d\u3002" : "\u5f53\u524d\u5df2\u6709\u4e00\u5b9a\u8bc1\u636e\u652f\u6491\uff0c\u53ef\u4ee5\u7ee7\u7eed\u52a0\u6df1\u3002"))}</p>
+            </article>
+          `;
+        }).join("")
+      : `<p class="crdoc-empty-state">\u6682\u65e0\u80fd\u529b\u7ef4\u5ea6\u6570\u636e</p>`;
+
+    return `
+      <section id="reportDocSection-position" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("01", "Current Position", "\u5f53\u524d\u72b6\u6001", "\u5148\u770b\u6700\u963b\u585e\u4f60\u7684\u95ee\u9898\uff0c\u518d\u5bf9\u5e94\u5230\u80fd\u529b\u7ef4\u5ea6\u548c\u8bc1\u636e\u72b6\u6001\u3002")}
+        <div class="crdoc-position-grid">
+          <article class="crdoc-card">
+            <div class="crdoc-card-topline">
+              <span class="crdoc-card-label">\u95ee\u9898\u6e05\u5355</span>
+              <span class="crdoc-card-meta">${esc(data.focusRole)}</span>
+            </div>
+            <h4>\u5f53\u524d\u5b9a\u4f4d\u5224\u65ad</h4>
+            <p>${esc(data.rationale)}</p>
+            ${renderReportIssueList(issueItems, "\u5f53\u524d\u672a\u68c0\u51fa\u9ad8\u98ce\u9669\u7f3a\u53e3")}
+            <div class="crdoc-inline-stack">
+              <span class="crdoc-inline-title">\u53ef\u8ffd\u6eaf\u8bc1\u636e</span>
+              ${evidenceTrace.length ? evidenceTrace.map((item) => `
+                <div class="crdoc-inline-evidence">
+                  <strong>${esc(item.title)}</strong>
+                  ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+                </div>
+              `).join("") : `<p class="crdoc-empty-state">\u6682\u65e0\u53ef\u8ffd\u6eaf\u8bc1\u636e</p>`}
+            </div>
+          </article>
+          <article class="crdoc-card">
+            <div class="crdoc-card-topline">
+              <span class="crdoc-card-label">\u80fd\u529b\u8bc4\u4f30</span>
+              <span class="crdoc-card-meta">\u72b6\u6001 + \u8fdb\u5ea6\u6761</span>
+            </div>
+            <div class="crdoc-cap-grid">${dimensionCards}</div>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardTrendSection(data) {
+    const skillPriorities = normalizeReportDocItems(data.marketSignals.skill_priorities);
+    const verificationActions = normalizeReportDocItems(data.marketSignals.verification_actions);
+    const riskSignals = normalizeReportDocItems(data.marketSignals.risk_signals);
+    return `
+      <section id="reportDocSection-trends" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("02", "Industry Trends", "\u884c\u4e1a\u8d8b\u52bf", "\u628a\u5f53\u524d\u53d8\u5316\u3001\u91cd\u70b9\u80fd\u529b\u548c\u9a8c\u8bc1\u65b9\u5f0f\u653e\u5728\u540c\u4e00\u5c42\u7ea7\u91cc\u3002")}
+        <div class="crdoc-trend-grid">
+          ${data.signals.length ? data.signals.map((item, index) => {
+            const normalized = normalizeExplainItem(item) || { title: getReportUiText(item?.title || item?.summary || item), detail: "", validate: "" };
+            const raw = item && typeof item === "object" ? item : {};
+            return `
+              <article class="crdoc-trend-card crdoc-reveal" style="transition-delay:${index * 70}ms">
+                ${renderReportTrendTimeline(Math.min(3, index + 1))}
+                <div class="crdoc-card-topline">
+                  <span class="crdoc-card-label">${esc(index === 0 ? "\u73b0\u5728" : index === 1 ? "\u91cd\u70b9\u9700\u8981" : "\u4e2d\u957f\u671f")}</span>
+                  <span class="crdoc-card-meta">${esc(getReportUiText(raw.time_horizon, "\u8d8b\u52bf\u89c2\u5bdf"))}</span>
+                </div>
+                <h4>${esc(normalized.title)}</h4>
+                <p>${esc(getReportUiText(raw.summary || raw.why_important || normalized.detail, "\u6682\u65e0\u8fd9\u4e2a\u8d8b\u52bf\u7684\u8be6\u7ec6\u8bf4\u660e"))}</p>
+                <div class="crdoc-fact-row">
+                  <span>\u6765\u6e90</span>
+                  <strong>${esc(getReportUiText(raw.source_type, "\u7efc\u5408\u5224\u65ad"))}</strong>
+                </div>
+                <details class="crdoc-accordion">
+                  <summary>\u5982\u4f55\u9a8c\u8bc1</summary>
+                  <p>${esc(getReportUiText(normalized.validate || raw.validation_action, "\u53ef\u4ee5\u901a\u8fc7\u9879\u76ee\u4ea7\u51fa\u3001\u5c97\u4f4d\u9700\u6c42\u6216\u8bd5\u6295\u53cd\u9988\u6765\u9a8c\u8bc1\u3002"))}</p>
+                </details>
+              </article>
+            `;
+          }).join("") : `<article class="crdoc-card"><p class="crdoc-empty-state">\u6682\u65e0\u884c\u4e1a\u8d8b\u52bf\u6570\u636e</p></article>`}
+        </div>
+        <article class="crdoc-card">
+          <div class="crdoc-card-topline">
+            <span class="crdoc-card-label">\u80fd\u529b\u5efa\u8bae</span>
+            <span class="crdoc-card-meta">\u6807\u7b7e\u4e91</span>
+          </div>
+          ${renderReportChipCloud([...skillPriorities, ...verificationActions], "accent")}
+          ${riskSignals.length ? `<div class="crdoc-inline-note crdoc-risk-note">${renderReportChipCloud(riskSignals, "warn")}</div>` : ""}
+        </article>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardTargetsSection(data) {
+    return `
+      <section id="reportDocSection-targets" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("03", "Target Roles", "\u76ee\u6807\u5c97\u4f4d\u5bf9\u6bd4", "\u4e0d\u53ea\u770b\u603b\u5206\uff0c\u8fd8\u8981\u770b\u4f60\u5df2\u7ecf\u62ff\u5728\u624b\u91cc\u7684\u80fd\u529b\u548c\u8fd8\u6ca1\u8865\u4e0a\u7684\u7f3a\u53e3\u3002")}
+        <div class="crdoc-role-grid">
+          ${data.roles.length ? data.roles.map((role, index) => {
+            const score = Math.max(0, Math.min(100, Number(role?.overall_score ?? role?.overallScore ?? 0)));
+            const tone = getReportRoleScoreTone(score);
+            const requiredSkills = Array.isArray(role?.required_skills) ? role.required_skills.slice(0, 8) : [];
+            const hardGapText = normalizeReportDocItems(role?.hard_gaps).map((item) => item.title.toLowerCase());
+            const partialGapText = normalizeReportDocItems(role?.partial_gaps).map((item) => item.title.toLowerCase());
+            return `
+              <article class="crdoc-target-card ${tone} crdoc-reveal" style="transition-delay:${index * 70}ms">
+                <div class="crdoc-target-head">
+                  <div>
+                    <h4>${esc(role?.name || role?.title || "\u5019\u9009\u5c97\u4f4d")}</h4>
+                    <span>${esc(index === 0 ? "\u4f18\u5148\u65b9\u5411" : `\u5019\u9009\u65b9\u5411 ${index + 1}`)}</span>
+                  </div>
+                  <div class="crdoc-target-score ${tone}">
+                    <strong>${score}</strong>
+                    <small>\u5206</small>
+                  </div>
+                </div>
+                <p class="crdoc-target-summary">${esc(getReportUiText(role?.fit_summary, "\u8fd9\u4e2a\u5c97\u4f4d\u7684\u8bf4\u660e\u8fd8\u5728\u8865\u5168\u4e2d\u3002"))}</p>
+                <div class="crdoc-skill-system">
+                  ${requiredSkills.length ? requiredSkills.map((skill) => {
+                    const skillText = String(skill || "").toLowerCase();
+                    const chipClass = hardGapText.some((item) => item.includes(skillText) || skillText.includes(item))
+                      ? "missing-core"
+                      : partialGapText.some((item) => item.includes(skillText) || skillText.includes(item))
+                        ? "missing"
+                        : "owned";
+                    return `<span class="crdoc-skill-chip ${chipClass}">${esc(skill)}</span>`;
+                  }).join("") : `<span class="crdoc-skill-chip missing">\u6682\u65e0\u6280\u80fd\u660e\u7ec6</span>`}
+                </div>
+                <div class="crdoc-target-layout">
+                  <div class="crdoc-target-explain">
+                    <span class="crdoc-target-mini-title">\u5339\u914d\u4f9d\u636e</span>
+                    ${renderReportIssueList(index === 0 ? collectUniqueExplainItems(data.matchOutput.why_match, role?.because) : role?.because, "\u6682\u65e0\u5173\u952e\u652f\u6491\u9879")}
+                  </div>
+                  <aside class="crdoc-missing-rail">
+                    <span class="crdoc-target-mini-title">\u7f3a\u5931\u9700\u6c42</span>
+                    ${renderReportIssueList(collectUniqueExplainItems(role?.hard_gaps, role?.partial_gaps), "\u6682\u65e0\u660e\u663e\u7f3a\u53e3")}
+                  </aside>
+                </div>
+              </article>
+            `;
+          }).join("") : `<article class="crdoc-card"><p class="crdoc-empty-state">\u6682\u65e0\u5c97\u4f4d\u5bf9\u6bd4\u6570\u636e</p></article>`}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardPathSection(data) {
+    return `
+      <section id="reportDocSection-path" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("04", "Career Path", "\u804c\u4e1a\u8def\u5f84", "\u628a\u5f53\u524d\u8282\u70b9\u3001\u4e0b\u4e00\u6b65\u3001\u4e2d\u671f\u548c\u8fdc\u671f\u8def\u5f84\u6536\u5728\u4e00\u6761\u7eb5\u5411\u6d41\u91cc\u3002")}
+        <div class="crdoc-path-grid">
+          <div class="crdoc-step-flow">
+            <article class="crdoc-step-item current">
+              <div class="crdoc-step-node"><span>1</span></div>
+              <div class="crdoc-step-card">
+                <div class="crdoc-step-card-head">
+                  <span class="crdoc-time-pill">\u73b0\u5728</span>
+                  <small>${esc(data.meta.generated_at || "--")}</small>
+                </div>
+                <h4>${esc(data.focusRole)}</h4>
+                <p>${esc(data.rationale)}</p>
+              </div>
+            </article>
+            ${data.milestones.length ? data.milestones.slice(0, 4).map((item, index) => `
+              <article class="crdoc-step-item">
+                <div class="crdoc-step-node"><span>${index + 2}</span></div>
+                <div class="crdoc-step-card">
+                  <div class="crdoc-step-card-head">
+                    <span class="crdoc-time-pill">${esc(getReportUiText(item?.horizon, `0-${(index + 1) * 3}m`))}</span>
+                    <small>${esc(index === 0 ? "\u4e0b\u4e00\u6b65" : index === 1 ? "\u4e2d\u671f" : "\u540e\u7eed\u9636\u6bb5")}</small>
+                  </div>
+                  <h4>${esc(getReportUiText(item?.title, "\u9636\u6bb5\u76ee\u6807"))}</h4>
+                  <p>${esc(getReportUiText(item?.reason, "\u6682\u65e0\u8be6\u7ec6\u8bf4\u660e"))}</p>
+                  ${renderReportTaskList(Array.isArray(item?.actions) ? item.actions.map((action) => ({ title: action, detail: item?.linked_gap || item?.priority_reason || "" })) : [], "\u6682\u65e0\u9636\u6bb5\u52a8\u4f5c")}
+                </div>
+              </article>
+            `).join("") : `<p class="crdoc-empty-state">\u6682\u65e0\u804c\u4e1a\u8def\u5f84\u8282\u70b9</p>`}
+          </div>
+          <div class="crdoc-stack">
+            <article class="crdoc-card crdoc-tip-card">
+              <div class="crdoc-card-topline">
+                <span class="crdoc-card-label">\u63a8\u8350\u4fe1\u606f</span>
+              </div>
+              <h4>\u4e3a\u4ec0\u4e48\u662f\u8fd9\u6761\u8def</h4>
+              ${renderReportIssueList(data.pathPlan.path_rationale, "\u6682\u65e0\u8def\u5f84\u89e3\u91ca")}
+            </article>
+            <article class="crdoc-card">
+              <div class="crdoc-card-topline">
+                <span class="crdoc-card-label">\u98ce\u9669\u4e0e\u524d\u63d0</span>
+              </div>
+              ${renderReportIssueList(data.pathPlan.dependencies?.must_resolve_hard_failures, "\u6682\u65e0\u5fc5\u987b\u5148\u89e3\u51b3\u7684\u786c\u95e8\u69db")}
+              ${renderReportIssueList(data.pathPlan.path_risks, "\u6682\u65e0\u663e\u6027\u98ce\u9669")}
+              ${renderReportIssueList(data.pathPlan.contingency, "\u6682\u65e0\u5907\u9009\u8def\u7ebf")}
+            </article>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardPlanSection(data) {
+    const stageCards = [
+      {
+        label: "0-2w",
+        title: "\u5f53\u4e0b\u6821\u51c6",
+        items: data.shortPlanActions,
+        reason: Array.isArray(data.nextActions.priority_logic) ? data.nextActions.priority_logic[0] : ""
+      },
+      {
+        label: "0-30d",
+        title: "\u4e00\u4e2a\u6708\u5185",
+        items: data.mediumPlanActions.slice(0, 3).length ? data.mediumPlanActions.slice(0, 3) : data.actionItems.slice(0, 3),
+        reason: Array.isArray(data.nextActions.priority_logic) ? data.nextActions.priority_logic[1] : ""
+      },
+      {
+        label: "1-3m",
+        title: "\u80fd\u529b\u8865\u5f3a",
+        items: data.mediumPlanActions.slice(3, 6).length ? data.mediumPlanActions.slice(3, 6) : data.actionItems.slice(3, 6),
+        reason: data.milestones[1]?.reason || ""
+      },
+      {
+        label: "3-12m",
+        title: "\u8def\u5f84\u6210\u578b",
+        items: data.longPlanActions,
+        reason: getReportUiText(data.nextActions.plan_b || data.milestones[2]?.reason)
+      }
+    ];
+    return `
+      <section id="reportDocSection-plan" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("05", "Action Plan", "\u884c\u52a8\u8ba1\u5212", "\u62c6\u6210\u56db\u4e2a\u65f6\u95f4\u9636\u6bb5\uff0c\u8ba9\u5148\u540e\u987a\u5e8f\u548c\u4f18\u5148\u7ea7\u66f4\u6e05\u695a\u3002")}
+        <div class="crdoc-stage-strip">
+          ${stageCards.map((stage, index) => `
+            <div class="crdoc-stage-node ${index < 2 ? "active" : ""}">
+              <span>${esc(stage.label)}</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="crdoc-plan-grid crdoc-plan-grid-4">
+          ${stageCards.map((stage, index) => `
+            <article class="crdoc-plan-card crdoc-reveal" style="transition-delay:${index * 70}ms">
+              <div class="crdoc-card-topline">
+                <span class="crdoc-card-label">${esc(stage.label)}</span>
+                <span class="crdoc-card-meta">${esc(stage.title)}</span>
+              </div>
+              ${renderReportTaskList(stage.items, "\u6682\u65e0\u8fd9\u4e2a\u9636\u6bb5\u7684\u4efb\u52a1")}
+              <details class="crdoc-accordion muted">
+                <summary>\u4e3a\u4ec0\u4e48\u5148\u505a\u8fd9\u6b65</summary>
+                <p>${esc(getReportUiText(stage.reason, "\u8fd9\u4e2a\u9636\u6bb5\u4e3b\u8981\u7528\u6765\u8865\u8db3\u6700\u5f71\u54cd\u5339\u914d\u7ed3\u679c\u7684\u5173\u952e\u7f3a\u53e3\u3002"))}</p>
+              </details>
+            </article>
+          `).join("")}
+        </div>
+        <div class="crdoc-two-col">
+          <article class="crdoc-card">
+            <div class="crdoc-card-topline">
+              <span class="crdoc-card-label">\u884c\u52a8\u5206\u89e3</span>
+            </div>
+            ${renderReportTaskList(data.actionItems, "\u6682\u65e0\u53ef\u6267\u884c\u52a8\u4f5c")}
+          </article>
+          <article class="crdoc-alert-card">
+            <div class="crdoc-card-topline">
+              <span class="crdoc-card-label">\u672a\u901a\u8fc7\u8bf4\u660e</span>
+            </div>
+            ${renderReportIssueList(data.matchOutput.hard_failures || data.evidenceHealth.hard_failures, "\u6682\u65e0\u660e\u786e\u7684\u672a\u901a\u8fc7\u6761\u76ee")}
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardSummarySection(data) {
+    return `
+      <section id="reportDocSection-summary" class="crdoc-section crdoc-reveal">
+        ${renderReportUiSectionHead("06", "Key Judgements", "\u5173\u952e\u5224\u65ad", "\u628a\u6700\u5f3a\u7f3a\u53e3\u3001\u6700\u5927\u98ce\u9669\u548c\u6700\u503c\u5f97\u4fdd\u7559\u7684\u57fa\u7840\u6536\u62e2\u6210\u4e09\u4e2a\u6807\u51c6\u89c6\u56fe\u3002")}
+        <div class="crdoc-insight-grid crdoc-insight-grid-3">
+          <article class="crdoc-insight-card breakthrough">
+            <div class="crdoc-insight-topline"></div>
+            <div class="crdoc-card-topline"><span class="crdoc-card-label">\u6700\u5f3a\u7f3a\u53e3</span></div>
+            <p class="crdoc-insight-summary">${esc(getReportUiText(data.decisionCards.find((card) => card?.tone === "risk")?.title || data.gaps[0]?.title, "\u76ee\u524d\u6700\u9700\u8981\u5148\u8865\u7684\uff0c\u662f\u6700\u5f71\u54cd\u5c97\u4f4d\u5224\u65ad\u7684\u5173\u952e\u7f3a\u53e3\u3002"))}</p>
+            ${renderReportIssueList(data.decisionCards.find((card) => card?.tone === "risk")?.because || data.gaps, "\u6682\u65e0\u5f3a\u7f3a\u53e3\u8bf4\u660e")}
+          </article>
+          <article class="crdoc-insight-card risk">
+            <div class="crdoc-insight-topline"></div>
+            <div class="crdoc-card-topline"><span class="crdoc-card-label">\u6700\u91cd\u8981\u98ce\u9669</span></div>
+            <p class="crdoc-insight-summary">${esc(getReportUiText(data.explainabilityOverview.match?.judgement || data.decisionCards.find((card) => card?.tone === "neutral")?.title, "\u4e0d\u8981\u5728\u8bc1\u636e\u4e0d\u8db3\u65f6\u628a\u5339\u914d\u5ea6\u5f53\u6210\u786e\u8ba4\u7ed3\u8bba\u3002"))}</p>
+            ${renderReportIssueList(data.explainabilityOverview.match?.because || data.marketSignals.risk_signals, "\u6682\u65e0\u98ce\u9669\u8bf4\u660e")}
+          </article>
+          <article class="crdoc-insight-card strength">
+            <div class="crdoc-insight-topline"></div>
+            <div class="crdoc-card-topline"><span class="crdoc-card-label">\u6700\u503c\u5f97\u4fdd\u7559\u57fa\u7840</span></div>
+            <p class="crdoc-insight-summary">${esc(getReportUiText(data.strengths[0]?.title || data.explainabilityOverview.positioning?.judgement, "\u76ee\u524d\u6700\u503c\u5f97\u4fdd\u7559\u7684\uff0c\u662f\u5df2\u88ab\u8bc1\u636e\u652f\u6491\u7684\u4e3b\u7ebf\u80fd\u529b\u57fa\u7840\u3002"))}</p>
+            ${renderReportIssueList(data.strengths.length ? data.strengths : (data.explainabilityOverview.positioning?.because || []), "\u6682\u65e0\u57fa\u7840\u4f18\u52bf\u8bf4\u660e")}
+          </article>
+        </div>
+        <div class="crdoc-feedback-wrap">
+          ${renderReportFeedbackCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderFullReportHeader(bundle, tracker) {
+    const meta = bundle?.meta || {};
+    const summary = getReportUiText(
+      bundle?.report_document?.executive_summary || meta.summary,
+      "\u62a5\u544a\u6309\u7167\u884c\u4e1a\u5224\u65ad\u3001\u80fd\u529b\u8bc1\u636e\u3001\u5c97\u4f4d\u5bf9\u6bd4\u548c\u804c\u4e1a\u8def\u5f84\u5c55\u5f00\u3002"
+    );
+    return `
+      <section class="ucrd-full-head crdoc-full-head">
+        <div class="crdoc-header-main">
+          <div class="crdoc-header-copy">
+            <span class="crdoc-header-bar" aria-hidden="true"></span>
+            <div>
+              <p class="ucrd-kicker">Career Report</p>
+              <h2 class="ucrd-full-head-title">${esc(meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
+              <p class="ucrd-full-head-summary">${esc(summary)}</p>
+            </div>
+          </div>
+          ${renderReportFullHeaderMeta(bundle, tracker)}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportDashboardV2(bundle, tracker) {
+    const data = buildReportDashboardUiData(bundle, tracker);
+    return `
+      <div class="crdoc-page">
+        ${renderReportDashboardHero(data)}
+        <nav class="crdoc-nav" aria-label="\u62a5\u544a\u6bb5\u843d\u5bfc\u822a">
+          <button type="button" class="crdoc-nav-btn active" data-report-doc-nav-target="reportDocSection-position" aria-pressed="true">01 \u5f53\u524d\u72b6\u6001</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-trends" aria-pressed="false">02 \u884c\u4e1a\u8d8b\u52bf</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-targets" aria-pressed="false">03 \u76ee\u6807\u5c97\u4f4d\u5bf9\u6bd4</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-path" aria-pressed="false">04 \u804c\u4e1a\u8def\u5f84</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-plan" aria-pressed="false">05 \u884c\u52a8\u8ba1\u5212</button>
+          <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-summary" aria-pressed="false">06 \u5173\u952e\u5224\u65ad</button>
+        </nav>
+        ${renderReportDashboardPositionSection(data)}
+        ${renderReportDashboardTrendSection(data)}
+        ${renderReportDashboardTargetsSection(data)}
+        ${renderReportDashboardPathSection(data)}
+        ${renderReportDashboardPlanSection(data)}
+        ${renderReportDashboardSummarySection(data)}
+      </div>
+    `;
+  }
+
+  function bindReportDocNavigation(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const buttons = Array.from(root.querySelectorAll("[data-report-doc-nav-target]"));
+    const sections = buttons
+      .map((button) => {
+        const targetId = String(button.dataset.reportDocNavTarget || "").trim();
+        if (!targetId) return null;
+        const target = root.querySelector(`#${targetId}`);
+        return target ? { button, target, targetId } : null;
+      })
+      .filter(Boolean);
+    const revealTargets = Array.from(root.querySelectorAll(".crdoc-reveal"));
+
+    const setActive = (targetId) => {
+      buttons.forEach((button) => {
+        const active = String(button.dataset.reportDocNavTarget || "").trim() === targetId;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    };
+
+    sections.forEach(({ button, target, targetId }) => {
+      button.addEventListener("click", () => {
+        setActive(targetId);
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
+    setActive(sections[0]?.targetId || "");
+
+    if (typeof window.IntersectionObserver !== "function") {
+      revealTargets.forEach((node) => node.classList.add("is-visible"));
+      return;
+    }
+
+    const navObserver = new window.IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible?.target?.id) return;
+      setActive(visible.target.id);
+    }, {
+      threshold: [0.25, 0.45, 0.65],
+      rootMargin: "-18% 0px -52% 0px"
+    });
+    sections.forEach(({ target }) => navObserver.observe(target));
+
+    const revealObserver = new window.IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    }, {
+      threshold: 0.18,
+      rootMargin: "0px 0px -8% 0px"
+    });
+    revealTargets.forEach((node) => {
+      if (node.classList.contains("is-visible")) return;
+      revealObserver.observe(node);
+    });
+  }
+
   async function initializeRestoration() {
     ensureAppState();
     ensurePlanFunctionsWrapped();
@@ -3996,6 +4715,7 @@
   window.getCareerReportVersionList = getCareerReportVersionList;
   window.fetchCareerReportVersion = fetchCareerReportVersion;
   window.restoreLatestCareerReportView = restoreLatestCareerReportView;
+  window.loadCurrentCareerReport = loadCurrentCareerReport;
   window.startCareerReportGeneration = startCareerReportGeneration;
   window.renderCareerReportPanels = renderCareerReportPanels;
   window.openReportViewer = openReportViewer;

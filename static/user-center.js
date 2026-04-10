@@ -16,6 +16,7 @@ const userCenterState = {
   reportViewMode: "dashboard",
   reportWorkspaceMode: "library",
   reportModule: "trends",
+  deletingReportId: "",
   roleBoardExpanded: false,
   cropper: {
     fileName: "",
@@ -169,7 +170,7 @@ function applyUserCenterReportWorkspaceMode() {
   const mode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
   const libraryShell = document.getElementById("userCenterReportLibraryShell");
   const detailShell = document.getElementById("userCenterReportDetailShell");
-  if (libraryShell) libraryShell.classList.toggle("hidden", mode !== "library");
+  if (libraryShell) libraryShell.classList.remove("hidden");
   if (detailShell) detailShell.classList.toggle("hidden", mode !== "detail");
   syncUserCenterSidebarSubnav();
 }
@@ -456,6 +457,65 @@ async function openUserCenterReportDetail(reportId = "") {
     await window.restoreLatestCareerReportView?.();
   }
   renderUserCenterDashboard();
+  window.requestAnimationFrame(() => {
+    document.getElementById("userCenterReportDetailShell")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  });
+}
+
+async function deleteUserCenterReport(reportId = "") {
+  const safeReportId = String(reportId || "").trim();
+  if (!safeReportId || userCenterState.deletingReportId === safeReportId) return;
+
+  const pack = typeof window.getCareerReportVersionList === "function"
+    ? window.getCareerReportVersionList()
+    : { versions: [] };
+  const versions = Array.isArray(pack.versions) ? pack.versions : [];
+  const target = versions.find((item) => String(item?.report_id || "").trim() === safeReportId);
+  const title = String(target?.focus_role_name || target?.title || "这份职业报告").trim() || "这份职业报告";
+  const selectedId = String(appState?.careerReport?.meta?.report_id || "").trim();
+  const keepCurrentDetail = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail"
+    && selectedId
+    && selectedId !== safeReportId;
+
+  const confirmed = window.confirm(`确认删除“${title}”对应的职业报告卡片吗？\n这会同时删除该报告下的编辑快照，且不可恢复。`);
+  if (!confirmed) return;
+
+  userCenterState.deletingReportId = safeReportId;
+  renderUserCenterDashboard();
+
+  try {
+    const payload = await requestJson("/api/career-report/version", {
+      method: "DELETE",
+      body: { report_id: safeReportId }
+    });
+
+    if (typeof window.loadCurrentCareerReport === "function") {
+      await window.loadCurrentCareerReport({ userCenterRefresh: false });
+    }
+
+    userCenterState.deletingReportId = "";
+
+    if (keepCurrentDetail) {
+      await openUserCenterReportDetail(selectedId);
+    } else {
+      openUserCenterReportLibrary();
+      renderUserCenterDashboard();
+    }
+
+    showToast(
+      "职业报告已删除",
+      payload?.message || "已从职业报告卡片库移除该正式报告。",
+      "success",
+      2200
+    );
+  } catch (error) {
+    userCenterState.deletingReportId = "";
+    renderUserCenterDashboard();
+    showToast("删除失败", error.message || "请稍后重试。", "error", 2400);
+  }
 }
 
 function renderUserCenterTargetRoles() {
@@ -666,6 +726,9 @@ function renderUserCenterReportLibrary() {
     : { versions: [], reportState: null, canonicalReportId: "" };
   const { versions, reportState, canonicalReportId } = pack;
   const cards = Array.isArray(versions) ? versions : [];
+  const deletingId = String(userCenterState.deletingReportId || "").trim();
+  const detailMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail";
+  const selectedId = detailMode ? String(appState?.careerReport?.meta?.report_id || "").trim() : "";
   const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
     ? `
       <article class="uc-report-library-card uc-report-library-card--pending">
@@ -698,6 +761,8 @@ function renderUserCenterReportLibrary() {
   host.innerHTML = pendingCard + cards.map((item) => {
     const rid = String(item?.report_id || "").trim();
     const isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
+    const isActive = Boolean(selectedId && rid === selectedId);
+    const isDeleting = Boolean(deletingId && rid === deletingId);
     const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别";
     const titleRaw = String(item?.title || "").trim();
     const version = escHtml(item?.version || "--");
@@ -706,7 +771,8 @@ function renderUserCenterReportLibrary() {
     const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
     const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
     return `
-      <button type="button" class="uc-report-library-card${isLatest ? " latest" : ""}" data-report-library-id="${escHtml(rid)}" ${!rid ? "disabled" : ""}>
+      <article class="uc-report-library-card${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
+        <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
         <div class="uc-report-library-card-top">
           <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
             ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
@@ -730,6 +796,111 @@ function renderUserCenterReportLibrary() {
   host.querySelectorAll("[data-report-library-id]").forEach((button) => {
     button.addEventListener("click", () => {
       void openUserCenterReportDetail(button.dataset.reportLibraryId || "");
+    });
+  });
+
+  host.querySelectorAll("[data-report-delete-id]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void deleteUserCenterReport(button.dataset.reportDeleteId || "");
+    });
+  });
+}
+
+function renderUserCenterReportLibrary() {
+  const host = document.getElementById("userCenterReportLibrary");
+  if (!host) return;
+
+  const pack = typeof window.getCareerReportVersionList === "function"
+    ? window.getCareerReportVersionList()
+    : { versions: [], reportState: null, canonicalReportId: "" };
+  const { versions, reportState, canonicalReportId } = pack;
+  const cards = Array.isArray(versions) ? versions : [];
+  const deletingId = String(userCenterState.deletingReportId || "").trim();
+  const detailMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail";
+  const selectedId = detailMode ? String(appState?.careerReport?.meta?.report_id || "").trim() : "";
+
+  const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
+    ? `
+      <article class="uc-report-library-card uc-report-library-card--pending">
+        <div class="uc-report-library-card-top">
+          <div class="uc-report-library-card-mark tone-general">
+            ${renderUserCenterReportIcon("")}
+          </div>
+          <div class="uc-report-library-card-head">
+            <div class="uc-report-library-meta">
+              <span class="uc-report-library-badge">生成中</span>
+              <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${escHtml(reportState.stage_label || "任务编排中")}</span>
+            </div>
+            <h4>新的正式职业报告正在生成</h4>
+          </div>
+        </div>
+        <p class="uc-report-library-title">${escHtml(reportState.stage_detail || "系统正在串联多智能体分析与报告写作。")}</p>
+      </article>
+    `
+    : "";
+
+  if (!cards.length && !pendingCard) {
+    host.innerHTML = `
+      <article class="uc-report-library-empty">
+        <p>当前还没有正式职业报告。先生成一份正式报告，卡片库会按岗位方向和生成时间保存历史版本。</p>
+      </article>
+    `;
+    return;
+  }
+
+  host.innerHTML = pendingCard + cards.map((item) => {
+    const rid = String(item?.report_id || "").trim();
+    const isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
+    const isActive = Boolean(selectedId && rid === selectedId);
+    const isDeleting = Boolean(deletingId && rid === deletingId);
+    const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
+    const titleRaw = String(item?.title || "").trim();
+    const version = escHtml(item?.version || "--");
+    const generatedAt = escHtml(item?.generated_at || "--");
+    const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
+    const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
+    const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
+
+    return `
+      <article class="uc-report-library-card${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
+        <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
+          <div class="uc-report-library-card-top">
+            <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
+              ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
+            </div>
+            <div class="uc-report-library-card-head">
+              <div class="uc-report-library-meta">
+                <span class="uc-report-library-badge${isLatest ? "" : " muted"}">${isLatest ? "最新" : "历史"}</span>
+                <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${generatedAt}</span>
+              </div>
+              <h4>${escHtml(focusRoleRaw)}</h4>
+            </div>
+          </div>
+          <p class="uc-report-library-title">${escHtml(subtitle)}</p>
+        </button>
+        <div class="uc-report-library-foot">
+          <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
+          <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
+            ${isDeleting ? "删除中..." : "删除卡片"}
+          </button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  host.querySelectorAll("[data-report-library-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void openUserCenterReportDetail(button.dataset.reportLibraryId || "");
+    });
+  });
+
+  host.querySelectorAll("[data-report-delete-id]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void deleteUserCenterReport(button.dataset.reportDeleteId || "");
     });
   });
 }

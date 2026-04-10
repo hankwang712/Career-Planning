@@ -1,0 +1,216 @@
+.sbti-page {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    color: #0f172a;
+}
+
+.sbti-shell {
+    width: min(960px, calc(100% - 2rem));
+    margin: 1.3rem auto 2rem;
+    display: grid;
+    gap: 0.9rem;
+}
+
+.sbti-hero,
+.sbti-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1.15rem;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+}
+
+.sbti-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1.15rem 1.2rem;
+}
+
+.sbti-kicker {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6366f1;
+    font-weight: 700;
+}
+
+.sbti-title {
+    margin: 0.28rem 0 0.45rem;
+    font-size: 1.42rem;
+    line-height: 1.22;
+}
+
+.sbti-copy {
+    margin: 0;
+    color: #475569;
+    line-height: 1.58;
+    font-size: 0.92rem;
+}
+
+.sbti-hero-actions,
+.sbti-nav-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.sbti-card {
+    padding: 1rem 1.1rem;
+}
+
+.sbti-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.sbti-progress-track {
+    flex: 1;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.sbti-progress-track i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #4f46e5, #7c3aed);
+    transition: width 0.2s ease;
+}
+
+.sbti-question-title {
+    margin: 0.75rem 0 0.3rem;
+    font-size: 1.12rem;
+}
+
+.sbti-question-meta {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.84rem;
+}
+
+.sbti-options {
+    margin-top: 0.85rem;
+    display: grid;
+    gap: 0.58rem;
+}
+
+.sbti-option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.55rem;
+    align-items: flex-start;
+    border: 1px solid #dbe3ee;
+    border-radius: 0.9rem;
+    padding: 0.72rem 0.78rem;
+    background: #ffffff;
+    cursor: pointer;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.sbti-option:hover {
+    transform: translateY(-1px);
+    border-color: rgba(79, 70, 229, 0.45);
+}
+
+.sbti-option input {
+    margin-top: 0.18rem;
+}
+
+.sbti-option.active {
+    border-color: rgba(79, 70, 229, 0.55);
+    box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+}
+
+.sbti-btn {
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    min-height: 2.25rem;
+    padding: 0 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.sbti-btn.primary {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+.sbti-btn.secondary {
+    background: #eef2ff;
+    color: #3730a3;
+    border-color: rgba(99, 102, 241, 0.25);
+}
+
+.sbti-btn.ghost {
+    background: #f8fafc;
+}
+
+.sbti-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.sbti-result-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.sbti-result-title {
+    margin: 0.28rem 0 0;
+    font-size: 1.18rem;
+}
+
+.sbti-result-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: rgba(79, 70, 229, 0.12);
+    color: #4338ca;
+    font-weight: 700;
+    font-size: 0.82rem;
+    min-height: 2rem;
+    padding: 0 0.82rem;
+}
+
+.sbti-dim-grid {
+    margin-top: 0.88rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.sbti-dim-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.78rem;
+    background: #f8fafc;
+    padding: 0.55rem 0.62rem;
+    font-size: 0.83rem;
+    color: #334155;
+}
+
+@media (max-width: 760px) {
+    .sbti-hero {
+        flex-direction: column;
+    }
+
+    .sbti-dim-grid {
+        grid-template-columns: 1fr;
+    }
+}

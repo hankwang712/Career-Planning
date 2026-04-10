@@ -1,6 +1,7 @@
 (function () {
   const STACK_KEY = "app_return_nav_stack_v1";
   const MAX_STACK_SIZE = 24;
+  const RELock_PATH = "/main.html";
 
   function currentUrl() {
     const path = window.location.pathname || "/";
@@ -76,6 +77,11 @@
     }
   }
 
+  function buildRelockUrl(target) {
+    const safeTarget = normalizeFallbackUrl(target);
+    return `${RELock_PATH}?force_lock=1&return_to=${encodeURIComponent(safeTarget)}`;
+  }
+
   function goBackToLastInterface(fallbackUrl) {
     const current = currentUrl();
     const fallback = normalizeFallbackUrl(fallbackUrl);
@@ -94,7 +100,7 @@
       target = fallback;
     }
     saveStack(stack.length ? stack : [target]);
-    window.location.href = target;
+    window.location.href = buildRelockUrl(target);
   }
 
   function bindReturnLinks() {

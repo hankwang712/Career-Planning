@@ -2,11 +2,14 @@
   const HISTORY_KEY_PREFIX = "dp_deeptest_hist_v2_";
   const RESULT_KEY_PREFIX = "dp_deeptest_result_v1_";
   const TYT_ASSET_BASE = "/static/trueyouteller";
+  const SBTI_ASSET_BASE = "/static/sbti";
+  const SBTI_OUTCOME_DATA_URL = `${SBTI_ASSET_BASE}/outcomes.json`;
 
   const GAME_COVER_MAP = {
     friends: `${TYT_ASSET_BASE}/miniGames/friends.png`,
     insideout: `${TYT_ASSET_BASE}/miniGames/insideOut.png`,
     deep: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
+    sbti: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
   };
 
   const FRIENDS_GIF_MAP = {
@@ -64,6 +67,11 @@
       pageTitle: "情绪主导完整结果",
       sectionTitle: "情绪主导完整结果",
       sectionHint: "完整展示情绪角色、行为特征和分数分布。",
+    },
+    sbti: {
+      pageTitle: "SBTI 人格扩展完整结果",
+      sectionTitle: "SBTI 人格扩展完整结果",
+      sectionHint: "展示人格代号、匹配度、15 维反馈与整体人格摘要。",
     },
   };
 
@@ -145,6 +153,9 @@
     deepAiLoading: false,
   };
 
+  let sbtiWikiData = null;
+  let sbtiWikiDataPromise = null;
+
   function esc(v) {
     return String(v || "")
       .replace(/&/g, "&amp;")
@@ -191,7 +202,7 @@
 
   function sanitizeTestType(raw) {
     const v = String(raw || "").trim().toLowerCase();
-    return ["deep", "friends", "insideout"].includes(v) ? v : "deep";
+    return ["deep", "friends", "insideout", "sbti"].includes(v) ? v : "deep";
   }
 
   function parseTestTypeFromUrl() {
@@ -245,6 +256,48 @@
     return `${TYT_ASSET_BASE}/animals/${file}`;
   }
 
+  function normalizeSbtiCode(code) {
+    const raw = String(code || "").trim();
+    return raw === "OG8K" ? "OJBK" : raw;
+  }
+
+  async function loadSbtiWikiData() {
+    if (sbtiWikiData) return sbtiWikiData;
+    if (!sbtiWikiDataPromise) {
+      sbtiWikiDataPromise = fetch(SBTI_OUTCOME_DATA_URL, { credentials: "same-origin" })
+        .then((response) => {
+          if (!response.ok) throw new Error("SBTI 图鉴数据加载失败");
+          return response.json();
+        })
+        .then((data) => {
+          const outcomes = Array.isArray(data?.outcomes) ? data.outcomes : [];
+          const byCode = {};
+          outcomes.forEach((item) => {
+            const code = normalizeSbtiCode(item?.code || "");
+            if (!code) return;
+            const imagePath = String(item?.image || "").trim();
+            byCode[code] = {
+              ...item,
+              code,
+              image: imagePath ? `${SBTI_ASSET_BASE}/${imagePath.replace(/^\/+/, "")}` : "",
+            };
+          });
+          sbtiWikiData = {
+            meta: data?.meta && typeof data.meta === "object" ? data.meta : {},
+            dimensionMeta: data?.dimensionMeta && typeof data.dimensionMeta === "object" ? data.dimensionMeta : {},
+            specialTriggers: data?.specialTriggers && typeof data.specialTriggers === "object" ? data.specialTriggers : {},
+            byCode,
+          };
+          return sbtiWikiData;
+        })
+        .catch(() => {
+          sbtiWikiData = { meta: {}, dimensionMeta: {}, specialTriggers: {}, byCode: {} };
+          return sbtiWikiData;
+        });
+    }
+    return sbtiWikiDataPromise;
+  }
+
   function normalizeGameResult(raw, fallbackMap) {
     if (!raw || typeof raw !== "object") return null;
     const winner = String(raw.winner || "").trim();
@@ -295,6 +348,23 @@
     };
   }
 
+  function normalizeSbtiResult(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const code = normalizeSbtiCode(raw.code || "");
+    if (!code) return null;
+    return {
+      code,
+      title: String(raw.title || code),
+      match: Number(raw.match || 0),
+      badge: String(raw.badge || ""),
+      mode: String(raw.mode || "你的主类型"),
+      summary: String(raw.summary || "已生成人格扩展画像。"),
+      levels: raw.levels && typeof raw.levels === "object" ? { ...raw.levels } : {},
+      rawScores: raw.rawScores && typeof raw.rawScores === "object" ? { ...raw.rawScores } : {},
+      completedAt: Number(raw.completedAt || Date.now()),
+    };
+  }
+
   function loadStoreData() {
     let parsed = {};
     try {
@@ -311,8 +381,15 @@
         aiText: String(parsed.deep.aiText || ""),
         completedAt: Number(parsed.deep.completedAt || Date.now()),
       } : null,
+      sbti: normalizeSbtiResult(parsed?.sbti),
     };
     if (state.store.deep && !state.store.deep.result) state.store.deep = null;
+    if (!state.store.sbti) {
+      try {
+        const rawSbti = localStorage.getItem("sbti_profile") || localStorage.getItem("sbti_profile_v1");
+        if (rawSbti) state.store.sbti = normalizeSbtiResult(JSON.parse(rawSbti));
+      } catch (_) {}
+    }
   }
 
   function loadHistoryRuns() {
@@ -1106,6 +1183,135 @@
     }
   }
 
+  function sbtiLevelLabel(level) {
+    return ({ H: "高位", M: "中位", L: "低位" })[String(level || "").toUpperCase()] || "中位";
+  }
+
+  function sbtiRarityText(outcome) {
+    const percent = Number(outcome?.rarity?.percent || 0);
+    if (!percent) return "";
+    const label = String(outcome?.rarity?.label || "稀有度").trim();
+    const oneInX = Number(outcome?.rarity?.oneInX || 0);
+    if (oneInX > 0) return `${label} · 约每 ${oneInX} 人 1 位`;
+    return `${label} · ${percent}%`;
+  }
+
+  async function renderSbti() {
+    const entry = state.store?.sbti;
+    if (!entry) return renderEmpty("请先完成 SBTI 人格扩展测试，再查看该页面。");
+
+    const wikiData = await loadSbtiWikiData();
+    const outcome = wikiData?.byCode?.[normalizeSbtiCode(entry.code)] || null;
+    const specialTrigger = wikiData?.specialTriggers?.[normalizeSbtiCode(entry.code)] || null;
+    const title = outcome ? `${outcome.code} · ${outcome.cn}` : String(entry.title || entry.code || "SBTI 结果");
+    const imageUrl = String(outcome?.image || getGameCover("sbti") || "").trim();
+    const intro = String(outcome?.intro || entry.badge || `匹配度 ${Number(entry.match || 0)}%`).trim();
+    const desc = String(outcome?.desc || entry.summary || "已生成 SBTI 人格扩展画像。").trim();
+    const commentary = String(outcome?.commentary || "").trim();
+    const rarityText = sbtiRarityText(outcome);
+    const scoreEntries = Object.entries(entry.rawScores || {});
+    const vectorEntries = Array.isArray(outcome?.vector) && outcome.vector.length
+      ? outcome.vector
+      : Object.entries(entry.levels || {}).map(([key, value]) => ({
+          dim: key,
+          model: wikiData?.dimensionMeta?.[key]?.model || "维度",
+          name: wikiData?.dimensionMeta?.[key]?.name || key,
+          level: value,
+          explanation: "",
+        }));
+    const dimCards = vectorEntries.length
+      ? vectorEntries.map((item) => {
+          const rawScore = Number(entry.rawScores?.[item.dim] || 0);
+          const level = String(item.level || entry.levels?.[item.dim] || "M").toUpperCase();
+          return `
+            <article class="tr-sbti-dim-card level-${esc(level.toLowerCase())}">
+              <div class="tr-sbti-dim-top">
+                <div>
+                  <p class="tr-sbti-dim-code">${esc(item.dim || "")}</p>
+                  <h4>${esc(item.name || item.dim || "维度")}</h4>
+                </div>
+                <span class="tr-sbti-level-pill level-${esc(level.toLowerCase())}">${esc(sbtiLevelLabel(level))}</span>
+              </div>
+              <p class="tr-sbti-dim-model">${esc(item.model || "人格维度")}</p>
+              <p class="tr-sbti-dim-copy">${esc(item.explanation || "该维度暂无补充说明。")}</p>
+              <div class="tr-sbti-dim-meta">
+                <span>原始分 ${esc(String(rawScore))}</span>
+                <span>${esc(level)} 级</span>
+              </div>
+            </article>`;
+        }).join("")
+      : '<p class="tr-muted">暂无维度数据。</p>';
+    const scoreLabels = Object.fromEntries(scoreEntries.map(([key]) => {
+      const hit = vectorEntries.find((item) => item.dim === key);
+      return [key, hit?.name || wikiData?.dimensionMeta?.[key]?.name || key];
+    }));
+    const specialPanel = specialTrigger
+      ? `
+        <article class="tr-tyt-panel">
+          <h3 class="tr-tyt-section-title">特殊触发说明</h3>
+          <div class="tr-tag-row">
+            <span class="tr-tag">${esc(`${specialTrigger.badge || "🧩"} ${specialTrigger.label || "特殊分支"}`)}</span>
+          </div>
+          <p class="tr-tyt-copy">${esc(specialTrigger.description || "")}</p>
+        </article>`
+      : "";
+
+    return `
+      <div class="tr-result-grid tr-tyt-mini-page tr-sbti-page">
+        <article class="tr-tyt-mini-hero tr-sbti-hero" style="--tr-accent:#8b5cf6;">
+          <div class="tr-tyt-mini-cover tr-sbti-cover">
+            <img src="${esc(imageUrl)}" alt="${esc(title)} 结果图">
+          </div>
+          <div class="tr-tyt-mini-copy">
+            <p class="tr-tyt-overline">扩展测试 · SBTI 图鉴结果</p>
+            <h2 class="tr-tyt-mini-title">${esc(title)}</h2>
+            <p class="tr-tyt-mini-tagline">${esc(outcome?.oneLiner || intro)}</p>
+            <div class="tr-sbti-chip-row">
+              <span class="tr-tyt-share-pill">${esc(entry.mode || "你的主类型")}</span>
+              ${entry.badge ? `<span class="tr-sbti-neutral-pill">${esc(entry.badge)}</span>` : ""}
+              ${rarityText ? `<span class="tr-sbti-neutral-pill">${esc(rarityText)}</span>` : ""}
+            </div>
+            <p class="tr-meta-line">完成时间：${esc(formatDate(entry.completedAt))}</p>
+          </div>
+        </article>
+
+        <div class="tr-sbti-summary-grid">
+          <article class="tr-tyt-panel">
+            <h3 class="tr-tyt-section-title">结果摘要</h3>
+            <p class="tr-tyt-copy">${esc(desc)}</p>
+          </article>
+          <article class="tr-tyt-panel">
+            <h3 class="tr-tyt-section-title">图鉴解读</h3>
+            <p class="tr-tyt-copy">${esc(commentary || entry.summary || "当前结果已完成匹配，可结合 15 维画像一起阅读。")}</p>
+          </article>
+        </div>
+
+        <article class="tr-block">
+          <h3>人格标签</h3>
+          <div class="tr-tag-row tr-sbti-tag-row">
+            <span class="tr-tag">代号 ${esc(entry.code)}</span>
+            ${outcome?.cn ? `<span class="tr-tag">中文名 ${esc(outcome.cn)}</span>` : ""}
+            ${outcome?.intro ? `<span class="tr-tag">开场句 ${esc(outcome.intro)}</span>` : ""}
+            ${outcome?.pattern ? `<span class="tr-tag">模板 ${esc(outcome.pattern)}</span>` : ""}
+          </div>
+        </article>
+
+        ${specialPanel}
+
+        <article class="tr-block">
+          <h3>15 维人格画像</h3>
+          <div class="tr-sbti-dim-grid">
+            ${dimCards}
+          </div>
+        </article>
+
+        <article class="tr-block">
+          <h3>原始维度分布</h3>
+          ${scoreEntries.length ? scoreRowsHtml(Object.fromEntries(scoreEntries), scoreLabels) : '<p class="tr-muted">暂无分布数据。</p>'}
+        </article>
+      </div>`;
+  }
+
   function bindResultActionEvents() {
     const startBtn = document.getElementById("trStartTestBtn");
     if (startBtn) startBtn.onclick = toRetest;
@@ -1127,6 +1333,11 @@
     }
     if (state.testType === "insideout") {
       root.innerHTML = renderGame(state.store?.insideout, INSIDEOUT_SCORE_LABELS);
+      bindResultActionEvents();
+      return;
+    }
+    if (state.testType === "sbti") {
+      root.innerHTML = await renderSbti();
       bindResultActionEvents();
       return;
     }
