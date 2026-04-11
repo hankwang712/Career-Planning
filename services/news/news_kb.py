@@ -41,6 +41,7 @@ EMBEDDING_API_KEY = "sk-or-v1-ad217b7a53c27dfad3ce30babf5f2f4ca0fbbdad644d6e94ab
 NEWS_MAX_ENTRIES = 500     # 最多保留条数
 NEWS_MAX_AGE_DAYS = 45     # 超过此天数的条目会被裁剪
 ARTICLE_FETCH_TIMEOUT = 8  # 抓取正文的超时（秒）
+ARTICLE_CONTENT_MAX_CHARS = 12000  # 存入 news_store 的正文上限（提取干净后再截断）
 
 CHUNK_SIZE_TOKENS = 500    # 每个 chunk 的 token 上限
 CHUNK_OVERLAP_TOKENS = 50  # chunk 之间的 overlap
@@ -140,10 +141,11 @@ def store_news_items(items: list[dict[str, Any]], fetch_content: bool = True) ->
 # 文章正文抓取
 # ---------------------------------------------------------------------------
 
-def _fetch_article_content(url: str) -> str:
-    """抓取文章 URL 并提取纯文本（最多 3000 字符）。"""
-    if not url or not url.startswith("http"):
-        return ""
+def _fetch_article_content_fallback(url: str) -> str:
+    """
+    旧版兜底：拉取更大 HTML 片段后粗暴去标签。
+    仍可能被首屏 CSS 污染，仅当 trafilatura 不可用时使用。
+    """
     try:
         req = urllib.request.Request(
             url,
@@ -157,18 +159,60 @@ def _fetch_article_content(url: str) -> str:
             },
         )
         with urllib.request.urlopen(req, timeout=ARTICLE_FETCH_TIMEOUT) as resp:
-            raw = resp.read(32768)
+            raw = resp.read(524288)
         try:
             text = raw.decode("utf-8", errors="replace")
         except Exception:
             text = raw.decode("gbk", errors="replace")
         text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<noscript[^>]*>.*?</noscript>", " ", text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r"<[^>]+>", " ", text)
         text = re.sub(r"\s+", " ", text).strip()
-        return text[:3000]
+        return text
     except Exception:
         return ""
+
+
+def _fetch_article_content(url: str) -> str:
+    """
+    抓取文章 URL 并提取可读正文。
+    优先使用 trafilatura（开源可读性/主文提取），避免把整页 CSS 当成正文。
+    """
+    if not url or not url.startswith("http"):
+        return ""
+
+    text = ""
+    try:
+        import trafilatura
+
+        downloaded = trafilatura.fetch_url(
+            url,
+            config=trafilatura.settings.use_config(),
+        )
+        if downloaded:
+            text = trafilatura.extract(
+                downloaded,
+                include_comments=False,
+                include_tables=True,
+                favor_recall=True,
+            ) or ""
+    except ImportError:
+        text = ""
+    except Exception:
+        text = ""
+
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(text) < 80:
+        text = _fetch_article_content_fallback(url)
+        text = re.sub(r"\s+", " ", text).strip()
+
+    if not text:
+        return ""
+
+    if len(text) > ARTICLE_CONTENT_MAX_CHARS:
+        text = f"{text[: ARTICLE_CONTENT_MAX_CHARS - 1].rstrip()}…"
+    return text
 
 
 # ---------------------------------------------------------------------------

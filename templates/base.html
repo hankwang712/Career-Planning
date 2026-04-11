@@ -19,7 +19,8 @@
         font-family: var(--app-font-stack);
       }
     </style>
-        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260410-portrait-plain-v1">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260412-resume-studio-full-v1">
+        <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
 </head>
 <body class="bg-gray-50 scroll-smooth auth-locked">
     <div class="ambient-orb a"></div>
@@ -470,10 +471,12 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260402-return-nav-v1"></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260411-return-nav-v2"></script>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260410-portrait-plain-v1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260412-resume-studio-full-v1"></script>
     <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260322-top-model-status-v1"></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260402-assessment-pet-restore-v1"></script>
     <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260410-sbti-embed-v1"></script>

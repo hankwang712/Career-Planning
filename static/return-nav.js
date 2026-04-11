@@ -1,7 +1,6 @@
 (function () {
   const STACK_KEY = "app_return_nav_stack_v1";
   const MAX_STACK_SIZE = 24;
-  const RELock_PATH = "/main.html";
 
   function currentUrl() {
     const path = window.location.pathname || "/";
@@ -77,11 +76,6 @@
     }
   }
 
-  function buildRelockUrl(target) {
-    const safeTarget = normalizeFallbackUrl(target);
-    return `${RELock_PATH}?force_lock=1&return_to=${encodeURIComponent(safeTarget)}`;
-  }
-
   function goBackToLastInterface(fallbackUrl) {
     const current = currentUrl();
     const fallback = normalizeFallbackUrl(fallbackUrl);
@@ -99,8 +93,10 @@
     if (!target || target === current || isBlockedReturnTarget(target)) {
       target = fallback;
     }
-    saveStack(stack.length ? stack : [target]);
-    window.location.href = buildRelockUrl(target);
+    const safeTarget = normalizeFallbackUrl(target);
+    saveStack(stack.length ? stack : [safeTarget]);
+    // 直接回到目标页，不再附加 force_lock：用户通常已登录，返回上一界面不应反复要求解锁。
+    window.location.href = safeTarget;
   }
 
   function bindReturnLinks() {

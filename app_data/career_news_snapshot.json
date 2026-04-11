@@ -1,12 +1,262 @@
 {
-  "window_snapshot_key": "2026-04-10",
-  "window_snapshot_label": "2026-04-10 12:00",
-  "next_refresh_label": "2026-04-11 12:00",
+  "window_snapshot_key": "2026-04-11",
+  "window_snapshot_label": "2026-04-11 12:00",
+  "next_refresh_label": "2026-04-12 12:00",
   "refresh_rule": "每日 12:00 更新",
-  "snapshot_key": "2026-04-10",
-  "snapshot_label": "2026-04-10 12:00",
-  "generated_at": "2026-04-10 13:48",
+  "snapshot_key": "2026-04-11",
+  "snapshot_label": "2026-04-11 12:00",
+  "generated_at": "2026-04-11 15:48",
   "items": [
+    {
+      "title": "Cloudflare 与苏黎世联邦理工学院概述了基于 AI 的缓存优化方法",
+      "url": "https://www.infoq.cn/article/e6qh5DKlDApGZGxxgKZO?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-11T19:00:00+08:00",
+      "published_label": "04-11 19:00",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "让每个员工都有一个 Coding Agent：蚂蚁 Vibe Coding 平台落地半年后的实践经验｜QCon北京",
+      "url": "https://www.infoq.cn/article/zwsaRqiZ99H7l3y8G9Lc?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-11T18:00:00+08:00",
+      "published_label": "04-11 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "面向 AI 智能体的有状态接续：传输层为何至关重要",
+      "url": "https://www.infoq.cn/article/P3Ko14uHlmRMm50rIhXs?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-11T18:00:00+08:00",
+      "published_label": "04-11 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "马来西亚推动“AI 城市”转型，目标 2030 年成为“AI 国家”",
+      "url": "https://www.ithome.com/0/938/097.htm",
+      "summary": "IT之家 4 月 11 日消息，据新华社报道，马来西亚总理安瓦尔 10 日表示，马来西亚城市发展正处于 向人工智能城市转型的关键阶段 ，这一转型将有助于马来西亚 实现“人工智能国家”的发展愿…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-11T14:58:01+08:00",
+      "published_label": "04-11 14:58",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "OpenAI 回应 Axios 工具安全事件，敦促苹果 Mac 用户更新 ChatGPT 等应用",
+      "url": "https://www.ithome.com/0/938/079.htm",
+      "summary": "IT之家 4 月 11 日消息，OpenAI 公司昨日（4 月 10 日）发布公告，回应涉及第三方开发工具 Axios 的软件安全事件， 并敦促苹果 Mac 用户尽快更新 ChatGPT、C…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-11T13:38:25+08:00",
+      "published_label": "04-11 13:38",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "AI技术革命：从岗位淘汰到产业创造的双重变奏 - Sohu",
+      "url": "https://news.google.com/rss/articles/CBMijAFBVV95cUxOMUpNMnRpMlJlc2tXU0RPOEMwdzhyVklRdFZKRDdxUk9ha0FTT2tjaEJZWjRqaHdNSkhkVHFzbnJWVHluQ0I5SXVPNDJ4UTc3OUJYQ2o2b2x4eC10bk4zam9CajJKQW43cmxSTmtDcWFHa1JhUDJCX054cVRHdXhHelliUEJ0OF9xMXpncQ?oc=5",
+      "summary": "AI技术革命：从岗位淘汰到产业创造的双重变奏 Sohu",
+      "source": "Google News / AI 与计算机岗位",
+      "published_at": "2026-04-11T13:05:55+08:00",
+      "published_label": "04-11 13:05",
+      "topic": "AI 与计算机岗位",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "壹号本 ONEXStation 迷你 AI 工作站上架：395 + 128GB + 1TB 首发 18999 元",
+      "url": "https://www.ithome.com/0/938/061.htm",
+      "summary": "IT之家 4 月 11 日消息，壹号本 ONE-NETBOOK 现已上架迷你 AI 工作站 ONEXStation。其搭载 AMD 锐龙 AI Max+ 395 处理器，配备 128GB L…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-11T11:13:29+08:00",
+      "published_label": "04-11 11:13",
+      "topic": "科技行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career",
+        "tech"
+      ]
+    },
+    {
+      "title": "OpenAI 奥尔特曼住所遭燃烧瓶袭击后发声：AI 担忧不应演变为暴力行为",
+      "url": "https://www.ithome.com/0/938/059.htm",
+      "summary": "IT之家 4 月 11 日消息，华尔街日报昨日（4 月 10 日）发布博文，报道称 OpenAI 首席执行官山姆 · 奥尔特曼位于旧金山的住所遭燃烧瓶袭击，嫌疑人随后在公司总部发出威胁后被警…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-11T10:59:55+08:00",
+      "published_label": "04-11 10:59",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Anthropic’s Mythos Will Force a Cybersecurity Reckoning—Just Not the One You Think",
+      "url": "https://www.wired.com/story/anthropics-mythos-will-force-a-cybersecurity-reckoning-just-not-the-one-you-think/",
+      "summary": "The new AI model is being heralded—and feared—as a hacker’s superweapon. Experts say its arriva…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-11T02:08:37+08:00",
+      "published_label": "04-11 02:08",
+      "topic": "AI 与工作",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "没有KPI，也能领先OpenAI？从“内部观察者”视角看顶级AI实验室如何运作",
+      "url": "https://www.infoq.cn/article/UeZ4cvw5hl06J0vFEJck?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-11T01:37:06+08:00",
+      "published_label": "04-11 01:37",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "10岁孩子都能训机器人！对话松应科技创始人：做物理AI界的“安卓”挑战英伟达，正将其开源开放",
+      "url": "https://www.infoq.cn/article/RGQ7l8UOAEth5bPMHodE?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-11T01:20:18+08:00",
+      "published_label": "04-11 01:20",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Stalking victim sues OpenAI, claims ChatGPT fueled her abuser’s delusions and ignored her warnings",
+      "url": "https://techcrunch.com/2026/04/10/stalking-victim-sues-openai-claims-chatgpt-fueled-her-abusers-delusions-and-ignored-her-warnings/",
+      "summary": "OpenAI ignored three warnings that a ChatGPT user was dangerous — including its own mass-casual…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-11T00:41:34+08:00",
+      "published_label": "04-11 00:41",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "TechCrunch is heading to Tokyo — and bringing the Startup Battlefield with it",
+      "url": "https://techcrunch.com/2026/04/10/techcrunch-is-heading-to-tokyo-and-bringing-the-startup-battlefield-with-it/",
+      "summary": "SusHi Tech 2026 is zeroing in on four technology domains reshaping society: AI, Robotics, Resil…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-11T00:38:43+08:00",
+      "published_label": "04-11 00:38",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Suspect Arrested for Allegedly Throwing Molotov Cocktail at Sam Altman’s Home",
+      "url": "https://www.wired.com/story/sam-altman-home-attack-openai-san-franisco-office-threat/",
+      "summary": "An attacker allegedly threw a molotov cocktail at the OpenAI CEO’s residence before making thre…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-11T00:32:19+08:00",
+      "published_label": "04-11 00:32",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "\"Uncanny Valley\": OpenAI and Musk Fight Again; DOJ Mishandles Voter Data; Artemis II Comes Home",
+      "url": "https://www.wired.com/story/uncanny-valley-podcast-openai-musk-fight-doj-mishandles-voter-data-artemis-ii-comes-home/",
+      "summary": "In this episode, the hosts discuss the fight between OpenAI and Elon Musk, the misuse of voter…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-11T00:21:27+08:00",
+      "published_label": "04-11 00:21",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "This Startup Wants You to Pay Up to Talk With AI Versions of Human Experts",
+      "url": "https://www.wired.com/story/onix-substack-ai-platform-therapy-medicine-nutrition/",
+      "summary": "Onix is launching a “Substack of bots,” where digital twins of health and wellness influencers…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-11T00:00:00+08:00",
+      "published_label": "04-11 00:00",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "开源信仰崩塌？Meta发布闭源巨兽，143亿美金重注AI赛道的野心",
+      "url": "https://www.infoq.cn/article/I71O7o2pufO4WFbpyTFT?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-10T23:21:52+08:00",
+      "published_label": "04-10 23:21",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Every fusion startup that has raised over $100M",
+      "url": "https://techcrunch.com/2026/04/10/every-fusion-startup-that-has-raised-over-100m/",
+      "summary": "Fusion startups have raised $7.1 billion to date, with the majority of it going to a handful of…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-10T22:05:00+08:00",
+      "published_label": "04-10 22:05",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "PSA: If you use the Meta AI app, your friends will find out and it will be embarrassing",
+      "url": "https://techcrunch.com/2026/04/10/psa-if-you-use-the-meta-ai-app-your-friends-will-find-out-and-it-will-be-embarrassing/",
+      "summary": "Now that Meta released its Muse Spark model, more people are downloading the Meta AI app. And i…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-10T21:52:02+08:00",
+      "published_label": "04-10 21:52",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
     {
       "title": "Anthropic 因 npm 源映射文件意外泄露 Claude Code 源码",
       "url": "https://www.infoq.cn/article/ycWjMWTxqBePkDj7eoPi?utm_source=rss&utm_medium=article",
@@ -44,6 +294,32 @@
       "relevance_score": 2,
       "match_tags": [
         "tech"
+      ]
+    },
+    {
+      "title": "Meta’s New AI Asked for My Raw Health Data—and Gave Me Terrible Advice",
+      "url": "https://www.wired.com/story/metas-new-ai-asked-for-my-raw-health-data-and-gave-me-terrible-advice/",
+      "summary": "Meta’s Muse Spark model offers to analyze users’ health data, including lab results. Beyond the…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-10T17:30:00+08:00",
+      "published_label": "04-10 17:30",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "我省大学生“就业引航”暨西部计划宣讲会正式启动 - sxwbs.com",
+      "url": "https://news.google.com/rss/articles/CBMimgFBVV95cUxNdjhFZDVzcVpOZ0tDcFZSTVJLNURpU3VKUzBaRzRoYnYyYy1GN3luM0hpUjRjc0dRaHFGVllxVU1wT3hjNF9tdlVIS25CaHpmdDlCU0JMa1VoMTV2NjVGQVMxaVp5QzlURlRRX29lWmlkT2syOVRNZ3ZqWU9PYjJzY1RhOTZIamJzV1RKbWxmUmZ6Wk0wRTJYYmRn?oc=5",
+      "summary": "我省大学生“就业引航”暨西部计划宣讲会正式启动 sxwbs.com",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-10T16:35:53+08:00",
+      "published_label": "04-10 16:35",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
       ]
     },
     {
@@ -109,6 +385,20 @@
       "topic": "科技行业",
       "relevance_score": 2,
       "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 - qq.com",
+      "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFA0X0E3U3NjUnltMHo2ZTVVX1B0R3BVNWJmSVA1bTZ1a2xfMkw5RDBlX3RpRGdPeUdUMlRkcXItLTJlWFA1NnJEdkRvS2thNVlrTnAxOE9n?oc=5",
+      "summary": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 qq.com",
+      "source": "Google News / 程序员就业",
+      "published_at": "2026-04-10T10:38:12+08:00",
+      "published_label": "04-10 10:38",
+      "topic": "程序员就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career",
         "tech"
       ]
     },
@@ -244,6 +534,19 @@
       ]
     },
     {
+      "title": "乌鲁木齐：招聘会助力大学生就业 - jyb.cn",
+      "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE4zVXQ3VDZ0eGlQNC1YYm5ERlVSUFY4ZXBoXzlhd2xHYlBnZXpLenh6MGtuR3lsb01BR2VLWW82cTdmZ1VRVlk3amFES1N6STFVRUtJTHNxQWZXRHIyd0Nqc2lKOHVldURYS1JqTXlOcjRNQ0RZby1N?oc=5",
+      "summary": "乌鲁木齐：招聘会助力大学生就业 jyb.cn",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-10T03:34:45+08:00",
+      "published_label": "04-10 03:34",
+      "topic": "求职就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
       "title": "Meta AI app climbs to No. 5 on the App Store after Muse Spark launch",
       "url": "https://techcrunch.com/2026/04/09/meta-ai-app-climbs-to-no-5-on-the-app-store-after-muse-spark-launch/",
       "summary": "The app was ranking No. 57 on the App Store just before Meta AI's new model launched. Now it's…",
@@ -361,313 +664,6 @@
       "match_tags": [
         "tech"
       ]
-    },
-    {
-      "title": "Claude Code 生成 13 种编程语言代码基准测试：动态语言更快更省成本",
-      "url": "https://www.infoq.cn/article/uFqo6LfcBAKhzwxZkoJO?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-09T22:00:00+08:00",
-      "published_label": "04-09 22:00",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "How Meta Cafeteria Workers Took on ICE—and Won",
-      "url": "https://www.wired.com/story/how-meta-cafeteria-workers-rallied-to-take-on-ice/",
-      "summary": "In Seattle, activists inside tech giants are leaning into grassroots fundraising and peer suppo…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-09T19:00:00+08:00",
-      "published_label": "04-09 19:00",
-      "topic": "AI 与工作",
-      "relevance_score": 5,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "TigerFS：将 PostgreSQL 数据库挂载为文件系统，面向开发者与 AI 智能体",
-      "url": "https://www.infoq.cn/article/r5EHCug4069tix7kDGLf?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-09T19:00:00+08:00",
-      "published_label": "04-09 19:00",
-      "topic": "技术趋势",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "大前端性能优化新范式：AI 火焰图在亿级 App 中的落地｜QCon北京",
-      "url": "https://www.infoq.cn/article/xJZRwpf2uuMA3UaS2SWm?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-09T18:00:00+08:00",
-      "published_label": "04-09 18:00",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "This AI Wearable From Ex-Apple Engineers Looks Like an iPod Shuffle",
-      "url": "https://www.wired.com/story/this-ai-button-wearable-from-ex-apple-engineers-looks-like-an-ipod-shuffle/",
-      "summary": "Two former Apple Vision Pro developers made an AI wearable that only listens when you tap it. T…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-09T17:30:00+08:00",
-      "published_label": "04-09 17:30",
-      "topic": "AI 与工作",
-      "relevance_score": 5,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "来到异地实习的大学生，陷入了新型贫困 - VanPeople",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE1kTVNhWHdNWkFaQjVXTXN0aU1sdmNyX0tPcEtpcDdkSUJhOXl6MHU4UjJScTg3QTJPUlhUYVMyUGFmdTRjUVdCMmFUMmc5b3oy?oc=5",
-      "summary": "来到异地实习的大学生，陷入了新型贫困 VanPeople",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-04-09T17:19:15+08:00",
-      "published_label": "04-09 17:19",
-      "topic": "求职就业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "2026年大学生求职平台推荐:AI精准匹配如何终结校招迷茫? - 新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxPelByZ0F6aGNreC0xLWlVa0ZBdmpVcUlNbFBiRzcyMlJ4Zl8ybzRtMlFiVnZGdXl2ODN0OVZXU0NfQ3JRYmtGTjk5bWxKOHFXTThvajJ2bTdpQkdWYjZINkc3TU9FZWhrQlBoOUJIcXUtUEpIbzBWaFkyRTJMLXphODZQZw?oc=5",
-      "summary": "2026年大学生求职平台推荐:AI精准匹配如何终结校招迷茫? 新浪财经",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-04-09T16:30:29+08:00",
-      "published_label": "04-09 16:30",
-      "topic": "求职就业",
-      "relevance_score": 6,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "AT&T Promo Codes and Bundle Deals: Save $50 in April",
-      "url": "https://www.wired.com/story/att-promo-code/",
-      "summary": "Whether you’re looking to upgrade your internet or get the latest phone, we’ve got you covered…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-09T13:00:00+08:00",
-      "published_label": "04-09 13:00",
-      "topic": "AI 与工作",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "Altra Promo Codes: Get 20% Off Plus Free Shipping",
-      "url": "https://www.wired.com/story/altra-promo-code/",
-      "summary": "Score big savings on Altra Running shoes with up to 50% off sale styles, 20% off select models,…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-09T13:00:00+08:00",
-      "published_label": "04-09 13:00",
-      "topic": "AI 与工作",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Petlibro Discount Codes: Save Up to 50%",
-      "url": "https://www.wired.com/story/petlibro-discount-code/",
-      "summary": "Save on Petlibro essentials, including automatic feeders, water fountains, and accessories to k…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-09T13:00:00+08:00",
-      "published_label": "04-09 13:00",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "春季校招来了！4780个岗位助力学子“毕业即就业” - tlfw.net",
-      "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBoNURSZ045V0xFV1RfSzhsazRUX0RycmlReGpDNTZEVHpZWHdoX1FVbUZpS0JnNnFNVjVoc1ktUnJibnZVUm5GWlJGSGxTaEM1M2FQWDNLS0ItdG43NjJ5bGlMX00?oc=5",
-      "summary": "春季校招来了！4780个岗位助力学子“毕业即就业” tlfw.net",
-      "source": "Google News / 职业规划",
-      "published_at": "2026-04-09T11:40:51+08:00",
-      "published_label": "04-09 11:40",
-      "topic": "职业规划",
-      "relevance_score": 7,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "MiniMax 发布面向 AI Agent 的命令行工具“MMX-CLI”，跑通自动化工作流",
-      "url": "https://www.ithome.com/0/937/310.htm",
-      "summary": "IT之家 4 月 9 日消息，今日，MiniMax 宣布发布一个面向 AI Agent 的命令行工具 ——MMX-CLI。 据 MiniMax 介绍，接入 MMX-CLI 后，Agent 可…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-09T11:21:16+08:00",
-      "published_label": "04-09 11:21",
-      "topic": "科技行业",
-      "relevance_score": 4,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "RationalFX 报告 2026Q1 全球科技裁员近 8 万人，约 47.9% 归因 AI 技术实施",
-      "url": "https://www.ithome.com/0/937/284.htm",
-      "summary": "IT之家 4 月 9 日消息，Nikkei Asia 昨日（4 月 8 日）发布博文，报道称 2026 年第 1 季度全球科技行业裁员近 8 万人，美国占比 76.7%， 其中近半数归因于…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-09T10:25:13+08:00",
-      "published_label": "04-09 10:25",
-      "topic": "科技行业",
-      "relevance_score": 4,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI - 驱动之家",
-      "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE84V1RMWEo1VHdnYmJER0prOUlUb2xfalFUS1pwMnJ4OTh0S25HWXp1bHJZbFBfbVU4eUV6ZWxGNnpiT3hmZlpOaEQ3ZkRxQTZiNXR6a3cwRTE?oc=5",
-      "summary": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI 驱动之家",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-04-09T09:39:00+08:00",
-      "published_label": "04-09 09:39",
-      "topic": "科技行业变化",
-      "relevance_score": 5,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "英特尔联手 SambaNova 推出异构 AI 推理硬件解决方案，结合三种处理器",
-      "url": "https://www.ithome.com/0/937/233.htm",
-      "summary": "IT之家 4 月 9 日消息，Intel 英特尔与 AI 推理芯片企业 SambaNova 美国当地时间 8 日宣布携手推出面向推理工作负载的异构硬件解决方案。该系统将于 2026 年下半年…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-09T08:41:01+08:00",
-      "published_label": "04-09 08:41",
-      "topic": "科技行业",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "WireGuard VPN developer can’t ship software updates after Microsoft locks account",
-      "url": "https://techcrunch.com/2026/04/08/wireguard-vpn-developer-cant-ship-software-updates-after-microsoft-locks-account/",
-      "summary": "The popular open source VPN maker is the second high-profile developer to say Microsoft locked…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T05:50:41+08:00",
-      "published_label": "04-09 05:50",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Poke makes using AI agents as easy as sending a text",
-      "url": "https://techcrunch.com/2026/04/08/poke-makes-ai-agents-as-easy-as-sending-a-text/",
-      "summary": "Poke brings AI agents to everyday users via text message by handling tasks and automations with…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T05:05:13+08:00",
-      "published_label": "04-09 05:05",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Canva doubles down on AI and marketing automation with Simtheory, Ortto acquisitions",
-      "url": "https://techcrunch.com/2026/04/08/canva-doubles-down-on-ai-and-marketing-automation-with-simtheory-ortto-acquisitions/",
-      "summary": "Canva says the acquisitions add strengths in agentic AI, data infrastructure, marketing automat…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T05:00:00+08:00",
-      "published_label": "04-09 05:00",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "OpenAI made economic proposals — here’s what DC thinks of them",
-      "url": "https://www.theverge.com/column/908880/openai-made-economic-proposals-heres-what-dc-thinks-of-them",
-      "summary": "Happy ceasefire day and welcome to Regulator, a newsletter for Verge subscribers about Big Tech…",
-      "source": "The Verge / 科技职场",
-      "published_at": "2026-04-09T04:14:00+08:00",
-      "published_label": "04-09 04:14",
-      "topic": "科技职场",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "AWS boss explains why investing billions in both Anthropic and OpenAI is an OK conflict",
-      "url": "https://techcrunch.com/2026/04/08/aws-boss-explains-why-investing-billions-in-both-anthropic-and-openai-is-an-ok-conflict/",
-      "summary": "AWS has an ingrained culture of handling competition, he explained, because the cloud giant als…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T04:09:14+08:00",
-      "published_label": "04-09 04:09",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Meta's Superintelligence Lab unveils its first public model, Muse Spark",
-      "url": "https://arstechnica.com/ai/2026/04/metas-superintelligence-lab-unveils-its-first-public-model-muse-spark/",
-      "summary": "Meta touts strong benchmarks but admits \"performance gaps\" in agentic and coding systems.",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-04-09T03:59:10+08:00",
-      "published_label": "04-09 03:59",
-      "topic": "开发与行业",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Meta debuts the Muse Spark model in a ‘ground-up overhaul’ of its AI",
-      "url": "https://techcrunch.com/2026/04/08/meta-debuts-the-muse-spark-model-in-a-ground-up-overhaul-of-its-ai/",
-      "summary": "This is the first model Meta has released under its Superintelligence Labs, led by former Scale…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T02:53:19+08:00",
-      "published_label": "04-09 02:53",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Hack-for-hire group caught targeting Android devices and iCloud backups",
-      "url": "https://techcrunch.com/2026/04/08/hack-for-hire-group-caught-targeting-android-devices-and-icloud-backups/",
-      "summary": "Security researchers exposed a spying campaign by a hack-for-hire group that used Android spywa…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-09T02:51:20+08:00",
-      "published_label": "04-09 02:51",
-      "topic": "全球科技",
-      "relevance_score": 4,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
     }
   ],
   "status": "ready",
@@ -680,8 +676,8 @@
       "topic": "职业规划",
       "kind": "search",
       "status": "ok",
-      "raw_count": 45,
-      "kept_count": 22,
+      "raw_count": 46,
+      "kept_count": 19,
       "error": ""
     },
     {
@@ -690,7 +686,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 44,
+      "kept_count": 48,
       "error": ""
     },
     {
@@ -698,8 +694,8 @@
       "topic": "程序员就业",
       "kind": "search",
       "status": "ok",
-      "raw_count": 61,
-      "kept_count": 3,
+      "raw_count": 70,
+      "kept_count": 7,
       "error": ""
     },
     {
@@ -708,7 +704,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 21,
+      "kept_count": 18,
       "error": ""
     },
     {
@@ -716,7 +712,7 @@
       "topic": "科技行业变化",
       "kind": "search",
       "status": "ok",
-      "raw_count": 97,
+      "raw_count": 96,
       "kept_count": 13,
       "error": ""
     },
@@ -726,7 +722,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 9,
+      "kept_count": 10,
       "error": ""
     },
     {
@@ -735,7 +731,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 60,
-      "kept_count": 5,
+      "kept_count": 4,
       "error": ""
     },
     {
@@ -744,7 +740,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 8,
+      "kept_count": 7,
       "error": ""
     },
     {
@@ -753,7 +749,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 50,
-      "kept_count": 8,
+      "kept_count": 9,
       "error": ""
     },
     {
@@ -762,16 +758,16 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 3,
+      "kept_count": 1,
       "error": ""
     },
     {
       "source": "The Verge",
       "topic": "科技职场",
       "kind": "direct",
-      "status": "ok",
+      "status": "empty",
       "raw_count": 10,
-      "kept_count": 2,
+      "kept_count": 0,
       "error": ""
     }
   ]

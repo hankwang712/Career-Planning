@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>简历深度审计报告</title>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.16/index.css" rel="stylesheet">
+<style>
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --text-primary: rgba(0, 0, 0, 0.9);
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --text-muted: rgba(0, 0, 0, 0.4);
+  --accent-cyan: #0ea5e9;
+  --accent-purple: #8b5cf6;
+  --accent-pink: #ec4899;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  --accent-red: #ef4444;
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --liquid-1: rgba(14, 165, 233, 0.15);
+  --liquid-2: rgba(139, 92, 246, 0.15);
+  --liquid-3: rgba(236, 72, 153, 0.15);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Background */
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.5;
+  animation: orbFloat 25s ease-in-out infinite;
+}
+
+.bg-orb:nth-child(1) {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, var(--liquid-1), transparent 70%);
+  top: -10%;
+  left: -5%;
+  animation-delay: 0s;
+}
+
+.bg-orb:nth-child(2) {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, var(--liquid-2), transparent 70%);
+  top: 50%;
+  right: -10%;
+  animation-delay: -8s;
+}
+
+.bg-orb:nth-child(3) {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--liquid-3), transparent 70%);
+  bottom: -20%;
+  left: 30%;
+  animation-delay: -16s;
+}
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.1); }
+  66% { transform: translate(-30px, 40px) scale(0.95); }
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: 
+    linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Layout */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Top Navigation */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.nav-logo {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.nav-tab {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  background: transparent;
+  position: relative;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.nav-tab.active {
+  background: white;
+  color: var(--accent-cyan);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.nav-tab .tab-num {
+  font-size: 0.7rem;
+  margin-right: 6px;
+  opacity: 0.6;
+}
+
+.nav-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-green);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-panel {
+  position: absolute;
+  inset: 0;
+  padding: 32px;
+  overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(20px);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.tab-panel.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+/* Scrollbar */
+.tab-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tab-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+
+.tab-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Liquid Glass Card */
+.liquid-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 32px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.liquid-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 50%, rgba(255, 255, 255, 0.4));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.liquid-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  border-color: rgba(14, 165, 233, 0.2);
+}
+
+/* Liquid Border Effect */
+.liquid-border {
+  position: relative;
+}
+
+.liquid-border::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 22px;
+  background: conic-gradient(from 0deg, var(--accent-cyan), var(--accent-purple), var(--accent-pink), var(--accent-green), var(--accent-cyan));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  animation: liquidSpin 6s linear infinite;
+}
+
+.liquid-border:hover::after {
+  opacity: 0.5;
+}
+
+@keyframes liquidSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dashboard Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.metric-card {
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.metric-card:nth-child(1)::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)); }
+.metric-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+.metric-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink)); }
+.metric-card:nth-child(4)::before { background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink)); }
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.metric-card:nth-child(1) .metric-value { color: var(--accent-cyan); }
+.metric-card:nth-child(2) .metric-value { color: var(--accent-green); }
+.metric-card:nth-child(3) .metric-value { color: var(--accent-orange); }
+.metric-card:nth-child(4) .metric-value { color: var(--accent-purple); }
+
+.metric-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.metric-bar {
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.metric-card:nth-child(1) .metric-bar-fill { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)); width: 95%; }
+.metric-card:nth-child(2) .metric-bar-fill { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); width: 88%; }
+.metric-card:nth-child(3) .metric-bar-fill { background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink)); width: 62%; }
+.metric-card:nth-child(4) .metric-bar-fill { background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink)); width: 45%; }
+
+/* Two Column Layout */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Audit Item */
+.audit-item {
+  margin-bottom: 24px;
+  padding-left: 20px;
+  border-left: 3px solid var(--bg-secondary);
+  transition: border-color 0.3s ease;
+}
+
+.audit-item:hover {
+  border-left-color: var(--accent-cyan);
+}
+
+.audit-question {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.audit-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.audit-impact {
+  margin-bottom: 12px;
+  padding: 14px;
+  background: rgba(236, 72, 153, 0.06);
+  border: 1px solid rgba(236, 72, 153, 0.15);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.audit-impact-label {
+  color: var(--accent-pink);
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: block;
+  font-size: 0.8rem;
+}
+
+.audit-suggestion {
+  padding: 14px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.audit-suggestion-label {
+  color: var(--accent-green);
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: block;
+  font-size: 0.8rem;
+}
+
+/* Comparison Grid */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.comparison-item {
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.comparison-item.before {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.comparison-item.after {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.comparison-label {
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: block;
+  font-size: 0.8rem;
+}
+
+.comparison-item.before .comparison-label { color: var(--accent-orange); }
+.comparison-item.after .comparison-label { color: var(--accent-green); }
+
+/* Formula Box */
+.formula-box {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.formula-box strong {
+  color: var(--accent-cyan);
+}
+
+/* Timeline */
+.timeline {
+  position: relative;
+  padding-left: 32px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent-cyan), var(--accent-purple), var(--accent-pink), var(--accent-green));
+  border-radius: 2px;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+
+.timeline-item:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -38px;
+  top: 24px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 3px solid var(--accent-cyan);
+  border-radius: 50%;
+}
+
+.timeline-item:nth-child(2)::before { border-color: var(--accent-purple); }
+.timeline-item:nth-child(3)::before { border-color: var(--accent-pink); }
+.timeline-item:nth-child(4)::before { border-color: var(--accent-green); }
+
+/* Checklist */
+.checklist {
+  list-style: none;
+  margin-top: 16px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+.checklist-item:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+  transform: translateX(4px);
+}
+
+.check-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+}
+
+.check-icon.primary {
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+}
+
+.check-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.check-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Resume Template */
+.resume-template {
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 40px;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+}
+
+.resume-template::before {
+  content: '修改后简历范本';
+  position: absolute;
+  top: -12px;
+  left: 28px;
+  padding: 6px 18px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 100px;
+  letter-spacing: 1px;
+}
+
+.resume-header {
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--bg-secondary);
+  margin-bottom: 24px;
+}
+
+.resume-name {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.resume-contact {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.resume-section {
+  margin-bottom: 24px;
+}
+
+.resume-section-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--glass-border);
+}
+
+.resume-item {
+  margin-bottom: 14px;
+}
+
+.resume-item-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+}
+
+.resume-item-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.resume-item-content {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+/* Highlight Text */
+.highlight { color: var(--accent-cyan); font-weight: 700; }
+.highlight-pink { color: var(--accent-pink); font-weight: 700; }
+.highlight-green { color: var(--accent-green); font-weight: 700; }
+
+/* SVG Decorations */
+.deco-svg {
+  position: absolute;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* Section Header */
+.section-header {
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bg-secondary);
+}
+
+.section-step {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: 6px;
+}
+
+.section-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #000, rgba(0, 0, 0, 0.8));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subsection */
+.subsection {
+  margin: 24px 0;
+}
+
+.subsection-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subsection-title::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 2px;
+}
+
+/* Radar Chart Container */
+.radar-container {
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* Progress Ring */
+.progress-ring {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+  .tab-panel {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-nav {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .nav-tab {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+  .tab-panel {
+    padding: 16px;
+  }
+}
+
+/* Animation Classes */
+.fade-in {
+  opacity: 0;
+  transform: translateY(15px);
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.fade-in-delay-1 { animation-delay: 0.1s; }
+.fade-in-delay-2 { animation-delay: 0.2s; }
+.fade-in-delay-3 { animation-delay: 0.3s; }
+.fade-in-delay-4 { animation-delay: 0.4s; }
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Liquid Shimmer Effect */
+.liquid-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  animation: shimmer 6s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%) rotate(30deg); }
+  100% { transform: translateX(100%) rotate(30deg); }
+}
+
+/* Floating Elements */
+.float-element {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.08;
+}
+
+.float-element:nth-child(1) {
+  width: 80px;
+  height: 80px;
+  background: var(--accent-cyan);
+  top: 10%;
+  right: 5%;
+  animation: float 8s ease-in-out infinite;
+}
+
+.float-element:nth-child(2) {
+  width: 60px;
+  height: 60px;
+  background: var(--accent-purple);
+  bottom: 15%;
+  left: 8%;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(10deg); }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-canvas">
+  <div class="bg-orb"></div>
+  <div class="bg-orb"></div>
+  <div class="bg-orb"></div>
+</div>
+<div class="bg-grid"></div>
+
+<div class="app-container">
+  <nav class="top-nav">
+    <div class="nav-logo">
+      <div class="logo-icon">R</div>
+      RESUME AUDIT
+    </div>
+    
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab(0)">
+        <span class="tab-num">01</span>第一印象与初步诊断
+      </button>
+      <button class="nav-tab" onclick="switchTab(1)">
+        <span class="tab-num">02</span>地毯式深度审计
+      </button>
+      <button class="nav-tab" onclick="switchTab(2)">
+        <span class="tab-num">03</span>战略性修改蓝图
+      </button>
+      <button class="nav-tab" onclick="switchTab(3)">
+        <span class="tab-num">04</span>修改后的简历范本
+      </button>
+      <button class="nav-tab" onclick="switchTab(4)">
+        <span class="tab-num">05</span>最终裁决与行动清单
+      </button>
+    </div>
+    
+    <div class="nav-status">
+      <div class="status-dot"></div>
+      <span>AI 分析完成</span>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <!-- Tab 0: Step 1 -->
+    <div class="tab-panel active" id="tab-0">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      
+      <div class="section-header fade-in">
+        <div class="section-step">Step 01</div>
+        <h2 class="section-title">第一印象与初步诊断</h2>
+      </div>
+
+      <div class="dashboard-grid fade-in fade-in-delay-1">
+        <div class="metric-card">
+          <div class="metric-value">95</div>
+          <div class="metric-label">学术背景评分</div>
+          <div class="metric-bar"><div class="metric-bar-fill"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">88</div>
+          <div class="metric-label">技术栈匹配度</div>
+          <div class="metric-bar"><div class="metric-bar-fill"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">62</div>
+          <div class="metric-label">项目推进能力</div>
+          <div class="metric-bar"><div class="metric-bar-fill"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">45</div>
+          <div class="metric-label">软技能展示</div>
+          <div class="metric-bar"><div class="metric-bar-fill"></div></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="liquid-card liquid-border fade-in fade-in-delay-2">
+          <h3 style="font-size: 1.1rem; margin-bottom: 14px; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">🎯</span> 目标定位判断
+          </h3>
+          <p style="color: var(--text-secondary); line-height: 1.8;">基于你的简历，你是一名极其优秀的应届本科生，目标岗位是AI/算法/数据科学相关的研究或应用开发岗。你的学术背景（专业第一、高绩点）、科研项目（顶会/顶刊论文、专利）和竞赛奖项（数模国奖）构成了非常强大的"硬通货"。结合你提供的JD，你的定位是具备强大技术落地和项目推进潜力的AI算法人才。</p>
+        </div>
+
+        <div class="liquid-card fade-in fade-in-delay-3" style="border-left: 4px solid var(--accent-green);">
+          <h3 style="font-size: 1.1rem; margin-bottom: 14px; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">⚡</span> 30秒定论
+          </h3>
+          <p style="color: var(--text-secondary); font-size: 1rem; line-height: 1.8;"><span class="highlight-green">留下深入研究。</span>你的学术和科研履历在应届生中属于顶尖水平，足以让你通过任何公司的简历筛选。然而，你的简历在"从研究者到工程师/项目推进者"的叙事转换上存在明显短板，这可能会影响你在业务团队面试中的评价。</p>
+        </div>
+      </div>
+
+      <!-- Radar Chart SVG -->
+      <div class="liquid-card fade-in fade-in-delay-4" style="margin-top: 24px;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 20px; color: var(--text-primary);">能力维度雷达图</h3>
+        <div style="display: flex; justify-content: center;">
+          <svg width="320" height="320" viewBox="0 0 320 320">
+            <!-- Background grid -->
+            <polygon points="160,40 260,100 260,220 160,280 60,220 60,100" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+            <polygon points="160,70 235,115 235,205 160,250 85,205 85,115" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+            <polygon points="160,100 210,130 210,190 160,220 110,190 110,130" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+            <polygon points="160,130 185,145 185,175 160,190 135,175 135,145" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+            
+            <!-- Axis lines -->
+            <line x1="160" y1="160" x2="160" y2="40" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            <line x1="160" y1="160" x2="260" y2="100" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            <line x1="160" y1="160" x2="260" y2="220" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            <line x1="160" y1="160" x2="160" y2="280" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            <line x1="160" y1="160" x2="60" y2="220" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            <line x1="160" y1="160" x2="60" y2="100" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+            
+            <!-- Data polygon -->
+            <polygon points="160,52 240,108 220,200 160,250 100,200 90,115" fill="rgba(14, 165, 233, 0.15)" stroke="var(--accent-cyan)" stroke-width="2"/>
+            
+            <!-- Data points -->
+            <circle cx="160" cy="52" r="4" fill="var(--accent-cyan)"/>
+            <circle cx="240" cy="108" r="4" fill="var(--accent-green)"/>
+            <circle cx="220" cy="200" r="4" fill="var(--accent-orange)"/>
+            <circle cx="160" cy="250" r="4" fill="var(--accent-purple)"/>
+            <circle cx="100" cy="200" r="4" fill="var(--accent-pink)"/>
+            <circle cx="90" cy="115" r="4" fill="var(--accent-red)"/>
+            
+            <!-- Labels -->
+            <text x="160" y="28" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="600">学术背景</text>
+            <text x="275" y="100" text-anchor="start" font-size="11" fill="var(--text-secondary)" font-weight="600">技术匹配</text>
+            <text x="275" y="230" text-anchor="start" font-size="11" fill="var(--text-secondary)" font-weight="600">项目推进</text>
+            <text x="160" y="300" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="600">软技能</text>
+            <text x="45" y="230" text-anchor="end" font-size="11" fill="var(--text-secondary)" font-weight="600">一致性</text>
+            <text x="45" y="100" text-anchor="end" font-size="11" fill="var(--text-secondary)" font-weight="600">内容精炼</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 1: Step 2 -->
+    <div class="tab-panel" id="tab-1">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      
+      <div class="section-header fade-in">
+        <div class="section-step">Step 02</div>
+        <h2 class="section-title">地毯式深度审计与指导</h2>
+        <p style="color: var(--text-secondary); margin-top: 6px; font-size: 0.95rem;">严格遵循"批判-解析-建议"三位一体模型对你的简历进行审计。</p>
+      </div>
+
+      <div class="subsection fade-in fade-in-delay-1">
+        <h3 class="subsection-title">A. 整体审计</h3>
+
+        <div class="liquid-card fade-item">
+          <div class="audit-item">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>职业故事线</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 10px;">简历呈现了清晰的"学术研究者"路径，但实习经历（税友）的描述过于技术化，与"项目推进"、"协调沟通"的JD要求关联较弱。从顶级科研到企业实习的转变逻辑未被阐明。</p>
+            <div class="audit-impact">
+              <span class="audit-impact-label">🤔 负面影响</span>
+              招聘官会看到一位优秀的"学生研究员"，但不确定你是否能快速适应企业快节奏、跨团队协作的项目环境。你可能会被贴上"只适合研究院"的标签。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              在个人摘要或实习经历中，主动构建一个"研究驱动，落地为本"的故事线。例如："在顶尖学术研究中锤炼了扎实的AI算法与问题建模能力，并渴望在真实的商业场景中，将前沿技术转化为可落地的产品功能，协调资源推动项目产生实际业务价值。"
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-card fade-item">
+          <div class="audit-item">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>关键词与技术栈匹配度</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 10px;">简历技术关键词（PCMCI, Mamba, LORA, RAG）非常前沿且专业，与AI算法岗高度匹配。但JD中要求的"项目推进"、"协调跨团队"、"AI辅助工具"等软技能关键词几乎完全缺失。</p>
+            <div class="audit-impact">
+              <span class="audit-impact-label">🤔 负面影响</span>
+              对于强调"协调推进"的岗位，你的简历看起来像一份纯技术报告，无法证明你具备所需的软技能，可能导致在后续面试中被重点拷问。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              必须在实习和项目经历中，有意识地植入能体现"推进"、"协调"、"沟通"的动词和成果。将"协助开发"改为"主导/负责了XX模块的开发，并与前后端、测试团队协作，确保按期上线"。
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-card fade-item" style="border-color: rgba(239, 68, 68, 0.3);">
+          <div class="audit-item">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>一致性检查</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 10px;">时间线上存在一处明显矛盾。你的实习时间为"2025.04-2025.08"，而当前时间是2026年4月。这是一段未来的实习经历。</p>
+            <div class="audit-impact" style="background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2);">
+              <span class="audit-impact-label" style="color: var(--accent-red);">🤔 负面影响</span>
+              这会立即引发对简历真实性的严重质疑，是足以让招聘官直接关闭简历的"致命伤"。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              请立即核实并修正所有时间信息。如果这是笔误，请更正为正确的时间段（例如2024.04-2024.08）。确保所有日期逻辑正确。
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-card fade-item">
+          <div class="audit-item">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>无效内容过滤</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 10px;">整体项目质量很高，没有"玩具项目"。但"获奖情况"罗列了6个竞赛奖项，略显堆砌。</p>
+            <div class="audit-impact">
+              <span class="audit-impact-label">🤔 负面影响</span>
+              过多的同类奖项罗列会稀释你的核心优势，让人感觉你在"凑篇幅"。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              保留最高级别的2-3个奖项（如美赛M奖、泰迪杯一等奖），其余可简化为"获得多项国家级数学建模与数据挖掘竞赛奖项"。把空间留给更重要的项目描述。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection fade-in fade-in-delay-2">
+        <h3 class="subsection-title">B. 模块化审计</h3>
+
+        <div class="liquid-card fade-item" style="margin-bottom: 24px;">
+          <h3 style="font-size: 1.05rem; margin-bottom: 14px; color: var(--accent-cyan);">[ ] 个人摘要/简介</h3>
+          <div class="audit-item" style="border-left: none; padding-left: 0;">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>问题：简历缺失"个人摘要"部分。这是一个严重的战略失误。</span>
+            </div>
+            <div class="audit-impact">
+              <span class="audit-impact-label">🤔 负面影响</span>
+              招聘官需要自己从大量信息中总结你的核心卖点。在快节奏的筛选中，你可能因为"没有一眼看到亮点"而被错过，或者被错误归类。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              在简历最顶部增加一个3行以内的个人摘要。公式：[你的定位] + [最硬核的学术/技术标签] + [与目标岗位相关的核心能力/经验]。<br><br>
+              <strong style="color: var(--accent-green);">示例：</strong>"杭州电子科技大学智能科学与技术专业排名第1的应届毕业生，拥有顶会/顶刊论文发表及发明专利授权。在深度学习、时间序列预测、计算机视觉及多模态大模型领域具备扎实的研究与工程落地经验，并具备在商业项目中协调推进AI功能上线的实践经验。"
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-card fade-item">
+          <h3 style="font-size: 1.05rem; margin-bottom: 20px; color: var(--accent-cyan);">[ ] 工作/项目经历</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">我们将运用清单对每段经历进行拷问。</p>
+
+          <div class="timeline">
+            <div class="timeline-item">
+              <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--accent-purple);">1. 税友软件集团实习 - NLP/大模型算法工程师</h4>
+              <div class="audit-item" style="border-left: none; padding-left: 0;">
+                <div class="audit-question">
+                  <span class="audit-icon">❓</span>
+                  <span>叙事框架与"所以呢？"</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 10px;">描述是任务清单（"开发优化..."、"协助开发..."、"负责..."），缺乏成果和价值体现。例如，"提升多源数据的统一识别与适配能力"——所以呢？带来了什么好处？</p>
+                <div class="audit-impact">
+                  <span class="audit-impact-label">🤔 负面影响</span>
+                  这让你看起来像一个被动的任务执行者，而非能主动创造价值的贡献者。完全无法体现JD要求的"项目推进"能力。
+                </div>
+                <div class="audit-suggestion">
+                  <span class="audit-suggestion-label">💡 建议</span>
+                  运用STAR模型和量化思维重写。<br>
+                  <div class="comparison-grid">
+                    <div class="comparison-item before">
+                      <span class="comparison-label">修改前</span>
+                      "开发并优化基于华为云OCR的银行回单识别服务...提升多源数据的统一识别与适配能力。"
+                    </div>
+                    <div class="comparison-item after">
+                      <span class="comparison-label">修改后</span>
+                      "主导了银行回单自动化识别系统的优化项目。通过引入NLP实体对齐技术，设计了一套通用结构化处理方案，将回单字段识别准确率从X%提升至Y%，并将新银行格式的适配开发周期从3人日缩短至0.5人日，显著提升了财务处理效率。"
+                    </div>
+                  </div>
+                  <div class="comparison-grid" style="margin-top: 10px;">
+                    <div class="comparison-item before">
+                      <span class="comparison-label">修改前</span>
+                      "协助开发税务AI助手'税友小二'，优化RAG检索模块..."
+                    </div>
+                    <div class="comparison-item after">
+                      <span class="comparison-label">修改后</span>
+                      "负责税务AI助手核心RAG检索模块的迭代。通过结合MonkeyOCR与Prompt工程优化文档切片策略，将相关税务政策条文的召回准确率提升了Z%，使AI助手的首次回答准确率获得显著改善，并与产品、前端团队紧密协作，确保了该功能在V1.2版本的顺利上线。"
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--accent-purple);">2. 光伏发电预测项目（负责人）</h4>
+              <div class="audit-item" style="border-left: none; padding-left: 0;">
+                <div class="audit-question">
+                  <span class="audit-icon">❓</span>
+                  <span>技术洞察与决策</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 10px;">描述提到了"提出基于PCMCI的特征因果权重机制"、"构建混合集成学习模型"，但未体现你作为负责人在技术选型、方案决策中的思考和权衡。</p>
+                <div class="audit-impact">
+                  <span class="audit-impact-label">🤔 负面影响</span>
+                  削弱了你作为"负责人"的领导力和技术判断力，听起来更像是一个方案的实现者。
+                </div>
+                <div class="audit-suggestion">
+                  <span class="audit-suggestion-label">💡 建议</span>
+                  增加一两个体现代入感和决策点的描述。<br><br>
+                  <strong style="color: var(--accent-green);">示例补充：</strong>"在模型选型阶段，对比了纯Transformer与CNN+RNN混合架构的优劣。针对光伏数据兼具长周期趋势与短期扰动的特点，我主导决策采用后者并进行定制化改进（如引入GAF-SE-ResNet50捕捉周期结构），最终在保证精度的同时降低了模型训练成本。"
+                </div>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--accent-purple);">3. 带钢表面缺陷检测项目（核心成员）</h4>
+              <div class="audit-item" style="border-left: none; padding-left: 0;">
+                <div class="audit-question">
+                  <span class="audit-icon">❓</span>
+                  <span>隐性软技能展示</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 10px;">"分析...提出...推动...承担..."这些动词用得很好，体现了主动性和ownership。这是亮点，可以加强。</p>
+                <div class="audit-suggestion">
+                  <span class="audit-suggestion-label">💡 建议</span>
+                  可以进一步明确你的"推动"产生了什么团队效果。例如："提出的工业适应性改进思路被团队采纳，并主导了该模块的代码实现与实验验证，最终推动整体方案落地。"
+                </div>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--accent-purple);">4. 儿童神母病理诊断项目（核心成员）</h4>
+              <div class="audit-item" style="border-left: none; padding-left: 0;">
+                <div class="audit-question">
+                  <span class="audit-icon">❓</span>
+                  <span>影响力的证明</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 10px;">"F1指标上实现6~9%的提升"——这是一个很好的量化指标！但缺少业务层面的价值解读。</p>
+                <div class="audit-suggestion">
+                  <span class="audit-suggestion-label">💡 建议</span>
+                  为这个技术指标加上业务价值的"帽子"。"在数据稀缺的医疗场景下，通过创新性的多模态融合框架，将神母细胞瘤亚型分类的F1分数提升了6-9个百分点，为后续辅助医生诊断、减少误判提供了更可靠的技术原型。"
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-card fade-item" style="margin-top: 20px;">
+          <h3 style="font-size: 1.05rem; margin-bottom: 14px; color: var(--accent-cyan);">[ ] 技术技能</h3>
+          <div class="audit-item" style="border-left: none; padding-left: 0;">
+            <div class="audit-question">
+              <span class="audit-icon">❓</span>
+              <span>技术前瞻性与学习能力</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 10px;">简历中充满了最前沿的AI技术（Mamba, LORA, VLM），这本身就体现了极强的学习能力。但未明确呼应JD中"熟练掌握AI辅助工具"的要求。</p>
+            <div class="audit-impact">
+              <span class="audit-impact-label">🤔 负面影响</span>
+              可能会被误认为你只关注底层模型，不善于利用工具提效。
+            </div>
+            <div class="audit-suggestion">
+              <span class="audit-suggestion-label">💡 建议</span>
+              在技能部分或实习经历中，明确加入对AI辅助工具的使用。<br><br>
+              <strong style="color: var(--accent-green);">示例：</strong>"熟练使用ChatGPT/GitHub Copilot等AI编程助手进行代码构思、调试和文档生成，提升开发效率。" 或在实习描述中加入："在开发过程中，积极利用AI代码生成工具，将部分重复性代码的编写效率提升了约30%。"
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Step 3 -->
+    <div class="tab-panel" id="tab-2">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      
+      <div class="section-header fade-in">
+        <div class="section-step">Step 03</div>
+        <h2 class="section-title">战略性修改蓝图</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="liquid-card liquid-border fade-in fade-in-delay-1">
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">🛠️</span> 影响力叙事工具箱
+            </h3>
+            <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.95rem;">你已经有了很好的基础，现在需要从"研究者叙事"转向"工程师/推进者叙事"。</p>
+            
+            <div class="formula-box">
+              <strong>针对JD的黄金公式：</strong>"为达成[业务目标，如'提升回单处理效率']，我[主导/协调了XX行动，并解决了XX技术难点]，通过与[协作团队，如产品、测试]紧密沟通，最终[带来了可量化的业务/技术成果]，并推动了项目在[时间点]成功上线。"
+            </div>
+
+            <h4 style="margin: 20px 0 12px; color: var(--text-primary); font-size: 0.95rem;">"修改前 vs 修改后"对比示例：</h4>
+            <div class="comparison-grid">
+              <div class="comparison-item before">
+                <span class="comparison-label">前</span>
+                "协助开发税务AI助手'税友小二'，优化RAG检索模块以提升内容召回准确性。"
+              </div>
+              <div class="comparison-item after">
+                <span class="comparison-label">后</span>
+                "主导税务AI助手RAG模块的精准化升级项目。为提升问答准确性，我分析了现有召回瓶颈，提出了结合专用OCR与Prompt工程的切片优化方案。协调数据标注团队获取测试集，推动方案在两周内完成开发与AB测试，最终将关键政策条文的召回准确率提升15%，并确保该优化随季度版本稳定发布。"
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="liquid-card fade-in fade-in-delay-2">
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">💡</span> 挖掘隐藏亮点的启发式提问
+            </h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 14px 0; border-bottom: 1px solid rgba(0,0,0,0.05); color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                <span style="color: var(--accent-cyan); margin-right: 8px; font-weight: 700;">Q1</span>
+                在税友的实习中，你优化的RAG模块，上线后用户（可能是内部客服或纳税人）的反馈有什么积极变化？有否减少人工介入的次数？
+              </li>
+              <li style="padding: 14px 0; border-bottom: 1px solid rgba(0,0,0,0.05); color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                <span style="color: var(--accent-cyan); margin-right: 8px; font-weight: 700;">Q2</span>
+                作为项目负责人，你是如何分配任务、组织会议、跟踪进度的？有没有遇到组员意见分歧，你是如何协调解决的？
+              </li>
+              <li style="padding: 14px 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                <span style="color: var(--accent-cyan); margin-right: 8px; font-weight: 700;">Q3</span>
+                在科研项目中，除了发表论文，你的算法或代码有没有被其他同学或后续项目复用？这体现了你的工作产生了超越项目本身的影响。
+              </li>
+            </ul>
+          </div>
+
+          <div class="liquid-card fade-in fade-in-delay-3" style="margin-top: 20px;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">📊</span> 影响力思维训练
+            </h3>
+            <p style="color: var(--text-secondary); margin-bottom: 14px; font-size: 0.9rem;">你已经会量化技术指标（RMSE, F1）。现在需要为这些技术指标赋予业务意义。</p>
+            
+            <div style="padding: 18px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 10px; margin-bottom: 14px;">
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px;"><strong style="color: var(--accent-cyan);">思考路径：</strong></p>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">"F1提升6-9%" → 这在医疗诊断中意味着什么？ → "可能意味着对某种易混淆亚型的诊断错误率降低了XX%" → "这能为临床医生提供更有价值的参考，潜在降低医疗风险"。</p>
+            </div>
+            
+            <p style="color: var(--accent-green); font-weight: 700; font-size: 0.9rem;">行动：为你每一个项目的技术成果，都尝试用一句话说明它的"外在价值"。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Step 4 -->
+    <div class="tab-panel" id="tab-3">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      
+      <div class="section-header fade-in">
+        <div class="section-step">Step 04</div>
+        <h2 class="section-title">重构与展示：修改后的简历范本</h2>
+      </div>
+
+      <div class="resume-template fade-in fade-in-delay-1">
+        <div class="resume-header">
+          <h2 class="resume-name">姓名 | 英文或拼音（示例）</h2>
+          <p class="resume-contact">联系电话: 13758043472 | 电子邮箱: lichenlei@hdu.edu.cn | 出生年月: 2003.11</p>
+        </div>
+
+        <div class="resume-section">
+          <h3 class="resume-section-title">个人摘要</h3>
+          <p class="resume-item-content">杭州电子科技大学智能科学与技术专业排名第1（1/685）的应届毕业生，拥有SCI一区TOP期刊论文与CCF-C会议论文发表经历，以及国家发明专利授权。在时间序列预测、计算机视觉及多模态大模型等AI领域具备扎实的研究与算法实现能力，并拥有在大型企业将AI技术落地、协调推进项目上线的实践经验，致力于将前沿算法转化为实际业务价值。</p>
+        </div>
+
+        <div class="resume-section">
+          <h3 class="resume-section-title">教育背景</h3>
+          <div class="resume-item">
+            <div class="resume-item-title">杭州电子科技大学 | 自动化学院（人工智能学院） | 智能科学与技术专业</div>
+            <div class="resume-item-meta">2022.09 - 2026.06（预计）</div>
+            <div class="resume-item-content">
+              - 学分绩点: 4.48/5.00 | 推免排名: 1/685<br>
+              - 英语能力: CET-4 (550分)、CET-6 (516分)<br>
+              - 核心课程: Python算法设计(A)、机器学习(A)、深度学习(A)、电路与电子学(A)
+            </div>
+          </div>
+        </div>
+
+        <div class="resume-section">
+          <h3 class="resume-section-title">工作经历</h3>
+          <div class="resume-item">
+            <div class="resume-item-title">税友软件集团股份有限公司 (大型财税数字服务企业) | NLP-大模型算法工程师实习</div>
+            <div class="resume-item-meta">[请修正为正确的实习时间，例如：2024.04 - 2024.08]</div>
+            <div class="resume-item-content">
+              - <strong>银行回单智能识别项目</strong>：主导回单自动化处理系统的优化，通过设计融合NLP实体对齐的通用结构化方案，将字段识别准确率提升至[量化指标，例如：98.5%]，并将新银行格式的适配开发周期缩短[量化指标，例如：80%]，显著提升财务运营效率。<br><br>
+              - <strong>税务AI助手"税友小二"RAG模块升级</strong>：负责核心检索模块的精准化迭代。通过优化文档切片与Prompt工程，将关键政策条文召回准确率提升[量化指标，例如：15%]，有效提升了AI助手的首次回答满意度。全程与产品、前端及测试团队协作，确保功能按期上线。<br><br>
+              - <strong>AI工具提效</strong>：在日常开发中积极使用ChatGPT/Copilot等工具进行代码构思与生成，提升[量化指标，例如：约30%]的基础代码开发效率。
+            </div>
+          </div>
+        </div>
+
+        <div class="resume-section">
+          <h3 class="resume-section-title">科研与项目经历</h3>
+          
+          <div class="resume-item">
+            <div class="resume-item-title">基于深度学习的光伏发电日前功率预测 | 项目负责人</div>
+            <div class="resume-item-meta">2023.12 - 2024.12</div>
+            <div class="resume-item-content">
+              - 聚焦光伏功率预测以服务电网调度，提出融合因果推断与多尺度特征融合的混合模型。作为负责人，主导技术路线规划，在模型选型中权衡不同架构优劣，决策采用定制化的CNN+RNN混合模型以平衡精度与成本。<br><br>
+              - <strong>成果</strong>：所提方法在跨站点场景下RMSE降低7.5%，R²提升2.4%；以第一作者授权国家发明专利1项，并以第一作者在SCI一区TOP期刊《Renewable Energy》(IF=9.1)发表论文1篇。
+            </div>
+          </div>
+
+          <div class="resume-item">
+            <div class="resume-item-title">基于Mamba的带钢表面缺陷轻量化检测 | 核心成员 (国家级大创项目)</div>
+            <div class="resume-item-meta">2024.06 - 2025.06</div>
+            <div class="resume-item-content">
+              - 针对工业实时检测需求，分析原始Mamba架构局限，提出并推动实现了局部-全局交互的并行Mamba编码器改进方案，以弥补其空间建模不足，本人主导了该核心模块的实现与验证。<br><br>
+              - <strong>成果</strong>：模型在精度与速度间取得优越平衡；以第二作者身份投稿论文被CCF-C类会议PRCV 2025接收（评审得分4/5）。
+            </div>
+          </div>
+
+          <div class="resume-item">
+            <div class="resume-item-title">VLM辅助的儿童神母细胞瘤病理诊断 | 核心成员 (与浙大儿院合作)</div>
+            <div class="resume-item-meta">2024.07 - 2025.03</div>
+            <div class="resume-item-content">
+              - 在少样本医疗数据场景下，参与提出利用微调后的VLM生成文本描述以增强图像特征的创新思路，并探索多模态融合策略。<br><br>
+              - <strong>成果</strong>：构建的分类框架F1分数较基线模型提升6-9%，为辅助诊断提供了新思路；相关论文已投稿至期刊《Computer Methods and Programs in Biomedicine》(IF=4.9)，专利已公开。
+            </div>
+          </div>
+        </div>
+
+        <div class="resume-section">
+          <h3 class="resume-section-title">获奖情况</h3>
+          <div class="resume-item-content">
+            - 浙江省政府奖学金、专业一等奖学金、优秀共青团员<br>
+            - （国际级）美国大学生数学建模竞赛国际一等奖（M奖）<br>
+            - （国家级）泰迪杯数据挖掘挑战赛一等奖<br>
+            - （国家级）Mathorcup高校数学建模挑战赛二等奖<br>
+            - [其他奖项可酌情精简列出]
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Step 5 -->
+    <div class="tab-panel" id="tab-4">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      
+      <div class="section-header fade-in">
+        <div class="section-step">Step 05</div>
+        <h2 class="section-title">最终裁决与行动清单</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="liquid-card fade-in fade-in-delay-1">
+            <h3 style="font-size: 1.1rem; margin-bottom: 14px; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">🏆</span> 整体评价
+            </h3>
+            <p style="color: var(--text-secondary); font-size: 1rem; line-height: 1.8;">你的原始简历是一份顶尖的"学术成绩单"，但修改目标是将其转化为一份卓越的"职业能力说明书"。通过重构，我们强化了你的项目推进能力、跨团队协作意识以及技术成果的业务影响力叙事，使你不仅能打动研究院，更能征服业务部门的面试官。</p>
+          </div>
+
+          <div class="liquid-card fade-in fade-in-delay-2" style="margin-top: 20px;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--accent-pink); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span> 核心风险点
+            </h3>
+            <div style="padding: 14px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; margin-bottom: 12px;">
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 6px; line-height: 1.7;"><span class="highlight-pink">时间信息矛盾：</span>未来时间的实习经历是简历的"一票否决项"，必须立即修正。</p>
+            </div>
+            <div style="padding: 14px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 10px;">
+              <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;"><span style="color: var(--accent-orange); font-weight: 700;">价值叙事缺失：</span>原简历的实习描述未能将技术工作与业务价值、个人主动性挂钩，这是你从"学生"到"职场人"形象转变的最大障碍。</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="liquid-card fade-in fade-in-delay-3">
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">✅</span> 下一步行动清单
+            </h3>
+            <ul class="checklist">
+              <li class="checklist-item">
+                <span class="check-icon primary">1</span>
+                <div class="check-text">
+                  <span class="check-label">[首要任务]：修正与填充</span>
+                  立即修正所有时间错误，并认真思考、补充修改版简历中所有的 [量化指标] 和 [请修正...] 部分。这是让你的简历从"框架"变为"成品"的关键一步。
+                </div>
+              </li>
+              <li class="checklist-item">
+                <span class="check-icon primary">2</span>
+                <div class="check-text">
+                  <span class="check-label">[第二任务]：故事演练</span>
+                  针对税友的实习经历，按照我们提供的"针对JD的黄金公式"，准备一个2分钟的口头陈述，重点突出你"协调推进"和"产生结果"的过程。
+                </div>
+              </li>
+              <li class="checklist-item">
+                <span class="check-icon primary">3</span>
+                <div class="check-text">
+                  <span class="check-label">[长期建议]：建立价值记录本</span>
+                  在未来的学习和工作中，每完成一项任务，都问自己三个问题：1）我的工作为谁解决了什么问题？2）如何证明它有效？（数据或反馈）3）我在这个过程中展现了哪些超越编码的能力？（沟通、协调、决策）。持续记录，这将成为你未来简历取之不尽的宝藏。
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function switchTab(index) {
+  // Update tabs
+  document.querySelectorAll('.nav-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === index);
+  });
+  
+  // Update panels
+  document.querySelectorAll('.tab-panel').forEach((panel, i) => {
+    panel.classList.toggle('active', i === index);
+  });
+}
+
+// Add hover liquid effect to cards
+document.querySelectorAll('.liquid-card').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    card.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.6))`;
+  });
+  
+  card.addEventListener('mouseleave', () => {
+    card.style.background = 'var(--glass-bg)';
+  });
+});
+
+// Animate metric bars on load
+setTimeout(() => {
+  document.querySelectorAll('.metric-bar-fill').forEach(bar => {
+    bar.style.width = bar.style.width;
+  });
+}, 300);
+</script>
+</body>
+</html>
+

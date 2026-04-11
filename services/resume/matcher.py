@@ -992,7 +992,11 @@ def _derive_candidate_name(resume):
         return full_name
     email = personal.get("email") or ""
     if "@" in email:
-        return email.split("@", 1)[0]
+        local = email.split("@", 1)[0].strip()
+        # 邮箱 @ 前多为登录名（如 sime、test01），不宜当正式姓名用在「某某，已提取…」里
+        if local and re.match(r"^[a-z]+$", local) and len(local) <= 5:
+            return "候选人"
+        return local or "候选人"
     return "候选人"
 
 def _build_resume_overview(resume):
@@ -1400,6 +1404,112 @@ def build_matcher_state(structured_resume, structured_job, analysis_markdown, jo
     }
 
 
+def build_fallback_resume_highlight_deck(profile, matcher, analysis_mode="resume_review"):
+    """
+    当亮点 JSON 提炼失败时的规则兜底：仍保持「结论—证据—风险—行动」四层结构，
+    避免前台空白。字段与 LLM 输出对齐，供 server 归一化。
+    """
+    profile = profile if isinstance(profile, dict) else {}
+    matcher = matcher if isinstance(matcher, dict) else {}
+    mode = str(analysis_mode or "").strip() or "resume_review"
+
+    summary = str(profile.get("candidate_summary") or "").strip()
+    if not summary:
+        summary = "已完成简历结构化提取与诊断，请优先关注下方「最强证据」与「关键风险」，再展开详细报告。"
+    core_conclusion = summary if len(summary) <= 520 else f"{summary[:517]}…"
+
+    identity_tag = ""
+    roles = profile.get("roles_detected") or []
+    if isinstance(roles, list) and roles:
+        r0 = roles[0] if isinstance(roles[0], dict) else {}
+        identity_tag = str(r0.get("role") or "").strip()[:32]
+
+    highlight_evidence = []
+    for ph in (profile.get("project_highlights") or [])[:2]:
+        if not isinstance(ph, dict):
+            continue
+        headline = str(ph.get("project") or ph.get("project_name") or "项目").strip() or "项目"
+        why = str(ph.get("evidence") or ph.get("impact") or "").strip()
+        if not why:
+            why = "建议用指标与独立贡献补全这条经历的「可验证结果」。"
+        highlight_evidence.append({"headline": headline[:80], "why": why[:360]})
+
+    if not highlight_evidence:
+        experiences = profile.get("experiences") or []
+        if isinstance(experiences, list) and experiences and isinstance(experiences[0], dict):
+            exp = experiences[0]
+            headline = " · ".join(
+                filter(
+                    None,
+                    [str(exp.get("company") or "").strip(), str(exp.get("job_title") or "").strip()],
+                )
+            )[:80] or "核心经历"
+            desc = exp.get("description") or []
+            line = desc[0] if isinstance(desc, list) and desc else ""
+            why = str(line).strip()[:360] or "可作为当前投递叙事的主锚点，建议补充量化结果。"
+            highlight_evidence.append({"headline": headline, "why": why})
+
+    key_risks = []
+    for u in (profile.get("uncertainty_layer") or [])[:3]:
+        if not isinstance(u, dict):
+            continue
+        item = str(u.get("item") or "").strip()
+        reason = str(u.get("reason") or "").strip()
+        if item:
+            key_risks.append(f"{item}：{reason}".strip("：") if reason else item)
+    missing_kw = matcher.get("missing_keywords") or []
+    if mode == "job_match" and isinstance(missing_kw, list) and missing_kw:
+        key_risks.append(f"与 JD 强相关的关键词尚未在简历中形成证据：例如「{missing_kw[0]}」。")
+    key_risks = [x for x in key_risks if x][:3]
+    if not key_risks:
+        key_risks = ["主线与岗位信号若不够集中，简历容易被判为「经历堆砌」而非「强匹配候选人」。"]
+
+    next_actions = []
+    if mode == "job_match" and isinstance(missing_kw, list) and missing_kw:
+        next_actions.append(f"在最强项目下增加一行与「{missing_kw[0]}」对齐的可量化成果。")
+    next_actions.extend(
+        [
+            "把一条核心经历改写成「背景—职责—动作—结果(指标)」四行，可复述口径。",
+            "删除弱相关技能/项目堆砌，把版面让给 1–2 个与目标方向强相关的证据。",
+        ]
+    )
+    next_actions = [str(x).strip() for x in next_actions if x][:3]
+
+    apply_verdict = "not_applicable"
+    apply_verdict_label = ""
+    if mode == "job_match":
+        mk = matcher.get("matched_keywords") or []
+        jk = matcher.get("job_keywords") or []
+        miss = matcher.get("missing_keywords") or []
+        jc = max(len(jk), 1)
+        mc = len(mk)
+        ratio = mc / jc
+        if ratio >= 0.42 and len(miss) <= 4:
+            apply_verdict, apply_verdict_label = "direct_ok", "可尝试投递"
+        elif ratio >= 0.22 or len(miss) <= 8:
+            apply_verdict, apply_verdict_label = "revise_first", "建议改后再投"
+        else:
+            apply_verdict, apply_verdict_label = "risky", "暂不建议硬投"
+
+    substitution_opportunities = []
+    if mode == "job_match" and isinstance(missing_kw, list):
+        for kw in missing_kw[:2]:
+            substitution_opportunities.append(
+                f"若实际做过相关工作，可把经历改写为包含「{kw}」语境的成果表述，而不是简单堆词。"
+            )
+
+    return {
+        "core_conclusion": core_conclusion,
+        "identity_tag": identity_tag,
+        "highlight_evidence": highlight_evidence,
+        "key_risks": key_risks,
+        "next_actions": next_actions,
+        "substitution_opportunities": substitution_opportunities[:2],
+        "apply_verdict": apply_verdict,
+        "apply_verdict_label": apply_verdict_label,
+    }
+
+
 __all__ = [
     "Document",
     "FLEXIBLE_MATCH_ANALYSIS_PROMPT",
@@ -1409,6 +1519,7 @@ __all__ = [
     "STRUCTURED_JOB_SCHEMA",
     "STRUCTURED_RESUME_PROMPT",
     "STRUCTURED_RESUME_SCHEMA",
+    "build_fallback_resume_highlight_deck",
     "build_matcher_state",
     "build_job_payload_from_text",
     "build_resume_text_payload",

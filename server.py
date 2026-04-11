@@ -66,9 +66,16 @@ from services.resume import (
     RESUME_REVIEW_PROMPT,
     STRUCTURED_RESUME_PROMPT,
     STRUCTURED_RESUME_SCHEMA,
+    build_fallback_resume_highlight_deck,
     build_matcher_state,
     build_job_payload_from_text,
     build_resume_text_payload,
+)
+from services.resume.diagnosis_ui import (
+    DIAGNOSIS_UI_EXTRACT_SYSTEM,
+    build_diagnosis_ui_extract_prompt,
+    diagnosis_ui_non_empty,
+    normalize_diagnosis_ui,
 )
 
 mimetypes.add_type("application/javascript", ".js")
@@ -3519,6 +3526,178 @@ def _extract_resume_profile(pdf_path, progress_callback=None, runtime_llm=None):
     raise RuntimeError("Legacy resume profile extractor is disabled. Use matcher pipeline instead.")
 
 
+RESUME_HIGHLIGHT_DECK_SYSTEM = """
+你是**资深职业规划顾问 + 技术招聘负责人视角**的合体：对用户温暖清晰，对岗位门槛判断冷静。
+任务：只阅读下方「系统信号」与「简历分析报告节选」，输出**一层**可被用户 10 秒内读完的 JSON，用于产品首屏；**禁止**输出 Markdown、代码块、注释或任何 JSON 外文字。
+
+# 输出目标（必须满足）
+- 用户应能直接回答：**我最强在哪、最大风险在哪、下一步改哪三处**；有 JD 时还应回答**现在投是否划算**。
+- **信息密度高**：每句话都要有判断或证据，不写正确的废话（如「建议优化简历」而不说改什么）。
+- **禁止**：堆砌字段名（如「structured_resume」「关键词」）；复述系统 JSON；空泛形容词（「较强」「不错」「丰富」若无证据支撑须改写为可核对表述）。
+- **称呼**：`candidate_summary` 里若出现看似邮箱昵称的英文片段（如短串、全小写），**不要**照抄为句首称呼；可改为「你的简历…」或直接以判断起句，避免「Sime，已提取…」这类观感。
+
+# 各字段细则
+
+## core_conclusion（约 140～420 字，中文）
+- **结构**：第 1～2 句给**总判断**；随后用「因为…」串起 **1～2 条**最关键依据（经历/项目/成果/匹配度），**不要**平均铺开报告里所有小节。
+- **resume_review（无 JD）**：写清三件事的压缩版——**更像哪类候选人**、**主线是否集中**、**当前最大成长瓶颈**；可自然提到 1～2 个建议探索方向，但不要写成岗位承诺。
+- **job_match（有 JD）**：**首句必须是投递态度**（用自然中文，例如「与目标岗位相比，当前简历属于…」），第二句起再写与**岗位核心门槛**（硬技能/年限/场景/成果类型）的关系；若报告认为有关键硬伤，必须在结论里点出**一个**最致命的，而不是罗列。
+
+## identity_tag（≤20 字，可空字符串）
+- 一句**画像标签**，像给人起外号但要专业：例如「工程实践驱动型」「项目强但叙事散」「转岗中·需对齐 JD 话术」。勿与 core_conclusion 完全重复。
+
+## highlight_evidence（**最多 2 条**）
+- 每条：`headline` = **可识别的经历锚点**（公司/项目名/角色，≤24 字）；`why` = **为何这条能支撑你的判断**（尽量含**可核对要素**：技术栈/职责/结果形态，避免纯形容词）。
+- 若材料不足，宁可 **1 条写深**，也不要 2 条空洞。
+
+## key_risks（**最多 3 条**）
+- 按**杀伤力**排序：优先写会导致 **简历筛不过 / 面试一追就穿 / 与 JD 核心场景不符** 的问题。
+- 每条一句，开头可用「风险：」或直接陈述；**不要**把「错别字」「格式」与「无岗位相关成果」并列——永远先写后者。
+
+## next_actions（**最多 3 条**）
+- **必须**以动词开头（「把…」「删掉…」「在…下补一行…」）。
+- 每条指向**简历上可改的一处具体位置或一类表述**，避免「提升表达能力」「多学习」等不可执行句。
+- 有 JD 时，至少 **1 条**应显式对齐 **missing_keywords 或岗位硬性要求**（用自然语言，不要机械堆词）。
+
+## substitution_opportunities（**0～2 条**，数组）
+- 仅当你判断：**能力/经历可能存在，但简历用语与岗位话术未对齐** 时填写；写清「可以把哪类经历改写成岗位听得懂的一句话」。
+- 若不存在或不确定，输出 **[]**。
+
+## apply_verdict 与 apply_verdict_label（仅 job_match 有意义）
+- `not_applicable`：analysis_mode 为 resume_review 时**必须**使用；此时 `apply_verdict_label` 为 **空字符串**。
+- `direct_ok`：核心门槛基本满足，缺的是**表达或锦上添花**，投递**可尝试**（仍可能有面试风险）。
+- `revise_first`：**有明显缺口或证据不足**，但**改简历 1～2 轮**后值得投。
+- `risky`：**硬门槛差太远**或**证据链断裂**，强投性价比低；用户应先换目标或补经历再投。
+- `apply_verdict_label`：≤12 字中文，与 verdict 一致，例如「可尝试投递」「建议改后再投」「暂不建议硬投」。
+
+# JSON Schema（键名与层级必须完全一致）
+{
+  "core_conclusion": "string",
+  "identity_tag": "string",
+  "highlight_evidence": [{"headline": "string", "why": "string"}],
+  "key_risks": ["string"],
+  "next_actions": ["string"],
+  "substitution_opportunities": ["string"],
+  "apply_verdict": "not_applicable|direct_ok|revise_first|risky",
+  "apply_verdict_label": "string"
+}
+""".strip()
+
+
+def _normalize_resume_highlight_deck(raw, profile, matcher, analysis_mode):
+    fb = build_fallback_resume_highlight_deck(profile, matcher, analysis_mode)
+    if not isinstance(raw, dict):
+        return fb
+    out = dict(fb)
+    cc = str(raw.get("core_conclusion") or "").strip()
+    if len(cc) >= 40:
+        out["core_conclusion"] = cc[:900]
+    it = str(raw.get("identity_tag") or "").strip()
+    if it:
+        out["identity_tag"] = it[:48]
+    he = raw.get("highlight_evidence")
+    cleaned_he = []
+    if isinstance(he, list):
+        for item in he[:2]:
+            if not isinstance(item, dict):
+                continue
+            hl = str(item.get("headline") or item.get("title") or "").strip()
+            why = str(item.get("why") or item.get("reason") or "").strip()
+            if hl or why:
+                cleaned_he.append({"headline": (hl or "亮点证据")[:120], "why": (why or hl)[:420]})
+    if cleaned_he:
+        out["highlight_evidence"] = cleaned_he
+    kr = raw.get("key_risks")
+    if isinstance(kr, list):
+        kr2 = [str(x).strip() for x in kr if str(x).strip()][:3]
+        if kr2:
+            out["key_risks"] = kr2
+    na = raw.get("next_actions")
+    if isinstance(na, list):
+        na2 = [str(x).strip() for x in na if str(x).strip()][:3]
+        if na2:
+            out["next_actions"] = na2
+    so = raw.get("substitution_opportunities")
+    if isinstance(so, list):
+        so2 = [str(x).strip() for x in so if str(x).strip()][:2]
+        if so2:
+            out["substitution_opportunities"] = so2
+    av = str(raw.get("apply_verdict") or "").strip()
+    if av in {"not_applicable", "direct_ok", "revise_first", "risky"}:
+        out["apply_verdict"] = av
+    if analysis_mode == "resume_review":
+        out["apply_verdict"] = "not_applicable"
+        out["apply_verdict_label"] = ""
+    lbl = str(raw.get("apply_verdict_label") or "").strip()
+    if lbl and analysis_mode == "job_match":
+        out["apply_verdict_label"] = lbl[:32]
+    return out
+
+
+def _extract_resume_highlight_deck_llm(base_url, api_key, model, matcher_state, analysis_mode):
+    profile = matcher_state.get("profile") if isinstance(matcher_state.get("profile"), dict) else {}
+    matcher = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
+    resume_ov = matcher.get("resume_overview") if isinstance(matcher.get("resume_overview"), dict) else {}
+    caps = profile.get("capability_scores") if isinstance(profile.get("capability_scores"), dict) else {}
+    cap_pairs = []
+    if caps:
+        try:
+            ranked = sorted(
+                ((str(k), int(float(v))) for k, v in caps.items() if str(k) != "matching"),
+                key=lambda x: -x[1],
+            )[:3]
+            cap_pairs = [{"dimension": k, "score": v} for k, v in ranked]
+        except (TypeError, ValueError):
+            cap_pairs = []
+
+    structured_job = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else {}
+    job_qual = structured_job.get("qualifications") if isinstance(structured_job.get("qualifications"), dict) else {}
+    company_profile = structured_job.get("company_profile") if isinstance(structured_job.get("company_profile"), dict) else {}
+
+    signals = {
+        "analysis_mode": analysis_mode,
+        "candidate_summary": str(profile.get("candidate_summary") or "")[:900],
+        "roles_detected": [
+            str(r.get("role") or "").strip()
+            for r in (profile.get("roles_detected") or [])
+            if isinstance(r, dict) and str(r.get("role") or "").strip()
+        ][:8],
+        "uncertainty_items": [
+            {"item": str(u.get("item") or "").strip(), "reason": str(u.get("reason") or "").strip()[:200]}
+            for u in (profile.get("uncertainty_layer") or [])
+            if isinstance(u, dict) and str(u.get("item") or "").strip()
+        ][:6],
+        "capability_top": cap_pairs,
+        "resume_experience_count": resume_ov.get("experience_count"),
+        "resume_project_count": resume_ov.get("project_count"),
+        "resume_skill_count": resume_ov.get("skill_count"),
+        "matched_keywords": (matcher.get("matched_keywords") or [])[:22],
+        "missing_keywords": (matcher.get("missing_keywords") or [])[:22],
+        "job_title": (matcher.get("job_overview") or {}).get("job_title") or "",
+        "job_company": str(company_profile.get("company_name") or "").strip()[:80],
+        "job_summary_snippet": str(structured_job.get("job_summary") or "").strip()[:420],
+        "job_required_snippets": [str(x).strip() for x in (job_qual.get("required") or []) if str(x).strip()][:8],
+        "job_preferred_snippets": [str(x).strip() for x in (job_qual.get("preferred") or []) if str(x).strip()][:6],
+        "recommended_directions": (matcher.get("recommended_directions") or [])[:8],
+    }
+    excerpt = str(matcher_state.get("analysis_result") or "")[:16000]
+    user_body = (
+        "请仅输出一个合法 JSON 对象，键名必须与 system 中的 Schema 完全一致，不要输出 ``` 代码围栏。\n\n"
+        "【系统已提取信号（JSON）】\n"
+        + json.dumps(signals, ensure_ascii=False)
+        + "\n\n【简历分析报告节选】\n"
+        + excerpt
+    )
+    return _call_structured_chat(
+        base_url,
+        api_key,
+        model,
+        [{"role": "user", "content": user_body}],
+        system_prompt=RESUME_HIGHLIGHT_DECK_SYSTEM,
+        max_tokens=2800,
+    )
+
+
 def _analyze_resume_matcher(storage_path, job_description, progress_callback=None, runtime_llm=None):
     def _report(stage, detail):
         if callable(progress_callback):
@@ -3602,6 +3781,49 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
         analysis_markdown=analysis_markdown,
         job_description=job_text,
     )
+    _report("highlight_deck", "正在提炼核心结论与亮点")
+    try:
+        raw_deck = _extract_resume_highlight_deck_llm(base_url, api_key, model, matcher_state, analysis_mode)
+        matcher_state["resume_highlight_deck"] = _normalize_resume_highlight_deck(
+            raw_deck,
+            matcher_state.get("profile"),
+            matcher_state.get("matcher"),
+            analysis_mode,
+        )
+    except Exception as exc:
+        app.logger.warning("resume highlight deck extraction failed: %s", exc)
+        matcher_state["resume_highlight_deck"] = build_fallback_resume_highlight_deck(
+            matcher_state.get("profile"),
+            matcher_state.get("matcher"),
+            analysis_mode,
+        )
+
+    _report("diagnosis_ui", "正在提炼深度审计结构化版面")
+    try:
+        profile_for_ui = matcher_state.get("profile") if isinstance(matcher_state.get("profile"), dict) else {}
+        basics_for_ui = profile_for_ui.get("basics") if isinstance(profile_for_ui.get("basics"), dict) else {}
+        canonical_resume_name = str(basics_for_ui.get("name") or "").strip()
+        cand_sum = str(profile_for_ui.get("candidate_summary") or "").strip()
+        user_ui = build_diagnosis_ui_extract_prompt(
+            matcher_state.get("analysis_result") or "",
+            cand_sum,
+            analysis_mode,
+            candidate_legal_name=canonical_resume_name,
+        )
+        raw_diagnosis_ui = _call_structured_chat(
+            base_url,
+            api_key,
+            model,
+            [{"role": "user", "content": user_ui}],
+            system_prompt=DIAGNOSIS_UI_EXTRACT_SYSTEM,
+            max_tokens=3800,
+        )
+        diagnosis_ui = normalize_diagnosis_ui(raw_diagnosis_ui, canonical_name=canonical_resume_name)
+        if diagnosis_ui_non_empty(diagnosis_ui):
+            matcher_state["matcher"]["diagnosis_ui"] = diagnosis_ui
+    except Exception as exc:
+        app.logger.warning("diagnosis_ui extract failed: %s", exc)
+
     analysis_meta = dict(text_payload.get("analysis_meta") or {})
     analysis_meta.update(
         {
@@ -3633,6 +3855,9 @@ def _public_resume_state(raw_state):
         "matcher": state.get("matcher") if isinstance(state.get("matcher"), dict) else {},
         "structured_resume": state.get("structured_resume") if isinstance(state.get("structured_resume"), dict) else None,
         "structured_job": state.get("structured_job") if isinstance(state.get("structured_job"), dict) else None,
+        "resume_highlight_deck": state.get("resume_highlight_deck")
+        if isinstance(state.get("resume_highlight_deck"), dict)
+        else None,
         "error_message": state.get("error_message") or "",
     }
 
@@ -3737,6 +3962,11 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_de
         resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
         resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
         resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
+        resume_state["resume_highlight_deck"] = (
+            matcher_state.get("resume_highlight_deck")
+            if isinstance(matcher_state.get("resume_highlight_deck"), dict)
+            else None
+        )
         resume_state["error_message"] = ""
         state["resume_profile"] = resume_state
         _save_user_state(username, state)
@@ -6095,6 +6325,7 @@ def api_resume_upload():
         "matcher": {},
         "structured_resume": None,
         "structured_job": None,
+        "resume_highlight_deck": None,
         "error_message": "",
     }
     _save_user_state(user["username"], state)
@@ -6144,6 +6375,11 @@ def api_resume_analyze():
     resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
     resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
     resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
+    resume_state["resume_highlight_deck"] = (
+        matcher_state.get("resume_highlight_deck")
+        if isinstance(matcher_state.get("resume_highlight_deck"), dict)
+        else None
+    )
     resume_state["error_message"] = ""
     state["resume_profile"] = resume_state
     _save_user_state(user["username"], state)
@@ -6203,6 +6439,7 @@ def api_resume_analyze_start():
     resume_state["matcher"] = {}
     resume_state["structured_resume"] = None
     resume_state["structured_job"] = None
+    resume_state["resume_highlight_deck"] = None
     resume_state["job_description"] = job_description
     meta = resume_state.get("analysis_meta") if isinstance(resume_state.get("analysis_meta"), dict) else {}
     meta.update(

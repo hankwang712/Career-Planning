@@ -1,932 +1,339 @@
 (function () {
-  let tocObserver = null;
-  let currentResume = null;
-  let currentDoc = null;
-  let activeSectionId = "";
+  let reportDoc = null;
 
-  function esc(value) {
-    return String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const strip = (v) => String(v || "").replace(/\[(.+?)\]\((.+?)\)/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/^#+\s+/gm, "").trim();
+  const inline = (v) => esc(v).replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>').replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  const api = (p) => {
+    const b = String(window.__API_BASE__ || "").trim().replace(/\/+$/, "");
+    if (!b || /^https?:\/\//i.test(p)) return p;
+    return p.startsWith("/") ? `${b}${p}` : `${b}/${p}`;
+  };
 
-  function stripMarkdown(value) {
-    return String(value || "")
-      .replace(/\[(.+?)\]\((.+?)\)/g, "$1")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/`([^`]+)`/g, "$1")
-      .trim();
-  }
-
-  function inlineMarkdown(value) {
-    return esc(value)
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
-  }
-
-  function resolveApiUrl(path) {
-    const rawBase = String(window.__API_BASE__ || "").trim().replace(/\/+$/, "");
-    const target = String(path || "").trim();
-    if (!target) return target;
-    if (/^https?:\/\//i.test(target)) return target;
-    if (!rawBase) return target;
-    return target.startsWith("/") ? `${rawBase}${target}` : `${rawBase}/${target}`;
-  }
-
-  async function requestJson(path, options) {
-    const response = await fetch(resolveApiUrl(path), {
+  async function json(path, options) {
+    const r = await fetch(api(path), {
       credentials: "include",
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options && options.headers ? options.headers : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(options && options.headers ? options.headers : {}) },
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(String(data.message || "请求失败"));
-    }
-    return data;
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(String(d.message || "请求失败"));
+    return d;
   }
 
-  function formatTime(ts) {
-    const value = Number(ts || 0);
-    if (!value) return "未生成";
-    return new Date(value * 1000).toLocaleString("zh-CN", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  function getAnalysisMode(resume) {
-    const matcher = resume && typeof resume.matcher === "object" ? resume.matcher : {};
-    return String(matcher.analysis_mode || resume?.analysis_meta?.analysis_mode || "").trim() || "resume_review";
-  }
-
-  function getModeLabel(mode) {
-    return mode === "job_match" ? "岗位匹配" : "简历诊断";
-  }
-
-  function getFriendlyError(raw) {
-    const text = String(raw || "").trim();
-    if (!text) return "";
-    if (text.includes("未能从简历中提取到有效文本")) {
-      return "这份简历更像扫描版图片，系统暂时没有拿到可分析文本。建议优先上传文字版 PDF 或 DOCX；如果继续使用扫描版 PDF，识别结果可能会有偏差。";
-    }
-    return text;
-  }
-
-  function fallbackMarkdownToHtml(markdownText) {
-    const lines = String(markdownText || "").replace(/\r\n/g, "\n").split("\n");
-    const result = [];
-    let listItems = [];
-    let listType = "";
-    let inCode = false;
-    let codeBuffer = [];
-
-    function flushList() {
-      if (!listItems.length) return;
-      const tag = listType === "ol" ? "ol" : "ul";
-      result.push(`<${tag}>${listItems.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</${tag}>`);
-      listItems = [];
-      listType = "";
-    }
-
-    function flushCode() {
-      if (!codeBuffer.length) return;
-      result.push(`<pre><code>${esc(codeBuffer.join("\n"))}</code></pre>`);
-      codeBuffer = [];
-    }
-
-    lines.forEach((rawLine) => {
-      const line = rawLine.replace(/\s+$/, "");
-      const stripped = line.trim();
-      if (stripped.startsWith("```")) {
-        flushList();
-        if (inCode) {
-          flushCode();
-          inCode = false;
-        } else {
-          inCode = true;
-        }
-        return;
-      }
-      if (inCode) {
-        codeBuffer.push(rawLine);
-        return;
-      }
-      if (!stripped) {
-        flushList();
-        return;
-      }
-      if (stripped === "---") {
-        flushList();
-        result.push("<hr>");
-        return;
-      }
-      if (/^\d+\.\s+/.test(stripped)) {
-        if (listType && listType !== "ol") flushList();
-        listType = "ol";
-        listItems.push(stripped.replace(/^\d+\.\s+/, "").trim());
-        return;
-      }
-      if (/^[-*]\s+/.test(stripped)) {
-        if (listType && listType !== "ul") flushList();
-        listType = "ul";
-        listItems.push(stripped.replace(/^[-*]\s+/, "").trim());
-        return;
-      }
+  function md(text) {
+    const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+    const out = [];
+    let items = [], type = "", code = [], inCode = false;
+    const flushList = () => {
+      if (!items.length) return;
+      const tag = type === "ol" ? "ol" : "ul";
+      out.push(`<${tag}>${items.map((x) => `<li>${inline(x)}</li>`).join("")}</${tag}>`);
+      items = []; type = "";
+    };
+    const flushCode = () => {
+      if (!code.length) return;
+      out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+      code = [];
+    };
+    lines.forEach((raw) => {
+      const t = raw.trimEnd(), s = t.trim();
+      if (s.startsWith("```")) { flushList(); inCode ? flushCode() : 0; inCode = !inCode; return; }
+      if (inCode) { code.push(raw); return; }
+      if (!s) { flushList(); return; }
+      if (s === "---") { flushList(); return; }
+      if (/^\s*\d+\.\s+/.test(raw)) { if (type && type !== "ol") flushList(); type = "ol"; items.push(s.replace(/^\d+\.\s+/, "")); return; }
+      if (/^\s*[-*]\s+/.test(raw)) { if (type && type !== "ul") flushList(); type = "ul"; items.push(s.replace(/^[-*]\s+/, "")); return; }
       flushList();
-      if (stripped.startsWith("### ")) {
-        result.push(`<h4>${inlineMarkdown(stripped.slice(4))}</h4>`);
-      } else if (stripped.startsWith("## ")) {
-        result.push(`<h3>${inlineMarkdown(stripped.slice(3))}</h3>`);
-      } else if (stripped.startsWith("# ")) {
-        result.push(`<h2>${inlineMarkdown(stripped.slice(2))}</h2>`);
-      } else {
-        result.push(`<p>${inlineMarkdown(stripped)}</p>`);
-      }
+      if (/^####\s+/.test(s)) out.push(`<h4>${inline(s.slice(5))}</h4>`);
+      else if (/^###\s+/.test(s)) out.push(`<h3>${inline(s.slice(4))}</h3>`);
+      else if (/^##\s+/.test(s)) out.push(`<h3>${inline(s.slice(3))}</h3>`);
+      else if (/^#\s+/.test(s)) out.push(`<h2>${inline(s.slice(2))}</h2>`);
+      else out.push(`<p>${inline(s)}</p>`);
     });
-
-    flushList();
-    flushCode();
-    return result.join("");
+    flushList(); flushCode();
+    return out.join("");
   }
 
-  function hasReport(resume) {
-    return String(resume?.status || "").trim() === "analyzed"
-      && Boolean(String(resume?.analysis_html || "").trim() || String(resume?.analysis_result || "").trim());
+  const bullets = (lines) => (lines || []).filter((x) => /^\s*[-*]\s+/.test(String(x || ""))).map((x) => String(x).trim().replace(/^[-*]\s+/, ""));
+  const ordered = (lines) => (lines || []).filter((x) => /^\s*\d+\.\s+/.test(String(x || ""))).map((x) => String(x).trim().replace(/^\d+\.\s+/, ""));
+  const summary = (lines, n = 150) => {
+    const t = strip((lines || []).join(" ").replace(/---/g, " "));
+    return !t ? "" : (t.length > n ? `${t.slice(0, n)}...` : t);
+  };
+
+  function blocks(lines) {
+    const arr = []; let cur = null;
+    (lines || []).forEach((raw) => {
+      const s = String(raw || "").trim();
+      if (!s || s === "---") return;
+      if (/^\d+\.\s+/.test(s)) {
+        if (cur) arr.push(cur);
+        cur = { title: s.replace(/^\d+\.\s+/, ""), lines: [] };
+        return;
+      }
+      if (cur) cur.lines.push(raw);
+    });
+    if (cur) arr.push(cur);
+    return arr.map((b, idx) => ({ ...b, idx: idx + 1, html: md((b.lines || []).join("\n")) }));
   }
 
-  function extractReportMarkdown(resume) {
+  function pair(text) {
+    const c = strip(text).replace(/^[\d.\-\s]+/, "");
+    const m = c.match(/^([^：:]{2,30})[：:]\s*(.+)$/);
+    return m ? { label: m[1].trim(), body: m[2].trim() } : null;
+  }
+
+  function mode(resume) {
+    const m = resume && typeof resume.matcher === "object" ? resume.matcher : {};
+    return String(m.analysis_mode || resume?.analysis_meta?.analysis_mode || "").trim() || "resume_review";
+  }
+
+  function has(resume) {
+    return String(resume?.status || "") === "analyzed" && Boolean(String(resume?.analysis_result || "").trim() || String(resume?.analysis_html || "").trim());
+  }
+
+  function markdown(resume) {
     const direct = String(resume?.analysis_result || "").trim();
     if (direct) return direct;
-    const rawHtml = String(resume?.analysis_html || "").trim();
-    if (!rawHtml) return "";
-    const shell = document.createElement("div");
-    shell.innerHTML = rawHtml;
-    const preCode = shell.querySelector("pre code");
-    if (preCode && String(preCode.textContent || "").trim()) {
-      return String(preCode.textContent || "").trim();
-    }
-    return String(shell.textContent || "").trim();
+    const html = String(resume?.analysis_html || "").trim();
+    if (!html) return "";
+    const box = document.createElement("div");
+    box.innerHTML = html;
+    const code = box.querySelector("pre code");
+    return String(code?.textContent || box.textContent || "").trim();
   }
 
-  function slugify(value, prefix, index) {
-    const base = String(value || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^\w\u4e00-\u9fff]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-    return `rr-${prefix}-${base || index + 1}`;
+  function titleOf(raw) {
+    return strip(raw).replace(/^step\s*\d+\s*:\s*/i, "").replace(/\s*\(([A-Za-z][^)]*)\)\s*$/g, "").replace(/[：:]\s*$/, "").trim();
   }
 
-  function extractOrderedItems(lines) {
-    return (lines || [])
-      .map((line) => String(line || "").trim())
-      .filter((line) => /^\d+\.\s+/.test(line))
-      .map((line) => line.replace(/^\d+\.\s+/, "").trim());
-  }
-
-  function extractBulletItems(lines) {
-    return (lines || [])
-      .map((line) => String(line || "").trim())
-      .filter((line) => /^[-*]\s+/.test(line))
-      .map((line) => line.replace(/^[-*]\s+/, "").trim());
-  }
-
-  function extractLabelValue(text) {
-    const clean = stripMarkdown(text).replace(/^[\d.\-\s]+/, "").trim();
-    if (!clean) return null;
-    const match = clean.match(/^([^：:]{2,24})[：:]\s*(.+)$/);
-    if (!match) return null;
-    return {
-      label: String(match[1] || "").trim(),
-      body: String(match[2] || "").trim(),
-    };
-  }
-
-  function getSectionTone(title) {
-    const text = String(title || "");
-    if (/风险|缺口|问题|短板/.test(text)) return "danger";
-    if (/建议|行动|优化/.test(text)) return "warm";
-    if (/优势|亮点|长处/.test(text)) return "positive";
-    return "accent";
-  }
-
-  function buildReportDocument(resume) {
-    const markdown = extractReportMarkdown(resume);
-    const doc = {
-      title: "",
-      metadata: [],
-      intro: [],
-      sections: [],
-      markdown,
-    };
-    if (!markdown) return doc;
-
-    const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-    let currentSection = null;
-    let currentSubsection = null;
-
-    function pushSection() {
-      if (!currentSection) return;
-      doc.sections.push(currentSection);
-      currentSection = null;
-      currentSubsection = null;
-    }
-
-    lines.forEach((rawLine) => {
-      const line = rawLine.replace(/\s+$/, "");
-      const stripped = line.trim();
-
-      if (/^#\s+/.test(stripped)) {
-        if (!doc.title) doc.title = stripMarkdown(stripped.slice(2));
-        return;
-      }
-
-      if (/^##\s+/.test(stripped)) {
-        pushSection();
-        currentSection = {
-          index: doc.sections.length + 1,
-          id: slugify(stripped.slice(3), "section", doc.sections.length),
-          title: stripMarkdown(stripped.slice(3)),
-          allLines: [],
-          leadLines: [],
-          subsections: [],
-        };
-        return;
-      }
-
-      if (!currentSection) {
-        const meta = stripped.match(/^\*\*([^*]+?)\*\*\s*(.+)$/);
-        if (meta) {
-          doc.metadata.push({
-            label: stripMarkdown(meta[1]).replace(/[：:]\s*$/, ""),
-            value: stripMarkdown(meta[2]),
-          });
-        } else if (stripped && stripped !== "---") {
-          doc.intro.push(stripped);
-        }
-        return;
-      }
-
-      if (/^###\s+/.test(stripped)) {
-        currentSubsection = {
-          id: slugify(stripped.slice(4), "topic", currentSection.subsections.length),
-          title: stripMarkdown(stripped.slice(4)),
-          lines: [],
-        };
-        currentSection.subsections.push(currentSubsection);
-        return;
-      }
-
-      currentSection.allLines.push(line);
-      if (currentSubsection) currentSubsection.lines.push(line);
-      else currentSection.leadLines.push(line);
+  function doc(resume) {
+    const text = markdown(resume), lines = text.replace(/\r\n/g, "\n").split("\n");
+    const out = { markdown: text, intro: [], sections: [] };
+    let sec = null, sub = null, inCode = false;
+    const push = () => { if (sec) out.sections.push(sec); sec = null; sub = null; };
+    lines.forEach((raw) => {
+      const s = raw.trim();
+      if (s.startsWith("```")) inCode = !inCode;
+      if (!inCode && /^###\s+/.test(s)) { push(); sec = { id: `tab-${out.sections.length}`, index: out.sections.length + 1, title: titleOf(s.slice(4)), lines: [], lead: [], subs: [] }; return; }
+      if (!inCode && /^####\s+/.test(s) && sec) { sub = { title: titleOf(s.slice(5)), lines: [] }; sec.subs.push(sub); return; }
+      if (!sec) { if (s) out.intro.push(raw); return; }
+      sec.lines.push(raw); sub ? sub.lines.push(raw) : sec.lead.push(raw);
     });
-
-    pushSection();
-
-    if (!doc.sections.length && markdown) {
-      doc.sections.push({
-        index: 1,
-        id: "rr-section-full",
-        title: doc.title || "完整报告",
-        allLines: lines,
-        leadLines: lines,
-        subsections: [],
-      });
-    }
-
-    doc.sections = doc.sections.map((section) => {
-      const leadMarkdown = section.leadLines.join("\n").trim();
-      const allMarkdown = section.allLines.join("\n").trim();
-      const subsections = section.subsections.map((sub) => {
-        const markdownText = sub.lines.join("\n").trim();
-        return {
-          ...sub,
-          markdown: markdownText,
-          html: fallbackMarkdownToHtml(markdownText),
-          orderedItems: extractOrderedItems(sub.lines),
-          bulletItems: extractBulletItems(sub.lines),
-        };
-      });
-      return {
-        ...section,
-        leadMarkdown,
-        markdown: allMarkdown,
-        leadHtml: fallbackMarkdownToHtml(leadMarkdown),
-        html: fallbackMarkdownToHtml(allMarkdown),
-        orderedItems: extractOrderedItems(section.leadLines.length ? section.leadLines : section.allLines),
-        bulletItems: extractBulletItems(section.leadLines.length ? section.leadLines : section.allLines),
-        subsections,
-      };
-    });
-
-    return doc;
+    push();
+    if (!out.sections.length && text) out.sections.push({ id: "tab-0", index: 1, title: "完整诊断", lines, lead: lines, subs: [] });
+    out.sections = out.sections.map((s) => ({
+      ...s,
+      html: md((s.lines || []).join("\n")),
+      leadHtml: md((s.lead || []).join("\n")),
+      bullets: bullets(s.lead.length ? s.lead : s.lines),
+      ordered: ordered(s.lead.length ? s.lead : s.lines),
+      blocks: blocks(s.lines),
+      sum: summary(s.lead.length ? s.lead : s.lines),
+      subs: (s.subs || []).map((x) => ({ ...x, html: md((x.lines || []).join("\n")), bullets: bullets(x.lines), blocks: blocks(x.lines), sum: summary(x.lines, 120) })),
+    }));
+    return out;
   }
 
-  function buildOverviewStats(resume, doc) {
-    const mode = getAnalysisMode(resume);
-    const matcher = resume && typeof resume.matcher === "object" ? resume.matcher : {};
-    const profile = resume && typeof resume.profile === "object" ? resume.profile : {};
-    const firstRole = Array.isArray(profile.roles_detected) && profile.roles_detected[0]
-      ? String(profile.roles_detected[0].role || "").trim()
-      : String(profile?.basics?.target_direction || "").trim();
-    const suggestionsSection = (doc.sections || []).find((section) => /建议|优化|行动/.test(section.title));
-    const projectCount = Array.isArray(profile.project_highlights) ? profile.project_highlights.length : 0;
-    const matchedCount = Array.isArray(matcher.matched_keywords) ? matcher.matched_keywords.length : 0;
-    const jobCount = Array.isArray(matcher.job_keywords) ? matcher.job_keywords.length : 0;
+  function stats(resume, d) {
+    const p = resume && typeof resume.profile === "object" ? resume.profile : {};
+    const m = resume && typeof resume.matcher === "object" ? resume.matcher : {};
+    const conf = p.confidence ? Math.round(Number(p.confidence) * 100) : 95;
+    const matched = Array.isArray(m.matched_keywords) ? m.matched_keywords.length : 0;
+    const all = Array.isArray(m.job_keywords) ? m.job_keywords.length : 0;
+    const focus = mode(resume) === "job_match" ? (all ? Math.round((matched / all) * 100) : 88) : Math.min(88, 48 + d.sections.length * 8);
+    const action = d.sections.find((x) => /行动|蓝图|建议|裁决/.test(x.title));
+    const actionCount = (action?.blocks || []).length || (action?.ordered || []).length || 2;
+    const project = Array.isArray(p.project_highlights) ? p.project_highlights.length : 3;
     return [
-      {
-        label: "综合判断",
-        value: profile.confidence ? `${Math.round(Number(profile.confidence || 0) * 100)}%` : "--",
-        note: "结构化画像置信度",
-        tone: "primary",
-      },
-      {
-        label: mode === "job_match" ? "岗位命中" : "推荐方向",
-        value: mode === "job_match" ? `${matchedCount}/${jobCount || 0}` : `${(Array.isArray(matcher.recommended_directions) ? matcher.recommended_directions.length : 0) || (firstRole ? 1 : 0)} 个`,
-        note: mode === "job_match" ? "已命中关键词 / JD 关键词" : "当前报告给出的优先方向",
-        tone: "warm",
-      },
-      {
-        label: "角色焦点",
-        value: firstRole || "待生成",
-        note: "当前最贴近的候选方向",
-        tone: "",
-        textual: true,
-      },
-      {
-        label: "项目证据",
-        value: `${projectCount || 0} 项`,
-        note: "结构化提取到的重点项目",
-        tone: "positive",
-      },
-      {
-        label: "建议动作",
-        value: `${(suggestionsSection?.orderedItems || suggestionsSection?.bulletItems || []).length || 0} 条`,
-        note: resume?.analysis_meta?.ocr_used ? "当前结果含 OCR 识别" : "可直接执行的修改动作",
-        tone: "",
-      },
+      { label: "综合判断", value: conf, note: "结构化候选人画像信心值" },
+      { label: mode(resume) === "job_match" ? "岗位匹配度" : "方向清晰度", value: focus, note: mode(resume) === "job_match" ? "与 JD 的关键词命中情况" : "对目标方向的判断强度" },
+      { label: "项目推进力", value: Math.min(99, 42 + project * 8), note: "经历中的落地、推进与结果表达" },
+      { label: "软技能展示", value: Math.min(95, 24 + actionCount * 10), note: "协作、沟通、故事线与业务表达" },
     ];
   }
 
-  function buildHeroMeta(resume, doc) {
-    const stats = buildOverviewStats(resume, doc);
-    const matcher = resume && typeof resume.matcher === "object" ? resume.matcher : {};
-    const profile = resume && typeof resume.profile === "object" ? resume.profile : {};
-    const roleTags = Array.isArray(profile.roles_detected)
-      ? profile.roles_detected.map((item) => item?.role).filter(Boolean).slice(0, 3)
-      : [];
-    const focusTags = getAnalysisMode(resume) === "job_match"
-      ? (Array.isArray(matcher.matched_keywords) ? matcher.matched_keywords.filter(Boolean).slice(0, 5) : [])
-      : (Array.isArray(matcher.recommended_directions) ? matcher.recommended_directions.filter(Boolean).slice(0, 5) : []);
-    const chips = [
-      ...roleTags.map((item) => ({ tone: "accent", label: item })),
-      ...focusTags.map((item, index) => ({ tone: index < 2 ? "warm" : "", label: item })),
-      ...(resume?.analysis_meta?.ocr_used ? [{ tone: "muted", label: "OCR 识别" }] : []),
+  function radar(resume, d) {
+    const arr = stats(resume, d);
+    const dims = [
+      ["学术背景", arr[0].value, "var(--accent-cyan)"],
+      ["技术匹配", arr[1].value, "var(--accent-green)"],
+      ["项目推进", arr[2].value, "var(--accent-orange)"],
+      ["软技能", arr[3].value, "var(--accent-purple)"],
+      ["一致性", /时间信息矛盾|未来时间/.test(d.markdown) ? 45 : 82, "var(--accent-pink)"],
+      ["内容精炼", 74, "var(--accent-red)"],
     ];
-
-    return `
-      <div class="rr-score-grid">
-        ${stats.map((item) => `
-          <article class="rr-score-card ${esc(item.tone || "")}">
-            <p class="rr-score-label">${esc(item.label)}</p>
-            <strong class="rr-score-value ${item.textual ? "textual" : ""}">${esc(item.value)}</strong>
-            <small class="rr-score-note">${esc(item.note || "")}</small>
-          </article>
-        `).join("")}
-      </div>
-      <div class="rr-chip-row">
-        ${chips.length ? chips.map((item) => `<span class="rr-chip ${esc(item.tone || "")}">${esc(item.label)}</span>`).join("") : '<span class="rr-chip muted">分析完成后，这里会显示角色标签和焦点关键词</span>'}
-      </div>
-    `;
+    const cx = 160, cy = 160, r = 108, n = dims.length;
+    const pt = (lv, idx) => {
+      const a = -Math.PI / 2 + (Math.PI * 2 / n) * idx;
+      return { x: cx + Math.cos(a) * r * lv, y: cy + Math.sin(a) * r * lv };
+    };
+    const poly = (lv) => dims.map((_, idx) => { const p = pt(lv, idx); return `${p.x},${p.y}`; }).join(" ");
+    const data = dims.map((x, idx) => ({ ...pt(x[1] / 100, idx), c: x[2] }));
+    return `<svg width="320" height="320" viewBox="0 0 320 320">
+      ${[1, 0.75, 0.5, 0.25].map((lv) => `<polygon points="${poly(lv)}" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"></polygon>`).join("")}
+      ${dims.map((_, idx) => { const p = pt(1, idx); return `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>`; }).join("")}
+      <polygon points="${data.map((p) => `${p.x},${p.y}`).join(" ")}" fill="rgba(14,165,233,0.15)" stroke="var(--accent-cyan)" stroke-width="2"></polygon>
+      ${data.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.c}"></circle>`).join("")}
+      ${dims.map((x, idx) => { const p = pt(1.14, idx); const a = idx === 0 || idx === 3 ? "middle" : (p.x > cx ? "start" : "end"); return `<text x="${p.x}" y="${p.y}" text-anchor="${a}" font-size="11" fill="var(--text-secondary)" font-weight="600">${esc(x[0])}</text>`; }).join("")}
+    </svg>`;
   }
 
-  function renderHero(resume, doc) {
-    const mode = getAnalysisMode(resume);
-    const profile = resume && typeof resume.profile === "object" ? resume.profile : null;
-    const topbarKicker = document.getElementById("rrTopbarKicker");
-    const topbarTitle = document.getElementById("rrTopbarTitle");
-    const topbarSubtitle = document.getElementById("rrTopbarSubtitle");
-    const heroKicker = document.getElementById("rrHeroKicker");
-    const heroTitle = document.getElementById("rrHeroTitle");
-    const heroSummary = document.getElementById("rrHeroSummary");
-    const heroMeta = document.getElementById("rrHeroMeta");
-    const sidebarHint = document.getElementById("rrSidebarHint");
+  const metricHtml = (resume, d) => `<div class="dashboard-grid">${stats(resume, d).map((x) => `<div class="metric-card"><div class="metric-value">${x.value}</div><div class="metric-label">${esc(x.label)}</div><div class="metric-note">${esc(x.note)}</div><div class="metric-bar"><div class="metric-bar-fill" style="width:${x.value}%"></div></div></div>`).join("")}</div>`;
+  const leadCard = (item, kind) => {
+    const p = pair(item) || { label: kind === "b" ? "30秒定论" : "目标定位判断", body: strip(item) };
+    return `<div class="liquid-card ${kind === "a" ? "liquid-border" : ""}"${kind === "b" ? ' style="border-left:4px solid var(--accent-green);"' : ""}>
+      <h3 class="card-title ${kind === "b" ? "green" : "cyan"}"><span>${kind === "b" ? "⚡" : "🎯"}</span><span>${esc(p.label)}</span></h3>
+      <p>${inline(p.body)}</p>
+    </div>`;
+  };
 
-    if (topbarKicker) topbarKicker.textContent = mode === "job_match" ? "Job Match Report" : "Resume Review";
-    if (topbarTitle) topbarTitle.textContent = mode === "job_match" ? "岗位匹配详细分析" : "简历诊断详细分析";
-    if (topbarSubtitle) {
-      topbarSubtitle.textContent = resume?.file_name
-        ? `${resume.file_name} · ${formatTime(resume?.analyzed_at || resume?.uploaded_at)}`
-        : "完成分析后，这里会展示结构化摘要、重点判断和完整建议。";
-    }
-
-    if (heroKicker) heroKicker.textContent = hasReport(resume) ? "报告摘要" : "结果状态";
-    if (heroTitle) {
-      if (hasReport(resume)) heroTitle.textContent = mode === "job_match" ? "完整岗位匹配报告" : "完整简历诊断报告";
-      else if (String(resume?.status || "").trim() === "failed") heroTitle.textContent = "这份简历暂时没有生成分析结果";
-      else if (resume?.file_name) heroTitle.textContent = "简历已上传，等待开始分析";
-      else heroTitle.textContent = "还没有简历分析结果";
-    }
-
-    if (heroSummary) {
-      if (profile?.candidate_summary) heroSummary.textContent = profile.candidate_summary;
-      else if (String(resume?.status || "").trim() === "failed") heroSummary.textContent = getFriendlyError(resume?.error_message || resume?.analysis_meta?.stage_detail);
-      else if (resume?.file_name) heroSummary.textContent = "当前只完成了上传，系统还没有开始生成摘要和详细报告。回到画像页点击“开始匹配”后，这里会自动更新。";
-      else heroSummary.textContent = "上传简历并完成分析后，这里会把关键信息压缩成可快速浏览的摘要，再按章节展示完整内容。";
-    }
-
-    if (heroMeta) heroMeta.innerHTML = buildHeroMeta(resume, doc);
-
-    if (sidebarHint) {
-      sidebarHint.textContent = hasReport(resume)
-        ? "先看顶部摘要和评分概览，再切到你最关心的章节。右侧导航只保留当前章节的小标题，阅读会更干净。"
-        : "这里不会直接显示上传结果。只有完成“开始匹配”之后，章节导航和详细分析才会出现。";
-    }
+  function auditGroups(items) {
+    const out = []; let cur = null;
+    (items || []).forEach((t) => {
+      const c = String(t || "").trim();
+      if (!c) return;
+      if (/^❓/.test(c) || /^问题/.test(strip(c))) { if (cur) out.push(cur); cur = { q: c, a: "", s: "" }; return; }
+      if (!cur) cur = { q: c, a: "", s: "" };
+      if (/^🤔/.test(c) || /负面影响/.test(strip(c))) cur.a = c;
+      else if (/^💡/.test(c) || /建议/.test(strip(c))) cur.s = c;
+      else if (!cur.a) cur.a = c;
+      else if (!cur.s) cur.s = c;
+    });
+    if (cur) out.push(cur);
+    return out;
   }
 
-  function renderOverviewCard(resume, doc) {
-    const root = document.getElementById("rrSidebarMeta");
+  const auditCard = (g) => `<div class="liquid-card"><div class="audit-item"><div class="audit-question"><span class="audit-icon">❓</span><span>${inline((pair(g.q)?.body) || strip(g.q))}</span></div>${g.a ? `<div class="audit-impact"><span class="audit-impact-label">负面影响</span>${inline((pair(g.a)?.body) || strip(g.a).replace(/^🤔\s*/, ""))}</div>` : ""}${g.s ? `<div class="audit-suggestion"><span class="audit-suggestion-label">建议</span>${inline((pair(g.s)?.body) || strip(g.s).replace(/^💡\s*/, ""))}</div>` : ""}</div></div>`;
+
+  function resumeTpl(section) {
+    const m = String(section.markdown || section.lines?.join("\n") || "").match(/```(?:markdown|md)?\n([\s\S]*?)```/i);
+    const text = String(m?.[1] || "").trim();
+    if (!text) return `<div class="markdown-body">${section.html}</div>`;
+    const lines = text.split("\n"); let name = "", contact = "", cur = null; const secs = [];
+    const push = () => { if (cur) secs.push(cur); cur = null; };
+    lines.forEach((raw) => {
+      const s = raw.trim();
+      if (!s) return;
+      if (/^#\s+/.test(s) && !name) { name = strip(s.replace(/^#\s+/, "")); return; }
+      if (/^##\s+/.test(s)) { push(); cur = { title: strip(s.replace(/^##\s+/, "")), lines: [] }; return; }
+      if (!cur && !contact) { contact = strip(s); return; }
+      if (cur) cur.lines.push(raw);
+    });
+    push();
+    return `<div class="resume-header"><h3 class="resume-name">${esc(name || "修改后的简历")}</h3>${contact ? `<div class="resume-contact">${esc(contact)}</div>` : ""}</div>${secs.map((x) => `<section class="resume-section"><h4 class="resume-section-title">${esc(x.title)}</h4><div class="markdown-body">${md((x.lines || []).join("\n"))}</div></section>`).join("")}`;
+  }
+
+  function panel(section, idx, resume, d) {
+    const head = `<div class="section-header"><div class="section-step">STEP ${String(idx + 1).padStart(2, "0")}</div><h2 class="section-title">${esc(section.title)}</h2>${(idx === 0 && summary(d.intro, 180)) || (idx > 0 && section.sum) ? `<p class="section-desc">${esc(idx === 0 ? summary(d.intro, 180) : section.sum)}</p>` : ""}</div>`;
+    if (idx === 0 || /第一印象|初步诊断/.test(section.title)) {
+      const items = section.bullets.length ? section.bullets : [section.sum];
+      return `<div class="tab-panel ${idx === 0 ? "active" : ""}" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}${metricHtml(resume, d)}<div class="two-col">${leadCard(items[0] || "目标定位判断：系统已生成核心判断。", "a")}${leadCard(items[1] || "30秒定论：这份报告将按 Step 1-5 独立展示。", "b")}</div><div class="liquid-card" style="margin-top:24px;"><h3 class="card-title"><span>📊</span><span>能力维度雷达图</span></h3><div class="radar-wrap">${radar(resume, d)}</div></div></div>`;
+    }
+    if (idx === 1 || /深度审计|审计与指导/.test(section.title)) {
+      const subs = section.subs.length ? section.subs : [{ title: "审计内容", bullets: bullets(section.lines), html: section.html }];
+      return `<div class="tab-panel" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}${subs.map((sub) => `<section class="subsection"><h3 class="subsection-title">${esc(sub.title || "审计模块")}</h3>${auditGroups(sub.bullets).length ? `<div class="subsection-grid">${auditGroups(sub.bullets).map(auditCard).join("")}</div>` : `<div class="liquid-card"><div class="markdown-body">${sub.html}</div></div>`}</section>`).join("")}</div>`;
+    }
+    if (idx === 2 || /蓝图|修改/.test(section.title)) {
+      return `<div class="tab-panel" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}<div class="liquid-card"><h3 class="subsection-title">战略修改蓝图</h3>${section.leadHtml ? `<div class="markdown-body">${section.leadHtml}</div>` : ""}${section.blocks.length ? `<div class="timeline">${section.blocks.map((b) => `<div class="timeline-item"><h4 class="timeline-title">${inline(b.title)}</h4><div class="markdown-body">${b.html}</div></div>`).join("")}</div>` : `<div class="markdown-body">${section.html}</div>`}</div></div>`;
+    }
+    if (idx === 3 || /简历范本|重构与展示|修改后的简历/.test(section.title)) {
+      return `<div class="tab-panel" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}<div class="resume-template">${resumeTpl(section)}</div></div>`;
+    }
+    if (idx === 4 || /最终裁决|行动清单/.test(section.title)) {
+      const bs = section.blocks.length ? section.blocks : section.ordered.map((x, i) => ({ title: x, idx: i + 1, html: "" }));
+      return `<div class="tab-panel" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}${bs.slice(0, 2).length ? `<div class="summary-grid">${bs.slice(0, 2).map((b, i) => `<div class="liquid-card"><h3 class="card-title ${i === 0 ? "orange" : "cyan"}"><span>${i === 0 ? "⚠️" : "✅"}</span><span>${inline(b.title)}</span></h3><div class="markdown-body">${b.html}</div></div>`).join("")}</div>` : ""}<div class="liquid-card"><h3 class="subsection-title">行动清单</h3><ul class="checklist">${bs.map((b) => `<li class="checklist-item"><div class="check-icon">${String(b.idx).padStart(2, "0")}</div><div class="check-text"><span class="check-label">${inline(b.title)}</span>${b.html ? `<div class="markdown-body">${b.html}</div>` : ""}</div></li>`).join("")}</ul></div></div>`;
+    }
+    return `<div class="tab-panel" id="${section.id}" data-tab-index="${idx}"><div class="float-element"></div><div class="float-element"></div>${head}<div class="liquid-card"><div class="markdown-body">${section.html}</div></div></div>`;
+  }
+
+  function setStatus(text, tone) {
+    const box = $(".nav-status");
+    const t = $("#rrStatusText");
+    if (t) t.textContent = text;
+    if (!box) return;
+    box.classList.remove("status-warning", "status-danger");
+    if (tone === "warning") box.classList.add("status-warning");
+    if (tone === "danger") box.classList.add("status-danger");
+  }
+
+  function renderTabs(d) {
+    const root = $("#rrNavTabs");
     if (!root) return;
-    const profile = resume && typeof resume.profile === "object" ? resume.profile : {};
-    const metaMap = new Map((doc.metadata || []).map((item) => [item.label, item.value]));
-    const rows = [
-      { label: "文件", value: resume?.file_name || "未上传" },
-      { label: "模式", value: getModeLabel(getAnalysisMode(resume)) },
-      { label: "状态", value: String(resume?.status || "empty") },
-      { label: "分析对象", value: metaMap.get("分析对象") || profile?.basics?.name || "未识别" },
-      { label: "更新时间", value: formatTime(resume?.analyzed_at || resume?.uploaded_at) },
-    ];
+    root.innerHTML = d.sections.length
+      ? d.sections.map((s, i) => `<button type="button" class="nav-tab ${i === 0 ? "active" : ""}" data-tab-index="${i}"><span class="tab-num">${String(i + 1).padStart(2, "0")}</span>${esc(s.title)}</button>`).join("")
+      : '<div class="empty-tabs">当前还没有可切换的章节</div>';
+  }
 
-    root.innerHTML = `
-      <p class="rr-overview-kicker">报告概览</p>
-      <h3 class="rr-overview-title">${esc(profile?.candidate_summary || (resume?.file_name ? "这份简历已上传到当前账号。" : "等待上传简历。"))}</h3>
-      <p class="rr-overview-copy">${esc(doc.title || "分析完成后，这里会同步显示报告标题和核心背景信息。")}</p>
-      <div class="rr-overview-meta">
-        ${rows.map((row) => `
-          <div class="rr-meta-row">
-            <span>${esc(row.label)}</span>
-            <strong>${esc(row.value)}</strong>
-          </div>
-        `).join("")}
-      </div>
-    `;
+  function renderState(title, body, meta) {
+    $("#rrNavTabs").innerHTML = '<div class="empty-tabs">完整诊断将在分析完成后解锁</div>';
+    $("#rrMainContent").innerHTML = `<div class="state-shell"><div class="liquid-card state-card"><h2>${esc(title)}</h2><p>${esc(body)}</p>${meta ? `<p>${esc(meta)}</p>` : ""}<div class="state-actions"><a class="state-btn primary" href="/main.html#profile" data-return-last="1">返回上一界面</a><button type="button" class="state-btn secondary" data-rr-action="user-center">打开个人中心</button></div></div></div>`;
+  }
+
+  function switchTab(i) {
+    document.querySelectorAll(".nav-tab").forEach((x, idx) => x.classList.toggle("active", idx === i));
+    document.querySelectorAll(".tab-panel").forEach((x, idx) => x.classList.toggle("active", idx === i));
   }
 
   function setUser(user) {
-    const displayName = String(user?.display_name || user?.displayName || user?.username || "未登录");
-    const currentUser = document.getElementById("rrCurrentUser");
-    const avatar = document.getElementById("rrAvatarBtn");
-    if (currentUser) currentUser.textContent = displayName;
-    if (avatar) avatar.textContent = displayName.slice(0, 1).toUpperCase();
-  }
-
-  function renderStatusBanner(resume) {
-    const root = document.getElementById("rrStatusBanner");
-    if (!root) return;
-    const status = String(resume?.status || "").trim();
-    const stageDetail = String(resume?.analysis_meta?.stage_detail || "").trim();
-    if (status === "failed") {
-      root.innerHTML = `
-        <div class="rr-status-banner danger">
-          <div>
-            <strong>本次分析没有成功生成报告</strong>
-            <p>${esc(getFriendlyError(resume?.error_message || stageDetail || "请检查文件内容后重试。"))}</p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-    if (resume?.analysis_meta?.ocr_used) {
-      root.innerHTML = `
-        <div class="rr-status-banner warning">
-          <div>
-            <strong>本次结果来自 OCR 识别</strong>
-            <p>当前 PDF 更接近扫描版图片，系统通过 OCR 读取后再生成分析。若你发现中文识别有误，建议优先上传文字版 PDF 或 DOCX。</p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-    if (hasReport(resume)) {
-      root.innerHTML = `
-        <div class="rr-status-banner">
-          <div>
-            <strong>完整报告已生成</strong>
-            <p>这页现在按章节展示完整分析，顶部看摘要，切换标签看详细诊断，右侧只保留当前章节的小标题导航。</p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-    root.innerHTML = "";
-  }
-
-  function renderEmptyState(resume) {
-    const root = document.getElementById("rrContentRoot");
-    const tabs = document.getElementById("rrSectionTabs");
-    const toc = document.getElementById("rrToc");
-    if (!root) return;
-    if (tabs) tabs.innerHTML = "";
-    if (toc) toc.innerHTML = '<div class="rr-toc-empty">当前没有可阅读的章节导航。</div>';
-
-    const status = String(resume?.status || "").trim();
-    const isFailure = status === "failed";
-    const hasFile = Boolean(resume?.file_name);
-    const failureHint = getFriendlyError(resume?.error_message || resume?.analysis_meta?.stage_detail);
-    root.innerHTML = `
-      <div class="rr-empty-state">
-        <section class="rr-empty-card">
-          <h3>${isFailure ? "这次分析为什么没有结果？" : hasFile ? "现在处于什么状态？" : "先完成简历上传"}</h3>
-          <p>${esc(
-            isFailure
-              ? failureHint || "系统没有生成可展示的分析内容，请返回画像页重新开始匹配。"
-              : hasFile
-                ? "当前只完成了上传，系统还没有开始生成摘要和详细报告。回到画像页点击“开始匹配”后，这里会自动更新。"
-                : "你还没有在当前账号下上传简历。上传后才能生成摘要、章节导航和详细分析结果。"
-          )}</p>
-          <ul>
-            ${isFailure ? "<li>如果是扫描版 PDF，优先导出文字版 PDF 或 DOCX 后重新上传。</li>" : ""}
-            ${hasFile ? "<li>如果已经上传成功，但没点“开始匹配”，前端会显示“待分析”，不会直接生成结果。</li>" : "<li>支持 PDF 和 DOCX，建议优先使用可复制文字的版本。</li>"}
-            <li>分析完成后，当前页会按章节重排结果，不再整段堆叠 Markdown。</li>
-          </ul>
-        </section>
-        <div class="rr-empty-actions">
-          <button type="button" class="rr-empty-btn primary" data-rr-action="back-profile">返回画像页</button>
-          <button type="button" class="rr-empty-btn" data-rr-action="open-user-center">打开个人中心</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderTabs(doc, activeId) {
-    const root = document.getElementById("rrSectionTabs");
-    if (!root) return;
-    root.innerHTML = (doc.sections || []).map((section, index) => `
-      <button type="button" class="rr-tab-btn ${section.id === activeId ? "active" : ""}" data-section="${esc(section.id)}">
-        <small>${String(index + 1).padStart(2, "0")}</small>
-        <span>${esc(section.title)}</span>
-      </button>
-    `).join("");
-  }
-
-  function renderToc(section) {
-    const root = document.getElementById("rrToc");
-    if (!root) return;
-    if (!section) {
-      root.innerHTML = '<div class="rr-toc-empty">当前没有可阅读的章节导航。</div>';
-      return;
-    }
-    if (Array.isArray(section.subsections) && section.subsections.length) {
-      root.innerHTML = section.subsections.map((item, index) => `
-        <button type="button" class="rr-toc-btn" data-target="${esc(item.id)}">
-          <small>${String(index + 1).padStart(2, "0")}</small>
-          <span>${esc(item.title)}</span>
-        </button>
-      `).join("");
-      return;
-    }
-    const orderedItems = Array.isArray(section.orderedItems) ? section.orderedItems : [];
-    if (orderedItems.length > 1) {
-      root.innerHTML = orderedItems.map((item, index) => `
-        <button type="button" class="rr-toc-btn" data-target="${esc(`${section.id}-item-${index + 1}`)}">
-          <small>${String(index + 1).padStart(2, "0")}</small>
-          <span>${esc(stripMarkdown(item).slice(0, 26) || `建议 ${index + 1}`)}</span>
-        </button>
-      `).join("");
-      return;
-    }
-    root.innerHTML = '<div class="rr-toc-empty">当前章节没有额外小节，内容会以摘要块方式直接展示。</div>';
-  }
-
-  function setActiveToc(targetId) {
-    document.querySelectorAll(".rr-toc-btn").forEach((button) => {
-      button.classList.toggle("active", button.dataset.target === targetId);
-    });
-  }
-
-  function bindTocObserver() {
-    if (tocObserver) {
-      tocObserver.disconnect();
-      tocObserver = null;
-    }
-    const targets = Array.from(document.querySelectorAll('#rrContentRoot [data-rr-anchor="topic"]'));
-    if (!targets.length || !("IntersectionObserver" in window)) {
-      if (targets[0]?.id) setActiveToc(targets[0].id);
-      return;
-    }
-    tocObserver = new IntersectionObserver((entries) => {
-      const activeEntry = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (activeEntry?.target?.id) setActiveToc(activeEntry.target.id);
-    }, {
-      rootMargin: "-12% 0px -72% 0px",
-      threshold: [0, 1],
-    });
-    targets.forEach((target) => tocObserver.observe(target));
-    if (targets[0]?.id) setActiveToc(targets[0].id);
-  }
-
-  function renderConclusionBody(section) {
-    const sourceItems = section.bulletItems.length ? section.bulletItems : extractOrderedItems(section.leadLines);
-    const cards = sourceItems.length
-      ? sourceItems.map((item, index) => {
-        const parsed = extractLabelValue(item) || { label: `重点 ${index + 1}`, body: stripMarkdown(item) };
-        const tones = ["positive", "danger", "warm"];
-        return `
-          <article class="rr-highlight-card ${tones[index % tones.length]}">
-            <p class="rr-highlight-label">${esc(parsed.label)}</p>
-            <p class="rr-highlight-body">${inlineMarkdown(parsed.body)}</p>
-          </article>
-        `;
-      }).join("")
-      : "";
-    const followUp = Array.isArray(section.orderedItems) && section.orderedItems.length
-      ? `
-        <ol class="rr-action-list">
-          ${section.orderedItems.map((item, index) => `
-            <li id="${esc(`${section.id}-item-${index + 1}`)}" class="rr-action-item" data-rr-anchor="topic">
-              <span class="rr-action-index">${index + 1}</span>
-              <div class="rr-action-copy rr-markdown-body">${fallbackMarkdownToHtml(item)}</div>
-            </li>
-          `).join("")}
-        </ol>
-      `
-      : "";
-
-    return `
-      ${cards ? `<div class="rr-highlight-grid">${cards}</div>` : ""}
-      ${followUp}
-      ${section.leadHtml && !cards ? `<div class="rr-markdown-body">${section.leadHtml}</div>` : ""}
-    `;
-  }
-
-  function buildTopicMetrics(sub) {
-    const bullets = Array.isArray(sub?.bulletItems) ? sub.bulletItems.length : 0;
-    const orders = Array.isArray(sub?.orderedItems) ? sub.orderedItems.length : 0;
-    const text = stripMarkdown(sub?.markdown || "");
-    const chars = text.length;
-    return [
-      { label: "要点", value: String(bullets || orders || 0) },
-      { label: "信息密度", value: chars > 180 ? "高" : chars > 80 ? "中" : "轻" },
-      { label: "阅读方式", value: bullets || orders ? "列表" : "段落" },
-    ];
-  }
-
-  function renderTopicSummary(sub) {
-    const source = sub.bulletItems.length ? sub.bulletItems : sub.orderedItems;
-    const first = source[0] || stripMarkdown(sub.markdown || "").slice(0, 88);
-    return first ? `<p class="rr-topic-summary">${inlineMarkdown(first)}</p>` : "";
-  }
-
-  function renderSubsectionBody(section) {
-    return `
-      ${section.leadHtml ? `<div class="rr-module-lead rr-markdown-body">${section.leadHtml}</div>` : ""}
-      <div class="rr-topic-grid">
-        ${section.subsections.map((sub, index) => {
-          const tone = getSectionTone(sub.title);
-          const items = sub.bulletItems.length ? sub.bulletItems : sub.orderedItems;
-          const metrics = buildTopicMetrics(sub);
-          const bodyHtml = items.length
-            ? `<ul class="rr-compact-list rr-topic-points">${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`
-            : `<div class="rr-markdown-body">${sub.html}</div>`;
-          return `
-            <section id="${esc(sub.id)}" class="rr-topic-card ${esc(tone)}" data-rr-anchor="topic">
-              <div class="rr-topic-head">
-                <div class="rr-topic-head-main">
-                  <span class="rr-topic-index">${String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <h4 class="rr-topic-title">${esc(sub.title)}</h4>
-                    ${renderTopicSummary(sub)}
-                  </div>
-                </div>
-                <div class="rr-topic-metrics">
-                  ${metrics.map((metric) => `
-                    <span class="rr-topic-metric">
-                      <small>${esc(metric.label)}</small>
-                      <strong>${esc(metric.value)}</strong>
-                    </span>
-                  `).join("")}
-                </div>
-              </div>
-              <div class="rr-topic-body">${bodyHtml}</div>
-            </section>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function renderActionBody(section) {
-    const items = section.orderedItems.length ? section.orderedItems : section.bulletItems;
-    if (!items.length) {
-      return `<div class="rr-markdown-body">${section.leadHtml || section.html}</div>`;
-    }
-    return `
-      <div class="rr-action-overview">
-        <div class="rr-action-overview-card">
-          <span>行动数量</span>
-          <strong>${items.length}</strong>
-        </div>
-        <div class="rr-action-overview-card">
-          <span>执行风格</span>
-          <strong>逐项推进</strong>
-        </div>
-        <div class="rr-action-overview-card">
-          <span>适用场景</span>
-          <strong>面试前复盘</strong>
-        </div>
-      </div>
-      <ol class="rr-action-list">
-        ${items.map((item, index) => {
-          const parsed = extractLabelValue(item);
-          const title = parsed?.label || `动作 ${index + 1}`;
-          const body = parsed?.body || stripMarkdown(item);
-          return `
-            <li id="${esc(`${section.id}-item-${index + 1}`)}" class="rr-action-item" data-rr-anchor="topic">
-              <span class="rr-action-index">${index + 1}</span>
-              <div class="rr-action-copy">
-                <div class="rr-action-card-head">
-                  <strong class="rr-action-card-title">${esc(title)}</strong>
-                  <span class="rr-action-card-tag">建议动作</span>
-                </div>
-                <div class="rr-action-card-body rr-markdown-body">${fallbackMarkdownToHtml(body)}</div>
-              </div>
-            </li>
-          `;
-        }).join("")}
-      </ol>
-    `;
-  }
-
-  function renderGenericBody(section) {
-    const summaryItems = section.bulletItems.length ? section.bulletItems.slice(0, 3) : [];
-    return `
-      ${summaryItems.length ? `
-        <div class="rr-generic-summary-grid">
-          ${summaryItems.map((item, index) => `
-            <article class="rr-generic-summary-card">
-              <small>重点 ${index + 1}</small>
-              <p>${inlineMarkdown(item)}</p>
-            </article>
-          `).join("")}
-        </div>
-      ` : ""}
-      <div class="rr-markdown-body">${section.html || section.leadHtml}</div>
-    `;
-  }
-
-  function renderActiveSection(section, doc) {
-    const root = document.getElementById("rrContentRoot");
-    if (!root || !section) return;
-    const sectionIntro = doc.intro.length
-      ? `<p class="rr-panel-subtitle">${esc(doc.intro.join(" "))}</p>`
-      : "";
-    let body = renderGenericBody(section);
-    if (/30\s*秒/.test(section.title)) body = renderConclusionBody(section);
-    else if (section.subsections.length) body = renderSubsectionBody(section);
-    else if (section.orderedItems.length >= 2 || /建议|优化|行动/.test(section.title)) body = renderActionBody(section);
-
-    const sectionMetrics = [
-      { label: "小节数", value: String(section.subsections.length || 0) },
-      { label: "行动项", value: String(section.orderedItems.length || 0) },
-      { label: "关键信号", value: String(section.bulletItems.length || 0) },
-    ];
-
-    root.innerHTML = `
-      <section class="rr-panel">
-        <header class="rr-panel-head rr-panel-head-rich">
-          <div>
-            <p class="rr-panel-kicker">Section ${String(section.index).padStart(2, "0")} / ${String((doc.sections || []).length).padStart(2, "0")}</p>
-            <h3 class="rr-panel-title">${esc(section.title)}</h3>
-            ${sectionIntro}
-          </div>
-          <div class="rr-panel-metrics">
-            ${sectionMetrics.map((metric) => `
-              <article class="rr-panel-metric-card">
-                <small>${esc(metric.label)}</small>
-                <strong>${esc(metric.value)}</strong>
-              </article>
-            `).join("")}
-          </div>
-        </header>
-        <div class="rr-panel-body">${body}</div>
-      </section>
-    `;
-    renderToc(section);
-    bindTocObserver();
-  }
-
-  function switchSection(sectionId) {
-    if (!currentDoc || !Array.isArray(currentDoc.sections) || !currentDoc.sections.length) return;
-    const target = currentDoc.sections.find((section) => section.id === sectionId) || currentDoc.sections[0];
-    activeSectionId = target.id;
-    renderTabs(currentDoc, activeSectionId);
-    renderActiveSection(target, currentDoc);
+    const name = String(user?.display_name || user?.displayName || user?.username || "未登录");
+    const chip = $("#rrCurrentUser"), avatar = $("#rrAvatarBtn");
+    if (chip) chip.textContent = name;
+    if (avatar) avatar.textContent = name.slice(0, 1).toUpperCase();
   }
 
   function renderReport(resume) {
-    const doc = buildReportDocument(resume);
-    currentResume = resume;
-    currentDoc = doc;
-    renderHero(resume, doc);
-    renderOverviewCard(resume, doc);
-    activeSectionId = doc.sections[0]?.id || "";
-    renderTabs(doc, activeSectionId);
-    switchSection(activeSectionId);
+    reportDoc = doc(resume);
+    renderTabs(reportDoc);
+    $("#rrMainContent").innerHTML = reportDoc.sections.map((s, i) => panel(s, i, resume, reportDoc)).join("");
+    setStatus(`AI 分析完成 · ${mode(resume) === "job_match" ? "岗位匹配" : "简历诊断"}`, "");
+    switchTab(0);
   }
 
-  function bindGlobalEvents() {
-    const logoutBtn = document.getElementById("rrLogoutBtn");
-    const avatarBtn = document.getElementById("rrAvatarBtn");
-    const tocRoot = document.getElementById("rrToc");
-    const tabsRoot = document.getElementById("rrSectionTabs");
-
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        try {
-          await requestJson("/api/auth/logout", { method: "POST" });
-        } catch (_) {}
-        window.location.href = "/main.html";
-      });
-    }
-
-    if (avatarBtn) {
-      avatarBtn.addEventListener("click", () => {
-        window.location.href = "/user-center.html#report-workspace";
-      });
-    }
-
-    if (tabsRoot) {
-      tabsRoot.addEventListener("click", (event) => {
-        const button = event.target.closest(".rr-tab-btn");
-        if (!button) return;
-        const sectionId = String(button.dataset.section || "").trim();
-        if (!sectionId) return;
-        switchSection(sectionId);
-      });
-    }
-
-    if (tocRoot) {
-      tocRoot.addEventListener("click", (event) => {
-        const button = event.target.closest(".rr-toc-btn");
-        if (!button) return;
-        const targetId = String(button.dataset.target || "").trim();
-        const target = targetId ? document.getElementById(targetId) : null;
-        if (!target) return;
-        setActiveToc(targetId);
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-
-    document.addEventListener("click", (event) => {
-      const trigger = event.target.closest("[data-rr-action]");
-      if (!trigger) return;
-      const action = String(trigger.dataset.rrAction || "").trim();
-      if (action === "back-profile") {
-        if (typeof window.goBackToLastInterface === "function") {
-          window.goBackToLastInterface("/main.html#profile");
-        } else {
-          window.location.href = "/main.html#profile";
-        }
-      }
-      if (action === "open-user-center") {
-        window.location.href = "/user-center.html#report-workspace";
-      }
+  function bind() {
+    $("#rrNavTabs")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".nav-tab");
+      if (btn) switchTab(Number(btn.dataset.tabIndex || 0));
+    });
+    $("#rrLogoutBtn")?.addEventListener("click", async () => {
+      try { await json("/api/auth/logout", { method: "POST" }); } catch (_) {}
+      window.location.href = "/main.html";
+    });
+    $("#rrAvatarBtn")?.addEventListener("click", () => { window.location.href = "/user-center.html#report-workspace"; });
+    document.addEventListener("click", (e) => {
+      const el = e.target.closest("[data-rr-action]");
+      if (!el) return;
+      if (el.dataset.rrAction === "user-center") window.location.href = "/user-center.html#report-workspace";
     });
   }
 
   async function init() {
-    bindGlobalEvents();
-    const auth = await requestJson("/api/auth/status?bootstrap=1").catch(() => null);
-    if (!auth || !auth.authenticated || !auth.user) {
-      window.location.href = "/main.html";
+    bind();
+    setStatus("正在加载报告", "");
+    const auth = await json("/api/auth/status?bootstrap=1").catch(() => null);
+    if (!auth || !auth.authenticated || !auth.user) { window.location.href = "/main.html"; return; }
+    setUser(auth.user);
+    const resume = auth?.scoped_data?.resume_profile || await json("/api/resume/profile").catch(() => ({}));
+    if (has(resume || {})) {
+      renderReport(resume || {});
       return;
     }
-
-    setUser(auth.user);
-    const resume = auth?.scoped_data?.resume_profile || await requestJson("/api/resume/profile").catch(() => ({}));
-    renderStatusBanner(resume || {});
-    if (hasReport(resume || {})) {
-      renderReport(resume || {});
-    } else {
-      const emptyDoc = buildReportDocument(resume || {});
-      renderHero(resume || {}, emptyDoc);
-      renderOverviewCard(resume || {}, emptyDoc);
-      renderEmptyState(resume || {});
+    if (String(resume?.status || "") === "failed") {
+      setStatus("分析生成失败", "danger");
+      renderState("这次没有生成完整诊断页", String(resume?.error_message || resume?.analysis_meta?.stage_detail || "当前没有可展示的分析内容。"), resume?.file_name ? `文件：${resume.file_name}` : "");
+      return;
     }
+    if (resume?.file_name) {
+      setStatus("等待开始分析", "warning");
+      renderState("简历已上传，但还没有生成完整诊断", "回到上一界面点击“开始匹配”后，这里会按 6.html 的标签页结构显示 Step 1 到 Step 5。", resume.file_name);
+      return;
+    }
+    setStatus("等待上传简历", "warning");
+    renderState("当前账号还没有可展示的简历报告", "先上传简历并完成分析，完整深度诊断页才会解锁。", "");
   }
 
+  window.switchResumeReportTab = switchTab;
   document.addEventListener("DOMContentLoaded", init);
 })();

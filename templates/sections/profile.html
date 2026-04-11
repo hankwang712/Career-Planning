@@ -228,20 +228,22 @@
             </div>
             <div class="assessment-extended-grid compact">
                 <article class="assessment-extended-card compact accent-deep">
-                    <div class="assessment-extended-card-head">
-                        <div class="assessment-extended-head-main">
-                            <span class="assessment-extended-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M12 3l7 4v10l-7 4-7-4V7z"></path><path d="M12 7v10"></path><path d="M8 9.5l4 2.5 4-2.5"></path></svg>
-                            </span>
-                            <div>
-                                <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
-                                <h5 class="assessment-extended-title">深层 MBTI</h5>
+                    <div class="assessment-extended-card-main">
+                        <div class="assessment-extended-card-head">
+                            <div class="assessment-extended-head-main">
+                                <span class="assessment-extended-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M12 3l7 4v10l-7 4-7-4V7z"></path><path d="M12 7v10"></path><path d="M8 9.5l4 2.5 4-2.5"></path></svg>
+                                </span>
+                                <div>
+                                    <p class="assessment-result-kicker">深层 MBTI · 52 题</p>
+                                    <h5 class="assessment-extended-title">深层 MBTI</h5>
+                                </div>
                             </div>
+                            <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
                         </div>
-                        <span id="dtDeepStatus" class="assessment-status-chip">未开始</span>
+                        <p class="assessment-extended-copy">适合复测，保留最近相邻记录。</p>
+                        <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
                     </div>
-                    <p class="assessment-extended-copy">适合复测，保留最近相邻记录。</p>
-                    <div id="dtDeepResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
                         <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('deep', true)">开始测试</button>
                         <button id="dtDeepResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('deep')" disabled>查看结果</button>
@@ -249,20 +251,22 @@
                 </article>
 
                 <article class="assessment-extended-card compact accent-friends">
-                    <div class="assessment-extended-card-head">
-                        <div class="assessment-extended-head-main">
-                            <span class="assessment-extended-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M4 18v-1.5A3.5 3.5 0 0 1 7.5 13H10"></path><path d="M14 18v-1.5A3.5 3.5 0 0 1 17.5 13H20"></path><circle cx="8" cy="9" r="2.5"></circle><circle cx="16" cy="9" r="2.5"></circle><path d="M9.5 18h5"></path></svg>
-                            </span>
-                            <div>
-                                <p class="assessment-result-kicker">老友记测试 · 10 题</p>
-                                <h5 class="assessment-extended-title">老友记角色</h5>
+                    <div class="assessment-extended-card-main">
+                        <div class="assessment-extended-card-head">
+                            <div class="assessment-extended-head-main">
+                                <span class="assessment-extended-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M4 18v-1.5A3.5 3.5 0 0 1 7.5 13H10"></path><path d="M14 18v-1.5A3.5 3.5 0 0 1 17.5 13H20"></path><circle cx="8" cy="9" r="2.5"></circle><circle cx="16" cy="9" r="2.5"></circle><path d="M9.5 18h5"></path></svg>
+                                </span>
+                                <div>
+                                    <p class="assessment-result-kicker">老友记测试 · 10 题</p>
+                                    <h5 class="assessment-extended-title">老友记角色</h5>
+                                </div>
                             </div>
+                            <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
                         </div>
-                        <span id="dtFriendsStatus" class="assessment-status-chip">未开始</span>
+                        <p class="assessment-extended-copy">用情景选择看角色偏向。</p>
+                        <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
                     </div>
-                    <p class="assessment-extended-copy">用情景选择看角色偏向。</p>
-                    <div id="dtFriendsResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
                         <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('friends', true)">开始测试</button>
                         <button id="dtFriendsResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('friends')" disabled>查看结果</button>
@@ -270,20 +274,22 @@
                 </article>
 
                 <article class="assessment-extended-card compact accent-insideout">
-                    <div class="assessment-extended-card-head">
-                        <div class="assessment-extended-head-main">
-                            <span class="assessment-extended-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M12 21c4.2 0 7-3 7-6.8C19 9 15.7 5 12 3 8.3 5 5 9 5 14.2 5 18 7.8 21 12 21z"></path><path d="M9 12c.7-.8 1.7-1.2 3-1.2s2.3.4 3 1.2"></path><path d="M9.5 15.5c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1"></path></svg>
-                            </span>
-                            <div>
-                                <p class="assessment-result-kicker">情绪测试 · 14 题</p>
-                                <h5 class="assessment-extended-title">头脑特工队</h5>
+                    <div class="assessment-extended-card-main">
+                        <div class="assessment-extended-card-head">
+                            <div class="assessment-extended-head-main">
+                                <span class="assessment-extended-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M12 21c4.2 0 7-3 7-6.8C19 9 15.7 5 12 3 8.3 5 5 9 5 14.2 5 18 7.8 21 12 21z"></path><path d="M9 12c.7-.8 1.7-1.2 3-1.2s2.3.4 3 1.2"></path><path d="M9.5 15.5c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1"></path></svg>
+                                </span>
+                                <div>
+                                    <p class="assessment-result-kicker">情绪测试 · 14 题</p>
+                                    <h5 class="assessment-extended-title">头脑特工队</h5>
+                                </div>
                             </div>
+                            <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
                         </div>
-                        <span id="dtIOStatus" class="assessment-status-chip">未开始</span>
+                        <p class="assessment-extended-copy">补充当前主导情绪倾向。</p>
+                        <div id="dtIOResult" class="assessment-extended-result hidden"></div>
                     </div>
-                    <p class="assessment-extended-copy">补充当前主导情绪倾向。</p>
-                    <div id="dtIOResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
                         <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('insideout', true)">开始测试</button>
                         <button id="dtIOResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('insideout')" disabled>查看结果</button>
@@ -291,20 +297,22 @@
                 </article>
 
                 <article class="assessment-extended-card compact accent-sbti">
-                    <div class="assessment-extended-card-head">
-                        <div class="assessment-extended-head-main">
-                            <span class="assessment-extended-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.9.9-4.2 4.1 1 5.7L12 16.8 6.7 19l1-5.7-4.2-4.1 5.9-.9z"></path></svg>
-                            </span>
-                            <div>
-                                <p class="assessment-result-kicker">SBTI · 完整版题库</p>
-                                <h5 class="assessment-extended-title">SBTI 人格扩展</h5>
+                    <div class="assessment-extended-card-main">
+                        <div class="assessment-extended-card-head">
+                            <div class="assessment-extended-head-main">
+                                <span class="assessment-extended-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.9.9-4.2 4.1 1 5.7L12 16.8 6.7 19l1-5.7-4.2-4.1 5.9-.9z"></path></svg>
+                                </span>
+                                <div>
+                                    <p class="assessment-result-kicker">SBTI · 完整版题库</p>
+                                    <h5 class="assessment-extended-title">SBTI 人格扩展</h5>
+                                </div>
                             </div>
+                            <span id="dtSBTIStatus" class="assessment-status-chip">未开始</span>
                         </div>
-                        <span id="dtSBTIStatus" class="assessment-status-chip">未开始</span>
+                        <p class="assessment-extended-copy">完整题库与完整匹配逻辑，点击选项自动跳题，结果会回写到当前页面。</p>
+                        <div id="dtSBTIResult" class="assessment-extended-result hidden"></div>
                     </div>
-                    <p class="assessment-extended-copy">完整题库与完整匹配逻辑，点击选项自动跳题，结果会回写到当前页面。</p>
-                    <div id="dtSBTIResult" class="assessment-extended-result hidden"></div>
                     <div class="assessment-extended-actions compact">
                         <button type="button" class="assessment-card-action primary" onclick="openDeepTestRunnerPage('sbti', true)">开始测试</button>
                         <button id="dtSBTIResultBtn" type="button" class="assessment-card-action secondary" onclick="openDeepTestResultPage('sbti')" disabled>查看结果</button>
@@ -348,12 +356,12 @@
     <div class="resume-workbench resume-judge-workspace mb-6">
         <section class="resume-judge-workspace-header">
             <div class="resume-judge-heading">
-                <p class="resume-judge-heading-kicker">Resume Matcher</p>
+                <p class="resume-judge-heading-kicker">Resume Studio</p>
                 <h3 class="resume-judge-heading-title">简历输入与岗位匹配</h3>
-                <p class="resume-judge-heading-copy">按照 2.html 的报告式结构重排这一整屏。上传简历后，可以直接做岗位匹配；如果你还没明确目标岗位，也可以先留空 JD，拿到更偏职业诊断的判断结果。</p>
+                <p class="resume-judge-heading-copy">上传简历后可填写目标岗位 JD 做匹配；若暂未明确岗位，可留空，系统会先给出简历诊断与方向建议。</p>
             </div>
             <div class="resume-judge-toolbar">
-                <span class="resume-judge-toolbar-badge">白底报告视图</span>
+                <span class="resume-judge-toolbar-badge">深度诊断工作台</span>
                 <div class="resume-judge-toolbar-actions">
                     <button id="resumeUploadBtn" type="button" onclick="pickResumeFile()" class="resume-toolbar-btn primary">上传简历</button>
                     <button id="resumeAnalyzeBtn" type="button" onclick="analyzeResumeMatch()" class="resume-toolbar-btn secondary">开始匹配</button>
@@ -386,8 +394,8 @@
                 <section class="resume-judge-surface-card resume-judge-input-card resume-judge-input-card-wide">
                     <div class="resume-judge-surface-head">
                         <div>
-                            <p class="resume-judge-surface-kicker">Role Input</p>
-                            <p class="resume-judge-surface-title">JD / 补充说明</p>
+                            <p class="resume-judge-surface-kicker">岗位输入区</p>
+                            <p class="resume-judge-surface-title">JD / 方向补充</p>
                         </div>
                         <div class="resume-panel-actions">
                             <span class="resume-local-badge">仅保存到当前用户状态</span>
@@ -411,6 +419,21 @@
                         <p id="resumeCandidateSummary" class="resume-judge-summary-text mt-2">上传简历后会在这里显示摘要，开始匹配后可查看完整结果。</p>
                     </div>
                 </section>
+                <aside class="resume-judge-surface-card resume-judge-guide-card">
+                    <div class="resume-judge-guide-head">
+                        <p class="resume-judge-surface-kicker">输入指引</p>
+                        <p class="resume-judge-guide-title">建议按下面顺序填写</p>
+                    </div>
+                    <ol class="resume-judge-guide-list">
+                        <li>先上传简历，确认文件状态与分析状态都正常。</li>
+                        <li>若有明确岗位，直接粘贴 JD 原文；没有可先留空。</li>
+                        <li>可补 1-2 句目标方向或城市，让建议更聚焦。</li>
+                        <li>点击「开始匹配」，等待生成结论流与完整诊断。</li>
+                    </ol>
+                    <div class="resume-judge-guide-note">
+                        你的历史输入会保存在当前账号，后续可继续迭代，不需要每次重填。
+                    </div>
+                </aside>
             </div>
         </section>
 
@@ -445,7 +468,7 @@
             <section class="resume-judge-report-card">
                 <div class="resume-judge-report-head">
                     <div>
-                        <p class="resume-judge-surface-kicker">Match Overview</p>
+                        <p class="resume-judge-surface-kicker">匹配总览</p>
                         <p class="resume-judge-surface-title">分析总览</p>
                     </div>
                     <p id="resumeAnalysisResultMeta" class="resume-judge-report-meta">等待分析</p>

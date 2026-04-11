@@ -9,48 +9,48 @@
     ]
   },
   "frontend/src/entries/resume-report.js": {
-    "file": "assets/frontend/src/entries/resume-report.js-Cq-lShFv.js",
+    "file": "assets/frontend/src/entries/resume-report.js-BjPH4C2I.js",
     "name": "frontend/src/entries/resume-report.js",
     "src": "frontend/src/entries/resume-report.js",
     "isEntry": true,
     "css": [
-      "assets/resume-report-CfL5-tyP.css"
+      "assets/resume-report-B_v0ABJN.css"
     ]
   },
   "frontend/src/entries/test-result.js": {
-    "file": "assets/frontend/src/entries/test-result.js-DhvYKukN.js",
+    "file": "assets/frontend/src/entries/test-result.js-CzTJISqE.js",
     "name": "frontend/src/entries/test-result.js",
     "src": "frontend/src/entries/test-result.js",
     "isEntry": true,
     "css": [
-      "assets/test-result-CKp__oLi.css"
+      "assets/test-result-C0QQE_a6.css"
     ]
   },
   "frontend/src/entries/test-runner.js": {
-    "file": "assets/frontend/src/entries/test-runner.js-BZHCsF5m.js",
+    "file": "assets/frontend/src/entries/test-runner.js-k4rqeib8.js",
     "name": "frontend/src/entries/test-runner.js",
     "src": "frontend/src/entries/test-runner.js",
     "isEntry": true,
     "css": [
-      "assets/test-runner-BUzILzhA.css"
+      "assets/test-runner-BxHuSX_y.css"
     ]
   },
   "frontend/src/entries/user-center.js": {
-    "file": "assets/frontend/src/entries/user-center.js-DO83PdI0.js",
+    "file": "assets/frontend/src/entries/user-center.js-D1jQn82x.js",
     "name": "frontend/src/entries/user-center.js",
     "src": "frontend/src/entries/user-center.js",
     "isEntry": true,
     "css": [
-      "assets/user-center-mbHHKoZB.css"
+      "assets/user-center-CXR4a_Ji.css"
     ]
   },
   "frontend/src/entries/workspace.js": {
-    "file": "assets/frontend/src/entries/workspace.js-BW8U_-6X.js",
+    "file": "assets/frontend/src/entries/workspace.js-CEqDk6mb.js",
     "name": "frontend/src/entries/workspace.js",
     "src": "frontend/src/entries/workspace.js",
     "isEntry": true,
     "css": [
-      "assets/workspace-CnCd0gJe.css"
+      "assets/workspace-B82ma1nP.css"
     ]
   }
 }

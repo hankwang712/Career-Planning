@@ -66,7 +66,9 @@
       "Bash(npm run:*)",
       "Bash(echo \"BUILD_EXIT:$?\")",
       "Bash(npx vite:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(ls -la /c/Users/rog/Desktop/web/static/*.js)",
+      "Bash(grep -n \"pickResumeFile\\\\|onResumeFileSelected\\\\|analyzeResumeMatch\" /c/Users/rog/Desktop/web/static/*.js)"
     ],
     "defaultMode": "bypassPermissions"
   }
