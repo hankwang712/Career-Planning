@@ -9,6 +9,12 @@
 
             <div class="kb-header-right">
                 <span id="knowledgeBaseStatus" class="kb-status-pill">图谱准备中</span>
+                <button id="knowledgeBaseRoadmapBtn" type="button" class="kb-roadmap-btn" disabled title="请先完成「开始匹配」">
+                    查看完整路线图
+                </button>
+                <button id="knowledgeBaseRematchBtn" type="button" class="kb-rematch-btn" disabled title="清除缓存并重新向服务器请求匹配">
+                    重新匹配
+                </button>
                 <button id="knowledgeBaseMatchButton" type="button" class="kb-match-btn" onclick="startCareerGraphMatching()">
                     开始匹配
                 </button>
@@ -120,7 +126,6 @@
                 </div>
 
                 <div id="knowledgeBaseCanvas" class="kb-graph-canvas"></div>
-                <div id="knowledgeBasePathDeck" class="kb-path-deck is-hidden" aria-live="polite"></div>
 
                 <div id="knowledgeBaseTooltip" class="kb-tooltip">
                     <div id="knowledgeBaseTooltipTitle" class="kb-tooltip-title"></div>

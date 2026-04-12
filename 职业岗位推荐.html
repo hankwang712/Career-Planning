@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>匹配路径看板</title>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/index.css" rel="stylesheet">
+<style>
+  :root {
+    --bg-start: #fafbff;
+    --bg-mid: #f4f0ff;
+    --bg-end: #f0f4ff;
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.8);
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --text-primary: #0c1222;
+    --text-secondary: #4a5568;
+    --text-tertiary: #94a3b8;
+    --card-main-bg: rgba(255, 255, 255, 0.78);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.02);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.04);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,0.06);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(160deg, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);
+    min-height: 100vh;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  .noise-overlay {
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ambient-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ambient-orb.orb1 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+    top: -100px; right: -100px;
+  }
+
+  .ambient-orb.orb2 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%);
+    bottom: -50px; left: -50px;
+  }
+
+  .page-container {
+    position: relative;
+    z-index: 1;
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 48px 32px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Header */
+  .header-section {
+    width: 100%;
+    margin-bottom: 44px;
+    animation: fadeDown 0.8s var(--ease-out-expo) both;
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .header-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .page-title-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .page-icon {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.2);
+    position: relative;
+  }
+
+  .page-icon::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.1));
+    filter: blur(10px);
+    z-index: -1;
+  }
+
+  .page-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .page-title-sub {
+    font-size: 13.5px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .collapse-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(0,0,0,0.06);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.25s var(--ease-out-expo);
+    backdrop-filter: blur(8px);
+  }
+
+  .collapse-btn:hover {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .info-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .info-chip svg {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .ai-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.3px;
+  }
+
+  .ai-tag .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: aiPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes aiPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  /* Cards Area */
+  .cards-section {
+    width: 100%;
+    position: relative;
+  }
+
+  .cards-scroll-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .cards-scroll-container::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .cards-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.02);
+    border-radius: 2px;
+  }
+
+  .cards-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(99,102,241,0.2);
+    border-radius: 2px;
+  }
+
+  /* Path Card */
+  .path-card {
+    min-width: 310px;
+    max-width: 310px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 22px;
+    padding: 28px 24px;
+    scroll-snap-align: start;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.45s var(--ease-out-expo);
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  .path-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .path-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(99,102,241,0.08);
+    border-color: rgba(99,102,241,0.2);
+  }
+
+  .path-card.main-card {
+    min-width: 350px;
+    max-width: 350px;
+    background: var(--card-main-bg);
+    border: 1px solid rgba(255,255,255,0.9);
+    box-shadow: 
+      0 20px 60px rgba(99,102,241,0.08),
+      0 8px 24px rgba(0,0,0,0.03),
+      inset 0 1px 0 rgba(255,255,255,0.6);
+    transform: translateY(-8px);
+    z-index: 2;
+  }
+
+  .path-card.main-card:hover {
+    transform: translateY(-14px);
+  }
+
+  .path-card.main-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6, #3b82f6);
+    border-radius: 22px 22px 0 0;
+  }
+
+  .card-bg-number {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-size: 64px;
+    font-weight: 800;
+    color: rgba(99,102,241,0.03);
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    letter-spacing: -0.04em;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .card-num-badge {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px var(--shadow-color);
+    position: relative;
+  }
+
+  .card-num-badge::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 16px;
+    background: inherit;
+    opacity: 0.2;
+    filter: blur(8px);
+    z-index: -1;
+  }
+
+  .card-num-badge.color-0 { background: linear-gradient(135deg, #6366f1, #818cf8); --shadow-color: rgba(99,102,241,0.3); }
+  .card-num-badge.color-1 { background: linear-gradient(135deg, #8b5cf6, #a78bfa); --shadow-color: rgba(139,92,246,0.3); }
+  .card-num-badge.color-2 { background: linear-gradient(135deg, #6366f1, #6366f1); --shadow-color: rgba(99,102,241,0.3); }
+  .card-num-badge.color-3 { background: linear-gradient(135deg, #3b82f6, #60a5fa); --shadow-color: rgba(59,130,246,0.3); }
+  .card-num-badge.color-4 { background: linear-gradient(135deg, #ec4899, #f472b6); --shadow-color: rgba(236,72,153,0.3); }
+
+  .card-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-career-name {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .meta-chip.location {
+    background: rgba(0,0,0,0.03);
+    color: var(--text-tertiary);
+  }
+
+  .meta-chip.level {
+    background: rgba(99,102,241,0.07);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .meta-chip.match {
+    background: rgba(16,185,129,0.07);
+    color: #059669;
+    font-weight: 600;
+  }
+
+  .meta-sep {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #cbd5e1;
+  }
+
+  .match-bar-wrapper {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .match-bar-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(99,102,241,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .match-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    transition: width 1.2s var(--ease-out-expo);
+    width: 0;
+  }
+
+  .match-bar-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .card-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent);
+    margin-bottom: 18px;
+  }
+
+  /* Path Section */
+  .path-group {
+    margin-bottom: 16px;
+  }
+
+  .path-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .path-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-left: 2px;
+  }
+
+  .path-group-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .path-group-icon.promo {
+    background: rgba(99,102,241,0.1);
+  }
+
+  .path-group-icon.promo svg { width: 10px; height: 10px; color: #6366f1; }
+
+  .path-group-icon.transfer {
+    background: rgba(245,158,11,0.1);
+  }
+
+  .path-group-icon.transfer svg { width: 10px; height: 10px; color: #f59e0b; }
+
+  .path-group-label-text {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .path-group-label-text.promo { color: #6366f1; }
+  .path-group-label-text.transfer { color: #f59e0b; }
+
+  /* Timeline path */
+  .path-timeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    position: relative;
+    padding: 4px 0;
+  }
+
+  .path-step {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+
+  .path-node-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .path-node-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    transition: all 0.25s var(--ease-spring);
+    flex-shrink: 0;
+  }
+
+  .path-step:hover .path-node-dot {
+    background: #6366f1;
+    box-shadow: 0 0 0 6px rgba(99,102,241,0.15);
+    transform: scale(1.15);
+  }
+
+  .path-connector {
+    width: 28px;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(99,102,241,0.2), rgba(99,102,241,0.08));
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .path-connector::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.3);
+  }
+
+  .path-node-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-top: 6px;
+    white-space: nowrap;
+    font-weight: 500;
+    transition: color 0.25s ease;
+    text-align: center;
+    line-height: 1.3;
+    max-width: 80px;
+  }
+
+  .path-step:hover .path-node-label {
+    color: var(--text-secondary);
+  }
+
+  .path-node-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(15,23,42,0.92);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+
+  .path-node-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: rgba(15,23,42,0.92);
+  }
+
+  .path-step:hover .path-node-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Transfer path style */
+  .path-transfer .path-node-dot {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+  }
+
+  .path-transfer:hover .path-node-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 6px rgba(245,158,11,0.15);
+  }
+
+  .path-transfer .path-connector {
+    background: linear-gradient(90deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08));
+  }
+
+  .path-transfer .path-connector::after {
+    background: rgba(245,158,11,0.3);
+  }
+
+  /* Best match ribbon */
+  .best-ribbon {
+    position: absolute;
+    top: 14px;
+    right: -4px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 14px 4px 10px;
+    border-radius: 8px 0 0 8px;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+  }
+
+  .best-ribbon::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -6px;
+    border: 3px solid transparent;
+    border-left-color: #5548d4;
+    border-bottom-color: #5548d4;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .page-container { padding: 32px 16px 48px; }
+    .page-title { font-size: 20px; }
+    .path-card, .path-card.main-card {
+      min-width: 280px;
+      max-width: 280px;
+    }
+    .path-card.main-card {
+      min-width: 300px;
+      max-width: 300px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+<div class="ambient-orb orb1"></div>
+<div class="ambient-orb orb2"></div>
+
+<div class="page-container">
+
+  <!-- Header -->
+  <div class="header-section">
+    <div class="header-top-row">
+      <div class="page-title-group">
+        <div class="page-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <div class="page-title">匹配路径看板</div>
+          <div class="page-title-sub">基于职业图谱边关系生成晋升 / 换岗 / 验证路径；点击卡片在左侧图谱中定位节点。</div>
+        </div>
+      </div>
+      <button class="collapse-btn">收起</button>
+    </div>
+
+    <div class="info-chip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+      已纳入：六维能力 7 项、简历解析、职业访谈、目标方向
+    </div>
+
+    <div class="ai-tag">
+      <span class="pulse-dot"></span>
+      AI 重排 · DEEPSEEK-CHAT
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards-section">
+    <div class="cards-scroll-container">
+
+      <!-- Card 01 -->
+      <div class="path-card main-card" data-delay="0.1" data-match="82">
+        <div class="card-bg-number">01</div>
+        <div class="best-ribbon">Best Match</div>
+        <div class="card-top">
+          <div class="card-num-badge color-0">01</div>
+          <div class="card-info">
+            <div class="card-career-name">nlp/大模型算法工程师</div>
+            <div class="card-meta-row">
+              <span class="meta-chip location">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                深圳
+              </span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip level">L2</span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip match">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                82%
+              </span>
+            </div>
+            <div class="match-bar-wrapper">
+              <div class="match-bar-track">
+                <div class="match-bar-fill" data-width="82"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+
+        <!-- Promotion Path -->
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon promo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <span class="path-group-label-text promo">晋升路径</span>
+          </div>
+          <div class="path-timeline">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">nlp/大模型算法工程师</div>
+                <div class="path-node-label">大模型</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">mcopilot算法工程师</div>
+                <div class="path-node-label">mcopilot</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">图像算法工程师（深度学习）</div>
+                <div class="path-node-label">图像算法</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">运营总监</div>
+                <div class="path-node-label">运营总监</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transfer Path -->
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon transfer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="path-group-label-text transfer">换岗路径</span>
+          </div>
+          <div class="path-timeline path-transfer">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">nlp/大模型算法工程师</div>
+                <div class="path-node-label">大模型</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">nlp算法开发岗</div>
+                <div class="path-node-label">nlp开发</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 02 -->
+      <div class="path-card" data-delay="0.2" data-match="81">
+        <div class="card-bg-number">02</div>
+        <div class="card-top">
+          <div class="card-num-badge color-1">02</div>
+          <div class="card-info">
+            <div class="card-career-name">AI应用工程师实习生</div>
+            <div class="card-meta-row">
+              <span class="meta-chip location">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                北京
+              </span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip level">L1</span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip match">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                81%
+              </span>
+            </div>
+            <div class="match-bar-wrapper">
+              <div class="match-bar-track">
+                <div class="match-bar-fill" data-width="81"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon promo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <span class="path-group-label-text promo">晋升路径</span>
+          </div>
+          <div class="path-timeline">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI应用工程师实习生</div>
+                <div class="path-node-label">实习生</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI开发工程师</div>
+                <div class="path-node-label">AI开发</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">JAVA工程师</div>
+                <div class="path-node-label">JAVA</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">java开发工程师</div>
+                <div class="path-node-label">java开发</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon transfer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="path-group-label-text transfer">换岗路径</span>
+          </div>
+          <div class="path-timeline path-transfer">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI应用工程师实习生</div>
+                <div class="path-node-label">实习生</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI开发实习生</div>
+                <div class="path-node-label">AI开发</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 03 -->
+      <div class="path-card" data-delay="0.3" data-match="84">
+        <div class="card-bg-number">03</div>
+        <div class="card-top">
+          <div class="card-num-badge color-2">03</div>
+          <div class="card-info">
+            <div class="card-career-name">AI智能体实习生</div>
+            <div class="card-meta-row">
+              <span class="meta-chip location">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                深圳
+              </span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip level">L1</span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip match">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                84%
+              </span>
+            </div>
+            <div class="match-bar-wrapper">
+              <div class="match-bar-track">
+                <div class="match-bar-fill" data-width="84"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon promo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <span class="path-group-label-text promo">晋升路径</span>
+          </div>
+          <div class="path-timeline">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI智能体实习生</div>
+                <div class="path-node-label">智能体</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">ai工程师</div>
+                <div class="path-node-label">AI工程师</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">php开发工程师</div>
+                <div class="path-node-label">php开发</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">高级php开发工程师</div>
+                <div class="path-node-label">高级php</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon transfer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="path-group-label-text transfer">换岗路径</span>
+          </div>
+          <div class="path-timeline path-transfer">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI智能体实习生</div>
+                <div class="path-node-label">智能体</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">智能体开发实习生</div>
+                <div class="path-node-label">开发实习</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 04 -->
+      <div class="path-card" data-delay="0.4" data-match="76">
+        <div class="card-bg-number">04</div>
+        <div class="card-top">
+          <div class="card-num-badge color-3">04</div>
+          <div class="card-info">
+            <div class="card-career-name">AI视觉算法实习生(A01026)</div>
+            <div class="card-meta-row">
+              <span class="meta-chip location">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                北京
+              </span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip level">L1</span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip match" style="background: rgba(245,158,11,0.07); color: #d97706;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                76%
+              </span>
+            </div>
+            <div class="match-bar-wrapper">
+              <div class="match-bar-track">
+                <div class="match-bar-fill" data-width="76" style="background: linear-gradient(90deg, #3b82f6, #60a5fa);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon promo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <span class="path-group-label-text promo">晋升路径</span>
+          </div>
+          <div class="path-timeline">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI视觉算法实习生(A01026)</div>
+                <div class="path-node-label">视觉实习</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">视觉算法工程师</div>
+                <div class="path-node-label">视觉算法</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">图像算法工程师</div>
+                <div class="path-node-label">图像算法</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">算法工程师(图像视觉)</div>
+                <div class="path-node-label">算法工程师</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon transfer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="path-group-label-text transfer">换岗路径</span>
+          </div>
+          <div class="path-timeline path-transfer">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI视觉算法实习生(A01026)</div>
+                <div class="path-node-label">视觉实习</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">AI视觉算法实习生(A01026)</div>
+                <div class="path-node-label">视觉实习</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 05 -->
+      <div class="path-card" data-delay="0.5" data-match="78">
+        <div class="card-bg-number">05</div>
+        <div class="card-top">
+          <div class="card-num-badge color-4">05</div>
+          <div class="card-info">
+            <div class="card-career-name">C++软件开发工程师</div>
+            <div class="card-meta-row">
+              <span class="meta-chip location">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                上海
+              </span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip level" style="background: rgba(236,72,153,0.07); color: #db2777;">L2</span>
+              <span class="meta-sep"></span>
+              <span class="meta-chip match" style="background: rgba(236,72,153,0.07); color: #db2777;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                78%
+              </span>
+            </div>
+            <div class="match-bar-wrapper">
+              <div class="match-bar-track">
+                <div class="match-bar-fill" data-width="78" style="background: linear-gradient(90deg, #ec4899, #f472b6);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon promo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <span class="path-group-label-text promo">晋升路径</span>
+          </div>
+          <div class="path-timeline">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">C++软件开发工程师</div>
+                <div class="path-node-label">C++开发</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">高级C++工程师</div>
+                <div class="path-node-label">高级C++</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">技术专家</div>
+                <div class="path-node-label">技术专家</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="path-group">
+          <div class="path-group-label">
+            <div class="path-group-icon transfer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="path-group-label-text transfer">换岗路径</span>
+          </div>
+          <div class="path-timeline path-transfer">
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">C++软件开发工程师</div>
+                <div class="path-node-label">C++开发</div>
+              </div>
+            </div>
+            <div class="path-connector"></div>
+            <div class="path-step">
+              <div class="path-node-wrapper">
+                <div class="path-node-dot"></div>
+                <div class="path-node-tooltip">后端开发工程师</div>
+                <div class="path-node-label">后端开发</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Animate cards on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.path-card');
+    cards.forEach((card) => {
+      const delay = parseFloat(card.getAttribute('data-delay')) || 0.1;
+      setTimeout(() => {
+        card.classList.add('visible');
+      }, delay * 1000 + 300);
+    });
+
+    // Animate match bars
+    setTimeout(() => {
+      const fills = document.querySelectorAll('.match-bar-fill');
+      fills.forEach((fill) => {
+        const width = fill.getAttribute('data-width');
+        fill.style.width = width + '%';
+      });
+    }, 800);
+  });
+</script>
+
+</body>
+</html>
+

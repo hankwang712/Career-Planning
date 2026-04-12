@@ -607,7 +607,7 @@ async function ensureCareerGraphMatchingAssets() {
       if (!window.d3) {
         await loadScriptOnce("/static/vendor/d3.v7.min.js?v=20260404-kb-v1", "d3");
       }
-      await loadScriptOnce("/static/career-graph-matching.js?v=20260408-kb-pathdeck-v1", "career-graph-matching");
+      await loadScriptOnce("/static/career-graph-matching.js?v=20260412-match-persist-v1", "career-graph-matching");
       const api = getCareerGraphMatchingApi();
       if (!api) {
         throw new Error("职业图谱模块已加载，但没有成功完成初始化");
@@ -626,6 +626,15 @@ window.startCareerGraphMatching = function startCareerGraphMatching(force = fals
     .then((api) => api?.startMatch?.({ force }))
     .catch((error) => {
       showToast("职业匹配加载失败", error.message, "error", 2200);
+    });
+};
+
+/** 清除本地保存的上次匹配结果并强制重新请求 API */
+window.rematchCareerGraphMatching = function rematchCareerGraphMatching() {
+  return ensureCareerGraphMatchingAssets()
+    .then((api) => api?.rematchCareerMatching?.())
+    .catch((error) => {
+      showToast("重新匹配失败", error.message, "error", 2200);
     });
 };
 
@@ -8299,6 +8308,15 @@ function deriveUnifiedProfile() {
   const interviewProfile = careerInterviewState.result?.profile || null;
   const resumeState = userWorkspaceState.scopedData.resume_profile || null;
   const resumeProfile = resumeState?.profile || null;
+  /** 与人岗匹配 API 对齐：后端从 resume.profile 读取 matcher / structured_resume，需从 workspace 根合并进来 */
+  const resumeProfileForApis =
+    resumeProfile && typeof resumeProfile === "object"
+      ? {
+          ...resumeProfile,
+          matcher: resumeState?.matcher || resumeProfile.matcher,
+          structured_resume: resumeState?.structured_resume || resumeProfile.structured_resume
+        }
+      : resumeProfile;
   const basics = mergeProfileBasicsWithResume(careerInterviewState.profileBasics, resumeProfile);
   const capabilityModel = deriveCapabilityScores(assessment, interviewProfile, basics, resumeProfile);
   const missingItems = [];
@@ -8335,7 +8353,7 @@ function deriveUnifiedProfile() {
       status: resumeState?.status || "empty",
       uploadedAt: resumeState?.uploaded_at || null,
       analyzedAt: resumeState?.analyzed_at || null,
-      profile: resumeProfile
+      profile: resumeProfileForApis
     },
     summary: interviewProfile?.summary || fallbackSummary,
     workValues: uniqueValues(
@@ -8349,6 +8367,11 @@ function deriveUnifiedProfile() {
     missingItems
   };
 }
+
+/** 供职业图谱等模块在请求前拉取最新画像（含简历 matcher 等）；每次现算，避免缓存画像缺字段 */
+window.getLatestUnifiedProfile = function getLatestUnifiedProfile() {
+  return deriveUnifiedProfile();
+};
 
 function computeTraitMatch(role, profile) {
   const assessment = profile.assessment;
@@ -10134,6 +10157,7 @@ function showSection(sectionId) {
     }
   });
   appState.currentSection = sectionId;
+  document.body.classList.toggle("section-matching", sectionId === "matching");
   // 更新 URL hash，让 return-nav 能记录当前 section，返回时恢复正确页面
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
   if (sectionId === "report") renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);

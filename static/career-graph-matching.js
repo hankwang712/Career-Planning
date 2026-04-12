@@ -1,4 +1,8 @@
 (function initCareerGraphMatchingModule() {
+  const LS_MATCH_RESULTS = "career_match_results";
+  const LS_MATCH_PROFILE = "career_match_profile";
+  const LS_MATCH_META = "career_match_meta";
+
   const GRAPH_NODE_LIMIT = 500;
   const DEFAULT_SEARCH_RESULT_LIMIT = 10;
   const RELATION_META = {
@@ -39,6 +43,7 @@
     relationFilter: "all",
     layoutMode: "force",
     pathOnly: false,
+    visibilityPauseBound: false,
     currentDisplayEdges: [],   // 供 updateVisualStates 复用，避免重建 simulation
     queryResultIds: new Set(),
     recommendationIds: new Set(),
@@ -46,7 +51,6 @@
     matchMeta: null,
     cityPreferences: [],
     suggestedCities: [],
-    pathDeckHidden: false,
     positions: new Map(),
     simulation: null,
     svg: null,
@@ -130,6 +134,64 @@
     return Boolean(normalized && splitCityTokens(state.cityPreferences).includes(normalized));
   }
 
+  function clearCareerMatchStorage() {
+    try {
+      localStorage.removeItem(LS_MATCH_RESULTS);
+      localStorage.removeItem(LS_MATCH_PROFILE);
+      localStorage.removeItem(LS_MATCH_META);
+      sessionStorage.removeItem(LS_MATCH_RESULTS);
+      sessionStorage.removeItem(LS_MATCH_PROFILE);
+    } catch (_) { /* ignore */ }
+  }
+
+  function buildMatchProfilePayload() {
+    return {
+      summary: state.profile?.summary || "",
+      basics: state.profile?.basics || {},
+      assessment: state.profile?.assessment || {},
+      matchSource: matchSourceLabel(),
+      matchBasis: matchBasisHint(),
+      cityPreferences: state.cityPreferences || []
+    };
+  }
+
+  function persistCareerMatchBundle() {
+    if (!state.matchResults.length) return;
+    try {
+      const profilePayload = buildMatchProfilePayload();
+      const metaStr = JSON.stringify(state.matchMeta || {});
+      const resultsStr = JSON.stringify(state.matchResults);
+      const profileStr = JSON.stringify(profilePayload);
+      localStorage.setItem(LS_MATCH_RESULTS, resultsStr);
+      localStorage.setItem(LS_MATCH_PROFILE, profileStr);
+      localStorage.setItem(LS_MATCH_META, metaStr);
+      sessionStorage.setItem(LS_MATCH_RESULTS, resultsStr);
+      sessionStorage.setItem(LS_MATCH_PROFILE, profileStr);
+    } catch (_) { /* quota / private mode */ }
+  }
+
+  /** 进入模块或刷新后恢复上次保存的匹配结果（含城市偏好） */
+  function tryRestorePersistedMatch() {
+    if (state.matchResults.length) return;
+    try {
+      const raw = localStorage.getItem(LS_MATCH_RESULTS);
+      if (!raw) return;
+      const results = JSON.parse(raw);
+      if (!Array.isArray(results) || !results.length) return;
+      state.matchResults = results;
+      const metaRaw = localStorage.getItem(LS_MATCH_META);
+      state.matchMeta = metaRaw ? JSON.parse(metaRaw) : null;
+      state.recommendationIds = new Set(state.matchResults.map((item) => item.id).filter(Boolean));
+      const pRaw = localStorage.getItem(LS_MATCH_PROFILE);
+      if (pRaw) {
+        const p = JSON.parse(pRaw);
+        if (Array.isArray(p.cityPreferences) && p.cityPreferences.length) {
+          state.cityPreferences = splitCityTokens(p.cityPreferences);
+        }
+      }
+    } catch (_) { /* ignore */ }
+  }
+
   function setCityPreferences(cities, { resetMatches = true } = {}) {
     state.cityPreferences = splitCityTokens(cities);
     if (resetMatches) {
@@ -137,7 +199,6 @@
       state.matchMeta = null;
       state.recommendationIds = new Set();
       state.selectedNodeId = "";
-      state.pathDeckHidden = false;
     }
     renderCityPlanner();
     renderPathDeck();
@@ -707,51 +768,46 @@
     return "等待匹配";
   }
 
-  function pathDeckCardHtml(item, index) {
-    const paths = Array.isArray(item?.pathOptions) ? item.pathOptions : [];
-    const fallback = item?.path ? [{ label: "主路径", text: item.path }] : [];
-    const usable = (paths.length ? paths : fallback).slice(0, 3);
-    return `
-      <button type="button" class="kb-path-deck-card${state.selectedNodeId === item.id ? " is-active" : ""}" data-node-id="${escapeHtml(item.id || "")}">
-        <span class="kb-path-deck-index">${String(index + 1).padStart(2, "0")}</span>
-        <span class="kb-path-deck-main">
-          <strong>${escapeHtml(item.title || "推荐岗位")}</strong>
-          <small>${escapeHtml([item.city, item.level, formatScore(item.overallScore)].filter(Boolean).join(" · "))}</small>
-        </span>
-        <span class="kb-path-deck-lines">
-          ${usable.length ? usable.map((path) => `
-            <span>
-              <b>${escapeHtml(path.label || "路径")}</b>
-              <em>${escapeHtml(path.text || "")}</em>
-            </span>
-          `).join("") : `<span><b>路径</b><em>点击岗位节点后查看图谱关系</em></span>`}
-        </span>
-      </button>
-    `;
+  function matchBasisHint() {
+    const parts = [];
+    if (state.profile?.capabilities && typeof state.profile.capabilities === "object") {
+      const n = Object.values(state.profile.capabilities).filter((x) => x && x.score != null).length;
+      if (n) parts.push(`六维能力 ${n} 项`);
+    }
+    if (state.profile?.assessment?.mbti?.completed || state.profile?.assessment?.holland?.completed) {
+      parts.push("测评");
+    }
+    if (state.profile?.resume?.status === "analyzed") parts.push("简历解析");
+    if (state.profile?.interview?.profile) parts.push("职业访谈");
+    if (state.profile?.basics?.target_direction) parts.push("目标方向");
+    return parts.length ? `已纳入：${parts.join("、")}` : "已纳入：当前画像中的可用信号（可继续补充测评与简历以提高置信度）";
   }
 
+  /** 中央「匹配路径看板」已移除；同步顶部「查看完整路线图」「重新匹配」按钮 */
   function renderPathDeck() {
-    const deck = getEl("knowledgeBasePathDeck");
-    if (!deck) return;
-    if (!state.matchResults.length || state.pathDeckHidden) {
-      deck.classList.add("is-hidden");
-      deck.innerHTML = "";
-      return;
+    const btn = getEl("knowledgeBaseRoadmapBtn");
+    const rematchBtn = getEl("knowledgeBaseRematchBtn");
+    const hasMem = state.matchResults.length > 0;
+    let hasStored = false;
+    try {
+      hasStored = Boolean(localStorage.getItem(LS_MATCH_RESULTS));
+    } catch (_) {
+      hasStored = false;
     }
-
-    deck.classList.remove("is-hidden");
-    deck.innerHTML = `
-      <div class="kb-path-deck-head">
-        <div>
-          <span>匹配路径看板</span>
-          <small>宽幅展示晋升、换岗与验证路径；点击卡片可定位到图谱节点。</small>
-        </div>
-        <button type="button" class="kb-path-deck-close" data-path-deck-close>收起</button>
-      </div>
-      <div class="kb-path-deck-track">
-        ${state.matchResults.map((item, index) => pathDeckCardHtml(item, index)).join("")}
-      </div>
-    `;
+    const canOpenReport = hasMem || hasStored;
+    const canRematch = hasMem || hasStored;
+    if (btn) {
+      btn.disabled = !canOpenReport;
+      btn.title = canOpenReport
+        ? "在新标签页打开完整职业路径报告"
+        : "请先点击「开始匹配」或等待恢复上次保存的结果";
+    }
+    if (rematchBtn) {
+      rematchBtn.disabled = !canRematch;
+      rematchBtn.title = canRematch
+        ? "清除本地保存的上次诊断并重新向服务器请求匹配"
+        : "暂无已保存的匹配结果";
+    }
   }
 
   function panelRecommendationHtml() {
@@ -1108,11 +1164,25 @@
       });
     }
 
+    const nodeCount = displayNodes.length;
+    const heavyGraph = nodeCount > 200;
+    const manyCharge = d3.forceManyBody()
+      .strength(nodeCount > 550 ? -90 : -220)
+      .theta(heavyGraph ? 0.92 : 0.9);
+    const collideRadius = (d) => levelRadius(d.level) + 12;
+    const collisionForce = d3.forceCollide()
+      .radius(collideRadius)
+      .iterations(heavyGraph ? 1 : 2)
+      .strength(0.92);
+
     state.simulation = d3.forceSimulation(displayNodes)
       .force("link", d3.forceLink(displayEdges).id((d) => d.id).distance((d) => d.relation === "promotion" ? 110 : 170).strength((d) => d.relation === "promotion" ? 0.72 : 0.42))
-      .force("charge", d3.forceManyBody().strength(displayNodes.length > 550 ? -90 : -220))
-      .force("collision", d3.forceCollide().radius((d) => levelRadius(d.level) + 12))
-      .force("center", d3.forceCenter(width * 0.42, height * 0.5));
+      .force("charge", manyCharge)
+      .force("collision", collisionForce)
+      .force("center", d3.forceCenter(width * 0.42, height * 0.5))
+      .velocityDecay(heavyGraph ? 0.58 : 0.48)
+      .alphaDecay(heavyGraph ? 0.052 : 0.038)
+      .alphaMin(0.012);
 
     if (state.layoutMode === "radial") {
       state.simulation
@@ -1241,9 +1311,12 @@
         .attr("x", (d) => (d.source.x + d.target.x) / 2)
         .attr("y", (d) => (d.source.y + d.target.y) / 2 - 6);
 
-      nodeGroups.attr("transform", (d) => {
-        state.positions.set(d.id, { x: d.x, y: d.y });
-        return `translate(${d.x},${d.y})`;
+      nodeGroups.attr("transform", (d) => `translate(${d.x},${d.y})`);
+    });
+
+    state.simulation.on("end", () => {
+      displayNodes.forEach((d) => {
+        if (d.x != null && d.y != null) state.positions.set(d.id, { x: d.x, y: d.y });
       });
     });
 
@@ -1338,9 +1411,15 @@
   }
 
   async function startMatch({ force = false } = {}) {
-    if (!state.profile) return;
+    if (typeof window.getLatestUnifiedProfile === "function") {
+      const fresh = window.getLatestUnifiedProfile();
+      if (fresh && typeof fresh === "object") state.profile = fresh;
+    }
+    if (!state.profile) {
+      showToast("画像未就绪", "请先加载测评与基础画像后再试", "warning", 2200);
+      return;
+    }
     if (state.matchResults.length && !force) {
-      state.pathDeckHidden = false;
       renderPathDeck();
       renderDefaultPanel();
       renderGraph();
@@ -1372,8 +1451,8 @@
       };
       state.recommendationIds = new Set(state.matchResults.map((item) => item.id).filter(Boolean));
       setStatus(`${matchSourceLabel()} · ${state.matchResults.length} 条路径`, "ready");
+      persistCareerMatchBundle();
       renderCityPlanner();
-      state.pathDeckHidden = false;
       renderPathDeck();
       renderDefaultPanel();
       renderGraph();
@@ -1412,6 +1491,13 @@
     if (state.bound) return;
     state.bound = true;
 
+    if (!state.visibilityPauseBound && typeof document !== "undefined") {
+      state.visibilityPauseBound = true;
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state.simulation) state.simulation.alpha(0).stop();
+      });
+    }
+
     const searchInput = getEl("knowledgeBaseSearchInput");
     const searchResults = getEl("knowledgeBaseSearchResults");
     const relationFilter = getEl("knowledgeBaseRelationFilter");
@@ -1427,8 +1513,6 @@
     const cityInput = getEl("knowledgeBaseCityInput");
     const cityAdd = getEl("knowledgeBaseCityAdd");
     const cityClear = getEl("knowledgeBaseCityClear");
-    const pathDeck = getEl("knowledgeBasePathDeck");
-
     if (searchInput) {
       searchInput.addEventListener("input", () => {
         state.searchQuery = searchInput.value.trim();
@@ -1481,17 +1565,15 @@
       });
     }
 
-    if (pathDeck) {
-      pathDeck.addEventListener("click", (event) => {
-        if (event.target.closest("[data-path-deck-close]")) {
-          state.pathDeckHidden = true;
-          renderPathDeck();
-          return;
-        }
-        const target = event.target.closest("[data-node-id]");
-        if (!target) return;
-        const nodeId = target.getAttribute("data-node-id");
-        if (nodeId) void focusNode(nodeId);
+    const roadmapBtn = getEl("knowledgeBaseRoadmapBtn");
+    if (roadmapBtn) {
+      roadmapBtn.addEventListener("click", () => openCareerReport());
+    }
+
+    const rematchBtn = getEl("knowledgeBaseRematchBtn");
+    if (rematchBtn) {
+      rematchBtn.addEventListener("click", () => {
+        void rematchCareerMatching();
       });
     }
 
@@ -1574,7 +1656,7 @@
         state.matchMeta = null;
         state.recommendationIds = new Set();
         state.selectedNodeId = "";
-        state.pathDeckHidden = false;
+        clearCareerMatchStorage();
       } else {
         state.profile = profile;
       }
@@ -1583,18 +1665,27 @@
     bindEvents();
     setStatus("图谱准备中", (state.profile?.missingItems || []).length ? "warning" : "loading");
     await ensureBootstrap();
+    tryRestorePersistedMatch();
     state.suggestedCities = buildSuggestedCities(Array.from(state.nodeMap.values()));
     renderCityPlanner();
     renderPathDeck();
     renderDefaultPanel();
     renderGraph();
-    setStatus((state.profile?.missingItems || []).length ? "画像待补充" : "图谱已就绪", (state.profile?.missingItems || []).length ? "warning" : "ready");
+    if (state.matchResults.length) {
+      setStatus(`${matchSourceLabel()} · ${state.matchResults.length} 条路径`, "ready");
+    } else {
+      setStatus(
+        (state.profile?.missingItems || []).length ? "画像待补充" : "图谱已就绪",
+        (state.profile?.missingItems || []).length ? "warning" : "ready"
+      );
+    }
   }
 
   function onSectionVisible() {
     bindEvents();
     if (!state.bootstrap) {
       void ensureBootstrap().then(() => {
+        tryRestorePersistedMatch();
         renderCityPlanner();
         renderPathDeck();
         renderDefaultPanel();
@@ -1602,13 +1693,56 @@
       }).catch((error) => showToast("图谱加载失败", error.message, "warning"));
       return;
     }
+    tryRestorePersistedMatch();
+    renderCityPlanner();
     renderPathDeck();
     renderGraph();
+  }
+
+  function openCareerReport() {
+    if (!state.matchResults.length) {
+      try {
+        const raw = localStorage.getItem(LS_MATCH_RESULTS);
+        const pRaw = localStorage.getItem(LS_MATCH_PROFILE);
+        if (raw && pRaw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length) {
+            sessionStorage.setItem(LS_MATCH_RESULTS, raw);
+            sessionStorage.setItem(LS_MATCH_PROFILE, pRaw);
+            window.open("/static/career-report.html", "_blank");
+            return;
+          }
+        }
+      } catch (_) { /* ignore */ }
+      showToast("暂无可展示结果", "请先点击「开始匹配」生成岗位推荐", "warning", 2400);
+      return;
+    }
+    try {
+      const profilePayload = buildMatchProfilePayload();
+      sessionStorage.setItem(LS_MATCH_RESULTS, JSON.stringify(state.matchResults));
+      sessionStorage.setItem(LS_MATCH_PROFILE, JSON.stringify(profilePayload));
+      persistCareerMatchBundle();
+    } catch (_) { /* sessionStorage unavailable */ }
+    window.open("/static/career-report.html", "_blank");
+  }
+
+  async function rematchCareerMatching() {
+    clearCareerMatchStorage();
+    state.matchResults = [];
+    state.matchMeta = null;
+    state.recommendationIds = new Set();
+    state.selectedNodeId = "";
+    renderPathDeck();
+    renderDefaultPanel();
+    renderGraph();
+    showToast("已清除上次诊断", "正在重新匹配…", "info", 2600);
+    await startMatch({ force: true });
   }
 
   window.__careerGraphMatchingApi = {
     render,
     startMatch,
+    rematchCareerMatching,
     focusNode,
     resetLayout,
     onSectionVisible

@@ -5279,7 +5279,13 @@ def _career_graph_collect_profile_inputs(profile_payload, city_preferences=None)
     resume_public = resume_state.get("profile") if isinstance(resume_state.get("profile"), dict) else {}
     resume_profile = resume_public.get("profile") if isinstance(resume_public.get("profile"), dict) else {}
     resume_matcher = resume_public.get("matcher") if isinstance(resume_public.get("matcher"), dict) else {}
+    if not resume_matcher:
+        resume_matcher = resume_state.get("matcher") if isinstance(resume_state.get("matcher"), dict) else {}
     structured_resume = resume_public.get("structured_resume") if isinstance(resume_public.get("structured_resume"), dict) else {}
+    if not structured_resume:
+        structured_resume = (
+            resume_state.get("structured_resume") if isinstance(resume_state.get("structured_resume"), dict) else {}
+        )
 
     capabilities = {}
     for key in ["professional", "learning", "communication", "innovation", "stress_tolerance", "internship", "execution"]:
