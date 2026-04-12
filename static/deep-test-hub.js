@@ -878,6 +878,12 @@
     return `/test-result.html?test=${encodeURIComponent(safeType)}`;
   }
 
+  /** test-runner 提交完成后进入主站画像「扩展测试」区，避免再回到独立结果页的一层跳转。 */
+  function afterSubmitLandingUrl(type) {
+    sanitizeTestType(type);
+    return "/main.html?deeptest_done=1#profile";
+  }
+
   function runnerPageUrl(type, restart) {
     const safeType = sanitizeTestType(type);
     const suffix = restart ? "&restart=1" : "";
@@ -1455,7 +1461,7 @@
     getQuestionsByType,
     getLikertAnswers: () => deepClone(DEEP_ANSWERS) || [],
     getSbtiConditionalQuestion: () => deepClone(SBTI_CONDITIONAL_SPECIAL_QUESTION) || null,
-    getResultPageUrl: resultPageUrl,
+    getResultPageUrl: afterSubmitLandingUrl,
     getRunnerPageUrl: runnerPageUrl,
     getStoredResultByType,
     getHistoryRunsSnapshot,
@@ -1487,6 +1493,21 @@
     }
   }
 
+  function scrollToExtendedBoardIfDone() {
+    try {
+      const url = new URL(window.location.href);
+      const path = (url.pathname || "").toLowerCase();
+      if (path !== "/" && path !== "/main.html") return;
+      if (url.searchParams.get("deeptest_done") !== "1") return;
+      url.searchParams.delete("deeptest_done");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      const el = document.getElementById("assessmentExtendedBoard");
+      if (!el) return;
+      const run = () => el.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(run, 280);
+    } catch (_) {}
+  }
+
   function init() {
     loadHist();
     loadStoredResults();
@@ -1494,6 +1515,7 @@
       saveDeepStore(st.deep.result || buildDeepResultFromHist(st.hist.cur), st.hist.cur.savedAt);
     }
     refreshCards();
+    scrollToExtendedBoardIfDone();
     window.addEventListener("app:auth-changed", () => {
       loadHist();
       loadStoredResults();

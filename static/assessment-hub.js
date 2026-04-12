@@ -138,7 +138,13 @@
   function getProgressStorageKey() {
     let userKey = "guest";
     try {
-      if (typeof window.getCurrentUser === "function") {
+      const ws = typeof window.userWorkspaceState === "object" && window.userWorkspaceState
+        ? window.userWorkspaceState
+        : null;
+      const cu = ws?.currentUser;
+      if (cu && cu.username) {
+        userKey = String(cu.username);
+      } else if (typeof window.getCurrentUser === "function") {
         const u = window.getCurrentUser();
         if (u && u.username) userKey = String(u.username);
       }

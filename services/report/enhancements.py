@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 
-PORTRAIT_PROMPT_PIPELINE_VERSION = "2026.04-portrait-loop-v1"
+PORTRAIT_PROMPT_PIPELINE_VERSION = "2026.04-portrait-pipeline-rich-v2"
 PORTRAIT_TEMPLATE_VERSION = "2026.04-portrait-dsl-v1"
 CAREER_REPORT_PIPELINE_VERSION = "2026.04-agent-loop-v2"
 CAREER_FEEDBACK_VERSION = "2026.04-feedback-memory-v1"
@@ -100,9 +100,17 @@ def _split_feedback_note(text: str) -> list[str]:
     return _unique_text(pieces, limit=4, item_limit=72)
 
 
+def _portrait_narrative_digest(text: Any, limit: int = 420) -> str:
+    raw = str(text or "").strip().replace("\n", " ")
+    return raw[:limit] if raw else ""
+
+
 def build_portrait_prompt_layers(context: dict[str, Any], fallback_brief: dict[str, Any] | None) -> dict[str, Any]:
     brief = fallback_brief if isinstance(fallback_brief, dict) else {}
     visual = brief.get("visual_spec") if isinstance(brief.get("visual_spec"), dict) else {}
+    id_digest = _portrait_narrative_digest(context.get("identity_narrative"), 380)
+    assess_digest = _portrait_narrative_digest(context.get("assessment_prose"), 320)
+    ext_digest = _portrait_narrative_digest(context.get("extended_tests_prose"), 320)
     evidence_pool = _unique_text(
         (brief.get("evidence_tags") or [])
         + (context.get("top_roles") or [])
@@ -112,6 +120,8 @@ def build_portrait_prompt_layers(context: dict[str, Any], fallback_brief: dict[s
         limit=8,
         item_limit=40,
     )
+    if id_digest:
+        evidence_pool = ([id_digest[:96]] + evidence_pool)[:8]
     dsl_template = {
         "persona": f"{context.get('gender') or '未指定'} / {visual.get('subject_age_hint') or '20-26岁'}",
         "role": brief.get("primary_role") or context.get("target_direction") or context.get("archetype_name") or "职业探索者",
@@ -128,12 +138,17 @@ def build_portrait_prompt_layers(context: dict[str, Any], fallback_brief: dict[s
                 item_limit=32,
             )
         ),
+        "narrative_for_image": {
+            "identity": id_digest,
+            "main_assessment_text": assess_digest,
+            "extended_tests": ext_digest,
+        },
         "visual": {
             "outfit": visual.get("outfit") or "职业休闲穿搭",
             "props": visual.get("props") or "笔记本、工作记录工具",
             "composition": visual.get("composition") or "3:4 纵向、单人、半身到 2/3 身构图",
         },
-        "style": visual.get("style") or "半写实职业插画",
+        "style": visual.get("style") or "半写实出版物风插画，自然柔光，肤质与衣料纹理清晰",
         "exclude": ["文字", "水印", "多人", "夸张卡通", "海报贴纸感"],
     }
     return {
@@ -157,6 +172,9 @@ def build_portrait_prompt_layers(context: dict[str, Any], fallback_brief: dict[s
             "work_values": _unique_text(context.get("work_values") or [], limit=4, item_limit=24),
             "support_roles": _unique_text(brief.get("support_roles") or context.get("role_cluster") or [], limit=3, item_limit=24),
             "uncertainty": _unique_text(context.get("uncertainty") or [], limit=3, item_limit=48),
+            "identity_narrative_digest": id_digest,
+            "assessment_prose_digest": assess_digest,
+            "extended_tests_digest": ext_digest,
         },
         "repair_rules": {
             "required_fields": ["title", "subtitle", "primary_role", "mission_line", "evidence_tags", "next_action"],
@@ -175,9 +193,10 @@ def build_portrait_prompt_layers(context: dict[str, Any], fallback_brief: dict[s
                 f"主角色：{dsl_template['role']}",
                 f"场景：{dsl_template['scene']}",
                 f"证据：{' / '.join(evidence_pool[:3]) if evidence_pool else '待补'}",
+                f"叙事：{id_digest[:72]}…" if len(id_digest) > 72 else (f"叙事：{id_digest}" if id_digest else ""),
                 f"视觉：{dsl_template['visual']['composition']}",
             ],
-            limit=4,
+            limit=5,
             item_limit=96,
         ),
     }
@@ -195,6 +214,9 @@ def evaluate_portrait_prompt_packet(context: dict[str, Any], packet: dict[str, A
             render_prompt,
             _clean_text(brief.get("primary_role"), 64),
             " ".join(_unique_text(brief.get("evidence_tags") or [], limit=4)),
+            _clean_text(context.get("identity_narrative"), 240),
+            _clean_text(context.get("assessment_prose"), 200),
+            _clean_text(context.get("extended_tests_prose"), 200),
         ]
     ).strip()
 

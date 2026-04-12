@@ -41,15 +41,18 @@
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         margin-top: 8px;
-        min-height: 96px;
+        min-height: 152px;
+        padding: 4px 0 2px;
       }
       .assessment-pet-slot .pet-img {
-        width: 80px;
-        height: 80px;
+        width: 132px;
+        height: 132px;
+        max-width: 100%;
         object-fit: contain;
         display: block;
-        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.14));
       }
       .assessment-pet-slot .pet-bubble {
         background: #fff;

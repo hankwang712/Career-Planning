@@ -21,10 +21,10 @@
     <link rel="preload" as="style" href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css"
           onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css"></noscript>
-    <link rel="stylesheet" href="/static/styles.css?v=20260401-guide-clickfix-v3">
-    <link rel="stylesheet" href="/static/workspace-shell.css?v=20260401-guide-clickfix-v3">
+    <link rel="stylesheet" href="/static/styles.css?v=20260414-auth-checking-nav-v1">
+    <link rel="stylesheet" href="/static/workspace-shell.css?v=20260413-career-iv-ui-v2">
 </head>
-<body class="shell-body scroll-smooth auth-locked">
+<body class="shell-body scroll-smooth auth-checking">
     <a href="#dashboard" class="skip-link">跳到主内容</a>
     <div class="ambient-orb a"></div>
     <div class="ambient-orb b"></div>
@@ -1733,36 +1733,30 @@
     </div>
 
     <div id="profileFlowStep3" class="profile-flow-panel hidden">
-    <div class="rounded-3xl bg-gradient-to-r from-sky-700 via-cyan-700 to-slate-800 p-6 text-white shadow-lg mb-6 overflow-hidden relative">
-        <div class="absolute top-4 right-4">
-            <span id="careerInterviewHeroStatus" class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">等待系统模型配置</span>
-        </div>
-        <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-                <p class="text-xs font-semibold tracking-[0.22em] text-cyan-100 uppercase">Interview Agent</p>
-                <h3 class="mt-2 text-2xl font-bold">职业访谈引擎正式纳入主流程</h3>
-                <p class="mt-3 text-sm leading-7 text-cyan-50/90">
-                    当前访谈结果会直接同步到统一画像、岗位匹配和报告页。后续的外部记忆、资源推送、反思和提醒保留状态接口，先以明确占位展示。
+    <div class="profile-ci-hero" data-ci-hero>
+        <div class="profile-ci-hero-noise" aria-hidden="true"></div>
+        <div class="profile-ci-hero-glow profile-ci-hero-glow-a" aria-hidden="true"></div>
+        <div class="profile-ci-hero-glow profile-ci-hero-glow-b" aria-hidden="true"></div>
+        <div class="profile-ci-hero-inner">
+            <div class="profile-ci-hero-main">
+                <p class="profile-ci-hero-kicker">Interview Agent</p>
+                <h3 class="profile-ci-hero-title">职业访谈工作台</h3>
+                <p class="profile-ci-hero-lead">
+                    结构化多轮对话沉淀可引用的职业证据；收敛后的假设与证据卡将写入统一画像，并参与岗位匹配与报告生成。
                 </p>
-                <div class="mt-5 flex flex-wrap gap-3">
-                    <button onclick="openCareerInterviewModal()" class="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-cyan-50 transition-all">开始职业访谈</button>
+                <div class="profile-ci-hero-cta">
+                    <button type="button" class="profile-ci-hero-btn" onclick="openCareerInterviewModal()">进入访谈</button>
+                    <span id="careerInterviewHeroStatus" class="profile-ci-hero-chip">等待系统模型配置</span>
                 </div>
-                <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">访谈完成后会自动更新下方画像摘要、工作价值观和推荐方向。</p>
+                <p id="careerInterviewHeroHint" class="profile-ci-hero-hint">配置就绪后进入全屏工作台；关闭或返回本页即可查看下方「画像收敛」摘要。</p>
             </div>
-            <div>
-                <p class="text-sm font-semibold text-white mb-3">维度推进</p>
-                <div id="careerInterviewHeroDimensionProgress" class="career-progress-grid mb-4"></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-cyan-100">核心维度</p>
-                        <p class="mt-1 text-sm font-semibold">职业兴趣 / 工作价值观 / 行动证据</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-cyan-100">状态接口</p>
-                        <p class="mt-1 text-sm font-semibold">动态记忆 / 规划 / 反思</p>
-                    </div>
+            <aside class="profile-ci-hero-aside" aria-label="六维推进">
+                <div class="profile-ci-hero-aside-head">
+                    <span class="profile-ci-hero-aside-title">维度推进</span>
+                    <span class="profile-ci-hero-aside-sub">六维目标 · 有效回答轮次</span>
                 </div>
-            </div>
+                <div id="careerInterviewHeroDimensionProgress" class="career-progress-grid profile-ci-hero-dim-grid"></div>
+            </aside>
         </div>
     </div>
 
@@ -1790,50 +1784,19 @@
             </div>
         </div>
 
-        <div id="careerInterviewContent" class="hidden space-y-5">
-            <div class="career-result-topline">
+        <div id="careerInterviewContent" class="hidden space-y-4">
+            <div class="career-result-topline career-result-topline-refined">
                 <div>
-                    <p class="text-xs text-gray-500">当前聚焦</p>
-                    <p id="careerInterviewResultFocus" class="text-sm font-semibold text-gray-800">职业兴趣</p>
+                    <p class="text-xs text-gray-500">当前探索</p>
+                    <p id="careerInterviewResultFocus" class="text-sm font-semibold text-gray-800">等待开始</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500">工作价值观</p>
+                    <p class="text-xs text-gray-500">工作价值观信号</p>
                     <div id="careerInterviewValueTags" class="career-tag-row"></div>
                 </div>
             </div>
 
-            <div class="career-summary-card">
-                <p class="career-summary-label">画像摘要</p>
-                <p id="careerInterviewSummary" class="career-summary-text">访谈开始后，这里会显示动态总结。</p>
-            </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
-                <div class="space-y-4">
-                    <div>
-                        <p class="career-block-title">高相关职业兴趣</p>
-                        <div id="careerInterviewInterestTags" class="career-tag-row"></div>
-                    </div>
-                    <div>
-                        <p class="career-block-title">推荐岗位方向</p>
-                        <div id="careerInterviewRoleTags" class="career-tag-row"></div>
-                    </div>
-                    <div>
-                        <p class="career-block-title">维度分布</p>
-                        <div id="careerInterviewDimensionList" class="career-dimension-list"></div>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="career-side-panel">
-                        <p class="career-block-title">关键证据</p>
-                        <div id="careerInterviewEvidenceList" class="career-list"></div>
-                    </div>
-                    <div class="career-side-panel">
-                        <p class="career-block-title">下一步建议</p>
-                        <div id="careerInterviewActionList" class="career-list"></div>
-                    </div>
-                </div>
-            </div>
+            <div id="careerInterviewEnginePanel" class="career-engine-panel career-engine-panel-elevated hidden" aria-live="polite"></div>
         </div>
     </div>
     <div class="profile-flow-actions mb-6">
@@ -3137,12 +3100,12 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="/static/app.js?v=20260401-app-restore-v1"></script>
+    <script src="/static/app.js?v=20260414-auth-checking-nav-v1"></script>
     <script src="/static/app-hotfix.js?v=20260401-guide-clickfix-v1"></script>
     <script src="/static/workspace-shell.js?v=20260331-workspace-rebuild-v1"></script>
     <script src="/static/assessment-hub.js?v=20260322-top-model-status-v1"></script>
     <script src="/static/deep-test-hub.js?v=20260401-deep-test-v5"></script>
-    <script src="/static/assessment-pet.js?v=20260330-pet-v1"></script>
+    <script src="/static/assessment-pet.js?v=20260414-pet-size-v1"></script>
     <script src="/static/jobs-analytics.js?v=20260321-analytics-v1"></script>
 </body>
 </html>

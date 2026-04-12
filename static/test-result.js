@@ -1354,11 +1354,7 @@
   }
 
   function toMainProfile() {
-    if (typeof window.goBackToLastInterface === "function") {
-      window.goBackToLastInterface("/main.html#profile");
-      return;
-    }
-    window.location.href = "/main.html#profile";
+    window.location.assign("/main.html#profile");
   }
 
   function toRetest() {

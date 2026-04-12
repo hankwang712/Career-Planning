@@ -65,6 +65,19 @@
     return safe === "/login.html";
   }
 
+  /** 扩展测试作答页 / 独立结果页：不应作为「返回主界面」的目标，否则用户会误以为结果被清空（实际仍在画像页）。 */
+  function isEphemeralTestSurface(url) {
+    const raw = String(url || "").trim();
+    if (!raw) return false;
+    try {
+      const pathOnly = raw.split("?")[0].split("#")[0] || "";
+      const base = pathOnly.toLowerCase();
+      return /(^|\/)test-runner(\.html)?$/i.test(base) || /(^|\/)test-result(\.html)?$/i.test(base);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function readReferrerTarget() {
     try {
       if (!document.referrer) return "";
@@ -83,20 +96,23 @@
     while (stack.length && stack[stack.length - 1] === current) {
       stack.pop();
     }
+    while (stack.length && isEphemeralTestSurface(stack[stack.length - 1])) {
+      stack.pop();
+    }
     let target = stack[stack.length - 1] || "";
-    if (!target || target === current || isBlockedReturnTarget(target)) {
+    if (!target || target === current || isBlockedReturnTarget(target) || isEphemeralTestSurface(target)) {
       const referrerTarget = readReferrerTarget();
-      if (referrerTarget && referrerTarget !== current && !isBlockedReturnTarget(referrerTarget)) {
+      if (referrerTarget && referrerTarget !== current && !isBlockedReturnTarget(referrerTarget) && !isEphemeralTestSurface(referrerTarget)) {
         target = referrerTarget;
       }
     }
-    if (!target || target === current || isBlockedReturnTarget(target)) {
+    if (!target || target === current || isBlockedReturnTarget(target) || isEphemeralTestSurface(target)) {
       target = fallback;
     }
     const safeTarget = normalizeFallbackUrl(target);
     saveStack(stack.length ? stack : [safeTarget]);
-    // 直接回到目标页，不再附加 force_lock：用户通常已登录，返回上一界面不应反复要求解锁。
-    window.location.href = safeTarget;
+    // 直接回到目标页；replace 减少历史栈中的中间页，避免「先回主站再跳」的顿挫感
+    window.location.replace(safeTarget);
   }
 
   function bindReturnLinks() {

@@ -95,7 +95,7 @@ RESUME_LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "resume_llm_config.json")
 RESUME_UPLOAD_DIR = os.path.join(APP_DATA_DIR, "user_uploads")
 CAREER_REPORT_DIR = os.path.join(APP_DATA_DIR, "career_reports")
 COMMUNITY_FORUM_FILE = os.path.join(APP_DATA_DIR, "community_forum.json")
-PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3.1-flash-image-preview").strip() or "google/gemini-3.1-flash-image-preview"
+PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3-pro-image-preview").strip() or "google/gemini-3-pro-image-preview"
 ASSESSMENT_DATA_FILE = os.path.join(BASE_DIR, "static", "assessment-data.json")
 JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
@@ -332,8 +332,38 @@ CAREER_INTERVIEW_SYSTEM_PROMPT = """
   "next_question": "下一轮问题，如果用户说完成了就填'__FINISH__'",
   "focus_dimension": "必须是以下之一（一字不差）：职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度。表示下一轮主要在为哪一维度收集信息。若系统消息里给出了各维度已答/目标数，已答满的维度不得再作为 focus_dimension，必须切换到下一个未答满的维度。",
   "completion_score": 0,
+  "readiness_score": 0,
   "topic": "当前主题，如'角色模型'或'生活故事'等",
   "topic_progress": "当前主题的探索进度描述",
+  "next_question_policy": {
+    "strategy": "fact_example | motive_reason | value_tradeoff | behavior_pref | conflict_clarify | micro_scenario",
+    "target_dimension": "职业兴趣",
+    "rationale": "为何现在优先追问这一维度（一句话）",
+    "expected_information_gain": 0.0
+  },
+  "dimension_metrics": {
+    "职业兴趣": {
+      "coverage": 0.0,
+      "specificity": 0.0,
+      "confidence": 0.0,
+      "evidence_count": 0,
+      "consistency": 0.0,
+      "saturated": false,
+      "missing_slots": ["仍缺的具体证据槽位，可为空数组"]
+    }
+  },
+  "profile_hypothesis": {
+    "top_roles": [{"name": "产品经理", "score": 0.35}],
+    "stable_traits": ["结构化表达强"],
+    "unresolved_conflicts": ["若用户既强调自由又强调流程稳定，可写一条待澄清张力"]
+  },
+  "evidence_cards": [
+    {"category": "偏好证据", "bullets": ["从对话可支撑的判断1", "判断2"]},
+    {"category": "能力证据", "bullets": []}
+  ],
+  "conflict_points": [
+    {"summary": "自由探索 vs 稳定流程", "clarify_prompt": "可选：用于反证追问的一句话"}
+  ],
   "profile": {
     "summary": "一段50字左右的叙事性画像描述",
     "role_model": "用户钦佩的人及原因（从对话中提取）",
@@ -341,10 +371,16 @@ CAREER_INTERVIEW_SYSTEM_PROMPT = """
     "key_experience": "用户提到的最具体的经历（用于证据）",
     "leadership_style": "从对话推断的领导/协作风格",
     "growth_mindset": "成长型思维的体现",
-    "recommended_exploration": ["还可以探索的方向1", "还可以探索的方向2"]
+    "recommended_exploration": ["还可以探索的方向1", "还可以探索的方向2"],
+    "missing_followups": ["若继续访谈，最影响职业判断的分歧点还没澄清的一句话（不要只说缺字段）"]
   }
 }
-completion_score 按六维整体信息完整度估算 0-100；六维未覆盖时不超过 40。
+规则补充：
+- completion_score：仍表示「对话覆盖度」0-100；readiness_score 表示「职业建议可决策度」0-100（证据够具体、冲突已澄清、方向可区分时更高）。
+- dimension_metrics：必须为六个维度键各给一份对象；coverage/specificity/confidence/consistency 为 0-1 小数；saturated=true 表示该维证据已够，不必再为凑题数追问。
+- 若用户一句话里已同时暴露多维度信息，应同步提高相关维度的 coverage/evidence_count，并在 next_question_policy 里选择「信息增益最大」的追问，而不是死板按顺序。
+- conflict_points：当检测到表述张力时填写，用于后续反证追问。
+- evidence_cards：用短句沉淀可引用证据，便于前端展示与推荐解释。
 """
 
 MBTI_CLARIFIER_SYSTEM_PROMPT = """
@@ -1097,6 +1133,7 @@ def _public_profile_portrait_state(raw_state):
         "model": str(state.get("model") or PROFILE_PORTRAIT_MODEL).strip() or PROFILE_PORTRAIT_MODEL,
         "archetype_name": str(state.get("archetype_name") or "").strip(),
         "prompt_summary": str(state.get("prompt_summary") or "").strip(),
+        # 完整图像渲染提示词：供「输入输出链路」折叠区展示完整叙事，不再只显示摘要句
         "prompt_text": str(state.get("prompt_text") or "").strip(),
         "prompt_mode": str(state.get("prompt_mode") or "").strip(),
         "prompt_writer_mode": str(state.get("prompt_writer_mode") or "").strip(),
@@ -1165,27 +1202,32 @@ def _normalize_profile_portrait_context(raw_context):
         "next_steps": _clean_list(context.get("next_steps"), limit=4, item_limit=72),
         "missing_items": _clean_list(context.get("missing_items"), limit=4, item_limit=72),
         "uncertainty": _clean_list(context.get("uncertainty"), limit=4, item_limit=72),
+        "identity_narrative": _clean_text(context.get("identity_narrative"), 3600),
+        "assessment_prose": _clean_text(context.get("assessment_prose"), 3600),
+        "extended_tests_prose": _clean_text(context.get("extended_tests_prose"), 3600),
         "module_outputs": {
             "assessment": {
                 "status": _clean_text(assessment_output.get("status"), 16),
-                "summary": _clean_text(assessment_output.get("summary"), 240),
-                "chips": _clean_list(assessment_output.get("chips"), limit=6, item_limit=48),
-                "note": _clean_text(assessment_output.get("note"), 220),
+                "summary": _clean_text(assessment_output.get("summary"), 520),
+                "chips": _clean_list(assessment_output.get("chips"), limit=8, item_limit=48),
+                "note": _clean_text(assessment_output.get("note"), 320),
+                "detail_prose": _clean_text(assessment_output.get("detail_prose"), 3800),
             },
             "resume": {
                 "status": _clean_text(resume_output.get("status"), 16),
-                "summary": _clean_text(resume_output.get("summary"), 240),
-                "chips": _clean_list(resume_output.get("chips"), limit=6, item_limit=64),
+                "summary": _clean_text(resume_output.get("summary"), 480),
+                "chips": _clean_list(resume_output.get("chips"), limit=8, item_limit=64),
                 "note": _clean_text(resume_output.get("note"), 220),
             },
             "interview": {
                 "status": _clean_text(interview_output.get("status"), 16),
-                "summary": _clean_text(interview_output.get("summary"), 260),
-                "chips": _clean_list(interview_output.get("chips"), limit=6, item_limit=64),
-                "note": _clean_text(interview_output.get("note"), 220),
+                "summary": _clean_text(interview_output.get("summary"), 2400),
+                "chips": _clean_list(interview_output.get("chips"), limit=8, item_limit=64),
+                "note": _clean_text(interview_output.get("note"), 420),
                 "completion_score": _safe_score(interview_output.get("completion_score"), 0),
                 "usable_for_portrait": bool(interview_output.get("usable_for_portrait")),
                 "missing_followups": _clean_list(interview_output.get("missing_followups"), limit=4, item_limit=72),
+                "forced_supplement": _clean_text(interview_output.get("forced_supplement"), 2400),
             },
         },
         "prompt_request": {
@@ -1627,6 +1669,25 @@ def _merge_profile_portrait_brief(primary, fallback):
     return _normalize_profile_portrait_brief(merged) or fallback_brief or primary_brief or None
 
 
+def _pipeline_interview_supplement(context: dict) -> str:
+    """访谈弱信号时，用主画像与测评侧线索强制补一段可写入提示词的叙事。"""
+    parts = []
+    thesis = str(context.get("summary") or "").strip()
+    if thesis:
+        parts.append(f"主画像收敛：{thesis[:520]}")
+    roles = context.get("top_roles") or []
+    if roles:
+        parts.append(f"岗位线索：{'、'.join([str(r) for r in roles[:3] if r])}")
+    vals = context.get("work_values") or []
+    if vals:
+        parts.append(f"价值观：{'、'.join([str(v) for v in vals[:4] if v])}")
+    mbti = str(context.get("mbti") or "").strip()
+    hol = str(context.get("holland") or "").strip()
+    if mbti or hol:
+        parts.append(f"测评交叉：MBTI {mbti or '—'}；霍兰德 {hol or '—'}。")
+    return "\n".join(parts)
+
+
 def _build_profile_portrait_module_outputs(context):
     raw_modules = context.get("module_outputs") if isinstance(context.get("module_outputs"), dict) else {}
     assessment_raw = raw_modules.get("assessment") if isinstance(raw_modules.get("assessment"), dict) else {}
@@ -1636,25 +1697,37 @@ def _build_profile_portrait_module_outputs(context):
     assessment = {
         "status": str(assessment_raw.get("status") or ("complete" if (context.get("mbti") and context.get("holland")) else ("partial" if (context.get("mbti") or context.get("holland")) else "missing"))).strip(),
         "summary": str(assessment_raw.get("summary") or "｜".join([item for item in [f"MBTI {context.get('mbti')}" if context.get("mbti") else "", f"霍兰德 {context.get('holland')}" if context.get("holland") else ""] if item]) or "尚未形成稳定测评输出").strip(),
-        "chips": (assessment_raw.get("chips") if isinstance(assessment_raw.get("chips"), list) else [item for item in [context.get("mbti"), context.get("holland")] if item])[:6],
+        "chips": (assessment_raw.get("chips") if isinstance(assessment_raw.get("chips"), list) else [item for item in [context.get("mbti"), context.get("holland")] if item])[:8],
         "note": str(assessment_raw.get("note") or ("提供人格倾向与职业兴趣的基础锚点。" if (context.get("mbti") or context.get("holland")) else "测评未完成时，人物画像只使用其它模块做弱收敛。")).strip(),
     }
+    detail_merge = str(assessment_raw.get("detail_prose") or context.get("assessment_prose") or "").strip()
+    if detail_merge:
+        assessment["summary"] = f"{assessment['summary']}\n\n【测评长文本与类型补述】\n{detail_merge[:2400]}".strip()
+
     resume = {
         "status": str(resume_raw.get("status") or ("complete" if (context.get("resume_summary") or context.get("resume_roles") or context.get("resume_projects")) else "missing")).strip(),
         "summary": str(resume_raw.get("summary") or context.get("resume_summary") or "尚未形成可用的简历证据").strip(),
-        "chips": (resume_raw.get("chips") if isinstance(resume_raw.get("chips"), list) else ((context.get("resume_roles") or []) + (context.get("resume_skills") or [])[:3]))[:6],
+        "chips": (resume_raw.get("chips") if isinstance(resume_raw.get("chips"), list) else ((context.get("resume_roles") or []) + (context.get("resume_skills") or [])[:3]))[:8],
         "note": str(resume_raw.get("note") or ("提供角色线索、项目证据与技能关键词。" if (context.get("resume_summary") or context.get("resume_roles") or context.get("resume_projects")) else "没有简历时，人物画像缺少经历证据，只能更多依赖测评和访谈。")).strip(),
     }
     interview_completion_score = _safe_score(interview_raw.get("completion_score"), 0)
     interview = {
         "status": str(interview_raw.get("status") or ("complete" if interview_raw.get("usable_for_portrait") else ("partial" if (context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")) else "missing"))).strip(),
         "summary": str(interview_raw.get("summary") or context.get("interview_summary") or "尚未形成访谈摘要").strip(),
-        "chips": (interview_raw.get("chips") if isinstance(interview_raw.get("chips"), list) else ((context.get("interview_values") or []) + (context.get("interview_roles") or []) + (context.get("interview_evidence") or [])))[:6],
+        "chips": (interview_raw.get("chips") if isinstance(interview_raw.get("chips"), list) else ((context.get("interview_values") or []) + (context.get("interview_roles") or []) + (context.get("interview_evidence") or [])))[:8],
         "note": str(interview_raw.get("note") or ("即使提前结束，只要已经形成价值观、经历或协作风格信号，就可以进入首版画像。" if (context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")) else "没有访谈信号时，画像更像静态推断。")).strip(),
         "completion_score": interview_completion_score,
         "usable_for_portrait": bool(interview_raw.get("usable_for_portrait") or context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")),
         "missing_followups": (interview_raw.get("missing_followups") if isinstance(interview_raw.get("missing_followups"), list) else context.get("missing_items") or [])[:4],
     }
+    forced = str(interview_raw.get("forced_supplement") or "").strip()
+    iv_note = str(interview_raw.get("note") or interview.get("note") or "")
+    weak_iv = len(interview["summary"]) < 36 or "弱信号" in iv_note
+    if weak_iv:
+        extra = forced or _pipeline_interview_supplement(context)
+        if extra:
+            interview["summary"] = f"{interview['summary']}\n\n【访谈强制补述】\n{extra}".strip()
+            interview["usable_for_portrait"] = True
     return {"assessment": assessment, "resume": resume, "interview": interview}
 
 
@@ -1666,8 +1739,8 @@ def _normalize_profile_portrait_prompt_packet(raw_payload):
 
     return {
         "brief": _normalize_profile_portrait_brief(payload.get("brief")),
-        "prompt_summary": _clean_text(payload.get("prompt_summary"), 180),
-        "render_prompt": _clean_text(payload.get("render_prompt"), 2600),
+        "prompt_summary": _clean_text(payload.get("prompt_summary"), 360),
+        "render_prompt": _clean_text(payload.get("render_prompt"), 8000),
         "prompt_pipeline": payload.get("prompt_pipeline") if isinstance(payload.get("prompt_pipeline"), dict) else None,
         "prompt_evaluation": payload.get("prompt_evaluation") if isinstance(payload.get("prompt_evaluation"), dict) else None,
     }
@@ -1697,11 +1770,14 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
 你是职业规划产品的画像提示词编辑器。请根据 3 个输入模块的标准化输出，生成一份“人物明信片 brief”和一段“给图像模型使用的渲染提示词”。
 
 要求：
-1. 先消化测评输出、简历输出、访谈输出，不要逐条复述输入。
-2. 如果访谈只是提前结束但已经有稳定信号，也要给出可用于首版人物明信片的结论。
-3. brief 必须用于白底产品页面，信息要清晰、克制、可展示，不能写成长报告。
-4. render_prompt 必须是给图像模型的完整中文提示词，强调 3:4 纵向、单人、半写实职业插画、无文字、适合人物明信片主视觉。
-5. 如果输入不足，允许保守收敛，但不要伪造过强结论。
+1. 先消化测评输出、简历输出、访谈输出，不要逐条机械复述，但要**把关键气质、岗位语境与证据写进叙事**。
+2. 若访谈为弱信号或已合并「强制补述」，必须把补述当作可画面化的线索写进 render_prompt（协作风格、价值取向、推断性神态），并标明哪些是推断。
+3. brief 必须用于白底产品页面，信息要清晰、克制、可展示；brief 本身不是长文，但 **render_prompt 必须是长而完整的叙事级提示词**（建议不少于 500 汉字），像美术指导写给插画师的分镜说明。
+4. render_prompt 必须是给图像模型的**完整中文**提示词：明确 3:4 纵向、单人、半写实偏写实比例、电影感自然光、无文字无水印、适合人物明信片主视觉；写出**具体场景、机位、服装材质、道具、微表情与体态**。
+5. 若输入不足，允许保守收敛，标注不确定性，但不要省略画面约束与气质描写。
+6. global_context.identity_narrative、assessment_prose、extended_tests_prose 含「你是谁」级叙事与主测/扩展测评的文字描述；生成 render_prompt 时必须把这些**具体气质、场景、专业语境**融入画面，**禁止**只写 MBTI/霍兰德四字代码或标签堆砌。
+7. 若 extended_tests_prose 非空，图像提示中应体现扩展测评里的角色气质或情绪隐喻（抽象转化为职业场景与光影），仍禁止在画面中出现文字。
+8. 画风：偏「高端出版物插画 + 写实肤质与布料」、柔和窗光或阴天柔光、浅景深、干净背景；避免廉价滤镜、过度磨皮、赛博霓虹与 Q 版大头。
 
 严格输出 JSON：
 {
@@ -1756,6 +1832,9 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
             "gender": context.get("gender") or "",
             "uncertainty": context.get("uncertainty") or [],
             "missing_items": context.get("missing_items") or [],
+            "identity_narrative": context.get("identity_narrative") or "",
+            "assessment_prose": context.get("assessment_prose") or "",
+            "extended_tests_prose": context.get("extended_tests_prose") or "",
         },
         "prompt_request": {
             "card_style": str(prompt_request.get("card_style") or "人物明信片").strip(),
@@ -1772,7 +1851,7 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
             model,
             [{"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}],
             system_prompt=system_prompt,
-            max_tokens=1600,
+            max_tokens=4200,
         )
         normalized_packet = _normalize_profile_portrait_prompt_packet(parsed)
         merged_brief = _merge_profile_portrait_brief(normalized_packet.get("brief"), fallback_brief)
@@ -1809,9 +1888,9 @@ def _build_profile_portrait_prompt_packet(context, preset_brief=None):
                 system_prompt=(
                     "你是职业画像提示词优化器。"
                     "请根据上一版输出和自动评分结果，修复缺失字段、增强证据一致性，并输出同样结构的 JSON。"
-                    "不要扩写成报告，不要删除已经成立的角色判断。"
+                    "尤其要把 render_prompt 扩写到叙事级完整度（画面、光影、道具、神态），不要删除已成立的角色判断。"
                 ),
-                max_tokens=1400,
+                max_tokens=3600,
             )
             refined_packet = _normalize_profile_portrait_prompt_packet(refined)
             packet["brief"] = _merge_profile_portrait_brief(refined_packet.get("brief"), packet["brief"]) or packet["brief"]
@@ -1849,10 +1928,23 @@ def _build_profile_portrait_render_prompt(context, brief=None):
     evidence_text = _join_unique_text(normalized_brief.get("evidence_tags"), "；", 3)
     value_text = _join_unique_text(normalized_brief.get("value_tags"), "、", 3)
     support_roles = _join_unique_text(normalized_brief.get("support_roles"), " / ", 2)
+    identity_narrative = str(context.get("identity_narrative") or "").strip()
+    assessment_prose = str(context.get("assessment_prose") or "").strip()
+    extended_prose = str(context.get("extended_tests_prose") or "").strip()
+    narrative_sections = []
+    if identity_narrative:
+        narrative_sections.append(f"【叙事·你是谁（访谈与收敛结论，用于气质与神态）】\n{identity_narrative}")
+    if assessment_prose:
+        narrative_sections.append(f"【主测评文字（MBTI/霍兰德的具体描述，勿仅当作四字代码）】\n{assessment_prose}")
+    if extended_prose:
+        narrative_sections.append(f"【扩展测评（深层 MBTI / 趣味测评 / SBTI 等详细描述）】\n{extended_prose}")
+    narrative_block = "\n\n".join(narrative_sections)
     return (
         "请为职业规划产品生成一张 3:4 纵向单人半写实插画海报，用于白底页面里的任务名片主视觉。"
         "不要文字、不要水印、不要拼贴、不要多人、不要 UI 截图、不要夸张卡通。\n"
-        "人物身份：\n"
+        "以下「叙事依据」用于推断人物气质、微表情、肢体语言、工作环境与道具；画面中不得出现任何可读文字。\n"
+        + (f"{narrative_block}\n\n" if narrative_block else "")
+        + "人物身份（卡片字段）：\n"
         f"- 标题：{title}\n"
         f"- 职业定位：{subtitle}\n"
         f"- 主角色：{normalized_brief.get('primary_role') or '职业探索中'}\n"
@@ -1862,16 +1954,17 @@ def _build_profile_portrait_render_prompt(context, brief=None):
         f"- 工作价值观：{value_text or '稳定成长、结果导向'}\n"
         f"- 性别提示：{gender}\n"
         f"- 年龄提示：{visual_spec.get('subject_age_hint') or _infer_profile_portrait_age_hint(context)}\n"
-        "视觉要求：\n"
-        f"- 风格：{visual_spec.get('style') or '半写实职业插画'}\n"
-        f"- 气质：{visual_spec.get('mood') or '专业、可信赖、克制'}\n"
-        f"- 穿搭：{visual_spec.get('outfit') or '商务休闲职业穿搭'}\n"
-        f"- 道具：{visual_spec.get('props') or '平板、笔记本、工作记录工具'}\n"
-        f"- 场景：{visual_spec.get('scene') or '现代办公空间'}\n"
-        f"- 构图：{visual_spec.get('composition') or '单人半身到 2/3 身构图'}\n"
-        f"- 配色：{visual_spec.get('palette') or '石板蓝、白色、雾灰'}\n"
-        "输出要求：人物主体明确，画面简洁，适合放在产品页面左侧做职业推广海报。"
-        "负面要求：低清晰度、背景杂乱、比例错误、畸形手部、过度赛博朋克、漫画分镜、文字乱码。"
+        "视觉与画风（须严格遵守）：\n"
+        f"- 风格：{visual_spec.get('style') or '半写实职业插画，偏高端出版物/编辑插图质感，肤质与布料纹理清晰，避免塑料磨皮与廉价滤镜'}\n"
+        f"- 气质：{visual_spec.get('mood') or '专业、可信赖、沉稳；微表情自然，目光有焦点，肢体语言放松但不松散'}\n"
+        f"- 光效：自然窗光或阴天柔光，柔和体积光，适度 rim light；避免刺目顶光、霓虹赛博光、过度镜头光斑\n"
+        f"- 穿搭：{visual_spec.get('outfit') or '商务休闲或工程师风职业穿搭，材质可见（棉、针织、夹克），避免夸张 logo'}\n"
+        f"- 道具：{visual_spec.get('props') or '笔记本电脑、平板、记事本、中性水杯等职场道具，数量少而有序'}\n"
+        f"- 场景：{visual_spec.get('scene') or '明亮现代办公或实验室风工作台，背景干净略虚化（浅景深）'}\n"
+        f"- 构图：{visual_spec.get('composition') or '3:4 纵向，单人，胸像到 2/3 身，视线方向留白，主体居中偏三分线'}\n"
+        f"- 配色：{visual_spec.get('palette') or '雾蓝、燕麦白、板岩灰与少量暖木色点缀，整体低饱和'}\n"
+        "输出要求：人物主体明确，手部结构合理，画面信息密度适中，适合白底产品页左侧主视觉。"
+        "负面要求：低清晰度、杂乱背景、比例失调、畸形手部、Q 版大头、贴纸海报风、可读文字、水印、多人同框。"
     )
 
 
@@ -1930,6 +2023,9 @@ def _has_profile_portrait_signal(context):
             context.get("resume_projects"),
             context.get("resume_roles"),
             context.get("work_values"),
+            context.get("identity_narrative"),
+            context.get("assessment_prose"),
+            context.get("extended_tests_prose"),
         ]
     )
 
@@ -4415,7 +4511,10 @@ def _career_interview_progress_system_suffix(focus_dimension: str, progress: lis
         return ""
     fd = str(focus_dimension or "").strip() or "（请根据下表选择下一未完成维度）"
     return (
-        "\n\n【维度进度快照】（必须遵守；next_question 与 focus_dimension 要与下一未完成维度一致）\n"
+        "\n\n【维度进度快照】（必须遵守）\n"
+        "- 完成条件以「证据饱和」为主，不以凑满题数为目标：若某维已在对话中获得足够具体证据，可将 dimension_metrics 中该维 saturated 置为 true。\n"
+        "- 用户一句话可能同时覆盖多维：应同步提高相关维度的 coverage / evidence_count，并用 next_question_policy 选择信息增益最大的下一问。\n"
+        "- next_question 与 focus_dimension 应优先服务「最大缺口维度」或「冲突澄清」，而非死板按顺序；已答满 target 的维度不得再作为 focus_dimension。\n"
         + "\n".join(lines)
         + f"\n前端当前聚焦维度参考：{fd}"
     )
@@ -4451,6 +4550,117 @@ def _merge_career_interview_focus_with_progress(normalized: dict, client_progres
         if t > 0 and a < t:
             normalized["focus_dimension"] = name
             return
+
+
+def _career_interview_answered_target(client_progress: list, dim_name: str) -> tuple[int, int]:
+    for item in client_progress or []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("name") or "").strip() != dim_name:
+            continue
+        try:
+            return int(item.get("answered") or 0), int(item.get("target") or 0)
+        except (TypeError, ValueError):
+            return 0, 0
+    return 0, 0
+
+
+def _apply_next_question_policy_focus(normalized: dict, client_progress: list) -> None:
+    """在合法前提下，优先采用模型给出的 next_question_policy.target_dimension（动态选路）。"""
+    if not isinstance(normalized, dict):
+        return
+    pol = normalized.get("next_question_policy") if isinstance(normalized.get("next_question_policy"), dict) else {}
+    td = str(pol.get("target_dimension") or "").strip()
+    if td not in DEFAULT_CAREER_DIMENSIONS:
+        return
+    answered, target = _career_interview_answered_target(client_progress, td)
+    if target <= 0 or answered >= target:
+        return
+    normalized["focus_dimension"] = td
+
+
+def _clamp_unit_float(value, default=0.0):
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _attach_career_interview_engine_fields(raw_payload: dict, normalized: dict) -> None:
+    """归一化访谈引擎扩展字段：证据指标、假设分布、证据卡与冲突点。"""
+    payload = raw_payload if isinstance(raw_payload, dict) else {}
+    rs = payload.get("readiness_score")
+    if rs is not None:
+        normalized["readiness_score"] = _safe_score(rs, 0)
+    else:
+        normalized["readiness_score"] = _safe_score(normalized.get("completion_score"), 0)
+
+    pol = payload.get("next_question_policy") if isinstance(payload.get("next_question_policy"), dict) else {}
+    normalized["next_question_policy"] = {
+        "strategy": str(pol.get("strategy") or "").strip()[:56],
+        "target_dimension": str(pol.get("target_dimension") or "").strip(),
+        "rationale": str(pol.get("rationale") or "").strip()[:320],
+        "expected_information_gain": _clamp_unit_float(pol.get("expected_information_gain"), 0.0),
+    }
+
+    raw_dm = payload.get("dimension_metrics") if isinstance(payload.get("dimension_metrics"), dict) else {}
+    dim_metrics = {}
+    for name in DEFAULT_CAREER_DIMENSIONS:
+        block = raw_dm.get(name) if isinstance(raw_dm.get(name), dict) else {}
+        slots = [str(x).strip() for x in (block.get("missing_slots") or []) if str(x).strip()][:6]
+        try:
+            evc = int(block.get("evidence_count") or 0)
+        except (TypeError, ValueError):
+            evc = 0
+        evc = max(0, min(12, evc))
+        dim_metrics[name] = {
+            "coverage": _clamp_unit_float(block.get("coverage")),
+            "specificity": _clamp_unit_float(block.get("specificity")),
+            "confidence": _clamp_unit_float(block.get("confidence")),
+            "consistency": _clamp_unit_float(block.get("consistency")),
+            "evidence_count": evc,
+            "saturated": bool(block.get("saturated")),
+            "missing_slots": slots,
+        }
+    normalized["dimension_metrics"] = dim_metrics
+
+    ph = payload.get("profile_hypothesis") if isinstance(payload.get("profile_hypothesis"), dict) else {}
+    top_roles = []
+    for r in ph.get("top_roles") or []:
+        if not isinstance(r, dict):
+            continue
+        nm = str(r.get("name") or "").strip()
+        if not nm:
+            continue
+        top_roles.append({"name": nm[:48], "score": _clamp_unit_float(r.get("score"))})
+    normalized["profile_hypothesis"] = {
+        "top_roles": top_roles[:8],
+        "stable_traits": [str(x).strip() for x in (ph.get("stable_traits") or []) if str(x).strip()][:8],
+        "unresolved_conflicts": [str(x).strip() for x in (ph.get("unresolved_conflicts") or []) if str(x).strip()][:6],
+    }
+
+    cards = []
+    for c in payload.get("evidence_cards") or []:
+        if not isinstance(c, dict):
+            continue
+        cat = str(c.get("category") or "").strip()[:36]
+        if not cat:
+            continue
+        bullets = [str(x).strip() for x in (c.get("bullets") or []) if str(x).strip()][:10]
+        if bullets:
+            cards.append({"category": cat, "bullets": bullets})
+    normalized["evidence_cards"] = cards[:12]
+
+    cps = []
+    for cp in payload.get("conflict_points") or []:
+        if not isinstance(cp, dict):
+            continue
+        sm = str(cp.get("summary") or "").strip()
+        cq = str(cp.get("clarify_prompt") or "").strip()
+        if not sm and not cq:
+            continue
+        cps.append({"summary": sm[:220], "clarify_prompt": cq[:320]})
+    normalized["conflict_points"] = cps[:8]
 
 
 def _normalize_profile(raw_payload):
@@ -4583,6 +4793,8 @@ def _normalize_profile(raw_payload):
     if normalized["is_complete"] and not normalized["completion_score"]:
         normalized["completion_score"] = 100
 
+    _attach_career_interview_engine_fields(payload, normalized)
+
     normalized["assistant_reply"] = (
         normalized["next_question"]
         if not normalized["is_complete"]
@@ -4699,7 +4911,7 @@ def _call_openai_compatible_chat(base_url, api_key, model, messages, system_prom
         model,
         messages,
         system_prompt=system_prompt or CAREER_INTERVIEW_SYSTEM_PROMPT,
-        max_tokens=900,
+        max_tokens=1400,
     )
     return _normalize_profile(parsed)
 
@@ -7609,6 +7821,7 @@ def api_career_interview():
             system_prompt=system_prompt,
         )
         _merge_career_interview_focus_with_progress(result, client_progress)
+        _apply_next_question_policy_focus(result, client_progress)
         return jsonify(result)
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400

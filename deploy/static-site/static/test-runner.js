@@ -189,11 +189,18 @@
       btn.addEventListener("click", () => {
         state.answers[qId] = value;
         renderQuestion();
-        if (state.idx < totalCount() - 1) {
+        const total = totalCount();
+        if (state.idx < total - 1) {
           window.setTimeout(() => {
             state.idx += 1;
             renderQuestion();
           }, 120);
+        } else {
+          window.setTimeout(() => {
+            if (answeredCount() >= totalCount() && !state.submitting) {
+              submitTest();
+            }
+          }, 200);
         }
       });
       root.appendChild(btn);
@@ -226,8 +233,10 @@
     if (textEl) textEl.textContent = String(q.text || "");
     if (hintEl) {
       hintEl.textContent = answered >= total
-        ? "已完成全部作答，可点击“完成并查看完整结果”。"
-        : "点击选项后会自动进入下一题，也可手动点击“下一题”。";
+        ? state.submitting
+          ? "正在生成结果并跳转完整结果页…"
+          : "已完成全部作答，将自动进入完整结果页；也可点击下方按钮。"
+        : "点击选项后会自动进入下一题，最后一题选择后将自动提交；也可手动点击“下一题”。";
     }
 
     const answeredCurrent = state.answers[Number(q.id)] !== undefined;

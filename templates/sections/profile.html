@@ -353,7 +353,28 @@
     </div>
 
     <div id="profileFlowStep2" class="profile-flow-panel hidden">
-    <div class="resume-workbench resume-judge-workspace mb-6">
+    <div class="resume-workbench resume-judge-workspace resume-studio-skin mb-6">
+        <div class="resume-studio-bg-canvas" aria-hidden="true">
+            <div class="resume-studio-bg-orb"></div>
+            <div class="resume-studio-bg-orb"></div>
+            <div class="resume-studio-bg-orb"></div>
+        </div>
+        <div class="resume-studio-bg-grid" aria-hidden="true"></div>
+        <section class="resume-studio-top-nav">
+            <div class="resume-studio-nav-logo">
+                <span class="resume-studio-logo-icon">R</span>
+                <span>RESUME AUDIT</span>
+            </div>
+            <div class="resume-studio-nav-tabs" id="resumeStudioTabs">
+                <button type="button" id="resumeStudioTabInput" class="resume-studio-nav-tab active" onclick="showResumeJudgeInputView()"><span>01</span>简历输入</button>
+                <button type="button" id="resumeStudioTabLoading" class="resume-studio-nav-tab" disabled><span>02</span>分析中</button>
+                <button type="button" id="resumeStudioTabReport" class="resume-studio-nav-tab" disabled><span>03</span>诊断结果</button>
+            </div>
+            <div class="resume-studio-nav-status">
+                <span class="resume-studio-status-dot"></span>
+                <strong id="resumeStudioLiveStatus">输入阶段</strong>
+            </div>
+        </section>
         <section class="resume-judge-workspace-header">
             <div class="resume-judge-heading">
                 <p class="resume-judge-heading-kicker">Resume Studio</p>
@@ -494,176 +515,30 @@
     </div>
 
     <div id="profileFlowStep3" class="profile-flow-panel hidden">
-    <div class="rounded-3xl bg-gradient-to-r from-sky-700 via-cyan-700 to-slate-800 p-6 text-white shadow-lg mb-6 overflow-hidden relative">
-        <div class="absolute top-4 right-4">
-            <span id="careerInterviewHeroStatus" class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">等待系统模型配置</span>
-        </div>
-        <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-                <p class="text-xs font-semibold tracking-[0.22em] text-cyan-100 uppercase">Interview Agent</p>
-                <h3 class="mt-2 text-2xl font-bold">职业访谈引擎正式纳入主流程</h3>
-                <p class="mt-3 text-sm leading-7 text-cyan-50/90">
-                    当前访谈结果会直接同步到统一画像、岗位匹配和报告页。后续的外部记忆、资源推送、反思和提醒保留状态接口，先以明确占位展示。
+    <div class="profile-ci-hero" data-ci-hero>
+        <div class="profile-ci-hero-noise" aria-hidden="true"></div>
+        <div class="profile-ci-hero-glow profile-ci-hero-glow-a" aria-hidden="true"></div>
+        <div class="profile-ci-hero-glow profile-ci-hero-glow-b" aria-hidden="true"></div>
+        <div class="profile-ci-hero-inner">
+            <div class="profile-ci-hero-main">
+                <p class="profile-ci-hero-kicker">Interview Agent</p>
+                <h3 class="profile-ci-hero-title">职业访谈工作台</h3>
+                <p class="profile-ci-hero-lead">
+                    结构化多轮对话沉淀可引用的职业证据；收敛后的假设与证据卡将写入统一画像，并参与岗位匹配与报告生成。
                 </p>
-                <div class="mt-5 flex flex-wrap gap-3">
-                    <button onclick="openCareerInterviewModal()" class="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-cyan-50 transition-all">开始职业访谈</button>
+                <div class="profile-ci-hero-cta">
+                    <button type="button" class="profile-ci-hero-btn" onclick="openCareerInterviewModal()">进入访谈</button>
+                    <span id="careerInterviewHeroStatus" class="profile-ci-hero-chip">等待系统模型配置</span>
                 </div>
-                <p id="careerInterviewHeroHint" class="mt-4 text-xs text-cyan-100/90">点击开始后会在本页展开工作台（不再遮挡整屏），可上下滚动对照说明与下方「访谈结果」。</p>
+                <p id="careerInterviewHeroHint" class="profile-ci-hero-hint">配置就绪后进入全屏工作台；关闭或返回本页即可查看下方「画像收敛」摘要。</p>
             </div>
-            <div>
-                <p class="text-sm font-semibold text-white mb-3">维度推进</p>
-                <div id="careerInterviewHeroDimensionProgress" class="career-progress-grid mb-4"></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-cyan-100">核心维度</p>
-                        <p class="mt-1 text-sm font-semibold">职业兴趣 / 工作价值观 / 行动证据</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-cyan-100">状态接口</p>
-                        <p class="mt-1 text-sm font-semibold">动态记忆 / 规划 / 反思</p>
-                    </div>
+            <aside class="profile-ci-hero-aside" aria-label="六维推进">
+                <div class="profile-ci-hero-aside-head">
+                    <span class="profile-ci-hero-aside-title">维度推进</span>
+                    <span class="profile-ci-hero-aside-sub">六维目标 · 有效回答轮次</span>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="careerInterviewModal" class="career-interview-modal hidden" role="region" aria-label="职业访谈工作台">
-        <div class="career-interview-shell">
-            <aside class="career-interview-side">
-                <div class="career-interview-side-head">
-                    <div>
-                        <p class="career-interview-side-kicker">访谈引导</p>
-                        <h3 class="career-interview-side-title">职业访谈采集台</h3>
-                        <p class="career-interview-side-copy">先选一条线索，再补一句真实经历。访谈结果会直接进入统一画像、岗位匹配和规划报告。</p>
-                    </div>
-                    <button type="button" class="career-close-btn" onclick="closeCareerInterviewModal()" aria-label="收起职业访谈工作台">&times;</button>
-                </div>
-
-                <div class="career-side-panel career-side-panel-spotlight">
-                    <p class="career-summary-label">当前聚焦</p>
-                    <div class="career-interview-focus-row">
-                        <div>
-                            <span class="career-focus-label">主题</span>
-                            <strong id="careerInterviewModalFocus">职业兴趣</strong>
-                        </div>
-                        <div class="career-focus-progress">
-                            <span class="career-focus-label">进度</span>
-                            <strong id="careerInterviewModalProgress">0%</strong>
-                        </div>
-                    </div>
-                    <div id="careerInterviewModalDimensionProgress" class="career-progress-grid career-progress-grid-compact"></div>
-                </div>
-
-                <div class="career-side-panel">
-                    <p class="career-summary-label">模型状态</p>
-                    <div class="career-config-status-row">
-                        <span>当前模型</span>
-                        <span id="careerInterviewConfigStatus">未配置</span>
-                    </div>
-                    <p class="career-interview-side-copy">系统会统一驱动追问逻辑。你只需要讲清偏好、经历和选择依据。</p>
-                    <div class="career-config-actions">
-                        <button type="button" onclick="openSettingsPanel()" class="career-secondary-btn">API 配置</button>
-                    </div>
-                </div>
+                <div id="careerInterviewHeroDimensionProgress" class="career-progress-grid profile-ci-hero-dim-grid"></div>
             </aside>
-
-            <main class="career-interview-main">
-                <div class="career-interview-main-head">
-                    <div>
-                        <p class="career-interview-main-kicker">访谈工作台</p>
-                        <h3 class="career-interview-main-title">从一个真实场景开始，比空白输入更容易说清楚</h3>
-                        <p class="career-interview-main-copy">这里不是普通聊天框，而是一块带引导的访谈板。系统会先帮你起头，再围绕你的回答继续追问。</p>
-                    </div>
-                    <div class="career-chat-toolbar">
-                        <button id="careerInterviewStartBtn" type="button" onclick="startCareerInterview()" class="career-primary-btn">立即开始访谈</button>
-                        <button type="button" onclick="clearCareerInterviewSession()" class="career-secondary-btn">清空当前访谈</button>
-                    </div>
-                </div>
-
-                <section class="career-interview-playbook">
-                    <div class="career-interview-playbook-head">
-                        <div class="career-interview-playbook-copy">
-                            <p class="career-interview-main-kicker">访谈建议</p>
-                            <h4 id="careerInterviewPromptHeadline" class="career-interview-playbook-title">先从一个最贴近你的场景开始</h4>
-                            <p id="careerInterviewPromptBody" class="career-interview-playbook-body">点一下场景卡或快捷标签，系统会帮你把第一句话写进输入框。</p>
-                        </div>
-                        <div class="career-interview-current-card">
-                            <span class="career-interview-section-label">当前问题</span>
-                            <p id="careerInterviewCurrentQuestion" class="career-interview-question-text">模型就绪后，会先给你一个更容易回答的起始问题。</p>
-                        </div>
-                    </div>
-
-                    <div class="career-interview-playbook-grid">
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">1</span>
-                            <div>
-                                <strong>先选一个场景</strong>
-                                <p>不要一上来回答“我适合什么工作”，先从你想靠近的职业画面开始。</p>
-                            </div>
-                        </article>
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">2</span>
-                            <div>
-                                <strong>再点一个标签</strong>
-                                <p>用快捷标签把话头带起来，再补一句“为什么”，会比空白输入更自然。</p>
-                            </div>
-                        </article>
-                        <article class="career-interview-step-card">
-                            <span class="career-interview-step-index">3</span>
-                            <div>
-                                <strong>尽量举真实经历</strong>
-                                <p>越接近项目、任务、选择依据和实际行动，最终画像就越稳定。</p>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div class="career-interview-answer-note">
-                        <span class="career-interview-section-label">回答提示</span>
-                        <p id="careerInterviewGuideText" class="career-interview-guide-text">先点一个场景，再补一句“为什么会被它吸引”，比空白输入更容易说清楚。</p>
-                    </div>
-                </section>
-
-                <section class="career-interview-scene-board">
-                    <div class="career-interview-section-head">
-                        <div>
-                            <p class="career-interview-main-kicker">场景入口</p>
-                            <h4 class="career-block-title">探索场景</h4>
-                        </div>
-                        <p class="career-chat-hint">把模糊兴趣先变成具体画面。</p>
-                    </div>
-                    <div id="careerInterviewSceneGrid" class="career-scene-grid"></div>
-                </section>
-
-                <section class="career-interview-chip-board">
-                    <div class="career-interview-section-head">
-                        <div>
-                            <p class="career-interview-main-kicker">快捷开场</p>
-                            <h4 class="career-block-title">快捷标签</h4>
-                        </div>
-                        <p class="career-chat-hint">适合先说关键词，再往下补充原因。</p>
-                    </div>
-                    <div id="careerInterviewQuickChips" class="career-quick-chip-row"></div>
-                </section>
-
-                <div id="careerInterviewMessages" class="career-chat-thread"></div>
-                <p id="careerInterviewHint" class="career-chat-hint">模型就绪后可开始访谈。</p>
-
-                <div id="careerInterviewComposer" class="career-chat-composer hidden">
-                    <div class="career-chat-toolbar career-chat-toolbar-stack">
-                        <div class="career-chat-toolbar-copy">
-                            <span class="career-interview-section-label">输入你的回答</span>
-                            <p class="career-chat-hint">可以先用上面的场景卡或快捷标签起头，再补一段真实经历。</p>
-                        </div>
-                        <button id="careerInterviewVoiceBtn" type="button" class="career-secondary-btn career-voice-btn" onclick="toggleCareerInterviewVoice()">语音输入</button>
-                    </div>
-                    <div id="careerInterviewSelectedScene" class="career-chat-anchor hidden"></div>
-                    <textarea id="careerInterviewInput" rows="4" onkeydown="handleCareerInterviewInputKeydown(event)" class="career-chat-textarea" placeholder="输入你的回答，尽量给出真实经历、具体任务或行动证据。"></textarea>
-                    <div class="career-chat-composer-actions">
-                        <button type="button" onclick="finishCareerInterview()" class="career-secondary-btn">完成访谈</button>
-                        <button id="careerInterviewSendBtn" type="button" onclick="submitCareerInterviewAnswer()" class="career-primary-btn">发送并继续</button>
-                    </div>
-                </div>
-            </main>
         </div>
     </div>
 
@@ -691,50 +566,19 @@
             </div>
         </div>
 
-        <div id="careerInterviewContent" class="hidden space-y-5">
-            <div class="career-result-topline">
+        <div id="careerInterviewContent" class="hidden space-y-4">
+            <div class="career-result-topline career-result-topline-refined">
                 <div>
                     <p class="text-xs text-gray-500">当前探索</p>
                     <p id="careerInterviewResultFocus" class="text-sm font-semibold text-gray-800">等待开始</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500">工作价值观</p>
+                    <p class="text-xs text-gray-500">工作价值观信号</p>
                     <div id="careerInterviewValueTags" class="career-tag-row"></div>
                 </div>
             </div>
 
-            <div class="career-summary-card">
-                <p class="career-summary-label">叙事性画像</p>
-                <p id="careerInterviewSummary" class="career-summary-text">开始对话后，这里会逐渐形成你的叙事性画像。</p>
-            </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
-                <div class="space-y-4">
-                    <div>
-                        <p class="career-block-title">职业榜样</p>
-                        <div id="careerInterviewInterestTags" class="career-tag-row"></div>
-                    </div>
-                    <div>
-                        <p class="career-block-title">协作风格</p>
-                        <div id="careerInterviewRoleTags" class="career-tag-row"></div>
-                    </div>
-                    <div>
-                        <p class="career-block-title">维度分布</p>
-                        <div id="careerInterviewDimensionList" class="career-dimension-list"></div>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="career-side-panel">
-                        <p class="career-block-title">关键经历</p>
-                        <div id="careerInterviewEvidenceList" class="career-list"></div>
-                    </div>
-                    <div class="career-side-panel">
-                        <p class="career-block-title">探索方向</p>
-                        <div id="careerInterviewActionList" class="career-list"></div>
-                    </div>
-                </div>
-            </div>
+            <div id="careerInterviewEnginePanel" class="career-engine-panel career-engine-panel-elevated hidden" aria-live="polite"></div>
         </div>
     </div>
     <div class="profile-flow-actions mb-6">
@@ -775,8 +619,8 @@
         <!-- 数据来源状态条 -->
         <div id="profileSourcePills" class="profile-source-pills-row"></div>
 
-        <!-- 能力速览 -->
-        <section class="profile-capability-strip-section">
+        <!-- 能力速览（分数来自画像数据动态推断；任务海报生成中会显示占位） -->
+        <section id="profileCapabilityStripSection" class="profile-capability-strip-section" aria-live="polite">
             <div class="profile-capability-strip-head">
                 <div>
                     <p class="profile-portrait-kicker">能力速览</p>

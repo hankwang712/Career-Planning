@@ -1,12 +1,116 @@
 {
-  "window_snapshot_key": "2026-04-11",
-  "window_snapshot_label": "2026-04-11 12:00",
-  "next_refresh_label": "2026-04-12 12:00",
+  "window_snapshot_key": "2026-04-12",
+  "window_snapshot_label": "2026-04-12 12:00",
+  "next_refresh_label": "2026-04-13 12:00",
   "refresh_rule": "每日 12:00 更新",
-  "snapshot_key": "2026-04-11",
-  "snapshot_label": "2026-04-11 12:00",
-  "generated_at": "2026-04-11 15:48",
+  "snapshot_key": "2026-04-12",
+  "snapshot_label": "2026-04-12 12:00",
+  "generated_at": "2026-04-12 12:19",
   "items": [
+    {
+      "title": "谷歌开源 Colab MCP Server，AI 智能体可云端运行代码",
+      "url": "https://www.infoq.cn/article/Z71AB0lSu0DcEhSNFXqQ?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-12T18:00:00+08:00",
+      "published_label": "04-12 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "可复制的 AI Coding 全栈实战：比 OpenSpec 更轻量、更丝滑｜QCon北京",
+      "url": "https://www.infoq.cn/article/4wNXLbIeHGEWrGNUwOjc?utm_source=rss&utm_medium=article",
+      "summary": "点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-12T18:00:00+08:00",
+      "published_label": "04-12 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Walmart-owned Flipkart, Amazon are squeezing India’s quick commerce startups",
+      "url": "https://techcrunch.com/2026/04/11/walmart-owned-flipkart-amazon-are-squeezing-indias-quick-commerce-startups/",
+      "summary": "Flipkart's ongoing expansion beyond major cities and heavy discounting is raising risks for Ind…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-12T11:00:00+08:00",
+      "published_label": "04-12 11:00",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "雄安新区2026年就业服务进校园活动开始了 - 新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxPSTA3N0JCb0FLUW5VTWMwUWdzbTdEY3F2dWNfdFhzUVpieFY1VzJSdWhMWDJaN2Z0LU8tZHpQZGM0UFVIUEl2MmFudkJ6MFpabzhSNzJIaHBtbG5oYmVrQ0xTRVppbXpCdDgzcENSNE5teW1jM2JZRDlacElFY3QzYmxnenJwcjU4WTBFSTVwaVVaMkI1U0RrUQ?oc=5",
+      "summary": "雄安新区2026年就业服务进校园活动开始了 新浪财经",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-12T10:43:26+08:00",
+      "published_label": "04-12 10:43",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ]
+    },
+    {
+      "title": "Sam Altman responds to ‘incendiary’ New Yorker article after attack on his home",
+      "url": "https://techcrunch.com/2026/04/11/sam-altman-responds-to-incendiary-new-yorker-article-after-attack-on-his-home/",
+      "summary": "The OpenAI CEO's new blog post responds to both an apparent attack on his home and an in-depth…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-12T01:18:22+08:00",
+      "published_label": "04-12 01:18",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Your article about AI doesn’t need AI art",
+      "url": "https://www.theverge.com/ai-artificial-intelligence/910460/new-yorker-david-szauder-illustration-generative-ai",
+      "summary": "The illustration for The New Yorker's profile of OpenAI CEO Sam Altman is a jump scare. Altman…",
+      "source": "The Verge / 科技职场",
+      "published_at": "2026-04-11T23:00:00+08:00",
+      "published_label": "04-11 23:00",
+      "topic": "科技职场",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "Nvidia-backed SiFive hits $3.65 billion valuation for open AI chips",
+      "url": "https://techcrunch.com/2026/04/11/nvidia-backed-sifive-hits-3-65-billion-valuation-for-open-ai-chips/",
+      "summary": "The deal is interesting for a number of reasons, including that SiFive's chip designs are based…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-11T22:03:00+08:00",
+      "published_label": "04-11 22:03",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "AI models are terrible at betting on soccer—especially xAI Grok",
+      "url": "https://arstechnica.com/ai/2026/04/ai-models-are-terrible-at-betting-on-soccer-especially-xai-grok/",
+      "summary": "Systems from Google, OpenAI, Anthropic, and xAI struggle with the Premier League.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-04-11T19:15:17+08:00",
+      "published_label": "04-11 19:15",
+      "topic": "开发与行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "tech"
+      ]
+    },
     {
       "title": "Cloudflare 与苏黎世联邦理工学院概述了基于 AI 的缓存优化方法",
       "url": "https://www.infoq.cn/article/e6qh5DKlDApGZGxxgKZO?utm_source=rss&utm_medium=article",
@@ -44,6 +148,20 @@
       "topic": "技术趋势",
       "relevance_score": 2,
       "match_tags": [
+        "tech"
+      ]
+    },
+    {
+      "title": "How the Internet Broke Everyone’s Bullshit Detectors",
+      "url": "https://www.wired.com/story/how-the-internet-broke-everyones-bullshit-detectors/",
+      "summary": "From AI-generated images to restricted satellite data, the systems used to verify what’s real o…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-11T17:30:00+08:00",
+      "published_label": "04-11 17:30",
+      "topic": "AI 与工作",
+      "relevance_score": 3,
+      "match_tags": [
+        "career",
         "tech"
       ]
     },
@@ -125,6 +243,19 @@
       "relevance_score": 3,
       "match_tags": [
         "tech"
+      ]
+    },
+    {
+      "title": "江苏苏州：公益招聘会助力大学生就业 - 中新社图片网",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE9wblJpc2ZDb3FIV2NsNF94ZHd2LVpiamtYaUtINzUxd0RNRXNGZjk1OUN3dG82Z0E3YWNQMmZ5bFpwTFVDeERKbEgxM0M5T2dZR19yVTNENnBYdlFxQWlRV1FIWkc0NGMwY25SM1p2eGstSE10MmlUaQ?oc=5",
+      "summary": "江苏苏州：公益招聘会助力大学生就业 中新社图片网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-11T02:07:32+08:00",
+      "published_label": "04-11 02:07",
+      "topic": "求职就业",
+      "relevance_score": 5,
+      "match_tags": [
+        "career"
       ]
     },
     {
@@ -389,9 +520,9 @@
       ]
     },
     {
-      "title": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 - qq.com",
+      "title": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 - 腾讯新闻",
       "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFA0X0E3U3NjUnltMHo2ZTVVX1B0R3BVNWJmSVA1bTZ1a2xfMkw5RDBlX3RpRGdPeUdUMlRkcXItLTJlWFA1NnJEdkRvS2thNVlrTnAxOE9n?oc=5",
-      "summary": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 qq.com",
+      "summary": "游戏业大佬实践：AI如何改变游戏编程？程序员招聘标准彻底变天 腾讯新闻",
       "source": "Google News / 程序员就业",
       "published_at": "2026-04-10T10:38:12+08:00",
       "published_label": "04-10 10:38",
@@ -532,138 +663,6 @@
       "match_tags": [
         "tech"
       ]
-    },
-    {
-      "title": "乌鲁木齐：招聘会助力大学生就业 - jyb.cn",
-      "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE4zVXQ3VDZ0eGlQNC1YYm5ERlVSUFY4ZXBoXzlhd2xHYlBnZXpLenh6MGtuR3lsb01BR2VLWW82cTdmZ1VRVlk3amFES1N6STFVRUtJTHNxQWZXRHIyd0Nqc2lKOHVldURYS1JqTXlOcjRNQ0RZby1N?oc=5",
-      "summary": "乌鲁木齐：招聘会助力大学生就业 jyb.cn",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-04-10T03:34:45+08:00",
-      "published_label": "04-10 03:34",
-      "topic": "求职就业",
-      "relevance_score": 5,
-      "match_tags": [
-        "career"
-      ]
-    },
-    {
-      "title": "Meta AI app climbs to No. 5 on the App Store after Muse Spark launch",
-      "url": "https://techcrunch.com/2026/04/09/meta-ai-app-climbs-to-no-5-on-the-app-store-after-muse-spark-launch/",
-      "summary": "The app was ranking No. 57 on the App Store just before Meta AI's new model launched. Now it's…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-10T03:10:07+08:00",
-      "published_label": "04-10 03:10",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Is Anthropic limiting the release of Mythos to protect the internet — or Anthropic?",
-      "url": "https://techcrunch.com/2026/04/09/is-anthropic-limiting-the-release-of-mythos-to-protect-the-internet-or-anthropic/",
-      "summary": "Anthropic said this week that it limited the release of its newest model, dubbed Mythos, becaus…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-10T02:50:05+08:00",
-      "published_label": "04-10 02:50",
-      "topic": "全球科技",
-      "relevance_score": 4,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "Google and Intel deepen AI infrastructure partnership",
-      "url": "https://techcrunch.com/2026/04/09/google-and-intel-deepen-ai-infrastructure-partnership/",
-      "summary": "The two tech giants are looking to co-develop custom chips, at a time when demand for CPUs is h…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-10T02:27:47+08:00",
-      "published_label": "04-10 02:27",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "How to make the Startup Battlefield Top 20 — and what every company gets regardless",
-      "url": "https://techcrunch.com/2026/04/09/how-to-make-the-startup-battlefield-top-20-and-what-every-company-gets-regardless/",
-      "summary": "Every founder who applies to Startup Battlefield wants the same thing: the Disrupt Main Stage.…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-10T02:01:48+08:00",
-      "published_label": "04-10 02:01",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "The 70-Person AI Image Startup Taking on Silicon Valley's Giants",
-      "url": "https://www.wired.com/story/black-forest-labs-ai-image-generation/",
-      "summary": "Black Forest Labs has long punched above its weight in the AI image generation space. Its next…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-10T02:00:00+08:00",
-      "published_label": "04-10 02:00",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "聚焦AI，深耕智造丨2026 赋能开发者大会圆满举办！",
-      "url": "https://www.infoq.cn/article/UFSb4zOXu9IKc6lhXZdQ?utm_source=rss&utm_medium=article",
-      "summary": "点击查看原文>",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-10T01:31:40+08:00",
-      "published_label": "04-10 01:31",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "Sierra’s Bret Taylor says the era of clicking buttons is over",
-      "url": "https://techcrunch.com/2026/04/09/sierras-bret-taylor-says-the-era-of-clicking-buttons-is-over/",
-      "summary": "Last month, Sierra launched Ghostwriter, an agent designed to build other agents. With this “ag…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-10T01:20:50+08:00",
-      "published_label": "04-10 01:20",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
-    },
-    {
-      "title": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI|日经225|美国|甲骨文|规模|岗位_手机新浪网 - 新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE5oZWNKVl9Fbl9DN21zc29veUREQ0lvY3NneDVzMlM4U3lNWHRNdXBoek9Dbkp3cUhhNzE5U3JFc0ZGTE95d0VSbk5QclpTanlfOWFwTFNvSklNbE9pNHE4SkgwenMwdVpib2NjaUJ0Y3h4V2poVDFQTHJCU1Y0UUE?oc=5",
-      "summary": "老板裁员最锋利的刀！科技行业一季度狂裁8万人：50%因为AI|日经225|美国|甲骨文|规模|岗位_手机新浪网 新浪财经",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-04-09T23:49:18+08:00",
-      "published_label": "04-09 23:49",
-      "topic": "科技行业变化",
-      "relevance_score": 7,
-      "match_tags": [
-        "career",
-        "tech"
-      ]
-    },
-    {
-      "title": "First, Tesla canceled the Model 2—now it's working on a new small EV",
-      "url": "https://arstechnica.com/cars/2026/04/first-tesla-canceled-the-model-2-now-its-working-on-a-new-small-ev/",
-      "summary": "After the pivot to humanoid robots and AI, does Tesla want to be a car company again?",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-04-09T22:10:40+08:00",
-      "published_label": "04-09 22:10",
-      "topic": "开发与行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ]
     }
   ],
   "status": "ready",
@@ -676,8 +675,8 @@
       "topic": "职业规划",
       "kind": "search",
       "status": "ok",
-      "raw_count": 46,
-      "kept_count": 19,
+      "raw_count": 48,
+      "kept_count": 17,
       "error": ""
     },
     {
@@ -686,7 +685,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 48,
+      "kept_count": 44,
       "error": ""
     },
     {
@@ -695,7 +694,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 70,
-      "kept_count": 7,
+      "kept_count": 4,
       "error": ""
     },
     {
@@ -704,7 +703,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 18,
+      "kept_count": 22,
       "error": ""
     },
     {
@@ -712,7 +711,7 @@
       "topic": "科技行业变化",
       "kind": "search",
       "status": "ok",
-      "raw_count": 96,
+      "raw_count": 100,
       "kept_count": 13,
       "error": ""
     },
@@ -729,9 +728,9 @@
       "source": "IT之家",
       "topic": "科技行业",
       "kind": "direct",
-      "status": "ok",
+      "status": "empty",
       "raw_count": 60,
-      "kept_count": 4,
+      "kept_count": 0,
       "error": ""
     },
     {
@@ -740,7 +739,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 7,
+      "kept_count": 9,
       "error": ""
     },
     {
@@ -758,16 +757,16 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 1,
+      "kept_count": 2,
       "error": ""
     },
     {
       "source": "The Verge",
       "topic": "科技职场",
       "kind": "direct",
-      "status": "empty",
+      "status": "ok",
       "raw_count": 10,
-      "kept_count": 0,
+      "kept_count": 1,
       "error": ""
     }
   ]

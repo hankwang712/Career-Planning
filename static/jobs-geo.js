@@ -537,9 +537,17 @@
   function bindResize() {
     if (state.resizeBound) return;
     state.resizeBound = true;
-    window.addEventListener("resize", () => {
+    const doResize = () => {
       if (state.chart) state.chart.resize();
-    });
+    };
+    window.addEventListener("resize", doResize);
+    const mapEl = document.getElementById("jobsChinaMap");
+    if (mapEl && typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(() => {
+        window.requestAnimationFrame(doResize);
+      });
+      ro.observe(mapEl);
+    }
   }
 
   function buildCityScatterData() {
@@ -737,6 +745,10 @@
         }
       ]
     }, true);
+
+    window.requestAnimationFrame(() => {
+      if (state.chart) state.chart.resize();
+    });
 
     if (state.selectedProvince && state.insights.provinceMap.has(state.selectedProvince)) {
       state.chart.dispatchAction({ type: "select", seriesIndex: 0, name: state.selectedProvince });

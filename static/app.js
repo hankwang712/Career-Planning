@@ -475,6 +475,7 @@ const careerInterviewState = {
   messages: [],
   result: null,
   completionScore: 0,
+  readinessScore: 0,
   focusDimension: "职业兴趣",
   profileBasics: getDefaultProfileBasics(),
   helperAnchor: ""
@@ -485,6 +486,13 @@ const careerInterviewVoiceState = {
   listening: false,
   supported: null
 };
+
+/** 职业访谈输入框自动增高时的最大高度（与 CSS max-height: 14rem 对齐） */
+const CAREER_INTERVIEW_INPUT_MAX_HEIGHT_PX = 224;
+
+const CAREER_VOICE_MIC_SVG = `<svg class="career-voice-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+
+const CAREER_VOICE_STOP_SVG = `<svg class="career-voice-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
 
 careerInterviewState.dimensionProgress = [];
 
@@ -579,7 +587,7 @@ async function ensureJobsGeoAssets() {
     jobsGeoAssetsPromise = (async () => {
       await loadScriptOnce("/static/vendor/echarts.min.js?v=20260319-lazy-geo", "echarts");
       await loadScriptOnce("/static/vendor/china.js?v=20260318-geo", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js?v=20260408-geo-salary-ui-v1", "jobs-geo");
+      await loadScriptOnce("/static/jobs-geo.js?v=20260414-geo-resize-observer-v1", "jobs-geo");
     })().catch((error) => {
       jobsGeoAssetsPromise = null;
       throw error;
@@ -829,6 +837,9 @@ const profilePortraitTaskState = {
   loading: false,
   stageIndex: 0,
   stageTimer: null,
+  pulseTimer: null,
+  pulseIndex: 0,
+  startedAt: 0,
   mode: "render"
 };
 
@@ -4190,7 +4201,6 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
   const verdict = resumeJudgeVerdictPayload(state, profile, matcher, analysisMode, recommendedDirections, conclusionItems);
   const highlightDeck = resumeJudgeResolveDeck(state, profile, matcher, analysisMode, verdict);
   const quickStats = resumeJudgeQuickStatItems(state, profile, matcher, analysisMode, recommendedDirections);
-  const templateText = resumeJudgeTemplateText(state, profile, matcher);
   const modeLabel = analysisMode === "resume_review" ? "简历诊断模式" : "岗位匹配模式";
   const subtitle = state?.analyzed_at
     ? `最近生成于 ${formatUnixTime(state.analyzed_at)}`
@@ -4271,28 +4281,36 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
         ${riskRadarHtml}
       </section>
 
-      <section class="resume-df-section resume-md-fusion">
+      <section class="resume-df-section resume-md-fusion resume-deep-launch-section">
         <p class="resume-df-section-kicker">完整深度诊断</p>
-        <div class="resume-md-fusion-gate">
-          <p class="resume-md-fusion-hint">在独立全屏页中查看与审计演示页一致的步骤标签、指标卡与雷达图布局；内容来自当前账号最近一次分析结果。</p>
-          <button type="button" class="resume-hj-action-btn primary" onclick="openResumeReportPage()" ${hasDeepReport ? "" : "disabled"}>${hasDeepReport ? "打开完整深度诊断" : "等待分析完成"}</button>
-        </div>
-      </section>
-
-      <section class="resume-df-section resume-hj-source-panel">
-        <p class="resume-df-section-kicker">简历正文</p>
-        <div class="resume-hj-card-head resume-df-code-head">
-          <button type="button" class="resume-hj-copy-btn" onclick="copyResumeCodeBlock('resumeJudgeFullResume')">复制全文</button>
-        </div>
-        <div class="resume-hj-evidence-tabs">
-          <button type="button" id="resumeJudgeEvidenceTabStructured" class="resume-hj-evidence-tab active" onclick="switchResumeJudgeEvidenceView('structured')">结构化视图</button>
-          <button type="button" id="resumeJudgeEvidenceTabRaw" class="resume-hj-evidence-tab" onclick="switchResumeJudgeEvidenceView('raw')">原文视图</button>
-        </div>
-        <div class="resume-hj-code-shell">
-          <pre id="resumeJudgeStructuredResumeView" class="resume-hj-code-pre"><code>${escHtml(templateText)}</code></pre>
-          <pre id="resumeJudgeRawResumeView" class="resume-hj-code-pre hidden"><code>${escHtml(String(state?.analysis_result || "暂无原文视图内容。").trim() || "暂无原文视图内容。")}</code></pre>
-          <pre id="resumeJudgeFullResume" class="hidden"><code>${escHtml(templateText)}</code></pre>
-        </div>
+        <button
+          type="button"
+          class="resume-deep-launch-card ${hasDeepReport ? "is-ready" : "is-locked"}"
+          onclick="openResumeReportPage()"
+          ${hasDeepReport ? "" : "disabled"}
+          aria-label="${hasDeepReport ? "进入完整深度诊断全屏工作台" : "完整深度诊断需等待简历分析完成"}"
+        >
+          <div class="resume-deep-launch-visual" aria-hidden="true">
+            <span class="resume-deep-launch-icon">◆</span>
+          </div>
+          <div class="resume-deep-launch-main">
+            <div class="resume-deep-launch-row">
+              <span class="resume-deep-launch-pill">全屏工作台</span>
+              <span class="resume-deep-launch-pill soft">审计级布局</span>
+            </div>
+            <h4 class="resume-deep-launch-title">${hasDeepReport ? "进入深度诊断工作台" : "深度诊断将在分析完成后解锁"}</h4>
+            <p class="resume-deep-launch-desc">在独立页面中查看步骤标签、指标卡与雷达图等完整链路，版式与审计演示一致；正文与结构化解析均在该页呈现，无需在下方重复展示简历全文。</p>
+            <ul class="resume-deep-launch-features">
+              <li>步骤化阅读</li>
+              <li>指标与证据卡</li>
+              <li>风险雷达与对照</li>
+            </ul>
+          </div>
+          <div class="resume-deep-launch-aside">
+            <span class="resume-deep-launch-cta-label">${hasDeepReport ? "进入" : "锁定"}</span>
+            <span class="resume-deep-launch-arrow" aria-hidden="true">→</span>
+          </div>
+        </button>
       </section>
     </div>
   `;
@@ -4841,8 +4859,72 @@ function createCareerInterviewDimensionProgress() {
   return CAREER_INTERVIEW_DIMENSION_PLAN.map((item) => ({
     name: item.name,
     target: item.target,
-    answered: 0
+    answered: 0,
+    turn_count: 0,
+    effective_answered: 0,
+    coverage: null,
+    specificity: null,
+    confidence: null,
+    consistency: null,
+    evidence_count: null,
+    saturated: false,
+    missing_slots: []
   }));
+}
+
+function scoreCareerAnswerQuality(text) {
+  const raw = String(text || "").trim();
+  if (raw.length < 8) {
+    return {
+      effective: false,
+      reminder: "可以再具体一点：例如最近一次你投入较多的任务、场景或选择依据（不必很长，但要能指向真实经历）。"
+    };
+  }
+  const weakHead = /^(不知道|都行|随便|没想好|没想过|差不多|看情况|还好|一般|无所谓|不太清楚|没区别|都可以)/;
+  if (weakHead.test(raw) && raw.length < 36) {
+    return {
+      effective: false,
+      reminder: "没关系，我们换个更小的切口：最近一次让你印象最深的学习、项目或合作经历是什么？用一两句话即可。"
+    };
+  }
+  if (raw.length < 14 && !/[，。！？；、]/.test(raw)) {
+    return {
+      effective: false,
+      reminder: "试着多写半句：当时的情境、你具体做了什么、以及你更看重结果还是过程？"
+    };
+  }
+  return { effective: true };
+}
+
+function bumpCareerDimensionTurn(dimName) {
+  const row = getCareerDimensionProgressByName(dimName);
+  if (!row) return;
+  row.turn_count = Number(row.turn_count || 0) + 1;
+}
+
+function mergeDimensionMetricsFromResult(result) {
+  const dm = result?.dimension_metrics;
+  if (!dm || typeof dm !== "object") return;
+  if (!Array.isArray(careerInterviewState.dimensionProgress) || careerInterviewState.dimensionProgress.length === 0) {
+    careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
+  }
+  careerInterviewState.dimensionProgress.forEach((item) => {
+    const block = dm[item.name];
+    if (!block || typeof block !== "object") return;
+    const n = (x) => (x == null || Number.isNaN(Number(x)) ? null : Number(x));
+    item.coverage = n(block.coverage);
+    item.specificity = n(block.specificity);
+    item.confidence = n(block.confidence);
+    item.consistency = n(block.consistency);
+    item.evidence_count = block.evidence_count != null ? Number(block.evidence_count) : item.evidence_count;
+    item.missing_slots = Array.isArray(block.missing_slots) ? block.missing_slots.filter(Boolean).slice(0, 6) : item.missing_slots;
+    if (block.saturated) {
+      item.saturated = true;
+      const t = Number(item.target || 0);
+      item.answered = Math.max(Number(item.answered || 0), t);
+      item.effective_answered = Math.max(Number(item.effective_answered || 0), t);
+    }
+  });
 }
 
 function normalizeCareerDimensionName(name) {
@@ -4876,7 +4958,10 @@ function getNextPendingCareerDimensionName() {
   if (!Array.isArray(careerInterviewState.dimensionProgress) || careerInterviewState.dimensionProgress.length === 0) {
     return CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   }
-  const nextItem = careerInterviewState.dimensionProgress.find((item) => Number(item.answered || 0) < Number(item.target || 0));
+  const nextItem = careerInterviewState.dimensionProgress.find((item) => {
+    if (item.saturated) return false;
+    return Number(item.answered || 0) < Number(item.target || 0);
+  });
   return nextItem ? nextItem.name : null;
 }
 
@@ -4933,6 +5018,7 @@ function setCareerInterviewComposerDraft(rawText, options = {}) {
   renderCareerInterviewHelperAnchor();
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
+  adjustCareerInterviewInputHeight();
 }
 
 async function useCareerInterviewDraft(rawText, options = {}) {
@@ -4984,6 +5070,27 @@ function getCareerInterviewSpeechApi() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+function adjustCareerInterviewInputHeight() {
+  const el = document.getElementById("careerInterviewInput");
+  if (!el || !el.classList.contains("career-chat-textarea-autogrow")) return;
+  el.style.height = "auto";
+  const next = Math.min(el.scrollHeight, CAREER_INTERVIEW_INPUT_MAX_HEIGHT_PX);
+  el.style.height = `${next}px`;
+  el.style.overflowY = el.scrollHeight > CAREER_INTERVIEW_INPUT_MAX_HEIGHT_PX ? "auto" : "hidden";
+}
+
+function scrollCareerInterviewModalToBottom() {
+  const modal = document.getElementById("careerInterviewModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  const run = () => {
+    modal.scrollTop = modal.scrollHeight;
+  };
+  requestAnimationFrame(run);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(run);
+  });
+}
+
 function updateCareerInterviewVoiceButton() {
   const voiceBtn = document.getElementById("careerInterviewVoiceBtn");
   if (!voiceBtn) return;
@@ -4993,11 +5100,22 @@ function updateCareerInterviewVoiceButton() {
   const supported = Boolean(careerInterviewVoiceState.supported);
   voiceBtn.disabled = !supported || !careerInterviewState.started || careerInterviewState.loading || careerInterviewState.isComplete;
   voiceBtn.classList.toggle("is-listening", careerInterviewVoiceState.listening);
+  voiceBtn.classList.toggle("is-unsupported", !supported);
   if (!supported) {
-    voiceBtn.textContent = "当前浏览器不支持语音";
+    voiceBtn.innerHTML = CAREER_VOICE_MIC_SVG;
+    voiceBtn.setAttribute("aria-label", "当前浏览器不支持语音输入");
+    voiceBtn.title = "当前浏览器不支持语音";
     return;
   }
-  voiceBtn.textContent = careerInterviewVoiceState.listening ? "停止录音" : "语音输入";
+  if (careerInterviewVoiceState.listening) {
+    voiceBtn.innerHTML = CAREER_VOICE_STOP_SVG;
+    voiceBtn.setAttribute("aria-label", "停止录音");
+    voiceBtn.title = "停止录音";
+    return;
+  }
+  voiceBtn.innerHTML = CAREER_VOICE_MIC_SVG;
+  voiceBtn.setAttribute("aria-label", "语音输入");
+  voiceBtn.title = "语音输入";
 }
 
 function stopCareerInterviewVoice() {
@@ -5093,7 +5211,10 @@ function renderCareerInterviewAssistSurface() {
 function markCareerDimensionAnswered(name) {
   const target = getCareerDimensionProgressByName(name);
   if (!target) return;
-  target.answered = Math.min(Number(target.target || 0), Number(target.answered || 0) + 1);
+  const t = Number(target.target || 0);
+  const next = Math.min(t, Number(target.answered || 0) + 1);
+  target.answered = next;
+  target.effective_answered = Math.min(t, Number(target.effective_answered || 0) + 1);
   careerInterviewState.completionScore = getCareerInterviewProgressPercent();
 }
 
@@ -5101,6 +5222,8 @@ function syncCareerInterviewProgress(result = null) {
   if (!Array.isArray(careerInterviewState.dimensionProgress) || careerInterviewState.dimensionProgress.length === 0) {
     careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
   }
+
+  mergeDimensionMetricsFromResult(result);
 
   let focusName = normalizeCareerDimensionName(result?.focus_dimension || careerInterviewState.focusDimension);
   const cur = getCareerDimensionProgressByName(focusName);
@@ -5113,7 +5236,15 @@ function syncCareerInterviewProgress(result = null) {
   if (result?.is_complete) {
     careerInterviewState.dimensionProgress.forEach((item) => {
       item.answered = item.target;
+      item.saturated = true;
     });
+  }
+
+  if (result?.readiness_score != null) {
+    careerInterviewState.readinessScore = Math.max(
+      Number(careerInterviewState.readinessScore || 0),
+      Number(result.readiness_score || 0)
+    );
   }
 
   careerInterviewState.completionScore = Math.max(
@@ -5128,15 +5259,26 @@ function renderCareerInterviewDimensionProgress() {
     const isActive = normalizeCareerDimensionName(careerInterviewState.focusDimension) === item.name;
     const answered = Math.min(Number(item.answered || 0), Number(item.target || 0));
     const ratio = item.target ? Math.round(answered / item.target * 100) : 0;
+    const cov = item.coverage != null && !Number.isNaN(Number(item.coverage))
+      ? Math.round(Number(item.coverage) * 100)
+      : null;
+    const sat = Boolean(item.saturated);
+    const sub = sat
+      ? "证据已饱和"
+      : cov != null
+        ? `覆盖约 ${cov}%`
+        : `${Number(item.turn_count || 0)} 轮`;
     return `
-      <div class="career-progress-item${isActive ? " active" : ""}">
+      <div class="career-progress-item${isActive ? " active" : ""}${sat ? " is-saturated" : ""}">
         <div class="career-progress-head">
           <span>${escHtml(item.name)}</span>
           <span>${answered}/${item.target}</span>
         </div>
+        <div class="career-progress-sub">${escHtml(sub)}</div>
         <div class="career-progress-track">
           <span class="career-progress-fill" style="width:${ratio}%"></span>
         </div>
+        ${cov != null ? `<div class="career-progress-coverage"><span style="width:${Math.min(100, cov)}%"></span></div>` : ""}
       </div>
     `;
   }).join("");
@@ -5236,6 +5378,7 @@ function persistCareerInterviewSnapshot() {
     messages: careerInterviewState.messages,
     result: careerInterviewState.result,
     completionScore: careerInterviewState.completionScore,
+    readinessScore: careerInterviewState.readinessScore,
     focusDimension: careerInterviewState.focusDimension,
     dimensionProgress: careerInterviewState.dimensionProgress,
     profileBasics: careerInterviewState.profileBasics
@@ -5254,6 +5397,7 @@ function resetCareerInterviewState(options = {}) {
   careerInterviewState.messages = [];
   careerInterviewState.result = null;
   careerInterviewState.completionScore = 0;
+  careerInterviewState.readinessScore = 0;
   careerInterviewState.focusDimension = CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   careerInterviewState.dimensionProgress = createCareerInterviewDimensionProgress();
   careerInterviewState.profileBasics = retainedBasics;
@@ -5303,12 +5447,15 @@ function updateCareerInterviewHero(result = null) {
 
   if (careerInterviewState.isComplete || result?.is_complete) {
     statusEl.textContent = "访谈完成";
-    hintEl.textContent = "六个核心维度已经补齐，可以直接参考下方的岗位方向、证据和行动建议。";
+    hintEl.textContent = "六个核心维度已补齐；方向假设与证据卡见下方「画像收敛」面板。";
     return;
   }
 
+  const rd = Number(careerInterviewState.readinessScore || 0);
   statusEl.textContent = `访谈进行中 ${progress}%`;
-  hintEl.textContent = `当前聚焦“${focusName}”，维度进度 ${ratioText}。继续回答即可推进画像。`;
+  hintEl.textContent = rd
+    ? `当前聚焦「${focusName}」，本维 ${ratioText}；可决策度约 ${rd}%。系统会按证据饱和度与信息增益选下一问。`
+    : `当前聚焦「${focusName}」，维度进度 ${ratioText}。继续回答即可推进画像。`;
 }
 function careerTagHtml(items, emptyText, variant = "default") {
   const values = Array.isArray(items) ? items.filter(Boolean) : [];
@@ -5330,27 +5477,158 @@ function careerListHtml(items, emptyText) {
     .join("");
 }
 
-function careerDimensionHtml(dimensions) {
-  const rows = Array.isArray(dimensions) ? dimensions : [];
-  return rows
-    .map((item) => {
-      const name = escHtml(String(item.name || "未命名维度"));
-      const score = Number(item.score || 0);
-      const evidence = escHtml(String(item.evidence || "等待补充更多证据"));
-      return `
-        <div class="career-dimension-item">
-          <div class="career-dimension-head">
-            <span>${name}</span>
-            <span>${score}%</span>
-          </div>
-          <div class="career-dimension-track">
-            <div class="career-dimension-fill" style="width: ${Math.max(0, Math.min(100, score))}%"></div>
-          </div>
-          <p class="career-dimension-evidence">${evidence}</p>
+function renderCareerInterviewEnginePanel(result) {
+  const el = document.getElementById("careerInterviewEnginePanel");
+  if (!el) return;
+  const r = result || careerInterviewState.result;
+  if (!r || !careerInterviewState.started) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+  const pol = r.next_question_policy && typeof r.next_question_policy === "object" ? r.next_question_policy : null;
+  const ph = r.profile_hypothesis && typeof r.profile_hypothesis === "object" ? r.profile_hypothesis : null;
+  const cards = Array.isArray(r.evidence_cards) ? r.evidence_cards : [];
+  const conflicts = Array.isArray(r.conflict_points) ? r.conflict_points : [];
+  const roles = Array.isArray(ph?.top_roles) ? ph.top_roles : [];
+  const uconf = Array.isArray(ph?.unresolved_conflicts) ? ph.unresolved_conflicts : [];
+  const rs = Number(r.readiness_score ?? careerInterviewState.readinessScore ?? 0);
+  const has =
+    (pol && (pol.rationale || pol.strategy || pol.target_dimension)) ||
+    roles.length ||
+    uconf.length ||
+    cards.length ||
+    conflicts.length ||
+    rs > 0;
+  if (!has) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  const strategyLabelZh = {
+    fact_example: "事实举例",
+    motive_reason: "动机与原因",
+    value_tradeoff: "价值权衡",
+    behavior_pref: "行为偏好",
+    conflict_clarify: "冲突澄清",
+    micro_scenario: "微场景"
+  };
+  const policyBlock = pol && (pol.rationale || pol.strategy)
+    ? `<div class="career-engine-block career-engine-block-policy">
+        <p class="career-engine-label">追问策略</p>
+        <div class="career-engine-policy-row">
+          <span class="career-engine-strategy-chip">${escHtml(strategyLabelZh[pol.strategy] || pol.strategy || "自适应")}</span>
+          ${pol.target_dimension ? `<span class="career-engine-policy-target">指向「${escHtml(pol.target_dimension)}」</span>` : ""}
         </div>
-      `;
+        ${pol.rationale ? `<p class="career-engine-copy">${escHtml(pol.rationale)}</p>` : ""}
+      </div>`
+    : "";
+  const rolesBlock = roles.length
+    ? `<div class="career-engine-block">
+        <p class="career-engine-label">职业方向假设（动态）</p>
+        <div class="career-engine-pills">
+          ${roles.slice(0, 5).map((x) => {
+            const nm = escHtml(String(x.name || ""));
+            const raw = Number(x.score || 0);
+            const sc = raw <= 1 ? Math.round(raw * 100) : Math.round(Math.min(100, raw));
+            return `<span class="career-engine-pill">${nm} <em>${sc}%</em></span>`;
+          }).join("")}
+        </div>
+      </div>`
+    : "";
+  const confBlock = uconf.length
+    ? `<div class="career-engine-block">
+        <p class="career-engine-label">待澄清张力</p>
+        <ul class="career-engine-list">${uconf.map((t) => `<li>${escHtml(String(t))}</li>`).join("")}</ul>
+      </div>`
+    : "";
+  const evidenceAccentClass = (cat) => {
+    const s = String(cat || "");
+    if (s.includes("偏好")) return "career-engine-evidence-card--pref";
+    if (s.includes("能力")) return "career-engine-evidence-card--ability";
+    if (s.includes("风险") || s.includes("张力")) return "career-engine-evidence-card--risk";
+    return "career-engine-evidence-card--default";
+  };
+  const cardBlocks = cards
+    .filter((c) => c && (c.category || (c.bullets && c.bullets.length)))
+    .map((c) => {
+      const bullets = Array.isArray(c.bullets) ? c.bullets : [];
+      const cat = String(c.category || "证据");
+      const accent = evidenceAccentClass(cat);
+      const bulletHtml = bullets
+        .map(
+          (b) => `
+        <div class="career-engine-bullet">
+          <span class="career-engine-bullet-dot" aria-hidden="true"></span>
+          <p class="career-engine-bullet-text">${escHtml(String(b))}</p>
+        </div>`
+        )
+        .join("");
+      return `<article class="career-engine-card career-engine-evidence-card ${accent}">
+        <header class="career-engine-card-head">
+          <span class="career-engine-card-head-mark"></span>
+          <h4 class="career-engine-card-title">${escHtml(cat)}</h4>
+        </header>
+        <div class="career-engine-bullet-stack">${bulletHtml}</div>
+      </article>`;
     })
     .join("");
+  const clash = conflicts
+    .map((c) => {
+      const sm = escHtml(String(c.summary || ""));
+      const cq = c.clarify_prompt ? `<p class="career-engine-clarify">${escHtml(String(c.clarify_prompt))}</p>` : "";
+      return `<div class="career-engine-clash"><p>${sm}</p>${cq}</div>`;
+    })
+    .join("");
+  el.innerHTML = `
+    <div class="career-engine-head">
+      <p class="career-engine-kicker">画像收敛</p>
+      <p class="career-engine-readiness">可决策度 <strong>${rs}</strong> / 100（模型估计）</p>
+    </div>
+    <div class="career-engine-grid">
+      ${policyBlock}
+      ${rolesBlock}
+      ${confBlock}
+      ${clash ? `<div class="career-engine-block career-engine-wide"><p class="career-engine-label">冲突与反证线索</p>${clash}</div>` : ""}
+      ${cardBlocks
+    ? `<div class="career-engine-block career-engine-wide career-engine-evidence-wrap">
+        <div class="career-engine-evidence-heading">
+          <span class="career-engine-evidence-heading-icon" aria-hidden="true"></span>
+          <div>
+            <p class="career-engine-label career-engine-label-section">职业证据卡</p>
+            <p class="career-engine-evidence-sub">按类别摘录、便于引用与复盘</p>
+          </div>
+        </div>
+        <div class="career-engine-cards">${cardBlocks}</div>
+      </div>`
+    : ""}
+    </div>
+  `;
+}
+
+let careerInterviewGuideUserCountSeen = 0;
+let careerInterviewGuideAutoCollapsedThisSession = false;
+
+function syncCareerInterviewGuideDrawer() {
+  const drawer = document.getElementById("careerInterviewGuideDrawer");
+  if (!drawer) return;
+  const userCount = careerInterviewState.messages.filter((m) => m.role === "user").length;
+  // 未开始：展开引导；已开始后的首次同步：收起一次让出对话区（之后不反复关掉用户手动展开）
+  if (!careerInterviewState.started) {
+    drawer.setAttribute("open", "");
+    careerInterviewGuideUserCountSeen = 0;
+    careerInterviewGuideAutoCollapsedThisSession = false;
+    return;
+  }
+  if (!careerInterviewGuideAutoCollapsedThisSession) {
+    drawer.removeAttribute("open");
+    careerInterviewGuideAutoCollapsedThisSession = true;
+  }
+  if (userCount >= 1 && careerInterviewGuideUserCountSeen === 0) {
+    drawer.removeAttribute("open");
+  }
+  careerInterviewGuideUserCountSeen = userCount;
 }
 
 function renderCareerInterviewMessages() {
@@ -5376,7 +5654,7 @@ function renderCareerInterviewMessages() {
         <span>已探索主题</span>
       </div>
       <div class="career-chat-topic-dots">${dotsHtml}</div>
-      <div class="career-chat-dimension-meta">${userMessageCount}轮对话</div>
+      <div class="career-chat-dimension-meta">${userMessageCount} 次发言</div>
     </div>
   ` : "";
 
@@ -5400,11 +5678,17 @@ function renderCareerInterviewMessages() {
         `;
       })
       .join("");
-    thread.scrollTop = thread.scrollHeight;
   }
 
   if (composer) composer.classList.toggle("hidden", !careerInterviewState.started);
-  if (input) input.disabled = !careerInterviewState.started || careerInterviewState.isComplete || careerInterviewState.loading;
+  if (input) {
+    input.disabled = !careerInterviewState.started || careerInterviewState.isComplete || careerInterviewState.loading;
+    if (input.dataset.autogrowBound !== "true") {
+      input.dataset.autogrowBound = "true";
+      input.addEventListener("input", adjustCareerInterviewInputHeight);
+    }
+    adjustCareerInterviewInputHeight();
+  }
   if (sendBtn) {
     sendBtn.disabled = !careerInterviewState.started || careerInterviewState.isComplete || careerInterviewState.loading;
     sendBtn.textContent = careerInterviewState.loading ? "生成中..." : "发送并继续";
@@ -5418,13 +5702,24 @@ function renderCareerInterviewMessages() {
         : (careerInterviewState.helperAnchor ? `围绕「${careerInterviewState.helperAnchor}」开始` : "立即开始访谈");
   }
   if (hintEl) {
+    const fd = normalizeCareerDimensionName(careerInterviewState.focusDimension);
+    const fp = getCareerDimensionProgressByName(fd);
+    const a = fp ? Math.min(Number(fp.answered || 0), Number(fp.target || 0)) : 0;
+    const t = fp ? Number(fp.target || 0) : 0;
     hintEl.textContent = careerInterviewState.isComplete
       ? "访谈已完成，可直接参考同步到能力画像的结果。"
-      : `已完成 ${userMessageCount} 轮对话，点击「完成访谈」可随时结束`;
+      : fp
+        ? `已发言 ${userMessageCount} 次 · 当前维度「${fp.name}」有效证据 ${a}/${t}（每维需 ${t} 条实质回答；过短/敷衍会提示重写且不计入）。点「完成访谈」可结束整段访谈。`
+        : `已发言 ${userMessageCount} 次。点「完成访谈」可结束整段访谈。`;
   }
 
   renderCareerInterviewAssistSurface();
+  syncCareerInterviewGuideDrawer();
   renderCareerInterviewDimensionProgress();
+
+  if (careerInterviewState.started && careerInterviewState.messages.length > 0) {
+    scrollCareerInterviewModalToBottom();
+  }
 }
 function renderCareerInterviewResult(result) {
   const emptyState = document.getElementById("careerInterviewEmptyState");
@@ -5433,18 +5728,14 @@ function renderCareerInterviewResult(result) {
   const modalProgressEl = document.getElementById("careerInterviewModalProgress");
   const focusEl = document.getElementById("careerInterviewResultFocus");
   const modalFocusEl = document.getElementById("careerInterviewModalFocus");
-  const summaryEl = document.getElementById("careerInterviewSummary");
   const valueTagsEl = document.getElementById("careerInterviewValueTags");
-  const interestTagsEl = document.getElementById("careerInterviewInterestTags");
-  const roleTagsEl = document.getElementById("careerInterviewRoleTags");
-  const dimensionListEl = document.getElementById("careerInterviewDimensionList");
-  const evidenceListEl = document.getElementById("careerInterviewEvidenceList");
-  const actionListEl = document.getElementById("careerInterviewActionList");
 
   syncCareerInterviewProgress(result);
   updateCareerInterviewHero(result);
 
-  const progressText = `${careerInterviewState.completionScore || 0}%`;
+  const basePct = careerInterviewState.completionScore || 0;
+  const readinessPct = careerInterviewState.readinessScore || 0;
+  const progressText = readinessPct ? `覆盖 ${basePct}% · 可决策 ${readinessPct}%` : `${basePct}%`;
   const focusName = normalizeCareerDimensionName(result?.focus_dimension || careerInterviewState.focusDimension);
 
   if (!result || !result.profile) {
@@ -5456,6 +5747,7 @@ function renderCareerInterviewResult(result) {
     if (modalFocusEl) modalFocusEl.textContent = focusName;
     updateProfileRadarChart(null);
     renderCareerInterviewDimensionProgress();
+    renderCareerInterviewEnginePanel(null);
     refreshUnifiedExperience();
     return;
   }
@@ -5467,62 +5759,15 @@ function renderCareerInterviewResult(result) {
   if (focusEl) focusEl.textContent = focusName;
   if (modalFocusEl) modalFocusEl.textContent = focusName;
 
-  // 新的profile格式：叙事性摘要
-  if (summaryEl) {
-    summaryEl.textContent = result.profile?.summary || "访谈进行中，继续探索以完善画像。";
-  }
-
-  // 工作价值观
   if (valueTagsEl) {
     const values = result.profile?.work_values || [];
     valueTagsEl.innerHTML = values.length > 0
       ? careerTagHtml(values, "等待补充", "soft")
-      : '<span class="text-xs text-gray-400">继续对话，探索你的工作价值观</span>';
-  }
-
-  // 角色模型/钦佩的人
-  if (interestTagsEl) {
-    const roleModel = result.profile?.role_model;
-    interestTagsEl.innerHTML = roleModel
-      ? `<span class="career-tag primary">${escHtml(roleModel)}</span>`
-      : '<span class="text-xs text-gray-400">继续对话，探索你的职业榜样</span>';
-  }
-
-  // 领导/协作风格
-  if (roleTagsEl) {
-    const leadership = result.profile?.leadership_style;
-    roleTagsEl.innerHTML = leadership
-      ? `<span class="career-tag accent">${escHtml(leadership)}</span>`
-      : '<span class="text-xs text-gray-400">继续对话，探索你的协作风格</span>';
-  }
-
-  // 关键经历证据
-  if (evidenceListEl) {
-    const experience = result.profile?.key_experience;
-    evidenceListEl.innerHTML = experience
-      ? `<div class="career-evidence-item"><span class="career-evidence-icon">&#127908;</span><p>${escHtml(experience)}</p></div>`
-      : '<p class="text-xs text-gray-400">继续对话，挖掘你的关键经历</p>';
-  }
-
-  // 推荐探索方向
-  if (actionListEl) {
-    const exploration = result.profile?.recommended_exploration || [];
-    actionListEl.innerHTML = exploration.length > 0
-      ? careerListHtml(exploration, "")
-      : '<p class="text-xs text-gray-400">继续对话，发现更多探索方向</p>';
-  }
-
-  // 维度列表（旧格式兼容）
-  if (dimensionListEl) {
-    const dims = result.profile?.dimensions;
-    if (dims && dims.length > 0) {
-      dimensionListEl.innerHTML = careerDimensionHtml(dims);
-    } else {
-      dimensionListEl.innerHTML = "";
-    }
+      : '<span class="text-xs text-gray-400">多轮对话后会在此收敛价值观标签</span>';
   }
 
   renderCareerInterviewDimensionProgress();
+  renderCareerInterviewEnginePanel(result);
   renderCareerInterviewAssistSurface();
   updateProfileRadarChart(result.profile);
   refreshUnifiedExperience();
@@ -5568,6 +5813,7 @@ async function hydrateCareerInterviewState(force = false) {
   careerInterviewState.messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
   careerInterviewState.result = snapshot.result || null;
   careerInterviewState.completionScore = Number(snapshot.completionScore || 0);
+  careerInterviewState.readinessScore = Number(snapshot.readinessScore || 0);
   careerInterviewState.focusDimension = snapshot.focusDimension || CAREER_INTERVIEW_DIMENSION_PLAN[0].name;
   careerInterviewState.profileBasics = normalizeProfileBasics(snapshot.profileBasics);
   careerInterviewState.dimensionProgress = Array.isArray(snapshot.dimensionProgress) && snapshot.dimensionProgress.length > 0
@@ -5589,9 +5835,7 @@ function openCareerInterviewModal(mode = "chat") {
   const modal = document.getElementById("careerInterviewModal");
   if (!modal) return;
   modal.classList.remove("hidden");
-  window.requestAnimationFrame(() => {
-    modal.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  document.body.classList.add("career-interview-open");
 
   window.setTimeout(() => {
     if (mode === "config") {
@@ -5602,12 +5846,15 @@ function openCareerInterviewModal(mode = "chat") {
     } else {
       document.getElementById("careerInterviewStartBtn")?.focus();
     }
+    adjustCareerInterviewInputHeight();
+    scrollCareerInterviewModalToBottom();
   }, 120);
 }
 
 function closeCareerInterviewModal() {
   const modal = document.getElementById("careerInterviewModal");
   if (modal) modal.classList.add("hidden");
+  document.body.classList.remove("career-interview-open");
   stopCareerInterviewVoice();
 }
 
@@ -5618,11 +5865,47 @@ function handleCareerInterviewOverlayClick(event) {
 }
 
 function clearCareerInterviewSession() {
+  careerInterviewState.loading = false;
   resetCareerInterviewState({ preserveBasics: true });
   persistCareerInterviewSnapshot();
+  careerInterviewGuideUserCountSeen = 0;
   renderCareerInterviewMessages();
   renderCareerInterviewResult(null);
   showToast("访谈已清空", "你可以重新开始新的访谈。", "info", 1600);
+}
+
+function restartCareerInterview() {
+  if (careerInterviewState.loading) {
+    showToast("访谈正在处理中", "请等待当前请求结束后再操作。", "info", 1800);
+    return;
+  }
+  const hasProgress =
+    careerInterviewState.started &&
+    (careerInterviewState.messages.length > 0 || careerInterviewState.isComplete);
+  if (hasProgress) {
+    if (!window.confirm("确定重新开始？当前访谈内容将清空。")) return;
+  }
+  clearCareerInterviewSession();
+}
+
+function terminateCareerInterview() {
+  if (careerInterviewState.loading) {
+    showToast("访谈正在处理中", "请等待当前请求结束后再操作。", "info", 1800);
+    return;
+  }
+  if (!careerInterviewState.started) {
+    closeCareerInterviewModal();
+    return;
+  }
+  if (!window.confirm("确定终止访谈？本次对话将清空，且不会执行完成整理（与「完成访谈」不同）。")) return;
+  resetCareerInterviewState({ preserveBasics: true });
+  persistCareerInterviewSnapshot();
+  stopCareerInterviewVoice();
+  careerInterviewGuideUserCountSeen = 0;
+  renderCareerInterviewMessages();
+  renderCareerInterviewResult(null);
+  closeCareerInterviewModal();
+  showToast("访谈已终止", "如需继续可随时重新开始。", "info", 1800);
 }
 
 window.clearCareerInterviewHelperAnchor = function clearCareerInterviewHelperAnchor() {
@@ -5728,10 +6011,29 @@ async function submitCareerInterviewAnswer() {
     showToast("请先输入回答", "模型需要你的回答才能继续追问。", "warning", 1800);
     return;
   }
+  if (input) {
+    input.value = "";
+    adjustCareerInterviewInputHeight();
+  }
+
+  careerInterviewState.messages.push({ role: "user", content: answer });
+  bumpCareerDimensionTurn(careerInterviewState.focusDimension);
+
+  const quality = scoreCareerAnswerQuality(answer);
+  if (!quality.effective) {
+    careerInterviewState.messages.push({
+      role: "assistant",
+      content: quality.reminder
+    });
+    careerInterviewState.completionScore = getCareerInterviewProgressPercent();
+    persistCareerInterviewSnapshot();
+    renderCareerInterviewMessages();
+    renderCareerInterviewResult(careerInterviewState.result);
+    document.getElementById("careerInterviewInput")?.focus();
+    return;
+  }
 
   markCareerDimensionAnswered(careerInterviewState.focusDimension);
-  careerInterviewState.messages.push({ role: "user", content: answer });
-  if (input) input.value = "";
 
   const currentProgress = getCareerDimensionProgressByName(careerInterviewState.focusDimension);
   const shouldAskLocalFollowUp = currentProgress && currentProgress.answered < currentProgress.target;
@@ -5763,9 +6065,6 @@ async function submitCareerInterviewAnswer() {
     const nextQuestion = result.next_question || "";
     const shouldFinish = nextQuestion === "__FINISH__" || Boolean(result.is_complete);
 
-    // 更新完成度（基于对话轮次）
-    const userMessageCount = careerInterviewState.messages.filter(m => m.role === "user").length;
-    careerInterviewState.completionScore = Math.min(Math.round(userMessageCount / 3 * 100), 95); // 3轮=100%,最多95%
     careerInterviewState.isComplete = shouldFinish;
 
     if (shouldFinish) {
@@ -6558,19 +6857,27 @@ function getProfilePortraitState() {
 function buildProfileAssessmentModuleOutput(profile) {
   const mbti = profile?.assessment?.mbti?.display_type || profile?.assessment?.mbti?.final_type || "";
   const holland = profile?.assessment?.holland?.code || "";
+  const prose = collectPortraitAssessmentProse();
+  const careers = profile?.assessment?.mbti?.careers && Array.isArray(profile.assessment.mbti.careers)
+    ? profile.assessment.mbti.careers.slice(0, 4).filter(Boolean)
+    : [];
   const chips = uniqueValues([
     mbti ? `MBTI ${mbti}` : "",
     holland ? `霍兰德 ${holland}` : "",
-    ...(Array.isArray(profile?.assessment?.holland?.top_codes) ? profile.assessment.holland.top_codes.map((item) => `兴趣 ${item}`) : [])
-  ], 6);
+    ...(Array.isArray(profile?.assessment?.holland?.top_codes) ? profile.assessment.holland.top_codes.map((item) => `兴趣 ${item}`) : []),
+    ...careers.map((c) => `职业线索 ${c}`)
+  ], 8);
   const status = mbti && holland ? "complete" : (mbti || holland ? "partial" : "missing");
-  const summary = mbti && holland
-    ? `测评阶段已经给出人格倾向和职业兴趣锚点，当前人物画像会把 ${mbti} 与 ${holland} 的共同信号作为底层基调。`
+  const detailProse = prose.trim()
+    || [portraitMbtiFallbackNarrative(mbti), portraitHollandCodeNarrative(holland)].filter(Boolean).join("\n");
+  const headline = mbti && holland
+    ? `测评已给出 ${mbti} 与 ${holland} 的人格—兴趣组合锚点；下方为系统抽取的测评正文与类型补述，将一并送入画像与绘图提示词。`
     : mbti || holland
-      ? `测评阶段只形成了部分锚点，当前会先使用已有结果参与人物画像收敛。`
+      ? `测评只完成了一部分，仍会把已有结果与类型补述写进链路；建议补全另一项测评以稳定画像。`
       : "测评阶段尚未形成稳定输出，人物画像会更多依赖简历和访谈信号。";
+  const summary = detailProse ? `${headline}\n\n${detailProse.slice(0, 520)}${detailProse.length > 520 ? "…" : ""}` : headline;
   const note = mbti && holland
-    ? "这一层主要负责回答“你大致是什么样的人、会被什么工作场景激活”。"
+    ? "这一层回答“你大致是什么样的人、会被什么工作场景激活”。长文来自主测摘要、四维侧写与类型气质补述，不是简单标签。"
     : "测评没有补齐时，人物画像仍可生成，但人格与兴趣的稳定度会下降。";
   return {
     stepLabel: "01",
@@ -6579,13 +6886,15 @@ function buildProfileAssessmentModuleOutput(profile) {
     summary,
     chips,
     note,
+    detail: detailProse,
     raw: {
       status,
-      summary,
+      summary: headline,
       chips,
       note,
       mbti,
-      holland
+      holland,
+      detail_prose: detailProse
     }
   };
 }
@@ -6626,7 +6935,25 @@ function buildProfileResumeModuleOutput(profile, resumeTraits = null) {
   };
 }
 
-function buildProfileInterviewModuleOutput(profile) {
+function buildPortraitInterviewSupplement(profile, synthesis) {
+  const parts = [];
+  const thesis = synthesis?.thesis ? String(synthesis.thesis).trim() : "";
+  if (thesis) parts.push(`【补述·主画像收敛】${thesis}`);
+  const ps = profile?.summary ? String(profile.summary).trim() : "";
+  if (ps && ps !== thesis) parts.push(`【全景摘要】${ps.slice(0, 360)}${ps.length > 360 ? "…" : ""}`);
+  const roles = uniqueValues(profile?.recommendedRoles || [], 4);
+  if (roles.length) parts.push(`【岗位线索】${roles.join("、")}`);
+  const wv = uniqueValues(profile?.workValues || [], 5);
+  if (wv.length) parts.push(`【价值观线索】${wv.join("、")}`);
+  const mbti = profile?.assessment?.mbti?.display_type || profile?.assessment?.mbti?.final_type || "";
+  const hol = profile?.assessment?.holland?.code || "";
+  if (mbti || hol) {
+    parts.push(`【与测评交叉】MBTI ${mbti || "—"}；霍兰德 ${hol || "—"}。访谈若提前结束或仅弱信号，系统仍强制把上述线索并入访谈层，避免本卡片空白。`);
+  }
+  return parts.filter(Boolean).join("\n");
+}
+
+function buildProfileInterviewModuleOutput(profile, synthesis) {
   const interviewProfile = profile?.interview?.profile || null;
   const completionScore = Math.max(0, Math.min(100, Number(profile?.interview?.completionScore || 0)));
   const isComplete = Boolean(profile?.interview?.isComplete);
@@ -6641,22 +6968,47 @@ function buildProfileInterviewModuleOutput(profile) {
     : isComplete
       ? "complete"
       : (usableForPortrait ? "partial" : "missing");
-  const chips = uniqueValues([
+  let chips = uniqueValues([
     ...(interviewProfile?.work_values || []),
     ...(interviewProfile?.recommended_roles || []),
     interviewProfile?.leadership_style || "",
     interviewProfile?.role_model || ""
-  ], 6);
-  const summary = interviewProfile?.summary
+  ], 8);
+  if (!chips.length) {
+    chips = uniqueValues([
+      ...(synthesis?.roleCluster || []).slice(0, 2),
+      ...(profile?.recommendedRoles || []).slice(0, 3),
+      completionScore > 0 ? `访谈进度 ${completionScore}%` : "",
+      "补述：主画像与测评交叉"
+    ].filter(Boolean), 8);
+  }
+  const supplement = buildPortraitInterviewSupplement(profile, synthesis);
+  const baseSummary = interviewProfile?.summary
     || (completionScore
-      ? `访谈已经形成 ${completionScore}% 的动态画像，但还没有沉淀出稳定摘要。`
-      : "访谈阶段尚未形成可用输出。");
+      ? `访谈已形成 ${completionScore}% 进度，但尚未沉淀出稳定访谈摘要。`
+      : "访谈阶段尚未形成独立摘要。");
+  const weakInterview = !interviewProfile?.summary
+    || String(interviewProfile.summary).trim().length < 24
+    || (interviewProfile?.coverage_note && String(interviewProfile.coverage_note).includes("弱信号"));
+  let summary = baseSummary;
+  if (weakInterview && supplement) {
+    summary = `${baseSummary}\n\n${supplement}`.trim();
+  }
+  const detail = [
+    interviewProfile?.key_experience ? `关键经历：${String(interviewProfile.key_experience).trim()}` : "",
+    interviewProfile?.growth_mindset ? `成长观：${String(interviewProfile.growth_mindset).trim()}` : "",
+    Array.isArray(interviewProfile?.evidence_highlights) && interviewProfile.evidence_highlights.length
+      ? `证据亮点：${interviewProfile.evidence_highlights.slice(0, 4).filter(Boolean).join("；")}`
+      : "",
+    weakInterview && supplement ? `系统补述：\n${supplement}` : ""
+  ].filter(Boolean).join("\n\n");
   const note = !interviewProfile
     ? "这一层负责补足价值观、关键经历、协作风格和行动证据。"
     : (interviewProfile?.coverage_note
-      || (isComplete
+      ? `${interviewProfile.coverage_note} 下方「补述」为系统根据主画像与测评强制写入，用于绘图与 brief，不等同于真实访谈逐字稿。`
+      : (isComplete
         ? "访谈已经形成完整输出，可直接进入人物明信片。"
-        : "即使提前结束，只要已经收敛出价值观、经历或协作风格，也可以进入人物明信片首版。"));
+        : "即使提前结束，也会用主画像与测评做补述，保证链路可渲染。"));
   const missingFollowups = uniqueValues(interviewProfile?.missing_followups || [], 4);
   return {
     stepLabel: "03",
@@ -6665,14 +7017,16 @@ function buildProfileInterviewModuleOutput(profile) {
     summary,
     chips,
     note,
+    detail,
     raw: {
       status,
       summary,
       chips,
       note,
       completion_score: completionScore,
-      usable_for_portrait: usableForPortrait,
+      usable_for_portrait: usableForPortrait || Boolean(supplement),
       missing_followups: missingFollowups,
+      forced_supplement: supplement,
       work_values: interviewProfile?.work_values || [],
       recommended_roles: interviewProfile?.recommended_roles || [],
       role_model: interviewProfile?.role_model || "",
@@ -6695,16 +7049,21 @@ function buildProfilePromptOutput(profile, roles, synthesis, portraitState) {
   const chips = uniqueValues([
     brief?.title || "",
     brief?.primary_role || "",
-    ...(brief?.evidence_tags || []).slice(0, 2),
-    ...(brief?.value_tags || []).slice(0, 2)
-  ], 6);
-  const summary = portraitState?.prompt_summary
-    || brief?.subtitle
-    || synthesis?.thesis
+    ...(brief?.evidence_tags || []).slice(0, 3),
+    ...(brief?.value_tags || []).slice(0, 2),
+    portraitState?.prompt_writer_mode === "llm" ? "叙事级 render_prompt" : ""
+  ].filter(Boolean), 8);
+  const promptText = String(portraitState?.prompt_text || "").trim();
+  const ps = String(portraitState?.prompt_summary || "").trim();
+  const lead = ps || brief?.subtitle || synthesis?.thesis
     || "系统会把前 3 步的输出压缩成标题、定位句、主角色、任务句和视觉设定。";
+  const summary = promptText
+    ? `${lead}\n\n—— 图像渲染提示词节选 ——\n${promptText.slice(0, 480)}${promptText.length > 480 ? "…" : ""}`
+    : lead;
+  const detail = promptText || "";
   const note = portraitState?.brief
-    ? `系统会先把 1/2/3 步的输出重写成画像 brief，再生成适合白底人物明信片的渲染提示词。当前模式：${promptModeLabel}。`
-    : "点击“生成任务海报”后，系统会自动整理三步输出并重写为人物画像提示词。";
+    ? `以下为送入图像模型的完整中文渲染提示词（含叙事依据与视觉硬约束）。当前模式：${promptModeLabel}。未生成前仅显示规则草稿。`
+    : "点击「生成任务海报」后，系统会合并测评/简历/访谈与补述，输出完整叙事级提示词。";
   return {
     stepLabel: "AI",
     title: "提示词重写",
@@ -6712,6 +7071,7 @@ function buildProfilePromptOutput(profile, roles, synthesis, portraitState) {
     summary,
     chips,
     note,
+    detail,
     meta: promptModeLabel
   };
 }
@@ -6720,7 +7080,7 @@ function buildProfilePortraitOutputCards(profile, roles, synthesis, portraitStat
   return [
     buildProfileAssessmentModuleOutput(profile),
     buildProfileResumeModuleOutput(profile, resumeTraits),
-    buildProfileInterviewModuleOutput(profile),
+    buildProfileInterviewModuleOutput(profile, synthesis),
     buildProfilePromptOutput(profile, roles, synthesis, portraitState)
   ];
 }
@@ -6733,8 +7093,16 @@ function renderProfilePortraitOutputBoard(boardEl, cards) {
       ? item.chips.map((chip) => `<span class="profile-portrait-output-chip">${escHtml(chip)}</span>`).join("")
       : `<span class="profile-portrait-output-chip is-muted">当前还没有稳定信号</span>`;
     const metaHtml = item.meta ? `<span class="profile-portrait-output-meta">${escHtml(item.meta)}</span>` : "";
+    const detailRaw = item.detail != null ? String(item.detail).trim() : "";
+    const detailHtml = detailRaw
+      ? `
+        <div class="profile-portrait-output-detail-wrap">
+          <p class="profile-portrait-output-detail-h">链路完整正文（送入模型 / 提示词管线）</p>
+          <pre class="profile-portrait-output-detail" spellcheck="false">${escHtml(detailRaw)}</pre>
+        </div>`
+      : "";
     return `
-      <article class="profile-portrait-output-card is-${escHtml(item.status || "missing")}">
+      <article class="profile-portrait-output-card is-${escHtml(item.status || "missing")}${detailHtml ? " has-detail" : ""}">
         <div class="profile-portrait-output-head">
           <div class="profile-portrait-output-headline">
             <span class="profile-portrait-output-step">${escHtml(item.stepLabel || "--")}</span>
@@ -6746,6 +7114,7 @@ function renderProfilePortraitOutputBoard(boardEl, cards) {
           ${metaHtml}
         </div>
         <div class="profile-portrait-output-chiprow">${chips}</div>
+        ${detailHtml}
         <p class="profile-portrait-output-note">${escHtml(item.note || "")}</p>
       </article>
     `;
@@ -6810,7 +7179,7 @@ function renderProfileSourcePills(el, profile) {
 }
 
 // ─── 六维能力速览 ─────────────────────────────────────────────────────────────
-function renderProfileCapabilityStrip(el, profile) {
+function renderProfileCapabilityStrip(el, profile, portraitLoading = false) {
   if (!el) return;
   const dims = [
     { key: "professional",     label: "专业技能", icon: "⚙️" },
@@ -6820,6 +7189,32 @@ function renderProfileCapabilityStrip(el, profile) {
     { key: "stress_tolerance", label: "抗压能力", icon: "🧱" },
     { key: "execution",        label: "执行力",   icon: "🎯" }
   ];
+
+  if (portraitLoading) {
+    el.innerHTML = dims.map((d) => `
+      <div class="profile-capability-skeleton-card" aria-hidden="true">
+        <div class="profile-cap-skel-row">
+          <div class="profile-cap-skel-title">
+            <span class="profile-cap-skel-ico">${d.icon}</span>
+            <span class="profile-cap-skel-bar profile-cap-skel-bar--label"></span>
+          </div>
+          <span class="profile-cap-skel-bar profile-cap-skel-bar--pct"></span>
+        </div>
+        <div class="profile-cap-skel-track">
+          <span class="profile-cap-skel-fill"></span>
+        </div>
+        <span class="profile-cap-skel-bar profile-cap-skel-bar--src"></span>
+      </div>
+    `).join("") + `
+      <p class="profile-cap-skel-hint col-span-full">
+        <span class="profile-cap-skel-pill">
+          <span class="profile-cap-strip-spinner" aria-hidden="true"></span>
+          任务海报生成中，六维推断结果将在完成后呈现（分数随测评与经历变化，非写死）
+        </span>
+      </p>
+    `;
+    return;
+  }
 
   const hasAnyCap = dims.some((d) => profile?.capabilities?.[d.key]?.score != null);
 
@@ -6872,8 +7267,19 @@ function renderProfileCapabilityStrip(el, profile) {
 }
 
 // ─── 关键证据 & 信息缺口 ──────────────────────────────────────────────────────
-function renderProfileEvidenceGaps(el, profile) {
+function renderProfileEvidenceGaps(el, profile, portraitLoading = false) {
   if (!el) return;
+  if (portraitLoading) {
+    el.innerHTML = `
+      <div class="profile-evidence-gaps-loading">
+        <span class="profile-cap-strip-spinner" aria-hidden="true"></span>
+        <div class="profile-evidence-gaps-loading-text">
+          <p class="profile-evidence-gaps-loading-title">正在生成任务海报</p>
+          <p class="profile-evidence-gaps-loading-desc">关键证据与信息缺口将在生成完成后展示；内容与当前访谈、简历和测评状态联动，并非固定文案。</p>
+        </div>
+      </div>`;
+    return;
+  }
   const interviewProfile = profile?.interview?.profile || null;
   const evidenceHighlights = Array.isArray(interviewProfile?.evidence_highlights)
     ? interviewProfile.evidence_highlights.filter(Boolean).slice(0, 4)
@@ -6931,13 +7337,163 @@ function renderProfileEvidenceGaps(el, profile) {
   el.innerHTML = `<div class="grid gap-4 md:grid-cols-2">${evidenceHtml}${gapsHtml}</div>`;
 }
 
+/** 当测评快照缺少长文时，用类型代码补一段「可读的」人格与兴趣侧写，避免折叠区只剩标签 */
+const PORTRAIT_MBTI_TYPE_NARRATIVE = {
+  INTJ: "建筑师型：内向直觉思维判断，偏好独立推演与长期架构；对低效与模糊容忍度低，习惯用模型与标准把复杂问题收口。",
+  INTP: "思想家型：内向直觉思维感知，热衷概念拆解与可能性探索；更在意逻辑自洽，节奏上可能显得审慎或反复求证。",
+  ENTJ: "指挥官型：外向直觉思维判断，擅长定目标、配资源、推团队执行；高压下仍保持决断，偏好清晰结构与可量化结果。",
+  ENTP: "辩论家型：外向直觉思维感知，擅长联想、挑战假设与快速试错；适合需要创意碰撞与方案迭代的场景。",
+  INFJ: "提倡者型：内向直觉情感判断，关注意义与人本价值；善于洞察他人动机，表达克制但立场坚定。",
+  INFP: "调停者型：内向直觉情感感知，价值驱动、共情强；在冲突中倾向寻找共识，创作与叙事表达有优势。",
+  ENFJ: "主人公型：外向直觉情感判断，善于激励与协调群体；在团队里常承担桥梁角色，关注氛围与共同目标。",
+  ENFP: "竞选者型：外向直觉情感感知，热情、发散、善于连接人与想法；需要结构伙伴帮助落地与收尾。",
+  ISTJ: "物流师型：内向感觉思维判断，可靠、重流程与责任边界；擅长把规则执行到位并持续优化细节。",
+  ISFJ: "守卫者型：内向感觉情感判断，细致、体贴、稳定交付；在支持型岗位中表现突出。",
+  ISTP: "鉴赏家型：内向感觉思维感知，动手与问题解决导向；偏好现场判断而非长篇讨论。",
+  ISFP: "探险家型：内向感觉情感感知，审美与体验敏感；表达温和，重视真实感受与当下体验。",
+  ESTJ: "总经理型：外向感觉思维判断，强执行与组织推进；擅长制度、排期与结果复盘。",
+  ESFJ: "执政官型：外向感觉情感判断，关注协作与关系维护；适合需要客户/团队润滑的角色。",
+  ESTP: "企业家型：外向感觉思维感知，行动快、应变强；适合高压现场与谈判推进。",
+  ESFP: "表演者型：外向感觉情感感知，外向热情、感染力强；适合需要表达与现场互动的场景。"
+};
+
+const PORTRAIT_HOLLAND_LETTER_BLURB = {
+  R: "实用型(R)：偏好工具、操作与具体产出，强调动手能力与现场感。",
+  I: "研究型(I)：偏好分析、实验与理论推演，强调证据与模型。",
+  A: "艺术型(A)：偏好创造、审美与表达，强调原创与风格。",
+  S: "社会型(S)：偏好助人、教育与协作，强调沟通与影响力。",
+  E: "企业型(E)：偏好说服、领导与资源整合，强调目标与推进。",
+  C: "常规型(C)：偏好流程、数据与规范，强调稳定与可控。"
+};
+
+function portraitHollandCodeNarrative(code) {
+  const c = String(code || "").trim().toUpperCase();
+  if (!c) return "";
+  const parts = [];
+  for (let i = 0; i < c.length; i += 1) {
+    const letter = c[i];
+    if (PORTRAIT_HOLLAND_LETTER_BLURB[letter]) parts.push(PORTRAIT_HOLLAND_LETTER_BLURB[letter]);
+  }
+  return parts.join(" ");
+}
+
+function portraitMbtiFallbackNarrative(code) {
+  const key = String(code || "").trim().toUpperCase();
+  return PORTRAIT_MBTI_TYPE_NARRATIVE[key] || "";
+}
+
+function collectPortraitIdentityNarrative(profile, synthesis) {
+  const parts = [];
+  const thesis = synthesis?.thesis ? String(synthesis.thesis).trim() : "";
+  if (thesis) parts.push(`收敛结论：${thesis}`);
+  const ip = profile?.interview?.profile;
+  if (ip?.summary) parts.push(`访谈摘要：${String(ip.summary).trim()}`);
+  if (ip?.key_experience) parts.push(`关键经历：${String(ip.key_experience).trim()}`);
+  if (ip?.leadership_style) parts.push(`协作与领导风格：${String(ip.leadership_style).trim()}`);
+  if (ip?.growth_mindset) parts.push(`成长观：${String(ip.growth_mindset).trim()}`);
+  if (ip?.role_model) parts.push(`认同榜样：${String(ip.role_model).trim()}`);
+  const dims = Array.isArray(ip?.dimensions) ? ip.dimensions : [];
+  dims.forEach((d) => {
+    const ev = d?.evidence && String(d.evidence).trim();
+    if (ev) parts.push(`${d.name || "维度"}：${ev}`);
+  });
+  return parts.join("\n").slice(0, 3500);
+}
+
+function collectPortraitAssessmentProse() {
+  try {
+    const snap = getAssessmentHubSnapshotSafe();
+    if (!snap) return "";
+    const chunks = [];
+    if (snap.mbti?.completed) {
+      const code = snap.mbti.display_type || snap.mbti.final_type || "";
+      const sum = snap.mbti.summary ? String(snap.mbti.summary).trim() : "";
+      if (sum) chunks.push(`MBTI（${code}）测评文字：${sum}`);
+      else if (code) chunks.push(`MBTI 已完成，类型 ${code}（请结合四维与主测摘要理解气质，而非仅四字标签）。`);
+      const d = snap.mbti.detail && typeof snap.mbti.detail === "object" ? snap.mbti.detail : null;
+      if (d) {
+        if (d.nickname) chunks.push(`MBTI 角色标签：${String(d.nickname).trim()}`);
+        if (Array.isArray(d.strengths) && d.strengths.length) chunks.push(`典型优势：${d.strengths.slice(0, 6).filter(Boolean).join("；")}`);
+        if (Array.isArray(d.risks) && d.risks.length) chunks.push(`需注意：${d.risks.slice(0, 4).filter(Boolean).join("；")}`);
+        if (Array.isArray(d.work_style) && d.work_style.length) chunks.push(`工作风格线索：${d.work_style.slice(0, 5).filter(Boolean).join("；")}`);
+        if (Array.isArray(d.career_advice) && d.career_advice.length) chunks.push(`发展建议摘录：${d.career_advice.slice(0, 4).filter(Boolean).join("；")}`);
+        if (d.summary && String(d.summary).trim() && String(d.summary).trim() !== sum) {
+          chunks.push(`MBTI 详细侧写：${String(d.summary).trim()}`);
+        }
+      }
+      const fb = portraitMbtiFallbackNarrative(code);
+      if (fb) chunks.push(`类型气质参考（补述）：${fb}`);
+    }
+    if (snap.holland?.completed) {
+      const h = snap.holland;
+      const sum = h.summary ? String(h.summary).trim() : "";
+      if (sum) chunks.push(`霍兰德（${h.code || ""}）测评文字：${sum}`);
+      else if (h.code) chunks.push(`霍兰德兴趣代码 ${h.code}。`);
+      if (h.primary && (h.primary.name || h.primary.code)) {
+        chunks.push(`霍兰德主导类型：${h.primary.name || h.primary.code}${h.primary.score != null ? `（强度约 ${h.primary.score}）` : ""}`);
+      }
+      const hd = h.detail && typeof h.detail === "object" ? h.detail : null;
+      if (hd?.summary) chunks.push(`霍兰德主导兴趣详解：${String(hd.summary).trim()}`);
+      const holNarr = portraitHollandCodeNarrative(h.code);
+      if (holNarr) chunks.push(`兴趣代码展开（补述）：${holNarr}`);
+    }
+    if (snap.combined_summary) chunks.push(`测评综合：${String(snap.combined_summary).trim()}`);
+    return chunks.filter(Boolean).join("\n").slice(0, 3800);
+  } catch (_) {
+    return "";
+  }
+}
+
+function collectPortraitExtendedTestsProse() {
+  try {
+    const core = window.__DeepTestHubCore__;
+    if (!core || typeof core.getStoredResultByType !== "function") return "";
+    const chunks = [];
+    const nameMap = typeof core.getMbtiNameMap === "function" ? core.getMbtiNameMap() : {};
+    const deep = core.getStoredResultByType("deep");
+    if (deep?.result?.type) {
+      const t = deep.result.type;
+      const cn = nameMap[t] || "";
+      const p = deep.result.pct && typeof deep.result.pct === "object" ? deep.result.pct : null;
+      const pctHint = p
+        ? `四维倾向强度（约）：内向-外向 ${p.IE ?? 0}% 、感觉-直觉 ${p.SN ?? 0}% 、思考-情感 ${p.TF ?? 0}% 、判断-感知 ${p.JP ?? 0}% 。`
+        : "";
+      let line = `深层 MBTI（52 题）：${t}${cn ? `（${cn}）` : ""}${pctHint ? ` ${pctHint}` : ""}`;
+      if (deep.aiText) line += ` 扩展解读摘录：${String(deep.aiText).trim().slice(0, 420)}`;
+      chunks.push(line.trim());
+    }
+    const fr = core.getStoredResultByType("friends");
+    if (fr?.winner) {
+      const syn = fr.detail?.synopsis ? String(fr.detail.synopsis).trim() : "";
+      const traits = Array.isArray(fr.detail?.traits) ? fr.detail.traits.slice(0, 5).filter(Boolean).join("、") : "";
+      chunks.push(
+        `老友记角色测评：最像 ${fr.winner}${syn ? `；角色叙事：${syn}` : ""}${traits ? `；相关特质：${traits}` : ""}`.trim()
+      );
+    }
+    const io = core.getStoredResultByType("insideout");
+    if (io?.winner) {
+      const syn = io.detail?.synopsis ? String(io.detail.synopsis).trim() : "";
+      chunks.push(`头脑特工队情绪主导：${io.winner}${syn ? `；气质描述：${syn}` : ""}`.trim());
+    }
+    const sb = core.getStoredResultByType("sbti");
+    if (sb?.code) {
+      chunks.push(
+        `SBTI 人格扩展：${String(sb.title || sb.code).trim()}（匹配度 ${sb.match != null ? sb.match : "--"}%）。${String(sb.summary || "").trim()}`.trim()
+      );
+    }
+    return chunks.filter(Boolean).join("\n").slice(0, 2800);
+  } catch (_) {
+    return "";
+  }
+}
+
 function buildProfilePortraitContext(profile, roles, synthesis) {
   const resumeState = userWorkspaceState.scopedData.resume_profile || null;
   const resumeTraits = buildResumePortraitTraits(resumeState);
   const interviewProfile = profile?.interview?.profile || null;
   const assessmentOutput = buildProfileAssessmentModuleOutput(profile);
   const resumeOutput = buildProfileResumeModuleOutput(profile, resumeTraits);
-  const interviewOutput = buildProfileInterviewModuleOutput(profile);
+  const interviewOutput = buildProfileInterviewModuleOutput(profile, synthesis);
   const nextSteps = uniqueValues([
     ...(Array.isArray(profile?.nextSteps) ? profile.nextSteps : []),
     ...(((roles || [])[0]?.nextActions) || [])
@@ -6973,6 +7529,9 @@ function buildProfilePortraitContext(profile, roles, synthesis) {
     next_steps: nextSteps,
     missing_items: uniqueValues(profile?.missingItems || [], 4),
     uncertainty: uniqueValues(synthesis?.uncertainty || [], 4),
+    identity_narrative: collectPortraitIdentityNarrative(profile, synthesis),
+    assessment_prose: collectPortraitAssessmentProse(),
+    extended_tests_prose: collectPortraitExtendedTestsProse(),
     module_outputs: {
       assessment: assessmentOutput.raw,
       resume: resumeOutput.raw,
@@ -6981,7 +7540,7 @@ function buildProfilePortraitContext(profile, roles, synthesis) {
     prompt_request: {
       card_style: "人物明信片",
       card_goal: "美观清晰，一眼看懂这个人最像什么岗位、能做什么任务、下一步该补什么。",
-      visual_direction: "适合白底页面展示，职业感明确，信息克制，避免宣传海报式堆砌。",
+      visual_direction: "半写实出版物/编辑插图质感，自然窗光或柔光，浅景深，低饱和配色；避免廉价滤镜与 Q 版卡通。",
       required_fields: ["标题", "定位句", "主角色", "任务句", "证据标签", "下一步"]
     }
   };
@@ -6993,11 +7552,35 @@ const PROFILE_PORTRAIT_LOADING_STAGES = [
   { title: "渲染海报", copy: "沿用当前图片 API 生成 3:4 半写实人物海报。" }
 ];
 
+/** 各阶段轮换的细粒度状态，让用户感知后台仍在工作 */
+const PROFILE_PORTRAIT_STAGE_ACTIVITY = [
+  ["正在读取测评、简历与访谈信号…", "合并目标方向与岗位线索…", "整理叙事与证据标签…", "计算主角色与置信度…"],
+  ["生成任务名片 brief 结构…", "压缩「你是谁」与下一步建议…", "预组装图像提示词约束…", "校验白底页面展示字段…"],
+  ["请求图像模型…", "应用 3:4 构图与半写实风格…", "优化光影与职业场景…", "写入海报资源…"]
+];
+
+function getProfilePortraitActivityLine() {
+  const maxStage = PROFILE_PORTRAIT_STAGE_ACTIVITY.length - 1;
+  const si = Math.min(Math.max(profilePortraitTaskState.stageIndex, 0), maxStage);
+  const lines = PROFILE_PORTRAIT_STAGE_ACTIVITY[si] || PROFILE_PORTRAIT_STAGE_ACTIVITY[0];
+  const idx = lines.length ? profilePortraitTaskState.pulseIndex % lines.length : 0;
+  return lines[idx] || "处理中…";
+}
+
+function getProfilePortraitElapsedLabel() {
+  if (!profilePortraitTaskState.loading || !profilePortraitTaskState.startedAt) return "";
+  const sec = Math.floor((Date.now() - profilePortraitTaskState.startedAt) / 1000);
+  return sec > 0 ? `已进行约 ${sec} 秒` : "";
+}
+
 function startProfilePortraitLoading(mode = "render") {
   if (profilePortraitTaskState.stageTimer) clearInterval(profilePortraitTaskState.stageTimer);
+  if (profilePortraitTaskState.pulseTimer) clearInterval(profilePortraitTaskState.pulseTimer);
   profilePortraitTaskState.loading = true;
   profilePortraitTaskState.mode = mode;
   profilePortraitTaskState.stageIndex = 0;
+  profilePortraitTaskState.pulseIndex = 0;
+  profilePortraitTaskState.startedAt = Date.now();
   profilePortraitTaskState.stageTimer = setInterval(() => {
     profilePortraitTaskState.stageIndex = Math.min(PROFILE_PORTRAIT_LOADING_STAGES.length - 1, profilePortraitTaskState.stageIndex + 1);
     const profile = appState.derivedProfile || deriveUnifiedProfile();
@@ -7006,13 +7589,25 @@ function startProfilePortraitLoading(mode = "render") {
       : computeRoleMatches(profile);
     renderProfileWorkspace(profile, roles);
   }, 850);
+  profilePortraitTaskState.pulseTimer = setInterval(() => {
+    profilePortraitTaskState.pulseIndex += 1;
+    const profile = appState.derivedProfile || deriveUnifiedProfile();
+    const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
+      ? appState.matchingRoles
+      : computeRoleMatches(profile);
+    renderProfileWorkspace(profile, roles);
+  }, 1500);
 }
 
 function stopProfilePortraitLoading() {
   if (profilePortraitTaskState.stageTimer) clearInterval(profilePortraitTaskState.stageTimer);
+  if (profilePortraitTaskState.pulseTimer) clearInterval(profilePortraitTaskState.pulseTimer);
   profilePortraitTaskState.stageTimer = null;
+  profilePortraitTaskState.pulseTimer = null;
   profilePortraitTaskState.loading = false;
   profilePortraitTaskState.stageIndex = 0;
+  profilePortraitTaskState.pulseIndex = 0;
+  profilePortraitTaskState.startedAt = 0;
 }
 
 function buildFallbackProfilePortraitBrief(profile, roles, synthesis, portraitState) {
@@ -7066,6 +7661,9 @@ function renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis
   if (!archetypeVisualEl) return;
   const safeBrief = brief && typeof brief === "object" ? brief : {};
   if (profilePortraitTaskState.loading) {
+    const activityLine = escHtml(getProfilePortraitActivityLine());
+    const elapsedRaw = getProfilePortraitElapsedLabel();
+    const elapsedHtml = elapsedRaw ? `<p class="profile-portrait-activity-elapsed">${escHtml(elapsedRaw)}</p>` : "";
     const items = PROFILE_PORTRAIT_LOADING_STAGES.map((item, index) => {
       const stateClass = index < profilePortraitTaskState.stageIndex
         ? "done"
@@ -7085,10 +7683,17 @@ function renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis
     archetypeVisualEl.innerHTML = `
       <div class="profile-portrait-poster-empty">
         <div class="profile-portrait-poster-copy-block">
-          <span class="profile-portrait-poster-status">生成中</span>
+          <span class="profile-portrait-poster-status is-live">生成中</span>
           <div>
             <h4 class="profile-portrait-poster-title">任务海报正在生成</h4>
             <p class="profile-portrait-poster-copy">系统会先收敛职业定位，再把结果压缩成任务名片，最后渲染为半写实人物海报。</p>
+          </div>
+          <div class="profile-portrait-activity-block" aria-live="polite">
+            <div class="profile-portrait-activity-track" role="progressbar" aria-busy="true" aria-valuetext="处理中">
+              <span class="profile-portrait-activity-indeterminate"></span>
+            </div>
+            <p class="profile-portrait-activity-line">${activityLine}</p>
+            ${elapsedHtml}
           </div>
         </div>
         <div class="profile-portrait-loading-list">${items}</div>
@@ -7142,6 +7747,9 @@ function renderProfilePortraitBriefCard(briefCardEl, portraitState, brief) {
   const safeBrief = brief && typeof brief === "object" ? brief : {};
   const hasGeneratedBrief = Boolean(portraitState?.brief && typeof portraitState.brief === "object");
   if (profilePortraitTaskState.loading) {
+    const activityLine = escHtml(getProfilePortraitActivityLine());
+    const elapsedRaw = getProfilePortraitElapsedLabel();
+    const elapsedHtml = elapsedRaw ? `<p class="profile-portrait-activity-elapsed">${escHtml(elapsedRaw)}</p>` : "";
     const items = PROFILE_PORTRAIT_LOADING_STAGES.map((item, index) => {
       const stateClass = index < profilePortraitTaskState.stageIndex
         ? "done"
@@ -7162,9 +7770,16 @@ function renderProfilePortraitBriefCard(briefCardEl, portraitState, brief) {
       <div class="profile-portrait-brief-surface">
         <div class="profile-portrait-brief-head">
           <div>
-            <p class="profile-portrait-kicker">任务名片生成中</p>
+            <p class="profile-portrait-kicker is-live">任务名片生成中</p>
             <h4 class="profile-portrait-brief-title">正在压缩关键信息</h4>
             <p class="profile-portrait-brief-subtitle">结果页只会保留首屏最重要的信息，避免把分析内容一次性铺满。</p>
+            <div class="profile-portrait-activity-block" aria-live="polite">
+              <div class="profile-portrait-activity-track" role="progressbar" aria-busy="true" aria-valuetext="处理中">
+                <span class="profile-portrait-activity-indeterminate"></span>
+              </div>
+              <p class="profile-portrait-activity-line">${activityLine}</p>
+              ${elapsedHtml}
+            </div>
           </div>
         </div>
         <div class="profile-portrait-loading-list">${items}</div>
@@ -7330,6 +7945,9 @@ async function generateProfilePortrait(options = {}) {
     || context.resume_summary
     || (context.resume_projects || []).length
     || (context.resume_roles || []).length
+    || (context.identity_narrative && String(context.identity_narrative).trim())
+    || (context.assessment_prose && String(context.assessment_prose).trim())
+    || (context.extended_tests_prose && String(context.extended_tests_prose).trim())
   );
   if (!hasPortraitSignals) {
     showToast("画像信息不足", "先完成测评、简历或目标方向补充后再生成。", "warning", 2000);
@@ -8159,8 +8777,19 @@ function renderProfileWorkspace(profile, roles) {
   renderProfilePortraitOutputBoard(portraitOutputBoardEl, portraitOutputCards);
   // 新增：数据来源状态条 / 六维能力速览 / 关键证据&信息缺口
   renderProfileSourcePills(document.getElementById("profileSourcePills"), profile);
-  renderProfileCapabilityStrip(document.getElementById("profileCapabilityStrip"), profile);
-  renderProfileEvidenceGaps(document.getElementById("profileEvidenceGapsContent"), profile);
+  const portraitLoading = Boolean(profilePortraitTaskState.loading);
+  const capStripSection = document.getElementById("profileCapabilityStripSection");
+  if (capStripSection) {
+    capStripSection.classList.toggle("is-generating", portraitLoading);
+    const copyEl = capStripSection.querySelector(".profile-capability-strip-copy");
+    if (copyEl) {
+      copyEl.textContent = portraitLoading
+        ? "任务海报生成期间暂缓展示下方分数；完成后会显示基于当前测评、简历与访谈综合推断的六维结果（因人而异）。"
+        : "基于测评、简历与访谈综合推断，有实证支撑的维度会标注来源，待补充的维度可通过继续访谈提升精度。";
+    }
+  }
+  renderProfileCapabilityStrip(document.getElementById("profileCapabilityStrip"), profile, portraitLoading);
+  renderProfileEvidenceGaps(document.getElementById("profileEvidenceGapsContent"), profile, portraitLoading);
   if (archetypeNameEl) archetypeNameEl.textContent = portraitBrief?.title || synthesis.archetype.name;
   if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
   if (archetypeSummaryEl) archetypeSummaryEl.textContent = portraitBrief?.positioning || synthesis.thesis;
@@ -9159,6 +9788,7 @@ function switchAuthTab(tab) {
 function lockApp() {
   userWorkspaceState.currentUser = null;
   userWorkspaceState.authReadyPromise = null;
+  document.body.classList.remove("auth-checking");
   document.body.classList.add("auth-locked");
   const startup = document.getElementById("startupScreen");
   const label = document.getElementById("currentUserLabel");
@@ -9176,13 +9806,24 @@ function unlockAppForUser(user) {
   const label = document.getElementById("currentUserLabel");
   const logoutBtn = document.getElementById("logoutBtn");
   const avatar = document.getElementById("currentUserAvatar");
-  document.body.classList.remove("auth-locked");
+  const hadAuthChecking = document.body.classList.contains("auth-checking");
+  let postLogin = false;
+  try {
+    postLogin = sessionStorage.getItem("app_post_login_refresh") === "1";
+    if (postLogin) sessionStorage.removeItem("app_post_login_refresh");
+  } catch (_) {
+    postLogin = false;
+  }
+  document.body.classList.remove("auth-checking", "auth-locked");
   if (startup) startup.classList.add("hidden");
   if (label) { label.textContent = `${user.display_name || user.displayName || user.username} (${user.role === "super_admin" ? "Super Admin" : "User"})`; label.classList.remove("hidden"); }
   if (logoutBtn) logoutBtn.classList.remove("hidden");
   if (avatar) avatar.textContent = user.role === "super_admin" ? "管" : "人";
   addLiveActivity(`User signed in: ${user.username}`);
-  showToast("登录成功", `欢迎回来，${user.display_name || user.displayName || user.username}。`, "success", 1800);
+  const silentSessionRestore = hadAuthChecking && !postLogin;
+  if (!silentSessionRestore) {
+    showToast("登录成功", `欢迎回来，${user.display_name || user.displayName || user.username}。`, "success", 1800);
+  }
   emitAuthStateChange();
   if (redirectAfterUnlock()) return;
 }
@@ -9197,6 +9838,11 @@ async function handleLogin(event) {
       method: "POST",
       body: { username, password }
     });
+    try {
+      sessionStorage.setItem("app_post_login_refresh", "1");
+    } catch (_) {
+      // ignore
+    }
     if (shouldForceRelock()) {
       showAuthMessage("解锁成功，正在返回上一界面……", "success");
     } else {
@@ -9236,12 +9882,13 @@ async function initAuth() {
       }
       if (payload.authenticated && payload.user) {
         if (shouldForceRelock()) {
-          lockApp();
-          switchAuthTab("login");
-          fillSuperUser();
-          showAuthMessage("请输入密码解锁后，再返回上一次界面。", "warning");
-          emitAuthStateChange();
-          return null;
+          const returnTarget = getRelockReturnTarget();
+          consumeRelockParams();
+          if (returnTarget) {
+            window.location.replace(returnTarget);
+            return null;
+          }
+          // 已登录且无 return_to：仅去掉 force_lock 参数，正常进入系统，不再弹出假登录
         }
         unlockAppForUser(payload.user);
         const llm = payload.llm || {};
@@ -10137,6 +10784,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    const careerIv = document.getElementById("careerInterviewModal");
+    if (careerIv && !careerIv.classList.contains("hidden")) {
+      closeCareerInterviewModal();
+      return;
+    }
     const resumeReportModal = document.getElementById("resumeReportModal");
     if (resumeReportModal && !resumeReportModal.classList.contains("hidden")) {
       closeResumeReportModal();
