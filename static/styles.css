@@ -17082,71 +17082,122 @@ nav.gradient-bg .nav-action-strip .action-icon {
     font-size: 0.9rem;
 }
 
-.report-agent-preview {
+/* 规划报告：多智能体协作流（浅色卡片，与「多智能体.html」版式对齐；连线仍由 app.js 渲染） */
+.report-workflow-section {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 20px;
     overflow: hidden;
-    border-radius: 12px;
+    box-shadow: 0 4px 0 #e2e8f0, 0 10px 30px rgba(0, 0, 0, 0.04);
 }
 
-.report-agent-preview-head {
+.report-workflow-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.1rem 1.5rem;
+    border-bottom: 2px solid #f1f5f9;
+    background: #fafbfc;
+}
+
+.report-workflow-title {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1.1rem 1.25rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: #06140f;
-    color: #e5f5ee;
+    gap: 0.75rem;
 }
 
-.report-agent-preview-head h3 {
-    margin: 0;
-    color: #ffffff;
+.report-workflow-title-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1.1rem;
-    font-weight: 900;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 2px solid #fcd34d;
 }
 
-.report-agent-legend {
+.report-workflow-heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #1e293b;
+}
+
+.report-workflow-sub {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.report-workflow-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.8rem;
-    color: #cbd5e1;
-    font-size: 0.78rem;
-    font-weight: 700;
+    gap: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
 }
 
-.report-agent-legend span {
+.report-workflow-legend span {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
 }
 
-.report-agent-legend i {
-    display: inline-block;
-    width: 26px;
-    border-top: 2px solid #ffffff;
+.report-workflow-legend .legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid;
+    flex-shrink: 0;
 }
 
-.report-agent-legend i.dashed {
-    border-top-color: #ef4444;
-    border-top-style: dashed;
+.report-workflow-legend .legend-dot.completed {
+    background: #34d399;
+    border-color: #059669;
+}
+
+.report-workflow-legend .legend-dot.active {
+    background: #fbbf24;
+    border-color: #d97706;
+}
+
+.report-workflow-legend .legend-dot.pending {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
 }
 
 .report-agent-map {
-    min-height: 650px;
-    overflow-x: auto;
-    padding: 2.35rem 2.6rem 2.8rem;
-    background:
-        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        radial-gradient(circle at 18% 50%, rgba(22, 163, 74, 0.12), transparent 25%),
-        #06140f;
-    background-size: 34px 34px, 34px 34px, auto, auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 2rem 1.5rem 2.25rem;
+    background: #fafbfc;
+}
+
+/* 整图按比例缩放入视口，避免横向滚动条挡视线（比例由 app.js 写入 --report-map-scale） */
+.report-agent-map-viewport {
+    position: relative;
+    width: 100%;
+    height: calc(780px * var(--report-map-scale, 1));
+    overflow: hidden;
 }
 
 .report-agent-map-inner {
-    position: relative;
+    position: absolute;
+    left: 50%;
+    top: 0;
     width: 2040px;
-    height: 720px;
+    height: 780px;
+    margin-left: -1020px;
+    transform: scale(var(--report-map-scale, 1));
+    transform-origin: top center;
 }
 
 .report-agent-edges {
@@ -17160,22 +17211,22 @@ nav.gradient-bg .nav-action-strip .action-icon {
 
 .report-agent-edge {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.24);
-    stroke-width: 2.4;
+    stroke: #cbd5e1;
+    stroke-width: 3;
     stroke-linecap: round;
 }
 
 .report-agent-edge.is-done {
-    stroke: rgba(255, 255, 255, 0.88);
-    filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.2));
+    stroke: #22c55e;
+    filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.35));
 }
 
 .report-agent-edge.is-active {
-    stroke: #ef4444;
-    stroke-width: 2.8;
+    stroke: #f59e0b;
+    stroke-width: 3.5;
     stroke-dasharray: 9 7;
     animation: reportAgentDash 1.1s linear infinite;
-    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.35));
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.35));
 }
 
 @keyframes reportAgentDash {
@@ -17184,7 +17235,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
 
 .report-agent-phase {
     position: absolute;
-    top: 0.1rem;
+    top: 0.35rem;
     z-index: 2;
     display: inline-flex;
     align-items: center;
@@ -17192,112 +17243,237 @@ nav.gradient-bg .nav-action-strip .action-icon {
     min-height: 28px;
     padding: 0 0.72rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.07);
-    color: #cbd5e1;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #475569;
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0.04em;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .phase-input { left: 88px; }
-.phase-parallel { left: 410px; color: #bbf7d0; }
-.phase-serial { left: 960px; color: #bfdbfe; }
-.phase-output { left: 1830px; color: #fde68a; }
+.phase-parallel { left: 410px; color: #047857; }
+.phase-serial { left: 960px; color: #1d4ed8; }
+.phase-output { left: 1830px; color: #b45309; }
 
-.report-agent-note {
-    position: absolute;
-    left: 74px;
-    right: 56px;
-    bottom: 0;
-    z-index: 2;
-    min-height: 34px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(226, 232, 240, 0.78);
-    font-size: 0.78rem;
-    line-height: 34px;
-}
-
-.report-agent-node {
+.report-agent-node.report-ma-card {
     position: absolute;
     z-index: 3;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-        "index status"
-        "icon copy";
-    gap: 0.68rem 0.76rem;
-    width: 196px;
-    min-height: 140px;
-    padding: 0.9rem 0.95rem;
-    border-radius: 18px;
-    text-align: left;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(2, 6, 23, 0.72));
-    color: #e5e7eb;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    box-sizing: border-box;
+    width: 220px;
+    padding: 0.85rem 0.75rem 0.75rem;
+    border-radius: 24px;
+    text-align: center;
+    border: 3px solid #e2e8f0;
+    background: #ffffff;
+    color: #1e293b;
+    box-shadow: 0 4px 0 #e2e8f0;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.35s ease;
 }
 
-.report-agent-node.is-done {
-    border-color: rgba(34, 197, 94, 0.62);
-    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.12), 0 0 32px rgba(34, 197, 94, 0.18);
+.report-agent-node.report-ma-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 0 #e2e8f0, 0 14px 28px rgba(15, 23, 42, 0.08);
 }
 
-.report-agent-node.is-active {
-    border-color: rgba(239, 68, 68, 0.75);
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.12), 0 0 36px rgba(239, 68, 68, 0.28);
+.report-agent-node.report-ma-card.is-done {
+    border-color: #22c55e;
+    box-shadow: 0 4px 0 #a7f3d0, 0 8px 24px rgba(34, 197, 94, 0.12);
 }
 
-.report-agent-node.is-failed {
-    border-color: rgba(248, 113, 113, 0.9);
+.report-agent-node.report-ma-card.is-active {
+    border-color: #fbbf24;
+    box-shadow: 0 4px 0 #fde68a, 0 8px 26px rgba(245, 158, 11, 0.2);
+    animation: reportMaCardBounce 2s ease-in-out infinite;
 }
 
-.report-agent-index {
-    grid-area: index;
-    display: inline-flex;
+.report-agent-node.report-ma-card.is-failed {
+    border-color: #f87171;
+    box-shadow: 0 4px 0 #fecaca;
+}
+
+@keyframes reportMaCardBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+.report-agent-node.report-ma-card.hub {
+    border-color: #a78bfa;
+    background: linear-gradient(180deg, #faf5ff 0%, #ffffff 55%);
+    box-shadow: 0 4px 0 #ddd6fe, 0 8px 24px rgba(124, 58, 237, 0.1);
+}
+
+.report-ma-badge {
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.9rem;
-    height: 1.9rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    font-size: 0.75rem;
-    font-weight: 900;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #fff;
+    border: 3px solid #fff;
+    background: linear-gradient(135deg, #a855f7, #7e22ce);
+    box-shadow: 0 3px 8px rgba(168, 85, 247, 0.28);
+    z-index: 5;
 }
 
-.report-agent-icon {
-    grid-area: icon;
-    display: inline-flex;
+.report-agent-node.report-ma-card.hub .report-ma-badge {
+    background: linear-gradient(135deg, #f472b6, #ec4899);
+}
+
+.report-ma-flow-status.status-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    z-index: 5;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    border: 2px solid;
+    text-transform: none;
+}
+
+.report-ma-flow-status.status-badge.completed {
+    background: #d1fae5;
+    color: #059669;
+    border-color: #34d399;
+}
+
+.report-ma-flow-status.status-badge.active {
+    background: #fef3c7;
+    color: #d97706;
+    border-color: #fbbf24;
+    animation: reportMaPulseBadge 1.5s ease-in-out infinite;
+}
+
+.report-ma-flow-status.status-badge.pending {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e1;
+}
+
+.report-ma-flow-status.status-badge.failed {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #f87171;
+}
+
+@keyframes reportMaPulseBadge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+.report-ma-portrait {
+    width: 120px;
+    height: 120px;
+    margin: 0.25rem auto 0.5rem;
+    position: relative;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 14px;
-    background: rgba(59, 130, 246, 0.16);
-    color: #93c5fd;
-    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.18);
-    overflow: hidden;
 }
 
-.report-agent-node.is-done .report-agent-icon {
-    background: rgba(34, 197, 94, 0.16);
-    color: #86efac;
+.report-ma-portrait--img img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 16px;
 }
 
-.report-agent-node.is-active .report-agent-icon {
-    background: rgba(239, 68, 68, 0.18);
-    color: #fecaca;
-}
-
-.report-agent-icon svg {
-    width: 1.3rem;
-    height: 1.3rem;
+.report-ma-portrait--svg svg {
+    width: 3rem;
+    height: 3rem;
     fill: none;
-    stroke: currentColor;
+    stroke: #64748b;
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.report-ma-portrait--user {
+    border-radius: 16px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #dbeafe, #f8fafc);
+    border: 2px solid #e2e8f0;
+}
+
+.report-ma-portrait--user .report-agent-user-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.report-ma-name {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0;
+}
+
+.report-ma-role {
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.02em;
+}
+
+.report-ma-detail {
+    margin: 0.45rem 0 0.5rem;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: #94a3b8;
+}
+
+.report-ma-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.report-ma-metrics .metric-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    border: 1px solid;
+}
+
+.report-ma-metrics .metric-tag.green {
+    background: #d1fae5;
+    color: #059669;
+    border-color: #6ee7b7;
+}
+
+.report-ma-metrics .metric-tag.yellow {
+    background: #fef3c7;
+    color: #d97706;
+    border-color: #fcd34d;
+}
+
+.report-ma-metrics .metric-tag.pink {
+    background: #fce7f3;
+    color: #db2777;
+    border-color: #f9a8d4;
+}
+
+.report-ma-metrics .metric-tag.gray {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e1;
 }
 
 .report-agent-user-avatar {
@@ -17321,54 +17497,6 @@ nav.gradient-bg .nav-action-strip .action-icon {
     display: block;
 }
 
-.report-agent-copy {
-    grid-area: copy;
-    min-width: 0;
-}
-
-.report-agent-node h4 {
-    margin: 0;
-    color: #ffffff;
-    font-size: 0.9rem;
-    font-weight: 900;
-}
-
-.report-agent-node p {
-    margin: 0.2rem 0;
-    color: #bbf7d0;
-    font-size: 0.76rem;
-    font-weight: 800;
-}
-
-.report-agent-node small {
-    display: block;
-    color: #cbd5e1;
-    font-size: 0.7rem;
-    line-height: 1.45;
-}
-
-.report-agent-node b {
-    grid-area: status;
-    justify-self: end;
-    align-self: center;
-    display: inline-flex;
-    border-radius: 999px;
-    padding: 0.26rem 0.58rem;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    font-size: 0.72rem;
-}
-
-.report-agent-node.is-done b {
-    background: rgba(34, 197, 94, 0.2);
-    color: #bbf7d0;
-}
-
-.report-agent-node.is-active b {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fecaca;
-}
-
 @media (max-width: 920px) {
     .report-launch-hero,
     .report-launch-status {
@@ -17383,9 +17511,13 @@ nav.gradient-bg .nav-action-strip .action-icon {
         text-align: left;
     }
 
+    .report-workflow-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .report-agent-map {
-        min-height: 520px;
-        padding: 3rem 1.25rem;
+        padding: 1.5rem 1rem 2rem;
     }
 }
 

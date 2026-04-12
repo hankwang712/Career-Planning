@@ -9165,6 +9165,19 @@ function renderMatchingWorkspace(profile, roles) {
     });
 }
 
+/** 与「多智能体图片」PNG 对应（报告合成等无图则回退 SVG） */
+const REPORT_AGENT_IMAGE_URL = {
+  profile_fusion: null,
+  industry_analysis: "/static/img/multi-agent/industry-analyst.png",
+  resume_evidence: "/static/img/multi-agent/resume-analyst.png",
+  career_positioning: "/static/img/multi-agent/career-advisor.png",
+  competency_assess: "/static/img/multi-agent/competency-assessor.png",
+  resume_evidence_2: "/static/img/multi-agent/resume-analyst.png",
+  role_match: "/static/img/multi-agent/role-match.png",
+  path_planning: "/static/img/multi-agent/path-planner.png",
+  report_writer: "/static/img/multi-agent/report-writer.png"
+};
+
 const REPORT_AGENT_FLOW = [
   { key: "profile_fusion", title: "画像输入", role: "Profile Intake", detail: "测评、简历、访谈与目标岗位快照", icon: "profile", x: 72, y: 282 },
   { key: "industry_analysis", title: "行业分析师", role: "Industry Analyst", detail: "外部趋势与需求侧判断", icon: "trend", x: 360, y: 112, aliases: ["trend_intelligence"] },
@@ -9177,8 +9190,11 @@ const REPORT_AGENT_FLOW = [
   { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic"] }
 ];
 
-const REPORT_AGENT_NODE_WIDTH = 196;
-const REPORT_AGENT_NODE_MID_Y = 70;
+const REPORT_AGENT_NODE_WIDTH = 220;
+const REPORT_AGENT_NODE_MID_Y = 118;
+/** 协作图画布逻辑尺寸（与 SVG viewBox、CSS 一致；窄屏整体缩放以消除横向滚动条） */
+const REPORT_AGENT_MAP_W = 2040;
+const REPORT_AGENT_MAP_H = 780;
 
 const REPORT_AGENT_EDGES = [
   ["profile_fusion", "industry_analysis"],
@@ -9206,6 +9222,35 @@ function getReportProgressMap(state) {
     if (key) map.set(key, String(item.status || "").trim().toLowerCase());
   });
   return map;
+}
+
+function reportMaLegendStatusClass(nodeStatus) {
+  if (nodeStatus === "done") return "completed";
+  if (nodeStatus === "active") return "active";
+  if (nodeStatus === "failed") return "failed";
+  return "pending";
+}
+
+function reportMaLegendStatusText(nodeStatus) {
+  if (nodeStatus === "done") return "已完成";
+  if (nodeStatus === "active") return "处理中";
+  if (nodeStatus === "failed") return "失败";
+  return "待启动";
+}
+
+function reportAgentMetricsHtml(item) {
+  const ns = item.nodeStatus;
+  const cls = ns === "done" ? "green" : ns === "active" ? "yellow" : ns === "failed" ? "pink" : "gray";
+  const text = ns === "done" ? "✅ 已就绪" : ns === "active" ? "⏳ 进行中" : ns === "failed" ? "⚠️ 异常" : "○ 待触发";
+  return `<span class="metric-tag ${cls}">${text}</span>`;
+}
+
+function reportAgentPortraitHtml(item) {
+  const url = REPORT_AGENT_IMAGE_URL[item.key];
+  if (url) {
+    return `<div class="report-ma-portrait report-ma-portrait--img"><img src="${escHtml(url)}" alt="${escHtml(item.title)}" loading="lazy" decoding="async" /></div>`;
+  }
+  return `<div class="report-ma-portrait report-ma-portrait--svg">${reportAgentIconSvg(item.icon)}</div>`;
 }
 
 function reportAgentIconSvg(icon) {
@@ -9244,10 +9289,14 @@ function getReportUserAvatarHtml() {
 function reportAgentEdgePath(from, to) {
   const x1 = Number(from.x || 0) + REPORT_AGENT_NODE_WIDTH;
   const y1 = Number(from.y || 0) + REPORT_AGENT_NODE_MID_Y;
-  const x2 = Number(to.x || 0);
+  // 留一点点空隙，视觉上连入卡片更优雅
+  const x2 = Number(to.x || 0) - 2;
   const y2 = Number(to.y || 0) + REPORT_AGENT_NODE_MID_Y;
-  const mid = Math.max(48, Math.abs(x2 - x1) * 0.46);
-  return `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`;
+  
+  // 使用更平滑的三次贝塞尔曲线 (Cubic Bezier)
+  // 控制点完全居中，这样可以形成从卡片中间水平引出然后平滑分叉的“树枝状”完美结构
+  const midX = x1 + (x2 - x1) * 0.5;
+  return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
 
 function renderReportAgentMap(profile, roles) {
@@ -9293,29 +9342,62 @@ function renderReportAgentMap(profile, roles) {
     return `<path class="report-agent-edge is-${edgeStatus}" d="${reportAgentEdgePath(from, to)}"></path>`;
   }).join("");
 
-  const nodeHtml = nodes.map((item, index) => `
-    <article class="report-agent-node is-${escHtml(item.nodeStatus)}" style="left:${Number(item.x || 0)}px; top:${Number(item.y || 0)}px;">
-      <span class="report-agent-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="report-agent-icon">${item.key === "profile_fusion" ? getReportUserAvatarHtml() : reportAgentIconSvg(item.icon)}</span>
-      <div class="report-agent-copy">
-        <h4>${escHtml(item.title)}</h4>
-        <p>${escHtml(item.role)}</p>
-        <small>${escHtml(item.detail)}</small>
-      </div>
-      <b>${escHtml(reportAgentStatusLabel(item.nodeStatus))}</b>
-    </article>
-  `).join("");
+  const nodeHtml = nodes
+    .map((item, index) => {
+      const step = String(index + 1).padStart(2, "0");
+      const maStatus = reportMaLegendStatusClass(item.nodeStatus);
+      const hub = item.key === "career_positioning" ? " hub" : "";
+      return `
+    <article class="report-agent-node report-ma-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
+      <div class="report-ma-badge">${step}</div>
+      <div class="report-ma-flow-status status-badge ${maStatus}">${escHtml(reportMaLegendStatusText(item.nodeStatus))}</div>
+      ${reportAgentPortraitHtml(item)}
+      <div class="report-ma-name">${escHtml(item.title)}</div>
+      <div class="report-ma-role">${escHtml(item.role)}</div>
+      <p class="report-ma-detail">${escHtml(item.detail)}</p>
+      <div class="report-ma-metrics">${reportAgentMetricsHtml(item)}</div>
+    </article>`;
+    })
+    .join("");
 
   return `
+    <div class="report-agent-map-viewport">
     <div class="report-agent-map-inner">
       <div class="report-agent-phase phase-input">输入</div>
       <div class="report-agent-phase phase-parallel">并行分析</div>
       <div class="report-agent-phase phase-serial">依赖汇合</div>
       <div class="report-agent-phase phase-output">输出</div>
-      <svg class="report-agent-edges" viewBox="0 0 2040 720" preserveAspectRatio="none" aria-hidden="true">${edges}</svg>
+      <svg class="report-agent-edges" viewBox="0 0 ${REPORT_AGENT_MAP_W} ${REPORT_AGENT_MAP_H}" preserveAspectRatio="none" aria-hidden="true">${edges}</svg>
       ${nodeHtml}
     </div>
+    </div>
   `;
+}
+
+function updateReportAgentMapFit() {
+  const map = document.getElementById("reportAgentMap");
+  if (!map) return;
+  const viewport = map.querySelector(".report-agent-map-viewport");
+  if (!viewport) return;
+  const style = getComputedStyle(map);
+  const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+  const cw = Math.max(0, map.clientWidth - padX);
+  // 区块 display:none 时宽度为 0，勿把 scale 写成 0；可见后 ResizeObserver 会再算
+  const scale = cw > 0 ? Math.min(1, cw / REPORT_AGENT_MAP_W) : 1;
+  viewport.style.setProperty("--report-map-scale", String(scale));
+}
+
+function ensureReportAgentMapFitObserver() {
+  const map = document.getElementById("reportAgentMap");
+  if (!map || map.dataset.reportMapFitBound === "1") return;
+  map.dataset.reportMapFitBound = "1";
+  const run = () => updateReportAgentMapFit();
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(run);
+    ro.observe(map);
+  }
+  window.addEventListener("resize", run);
+  window.addEventListener("orientationchange", run);
 }
 
 function renderReportWorkspace(profile, roles) {
@@ -9372,7 +9454,12 @@ function renderReportWorkspace(profile, roles) {
     cancelBtn.classList.toggle("hidden", !running);
     cancelBtn.disabled = !running;
   }
-  if (mapEl) mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
+  if (mapEl) {
+    mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
+    ensureReportAgentMapFitObserver();
+    updateReportAgentMapFit();
+    requestAnimationFrame(() => updateReportAgentMapFit());
+  }
 }
 
 const CAREER_REPORT_POLL_MS = 1800;

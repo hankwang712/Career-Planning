@@ -1,11 +1,11 @@
-<section id="report" class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 hidden fade-in">
+<section id="report" class="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 hidden fade-in">
     <div class="report-launch-page">
         <div class="report-launch-hero">
             <div>
                 <p class="report-launch-kicker">Career Report Pipeline</p>
                 <h2 class="report-launch-title">职业生涯发展报告生成台</h2>
                 <p class="report-launch-copy">
-                    这里仅用于启动与观察多智能体协作状态，不展开任何报告正文。完整报告生成后会同步到个人中心的报告查看器。
+                    这里仅用于启动与观察多智能体协作状态，不展开报告正文。下方协作流沿用原有阶段与连线逻辑，版式对齐「多智能体」参考页。完整报告在个人中心查看。
                 </p>
             </div>
             <div class="report-launch-actions">
@@ -26,15 +26,19 @@
             </div>
         </div>
 
-        <div id="reportAgentPreview" class="report-agent-preview" aria-label="多智能体工作状态预览">
-            <div class="report-agent-preview-head">
-                <div>
-                    <p class="report-launch-kicker">Agent Workflow</p>
-                    <h3>多智能体协作流</h3>
+        <div class="report-workflow-section" aria-label="多智能体协作流">
+            <div class="report-workflow-header">
+                <div class="report-workflow-title">
+                    <div class="report-workflow-title-icon" aria-hidden="true">🤖</div>
+                    <div>
+                        <h3 class="report-workflow-heading">AGENT WORKFLOW</h3>
+                        <span class="report-workflow-sub">多智能体协作流</span>
+                    </div>
                 </div>
-                <div class="report-agent-legend">
-                    <span><i class="solid"></i> 已传递</span>
-                    <span><i class="dashed"></i> 当前传递</span>
+                <div class="report-workflow-legend">
+                    <span><span class="legend-dot completed"></span>已完成</span>
+                    <span><span class="legend-dot active"></span>处理中</span>
+                    <span><span class="legend-dot pending"></span>待启动</span>
                 </div>
             </div>
             <div id="reportAgentMap" class="report-agent-map"></div>
