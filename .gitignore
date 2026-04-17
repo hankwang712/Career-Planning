@@ -5,3 +5,8 @@ __pycache__/
 .claude/
 .clawhub/
 node_modules/
+
+# AI tools
+.claude/
+.cursor/
+.codex/

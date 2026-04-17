@@ -127,39 +127,6 @@
     transform: translateY(-1px);
 }
 
-.uc-nav-subnav {
-    display: grid;
-    gap: 0.38rem;
-    margin: -0.1rem 0 0.1rem 3.15rem;
-    padding-left: 0.9rem;
-    border-left: 1px solid rgba(96, 165, 250, 0.2);
-}
-
-.uc-nav-subnav.hidden {
-    display: none;
-}
-
-.uc-nav-subitem {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.9rem;
-    padding: 0 0.15rem;
-    border: none;
-    background: transparent;
-    color: rgba(226, 232, 240, 0.66);
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-    transition: color 0.18s ease, transform 0.18s ease;
-}
-
-.uc-nav-subitem:hover,
-.uc-nav-subitem.active {
-    color: #f8fafc;
-    transform: translateX(2px);
-}
-
 .uc-nav-icon {
     display: inline-flex;
     align-items: center;
@@ -349,6 +316,16 @@
     gap: 1rem;
 }
 
+/* 详情区仅在选中卡片进入「详情模式」时展示（由 .hidden / aria-hidden 控制） */
+#userCenterReportDetailShell.hidden,
+#userCenterReportDetailShell[aria-hidden="true"] {
+    display: none !important;
+}
+
+.uc-report-library-shell--with-detail {
+    scroll-margin-top: 0.5rem;
+}
+
 .uc-report-library-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -371,13 +348,69 @@
 
 .uc-report-library-card {
     cursor: pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease, border-color 0.22s ease;
 }
 
-.uc-report-library-card:hover:not(:disabled) {
-    transform: translateY(-2px);
-    border-color: rgba(29, 78, 216, 0.38);
-    box-shadow: 0 24px 44px rgba(15, 23, 42, 0.08);
+.uc-report-library-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(37, 99, 235, 0.42);
+    box-shadow: 0 26px 52px rgba(15, 23, 42, 0.12);
+}
+
+.uc-report-library-card:focus-within {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+}
+
+.uc-report-library-sparkles {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.uc-report-library-spark {
+    display: block;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    opacity: 0.92;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.uc-report-library-spark--a {
+    background: linear-gradient(135deg, #38bdf8, #2563eb);
+}
+
+.uc-report-library-spark--b {
+    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+}
+
+.uc-report-library-spark--c {
+    background: linear-gradient(135deg, #f472b6, #fb7185);
+}
+
+.uc-report-library-card:hover .uc-report-library-spark--a {
+    animation: ucReportSparkNudge 1.2s ease-in-out infinite;
+}
+
+.uc-report-library-card:hover .uc-report-library-spark--b {
+    animation: ucReportSparkNudge 1.2s ease-in-out 0.15s infinite;
+}
+
+.uc-report-library-card:hover .uc-report-library-spark--c {
+    animation: ucReportSparkNudge 1.2s ease-in-out 0.3s infinite;
+}
+
+@keyframes ucReportSparkNudge {
+    0%, 100% { transform: translateY(0); opacity: 0.92; }
+    50% { transform: translateY(-3px); opacity: 1; }
 }
 
 .uc-report-library-card.latest {
@@ -390,7 +423,6 @@
 }
 
 .uc-report-library-meta,
-.uc-report-library-foot,
 .uc-report-detail-backline {
     display: flex;
     align-items: center;
@@ -480,6 +512,7 @@
     color: inherit;
     text-align: left;
     cursor: pointer;
+    position: relative;
 }
 
 .uc-report-library-card--pending {
@@ -576,18 +609,52 @@
 
 .uc-report-library-title {
     margin: 0;
-    min-height: 3.1rem;
+    min-height: 2.75rem;
     color: #334155;
     line-height: 1.65;
     font-size: 0.93rem;
 }
 
+.uc-report-library-summary {
+    margin: 0.35rem 0 0;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: #64748b;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .uc-report-library-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.65rem;
     margin-top: auto;
-    padding-top: 0.8rem;
-    border-top: 1px solid #e2e8f0;
-    justify-content: space-between;
+    padding-top: 1rem;
+    min-height: 0;
+    border-top: none;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+}
+
+.uc-report-library-foot-chips {
+    display: flex;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
+    min-width: 0;
+    margin-top: 0.5rem;
+}
+
+.uc-report-library-foot-actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .uc-report-library-chip {
@@ -616,6 +683,8 @@
 }
 
 .uc-report-library-delete-btn {
+    margin-left: 0;
+    flex-shrink: 0;
     min-height: 1.9rem;
     padding: 0 0.78rem;
     border-radius: 999px;
@@ -637,6 +706,253 @@
 .uc-report-library-delete-btn:disabled {
     opacity: 0.65;
     cursor: wait;
+}
+
+.uc-report-library-surface {
+    background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 24rem),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+/* 正式报告卡片库：流式网格，单卡时铺满容器宽度（避免固定 520px 留白） */
+.uc-report-library-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    justify-content: stretch;
+    gap: 0.8rem;
+    align-items: stretch;
+    width: 100%;
+}
+
+.uc-report-library-card,
+.uc-report-library-empty {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    min-height: 21.25rem;
+    max-height: none;
+    padding: 1.38rem 1.4rem 1.28rem;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.94));
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.uc-report-library-card {
+    --uc-report-accent: #475569;
+    --uc-report-soft: rgba(148, 163, 184, 0.16);
+    display: flex;
+    flex-direction: column;
+}
+
+.uc-report-library-card.tone-tech {
+    --uc-report-accent: #2563eb;
+    --uc-report-soft: rgba(37, 99, 235, 0.14);
+}
+
+.uc-report-library-card.tone-data {
+    --uc-report-accent: #0f766e;
+    --uc-report-soft: rgba(13, 148, 136, 0.14);
+}
+
+.uc-report-library-card.tone-content {
+    --uc-report-accent: #c2410c;
+    --uc-report-soft: rgba(249, 115, 22, 0.14);
+}
+
+.uc-report-library-card.tone-strategy {
+    --uc-report-accent: #7c3aed;
+    --uc-report-soft: rgba(124, 58, 237, 0.14);
+}
+
+.uc-report-library-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 100% 0, var(--uc-report-soft), transparent 34%);
+    pointer-events: none;
+}
+
+.uc-report-library-card::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, var(--uc-report-accent), rgba(255, 255, 255, 0));
+    pointer-events: none;
+}
+
+.uc-report-library-card-main {
+    display: grid;
+    gap: 1rem;
+    z-index: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-content: start;
+}
+
+.uc-report-library-card-top {
+    grid-template-columns: 3.9rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.uc-report-library-card-mark {
+    width: 3.9rem;
+    height: 3.9rem;
+    border-radius: 1.15rem;
+    box-shadow: 0 16px 30px rgba(148, 163, 184, 0.18);
+}
+
+.uc-report-library-card-mark svg,
+.uc-report-library-open svg,
+.uc-report-library-stat-label svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.uc-report-library-card-head {
+    gap: 0.5rem;
+}
+
+.uc-report-library-card-head h4 {
+    font-size: 1.18rem;
+    line-height: 1.24;
+}
+
+.uc-report-library-title {
+    min-height: 0;
+    margin: 0;
+    font-size: 0.93rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.uc-report-library-summary {
+    margin: 0;
+    color: #334155;
+    font-size: 0.92rem;
+    line-height: 1.68;
+    min-height: 0;
+    max-height: 8.8rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    -webkit-line-clamp: 5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.uc-report-library-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, 0.96);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--uc-report-accent);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.uc-report-library-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-top: 0.15rem;
+}
+
+.uc-report-library-stat {
+    display: grid;
+    gap: 0.38rem;
+    min-height: 4.35rem;
+    padding: 0.82rem 0.84rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: rgba(255, 255, 255, 0.82);
+}
+
+.uc-report-library-stat-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+
+.uc-report-library-stat strong {
+    color: #0f172a;
+    font-size: 1.08rem;
+    line-height: 1.2;
+    font-weight: 800;
+}
+
+.uc-report-library-stat.tone-high strong {
+    color: #047857;
+}
+
+.uc-report-library-stat.tone-mid strong,
+.uc-report-library-stat.tone-warn strong {
+    color: #c2410c;
+}
+
+.uc-report-library-stat.tone-low strong {
+    color: #dc2626;
+}
+
+.uc-report-library-stat.tone-accent strong {
+    color: #1d4ed8;
+}
+
+.uc-report-library-stat.tone-neutral strong {
+    color: #334155;
+}
+
+.uc-report-library-chip.muted {
+    background: rgba(241, 245, 249, 0.9);
+    color: #64748b;
+}
+
+.uc-report-library-card.active {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 26px 52px rgba(37, 99, 235, 0.14);
+}
+
+.uc-report-library-card--pending .uc-report-library-title {
+    color: #0f172a;
+    font-size: 1rem;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+@media (max-width: 900px) {
+    .uc-report-library-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .uc-report-library-card-top {
+        grid-template-columns: 3.6rem minmax(0, 1fr);
+    }
+
+    .uc-report-library-open {
+        display: none;
+    }
+
+    .uc-report-library-stats {
+        grid-template-columns: 1fr;
+    }
 }
 
 .uc-section-subline {
@@ -1634,9 +1950,9 @@
 }
 
 .crdoc-nav {
-    position: sticky;
-    top: 0.75rem;
-    z-index: 4;
+    position: relative;
+    top: auto;
+    z-index: 1;
     display: flex;
     gap: 0.55rem;
     overflow-x: auto;
@@ -2586,7 +2902,7 @@
     justify-content: center;
     width: 170px;
     height: 170px;
-    border-radius: 1.6rem;
+    border-radius: 50%;
     background:
         radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 28%),
         linear-gradient(135deg, #dbeafe, #eff6ff);
@@ -2597,6 +2913,20 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: 50%;
+}
+
+.user-center-page .up-avatar-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    font-size: 3rem;
+    font-weight: 800;
+    color: #1e3a8a;
+    background: linear-gradient(145deg, #dbeafe, #bfdbfe);
 }
 
 .uc-account-copy h3,
@@ -4092,6 +4422,33 @@
     margin: 0.8em 0;
 }
 
+/* 行业分析：完整 Markdown 主展示（不限制高度，便于通读） */
+.cr4-module-markdown--primary {
+    max-height: none;
+    margin-top: 0;
+    font-size: 14px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+.cr4-module-structure {
+    margin-top: 20px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 12px;
+}
+.cr4-module-structure summary {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    padding: 6px 0;
+    user-select: none;
+    list-style: none;
+}
+.cr4-module-structure summary::-webkit-details-marker { display: none; }
+.cr4-module-structure-inner {
+    margin-top: 12px;
+}
+
 /* ── Empty state ──────────────────────────────────── */
 .cr4-module-empty {
     text-align: center;
@@ -4157,41 +4514,62 @@
     padding-bottom: 40px;
 }
 
-.career-report-main .crdoc-reveal {
+/* 阅读器：正文与顶部横幅同宽居中 */
+.career-report-main > .crdoc-page.crdoc-page--reader {
+    max-width: min(72rem, 100%);
+}
+
+/* 大块章节默认可见，避免「只有顶部摘要可见、下面像被挡住」 */
+.career-report-main .crdoc-section.crdoc-reveal {
+    opacity: 1;
+    transform: none;
+}
+
+.career-report-main .crdoc-reveal:not(.crdoc-section) {
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.42s ease, transform 0.42s ease;
 }
 
-.career-report-main .crdoc-reveal.is-visible {
+.career-report-main .crdoc-reveal:not(.crdoc-section).is-visible {
     opacity: 1;
     transform: translateY(0);
 }
 
+/* 随页面正常滚动；块级排版，避免与全局 .crdoc-hero 双列 grid 叠层 */
 .career-report-main .crdoc-hero,
 .career-report-main .crdoc-full-head {
-    position: sticky;
-    top: 10px;
-    z-index: 14;
+    position: relative;
+    top: auto;
+    z-index: auto;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
     border: none;
     border-radius: 0;
     padding: 0 0 16px;
     margin: 0;
     background: linear-gradient(180deg, rgba(247, 248, 250, 0.92), rgba(255, 255, 255, 0.82));
-    backdrop-filter: blur(18px);
     box-shadow: none;
 }
 
 .career-report-main .crdoc-header-main {
+    position: relative;
+    z-index: auto;
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(280px, 420px);
     gap: 24px;
     align-items: start;
+    width: 100%;
     padding: 20px 0 16px;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .career-report-main .crdoc-header-copy {
+    position: relative;
+    z-index: auto;
+    min-width: 0;
     display: grid;
     grid-template-columns: 4px minmax(0, 1fr);
     gap: 16px;
@@ -4365,9 +4743,9 @@
 }
 
 .career-report-main .crdoc-nav {
-    position: sticky;
-    top: 128px;
-    z-index: 10;
+    position: relative;
+    top: auto;
+    z-index: 1;
     display: inline-flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -4409,7 +4787,7 @@
     padding: 0;
     border: none;
     background: transparent;
-    scroll-margin-top: 196px;
+    scroll-margin-top: 88px;
 }
 
 .career-report-main .crdoc-section-head {
@@ -5114,9 +5492,6 @@
         grid-template-columns: 1fr;
     }
 
-    .career-report-main .crdoc-nav {
-        top: 164px;
-    }
 }
 
 @media (max-width: 820px) {
@@ -5126,15 +5501,6 @@
     .career-report-main > .cr4-report-shell {
         padding-left: 18px;
         padding-right: 18px;
-    }
-
-    .career-report-main .crdoc-hero,
-    .career-report-main .crdoc-full-head {
-        top: 0;
-    }
-
-    .career-report-main .crdoc-nav {
-        top: 154px;
     }
 
     .career-report-feedback-actions {
@@ -5186,7 +5552,6 @@
     }
 
     .career-report-main .crdoc-nav {
-        top: 142px;
         width: 100%;
         justify-content: flex-start;
     }
@@ -5250,4 +5615,1317 @@
 
 .career-report-main .cr4-progress-fill {
     background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* Career report reader refresh */
+.uc-report-detail-shell {
+    margin-top: 0.4rem;
+}
+
+.uc-report-workbench {
+    padding: 1.5rem 1.6rem 1.75rem;
+    background:
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 24rem),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+.uc-report-workbench-head {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    margin-bottom: 1.1rem;
+    padding-bottom: 1.15rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.88));
+    backdrop-filter: blur(18px);
+}
+
+.uc-report-toolbar {
+    padding: 0.32rem;
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, 0.96);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.uc-report-workbench .career-report-layout--report {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.uc-report-workbench .career-report-aside {
+    display: none !important;
+}
+
+.uc-report-workbench .career-report-main > .crdoc-page,
+.uc-report-workbench .career-report-main > .crdoc-full-head,
+.uc-report-workbench .career-report-main > .ucrd-full-head,
+.uc-report-workbench .career-report-main > .cr4-report-shell {
+    max-width: min(1680px, 100%);
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.career-report-main .crdoc-page--reader {
+    gap: 1.3rem;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.career-report-main .crdoc-reader-hero {
+    padding-bottom: 0.25rem;
+    background: transparent;
+    width: 100%;
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+    box-sizing: border-box;
+}
+
+.career-report-main .crdoc-header-main--reader {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 2rem;
+    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #14b8a6 100%);
+    box-shadow: 0 28px 56px rgba(15, 23, 42, 0.18);
+    width: 100%;
+}
+
+.career-report-main .crdoc-header-copy--reader {
+    gap: 1rem;
+    padding: 2rem 2rem 2.1rem;
+}
+
+.career-report-main .crdoc-header-copy--reader .crdoc-header-bar {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(186, 230, 253, 0.55));
+}
+
+.career-report-main .crdoc-reader-copy {
+    display: grid;
+    gap: 0.95rem;
+}
+
+.career-report-main .crdoc-reader-copy .ucrd-kicker,
+.career-report-main .crdoc-reader-copy .crdoc-kicker {
+    color: rgba(255, 255, 255, 0.76);
+}
+
+.career-report-main .crdoc-reader-copy .ucrd-full-head-title {
+    color: #f8fafc;
+    font-size: clamp(1.8rem, 2.5vw, 2.55rem);
+    line-height: 1.18;
+}
+
+.career-report-main .crdoc-reader-copy .ucrd-full-head-summary {
+    margin: 0;
+    max-width: 50rem;
+    color: rgba(241, 245, 249, 0.92);
+    font-size: 0.98rem;
+    line-height: 1.85;
+}
+
+.career-report-main .crdoc-reader-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1rem;
+}
+
+.career-report-main .crdoc-reader-meta span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(248, 250, 252, 0.92);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-reader-highlights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.career-report-main .crdoc-reader-highlight {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.82rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-reader-aside {
+    display: none;
+}
+
+.career-report-main .crdoc-reader-orb {
+    position: relative;
+    width: min(100%, 176px);
+    aspect-ratio: 1;
+    margin: 0 auto;
+}
+
+.career-report-main .crdoc-reader-orb svg {
+    width: 100%;
+    height: 100%;
+}
+
+.career-report-main .crdoc-reader-orb-copy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+}
+
+.career-report-main .crdoc-reader-orb-copy strong {
+    color: #ffffff;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 800;
+}
+
+.career-report-main .crdoc-reader-orb-copy span {
+    color: rgba(241, 245, 249, 0.82);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.career-report-main .crdoc-reader-note {
+    display: grid;
+    gap: 0.4rem;
+    padding: 1rem 1.05rem;
+    border-radius: 1.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(15, 23, 42, 0.18);
+}
+
+.career-report-main .crdoc-reader-note strong {
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+
+.career-report-main .crdoc-reader-note p {
+    margin: 0;
+    color: rgba(241, 245, 249, 0.8);
+    line-height: 1.7;
+    font-size: 0.82rem;
+}
+
+.career-report-main .crdoc-reader-statbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-top: 1.05rem;
+    width: 100%;
+}
+
+.career-report-main .crdoc-reader-statbar .crdoc-header-info-card {
+    min-height: 100%;
+    padding: 1rem 1.05rem;
+    border-radius: 1.2rem;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.06);
+}
+
+.career-report-main .crdoc-reader-toc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.8rem;
+    margin-top: 1.1rem;
+}
+
+.career-report-main .crdoc-reader-toc-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    width: 100%;
+    min-height: 4.25rem;
+    padding: 0.9rem 1rem;
+    border-radius: 1.15rem;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+    text-align: left;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.career-report-main .crdoc-reader-toc-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 18px 32px rgba(37, 99, 235, 0.1);
+}
+
+.career-report-main .crdoc-reader-toc-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.65rem;
+    height: 2.65rem;
+    border-radius: 0.9rem;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+    flex-shrink: 0;
+}
+
+.career-report-main .crdoc-reader-toc-icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.career-report-main .crdoc-reader-toc-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.career-report-main .crdoc-reader-toc-copy small {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.career-report-main .crdoc-reader-toc-copy strong {
+    color: #0f172a;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.career-report-main .cr4-report-index,
+.career-report-main .cr4-group-hero,
+.career-report-main .cr4-module,
+.career-report-main .career-report-section-card.crdoc-article-card {
+    border-radius: 1.7rem;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    box-shadow: 0 22px 44px rgba(15, 23, 42, 0.06);
+}
+
+.career-report-main .cr4-report-modules {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.career-report-main .cr4-report-index {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.45rem;
+    background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 16rem),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.94));
+}
+
+.career-report-main .cr4-report-index-copy {
+    max-width: 44rem;
+}
+
+.career-report-main .cr4-report-index-tree {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.career-report-main .cr4-report-index-root {
+    grid-column: 1 / -1;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    border-radius: 1rem;
+    border-style: dashed;
+    background: rgba(248, 250, 252, 0.88);
+}
+
+.career-report-main .cr4-report-index-item {
+    padding: 0.95rem 1rem;
+    border-radius: 1.1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+}
+
+.career-report-main .cr4-report-index-item::before {
+    display: none;
+}
+
+.career-report-main .cr4-module {
+    padding: 1.45rem;
+}
+
+.career-report-main .cr4-module-head {
+    gap: 1rem;
+    margin-bottom: 1.15rem;
+    padding-bottom: 1rem;
+}
+
+.career-report-main .cr4-module-icon {
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 1rem;
+    font-size: 0.92rem;
+    font-weight: 800;
+    box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
+}
+
+.career-report-main .cr4-module-num {
+    color: #e2e8f0;
+    font-size: 2.1rem;
+}
+
+.career-report-main .cr4-polish-btn {
+    min-height: 2.3rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(191, 219, 254, 0.96);
+    background: rgba(239, 246, 255, 0.98);
+    color: #1d4ed8;
+}
+
+.career-report-main .cr4-card,
+.career-report-main .cr4-stat-card,
+.career-report-main .cr4-dim-card {
+    border-radius: 1.2rem;
+    border-color: rgba(226, 232, 240, 0.96);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+    box-shadow: none;
+}
+
+.career-report-main .cr4-module-detail {
+    margin-top: 1.05rem;
+    padding-top: 1rem;
+}
+
+.career-report-main .cr4-module-detail summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.2rem;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(191, 219, 254, 0.96);
+    background: rgba(239, 246, 255, 0.94);
+    color: #1d4ed8;
+}
+
+.career-report-main .cr4-module-markdown,
+.career-report-main .cr4-module-markdown--reader {
+    max-height: none;
+    overflow: visible;
+    margin-top: 0.9rem;
+    padding: 0.35rem 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #334155;
+    font-size: 0.96rem;
+    line-height: 1.9;
+}
+
+.career-report-main .cr4-module-markdown h2,
+.career-report-main .cr4-module-markdown--reader h2 {
+    font-size: 1.32rem;
+    margin-top: 1.5rem;
+}
+
+.career-report-main .cr4-module-markdown h3,
+.career-report-main .cr4-module-markdown--reader h3 {
+    font-size: 1.12rem;
+}
+
+.career-report-main .cr4-module-markdown table,
+.career-report-main .cr4-module-markdown--reader table {
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+/* 正文由 .career-report-md-prose 统一排版；此处不再对裸 h2/h3 重复设样式 */
+
+/* ── 职业报告 Markdown 专业排版（career-report-md-prose） ───────────────── */
+.career-report-main .career-report-md-prose {
+    max-width: min(44rem, 100%);
+    margin: 0 auto;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.97rem;
+    line-height: 1.82;
+    letter-spacing: 0.01em;
+    color: #334155;
+    font-feature-settings: "kern" 1;
+}
+
+/* 工作台「全屏阅读」：在可用宽度内拉宽正文，减少两侧空白 */
+.uc-report-workbench .career-report-main .career-report-md-prose {
+    max-width: min(70rem, 100%);
+}
+
+.uc-report-workbench .career-report-main .crdoc-reader-copy .ucrd-full-head-summary {
+    max-width: min(62rem, 100%);
+}
+
+.career-report-main .career-report-md-prose .career-report-md-p {
+    margin: 0 0 1rem;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-h1 {
+    margin: 0 0 0.35rem;
+    padding-bottom: 1rem;
+    font-size: clamp(1.45rem, 2.6vw, 1.75rem);
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+    line-height: 1.28;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.35);
+}
+
+.career-report-main .career-report-md-prose .career-report-md-h1 + .career-report-md-p {
+    margin-top: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.88rem;
+    color: #64748b;
+    line-height: 1.65;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-h2 {
+    margin-top: 2.35rem;
+    margin-bottom: 0.75rem;
+    padding: 0.45rem 0 0.45rem 0.85rem;
+    font-size: 1.22rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    border-left: 4px solid #6366f1;
+    background: linear-gradient(90deg, rgba(238, 242, 255, 0.65), rgba(255, 255, 255, 0));
+    border-radius: 0 0.5rem 0.5rem 0;
+    border-bottom: none;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-h3 {
+    margin-top: 1.65rem;
+    margin-bottom: 0.55rem;
+    font-size: 1.07rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-h4 {
+    margin-top: 1.2rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.98rem;
+    font-weight: 650;
+    color: #475569;
+}
+
+.career-report-main .career-report-md-prose strong {
+    color: #0f172a;
+    font-weight: 650;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-bq {
+    margin: 1.1rem 0;
+    padding: 0.85rem 1rem 0.85rem 1.1rem;
+    border-left: 4px solid #94a3b8;
+    border-radius: 0 0.65rem 0.65rem 0;
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.5));
+    color: #475569;
+    font-size: 0.92rem;
+    line-height: 1.75;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ul,
+.career-report-main .career-report-md-prose .career-report-md-ol {
+    margin: 0.65rem 0 1.1rem;
+    padding-left: 1.25rem;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ul {
+    list-style-type: disc;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ul li::marker {
+    color: #818cf8;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ol li::marker {
+    color: #6366f1;
+    font-weight: 600;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-ul li,
+.career-report-main .career-report-md-prose .career-report-md-ol li {
+    margin: 0.4em 0;
+    padding-left: 0.25rem;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-hr {
+    margin: 2rem 0;
+    border: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.55), transparent);
+}
+
+/* Markdown 插图：![alt](url) 由 renderMarkdownBasic 转为 figure/img */
+.career-report-md-prose .career-report-md-figure {
+    margin: 0.9rem 0 1.15rem;
+}
+
+.career-report-md-prose .career-report-md-img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(203, 213, 225, 0.92);
+    background: #f8fafc;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+    object-fit: contain;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table-wrap {
+    margin: 1.15rem 0 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table {
+    width: 100%;
+    min-width: 36rem;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    line-height: 1.55;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table th {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    font-weight: 650;
+    color: #1e293b;
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+    color: #475569;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table tr:nth-child(even) td {
+    background: rgba(248, 250, 252, 0.55);
+}
+
+.career-report-main .career-report-md-prose .career-report-md-table tr:last-child td {
+    border-bottom: none;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-code {
+    padding: 0.12em 0.4em;
+    border-radius: 0.3rem;
+    font-size: 0.88em;
+    background: rgba(241, 245, 249, 0.95);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    color: #4338ca;
+}
+
+.career-report-main .career-report-md-prose .career-report-md-pre {
+    margin: 1rem 0;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    border-radius: 0.65rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+.career-report-main .crdoc-article-card {
+    padding: 1.5rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.95));
+}
+
+.career-report-main .crdoc-article-head {
+    margin-bottom: 0.35rem;
+}
+
+@media (max-width: 1100px) {
+    .career-report-main .crdoc-header-main--reader {
+        grid-template-columns: 1fr;
+    }
+
+    .career-report-main .crdoc-reader-statbar,
+    .career-report-main .cr4-report-index-tree {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 780px) {
+    .uc-report-workbench {
+        padding: 1.15rem 1rem 1.35rem;
+    }
+
+    .uc-report-workbench-head {
+        position: static;
+    }
+
+    .uc-report-toolbar {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .career-report-main .crdoc-header-copy--reader,
+    .career-report-main .crdoc-reader-aside {
+        padding: 1.25rem;
+    }
+
+    .career-report-main .crdoc-reader-statbar,
+    .career-report-main .crdoc-reader-toc,
+    .career-report-main .cr4-report-index-tree {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── 8-section report new styles ── */
+.cr4-module.cr-module-rose::before  { background: linear-gradient(90deg,#e11d48,#fb7185); }
+.cr4-module.cr-module-slate::before { background: linear-gradient(90deg,#475569,#94a3b8); }
+.cr-module-rose  .cr4-module-icon { background: linear-gradient(135deg,#e11d48,#fb7185); }
+.cr-module-slate .cr4-module-icon { background: linear-gradient(135deg,#475569,#94a3b8); }
+
+.cr4-nested-modules { display: grid; gap: 0.75rem; }
+.cr4-nested-mod {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(226,232,240,0.9);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cr4-nested-mod > summary {
+  padding: 0.85rem 1rem;
+  font-weight: 650;
+  font-size: 0.92rem;
+  color: #1e293b;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.cr4-nested-mod > summary::-webkit-details-marker { display: none; }
+.cr4-nested-mod > summary::after {
+  content: "▸";
+  font-size: 0.85rem;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+.cr4-nested-mod[open] > summary::after { transform: rotate(90deg); }
+.cr4-nested-body {
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid rgba(226,232,240,0.6);
+}
+.cr4-nested-body .cr4-explain { margin-top: 0; }
+.cr4-nested-body .cr4-stat-row { margin-top: 0.5rem; }
+
+.cr4-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+.cr4-pill-row .cr4-tag {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.55rem;
+  background: rgba(241,245,249,0.9);
+  border: 1px solid rgba(226,232,240,0.9);
+  border-radius: 999px;
+  color: #475569;
+}
+
+.cr4-card-risk {
+  border-left: 3px solid #ef4444;
+  background: linear-gradient(180deg, rgba(254,242,242,0.55), rgba(255,255,255,0.65));
+}
+
+/* ── 职业报告 Markdown 树形目录（正文区 ## / ### 锚点 + 左侧/编辑器/浮层） ── */
+.uc-report-workbench .career-report-layout--report.career-report-layout--md-toc {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 1.15rem;
+  align-items: start;
+}
+
+.uc-report-workbench .career-report-layout--report.career-report-layout--md-toc .career-report-aside {
+  display: block !important;
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+@media (max-width: 980px) {
+  .uc-report-workbench .career-report-layout--report.career-report-layout--md-toc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .uc-report-workbench .career-report-layout--report.career-report-layout--md-toc .career-report-aside {
+    position: relative;
+    top: auto;
+    max-height: none;
+  }
+}
+
+.career-report-side-card--toc {
+  padding: 0.85rem 0.95rem !important;
+}
+
+.cr-md-toc-heading-label {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.cr-md-toc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.cr-md-toc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.12rem;
+  min-height: 2rem;
+}
+
+.cr-md-toc-toggle {
+  flex: 0 0 1.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 0.65rem;
+}
+
+.cr-md-toc-toggle::before {
+  content: "▾";
+  display: block;
+  transform: scale(1.12);
+}
+
+.cr-md-toc-toggle:not(.is-open)::before {
+  content: "▸";
+}
+
+.cr-md-toc-toggle-spacer {
+  flex: 0 0 1.35rem;
+  width: 1.35rem;
+  display: inline-block;
+}
+
+.cr-md-toc-h2,
+.cr-md-toc-h3 {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.28rem 0.45rem;
+  border-radius: 6px;
+  color: #0f172a;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.cr-md-toc-h2 {
+  font-weight: 650;
+}
+
+.cr-md-toc-h3 {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.cr-md-toc-h2:hover,
+.cr-md-toc-h3:hover {
+  background: rgba(241, 245, 249, 0.95);
+}
+
+.cr-md-toc-h2:focus-visible,
+.cr-md-toc-h3:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+}
+
+.cr-md-toc-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  margin: 0.08rem 0 0.35rem 1.45rem;
+  padding-left: 0.12rem;
+  border-left: 1px solid rgba(226, 232, 240, 0.95);
+}
+
+.cr-md-toc-branch:not(.is-open) .cr-md-toc-subs {
+  display: none;
+}
+
+.report-editor-nav-rail .report-editor-section-map {
+  padding: 0;
+  gap: 0;
+  display: block;
+}
+
+.report-editor-toc-wrap .cr-md-toc-heading-label {
+  margin-bottom: 0.4rem;
+}
+
+.report-editor-toc-wrap .cr-md-toc-h2 {
+  font-size: 0.82rem;
+}
+
+.report-editor-toc-wrap .cr-md-toc-h3 {
+  font-size: 0.76rem;
+}
+
+.report-viewer-sidebar .report-viewer-toc-tree.cr-md-toc {
+  display: block;
+  margin-top: 0.45rem;
+}
+
+.report-viewer-sidebar .cr-md-toc-subs {
+  margin-left: 0.85rem;
+}
+
+/* ── 报告编辑器 ·「原文」阅读区：段落卡片 + 与阅读态一致的 Markdown/表格排版 ── */
+#reportEditorOverlay .report-editor-compare-pane--orig .report-editor-pane-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+  padding: 0 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+#reportEditorOverlay .report-editor-compare-pane--orig .report-editor-pane-label::before {
+  content: "";
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3b82f6, #6366f1);
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay .report-editor-rendered-wrap {
+  border-radius: 16px;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+#reportEditorOverlay .report-editor-rendered-doc {
+  padding: 1.1rem 1.15rem 1.35rem;
+  background: linear-gradient(165deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.98) 38%, #fafbfc 100%);
+  scrollbar-gutter: stable;
+}
+
+#reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment {
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-left: 3px solid #e2e8f0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+#reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment:hover {
+  border-left-color: rgba(59, 130, 246, 0.55);
+  border-color: rgba(191, 219, 254, 0.65);
+  background: #fbfdff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.07);
+}
+
+#reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment.selected {
+  border-left-color: #2563eb;
+  border-color: rgba(147, 197, 253, 0.85);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.65) 0%, #ffffff 55%);
+  box-shadow: 0 0 0 2px rgba(191, 219, 254, 0.55), 0 6px 20px rgba(37, 99, 235, 0.08);
+}
+
+#reportEditorOverlay .report-editor-segment-ref {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.65rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  background: rgba(241, 245, 249, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose {
+  max-width: 100%;
+  margin: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.78;
+  letter-spacing: 0.01em;
+  color: #334155;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-p {
+  margin: 0 0 0.85rem;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h1 {
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.65rem;
+  font-size: clamp(1.2rem, 2.2vw, 1.45rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.28;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h2 {
+  margin-top: 1.15rem;
+  margin-bottom: 0.55rem;
+  padding: 0.35rem 0 0.35rem 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.015em;
+  border-left: 3px solid #6366f1;
+  background: linear-gradient(90deg, rgba(238, 242, 255, 0.55), rgba(255, 255, 255, 0));
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h2:first-child,
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose > .career-report-md-p:first-child + .career-report-md-h2 {
+  margin-top: 0.15rem;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h4 {
+  margin-top: 0.85rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose strong {
+  color: #0f172a;
+  font-weight: 650;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-bq {
+  margin: 0.85rem 0;
+  padding: 0.75rem 0.9rem 0.75rem 1rem;
+  border-left: 3px solid #94a3b8;
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.45));
+  color: #475569;
+  font-size: 0.88rem;
+  line-height: 1.72;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ul,
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ol {
+  margin: 0.5rem 0 0.85rem;
+  padding-left: 1.2rem;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ul li::marker {
+  color: #818cf8;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ol li::marker {
+  color: #6366f1;
+  font-weight: 600;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table-wrap {
+  margin: 0.85rem 0 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.98);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table th {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  font-weight: 650;
+  color: #1e293b;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+  color: #475569;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.65);
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table tr:last-child td {
+  border-bottom: none;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-code {
+  padding: 0.1em 0.35em;
+  border-radius: 0.3rem;
+  font-size: 0.88em;
+  background: rgba(241, 245, 249, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  color: #4338ca;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-pre {
+  margin: 0.75rem 0;
+  padding: 0.85rem 0.95rem;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-figure {
+  margin: 0.65rem 0 0.85rem;
+}
+
+#reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-img {
+  border-radius: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+/* User center report layout fixes */
+#report-workspace .uc-report-library-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.72rem, 1vw, 0.95rem);
+}
+
+#report-workspace .uc-report-library-card,
+#report-workspace .uc-report-library-empty {
+  min-height: clamp(22.5rem, 32vw, 24.75rem);
+  padding: 1.48rem 1.5rem 1.3rem;
+}
+
+#report-workspace .uc-report-library-card-main {
+  gap: 1.15rem;
+}
+
+#report-workspace .uc-report-library-card-top {
+  grid-template-columns: 4.4rem minmax(0, 1fr);
+  gap: 1.05rem;
+  align-items: start;
+}
+
+#report-workspace .uc-report-library-card-mark {
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 1.25rem;
+}
+
+#report-workspace .uc-report-library-card-head h4 {
+  font-size: clamp(1.32rem, 1.22rem + 0.35vw, 1.58rem);
+  line-height: 1.22;
+}
+
+#report-workspace .uc-report-library-title {
+  font-size: 0.94rem;
+  -webkit-line-clamp: 3;
+}
+
+#report-workspace .uc-report-library-outline {
+  gap: 0.55rem;
+}
+
+#report-workspace .uc-report-library-summary {
+  min-height: 8.6rem;
+  max-height: none;
+  -webkit-line-clamp: 5;
+}
+
+#report-workspace .uc-report-library-stats {
+  grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
+  gap: 0.8rem;
+}
+
+#report-workspace .uc-report-library-stat {
+  min-height: 4.55rem;
+}
+
+#report-workspace .uc-report-library-foot {
+  padding-top: 1.35rem;
+}
+
+#report-workspace .uc-report-workbench {
+  padding: clamp(1.25rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.8rem) 2rem;
+}
+
+#report-workspace .uc-report-workbench .career-report-layout--report {
+  width: min(100%, 88rem);
+  margin: 0 auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main {
+  width: 100%;
+  max-width: min(100%, 78rem);
+  margin: 0 auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-page,
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-full-head,
+#report-workspace .uc-report-workbench .career-report-main > .ucrd-full-head,
+#report-workspace .uc-report-workbench .career-report-main > .cr4-report-shell {
+  max-width: min(72rem, 100%);
+  margin-inline: auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-page {
+  gap: clamp(2rem, 3vw, 2.8rem);
+}
+
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-hero,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-page--reader,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-toc,
+#report-workspace .uc-report-workbench .career-report-main .cr4-report-index,
+#report-workspace .uc-report-workbench .career-report-main .cr4-report-modules,
+#report-workspace .uc-report-workbench .career-report-main .career-report-section-card.crdoc-article-card {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main .crdoc-header-main--reader,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-statbar {
+  width: 100%;
+  margin-inline: 0;
+}
+
+@media (max-width: 1100px) {
+  #report-workspace .uc-report-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #report-workspace .uc-report-workbench .career-report-main > .crdoc-page,
+  #report-workspace .uc-report-workbench .career-report-main > .crdoc-full-head,
+  #report-workspace .uc-report-workbench .career-report-main > .ucrd-full-head,
+  #report-workspace .uc-report-workbench .career-report-main > .cr4-report-shell,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-reader-hero,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-page--reader,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-reader-toc,
+  #report-workspace .uc-report-workbench .career-report-main .cr4-report-index,
+  #report-workspace .uc-report-workbench .career-report-main .cr4-report-modules,
+  #report-workspace .uc-report-workbench .career-report-main .career-report-section-card.crdoc-article-card {
+    width: min(100%, 66rem);
+  }
+}
+
+@media (max-width: 900px) {
+  #report-workspace .uc-report-library-card,
+  #report-workspace .uc-report-library-empty {
+    min-height: auto;
+  }
+
+  #report-workspace .uc-report-library-card-top {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  #report-workspace .uc-report-library-stats {
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+
+  #report-workspace .uc-report-workbench {
+    padding-inline: 0.9rem;
+  }
+
+}
+
+@media (max-width: 640px) {
+  #report-workspace .uc-report-library-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #report-workspace .uc-report-library-card-top {
+    grid-template-columns: 1fr;
+  }
+
+  #report-workspace .uc-report-library-card-mark {
+    width: 3.8rem;
+    height: 3.8rem;
+  }
+
+  #report-workspace .uc-report-library-summary {
+    min-height: 0;
+  }
 }

@@ -3,23 +3,24 @@
 {% set hidden_items = news.get("hidden_items", []) %}
 {% set all_items = visible_items + hidden_items %}
 
-<section id="careerNewsBoard" data-display-limit="{{ news.get('display_limit', 10) }}" class="news-board cs-news-board">
+<section id="careerNewsBoard" data-display-limit="{{ news.get('display_limit', 10) }}" class="news-board cs-news-board cs-news-board-editorial">
     <div class="cs-news-head">
-        <div>
+        <div class="cs-news-head-copy">
+            <span class="cs-news-kicker">News Desk</span>
             <h3>职业规划与计算机行业快报</h3>
-            <p>聚合招聘、校招、技术和行业变化，按时间与相关度整理成可横向浏览的新闻轨道。</p>
             {% if news.get("stale_reason") %}
             <p class="cs-news-stale">{{ news.get("stale_reason") }}</p>
             {% endif %}
         </div>
-        <div class="cs-news-controls" aria-label="新闻滑轨控制">
-            <button id="careerNewsPrevBtn" type="button" aria-label="上一组新闻">‹</button>
-            <button id="careerNewsNextBtn" type="button" aria-label="下一组新闻">›</button>
+        <div class="cs-news-head-side">
+            <div class="cs-news-controls" aria-label="快报轮播控制">
+                <button id="careerNewsPrevBtn" type="button" aria-label="上一条焦点" title="上一条">‹</button>
+                <button id="careerNewsNextBtn" type="button" aria-label="下一条焦点" title="下一条">›</button>
+            </div>
         </div>
     </div>
 
     <div class="cs-news-meta-row">
-        <span id="careerNewsShowingCount">当前展示 0 / 0 条</span>
         <span>{{ news.get("refresh_rule", "每日 12:00 更新") }}</span>
         {% if news.get("is_stale") %}
         <span>沿用上一份快照</span>
@@ -51,9 +52,9 @@
                     >
                     {% endif %}
                     <div class="career-news-preview-fallback">
-                        <span class="career-news-preview-domain">{{ item.domain_label or source_name }}</span>
+                        <span class="career-news-preview-domain">{{ topic_label or "职业快报" }}</span>
                         <strong>{{ source_name }}</strong>
-                        <p>{{ topic_label or "职业快报" }}</p>
+                        <p>{{ item.title }}</p>
                     </div>
                 </div>
                 <div class="career-news-preview-card">
@@ -77,10 +78,12 @@
                         <span>{{ item.published_label }}</span>
                     </div>
                 </div>
-                <h4 class="career-news-title mt-4">{{ item.title }}</h4>
-                {% if item.summary %}
-                <p class="career-news-summary">{{ item.summary }}</p>
-                {% endif %}
+                <div class="career-news-item-body">
+                    <h4 class="career-news-title">{{ item.title }}</h4>
+                    {% if item.summary %}
+                    <p class="career-news-summary">{{ item.summary }}</p>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="career-news-row-meta">
@@ -89,15 +92,30 @@
                 <span class="career-news-row-dot">·</span>
                 <span class="career-news-row-date">{{ item.published_label }}</span>
             </div>
-            <span class="career-news-row-arrow">›</span>
+            <div class="career-news-readmore">
+                <span class="career-news-readmore-label">查看原文</span>
+                <span class="career-news-readmore-icon" aria-hidden="true">→</span>
+            </div>
         </a>
         {% endfor %}
     </div>
 
-    <div id="careerNewsFeatured" class="career-news-track" tabindex="0" aria-label="职业快报横向列表"></div>
+    <div id="careerNewsFeatured" class="career-news-carousel" role="region" aria-roledescription="carousel" aria-label="职业快报轮播">
+        <div class="career-news-spotlight" aria-label="焦点快讯，三卡轮排">
+            <div class="career-news-spotlight-viewport" tabindex="0" aria-label="焦点区，左右键切换">
+                <!-- 与「CSS Cards」教程一致：三张固定壳子轮换 previous/current/next 类名，用 CSS transition 做横向平移 -->
+                <div class="career-news-cards-wrapper" data-career-news-cards-wrapper>
+                    <div class="career-news-spot-card previous--card" aria-hidden="true"></div>
+                    <div class="career-news-spot-card current--card"></div>
+                    <div class="career-news-spot-card next--card" aria-hidden="true"></div>
+                </div>
+            </div>
+        </div>
+        <div id="careerNewsGridBoard" class="career-news-grid-board" aria-label="本批快讯列表"></div>
+    </div>
     <div id="careerNewsListRows" class="hidden"></div>
     <div id="careerNewsPagination" class="cs-news-footer">
-        <button id="careerNewsMoreBtn" type="button">More +</button>
+        <button id="careerNewsMoreBtn" type="button">加载更多（每次 10 条）</button>
     </div>
     {% else %}
     <div class="cs-news-empty">

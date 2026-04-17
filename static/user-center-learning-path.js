@@ -123,7 +123,7 @@
   }
 
   function inferPhaseKey(value, fallback = "short") {
-    const text = String(value || "").trim();
+    const text = String(value || "").trim().toLowerCase();
     if (!text) return fallback;
     if (text.includes("中期")) return "mid";
     if (text.includes("长期")) return "long";
@@ -134,6 +134,10 @@
     if (text.includes("long")) return "long";
     if (text.includes("mid")) return "mid";
     if (text.includes("short")) return "short";
+    // 数字范围推断：3-12m、6m、12m 等视为中期；1-3y 等视为长期；0-3m 视为短期
+    if (/\b(3-12|6m|12m|3~12|3—12)\b/.test(text)) return "mid";
+    if (/\b(0-3|3m|0~3|0—3)\b/.test(text)) return "short";
+    if (/\b(1-3y|1~3y|1—3y|year|years)\b/.test(text)) return "long";
     return fallback;
   }
 
@@ -332,8 +336,8 @@
 
     phaseItems.forEach((item, index) => {
       const phase = String(item?.phase || "").trim();
-      // short_term → short, long_term → long (2 items each from stage planning agent)
-      const phaseKey = inferPhaseKey(phase, index < 2 ? "short" : "long");
+      // 根据 phase 文本推断 short/mid/long，不再依赖硬编码的索引
+      const phaseKey = inferPhaseKey(phase, index === 0 ? "short" : "long");
       const summary = String(item?.objective || "").trim();
       const tasks = [];
 

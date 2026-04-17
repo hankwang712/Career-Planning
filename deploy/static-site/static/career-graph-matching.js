@@ -134,7 +134,8 @@
     return Boolean(normalized && splitCityTokens(state.cityPreferences).includes(normalized));
   }
 
-  function clearCareerMatchStorage() {
+  function clearCareerMatchStorage(options = {}) {
+    const shouldClearRemote = Boolean(options && options.clearRemote);
     try {
       localStorage.removeItem(LS_MATCH_RESULTS);
       localStorage.removeItem(LS_MATCH_PROFILE);
@@ -142,6 +143,17 @@
       sessionStorage.removeItem(LS_MATCH_RESULTS);
       sessionStorage.removeItem(LS_MATCH_PROFILE);
     } catch (_) { /* ignore */ }
+    if (
+      shouldClearRemote
+      && typeof window.isAuthenticatedUser === "function"
+      && window.isAuthenticatedUser()
+      && typeof window.mergeScopedUserState === "function"
+    ) {
+      void window.mergeScopedUserState("career_matching", {
+        updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        graph_match_bundle: {}
+      });
+    }
   }
 
   function buildMatchProfilePayload() {
@@ -155,10 +167,51 @@
     };
   }
 
+  function getScopedCareerMatchingState() {
+    const scoped = window.userWorkspaceState?.scopedData?.career_matching;
+    return scoped && typeof scoped === "object" ? scoped : null;
+  }
+
+  function persistCareerMatchBundleToAccount(profilePayload) {
+    if (
+      !state.matchResults.length
+      || typeof window.isAuthenticatedUser !== "function"
+      || !window.isAuthenticatedUser()
+      || typeof window.mergeScopedUserState !== "function"
+    ) {
+      return;
+    }
+    const roleRows =
+      typeof window.graphMatchResultsToRoleRankings === "function"
+        ? window.graphMatchResultsToRoleRankings(state.matchResults)
+        : [];
+    const patch = {
+      updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      graph_match_bundle: {
+        version: "2026.04-graph-match-v1",
+        saved_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        profile_signature: state.profileSignature || "",
+        results: Array.isArray(state.matchResults) ? state.matchResults : [],
+        meta: state.matchMeta && typeof state.matchMeta === "object" ? state.matchMeta : {},
+        profile: profilePayload && typeof profilePayload === "object" ? profilePayload : {},
+        city_preferences: Array.isArray(state.cityPreferences) ? state.cityPreferences : []
+      }
+    };
+    if (roleRows.length) {
+      patch.role_rankings = roleRows;
+      patch.focus_role_id = String(roleRows[0].id || "").trim();
+    }
+    void window.mergeScopedUserState("career_matching", patch).then(() => {
+      if (typeof window.refreshUnifiedExperience === "function") {
+        window.refreshUnifiedExperience();
+      }
+    });
+  }
+
   function persistCareerMatchBundle() {
     if (!state.matchResults.length) return;
+    const profilePayload = buildMatchProfilePayload();
     try {
-      const profilePayload = buildMatchProfilePayload();
       const metaStr = JSON.stringify(state.matchMeta || {});
       const resultsStr = JSON.stringify(state.matchResults);
       const profileStr = JSON.stringify(profilePayload);
@@ -168,11 +221,29 @@
       sessionStorage.setItem(LS_MATCH_RESULTS, resultsStr);
       sessionStorage.setItem(LS_MATCH_PROFILE, profileStr);
     } catch (_) { /* quota / private mode */ }
+    persistCareerMatchBundleToAccount(profilePayload);
   }
 
   /** 进入模块或刷新后恢复上次保存的匹配结果（含城市偏好） */
   function tryRestorePersistedMatch() {
     if (state.matchResults.length) return;
+    try {
+      const scoped = getScopedCareerMatchingState();
+      const bundle = scoped?.graph_match_bundle;
+      const results = Array.isArray(bundle?.results) ? bundle.results : [];
+      if (results.length) {
+        state.matchResults = results;
+        state.matchMeta = bundle?.meta && typeof bundle.meta === "object" ? bundle.meta : null;
+        state.recommendationIds = new Set(state.matchResults.map((item) => item.id).filter(Boolean));
+        const savedCities = Array.isArray(bundle?.city_preferences)
+          ? bundle.city_preferences
+          : (Array.isArray(bundle?.profile?.cityPreferences) ? bundle.profile.cityPreferences : []);
+        if (savedCities.length) {
+          state.cityPreferences = splitCityTokens(savedCities);
+        }
+        return;
+      }
+    } catch (_) { /* ignore account scope restore */ }
     try {
       const raw = localStorage.getItem(LS_MATCH_RESULTS);
       if (!raw) return;
@@ -1652,11 +1723,6 @@
       if (nextSignature !== state.profileSignature) {
         state.profileSignature = nextSignature;
         state.profile = profile;
-        state.matchResults = [];
-        state.matchMeta = null;
-        state.recommendationIds = new Set();
-        state.selectedNodeId = "";
-        clearCareerMatchStorage();
       } else {
         state.profile = profile;
       }
@@ -1727,7 +1793,7 @@
   }
 
   async function rematchCareerMatching() {
-    clearCareerMatchStorage();
+    clearCareerMatchStorage({ clearRemote: true });
     state.matchResults = [];
     state.matchMeta = null;
     state.recommendationIds = new Set();

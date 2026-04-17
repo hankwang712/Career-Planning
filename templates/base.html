@@ -4,10 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>职业规划智能体｜今天也要Debug</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
-        --app-font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif;
+        --app-font-stack: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        --app-display-stack: "Space Grotesk", "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+        --app-editorial-stack: "Noto Serif SC", "Songti SC", "STSong", serif;
+        --product-accent: #355b82;
+        --product-accent-hover: #274766;
+        --product-bg: #edf2f7;
+        --product-card: #f8fbff;
+        --product-text: #1f2c3a;
+        --product-muted: #617487;
+        --product-border: #d6e0ea;
       }
 
       html,
@@ -19,7 +31,8 @@
         font-family: var(--app-font-stack);
       }
     </style>
-        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260412-report-map-fit-v5">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260418-nav-workspace-pill-light-v7">
+        <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}?v=20260418-career-news-grid-margin-v16">
         <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
 </head>
 <body class="bg-gray-50 scroll-smooth auth-checking">
@@ -29,49 +42,225 @@
     
     <!-- 启动登录界面 -->
     <div id="startupScreen" class="startup-screen">
-        <div class="startup-card">
-            <div class="startup-brand">
-                <div class="startup-logo app-brand-mark">
-                    <svg viewBox="0 0 32 32" aria-hidden="true">
-                        <path d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"></path>
-                        <circle cx="16" cy="16" r="3.2"></circle>
-                        <path d="M16 12.8 23 9.5M16 19.2l7 3.3M13.2 17.7 8.8 20.4"></path>
-                    </svg>
+        <div class="startup-layout">
+            <header class="startup-topbar">
+                <div class="startup-brand">
+                    <div class="startup-logo app-brand-mark">
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <path d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"></path>
+                            <circle cx="16" cy="16" r="3.2"></circle>
+                            <path d="M16 12.8 23 9.5M16 19.2l7 3.3M13.2 17.7 8.8 20.4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="startup-brand-name">职业规划智能体</p>
+                        <p class="startup-brand-sub">AI career planning platform for students and early-career talent</p>
+                    </div>
                 </div>
+                <div class="startup-topbar-actions">
+                    <span class="startup-topbar-note">开发版产品</span>
+                    <a class="startup-topbar-link" href="#startupLogin">登录工作台</a>
+                </div>
+            </header>
+
+            <section class="startup-hero">
+                <div class="startup-copy">
+                    <span class="startup-badge">Commercial Platform Preview</span>
+                    <h2 class="startup-title">把测评、岗位匹配和行动规划，收成一条清晰的职业推进线</h2>
+                    <p class="startup-subtitle">
+                        首页不再堆满重复入口，而是先讲清楚这套平台能为谁服务、怎么推进、后续会看到什么。
+                        登录后直接进入工作台，继续完成画像、岗位判断和发展报告。
+                    </p>
+
+                    <div class="startup-actions">
+                        <a class="startup-primary-cta" href="#startupLogin">立即登录</a>
+                        <a class="startup-secondary-cta" href="#platformPreview">查看平台能力</a>
+                    </div>
+
+                    <div class="startup-stat-grid" aria-label="平台概览">
+                        <article class="startup-stat">
+                            <strong>01</strong>
+                            <span>能力评估先建立判断，不直接把用户扔进复杂功能页。</span>
+                        </article>
+                        <article class="startup-stat">
+                            <strong>02</strong>
+                            <span>岗位匹配和市场热度前置展示，让后续模块更像完整产品链路。</span>
+                        </article>
+                        <article class="startup-stat">
+                            <strong>03</strong>
+                            <span>行动规划最终沉淀成可执行报告，而不是只停留在结果展示。</span>
+                        </article>
+                    </div>
+
+                    <div class="startup-proof-list">
+                        <span>适合高校学生、应届生和转型中的早期人才</span>
+                        <span>把后续关键模块信息提前说明，但不在首屏重复堆叠</span>
+                        <span>保留工作台入口与账号体系，不改现有业务逻辑</span>
+                    </div>
+                </div>
+
+                <div class="startup-hero-side">
+                    <div class="startup-visual-card">
+                        <div class="startup-visual-copy">
+                            <span class="startup-visual-kicker">Platform Flow</span>
+                            <h3>先判断方向，再组织行动</h3>
+                            <p>把后续真正重要的模块提前露出，但每一层只讲一个重点。</p>
+                        </div>
+                        <img
+                            class="startup-visual-illustration"
+                            src="{{ url_for('static', filename='assets/illustrations/undraw-career-development-hero.svg') }}"
+                            alt="职业规划平台的流程示意插画"
+                        >
+                        <div class="startup-visual-panel">
+                            <div class="startup-visual-item">
+                                <strong>Assess</strong>
+                                <span>能力画像与兴趣判断</span>
+                            </div>
+                            <div class="startup-visual-item">
+                                <strong>Match</strong>
+                                <span>目标岗位与市场信号</span>
+                            </div>
+                            <div class="startup-visual-item">
+                                <strong>Execute</strong>
+                                <span>阶段性行动清单与报告</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside id="startupLogin" class="startup-card">
+                        <div class="startup-auth-head">
+                            <span class="startup-auth-kicker">Workspace Access</span>
+                            <h3 class="startup-auth-title">登录工作台</h3>
+                            <p class="startup-auth-text">当前环境仅开放预置账号体验。登录后只会看到各自账号的数据和访谈内容。</p>
+                        </div>
+
+                        <div class="auth-tabs auth-tabs--single">
+                            <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
+                            <button id="registerTabBtn" class="auth-tab hidden" type="button" onclick="switchAuthTab('register')">注册</button>
+                        </div>
+
+                        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+                            <label class="auth-label" for="loginUsername">用户名</label>
+                            <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名" value="system">
+                            <label class="auth-label" for="loginPassword">密码</label>
+                            <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码" value="123456">
+                            <button class="auth-submit" type="submit">进入系统</button>
+                            <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填充超级用户</button>
+                        </form>
+
+                        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+                            <label class="auth-label" for="registerUsername">注册用户名</label>
+                            <input id="registerUsername" class="auth-input" type="text" autocomplete="username" placeholder="例如：student01">
+                            <label class="auth-label" for="registerPassword">登录密码</label>
+                            <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
+                            <label class="auth-label" for="registerConfirmPassword">确认密码</label>
+                            <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="请再次输入密码">
+                            <button class="auth-submit" type="submit">创建普通用户</button>
+                            <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
+                        </form>
+
+                        <div class="startup-auth-foot">
+                            <span class="startup-auth-chip">预置账号</span>
+                            <span class="startup-auth-chip">system / 123456</span>
+                            <span class="startup-auth-chip">可切换其他演示账号</span>
+                        </div>
+                        <p id="authMessage" class="auth-message">已自动填充预置账号：system，密码：123456。也可以切换为其他预置账号登录。</p>
+                    </aside>
+                </div>
+            </section>
+
+            <section class="startup-section">
+                <div class="startup-section-head">
+                    <span class="startup-section-kicker">Why This Platform</span>
+                    <h3>首页只保留商业平台真正需要说清楚的三件事</h3>
+                    <p>不再把所有后续能力都堆成卡片，而是先让用户理解平台价值、后续流程和进入方式。</p>
+                </div>
+                <div class="startup-feature-grid">
+                    <article class="startup-feature-card">
+                        <strong>信息更聚焦</strong>
+                        <p>首屏只讲平台价值和推进逻辑，不把工作台所有功能同时暴露出来。</p>
+                    </article>
+                    <article class="startup-feature-card">
+                        <strong>后续模块有预告</strong>
+                        <p>能力评估、岗位匹配、规划报告仍然会被感知到，但以“流程预览”而不是重复入口呈现。</p>
+                    </article>
+                    <article class="startup-feature-card">
+                        <strong>更像商业网站</strong>
+                        <p>品牌叙事、视觉层级、登录转化和模块预览被整合进同一套落地页结构。</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="platformPreview" class="startup-section startup-section--soft">
+                <div class="startup-section-head">
+                    <span class="startup-section-kicker">Platform Preview</span>
+                    <h3>后续工作台保留四个真正核心的推进环节</h3>
+                    <p>用户登录后仍然能继续完成完整链路，但首页只展示它们的角色，而不是把全部细节提前展开。</p>
+                </div>
+                <div class="startup-flow-grid">
+                    <article class="startup-flow-step">
+                        <span>01</span>
+                        <strong>能力盘点</strong>
+                        <p>先确认技能结构、兴趣和证据，建立基础判断。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>02</span>
+                        <strong>岗位雷达</strong>
+                        <p>把个人优势和岗位要求放在同一层比对，聚焦高价值方向。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>03</span>
+                        <strong>市场热度</strong>
+                        <p>结合城市与行业信号，筛掉不值得投入的目标池。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>04</span>
+                        <strong>行动规划</strong>
+                        <p>把方向转成报告、阶段任务和真正可以执行的下一步。</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="startup-section">
+                <div class="startup-section-head">
+                    <span class="startup-section-kicker">Module Snapshot</span>
+                    <h3>把后续信息提前带上，但控制在刚刚好的密度</h3>
+                </div>
+                <div class="startup-preview-grid">
+                    <article class="startup-preview-card">
+                        <strong>评估层</strong>
+                        <ul class="startup-preview-list">
+                            <li>多维度能力画像</li>
+                            <li>访谈与测评结果整合</li>
+                            <li>进度状态可追踪</li>
+                        </ul>
+                    </article>
+                    <article class="startup-preview-card">
+                        <strong>匹配层</strong>
+                        <ul class="startup-preview-list">
+                            <li>高匹配岗位优先呈现</li>
+                            <li>市场热度同步参考</li>
+                            <li>减少重复入口切换</li>
+                        </ul>
+                    </article>
+                    <article class="startup-preview-card">
+                        <strong>规划层</strong>
+                        <ul class="startup-preview-list">
+                            <li>短中长期行动建议</li>
+                            <li>报告生成与版本沉淀</li>
+                            <li>工作台继续执行闭环</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="startup-bottom-cta">
                 <div>
-                    <p class="startup-brand-name">职业规划智能体</p>
-                    <p class="startup-brand-sub">开发版产品 · 今天也要Debug</p>
+                    <span class="startup-section-kicker">Start From Here</span>
+                    <h3>先用一个账号完整走完这条链路，再决定还需要加什么内容。</h3>
                 </div>
-            </div>
-            <h2 class="startup-title">欢迎进入职业规划智能体</h2>
-            <p class="startup-subtitle">请使用预置账号登录。每个账号只会看到自己的访谈与测评内容。</p>
-
-            <div class="auth-tabs">
-                <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
-                <button id="registerTabBtn" class="auth-tab" type="button" onclick="switchAuthTab('register')">注册</button>
-            </div>
-
-            <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-                <label class="auth-label" for="loginUsername">用户名</label>
-                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名" value="system">
-                <label class="auth-label" for="loginPassword">密码</label>
-                <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码" value="123456">
-                <button class="auth-submit" type="submit">进入系统</button>
-                <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填充超级用户</button>
-            </form>
-
-            <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-                <label class="auth-label" for="registerUsername">注册用户名</label>
-                <input id="registerUsername" class="auth-input" type="text" autocomplete="username" placeholder="例如：student01">
-                <label class="auth-label" for="registerPassword">登录密码</label>
-                <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
-                <label class="auth-label" for="registerConfirmPassword">确认密码</label>
-                <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="请再次输入密码">
-                <button class="auth-submit" type="submit">创建普通用户</button>
-                <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
-            </form>
-
-            <p id="authMessage" class="auth-message">已自动填充预置账号：system，密码：123456。也可以切换为其他预置账号登录。</p>
+                <a class="startup-primary-cta" href="#startupLogin">进入平台</a>
+            </section>
         </div>
     </div>
     
@@ -152,29 +341,50 @@
                     </button>
                 </div>
 
-                <!-- 右侧操作区：紧凑布局 -->
+                <!-- 右侧操作区：时钟 + 深色工作区胶囊（参考 Notion/Linear 工作区切换器） -->
                 <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
                     <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
-                    <span id="currentUserLabel" class="hidden lg:inline-flex text-sm bg-white/20 px-3 py-1.5 rounded-full max-w-[220px] truncate whitespace-nowrap">未登录</span>
-                    <button id="notificationBtn" class="inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl text-sm transition-all tooltip flex-shrink-0" data-tooltip="系统通知">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <span id="notificationCount" class="ml-0.5">3</span>
-                    </button>
-                    <button id="logoutBtn" onclick="logout()" class="hidden bg-white/20 hover:bg-white/30 px-3 py-2 rounded-xl text-sm transition-all whitespace-nowrap">
-                        退出
-                    </button>
-                    <button type="button" class="nav-avatar-btn w-10 h-10 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="window.location.href='/user-center.html#report-workspace'" title="个人中心" aria-label="打开个人中心">
-                        <span id="currentUserAvatar" class="text-xs">SA</span>
-                    </button>
-                    <button type="button" class="nav-settings-btn w-10 h-10 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all flex-shrink-0" onclick="toggleSettingsPanel(event)" title="模型设置" aria-label="打开模型设置">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 0 1 7.04 4.3l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.49 1 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
-                        </svg>
-                    </button>
+                    <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
+                        <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区与账号菜单">
+                            <span class="nav-workspace-avatar-wrap">
+                                <span id="currentUserAvatar" class="nav-workspace-avatar-inner">人</span>
+                            </span>
+                            <span id="navWorkspaceTitle" class="nav-workspace-title">Personal</span>
+                            <svg class="nav-workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M6 9l6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div id="navWorkspaceMenu" class="nav-workspace-menu hidden" role="menu" aria-labelledby="navWorkspaceToggle">
+                            <div class="nav-workspace-menu-header">
+                                <span id="currentUserLabel" class="nav-workspace-menu-label">未登录</span>
+                            </div>
+                            <div class="nav-workspace-menu-divider" role="presentation"></div>
+                            <button type="button" id="notificationBtn" class="nav-workspace-menu-row" role="menuitem" data-tooltip="系统通知">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">系统通知</span>
+                                <span id="notificationCount" class="nav-workspace-menu-badge">3</span>
+                            </button>
+                            <a href="/user-center.html#report-workspace" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" title="个人中心">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">个人中心</span>
+                            </a>
+                            <button type="button" class="nav-workspace-menu-row" role="menuitem" onclick="closeNavWorkspaceMenu(); toggleSettingsPanel(event);" title="模型设置">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 0 1 7.04 4.3l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.49 1 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">模型设置</span>
+                            </button>
+                            <div class="nav-workspace-menu-divider" role="presentation"></div>
+                            <button type="button" id="logoutBtn" onclick="logout()" class="nav-workspace-menu-row nav-workspace-menu-danger" role="menuitem">退出登录</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -478,7 +688,9 @@
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260412-report-map-fit-v5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260417-career-news-3col-carousel-v1"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260417-account-avatar-main-v1"></script>
     <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260412-assessment-storage-user-v1"></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260414-pet-size-v1"></script>
     <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260412-deeptest-submit-main-v1"></script>

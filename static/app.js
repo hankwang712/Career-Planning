@@ -82,14 +82,22 @@ const userWorkspaceState = {
     assessment_hub: null,
     resume_profile: null,
     career_report: null,
-    profile_portrait: null
+    profile_portrait: null,
+    account_avatar: null,
+    profile_snapshot: null,
+    career_matching: null,
+    news_context: null
   },
   scopedDataLoaded: {
     career_interview: false,
     assessment_hub: false,
     resume_profile: false,
     career_report: false,
-    profile_portrait: false
+    profile_portrait: false,
+    account_avatar: false,
+    profile_snapshot: false,
+    career_matching: false,
+    news_context: false
   }
 };
 const inFlightGetRequests = new Map();
@@ -325,138 +333,6 @@ const profileFlowState = {
   completedSteps: [],
   touched: false
 };
-const ROLE_LIBRARY = [
-  {
-    id: "java_backend",
-    name: "Java 后端开发",
-    category: "互联网/科技",
-    majors: ["计算机", "软件", "信息", "网络", "智能"],
-    requiredSkills: ["编程", "数据库", "Spring"],
-    certificates: ["软考"],
-    requirements: { professional: 85, innovation: 60, learning: 90, stress_tolerance: 80, communication: 50, internship: 80, execution: 85 },
-    recommendedHolland: ["I", "R", "C"],
-    recommendedMbti: ["ISTJ", "INTJ"],
-    workValues: ["稳定成长", "技术深耕"],
-    path: "后端开发 → 高级开发 → 架构师"
-  },
-  {
-    id: "product_manager",
-    name: "产品经理",
-    category: "互联网/科技",
-    majors: ["不限", "计算机", "智能", "管理"],
-    requiredSkills: ["需求分析", "原型设计", "数据分析"],
-    certificates: ["NPDP", "PMP"],
-    requirements: { professional: 75, innovation: 90, learning: 80, stress_tolerance: 90, communication: 90, internship: 85, execution: 80 },
-    recommendedHolland: ["E", "I", "S"],
-    recommendedMbti: ["ENTJ", "ENFP", "INTJ"],
-    workValues: ["成长空间", "影响力", "协作成就"],
-    path: "产品助理 → 产品经理 → 高级产品经理"
-  },
-  {
-    id: "data_analyst",
-    name: "数据分析师",
-    category: "数据与商业分析",
-    majors: ["统计", "计算机", "经管", "数学", "智能"],
-    requiredSkills: ["SQL", "Python", "BI"],
-    certificates: ["CDA"],
-    requirements: { professional: 80, innovation: 70, learning: 90, stress_tolerance: 70, communication: 60, internship: 65, execution: 75 },
-    recommendedHolland: ["I", "C", "S"],
-    recommendedMbti: ["INTJ", "ISTJ"],
-    workValues: ["问题解决", "稳定成长", "数据驱动"],
-    path: "数据分析师 → 高级分析师 → 数据策略"
-  },
-  {
-    id: "new_media_ops",
-    name: "新媒体运营",
-    category: "内容与增长",
-    majors: ["不限", "新闻", "传播", "中文", "设计"],
-    requiredSkills: ["内容策划", "剪辑", "运营分析"],
-    certificates: ["营销师"],
-    requirements: { professional: 65, innovation: 80, learning: 70, stress_tolerance: 60, communication: 80, internship: 60, execution: 70 },
-    recommendedHolland: ["A", "E", "S"],
-    recommendedMbti: ["ENFP", "ESFP"],
-    workValues: ["创造表达", "传播影响", "节奏灵活"],
-    path: "运营专员 → 内容负责人 → 增长运营"
-  },
-  {
-    id: "hr_specialist",
-    name: "人力资源专员",
-    category: "组织与服务",
-    majors: ["管理", "心理", "不限"],
-    requiredSkills: ["招聘", "沟通", "劳动法规"],
-    certificates: ["人力资源管理师"],
-    requirements: { professional: 65, innovation: 50, learning: 60, stress_tolerance: 70, communication: 95, internship: 65, execution: 72 },
-    recommendedHolland: ["S", "C", "E"],
-    recommendedMbti: ["ESFJ", "ENFJ"],
-    workValues: ["助人成长", "组织支持", "关系协作"],
-    path: "HR 助理 → HRBP/招聘专员 → 人力负责人"
-  },
-  {
-    id: "sales_trainee",
-    name: "销售管培生",
-    category: "商业拓展",
-    majors: ["不限"],
-    requiredSkills: ["谈判", "客户管理", "目标推进"],
-    certificates: [],
-    requirements: { professional: 55, innovation: 60, learning: 80, stress_tolerance: 95, communication: 95, internship: 80, execution: 82 },
-    recommendedHolland: ["E", "S", "A"],
-    recommendedMbti: ["ESTJ", "ENTJ"],
-    workValues: ["回报激励", "竞争成就", "成长速度"],
-    path: "管培生 → 销售经理 → 区域负责人"
-  },
-  {
-    id: "uiux_designer",
-    name: "UI/UX 设计师",
-    category: "设计与体验",
-    majors: ["设计", "计算机", "数字媒体", "不限"],
-    requiredSkills: ["界面设计", "交互设计", "用户研究"],
-    certificates: ["Adobe"],
-    requirements: { professional: 72, innovation: 95, learning: 80, stress_tolerance: 70, communication: 70, internship: 75, execution: 68 },
-    recommendedHolland: ["A", "I", "R"],
-    recommendedMbti: ["INFP", "ENFP"],
-    workValues: ["审美表达", "用户体验", "作品成就"],
-    path: "设计师 → 高级设计师 → 体验负责人"
-  },
-  {
-    id: "finance_audit",
-    name: "财务/审计助理",
-    category: "财务与风控",
-    majors: ["会计", "财务", "审计", "经济"],
-    requiredSkills: ["会计准则", "税务", "报表"],
-    certificates: ["初级会计", "CPA"],
-    requirements: { professional: 80, innovation: 40, learning: 70, stress_tolerance: 80, communication: 50, internship: 80, execution: 90 },
-    recommendedHolland: ["C", "I", "E"],
-    recommendedMbti: ["ISTJ", "ISFJ"],
-    workValues: ["稳定性", "规范流程", "准确性"],
-    path: "财务助理 → 审计/财务专员 → 财务经理"
-  },
-  {
-    id: "project_assistant",
-    name: "项目管理助理",
-    category: "组织与项目",
-    majors: ["不限", "管理", "工程", "计算机"],
-    requiredSkills: ["进度管理", "风险跟踪", "协调沟通"],
-    certificates: ["PMP"],
-    requirements: { professional: 68, innovation: 50, learning: 70, stress_tolerance: 80, communication: 90, internship: 65, execution: 88 },
-    recommendedHolland: ["E", "S", "C"],
-    recommendedMbti: ["ENTJ", "ESTJ"],
-    workValues: ["组织推进", "交付成果", "节奏掌控"],
-    path: "项目助理 → 项目经理 → PMO"
-  },
-  {
-    id: "content_editor",
-    name: "内容创作/编辑",
-    category: "内容与表达",
-    majors: ["文史", "新闻", "中文", "传播", "不限"],
-    requiredSkills: ["写作", "策划", "选题"],
-    certificates: ["出版资格"],
-    requirements: { professional: 68, innovation: 90, learning: 60, stress_tolerance: 60, communication: 60, internship: 60, execution: 70 },
-    recommendedHolland: ["A", "S", "I"],
-    recommendedMbti: ["INFP", "INFJ"],
-    workValues: ["表达自由", "内容影响", "持续创作"],
-    path: "编辑 → 内容策划 → 内容负责人"
-  }
-];
 
 function getDefaultProfileBasics() {
   return {
@@ -722,11 +598,19 @@ async function requestJson(url, options = {}) {
         userWorkspaceState.scopedData.resume_profile = null;
         userWorkspaceState.scopedData.career_report = null;
         userWorkspaceState.scopedData.profile_portrait = null;
+        userWorkspaceState.scopedData.account_avatar = null;
+        userWorkspaceState.scopedData.profile_snapshot = null;
+        userWorkspaceState.scopedData.career_matching = null;
+        userWorkspaceState.scopedData.news_context = null;
         userWorkspaceState.scopedDataLoaded.career_interview = false;
         userWorkspaceState.scopedDataLoaded.assessment_hub = false;
         userWorkspaceState.scopedDataLoaded.resume_profile = false;
         userWorkspaceState.scopedDataLoaded.career_report = false;
         userWorkspaceState.scopedDataLoaded.profile_portrait = false;
+        userWorkspaceState.scopedDataLoaded.account_avatar = false;
+        userWorkspaceState.scopedDataLoaded.profile_snapshot = false;
+        userWorkspaceState.scopedDataLoaded.career_matching = false;
+        userWorkspaceState.scopedDataLoaded.news_context = false;
         if (typeof lockApp === "function") lockApp();
         emitAuthStateChange();
       }
@@ -782,6 +666,14 @@ async function saveScopedUserState(scope, data) {
     userWorkspaceState.scopedDataLoaded[scope] = true;
   }
   return userWorkspaceState.scopedData[scope];
+}
+
+async function mergeScopedUserState(scope, patch) {
+  const current = (userWorkspaceState.scopedData?.[scope] && typeof userWorkspaceState.scopedData[scope] === "object")
+    ? userWorkspaceState.scopedData[scope]
+    : {};
+  const next = { ...current, ...(patch && typeof patch === "object" ? patch : {}) };
+  return saveScopedUserState(scope, next);
 }
 
 async function requestFormData(url, formData, options = {}) {
@@ -4030,17 +3922,20 @@ function resumeJudgeRiskRadarHtml(profile, matcher, analysisMode, deck, matchSco
   return `
     <div class="resume-risk-bars">
       <p class="resume-risk-bars-legend">条形越长，该维度越容易在投递或面试中出问题；建议优先处理最长的 1～2 项。</p>
-      ${items.map(([label, score]) => `
+      ${items.map(([label, score]) => {
+        const fillClass = score < 40 ? "low" : (score < 70 ? "medium" : "high");
+        return `
         <div class="resume-risk-bar-row">
           <div class="resume-risk-bar-head">
             <span>${escHtml(label)}</span>
             <strong>${score}%</strong>
           </div>
           <div class="resume-risk-bar-track">
-            <div class="resume-risk-bar-fill" style="width:${score}%"></div>
+            <div class="resume-risk-bar-fill ${fillClass}" style="width:${score}%"></div>
           </div>
         </div>
-      `).join("")}
+        `;
+      }).join("")}
     </div>
   `;
 }
@@ -4075,10 +3970,16 @@ function resumeJudgeExactEmptyDashboardHtml(state) {
           </div>
         </div>
         <div class="resume-hj-score-grid">
-          ${["综合匹配", "岗位命中", "项目相关性", "风险等级"].map((label) => `
-            <article class="resume-hj-score-card">
+          ${[
+            { label: "综合匹配", tone: "primary", desc: "整体进入下一轮潜力" },
+            { label: "岗位命中", tone: "warn", desc: "JD 关键词贴合程度" },
+            { label: "项目相关性", tone: "brand", desc: "项目与目标方向一致性" },
+            { label: "风险等级", tone: "success", desc: "风险可控，可直接推进" }
+          ].map((item) => `
+            <article class="resume-hj-score-card ${item.tone}">
               <div class="resume-hj-score-value">--</div>
-              <div class="resume-hj-score-label">${label}</div>
+              <div class="resume-hj-score-label">${item.label}</div>
+              <div class="resume-hj-score-desc">${item.desc}</div>
             </article>
           `).join("")}
         </div>
@@ -4556,7 +4457,7 @@ async function onResumePdfSelected(event) {
   return onResumeFileSelected(event);
 }
 
-async function analyzeResumeMatch() {
+async function legacyAnalyzeResumeMatch() {
   if (resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight) {
     showToast("请稍候", "当前有任务正在执行中。", "warning", 1800);
     return;
@@ -4613,6 +4514,120 @@ async function analyzeResumeMatch() {
     syncResumeJudgeFlow(getResumeProfileFromCache());
     setResumeProgress("analyze", 0, "分析失败", false);
     showToast("分析失败", error.message, "error", 2600);
+  } finally {
+    resumeTaskState.analyzeInFlight = false;
+    stopAnalyzeProgressTicker();
+    updateResumeActionButtons();
+  }
+}
+
+async function analyzeResumeMatch() {
+  if (resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight) {
+    return legacyAnalyzeResumeMatch();
+  }
+
+  const jobDescription = getResumeJobDescription();
+  const hasJobDescription = jobDescription.length > 0;
+  resumeTaskState.analyzeInFlight = true;
+  resumeTaskState.forceInputView = false;
+  syncResumeJudgeFlow(getResumeProfileFromCache());
+  updateResumeActionButtons();
+  startAnalyzeProgressTicker();
+
+  const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
+  const analyzeMeta = document.getElementById("resumeAnalyzeMeta");
+  if (analyzeStatus) analyzeStatus.textContent = "排队中";
+  if (analyzeMeta) analyzeMeta.textContent = "正在创建分析任务...";
+
+  try {
+    const startPayload = await requestJson("/api/resume/analyze/start", {
+      method: "POST",
+      body: { job_description: jobDescription }
+    });
+    const jobId = String(startPayload.job_id || "").trim();
+    if (!jobId) throw new Error("分析任务创建失败：缺少任务 ID");
+
+    const startedAt = Date.now();
+    const maxPollRounds = 900;
+    let statusPayload = null;
+
+    for (let round = 0; round < maxPollRounds; round += 1) {
+      statusPayload = await requestJson(`/api/resume/analyze/status?job_id=${encodeURIComponent(jobId)}`);
+      const job = statusPayload?.job || {};
+      const resumeData = statusPayload?.resume || null;
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const jobStatus = String(job.status || "").trim();
+      const resumeStatus = String(resumeData?.status || "").trim();
+      const resumeStage = String(resumeData?.analysis_meta?.stage || "").trim();
+      const resumeSucceeded = resumeStatus === "analyzed" || resumeStage === "done";
+
+      if (jobStatus === "success" || resumeSucceeded) break;
+
+      if (jobStatus === "failed" && !resumeSucceeded) {
+        const resumeError = String(resumeData?.error_message || "").trim();
+        throw new Error(String(job.message || resumeError || "简历匹配分析失败"));
+      }
+
+      applyResumeAnalyzeRuntimeStatus(job, elapsedSec);
+      await sleepMs(900);
+    }
+
+    let resumeData = statusPayload?.resume || null;
+    let jobStatus = String(statusPayload?.job?.status || "").trim();
+    let resumeStatus = String(resumeData?.status || "").trim();
+    let resumeStage = String(resumeData?.analysis_meta?.stage || "").trim();
+    let resumeSucceeded = resumeStatus === "analyzed" || resumeStage === "done";
+
+    if (!resumeSucceeded && jobStatus !== "success") {
+      const refreshedResume = await loadResumeProfile(true);
+      resumeData = refreshedResume || resumeData;
+      resumeStatus = String(resumeData?.status || "").trim();
+      resumeStage = String(resumeData?.analysis_meta?.stage || "").trim();
+      resumeSucceeded = resumeStatus === "analyzed" || resumeStage === "done";
+    }
+
+    if (!resumeData || !resumeSucceeded) {
+      const stillRunning = resumeStatus === "analyzing" || resumeStage === "queued";
+      if (stillRunning) {
+        userWorkspaceState.scopedData.resume_profile = resumeData;
+        userWorkspaceState.scopedDataLoaded.resume_profile = true;
+        resumeTaskState.forceInputView = false;
+        renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
+        setResumeProgress("analyze", 100, "后台继续分析中", true);
+        showToast("任务仍在运行", "简历分析耗时较长，已转入后台继续处理。", "warning", 2600);
+        return;
+      }
+      throw new Error("分析超时，请稍后在简历状态中查看结果。");
+    }
+
+    userWorkspaceState.scopedData.resume_profile = resumeData;
+    userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    resumeTaskState.forceInputView = false;
+    renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
+    setResumeProgress("analyze", 100, "分析完成", false);
+    showToast("分析完成", hasJobDescription ? "简历匹配结果已更新。" : "简历诊断结果已更新。", "success", 1800);
+    refreshUnifiedExperience();
+  } catch (error) {
+    const refreshedResume = await loadResumeProfile(true).catch(() => null);
+    const resumeStatus = String(refreshedResume?.status || "").trim();
+    const resumeStage = String(refreshedResume?.analysis_meta?.stage || "").trim();
+    const resumeSucceeded = resumeStatus === "analyzed" || resumeStage === "done";
+
+    if (resumeSucceeded) {
+      userWorkspaceState.scopedData.resume_profile = refreshedResume;
+      userWorkspaceState.scopedDataLoaded.resume_profile = true;
+      resumeTaskState.forceInputView = false;
+      renderResumeProfileSection(userWorkspaceState.scopedData.resume_profile);
+      setResumeProgress("analyze", 100, "分析完成", false);
+      showToast("分析完成", hasJobDescription ? "简历匹配结果已更新。" : "简历诊断结果已更新。", "success", 1800);
+      refreshUnifiedExperience();
+      return;
+    }
+
+    resumeTaskState.forceInputView = true;
+    syncResumeJudgeFlow(getResumeProfileFromCache());
+    setResumeProgress("analyze", 0, "分析失败", false);
+    showToast("分析失败", error?.message || "简历分析失败", "error", 2600);
   } finally {
     resumeTaskState.analyzeInFlight = false;
     stopAnalyzeProgressTicker();
@@ -4709,6 +4724,7 @@ window.isAuthenticatedUser = isAuthenticatedUser;
 window.isSuperAdminUser = isSuperAdminUser;
 window.fetchScopedUserState = fetchScopedUserState;
 window.saveScopedUserState = saveScopedUserState;
+window.mergeScopedUserState = mergeScopedUserState;
 window.fetchManagedLlmConfig = fetchManagedLlmConfig;
 window.fetchActiveLlmRuntimeConfig = fetchActiveLlmRuntimeConfig;
 window.saveManagedLlmConfig = saveManagedLlmConfig;
@@ -6171,8 +6187,14 @@ const careerNewsState = {
   initialized: false,
   displayLimit: 10,
   visibleCount: 10,
-  pageSize: 5,
-  items: []
+  pageSize: 10,
+  /** 在当前已加载列表中的焦点下标（三卡轮排中心） */
+  spotlightIndex: 0,
+  items: [],
+  autoPlayTimer: null,
+  progressRaf: null,
+  /** 10s 进度条起点（ms） */
+  progressEpoch: 0
 };
 
 function _careerNewsPublishedTs(el) {
@@ -6193,68 +6215,338 @@ function _getCareerNewsWorkingItems() {
   return working;
 }
 
-function _updateCareerNewsCarouselControls() {
-  const track = document.getElementById("careerNewsFeatured");
-  const prevBtn = document.getElementById("careerNewsPrevBtn");
-  const nextBtn = document.getElementById("careerNewsNextBtn");
-  if (!track || !prevBtn || !nextBtn) return;
-  const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
-  const canScroll = maxScroll > 4;
-  prevBtn.disabled = !canScroll || track.scrollLeft <= 4;
-  nextBtn.disabled = !canScroll || track.scrollLeft >= maxScroll - 4;
+function _careerNewsClearProgressRaf() {
+  if (careerNewsState.progressRaf) {
+    cancelAnimationFrame(careerNewsState.progressRaf);
+    careerNewsState.progressRaf = null;
+  }
 }
 
-function _careerNewsScrollStep(track) {
-  const first = track?.querySelector(".career-news-item");
-  if (!track || !first) return 320;
-  const styles = window.getComputedStyle(track);
-  const gap = Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
-  return first.getBoundingClientRect().width + gap;
+function _careerNewsClearAutoPlay() {
+  if (careerNewsState.autoPlayTimer) {
+    window.clearInterval(careerNewsState.autoPlayTimer);
+    careerNewsState.autoPlayTimer = null;
+  }
+  _careerNewsClearProgressRaf();
+  careerNewsState.progressEpoch = 0;
+}
+
+function _careerNewsResetProgressEpoch() {
+  careerNewsState.progressEpoch = Date.now();
+}
+
+function _careerNewsTickProgress() {
+  careerNewsState.progressRaf = null;
+  const bar = document.getElementById("careerNewsProgressBar");
+  if (!careerNewsState.progressEpoch || !careerNewsState.autoPlayTimer) return;
+  if (!bar) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    bar.style.width = "100%";
+    return;
+  }
+  const elapsed = Date.now() - careerNewsState.progressEpoch;
+  const pct = Math.min(100, (elapsed / 10000) * 100);
+  bar.style.width = `${pct}%`;
+  careerNewsState.progressRaf = requestAnimationFrame(_careerNewsTickProgress);
+}
+
+function _careerNewsStartProgressLoop() {
+  _careerNewsClearProgressRaf();
+  careerNewsState.progressRaf = requestAnimationFrame(_careerNewsTickProgress);
+}
+
+/** 旧版 DOM 自愈：补全三卡轮排 + 网格结构 */
+function _ensureCareerNewsFeaturedDom() {
+  const root = document.getElementById("careerNewsFeatured");
+  if (!root) return false;
+  if (root.querySelector("[data-career-news-cards-wrapper]") && root.querySelector("#careerNewsGridBoard")) return true;
+  root.className = "career-news-carousel";
+  root.setAttribute("role", "region");
+  root.setAttribute("aria-roledescription", "carousel");
+  root.setAttribute("aria-label", "职业快报轮播");
+  root.innerHTML = `
+    <div class="career-news-spotlight" aria-label="焦点快讯，三卡轮排">
+      <div class="career-news-spotlight-viewport" tabindex="0" aria-label="焦点区，左右键切换">
+        <div class="career-news-cards-wrapper" data-career-news-cards-wrapper>
+          <div class="career-news-spot-card previous--card" aria-hidden="true"></div>
+          <div class="career-news-spot-card current--card"></div>
+          <div class="career-news-spot-card next--card" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+    <div id="careerNewsGridBoard" class="career-news-grid-board" aria-label="本批快讯列表"></div>
+  `;
+  return true;
+}
+
+function _careerNewsSpotlightClone(el, role) {
+  const c = el.cloneNode(true);
+  c.classList.remove("career-news-item--grid");
+  c.classList.add("career-news-item--spotlight", `career-news-item--spotlight-${role}`);
+  c.setAttribute("data-spotlight-clone", role);
+  return c;
+}
+
+function _careerNewsFillSpotCard(shell, sourceItem, role) {
+  if (!shell) return;
+  shell.innerHTML = "";
+  if (!sourceItem) return;
+  shell.appendChild(_careerNewsSpotlightClone(sourceItem, role));
+}
+
+function _syncSpotlightInnerRoles(wrapper) {
+  if (!wrapper) return;
+  const prevShell = wrapper.querySelector(".career-news-spot-card.previous--card");
+  const curShell = wrapper.querySelector(".career-news-spot-card.current--card");
+  const nextShell = wrapper.querySelector(".career-news-spot-card.next--card");
+  [
+    [prevShell, "prev"],
+    [curShell, "current"],
+    [nextShell, "next"]
+  ].forEach(([shell, r]) => {
+    const link = shell?.querySelector(".career-news-item");
+    if (!link) return;
+    link.classList.remove(
+      "career-news-item--spotlight-prev",
+      "career-news-item--spotlight-current",
+      "career-news-item--spotlight-next"
+    );
+    link.classList.add("career-news-item--spotlight", `career-news-item--spotlight-${r}`);
+  });
+  [prevShell, curShell, nextShell].forEach((shell) => {
+    if (!shell) return;
+    shell.setAttribute("aria-hidden", shell.classList.contains("current--card") ? "false" : "true");
+  });
+}
+
+/** 参考 CSS Cards：向右切 = 原右侧卡平移进中，仅给轮换到「右」位的那张壳子换新稿 */
+function _careerNewsSpotlightSwapForward(slice) {
+  const wrapper = document.querySelector("#careerNewsFeatured [data-career-news-cards-wrapper]");
+  if (!wrapper) return;
+  const currentEl = wrapper.querySelector(".career-news-spot-card.current--card");
+  const previousEl = wrapper.querySelector(".career-news-spot-card.previous--card");
+  const nextEl = wrapper.querySelector(".career-news-spot-card.next--card");
+  if (!currentEl || !previousEl || !nextEl) return;
+
+  const N = slice.length;
+  const k = ((careerNewsState.spotlightIndex % N) + N) % N;
+  const newNextIdx = (k + 2) % N;
+
+  currentEl.classList.remove("current--card");
+  previousEl.classList.remove("previous--card");
+  nextEl.classList.remove("next--card");
+
+  currentEl.classList.add("previous--card");
+  nextEl.classList.add("current--card");
+  previousEl.classList.add("next--card");
+
+  currentEl.style.zIndex = "50";
+  nextEl.style.zIndex = "42";
+  previousEl.style.zIndex = "38";
+
+  _careerNewsFillSpotCard(previousEl, slice[newNextIdx], "next");
+  careerNewsState.spotlightIndex = (k + 1) % N;
+  _syncSpotlightInnerRoles(wrapper);
+
+  const trio = [currentEl, previousEl, nextEl];
+  const clearZ = () => {
+    trio.forEach((el) => {
+      el.style.zIndex = "";
+    });
+  };
+  previousEl.addEventListener(
+    "transitionend",
+    (e) => {
+      if (e.propertyName === "transform") clearZ();
+    },
+    { once: true }
+  );
+  window.setTimeout(clearZ, 820);
+}
+
+function _careerNewsSpotlightSwapBackward(slice) {
+  const wrapper = document.querySelector("#careerNewsFeatured [data-career-news-cards-wrapper]");
+  if (!wrapper) return;
+  const currentEl = wrapper.querySelector(".career-news-spot-card.current--card");
+  const previousEl = wrapper.querySelector(".career-news-spot-card.previous--card");
+  const nextEl = wrapper.querySelector(".career-news-spot-card.next--card");
+  if (!currentEl || !previousEl || !nextEl) return;
+
+  const N = slice.length;
+  const k = ((careerNewsState.spotlightIndex % N) + N) % N;
+  const newPrevIdx = (k - 2 + N) % N;
+
+  currentEl.classList.remove("current--card");
+  previousEl.classList.remove("previous--card");
+  nextEl.classList.remove("next--card");
+
+  currentEl.classList.add("next--card");
+  previousEl.classList.add("current--card");
+  nextEl.classList.add("previous--card");
+
+  currentEl.style.zIndex = "50";
+  previousEl.style.zIndex = "42";
+  nextEl.style.zIndex = "38";
+
+  _careerNewsFillSpotCard(nextEl, slice[newPrevIdx], "prev");
+  careerNewsState.spotlightIndex = (k - 1 + N) % N;
+  _syncSpotlightInnerRoles(wrapper);
+
+  const trio = [currentEl, previousEl, nextEl];
+  const clearZ = () => {
+    trio.forEach((el) => {
+      el.style.zIndex = "";
+    });
+  };
+  nextEl.addEventListener(
+    "transitionend",
+    (e) => {
+      if (e.propertyName === "transform") clearZ();
+    },
+    { once: true }
+  );
+  window.setTimeout(clearZ, 820);
+}
+
+function _renderCareerNewsSpotlight(visibleList) {
+  const root = document.getElementById("careerNewsFeatured");
+  if (!root) return;
+  const wrapper = root.querySelector("[data-career-news-cards-wrapper]");
+  const previousEl = wrapper?.querySelector(".career-news-spot-card.previous--card");
+  const currentEl = wrapper?.querySelector(".career-news-spot-card.current--card");
+  const nextEl = wrapper?.querySelector(".career-news-spot-card.next--card");
+  if (!wrapper || !previousEl || !currentEl || !nextEl) return;
+
+  [previousEl, currentEl, nextEl].forEach((el) => {
+    el.innerHTML = "";
+    el.style.zIndex = "";
+  });
+
+  const N = visibleList.length;
+  wrapper.classList.toggle("career-news-cards-wrapper--single", N <= 1);
+
+  if (!N) return;
+
+  const i = ((careerNewsState.spotlightIndex % N) + N) % N;
+  const ip = (i - 1 + N) % N;
+  const ix = (i + 1) % N;
+
+  _careerNewsFillSpotCard(previousEl, visibleList[ip], "prev");
+  _careerNewsFillSpotCard(currentEl, visibleList[i], "current");
+  _careerNewsFillSpotCard(nextEl, visibleList[ix], "next");
+  _syncSpotlightInnerRoles(wrapper);
+}
+
+function _updateCareerNewsCarouselControls() {
+  const prevBtn = document.getElementById("careerNewsPrevBtn");
+  const nextBtn = document.getElementById("careerNewsNextBtn");
+  const posEl = document.getElementById("careerNewsSpotlightPos");
+  const countEl = document.getElementById("careerNewsShowingCount");
+  const visibleCount = Math.min(Math.max(0, careerNewsState.visibleCount), careerNewsState.items.length);
+  const workingLen = careerNewsState.items.length;
+  const N = Math.min(visibleCount, workingLen);
+  const idx = N ? ((careerNewsState.spotlightIndex % N) + N) % N : 0;
+  const disableNav = N <= 1;
+  if (prevBtn) prevBtn.disabled = disableNav;
+  if (nextBtn) nextBtn.disabled = disableNav;
+  if (posEl) posEl.textContent = N ? `${idx + 1} / ${N}` : "0 / 0";
+  if (countEl) {
+    countEl.textContent = `已加载 ${visibleCount} / ${workingLen} 条 · 当前第 ${N ? idx + 1 : 0} 条`;
+  }
+}
+
+function _careerNewsScheduleAutoPlay() {
+  _careerNewsClearAutoPlay();
+  const visibleCount = Math.min(Math.max(0, careerNewsState.visibleCount), careerNewsState.items.length);
+  if (visibleCount <= 1) {
+    const bar = document.getElementById("careerNewsProgressBar");
+    if (bar) bar.style.width = "0%";
+    return;
+  }
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const bar = document.getElementById("careerNewsProgressBar");
+    if (bar) bar.style.width = "100%";
+    return;
+  }
+  _careerNewsResetProgressEpoch();
+  careerNewsState.autoPlayTimer = window.setInterval(() => {
+    careerNewsSlide(1, { fromTimer: true });
+    _careerNewsResetProgressEpoch();
+  }, 10000);
+  _careerNewsStartProgressLoop();
 }
 
 function _applyCareerNewsBoard(options = {}) {
+  const preserveSpotlight = Boolean(options.preservePage || options.preserveScroll);
   const board = document.getElementById("careerNewsBoard");
-  const track = document.getElementById("careerNewsFeatured");
+  const carousel = document.getElementById("careerNewsFeatured");
   const parking = document.getElementById("careerNewsListRows");
   const moreBtn = document.getElementById("careerNewsMoreBtn");
-  if (!board || !track) return;
+  if (!board || !carousel) return;
+  _ensureCareerNewsFeaturedDom();
+  const gridBoard = document.getElementById("careerNewsGridBoard");
+  if (!gridBoard) return;
 
-  const prevScroll = options.preserveScroll ? track.scrollLeft : 0;
   const working = _getCareerNewsWorkingItems();
   working.forEach((el, idx) => {
     const rank = el.querySelector(".career-news-rank");
-    if (rank) rank.textContent = String(idx + 1);
+    if (rank) rank.textContent = String(idx + 1).padStart(2, "0");
   });
 
   if (parking) {
     careerNewsState.items.forEach((el) => {
-      el.classList.remove("career-news-slide");
+      el.classList.remove("career-news-slide", "career-news-item--grid");
       parking.appendChild(el);
     });
   }
 
-  track.innerHTML = "";
+  gridBoard.innerHTML = "";
   const visibleCount = Math.min(Math.max(0, careerNewsState.visibleCount), working.length);
-  working.slice(0, visibleCount).forEach((el) => {
-    el.classList.add("career-news-slide");
-    track.appendChild(el);
+  const slice = working.slice(0, visibleCount);
+
+  if (!slice.length) {
+    if (moreBtn) {
+      moreBtn.hidden = true;
+      moreBtn.disabled = true;
+    }
+    const countEl = document.getElementById("careerNewsShowingCount");
+    if (countEl) countEl.textContent = "当前展示 0 / 0 条";
+    const bar = document.getElementById("careerNewsProgressBar");
+    if (bar) bar.style.width = "0%";
+    const prevE = document.getElementById("careerNewsPrevBtn");
+    const nextE = document.getElementById("careerNewsNextBtn");
+    if (prevE) prevE.disabled = true;
+    if (nextE) nextE.disabled = true;
+    _careerNewsClearAutoPlay();
+    _renderCareerNewsSpotlight([]);
+    return;
+  }
+
+  if (!preserveSpotlight) careerNewsState.spotlightIndex = 0;
+  else {
+    const N = slice.length;
+    careerNewsState.spotlightIndex = Math.min(Math.max(0, careerNewsState.spotlightIndex), N - 1);
+  }
+
+  slice.forEach((el) => {
+    el.classList.add("career-news-item--grid");
+    gridBoard.appendChild(el);
   });
+
+  _renderCareerNewsSpotlight(slice);
 
   if (moreBtn) {
     const hasMore = visibleCount < working.length;
     moreBtn.hidden = !hasMore;
     moreBtn.disabled = !hasMore;
-    moreBtn.textContent = "More +";
-  }
-
-  const countEl = document.getElementById("careerNewsShowingCount");
-  if (countEl) {
-    countEl.textContent = `当前展示 ${visibleCount} / ${working.length} 条`;
+    const labelSpan = moreBtn.querySelector("span");
+    if (labelSpan) labelSpan.textContent = "加载更多（每次 10 条）";
+    else moreBtn.textContent = "加载更多（每次 10 条）";
   }
 
   requestAnimationFrame(() => {
-    track.scrollLeft = options.preserveScroll ? prevScroll : 0;
     _updateCareerNewsCarouselControls();
+    _careerNewsScheduleAutoPlay();
   });
 }
 
@@ -6263,41 +6555,83 @@ function initCareerNewsBoard() {
   if (!board || careerNewsState.initialized) return;
   careerNewsState.initialized = true;
   careerNewsState.displayLimit = Math.max(1, Number(board.dataset.displayLimit || 10));
-  careerNewsState.visibleCount = careerNewsState.displayLimit;
+  careerNewsState.pageSize = 10;
   const pool = document.getElementById("careerNewsPool");
   careerNewsState.items = [...(pool || board).querySelectorAll(".career-news-item")];
+  /* 首屏 displayLimit 条（默认 10）；顶部三卡轮排在批次内循环；下方 2×5 概览；加载更多 +10 */
+  careerNewsState.visibleCount = Math.min(
+    careerNewsState.displayLimit,
+    careerNewsState.items.length
+  );
 
   document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => careerNewsSlide(-1));
   document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => careerNewsSlide(1));
   document.getElementById("careerNewsMoreBtn")?.addEventListener("click", () => careerNewsLoadMore());
-  document.getElementById("careerNewsFeatured")?.addEventListener("scroll", () => {
-    window.requestAnimationFrame(_updateCareerNewsCarouselControls);
-  }, { passive: true });
-  window.addEventListener("resize", _updateCareerNewsCarouselControls);
-
+  window.addEventListener("resize", () => {
+    _updateCareerNewsCarouselControls();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) _careerNewsClearAutoPlay();
+    else _careerNewsScheduleAutoPlay();
+  });
+  const spotlightVp = document.querySelector("#careerNewsFeatured .career-news-spotlight-viewport");
+  spotlightVp?.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      careerNewsSlide(-1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      careerNewsSlide(1);
+    }
+  });
   _applyCareerNewsBoard();
 }
 
-function careerNewsSlide(direction = 1) {
+function careerNewsSlide(direction = 1, opts = {}) {
   if (!careerNewsState.initialized) initCareerNewsBoard();
-  const track = document.getElementById("careerNewsFeatured");
-  if (!track) return;
-  track.scrollBy({ left: _careerNewsScrollStep(track) * direction, behavior: "smooth" });
-  window.setTimeout(_updateCareerNewsCarouselControls, 260);
+  const visibleCount = Math.min(Math.max(0, careerNewsState.visibleCount), careerNewsState.items.length);
+  const slice = _getCareerNewsWorkingItems().slice(0, visibleCount);
+  const N = visibleCount;
+  if (N <= 1) {
+    careerNewsState.spotlightIndex = 0;
+    _renderCareerNewsSpotlight(slice);
+    _updateCareerNewsCarouselControls();
+    if (!opts.fromTimer) {
+      _careerNewsClearAutoPlay();
+      _careerNewsScheduleAutoPlay();
+    }
+    return;
+  }
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const narrow = window.matchMedia("(max-width: 620px)").matches;
+  if (reduced || narrow) {
+    careerNewsState.spotlightIndex = (careerNewsState.spotlightIndex + direction + N) % N;
+    _renderCareerNewsSpotlight(slice);
+    _updateCareerNewsCarouselControls();
+    if (!opts.fromTimer) {
+      _careerNewsClearAutoPlay();
+      _careerNewsScheduleAutoPlay();
+    }
+    return;
+  }
+
+  if (direction === 1) _careerNewsSpotlightSwapForward(slice);
+  else _careerNewsSpotlightSwapBackward(slice);
+
+  _updateCareerNewsCarouselControls();
+  if (opts.fromTimer) return;
+  _careerNewsClearAutoPlay();
+  _careerNewsScheduleAutoPlay();
 }
 
 function careerNewsLoadMore() {
   if (!careerNewsState.initialized) initCareerNewsBoard();
-  const track = document.getElementById("careerNewsFeatured");
-  const beforeWidth = track?.scrollWidth || 0;
-  careerNewsState.visibleCount += careerNewsState.pageSize;
-  _applyCareerNewsBoard({ preserveScroll: true });
-  if (track) {
-    window.setTimeout(() => {
-      track.scrollTo({ left: Math.max(0, beforeWidth), behavior: "smooth" });
-      _updateCareerNewsCarouselControls();
-    }, 60);
-  }
+  careerNewsState.visibleCount = Math.min(
+    careerNewsState.visibleCount + careerNewsState.pageSize,
+    careerNewsState.items.length
+  );
+  _applyCareerNewsBoard({ preservePage: true, preserveScroll: true });
 }
 
 // 兼容旧调用
@@ -8373,181 +8707,96 @@ window.getLatestUnifiedProfile = function getLatestUnifiedProfile() {
   return deriveUnifiedProfile();
 };
 
-function computeTraitMatch(role, profile) {
-  const assessment = profile.assessment;
-  const scores = [];
-  const reasons = [];
-  const mbtiType = assessment?.mbti?.completed ? String(assessment.mbti.final_type || assessment.mbti.raw_type || "") : "";
-  if (mbtiType) {
-    if ((role.recommendedMbti || []).includes(mbtiType)) {
-      scores.push(95);
-      reasons.push(`MBTI ${mbtiType} 落在岗位推荐类型内`);
-    } else if ((role.recommendedMbti || []).some((code) => code.slice(1, 3) === mbtiType.slice(1, 3))) {
-      scores.push(80);
-      reasons.push("MBTI 与岗位推荐的核心偏好相近");
-    } else {
-      scores.push(58);
-      reasons.push("MBTI 与岗位偏好存在一定差距");
-    }
-  }
-  const hollandCodes = Array.isArray(assessment?.holland?.top_codes) ? assessment.holland.top_codes : [];
-  if (hollandCodes.length) {
-    const overlap = (role.recommendedHolland || []).filter((code) => hollandCodes.includes(code)).length;
-    if (overlap >= 3) {
-      scores.push(95);
-      reasons.push("霍兰德代码与岗位画像高度重合");
-    } else if (overlap === 2) {
-      scores.push(82);
-      reasons.push("霍兰德主导兴趣与岗位需求较一致");
-    } else if (overlap === 1) {
-      scores.push(66);
-      reasons.push("霍兰德兴趣部分覆盖岗位画像");
-    } else {
-      scores.push(45);
-      reasons.push("霍兰德兴趣与岗位画像重合度较低");
-    }
-  }
-  return {
-    score: averageValues(scores),
-    reason: reasons.join("；") || "等待测评结果。"
-  };
+/**
+ * 将职业图谱 /api/career-graph/match 返回的 recommendations 转为与人岗 UI、报告 payload 兼容的结构。
+ */
+function graphMatchResultsToRoleRankings(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  return list
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const name = String(item.title || item.name || "").trim() || "未命名岗位";
+      const id = String(item.id || item.node_id || "").trim()
+        || `graph_${Math.abs([...name].reduce((h, c) => Math.imul(31, h) + c.charCodeAt(0), 0))}`;
+      const skills = Array.isArray(item.skills) ? item.skills.map((s) => String(s)) : [];
+      const reasonLines = Array.isArray(item.reasonLines) ? item.reasonLines.map((s) => String(s)) : [];
+      const nextActions = Array.isArray(item.nextActions) ? item.nextActions.map((s) => String(s)) : [];
+      const os = Number(item.overallScore);
+      const overallScore = Number.isFinite(os) ? Math.round(os) : null;
+      const ds = item.directionScore != null ? Number(item.directionScore) : null;
+      const cs = item.capabilityScore != null ? Number(item.capabilityScore) : null;
+      const ms = item.majorScore != null ? Number(item.majorScore) : null;
+      const skillHits = Array.isArray(item.skillHits) ? item.skillHits.map((s) => String(s)) : [];
+      const capGaps = Array.isArray(item.capabilityGaps) ? item.capabilityGaps.map((s) => String(s)) : [];
+      const trait = {
+        score: Number.isFinite(ds) ? Math.round(ds) : null,
+        reason: reasonLines[0] || "方向契合度由职业图谱与画像信号计算。"
+      };
+      const ability = {
+        score: Number.isFinite(cs) ? Math.round(cs) : null,
+        reason: skillHits.length ? `技能重合：${skillHits.slice(0, 4).join("、")}` : "能力维度由图谱侧与画像能力模型估算。",
+        gaps: capGaps.slice(0, 4)
+      };
+      const major = {
+        score: Number.isFinite(ms) ? Math.round(ms) : null,
+        reason: "专业匹配由图谱侧估算。"
+      };
+      const willingness = {
+        score: null,
+        reason: "求职意愿请结合「目标方向」与职业访谈理解。"
+      };
+      return {
+        id,
+        name,
+        category: String(item.cluster || item.directionLabel || "").trim() || "职业图谱",
+        majors: [],
+        requiredSkills: skills.slice(0, 12),
+        certificates: [],
+        requirements: {},
+        recommendedHolland: [],
+        recommendedMbti: [],
+        workValues: skills.slice(0, 4),
+        path: String(item.path || ""),
+        trait,
+        ability,
+        major,
+        willingness,
+        coverageWeight: 100,
+        overallScore,
+        confidence: item.confidence || "中",
+        summary: reasonLines.filter(Boolean).join("；") || `图谱推荐：${name}`,
+        nextActions: nextActions.length
+          ? nextActions
+          : [`在岗位探索中查看「${name}」的路径与要求`],
+        matchSource: "career_graph",
+        graph: {
+          city: item.city || "",
+          level: item.level || "",
+          directionLabel: item.directionLabel || ""
+        }
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
 }
 
-function computeAbilityMatch(role, profile) {
-  const capabilityConfig = [
-    { key: "professional", label: "专业技能", weight: 0.2 },
-    { key: "innovation", label: "创新能力", weight: 0.15 },
-    { key: "learning", label: "学习能力", weight: 0.15 },
-    { key: "stress_tolerance", label: "抗压能力", weight: 0.12 },
-    { key: "communication", label: "沟通能力", weight: 0.18 },
-    { key: "internship", label: "实习能力", weight: 0.1 },
-    { key: "execution", label: "执行能力", weight: 0.1 }
-  ];
-  const strengths = [];
-  const gaps = [];
-  const lines = [];
-  let weightedScore = 0;
-  let usedWeight = 0;
-  capabilityConfig.forEach((item) => {
-    const current = profile.capabilities[item.key]?.score;
-    const required = Number(role.requirements[item.key] || 0);
-    if (current === null || current === undefined || !required) return;
-    const fitScore = clampPercent(current / required * 100);
-    weightedScore += fitScore * item.weight;
-    usedWeight += item.weight;
-    lines.push(`${item.label} ${current}/${required}`);
-    if (current + 8 < required) gaps.push(`${item.label} ${current}/${required}`);
-    if (current >= required) strengths.push(`${item.label} ${current}/${required}`);
-  });
-  return {
-    score: usedWeight ? Math.round(weightedScore / usedWeight) : null,
-    coverageWeight: Math.round(usedWeight * 100),
-    reason: lines.length ? `已使用 ${lines.join("、")} 计算能力匹配。` : "职业访谈和基础信息尚不足以判断能力匹配。",
-    strengths: strengths.slice(0, 3),
-    gaps: gaps.slice(0, 4)
-  };
-}
+window.graphMatchResultsToRoleRankings = graphMatchResultsToRoleRankings;
 
-function computeMajorMatch(role, basics) {
-  const major = String(basics.major || "").trim();
-  if (!major) {
-    return { score: null, reason: "未填写专业，专业匹配待补充。" };
-  }
-  if ((role.majors || []).includes("不限")) {
-    return { score: 82, reason: "该岗位对专业限制较低，可通过能力与作品补足。" };
-  }
-  if ((role.majors || []).some((item) => major.includes(item) || item.includes(major))) {
-    return { score: 100, reason: `${major} 与岗位常见专业背景直接相关。` };
-  }
-  const relatedGroups = [
-    { keywords: ["计算机", "软件", "信息", "网络", "智能"], score: 80 },
-    { keywords: ["统计", "数学", "数据", "经管"], score: 78 },
-    { keywords: ["设计", "数字媒体", "美术"], score: 82 },
-    { keywords: ["新闻", "传播", "中文", "文史"], score: 80 },
-    { keywords: ["管理", "心理", "工商", "人力"], score: 76 },
-    { keywords: ["会计", "财务", "审计", "经济"], score: 86 }
-  ];
-  const matchedGroup = relatedGroups.find((group) => group.keywords.some((item) => major.includes(item)) && (role.majors || []).some((item) => group.keywords.includes(item)));
-  if (matchedGroup) {
-    return { score: matchedGroup.score, reason: `${major} 与岗位专业要求存在相关性，但仍需用课程或项目进一步证明。` };
-  }
-  return { score: 38, reason: `${major} 与岗位主流专业背景相关性较弱，需要额外的项目和技能证明。` };
-}
-
-function computeWillingnessMatch(role, profile) {
-  const signals = [];
-  const reasons = [];
-  if (profile.basics.target_direction) {
-    const matched = roleMatchesText(role, profile.basics.target_direction);
-    signals.push(matched ? 92 : 52);
-    reasons.push(matched ? "目标方向与岗位关键词一致" : "目标方向与岗位未形成明显重合");
-  }
-  const interviewProfile = profile.interview.profile;
-  const recommendedRoles = Array.isArray(interviewProfile?.recommended_roles) ? interviewProfile.recommended_roles : [];
-  if (recommendedRoles.length) {
-    const matched = recommendedRoles.some((item) => roleMatchesText(role, item));
-    signals.push(matched ? 95 : 58);
-    reasons.push(matched ? "访谈推荐岗位包含该方向" : "访谈推荐岗位更偏向其他方向");
-  }
-  const interests = Array.isArray(interviewProfile?.career_interests) ? interviewProfile.career_interests : [];
-  if (interests.length) {
-    const matched = interests.some((item) => roleMatchesText(role, item));
-    signals.push(matched ? 85 : 60);
-    reasons.push(matched ? "访谈兴趣点与岗位特征重合" : "兴趣点与岗位仅部分相关");
-  }
-  return {
-    score: averageValues(signals),
-    reason: reasons.join("；") || "尚未填写目标方向或完成访谈，意愿匹配待补充。"
-  };
-}
-
+/** 岗位列表仅来自职业图谱「开始匹配」结果，不再使用本地预制岗位库。 */
 function computeRoleMatches(profile) {
-  const hasSignal = Boolean(
-    profile.assessment?.mbti?.completed
-    || profile.assessment?.holland?.completed
-    || profile.basics.major
-    || profile.basics.target_direction
-    || profile.interview.profile
-  );
-  if (!hasSignal) return [];
-  return ROLE_LIBRARY.map((role) => {
-    const trait = computeTraitMatch(role, profile);
-    const ability = computeAbilityMatch(role, profile);
-    const major = computeMajorMatch(role, profile.basics);
-    const willingness = computeWillingnessMatch(role, profile);
-    const weightedParts = [
-      { weight: appState.weights["特质匹配"], result: trait },
-      { weight: appState.weights["能力匹配"], result: ability },
-      { weight: appState.weights["专业匹配"], result: major },
-      { weight: appState.weights["意愿匹配"], result: willingness }
-    ];
-    const coverageWeight = weightedParts.reduce((sum, item) => sum + (item.result.score === null ? 0 : item.weight), 0);
-    const weightedScore = weightedParts.reduce((sum, item) => sum + (item.result.score === null ? 0 : item.result.score * item.weight), 0);
-    const overallScore = coverageWeight ? Math.round(weightedScore / coverageWeight) : null;
-    const confidence = coverageWeight >= 85 ? "高" : coverageWeight >= 55 ? "中" : "低";
-    const nextActions = uniqueValues([
-      ...ability.gaps.map((item) => `补足 ${item}`),
-      major.score !== null && major.score < 60 ? `为 ${role.name} 准备跨专业证明材料` : "",
-      willingness.score === null ? "补充目标方向或完成访谈，提升意愿匹配精度" : "",
-      `围绕 ${role.name} 的 ${role.requiredSkills.slice(0, 2).join("、")} 产出作品或经历`
-    ], 4);
-    return {
-      ...role,
-      trait,
-      ability,
-      major,
-      willingness,
-      coverageWeight,
-      overallScore,
-      confidence,
-      summary: [trait.reason, ability.reason, major.reason, willingness.reason].filter(Boolean).slice(0, 2).join("；"),
-      nextActions
-    };
-  }).sort((a, b) => {
-    const scoreA = a.overallScore ?? a.trait.score ?? 0;
-    const scoreB = b.overallScore ?? b.trait.score ?? 0;
-    return scoreB - scoreA;
-  });
+  void profile;
+  const scoped = userWorkspaceState?.scopedData?.career_matching;
+  const graphBundle = scoped?.graph_match_bundle;
+  const fromBundle = Array.isArray(graphBundle?.results) ? graphBundle.results : [];
+  if (fromBundle.length) {
+    return graphMatchResultsToRoleRankings(fromBundle);
+  }
+  const saved = Array.isArray(scoped?.role_rankings) ? scoped.role_rankings : [];
+  const legacyGraph = saved.filter((r) => r && r.matchSource === "career_graph");
+  if (legacyGraph.length) {
+    return legacyGraph.slice().sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
+  }
+  return [];
 }
 
 function buildAgentModuleStates(profile, roles) {
@@ -8880,7 +9129,7 @@ function renderMatchingWorkspace(profile, roles) {
   if (overviewEl) {
     const cards = [
       { label: "当前 Top1", value: topRole?.overallScore !== null && topRole?.overallScore !== undefined ? `${topRole.overallScore}%` : "初步推荐", hint: topRole ? `${topRole.name} · 置信度${topRole.confidence}` : "等待画像输入" },
-      { label: "岗位覆盖", value: `${roles.length}`, hint: "基于 10 个岗位画像库自动初筛" },
+      { label: "岗位覆盖", value: `${roles.length}`, hint: "来自岗位探索「开始匹配」结果，无预制岗位表" },
       { label: "关键差距", value: `${focused?.ability?.gaps?.length || 0}`, hint: focused ? `聚焦 ${focused.name}` : "等待选择岗位" },
       { label: "状态提示", value: profile.missingItems.length ? "待补充" : "已就绪", hint: profile.missingItems.length ? profile.missingItems[0] : "可进入报告页查看行动计划" }
     ];
@@ -9187,7 +9436,7 @@ const REPORT_AGENT_FLOW = [
   { key: "resume_evidence_2", title: "证据复核", role: "Resume Evidence Analyst", detail: "按 must_prove 二次校验", icon: "verify", x: 950, y: 452 },
   { key: "role_match", title: "岗位匹配官", role: "Role Match Officer", detail: "对齐岗位矩阵与差距项", icon: "match", x: 1240, y: 282 },
   { key: "path_planning", title: "路径规划师", role: "Career Path Planner", detail: "差距驱动行动计划与复查节点", icon: "route", x: 1530, y: 282, aliases: ["stage_planning"] },
-  { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic"] }
+  { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic", "report_editor"] }
 ];
 
 const REPORT_AGENT_NODE_WIDTH = 220;
@@ -9320,7 +9569,7 @@ function renderReportAgentMap(profile, roles) {
     let nodeStatus = "pending";
     if (completed || progressStatus === "done" || (running && activeIndex >= 0 && index < activeIndex)) {
       nodeStatus = "done";
-    } else if (progressStatus === "active" || progressStatus === "running" || index === activeIndex || (running && activeIndex < 0 && index === 0)) {
+    } else if (progressStatus === "active" || progressStatus === "running" || index === activeIndex) {
       nodeStatus = "active";
     } else if (progressStatus === "failed" || status === "failed") {
       nodeStatus = "failed";
@@ -9462,7 +9711,7 @@ function renderReportWorkspace(profile, roles) {
   }
 }
 
-const CAREER_REPORT_POLL_MS = 1800;
+const CAREER_REPORT_POLL_MS = 4000;
 let careerReportPollTimer = null;
 let careerReportPollJobId = "";
 
@@ -9524,24 +9773,47 @@ function mergeCareerReportStatusPayload(payload) {
   return merged;
 }
 
+/**
+ * 职业报告岗位匹配章节：提交「当前聚焦岗 + 至多 4 个对照岗」（共 5 个）。
+ */
+function buildReportRoleRankingsForPayload(roles, focusRoleId) {
+  const full = Array.isArray(roles) ? roles : [];
+  const fid = String(focusRoleId || "").trim();
+  const focus = full.find((r) => r && String(r.id) === fid) || full[0];
+  if (!focus) return [];
+  const rest = full.filter((r) => r && String(r.id) !== String(focus.id));
+  return [focus, ...rest.slice(0, 4)];
+}
+
+window.buildReportRoleRankingsForPayload = buildReportRoleRankingsForPayload;
+
 function buildCareerReportGenerationPayload() {
+  const savedProfile = userWorkspaceState.scopedData?.profile_snapshot?.profile
+    && typeof userWorkspaceState.scopedData.profile_snapshot.profile === "object"
+      ? userWorkspaceState.scopedData.profile_snapshot.profile
+      : null;
+  const savedRoles = Array.isArray(userWorkspaceState.scopedData?.career_matching?.role_rankings)
+    ? userWorkspaceState.scopedData.career_matching.role_rankings
+    : [];
   const profile = appState.derivedProfile && typeof appState.derivedProfile === "object"
     ? appState.derivedProfile
-    : deriveUnifiedProfile();
+    : (savedProfile || deriveUnifiedProfile());
   const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
     ? appState.matchingRoles
-    : computeRoleMatches(profile);
+    : (savedRoles.length ? savedRoles : computeRoleMatches(profile));
   if (!profile || typeof profile !== "object") return null;
   if (!Array.isArray(roles) || !roles.length) return null;
   appState.derivedProfile = profile;
   appState.matchingRoles = roles;
   if (!roles.some((item) => item.id === appState.focusedRoleId)) {
-    appState.focusedRoleId = roles[0]?.id || "";
+    appState.focusedRoleId = String(userWorkspaceState.scopedData?.career_matching?.focus_role_id || roles[0]?.id || "").trim();
   }
+  const focusId = String(appState.focusedRoleId || roles[0]?.id || "").trim();
+  const role_rankings = buildReportRoleRankingsForPayload(roles, focusId);
   return {
     profile_snapshot: profile,
-    role_rankings: roles,
-    focus_role_id: String(appState.focusedRoleId || roles[0]?.id || "").trim()
+    role_rankings: role_rankings,
+    focus_role_id: focusId
   };
 }
 
@@ -9581,10 +9853,14 @@ async function pollCareerReportJob(jobId) {
   careerReportPollJobId = safeJobId;
   try {
     const state = await syncCareerReportRuntimeStatus(safeJobId);
+    const followId = String(state.job_id || safeJobId || "").trim();
+    if (followId) {
+      careerReportPollJobId = followId;
+    }
     const status = String(state.status || "").trim().toLowerCase();
     if (isCareerReportRunningStatus(status)) {
       careerReportPollTimer = window.setTimeout(() => {
-        void pollCareerReportJob(safeJobId);
+        void pollCareerReportJob(followId || safeJobId);
       }, CAREER_REPORT_POLL_MS);
       return state;
     }
@@ -9603,9 +9879,11 @@ async function pollCareerReportJob(jobId) {
     }
     return state;
   } catch (error) {
-    stopCareerReportPolling();
-    showToast("同步报告进度失败", error.message || "请稍后重试。", "error", 2400);
-    throw error;
+    careerReportPollTimer = window.setTimeout(() => {
+      void pollCareerReportJob(safeJobId);
+    }, CAREER_REPORT_POLL_MS * 2);
+    console.warn("career report status poll failed", error);
+    return null;
   }
 }
 
@@ -9754,43 +10032,119 @@ function refreshUnifiedExperience() {
   }
 }
 
+function buildProfileSnapshotScope(profile) {
+  return {
+    version: "2026.04-profile-snapshot-v1",
+    updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    source: "unified_experience",
+    profile: profile && typeof profile === "object" ? profile : null
+  };
+}
+
+function buildCareerMatchingScope(profile, roles) {
+  let role_rankings = Array.isArray(roles) ? roles : [];
+  const scoped = userWorkspaceState.scopedData?.career_matching;
+  if (!role_rankings.length && scoped?.graph_match_bundle?.results?.length && typeof graphMatchResultsToRoleRankings === "function") {
+    role_rankings = graphMatchResultsToRoleRankings(scoped.graph_match_bundle.results);
+  }
+  const focusFallback = String(
+    appState.focusedRoleId || role_rankings[0]?.id || scoped?.focus_role_id || ""
+  ).trim();
+  return {
+    version: "2026.04-career-matching-v1",
+    updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    source: "unified_experience",
+    focus_role_id: focusFallback,
+    profile_summary: String(profile?.summary || "").trim(),
+    role_rankings: role_rankings
+  };
+}
+
+async function persistUnifiedExperienceState(profile, roles) {
+  if (!isAuthenticatedUser()) return;
+  try {
+    await Promise.allSettled([
+      saveScopedUserState("profile_snapshot", buildProfileSnapshotScope(profile)),
+      mergeScopedUserState("career_matching", buildCareerMatchingScope(profile, roles))
+    ]);
+  } catch (error) {
+    console.warn("persist unified experience failed", error);
+  }
+}
+
+function applyUnifiedExperienceState(profile, roles, options = {}) {
+  const safeProfile = profile && typeof profile === "object" ? profile : deriveUnifiedProfile();
+  const safeRoles = Array.isArray(roles) ? roles : [];
+  const requestedFocusRoleId = String(options.focusRoleId || "").trim();
+
+  appState.derivedProfile = safeProfile;
+  appState.matchingRoles = safeRoles;
+  if (safeRoles.some((item) => item.id === requestedFocusRoleId)) {
+    appState.focusedRoleId = requestedFocusRoleId;
+  } else if (!safeRoles.some((item) => item.id === appState.focusedRoleId)) {
+    appState.focusedRoleId = safeRoles[0]?.id || "";
+  }
+  appState.profileCompletion = Math.round(
+    (safeProfile.assessment?.mbti?.completed ? 15 : 0)
+    + (safeProfile.assessment?.holland?.completed ? 15 : 0)
+    + (PROFILE_BASIC_FIELDS.filter((key) => safeProfile.basics?.[key]).length / PROFILE_BASIC_FIELDS.length) * 30
+    + clampPercent(safeProfile.interview?.completionScore) * 0.3
+    + (safeProfile.resume?.status === "analyzed" ? 10 : 0)
+  );
+  appState.profileComplete = Boolean(
+    safeProfile.assessment?.mbti?.completed
+    && safeProfile.assessment?.holland?.completed
+    && PROFILE_BASIC_FIELDS.every((key) => safeProfile.basics?.[key])
+  );
+  appState.matchingComplete = safeRoles.length > 0 && Boolean(safeProfile.assessment?.mbti?.completed || safeProfile.assessment?.holland?.completed);
+  appState.score = safeRoles[0]?.overallScore || safeRoles[0]?.trait?.score || appState.profileCompletion;
+
+  renderProfileWorkspace(safeProfile, safeRoles);
+  renderMatchingWorkspace(safeProfile, safeRoles);
+  renderReportWorkspace(safeProfile, safeRoles);
+  updateDashboardMetrics();
+
+  if (options.persist) {
+    void persistUnifiedExperienceState(safeProfile, safeRoles);
+  }
+}
+
+function restoreUnifiedExperienceFromSavedScopes() {
+  const profileScope = userWorkspaceState.scopedData?.profile_snapshot;
+  const matchingScope = userWorkspaceState.scopedData?.career_matching;
+  const profile = profileScope && typeof profileScope === "object" && profileScope.profile && typeof profileScope.profile === "object"
+    ? profileScope.profile
+    : null;
+  const roles = matchingScope && typeof matchingScope === "object" && Array.isArray(matchingScope.role_rankings)
+    ? matchingScope.role_rankings
+    : [];
+  const focusRoleId = matchingScope && typeof matchingScope === "object"
+    ? String(matchingScope.focus_role_id || "").trim()
+    : "";
+  if (!profile && !roles.length) return false;
+  applyUnifiedExperienceState(profile || deriveUnifiedProfile(), roles, { focusRoleId, persist: false });
+  return true;
+}
+
 function refreshUnifiedExperienceNow() {
   const profile = deriveUnifiedProfile();
   const roles = computeRoleMatches(profile);
   profile.recommendedRoles = uniqueValues([...profile.recommendedRoles, ...roles.slice(0, 3).map((item) => item.name)], 6);
   profile.nextSteps = uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6);
   profile.moduleStates = buildAgentModuleStates(profile, roles);
-
-  appState.derivedProfile = profile;
-  appState.matchingRoles = roles;
-  if (!roles.some((item) => item.id === appState.focusedRoleId)) {
-    appState.focusedRoleId = roles[0]?.id || "";
-  }
-  appState.profileCompletion = Math.round(
-    (profile.assessment?.mbti?.completed ? 15 : 0)
-    + (profile.assessment?.holland?.completed ? 15 : 0)
-    + (PROFILE_BASIC_FIELDS.filter((key) => profile.basics[key]).length / PROFILE_BASIC_FIELDS.length) * 30
-    + clampPercent(profile.interview.completionScore) * 0.3
-    + (profile.resume?.status === "analyzed" ? 10 : 0)
-  );
-  appState.profileComplete = Boolean(
-    profile.assessment?.mbti?.completed
-    && profile.assessment?.holland?.completed
-    && PROFILE_BASIC_FIELDS.every((key) => profile.basics[key])
-  );
-  appState.matchingComplete = roles.length > 0 && Boolean(profile.assessment?.mbti?.completed || profile.assessment?.holland?.completed);
-  appState.score = roles[0]?.overallScore || roles[0]?.trait?.score || appState.profileCompletion;
-
-  renderProfileWorkspace(profile, roles);
-  renderMatchingWorkspace(profile, roles);
-  renderReportWorkspace(profile, roles);
-  updateDashboardMetrics();
+  applyUnifiedExperienceState(profile, roles, { persist: true });
 }
 
 function focusMatchingRole(roleId) {
   appState.focusedRoleId = String(roleId || "");
   renderMatchingWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
   renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  if (isAuthenticatedUser()) {
+    void mergeScopedUserState("career_matching", {
+      focus_role_id: appState.focusedRoleId,
+      updated_at: new Date().toLocaleString("zh-CN", { hour12: false })
+    });
+  }
 }
 
 function openMatchingRoleReport(roleId) {
@@ -9895,6 +10249,39 @@ function switchAuthTab(tab) {
   }
 }
 
+function closeNavWorkspaceMenu() {
+  const menu = document.getElementById("navWorkspaceMenu");
+  const toggle = document.getElementById("navWorkspaceToggle");
+  if (menu) menu.classList.add("hidden");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.classList.remove("nav-workspace-menu-open");
+  }
+}
+
+function initNavWorkspaceMenu() {
+  const shell = document.getElementById("navWorkspaceShell");
+  const toggle = document.getElementById("navWorkspaceToggle");
+  const menu = document.getElementById("navWorkspaceMenu");
+  if (!shell || !toggle || !menu) return;
+  toggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = !menu.classList.contains("hidden");
+    if (isOpen) closeNavWorkspaceMenu();
+    else {
+      menu.classList.remove("hidden");
+      toggle.setAttribute("aria-expanded", "true");
+      toggle.classList.add("nav-workspace-menu-open");
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (!shell.contains(e.target)) closeNavWorkspaceMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeNavWorkspaceMenu();
+  });
+}
+
 function lockApp() {
   userWorkspaceState.currentUser = null;
   userWorkspaceState.authReadyPromise = null;
@@ -9902,20 +10289,25 @@ function lockApp() {
   document.body.classList.add("auth-locked");
   const startup = document.getElementById("startupScreen");
   const label = document.getElementById("currentUserLabel");
-  const logoutBtn = document.getElementById("logoutBtn");
   const avatar = document.getElementById("currentUserAvatar");
+  const shell = document.getElementById("navWorkspaceShell");
   if (startup) startup.classList.remove("hidden");
-  if (label) { label.textContent = "未登录"; label.classList.add("hidden"); }
-  if (logoutBtn) logoutBtn.classList.add("hidden");
-  if (avatar) avatar.textContent = "人";
+  if (label) label.textContent = "未登录";
+  if (shell) shell.classList.add("hidden");
+  if (typeof window.loadAccountAvatarState === "function") {
+    void window.loadAccountAvatarState(true);
+  } else if (avatar) {
+    avatar.textContent = "人";
+  }
+  closeNavWorkspaceMenu();
 }
 
 function unlockAppForUser(user) {
   userWorkspaceState.currentUser = user;
   const startup = document.getElementById("startupScreen");
   const label = document.getElementById("currentUserLabel");
-  const logoutBtn = document.getElementById("logoutBtn");
   const avatar = document.getElementById("currentUserAvatar");
+  const shell = document.getElementById("navWorkspaceShell");
   const hadAuthChecking = document.body.classList.contains("auth-checking");
   let postLogin = false;
   try {
@@ -9926,9 +10318,13 @@ function unlockAppForUser(user) {
   }
   document.body.classList.remove("auth-checking", "auth-locked");
   if (startup) startup.classList.add("hidden");
-  if (label) { label.textContent = `${user.display_name || user.displayName || user.username} (${user.role === "super_admin" ? "Super Admin" : "User"})`; label.classList.remove("hidden"); }
-  if (logoutBtn) logoutBtn.classList.remove("hidden");
-  if (avatar) avatar.textContent = user.role === "super_admin" ? "管" : "人";
+  if (label) label.textContent = `${user.display_name || user.displayName || user.username} (${user.role === "super_admin" ? "Super Admin" : "User"})`;
+  if (shell) shell.classList.remove("hidden");
+  if (typeof window.loadAccountAvatarState === "function") {
+    void window.loadAccountAvatarState(true);
+  } else if (avatar) {
+    avatar.textContent = user.role === "super_admin" ? "管" : "人";
+  }
   addLiveActivity(`User signed in: ${user.username}`);
   const silentSessionRestore = hadAuthChecking && !postLogin;
   if (!silentSessionRestore) {
@@ -10035,6 +10431,22 @@ async function initAuth() {
         if (Object.prototype.hasOwnProperty.call(scoped, "profile_portrait")) {
           userWorkspaceState.scopedData.profile_portrait = scoped.profile_portrait ?? null;
           userWorkspaceState.scopedDataLoaded.profile_portrait = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "account_avatar")) {
+          userWorkspaceState.scopedData.account_avatar = scoped.account_avatar ?? null;
+          userWorkspaceState.scopedDataLoaded.account_avatar = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "profile_snapshot")) {
+          userWorkspaceState.scopedData.profile_snapshot = scoped.profile_snapshot ?? null;
+          userWorkspaceState.scopedDataLoaded.profile_snapshot = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "career_matching")) {
+          userWorkspaceState.scopedData.career_matching = scoped.career_matching ?? null;
+          userWorkspaceState.scopedDataLoaded.career_matching = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(scoped, "news_context")) {
+          userWorkspaceState.scopedData.news_context = scoped.news_context ?? null;
+          userWorkspaceState.scopedDataLoaded.news_context = true;
         }
         await Promise.allSettled([
           loadCareerInterviewConfig(false),
@@ -10242,6 +10654,10 @@ function showSection(sectionId) {
       section.classList.remove("fade-in");
       if (navItem) navItem.classList.remove("active");
     }
+  });
+  document.querySelectorAll(".cs-hero-concierge-nav button[data-section]").forEach((btn) => {
+    const sid = btn.getAttribute("data-section");
+    btn.classList.toggle("is-active", Boolean(sid) && sid === sectionId);
   });
   appState.currentSection = sectionId;
   document.body.classList.toggle("section-matching", sectionId === "matching");
@@ -10553,12 +10969,12 @@ function renderJobCards() {
     return;
   }
 
-  grid.innerHTML = pageData.map((job, i) => {
+grid.innerHTML = pageData.map((job, i) => {
     const idx     = start + i;
     const skills  = String(job["技能要求"] || "").split(",").map((s) => s.trim()).filter(Boolean);
     const skillTags = skills.slice(0, 5).map(s =>
-      `<span class="px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded border border-purple-100 whitespace-nowrap">${escHtml(s)}</span>`
-    ).join("") + (skills.length > 5 ? `<span class="px-2 py-0.5 bg-gray-50 text-gray-400 text-xs rounded">+${skills.length - 5}</span>` : "");
+      `<span class="job-skill-tag whitespace-nowrap">${escHtml(s)}</span>`
+    ).join("") + (skills.length > 5 ? `<span class="job-skill-tag job-skill-tag-more">+${skills.length - 5}</span>` : "");
 
     const fundingColors = {
       "已上市": "bg-blue-100 text-blue-700",
@@ -10571,28 +10987,27 @@ function renderJobCards() {
     const fundingCls = fundingColors[job["融资阶段"]] || "bg-gray-100 text-gray-500";
 
     return `
-    <div class="job-card-real bg-white rounded-xl glass-surface p-5 shadow-sm cursor-pointer
-                border-2 border-transparent hover:border-purple-300 hover:shadow-lg transition-all duration-200"
+    <div class="job-card-real job-card-shell glass-surface p-5 cursor-pointer"
          onclick="openJobModal(${idx})">
       <!-- 标题 + 薪资 -->
-      <div class="flex justify-between items-start mb-2 gap-2">
-        <h3 class="text-base font-bold text-gray-800 leading-tight line-clamp-2 flex-1">${escHtml(job["岗位名称"] || "--")}</h3>
-        <span class="text-sm font-bold text-emerald-600 flex-shrink-0 mt-0.5">${escHtml(job["薪资"] || "面议")}</span>
+      <div class="flex justify-between items-start mb-2 gap-3">
+        <h3 class="job-card-title line-clamp-2 flex-1">${escHtml(job["岗位名称"] || "--")}</h3>
+        <span class="job-card-salary flex-shrink-0 mt-0.5">${escHtml(job["薪资"] || "面议")}</span>
       </div>
       <!-- 公司 -->
-      <p class="text-sm text-gray-500 mb-3 truncate">${escHtml(job["公司名称"] || "")}</p>
-      <!-- 鍩庡競 / 缁忛獙 / 瀛﹀巻 -->
+      <p class="job-card-company mb-3 truncate">${escHtml(job["公司名称"] || "")}</p>
+      <!-- 城市 / 经验 / 学历 -->
       <div class="flex flex-wrap gap-1.5 mb-3">
-        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-full whitespace-nowrap">馃搷 ${escHtml(job["城市"] || job["采集城市"] || "")}</span>
-        <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full whitespace-nowrap">${escHtml(job["经验要求"] || "")}</span>
-        <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full whitespace-nowrap">馃帗 ${escHtml(job["学历要求"] || "")}</span>
+        <span class="job-meta-chip is-city whitespace-nowrap">城市 ${escHtml(job["城市"] || job["采集城市"] || "")}</span>
+        <span class="job-meta-chip whitespace-nowrap">${escHtml(job["经验要求"] || "")}</span>
+        <span class="job-meta-chip whitespace-nowrap">学历 ${escHtml(job["学历要求"] || "")}</span>
       </div>
       <!-- 技能标签 -->
-      <div class="flex flex-wrap gap-1 mb-4">${skillTags}</div>
+      <div class="job-skill-row mb-4">${skillTags}</div>
       <!-- 底部：公司信息 -->
-      <div class="flex justify-between items-center pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span class="truncate">${escHtml(job["公司规模"] || "")} 路 ${escHtml(job["公司行业"] || "")}</span>
-        <span class="px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${fundingCls}">${escHtml(job["融资阶段"] || "")}</span>
+      <div class="job-card-footer">
+        <span class="job-company-meta truncate">${escHtml(job["公司规模"] || "")} · ${escHtml(job["公司行业"] || "")}</span>
+        <span class="job-stage-chip flex-shrink-0 ml-2 ${fundingCls}">${escHtml(job["融资阶段"] || "")}</span>
       </div>
     </div>`;
   }).join("");
@@ -10693,10 +11108,9 @@ async function openJobModal(idx) {
   ).join("");
 
   const skills = String(job["技能要求"] || "").split(",").map((item) => item.trim()).filter(Boolean);
-  document.getElementById("jobModalSkills").innerHTML = skills.length
+document.getElementById("jobModalSkills").innerHTML = skills.length
     ? skills.map((skill) =>
-        `<span class="px-3 py-1 text-xs rounded-full font-medium"
-               style="background:#f0ebff;color:#6d28d9;border:1px solid #ddd6fe">${escHtml(skill)}</span>`
+        `<span class="job-modal-skill">${escHtml(skill)}</span>`
       ).join("")
     : `<span class="text-gray-400 text-sm">暂无标签</span>`;
 
@@ -10793,9 +11207,11 @@ function initAnimations() {
 }
 
 function bindGlobalEvents() {
+  initNavWorkspaceMenu();
   const notificationBtn = document.getElementById("notificationBtn");
   if (notificationBtn) {
     notificationBtn.addEventListener("click", () => {
+      closeNavWorkspaceMenu();
       const unread = appState.notifications;
       if (unread > 0) {
         showToast("Notifications", `You have ${unread} new update(s).`, "info", 1600);
@@ -10874,7 +11290,10 @@ document.addEventListener("DOMContentLoaded", function () {
     void updateProfileFlowModelStatus(true);
     renderCareerInterviewMessages();
     renderCareerInterviewResult(careerInterviewState.result);
-    refreshUnifiedExperience();
+    const restoredUnifiedExperience = restoreUnifiedExperienceFromSavedScopes();
+    if (!restoredUnifiedExperience) {
+      refreshUnifiedExperience();
+    }
     void resumeCareerReportRuntime();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
@@ -11717,3 +12136,208 @@ if (typeof window !== "undefined") {
     }
   };
 }
+
+/* =========================================================
+   Product Website Redesign — GSAP 动画与交互增强
+   ========================================================= */
+
+function initHeroProductParallax() {
+  const hero = document.getElementById("productHero");
+  const orb1 = document.getElementById("gradient-orb-1");
+  const orb2 = document.getElementById("gradient-orb-2");
+  const orb3 = document.getElementById("gradient-orb-3");
+  if (!hero || !orb1 || !orb2) return;
+
+  hero.addEventListener("mousemove", (e) => {
+    const rect = hero.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    orb1.style.left = `${-5 + x * 8}%`;
+    orb1.style.top = `${-10 + y * 8}%`;
+    orb2.style.right = `${-10 + x * 12}%`;
+    orb2.style.top = `${20 + y * 10}%`;
+    if (orb3) {
+      orb3.style.left = `${30 + x * 6}%`;
+      orb3.style.bottom = `${-15 + y * 8}%`;
+    }
+  }, { passive: true });
+}
+
+function initHeroProductGsapAnimations() {
+  if (typeof gsap === "undefined") return;
+
+  const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+  tl.fromTo("#productHero .cs-hero-product-badge",
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.6 }
+  )
+  .fromTo("#heroBrandTitle",
+    { opacity: 0, y: 26 },
+    { opacity: 1, y: 0, duration: 0.65 },
+    "-=0.35"
+  )
+  .fromTo("#heroBrandSubEn",
+    { opacity: 0, y: 16 },
+    { opacity: 1, y: 0, duration: 0.5 },
+    "-=0.4"
+  )
+  .fromTo(".cs-hero-brand-zh",
+    { opacity: 0 },
+    { opacity: 1, duration: 0.4 },
+    "-=0.35"
+  )
+  .fromTo(".cs-hero-search-wrap",
+    { opacity: 0, y: 18 },
+    { opacity: 1, y: 0, duration: 0.55 },
+    "-=0.3"
+  )
+  .fromTo("#productHero .cs-hero-product-actions .cs-btn-product",
+    { opacity: 0, y: 15 },
+    { opacity: 1, y: 0, duration: 0.5, stagger: 0.08 },
+    "-=0.35"
+  )
+  .fromTo("#productHero .cs-product-stat",
+    { opacity: 0, y: 22 },
+    { opacity: 1, y: 0, duration: 0.55, stagger: 0.07 },
+    "-=0.3"
+  )
+  .fromTo("#productHero .cs-hero-product-visual",
+    { opacity: 0, scale: 0.96, y: 24 },
+    { opacity: 1, scale: 1, y: 0, duration: 0.85 },
+    "-=0.75"
+  )
+  .fromTo(".cs-hero-pulse",
+    { opacity: 0, y: 18 },
+    { opacity: 1, y: 0, duration: 0.55 },
+    "-=0.55"
+  )
+  .fromTo(".cs-product-quickbar",
+    { opacity: 0, y: 36 },
+    { opacity: 1, y: 0, duration: 0.7 },
+    "-=0.5"
+  );
+}
+
+function initProductSvgAnimations() {
+  if (typeof gsap === "undefined") return;
+
+  gsap.utils.toArray("#productHero .product-nodes circle").forEach((node, i) => {
+    gsap.fromTo(node,
+      { scale: 0, opacity: 0, transformOrigin: "center center" },
+      { scale: 1, opacity: 1, duration: 0.5, delay: 0.8 + i * 0.12, ease: "back.out(1.7)" }
+    );
+    gsap.to(node, {
+      scale: 1.3,
+      opacity: 0.6,
+      duration: 1.6,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+      delay: 1.4 + i * 0.12
+    });
+  });
+
+  const nodesEl = document.querySelector(".product-nodes");
+  const path = nodesEl && nodesEl.previousElementSibling && nodesEl.previousElementSibling.tagName.toLowerCase() === "path"
+    ? nodesEl.previousElementSibling
+    : null;
+  if (path && path.getTotalLength) {
+    const length = path.getTotalLength();
+    gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
+    gsap.to(path, { strokeDashoffset: 0, duration: 1.8, ease: "power2.inOut", delay: 0.4 });
+  }
+
+  const figure = document.querySelector(".product-figure");
+  if (figure) {
+    gsap.fromTo(figure,
+      { opacity: 0, x: -15 },
+      { opacity: 1, x: 0, duration: 0.9, delay: 0.5, ease: "power2.out" }
+    );
+  }
+
+  gsap.utils.toArray(".product-card-float").forEach((card, i) => {
+    gsap.fromTo(card,
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.7, delay: 1 + i * 0.2, ease: "power2.out" }
+    );
+    gsap.to(card, {
+      y: "-=6",
+      duration: 3 + i,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+      delay: 1.5 + i * 0.3
+    });
+  });
+}
+
+function initDashboardHeroSearch() {
+  const el = document.getElementById("dashboardHeroSearch");
+  const btn = document.getElementById("dashboardHeroSearchBtn");
+  const go = () => showSection("jobs");
+  if (el && el.dataset.bound !== "1") {
+    el.dataset.bound = "1";
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        go();
+      }
+    });
+  }
+  if (btn && btn.dataset.bound !== "1") {
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      go();
+    });
+  }
+}
+
+function initCareerNewsGsapAnimations() {
+  if (typeof gsap === "undefined") return;
+
+  const track = document.getElementById("careerNewsGridBoard");
+  if (!track) return;
+
+  const cards = track.querySelectorAll(".career-news-item");
+  if (cards.length) {
+    gsap.fromTo(cards,
+      { opacity: 0, y: 30, rotateX: 6 },
+      { opacity: 1, y: 0, rotateX: 0, duration: 0.6, stagger: 0.08, ease: "power2.out", clearProps: "transform" }
+    );
+  }
+
+  track.addEventListener("scroll", updateCareerNewsTrackProgress, { passive: true });
+  updateCareerNewsTrackProgress();
+}
+
+function updateCareerNewsTrackProgress() {
+  const track = document.getElementById("careerNewsFeatured");
+  const bar = document.getElementById("careerNewsTrackBar")?.querySelector("span");
+  if (!track || !bar) return;
+  const max = Math.max(1, track.scrollWidth - track.clientWidth);
+  const pct = Math.min(100, Math.max(0, (track.scrollLeft / max) * 100));
+  bar.style.width = `${pct}%`;
+}
+
+// 在 dashboard 显示时初始化动画
+let _productDashboardAnimationsInitialized = false;
+
+const _originalShowSection = showSection;
+showSection = function(sectionId) {
+  _originalShowSection(sectionId);
+  if (sectionId === "dashboard") {
+    requestAnimationFrame(() => {
+      initHeroProductParallax();
+      initDashboardHeroSearch();
+      if (!_productDashboardAnimationsInitialized) {
+        initHeroProductGsapAnimations();
+        initProductSvgAnimations();
+        _productDashboardAnimationsInitialized = true;
+      }
+      initCareerNewsGsapAnimations();
+    });
+  }
+};

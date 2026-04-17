@@ -346,8 +346,6 @@
         </div>
         <div class="news-board-meta">
             <span class="news-board-chip">每日 12:00 更新</span>
-            <span id="careerNewsShowingCount" class="news-board-chip news-board-chip-quiet">当前展示 0 / 0 条</span>
-            
         </div>
     </div>
 
@@ -2156,7 +2154,7 @@
                     查看完整报告
                 </button>
                 <button id="careerReportSaveBtn" type="button" class="career-report-secondary-btn" onclick="saveReport()">保存版本</button>
-                <button id="careerReportExportHtmlBtn" type="button" class="career-report-secondary-btn" onclick="exportReport('html')">导出 HTML</button>
+                <button id="careerReportExportPdfBtn" type="button" class="career-report-secondary-btn" onclick="exportReport('pdf')">导出 PDF</button>
                 <button id="careerReportExportMdBtn" type="button" class="career-report-secondary-btn" onclick="exportReport('md')">导出 MD</button>
             </div>
         </div>
@@ -2214,9 +2212,9 @@
 
                 <!-- Quick actions -->
                 <div class="report-viewer-sidebar-actions">
-                    <button type="button" class="report-viewer-action-btn" onclick="exportReport('html')">
+                    <button type="button" class="report-viewer-action-btn" onclick="exportReport('pdf')">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        导出 HTML
+                        导出 PDF
                     </button>
                     <button type="button" class="report-viewer-action-btn" onclick="exportReport('md')">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -3101,6 +3099,7 @@
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
     <script src="/static/app.js?v=20260412-match-persist-v1"></script>
+    <script src="/static/workspace-restoration.js?v=20260417-account-avatar-main-v1"></script>
     <script src="/static/app-hotfix.js?v=20260401-guide-clickfix-v1"></script>
     <script src="/static/workspace-shell.js?v=20260331-workspace-rebuild-v1"></script>
     <script src="/static/assessment-hub.js?v=20260322-top-model-status-v1"></script>

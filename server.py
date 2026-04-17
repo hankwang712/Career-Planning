@@ -8,6 +8,7 @@
 import gzip
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -45,8 +46,18 @@ from services.report import (
     empty_report_state,
     generate_career_report_bundle,
 )
+from services.report.orchestrator import (
+    _build_dashboard_summary,
+    _build_role_cards,
+    _build_role_rankings,
+    _normalize_match_output,
+    _resolve_effective_match_output,
+    _resolve_focus_role_name,
+)
 from services.report.exporters import (
     export_markdown_to_docx_bytes,
+    export_markdown_to_pdf_via_docx_bytes,
+    normalize_br_tags_in_markdown,
     render_markdown_export_html,
     render_report_html,
     render_report_markdown,
@@ -77,6 +88,7 @@ from services.resume.diagnosis_ui import (
     diagnosis_ui_non_empty,
     normalize_diagnosis_ui,
 )
+from services.tools import generate_text_to_image, get_text_to_image_runtime
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("application/javascript", ".mjs")
@@ -96,6 +108,9 @@ RESUME_UPLOAD_DIR = os.path.join(APP_DATA_DIR, "user_uploads")
 CAREER_REPORT_DIR = os.path.join(APP_DATA_DIR, "career_reports")
 COMMUNITY_FORUM_FILE = os.path.join(APP_DATA_DIR, "community_forum.json")
 PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3-pro-image-preview").strip() or "google/gemini-3-pro-image-preview"
+TEXT_TO_IMAGE_BASE_URL = os.environ.get("TEXT_TO_IMAGE_BASE_URL", "https://openrouter.ai/api/v1").strip() or "https://openrouter.ai/api/v1"
+TEXT_TO_IMAGE_MODEL = os.environ.get("TEXT_TO_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview").strip() or "google/gemini-3.1-flash-image-preview"
+TEXT_TO_IMAGE_API_KEY = os.environ.get("TEXT_TO_IMAGE_API_KEY", "").strip()
 ASSESSMENT_DATA_FILE = os.path.join(BASE_DIR, "static", "assessment-data.json")
 JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
@@ -168,6 +183,37 @@ app = Flask(
     static_folder=os.path.join(BASE_DIR, "static"),
 )
 app.secret_key = os.environ.get("APP_SECRET_KEY") or os.environ.get("SECRET_KEY") or "career-planner-dev-secret"
+
+
+class _QuietWerkzeugPollPathsFilter(logging.Filter):
+    """屏蔽高频轮询接口的成功 access 行；4xx/5xx 仍会打印，便于排查问题。"""
+
+    _SKIP_SUBSTRINGS = (
+        "/api/career-report/generate/status",
+        "/api/resume/analyze/status",
+    )
+    _WERKZEUG_STATUS_RE = re.compile(r'HTTP/1\.[01]"\s+(\d{3})\b')
+
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        for sub in self._SKIP_SUBSTRINGS:
+            if sub not in msg:
+                continue
+            m = self._WERKZEUG_STATUS_RE.search(msg)
+            if m:
+                code = int(m.group(1))
+                if 200 <= code < 400:
+                    return False
+            return True
+        return True
+
+
+for _lg_name in ("werkzeug",):
+    logging.getLogger(_lg_name).addFilter(_QuietWerkzeugPollPathsFilter())
+
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
@@ -425,7 +471,18 @@ DEFAULT_USER_SPECS = [
     {"username": "24151007", "password": "123456", "role": "user", "display_name": "24151007"},
 ]
 
-VALID_USER_STATE_SCOPES = {"career_interview", "assessment_hub", "resume_profile", "career_report", "career_plans", "profile_portrait", "account_avatar"}
+VALID_USER_STATE_SCOPES = {
+    "career_interview",
+    "assessment_hub",
+    "resume_profile",
+    "career_report",
+    "career_plans",
+    "profile_portrait",
+    "account_avatar",
+    "profile_snapshot",
+    "career_matching",
+    "news_context",
+}
 VALID_LLM_CONFIG_SCOPES = {"career_interview", "assessment_hub"}
 COMMUNITY_FORUM_BOARD_OPTIONS = ("面经互助", "简历门诊", "实习内推", "选岗热议", "职场日常")
 
@@ -606,6 +663,16 @@ def _get_profile_portrait_runtime():
         str(provider.get("base_url") or "").strip(),
         str(provider.get("api_key") or "").strip(),
         PROFILE_PORTRAIT_MODEL,
+    )
+
+
+def _get_text_to_image_runtime(payload=None):
+    return get_text_to_image_runtime(
+        payload=payload,
+        env_api_key=TEXT_TO_IMAGE_API_KEY,
+        default_base_url=TEXT_TO_IMAGE_BASE_URL,
+        default_model=TEXT_TO_IMAGE_MODEL,
+        providers=_load_providers(),
     )
 
 
@@ -840,6 +907,58 @@ def _save_user_state(username, payload):
     with USER_STATE_LOCK:
         _write_json_file(path, normalized)
     return normalized
+
+
+def _saved_profile_snapshot_payload(raw_scope):
+    scope = raw_scope if isinstance(raw_scope, dict) else {}
+    payload = scope.get("profile") if isinstance(scope.get("profile"), dict) else {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _saved_matching_role_payload(raw_scope):
+    scope = raw_scope if isinstance(raw_scope, dict) else {}
+    items = scope.get("role_rankings") if isinstance(scope.get("role_rankings"), list) else []
+    return items
+
+
+def _build_career_report_agent_memory(state, profile_payload=None, role_payload=None):
+    safe_state = state if isinstance(state, dict) else {}
+    profile_scope = safe_state.get("profile_snapshot") if isinstance(safe_state.get("profile_snapshot"), dict) else {}
+    matching_scope = safe_state.get("career_matching") if isinstance(safe_state.get("career_matching"), dict) else {}
+    resume_scope = safe_state.get("resume_profile") if isinstance(safe_state.get("resume_profile"), dict) else {}
+    portrait_scope = safe_state.get("profile_portrait") if isinstance(safe_state.get("profile_portrait"), dict) else {}
+    news_scope = safe_state.get("news_context") if isinstance(safe_state.get("news_context"), dict) else {}
+
+    effective_profile = profile_payload if isinstance(profile_payload, dict) and profile_payload else _saved_profile_snapshot_payload(profile_scope)
+    effective_roles = role_payload if isinstance(role_payload, list) and role_payload else _saved_matching_role_payload(matching_scope)
+
+    return {
+        "profile_snapshot": effective_profile,
+        "career_matching": {
+            "focus_role_id": str(matching_scope.get("focus_role_id") or "").strip(),
+            "role_rankings": effective_roles,
+            "graph_match_bundle": matching_scope.get("graph_match_bundle") if isinstance(matching_scope.get("graph_match_bundle"), dict) else {},
+            "updated_at": str(matching_scope.get("updated_at") or "").strip(),
+        },
+        "resume_memory": {
+            "file_name": str(resume_scope.get("file_name") or "").strip(),
+            "status": str(resume_scope.get("status") or "").strip(),
+            "job_description": str(resume_scope.get("job_description") or "").strip(),
+            "resume_source_text": str(resume_scope.get("resume_source_text") or ""),
+            "resume_text_char_count": int(resume_scope.get("resume_text_char_count") or 0),
+            "structured_resume": resume_scope.get("structured_resume") if isinstance(resume_scope.get("structured_resume"), dict) else {},
+            "structured_job": resume_scope.get("structured_job") if isinstance(resume_scope.get("structured_job"), dict) else {},
+            "resume_highlight_deck": resume_scope.get("resume_highlight_deck") if isinstance(resume_scope.get("resume_highlight_deck"), dict) else {},
+            "analysis_meta": resume_scope.get("analysis_meta") if isinstance(resume_scope.get("analysis_meta"), dict) else {},
+        },
+        "portrait_memory": {
+            "status": str(portrait_scope.get("status") or "").strip(),
+            "brief": portrait_scope.get("brief") if isinstance(portrait_scope.get("brief"), dict) else {},
+            "context_snapshot": _normalize_profile_portrait_context(portrait_scope.get("context_snapshot")),
+            "prompt_summary": str(portrait_scope.get("prompt_summary") or "").strip(),
+        },
+        "news_memory": news_scope,
+    }
 
 
 def _forum_clean_text(value, limit=800):
@@ -1124,6 +1243,7 @@ def _public_profile_portrait_state(raw_state):
     state = raw_state if isinstance(raw_state, dict) else {}
     image_url = str(state.get("image_url") or "").strip()
     brief = _normalize_profile_portrait_brief(state.get("brief"))
+    context_snapshot = _normalize_profile_portrait_context(state.get("context_snapshot"))
     if not image_url and not brief:
         return None
     return {
@@ -1143,6 +1263,7 @@ def _public_profile_portrait_state(raw_state):
         "prompt_evaluation": state.get("prompt_evaluation") if isinstance(state.get("prompt_evaluation"), dict) else None,
         "image_error": str(state.get("image_error") or "").strip(),
         "brief": brief,
+        "context_snapshot": context_snapshot,
     }
 
 
@@ -2139,16 +2260,69 @@ def _career_report_user_dir(username):
     return os.path.join(CAREER_REPORT_DIR, safe_name)
 
 
-CAREER_REPORT_EXPORT_FORMATS = ["html", "md", "docx"]
+CAREER_REPORT_EXPORT_FORMATS = ["pdf", "docx", "md", "html"]
 
 
 def _career_report_export_formats(raw_formats=None):
     ordered = []
     for item in list(raw_formats or []) + CAREER_REPORT_EXPORT_FORMATS:
         fmt = str(item or "").strip().lower()
-        if fmt in {"html", "md", "docx"} and fmt not in ordered:
+        if fmt in {"html", "md", "docx", "pdf"} and fmt not in ordered:
             ordered.append(fmt)
     return ordered or list(CAREER_REPORT_EXPORT_FORMATS)
+
+
+def _career_report_export_filename_stem(
+    title: str,
+    *,
+    report_id: str = "",
+    generated_at: str = "",
+    version: str = "",
+    snapshot_id: str = "",
+) -> str:
+    """Build download filename stem (no extension): keep CJK, strip path-forbidden characters."""
+    text = str(title or "").strip() or "职业规划报告"
+    text = text.replace("\u00b7", "-").replace("・", "-").replace("·", "-")
+    text = re.sub(r'[\\/:*?"<>|\r\n\x00]', " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" .")
+    extra = []
+    ga = str(generated_at or "").strip()
+    m = re.search(r"(\d{4})[-/](\d{2})[-/](\d{2})", ga)
+    if m:
+        extra.append(f"{m.group(1)}{m.group(2)}{m.group(3)}")
+    elif str(version or "").strip():
+        ver = re.sub(r"[^\w.\-]", "-", str(version))[:24].strip("-")
+        if ver:
+            extra.append(ver)
+    if snapshot_id:
+        snap = re.sub(r"[^a-zA-Z0-9._-]", "-", str(snapshot_id))[:24].strip("-")
+        if snap:
+            extra.append(f"snap-{snap}")
+    suffix = ""
+    if extra:
+        suffix = "_" + "_".join(extra)
+    max_text = max(32, 120 - len(suffix))
+    if len(text) > max_text:
+        text = text[:max_text].rstrip(" .")
+    stem = f"{text}{suffix}".strip(" ._")
+    if len(stem) > 180:
+        stem = stem[:180].rstrip(" .")
+    rid = re.sub(r"[^a-zA-Z0-9._-]", "-", str(report_id or ""))[:32].strip("-")
+    if not stem or stem in {".", ".."}:
+        stem = f"职业规划报告_{rid}" if rid else "职业规划报告"
+    return stem
+
+
+def _attachment_content_disposition(full_filename: str) -> str:
+    """ASCII `filename` fallback plus RFC 5987 `filename*` for Unicode download names."""
+    safe = secure_filename(full_filename)
+    if not safe:
+        base, ext = os.path.splitext(full_filename)
+        safe = (secure_filename(base) or "career-report") + ext
+    encoded = urllib.parse.quote(full_filename, safe="")
+    if any(ord(c) > 127 for c in full_filename):
+        return f'attachment; filename="{safe}"; filename*=UTF-8\'\'{encoded}'
+    return f'attachment; filename="{full_filename}"'
 
 
 def _career_report_file_paths(username):
@@ -2192,6 +2366,7 @@ def _read_career_report_bundle_by_id(username, report_id=""):
 
 
 def _summarize_career_report_bundle(bundle):
+    bundle = _refresh_career_report_role_resolution(bundle)
     if not isinstance(bundle, dict):
         return None
 
@@ -2202,11 +2377,54 @@ def _summarize_career_report_bundle(bundle):
 
     document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
     gap_map = bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {}
+    dashboard_summary = document.get("dashboard_summary") if isinstance(document.get("dashboard_summary"), dict) else {}
+    evidence_health = document.get("evidence_health") if isinstance(document.get("evidence_health"), dict) else {}
+    plan_board = document.get("plan_board") if isinstance(document.get("plan_board"), dict) else {}
+    next_actions = document.get("next_actions") if isinstance(document.get("next_actions"), dict) else {}
+    match_output = bundle.get("match_output") if isinstance(bundle.get("match_output"), dict) else {}
     focus_role_name = (
         str(document.get("focus_role_name") or "")
         or str(meta.get("focus_role_name") or "")
         or str(gap_map.get("focus_role_name") or "")
     ).strip()
+    summary_text = re.sub(
+        r"\s+",
+        " ",
+        str(document.get("executive_summary") or meta.get("summary") or "").strip(),
+    )
+    fit_score = dashboard_summary.get("fit_score")
+    try:
+        fit_score = max(0, min(100, int(round(float(fit_score)))))
+    except (TypeError, ValueError):
+        fit_score = None
+    fit_band = str(dashboard_summary.get("fit_band") or match_output.get("fit_band") or "").strip().lower()
+    fit_band_label = str(dashboard_summary.get("fit_band_label") or "").strip()
+    if not fit_band_label:
+        fit_band_label = {
+            "strong": "高匹配",
+            "moderate": "中等匹配",
+            "weak": "低匹配",
+            "not_ready": "尚需准备",
+        }.get(fit_band, "")
+
+    strengths = evidence_health.get("strengths") if isinstance(evidence_health.get("strengths"), list) else []
+    gap_items = []
+    for key in ("hard_failures", "skill_gaps", "evidence_gaps", "missing_inputs"):
+        values = evidence_health.get(key)
+        if isinstance(values, list):
+            gap_items.extend(values)
+    action_items = plan_board.get("action_items") if isinstance(plan_board.get("action_items"), list) else []
+    if not action_items:
+        action_items = next_actions.get("action_items") if isinstance(next_actions.get("action_items"), list) else []
+    role_cards = document.get("role_cards") if isinstance(document.get("role_cards"), list) else []
+    role_rankings = bundle.get("role_rankings") if isinstance(bundle.get("role_rankings"), list) else []
+    sections = document.get("sections")
+    if isinstance(sections, dict):
+        section_count = len(sections)
+    elif isinstance(sections, list):
+        section_count = len(sections)
+    else:
+        section_count = 0
 
     return {
         "report_id": report_id,
@@ -2215,7 +2433,79 @@ def _summarize_career_report_bundle(bundle):
         "generated_at": str(meta.get("generated_at") or "").strip(),
         "focus_role_id": str(meta.get("focus_role_id") or "").strip(),
         "focus_role_name": focus_role_name,
+        "summary_excerpt": summary_text[:117] + "..." if len(summary_text) > 120 else summary_text,
+        "fit_score": fit_score,
+        "fit_band": fit_band,
+        "fit_band_label": fit_band_label,
+        "strength_count": len(strengths),
+        "gap_count": len(gap_items),
+        "action_count": len(action_items),
+        "role_count": len(role_cards or role_rankings),
+        "section_count": section_count,
     }
+
+
+def _refresh_career_report_role_resolution(raw_bundle):
+    bundle = dict(raw_bundle) if isinstance(raw_bundle, dict) else {}
+    meta = dict(bundle.get("meta") or {}) if isinstance(bundle.get("meta"), dict) else {}
+    if not meta:
+        return bundle
+
+    role_rankings = bundle.get("role_rankings") if isinstance(bundle.get("role_rankings"), list) else []
+    match_output = bundle.get("match_output") if isinstance(bundle.get("match_output"), dict) else {}
+    if not role_rankings or not match_output:
+        return bundle
+
+    normalized_match = _normalize_match_output(match_output, role_rankings)
+    resolved_match = _resolve_effective_match_output(
+        normalized_match,
+        role_rankings,
+        str(meta.get("focus_role_id") or "").strip(),
+    )
+    focus_role_name = _resolve_focus_role_name("", role_rankings, resolved_match.get("target_role"))
+    if not focus_role_name:
+        return bundle
+
+    previous_focus_role_name = str(meta.get("focus_role_name") or "").strip()
+    meta["focus_role_name"] = focus_role_name
+    title = str(meta.get("title") or "").strip()
+    if title and previous_focus_role_name and previous_focus_role_name != focus_role_name:
+        meta["title"] = title.replace(previous_focus_role_name, focus_role_name, 1)
+    bundle["meta"] = meta
+    bundle["match_output"] = resolved_match
+
+    gap_map = dict(bundle.get("gap_map") or {}) if isinstance(bundle.get("gap_map"), dict) else {}
+    gap_map["focus_role_name"] = focus_role_name
+    bundle["gap_map"] = gap_map
+
+    career_path = dict(bundle.get("career_path") or {}) if isinstance(bundle.get("career_path"), dict) else {}
+    if career_path:
+        career_path["target_role"] = focus_role_name
+        bundle["career_path"] = career_path
+
+    document = dict(bundle.get("report_document") or {}) if isinstance(bundle.get("report_document"), dict) else {}
+    if document:
+        document_title = str(document.get("title") or "").strip()
+        if document_title and previous_focus_role_name and previous_focus_role_name != focus_role_name:
+            document["title"] = document_title.replace(previous_focus_role_name, focus_role_name, 1)
+        document["focus_role_name"] = focus_role_name
+        document["dashboard_summary"] = _build_dashboard_summary(
+            focus_role_name,
+            resolved_match,
+            bundle.get("positioning_output") if isinstance(bundle.get("positioning_output"), dict) else {},
+            gap_map,
+            bundle.get("resume_evidence") if isinstance(bundle.get("resume_evidence"), dict) else {},
+            bundle.get("industry_brief") if isinstance(bundle.get("industry_brief"), dict) else {},
+        )
+        document["role_cards"] = _build_role_cards(
+            role_rankings,
+            resolved_match,
+            bundle.get("resume_evidence") if isinstance(bundle.get("resume_evidence"), dict) else {},
+        )
+        bundle["report_document"] = document
+
+    bundle["role_rankings"] = _build_role_rankings(role_rankings, resolved_match)
+    return bundle
 
 
 def _list_career_report_version_summaries(username, include_latest=True, lock=True):
@@ -2268,7 +2558,8 @@ def _prepare_career_report_bundle_payload(bundle):
     markdown_text = str(report_document.get("markdown") or "").strip()
     if not markdown_text:
         markdown_text = render_report_markdown(payload).strip()
-        report_document["markdown"] = markdown_text
+    markdown_text = normalize_br_tags_in_markdown(markdown_text)
+    report_document["markdown"] = markdown_text
 
     html_text = str(report_document.get("html") or "").strip()
     if not html_text:
@@ -2668,6 +2959,54 @@ def _save_career_report_bundle(username, bundle):
                 if not os.path.isfile(archive_path):
                     _write_json_file(archive_path, existing)
         _write_current_career_report_files(paths, payload, markdown_text, html_text)
+    state = _load_user_state(username)
+    profile_snapshot = payload.get("profile_snapshot") if isinstance(payload.get("profile_snapshot"), dict) else {}
+    if profile_snapshot:
+        state["profile_snapshot"] = {
+            "version": "2026.04-profile-snapshot-v1",
+            "updated_at": str(new_meta.get("generated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "profile": profile_snapshot,
+            "source": "career_report_bundle",
+        }
+    role_rankings = payload.get("role_rankings") if isinstance(payload.get("role_rankings"), list) else []
+    if role_rankings:
+        matching_state = state.get("career_matching") if isinstance(state.get("career_matching"), dict) else {}
+        focus_role_id = str(new_meta.get("focus_role_id") or matching_state.get("focus_role_id") or "").strip()
+        focus_role_name = str(new_meta.get("focus_role_name") or matching_state.get("focus_role_name") or "").strip()
+        matched_focus_role = next((role for role in role_rankings if str(role.get("id") or "").strip() == focus_role_id), None)
+        if focus_role_name and matched_focus_role and str(matched_focus_role.get("name") or "").strip() != focus_role_name:
+            matched_focus_role = next((role for role in role_rankings if str(role.get("name") or "").strip() == focus_role_name), None)
+        if not matched_focus_role and focus_role_name:
+            matched_focus_role = next((role for role in role_rankings if str(role.get("name") or "").strip() == focus_role_name), None)
+        if not matched_focus_role and role_rankings:
+            matched_focus_role = role_rankings[0] if isinstance(role_rankings[0], dict) else None
+        if isinstance(matched_focus_role, dict):
+            focus_role_id = str(matched_focus_role.get("id") or focus_role_id or "").strip()
+            focus_role_name = str(matched_focus_role.get("name") or focus_role_name or "").strip()
+        matching_state.update(
+            {
+                "version": "2026.04-career-matching-v1",
+                "updated_at": str(new_meta.get("generated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                "focus_role_id": focus_role_id,
+                "focus_role_name": focus_role_name,
+                "role_rankings": role_rankings,
+                "source": "career_report_bundle",
+            }
+        )
+        state["career_matching"] = matching_state
+    diagnostics = payload.get("generation_diagnostics") if isinstance(payload.get("generation_diagnostics"), dict) else {}
+    news_snapshot = diagnostics.get("news_context_snapshot") if isinstance(diagnostics.get("news_context_snapshot"), dict) else {}
+    if news_snapshot:
+        state["news_context"] = {
+            "version": "2026.04-news-context-v1",
+            "updated_at": str(new_meta.get("generated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "report_id": str(new_meta.get("report_id") or "").strip(),
+            "item_count": int(news_snapshot.get("item_count") or 0),
+            "char_count": int(news_snapshot.get("char_count") or 0),
+            "source": str(news_snapshot.get("source") or "career_report_bundle").strip(),
+            "text": str(news_snapshot.get("text") or ""),
+        }
+    _save_user_state(username, state)
     return payload
 
 
@@ -2743,7 +3082,8 @@ def _public_career_report_job(raw_job):
 
 
 def _public_career_report_bundle(raw_bundle):
-    bundle = raw_bundle if isinstance(raw_bundle, dict) else {}
+    bundle = _refresh_career_report_role_resolution(raw_bundle)
+    bundle = bundle if isinstance(bundle, dict) else {}
     meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
     document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
     public_document = dict(document)
@@ -2889,6 +3229,7 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
     plan_items = []
     raw_plan_items = []
     raw_plan_items.extend(phase_plan.get("short_term") or [])
+    raw_plan_items.extend(phase_plan.get("mid_term") or [])
     raw_plan_items.extend(phase_plan.get("long_term") or [])
     for index, item in enumerate(raw_plan_items):
         if not isinstance(item, dict):
@@ -3044,7 +3385,7 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
     focus_role_name = (
         str(gap_map.get("focus_role_name") or "")
         or str(document.get("focus_role_name") or "")
-        or str(existing.get("focus_role_name") or "")
+        or str(meta.get("focus_role_name") or "")
         or "待识别方向"
     )
     focus_role_id = str(meta.get("focus_role_id") or existing.get("focus_role_id") or "")
@@ -3103,6 +3444,7 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
         "checkpoints": checkpoints,
         "ability_growth": ability_growth,
         "versions": versions,
+        "action_checklists": phase_plan.get("action_checklists") if isinstance(phase_plan.get("action_checklists"), dict) else {},
     }
 
 
@@ -3929,8 +4271,11 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
             "model": model,
             "resume_keyword_count": len((matcher_state.get("matcher") or {}).get("resume_keywords") or []),
             "job_keyword_count": len((matcher_state.get("matcher") or {}).get("job_keywords") or []),
+            "resume_text_char_count": len(resume_text),
         }
     )
+    matcher_state["resume_source_text"] = resume_text
+    matcher_state["resume_text_payload"] = text_payload
     return matcher_state, analysis_meta
 
 
@@ -3954,6 +4299,8 @@ def _public_resume_state(raw_state):
         "resume_highlight_deck": state.get("resume_highlight_deck")
         if isinstance(state.get("resume_highlight_deck"), dict)
         else None,
+        "resume_text_char_count": int(state.get("resume_text_char_count") or 0),
+        "has_resume_source_text": bool(str(state.get("resume_source_text") or "").strip()),
         "error_message": state.get("error_message") or "",
     }
 
@@ -4058,6 +4405,8 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_de
         resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
         resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
         resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
+        resume_state["resume_source_text"] = str(matcher_state.get("resume_source_text") or "")
+        resume_state["resume_text_char_count"] = int(len(str(matcher_state.get("resume_source_text") or "")))
         resume_state["resume_highlight_deck"] = (
             matcher_state.get("resume_highlight_deck")
             if isinstance(matcher_state.get("resume_highlight_deck"), dict)
@@ -5921,6 +6270,11 @@ def api_auth_status():
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
             "career_report": _public_career_report_state(career_report_state),
+            "profile_portrait": _public_profile_portrait_state(state.get("profile_portrait")),
+            "account_avatar": state.get("account_avatar"),
+            "profile_snapshot": state.get("profile_snapshot"),
+            "career_matching": state.get("career_matching"),
+            "news_context": state.get("news_context"),
         }
     return jsonify(payload)
 
@@ -5963,6 +6317,10 @@ def api_bootstrap():
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
             "career_report": _public_career_report_state(career_report_state),
+            "profile_portrait": _public_profile_portrait_state(state.get("profile_portrait")),
+            "profile_snapshot": state.get("profile_snapshot"),
+            "career_matching": state.get("career_matching"),
+            "news_context": state.get("news_context"),
         },
     })
 
@@ -6198,6 +6556,47 @@ def api_community_feed_view(post_id):
     return jsonify({"message": "浏览次数已记录。", "post": _public_community_forum_post(refreshed, user)})
 
 
+@app.route("/api/tools/text-to-image", methods=["POST"])
+@_login_required
+def api_tools_text_to_image():
+    payload = request.get_json(silent=True) or {}
+    prompt = str(payload.get("prompt") or payload.get("text") or "").strip()
+    if not prompt:
+        return jsonify({"message": "请传入 prompt。"}), 400
+
+    aspect_ratio = str(payload.get("aspect_ratio") or "").strip()
+    base_url, api_key, model = _get_text_to_image_runtime(payload)
+    if not api_key:
+        return jsonify({
+            "message": "未找到可用的 OpenRouter key。你可以在请求体中传 api_key，或配置 TEXT_TO_IMAGE_API_KEY / 系统 OpenRouter Provider。"
+        }), 400
+
+    try:
+        result = generate_text_to_image(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+        )
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 502
+    except Exception:
+        app.logger.exception("text to image generation failed")
+        return jsonify({"message": "图片生成失败，请稍后再试。"}), 502
+
+    return jsonify({
+        "message": "图片已生成。",
+        "data": {
+            "prompt": prompt,
+            "model": model,
+            "base_url": _normalize_sdk_base_url(base_url),
+            "aspect_ratio": aspect_ratio,
+            **result,
+        },
+    })
+
+
 @app.route("/api/profile-portrait/generate", methods=["POST"])
 @_login_required
 def api_profile_portrait_generate():
@@ -6262,6 +6661,7 @@ def api_profile_portrait_generate():
         "prompt_evaluation": prompt_evaluation,
         "image_error": image_error,
         "brief": brief,
+        "context_snapshot": context,
     }
     state["profile_portrait"] = portrait_state
     _save_user_state(user["username"], state)
@@ -6544,6 +6944,8 @@ def api_resume_upload():
         "structured_resume": None,
         "structured_job": None,
         "resume_highlight_deck": None,
+        "resume_source_text": "",
+        "resume_text_char_count": 0,
         "error_message": "",
     }
     _save_user_state(user["username"], state)
@@ -6593,6 +6995,8 @@ def api_resume_analyze():
     resume_state["matcher"] = matcher_state.get("matcher") if isinstance(matcher_state.get("matcher"), dict) else {}
     resume_state["structured_resume"] = matcher_state.get("structured_resume") if isinstance(matcher_state.get("structured_resume"), dict) else None
     resume_state["structured_job"] = matcher_state.get("structured_job") if isinstance(matcher_state.get("structured_job"), dict) else None
+    resume_state["resume_source_text"] = str(matcher_state.get("resume_source_text") or "")
+    resume_state["resume_text_char_count"] = int(len(str(matcher_state.get("resume_source_text") or "")))
     resume_state["resume_highlight_deck"] = (
         matcher_state.get("resume_highlight_deck")
         if isinstance(matcher_state.get("resume_highlight_deck"), dict)
@@ -6658,6 +7062,8 @@ def api_resume_analyze_start():
     resume_state["structured_resume"] = None
     resume_state["structured_job"] = None
     resume_state["resume_highlight_deck"] = None
+    resume_state["resume_source_text"] = ""
+    resume_state["resume_text_char_count"] = 0
     resume_state["job_description"] = job_description
     meta = resume_state.get("analysis_meta") if isinstance(resume_state.get("analysis_meta"), dict) else {}
     meta.update(
@@ -6838,6 +7244,17 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
     runtime_llm_with_caller = dict(runtime_llm_payload)
     runtime_llm_with_caller["caller"] = llm_caller
     runtime_llm_with_caller["logger"] = _log
+    # 注入图片生成配置，供 orchestrator 使用
+    try:
+        tti_base, tti_key, tti_model = _get_text_to_image_runtime()
+        if tti_key:
+            runtime_llm_with_caller["text_to_image"] = {
+                "base_url": tti_base,
+                "api_key": tti_key,
+                "model": tti_model,
+            }
+    except Exception:
+        pass
 
     _ensure_not_cancelled()
     _update_career_report_job(
@@ -6997,10 +7414,15 @@ def api_career_report_generate_start():
     profile_payload = payload.get("profile_snapshot") if isinstance(payload.get("profile_snapshot"), dict) else {}
     role_payload = payload.get("role_rankings") if isinstance(payload.get("role_rankings"), list) else []
     focus_role_id = str(payload.get("focus_role_id") or "").strip()
+    state = _load_user_state(username)
+    if not profile_payload:
+        profile_payload = _saved_profile_snapshot_payload(state.get("profile_snapshot"))
+    if not role_payload:
+        role_payload = _saved_matching_role_payload(state.get("career_matching"))
+    if not focus_role_id and isinstance(state.get("career_matching"), dict):
+        focus_role_id = str((state.get("career_matching") or {}).get("focus_role_id") or "").strip()
     if not profile_payload:
         return jsonify({"message": "请先完成画像步骤后再生成职业规划报告。"}), 400
-
-    state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
     profile_portrait = state.get("profile_portrait") if isinstance(state.get("profile_portrait"), dict) else {}
     profile_payload = dict(profile_payload)
@@ -7009,6 +7431,7 @@ def api_career_report_generate_start():
         ((profile_portrait.get("prompt_pipeline") or {}).get("pipeline_version"))
         or PORTRAIT_PROMPT_PIPELINE_VERSION
     ).strip()
+    profile_payload["agent_memory"] = _build_career_report_agent_memory(state, profile_payload, role_payload)
 
     selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
     base_url, api_key, model = _get_active_provider_and_model(selection_snapshot)
@@ -7179,6 +7602,21 @@ def api_career_report_generate_status():
             if jobs:
                 selected = jobs[0]
 
+    # 前端可能仍轮询「已取消/已结束」的旧 job_id；若已有更新的运行中任务，改为返回当前运行任务。
+    if isinstance(selected, dict):
+        sel_status = str(selected.get("status") or "")
+        if sel_status not in {"queued", "running"}:
+            running = _find_running_career_report_job(username)
+            if (
+                running
+                and int(running.get("created_at") or 0) > int(selected.get("created_at") or 0)
+            ):
+                selected = dict(running)
+    elif job_id:
+        running = _find_running_career_report_job(username)
+        if running:
+            selected = dict(running)
+
     state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
     report_status = str(report_state.get("status") or "")
@@ -7190,9 +7628,36 @@ def api_career_report_generate_status():
         })
         state["career_report"] = report_state
         _save_user_state(username, state)
+
+    merged_state = dict(report_state) if isinstance(report_state, dict) else {}
+    if isinstance(selected, dict):
+        jst = str(selected.get("status") or "")
+        if jst in {"queued", "running"}:
+            merged_state.update(
+                {
+                    "status": jst,
+                    "job_id": str(selected.get("job_id") or merged_state.get("job_id") or ""),
+                    "report_id": str(selected.get("report_id") or merged_state.get("report_id") or ""),
+                    "stage": str(selected.get("stage") or merged_state.get("stage") or ""),
+                    "stage_label": str(selected.get("stage_label") or merged_state.get("stage_label") or ""),
+                    "stage_detail": str(
+                        selected.get("stage_detail")
+                        or selected.get("message")
+                        or merged_state.get("stage_detail")
+                        or ""
+                    ),
+                    "progress": selected.get("progress")
+                    if isinstance(selected.get("progress"), list)
+                    else merged_state.get("progress"),
+                    "model": str(selected.get("model") or merged_state.get("model") or ""),
+                    "generation_mode": str(selected.get("generation_mode") or merged_state.get("generation_mode") or ""),
+                    "error_message": "",
+                }
+            )
+
     return jsonify({
         "job": _public_career_report_job(selected),
-        "state": _public_career_report_state(report_state),
+        "state": _public_career_report_state(merged_state),
     })
 
 
@@ -7201,6 +7666,7 @@ def api_career_report_generate_status():
 def api_career_report_current():
     user = _current_user()
     bundle = _read_career_report_bundle(user["username"])
+    bundle = _refresh_career_report_role_resolution(bundle)
     if isinstance(bundle, dict) and bundle.get("meta"):
         state, report_state, _ = _sync_career_report_tracker_state(user["username"], bundle)
     else:
@@ -7260,11 +7726,21 @@ def api_career_report_polish():
     section_key = str(payload.get("section_key") or "").strip()[:80]
     text = str(payload.get("selection") or payload.get("text") or "").strip()
     instruction = str(payload.get("instruction") or "").strip()[:500]
+    model_override = str(payload.get("model") or "").strip()[:120]
+    full_text = str(payload.get("full_text") or "").strip()
+    try:
+        selection_start = int(payload.get("selection_start")) if payload.get("selection_start") is not None else -1
+        selection_end = int(payload.get("selection_end")) if payload.get("selection_end") is not None else -1
+    except Exception:
+        selection_start = -1
+        selection_end = -1
     if not text:
         return jsonify({"message": "缺少需要润色的报告段落。"}), 400
 
     text = text[:6000]
     base_url, api_key, model = _get_active_provider_and_model()
+    if model_override:
+        model = model_override
     if not (base_url and api_key and model):
         return jsonify({"message": "请先配置可用的模型后再润色报告段落。"}), 400
 
@@ -7272,9 +7748,26 @@ def api_career_report_polish():
         "你是职业发展报告编辑。只润色用户提供的报告段落，不新增事实、不改变结论、不编造数据。"
         "保留 Markdown 结构，压缩重复表达，让语言更清晰、专业、适合学生职业规划报告。"
         "如果原文包含 JSON 或表格，只保留必要说明，不改动事实字段。"
+        "需要注意段落连贯性，避免句子层面的孤立替换；若提供上下文，需与上下文语气、术语、叙事节奏一致。"
     )
     extra_instruction = f"\n\n用户额外要求：{instruction}" if instruction else ""
-    user_msg = f"模块：{section_key or '未指定'}{extra_instruction}\n\n请润色以下报告段落：\n\n{text}"
+    context_hint = ""
+    if full_text and selection_start >= 0 and selection_end > selection_start:
+        safe_start = max(0, min(selection_start, len(full_text)))
+        safe_end = max(safe_start, min(selection_end, len(full_text)))
+        before = full_text[max(0, safe_start - 900):safe_start].strip()
+        after = full_text[safe_end:min(len(full_text), safe_end + 900)].strip()
+        if before or after:
+            context_hint = (
+                "\n\n上下文（仅用于保证连贯）：\n"
+                f"--- 上文 ---\n{before or '（无）'}\n"
+                f"--- 下文 ---\n{after or '（无）'}\n"
+            )
+    user_msg = (
+        f"模块：{section_key or '未指定'}{extra_instruction}{context_hint}\n\n"
+        "请只输出润色后的目标段落文本（不要附加解释），并保持与上下文衔接自然：\n\n"
+        f"{text}"
+    )
     try:
         polished = _call_markdown_chat(
             base_url,
@@ -7416,7 +7909,7 @@ def api_career_report_snapshot_save():
         return jsonify({"message": "未找到对应的职业报告。"}), 404
 
     resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
-    markdown_text = str(payload.get("markdown") or "").strip()
+    markdown_text = normalize_br_tags_in_markdown(str(payload.get("markdown") or "").strip())
     if not markdown_text:
         return jsonify({"message": "缺少快照 Markdown 内容。"}), 400
 
@@ -7562,9 +8055,9 @@ def api_career_report_tracker_item():
 @_login_required
 def api_career_report_export():
     user = _current_user()
-    export_format = str(request.args.get("format") or "html").strip().lower()
-    if export_format not in {"html", "md", "docx"}:
-        return jsonify({"message": "仅支持 html / md / docx 导出。"}), 400
+    export_format = str(request.args.get("format") or "pdf").strip().lower()
+    if export_format not in {"html", "md", "docx", "pdf"}:
+        return jsonify({"message": "仅支持 html / md / docx / pdf 导出。"}), 400
 
     report_id = str(request.args.get("report_id") or "").strip()
     snapshot_id = str(request.args.get("snapshot_id") or "").strip()
@@ -7572,8 +8065,9 @@ def api_career_report_export():
     if not isinstance(bundle, dict) or not bundle.get("meta"):
         return jsonify({"message": "当前还没有可导出的职业规划报告。"}), 404
 
-    resolved_report_id = str((bundle.get("meta") or {}).get("report_id") or report_id or "").strip()
-    source_label = str((bundle.get("meta") or {}).get("title") or "career-report").strip() or "career-report"
+    meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    resolved_report_id = str(meta.get("report_id") or report_id or "").strip()
+    source_label = str(meta.get("title") or "career-report").strip() or "career-report"
     if snapshot_id:
         snapshot = _read_career_report_snapshot(user["username"], resolved_report_id, snapshot_id)
         if not isinstance(snapshot, dict) or not snapshot:
@@ -7585,23 +8079,52 @@ def api_career_report_export():
         report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
         markdown_text = str(report_document.get("markdown") or render_report_markdown(bundle)).strip()
 
-    filename_base = secure_filename(source_label) or f"career-report-{resolved_report_id or user['username']}"
+    markdown_text = normalize_br_tags_in_markdown(markdown_text)
+
+    filename_stem = _career_report_export_filename_stem(
+        source_label,
+        report_id=resolved_report_id,
+        generated_at=str(meta.get("generated_at") or ""),
+        version=str(meta.get("version") or ""),
+        snapshot_id=snapshot_id,
+    )
     if export_format == "md":
         return app.response_class(
             markdown_text,
             mimetype="text/markdown; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename_base}.md"'},
+            headers={"Content-Disposition": _attachment_content_disposition(f"{filename_stem}.md")},
         )
+
+    html_for_render = None
     if export_format == "html":
-        html_text = render_markdown_export_html(markdown_text, title=source_label) if snapshot_id else render_report_html(bundle)
+        html_for_render = (
+            render_markdown_export_html(markdown_text, title=source_label)
+            if snapshot_id
+            else render_report_html(bundle)
+        )
+
+    if export_format == "html":
         return app.response_class(
-            html_text,
+            html_for_render or "",
             mimetype="text/html; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename_base}.html"'},
+            headers={"Content-Disposition": _attachment_content_disposition(f"{filename_stem}.html")},
+        )
+
+    if export_format == "pdf":
+        try:
+            pdf_bytes = export_markdown_to_pdf_via_docx_bytes(markdown_text, title=source_label)
+        except Exception as exc:
+            app.logger.exception("career report pdf export failed")
+            return jsonify({"message": str(exc)[:500] or "PDF 导出失败。"}), 500
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{filename_stem}.pdf",
         )
 
     try:
-        docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=filename_base)
+        docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=source_label)
     except Exception as exc:
         app.logger.exception("career report docx export failed")
         return jsonify({"message": str(exc)[:500] or "DOCX 导出失败。"}), 500
@@ -7610,7 +8133,7 @@ def api_career_report_export():
         io.BytesIO(docx_bytes),
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         as_attachment=True,
-        download_name=f"{filename_base}.docx",
+        download_name=f"{filename_stem}.docx",
     )
 
 

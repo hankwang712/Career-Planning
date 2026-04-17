@@ -198,6 +198,7 @@
   }
 
   function persistLocalImmediate() {
+    if (!state.hydrated) return;
     try {
       writeLocalProgressSnapshot(buildPersistPayload());
     } catch (_) {
@@ -206,6 +207,7 @@
   }
 
   function persistState() {
+    if (!state.hydrated) return;
     persistDirty = true;
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {

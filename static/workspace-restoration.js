@@ -1,5 +1,5 @@
 (function () {
-  const REPORT_POLL_INTERVAL_MS = 1800;
+  const REPORT_POLL_INTERVAL_MS = 4000;
   const PLAN_STORAGE_PREFIX = "dp_overlay_plans_v1_";
   const PLAN_PROGRESS_PREFIX = "dp_plan_progress_v1_";
   const DEFAULT_STAGE_PROGRESS = [
@@ -23,7 +23,12 @@
     editorSource: null,
     editorSelection: null,
     editorDiff: null,
-    editorConversation: []
+    editorConversation: [],
+    editorMode: "edit",
+    editorViewMode: "rendered",
+    editorSegments: [],
+    editorSelectedRange: null,
+    editorAnchorIndex: -1
   };
 
   const avatarRuntime = {
@@ -60,24 +65,257 @@
     return esc(String(value || "").trim()).replace(/\n/g, "<br>");
   }
 
-  // Lightweight markdown-to-HTML for v2 module content
-  function renderMarkdownBasic(md) {
+  /**
+   * 轻量 Markdown→HTML（职业报告正文）。不引入外部依赖，保持与现有 md 文件兼容。
+   * @param {{ wrapProse?: boolean }} [options] wrapProse 默认 true，套一层专业排版容器
+   */
+  /** 与正文锚点 id 规则一致，供目录树解析 */
+  function buildHeadingAnchorQueues(md) {
+    const lines = String(md || "").split("\n");
+    const h2 = [];
+    const h3 = [];
+    let h2i = 0;
+    let h3i = 0;
+    let curH2 = -1;
+    for (const raw of lines) {
+      const t = raw.trim();
+      if (/^## /.test(t) && !/^###/.test(t)) {
+        curH2 = h2i++;
+        h3i = 0;
+        h2.push(`cr-md-h2-${curH2}`);
+      } else if (/^### /.test(t)) {
+        const id = curH2 < 0 ? `cr-md-h3-0-${h3i++}` : `cr-md-h3-${curH2}-${h3i++}`;
+        h3.push(id);
+      }
+    }
+    return { h2, h3 };
+  }
+
+  /**
+   * 从阅读态 Markdown 解析 ## / ### 层级，用于树形目录（id 与 buildHeadingAnchorQueues 一致）。
+   */
+  function buildMarkdownTocBranches(md) {
+    const lines = String(md || "").split("\n");
+    let h2i = 0;
+    let h3i = 0;
+    let curH2 = -1;
+    const branches = [];
+    let lineNo = 0;
+    for (const raw of lines) {
+      lineNo += 1;
+      const t = raw.trim();
+      if (/^## /.test(t) && !/^###/.test(t)) {
+        curH2 = h2i++;
+        h3i = 0;
+        branches.push({
+          id: `cr-md-h2-${curH2}`,
+          title: t.replace(/^##\s+/, ""),
+          line: lineNo,
+          subs: []
+        });
+      } else if (/^### /.test(t)) {
+        const title = t.replace(/^###\s+/, "");
+        const id = curH2 < 0 ? `cr-md-h3-0-${h3i++}` : `cr-md-h3-${curH2}-${h3i++}`;
+        const sub = { id, title, line: lineNo };
+        if (branches.length && branches[branches.length - 1].subs) {
+          branches[branches.length - 1].subs.push(sub);
+        }
+      }
+    }
+    return branches;
+  }
+
+  function getCareerReportReadingMarkdown(bundle) {
+    let raw = String(bundle?.report_document?.markdown || "").trim();
+    if (!raw) raw = String(stitchModularMarkdownFromBundle(bundle) || "").trim();
+    return markdownForCareerReportReading(raw);
+  }
+
+  function renderMarkdownTocNavHtml(branches, options = {}) {
+    const variant = options.variant || "aside";
+    if (!branches || !branches.length) return "";
+    const subsClip = variant === "aside" ? 80 : 120;
+    const rows = branches.map((br) => {
+      const hasSubs = Array.isArray(br.subs) && br.subs.length > 0;
+      const startExpanded = variant !== "editor";
+      const h2Btn =
+        variant === "editor"
+          ? `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-editor-goto-line="${Number(br.line) || 1}">${esc(br.title)}</button>`
+          : `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-report-scroll-target="${esc(br.id)}">${esc(br.title)}</button>`;
+      const toggle = hasSubs
+        ? `<button type="button" class="cr-md-toc-toggle${startExpanded ? " is-open" : ""}" aria-expanded="${startExpanded ? "true" : "false"}" aria-label="展开或收起子章节"></button>`
+        : `<span class="cr-md-toc-toggle-spacer" aria-hidden="true"></span>`;
+      const subsHtml = hasSubs
+        ? `<div class="cr-md-toc-subs"${startExpanded ? "" : " hidden"}>${br.subs
+            .map((s) => {
+              const shortTitle = s.title.length > subsClip ? `${s.title.slice(0, subsClip)}…` : s.title;
+              return variant === "editor"
+                ? `<button type="button" class="cr-md-toc-h3" data-editor-goto-line="${Number(s.line) || 1}">${esc(shortTitle)}</button>`
+                : `<button type="button" class="cr-md-toc-h3" data-report-scroll-target="${esc(s.id)}">${esc(shortTitle)}</button>`;
+            })
+            .join("")}</div>`
+        : "";
+      return `
+      <div class="cr-md-toc-branch${startExpanded ? " is-open" : ""}">
+        <div class="cr-md-toc-row">
+          ${toggle}
+          ${h2Btn}
+        </div>
+        ${subsHtml}
+      </div>`;
+    }).join("");
+    if (variant === "overlay") {
+      return `
+      <nav class="cr-md-toc cr-md-toc--overlay report-viewer-toc-tree" aria-label="报告目录">
+        <div class="report-viewer-toc-label">目录</div>
+        <div class="cr-md-toc-body">${rows}</div>
+      </nav>`;
+    }
+    if (variant === "editor") {
+      return `<div class="report-editor-toc-wrap">
+      <nav class="cr-md-toc cr-md-toc--editor" aria-label="报告目录">
+        <p class="cr-md-toc-heading-label">导航</p>
+        <div class="cr-md-toc-body">${rows}</div>
+      </nav>
+      </div>`;
+    }
+    const kicker = "目录";
+    return `
+    <section class="career-report-side-card career-report-side-card--toc">
+      <nav class="cr-md-toc cr-md-toc--${variant}" aria-label="报告目录">
+        <p class="cr-md-toc-heading-label">${kicker}</p>
+        <div class="cr-md-toc-body">${rows}</div>
+      </nav>
+    </section>`;
+  }
+
+  function initCrMdTocToggles(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll(".cr-md-toc-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const branch = btn.closest(".cr-md-toc-branch");
+        if (!branch) return;
+        const subs = branch.querySelector(".cr-md-toc-subs");
+        if (!subs) return;
+        const open = branch.classList.toggle("is-open");
+        btn.classList.toggle("is-open", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        subs.hidden = !open;
+      });
+    });
+  }
+
+  function bindMarkdownTocScrollNav(root, scrollRoot) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const main = scrollRoot || document.getElementById("careerReportMain");
+    root.querySelectorAll("[data-report-scroll-target]").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        const targetId = String(button.dataset.reportScrollTarget || "").trim();
+        if (!targetId) return;
+        const target =
+          main?.querySelector?.(`#${escapeSelectorId(targetId)}`) || document.getElementById(targetId);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  function scrollCareerReportEditorToLine(lineNo) {
+    const n = Math.max(1, Number(lineNo) || 1);
+    const textarea = document.getElementById("reportEditorTextarea");
+    const host = document.getElementById("reportEditorRenderedDoc");
+    const markdown = String(textarea?.value || "");
+    const branches = buildMarkdownTocBranches(markdown);
+    let targetId = "";
+    branches.forEach((branch) => {
+      if (Number(branch.line) === n && branch.id) targetId = branch.id;
+      (Array.isArray(branch.subs) ? branch.subs : []).forEach((sub) => {
+        if (Number(sub.line) === n && sub.id) targetId = sub.id;
+      });
+    });
+    setCareerReportEditorViewMode("rendered");
+    requestAnimationFrame(() => {
+      if (targetId) {
+        host?.querySelector?.(`#${escapeSelectorId(targetId)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        host?.scrollTo?.({ top: 0, behavior: "smooth" });
+      }
+    });
+  }
+
+  function bindMarkdownTocEditorNav(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("[data-editor-goto-line]").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        const line = Number(button.dataset.editorGotoLine || 0);
+        if (!line) return;
+        scrollCareerReportEditorToLine(line);
+      });
+    });
+  }
+
+  function renderMarkdownBasic(md, options) {
     if (!md) return "";
+    const opts = options && typeof options === "object" ? options : {};
+    const wrapProse = opts.wrapProse !== false;
+    const injectAnchors = opts.injectHeadingAnchors === true;
     let text = String(md);
-    // Escape HTML first
-    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const anchorQueues = injectAnchors ? buildHeadingAnchorQueues(text) : null;
+    // Escape HTML（保留 `>`，否则 Markdown 引用行 `> ...` 无法识别）
+    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     // Code blocks (```...```)
     text = text.replace(/```(?:json|python|markdown|md)?\s*([\s\S]*?)```/g, (_, code) =>
-      `<pre><code>${code.trim()}</code></pre>`);
+      `<pre class="career-report-md-pre"><code>${code.trim()}</code></pre>`);
     // Inline code
-    text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
-    // Headings
-    text = text.replace(/^#### (.+)$/gm, "<h4>$1</h4>");
-    text = text.replace(/^### (.+)$/gm, "<h3>$1</h3>");
-    text = text.replace(/^## (.+)$/gm, "<h2>$1</h2>");
-    text = text.replace(/^# (.+)$/gm, "<h2>$1</h2>");
+    text = text.replace(/`([^`]+)`/g, '<code class="career-report-md-code">$1</code>');
+    // Headings（从长到短，避免 # 被提前吃掉）
+    if (anchorQueues) {
+      let i2 = 0;
+      let i3 = 0;
+      text = text.replace(/^#### (.+)$/gm, '<h4 class="career-report-md-h4">$1</h4>');
+      text = text.replace(/^### (.+)$/gm, (m, t) => {
+        const id = anchorQueues.h3[i3++] || "";
+        return id ? `<h3 class="career-report-md-h3" id="${id}">${t}</h3>` : `<h3 class="career-report-md-h3">${t}</h3>`;
+      });
+      text = text.replace(/^## (.+)$/gm, (m, t) => {
+        const id = anchorQueues.h2[i2++] || "";
+        return id ? `<h2 class="career-report-md-h2" id="${id}">${t}</h2>` : `<h2 class="career-report-md-h2">${t}</h2>`;
+      });
+      text = text.replace(/^# (.+)$/gm, '<h1 class="career-report-md-h1">$1</h1>');
+    } else {
+      text = text.replace(/^#### (.+)$/gm, '<h4 class="career-report-md-h4">$1</h4>');
+      text = text.replace(/^### (.+)$/gm, '<h3 class="career-report-md-h3">$1</h3>');
+      text = text.replace(/^## (.+)$/gm, '<h2 class="career-report-md-h2">$1</h2>');
+      text = text.replace(/^# (.+)$/gm, '<h1 class="career-report-md-h1">$1</h1>');
+    }
     // Bold
     text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Images ![alt](url) 与 ![alt](url "title") — 块级展示，避免整行仍以纯文本出现
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, dest) => {
+      let href = String(dest || "").trim();
+      let title = "";
+      const titled = href.match(/^(.+?)\s+"([^"]*)"$/);
+      if (titled) {
+        href = titled[1].trim();
+        title = titled[2] || "";
+      }
+      const safeSrc = esc(href);
+      const safeAlt = esc(alt);
+      const titleAttr = title ? ` title="${esc(title)}"` : "";
+      return `<div class="career-report-md-figure"><img class="career-report-md-img" src="${safeSrc}" alt="${safeAlt}"${titleAttr} loading="lazy" decoding="async" /></div>`;
+    });
+    // Blockquotes（连续以 > 开头的行）
+    text = text.replace(/(?:^>[^\n]*(?:\n|$))+?/gm, (block) => {
+      const inner = block
+        .trim()
+        .split("\n")
+        .map((line) => line.replace(/^>\s?/, "").trim())
+        .join("<br>");
+      return `<blockquote class="career-report-md-bq">${inner}</blockquote>`;
+    });
     // Tables: find lines with | separators
     text = text.replace(/((?:\|.+\|\n?)+)/g, (tableBlock) => {
       const lines = tableBlock.trim().split("\n").filter((l) => l.trim());
@@ -87,38 +325,53 @@
         return cells;
       });
       const isSep = (row) => row.every((c) => /^[-:]+$/.test(c));
-      let html = "<table>";
+      let body = "";
       let headerDone = false;
       for (let i = 0; i < rows.length; i++) {
         if (i === 1 && isSep(rows[i])) continue;
         const tag = !headerDone && i === 0 ? "th" : "td";
         if (tag === "th") headerDone = true;
-        html += "<tr>" + rows[i].map((c) => `<${tag}>${c}</${tag}>`).join("") + "</tr>";
+        body += "<tr>" + rows[i].map((c) => `<${tag}>${c}</${tag}>`).join("") + "</tr>";
       }
-      html += "</table>";
-      return html;
+      return `<div class="career-report-md-table-wrap"><table class="career-report-md-table">${body}</table></div>`;
     });
-    // Unordered lists
-    text = text.replace(/((?:^[-*] .+\n?)+)/gm, (block) => {
-      const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^[-*] /, "")}</li>`).join("");
-      return `<ul>${items}</ul>`;
+    // Numbered lists（允许 1. xxx 或 1.  多空格）
+    text = text.replace(/((?:^\d+\.\s+.+\n?)+)/gm, (block) => {
+      const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^\d+\.\s+/, "")}</li>`).join("");
+      return `<ol class="career-report-md-ol">${items}</ol>`;
     });
-    // Numbered lists
-    text = text.replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
-      const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("");
-      return `<ol>${items}</ol>`;
+    // Unordered lists（* 或 -，允许缩进与 * 后多空格，与常见 md 导出一致）
+    text = text.replace(/((?:^\s*[*+-]\s+.+\n?)+)/gm, (block) => {
+      const items = block
+        .trim()
+        .split("\n")
+        .map((l) => `<li>${l.replace(/^\s*[*+-]\s+/, "")}</li>`)
+        .join("");
+      return `<ul class="career-report-md-ul">${items}</ul>`;
     });
     // Horizontal rules
-    text = text.replace(/^---+$/gm, "<hr>");
+    text = text.replace(/^---+$/gm, '<hr class="career-report-md-hr">');
     // Paragraphs (double newlines)
     text = text.replace(/\n\n+/g, "</p><p>");
-    text = `<p>${text}</p>`;
+    text = `<p class="career-report-md-p">${text}</p>`;
     // Single newlines
     text = text.replace(/\n/g, "<br>");
     // Clean up empty paragraphs
-    text = text.replace(/<p>\s*<\/p>/g, "");
-    text = text.replace(/<p>(<(?:h[1-4]|ul|ol|table|pre|hr)[^>]*>)/g, "$1");
-    text = text.replace(/(<\/(?:h[1-4]|ul|ol|table|pre|hr)>)<\/p>/g, "$1");
+    text = text.replace(/<p class="career-report-md-p">\s*<\/p>/g, "");
+    text = text.replace(/<p class="career-report-md-p">(<(?:h[1-4]|ul|ol|div|blockquote|pre|hr)[^>]*>)/g, "$1");
+    text = text.replace(/(<\/(?:h[1-4]|ul|ol|div|blockquote|pre|hr)>)<\/p>/g, "$1");
+    // 兼容：上面替换若未加 class 的残留 p 标签
+    text = text.replace(/<p>(<(?:h[1-4]|ul|ol|div|blockquote|pre|hr)[^>]*>)/g, "$1");
+    text = text.replace(/(<\/(?:h[1-4]|ul|ol|div|blockquote|pre|hr)>)<\/p>/g, "$1");
+    // 独占一行的图片块：去掉外层 p（允许前导 br），避免段落边距挤压观感
+    text = text.replace(
+      /<p class="career-report-md-p">(?:<br\s*\/?>|\s)*(\s*<div class="career-report-md-figure">[\s\S]*?<\/div>\s*)<\/p>/g,
+      "$1"
+    );
+    text = text.replace(/<p>(?:<br\s*\/?>|\s)*(\s*<div class="career-report-md-figure">[\s\S]*?<\/div>\s*)<\/p>/g, "$1");
+    if (wrapProse) {
+      return `<div class="career-report-md-prose">${text}</div>`;
+    }
     return text;
   }
 
@@ -127,6 +380,79 @@
     if (!t) return "";
     if (t.length <= maxLen) return t;
     return `${t.slice(0, maxLen)}…`;
+  }
+
+  /**
+   * 阅读态移除各模块末尾「机器可读*」标题及其子内容（供编排用的 JSON），保留连续可读正文。
+   */
+  function stripMachineReadableSectionsFromMarkdown(md) {
+    const lines = String(md || "").split("\n");
+    const out = [];
+    let skipDepth = null;
+    const headingRe = /^(#{1,6})\s+(.*)$/;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const hm = line.match(headingRe);
+      if (hm) {
+        const depth = hm[1].length;
+        const title = hm[2] || "";
+        if (skipDepth !== null) {
+          if (depth <= skipDepth) {
+            skipDepth = null;
+            i -= 1;
+            continue;
+          }
+          continue;
+        }
+        if (/机器可读/.test(title)) {
+          skipDepth = depth;
+          continue;
+        }
+      }
+      if (skipDepth !== null) continue;
+      out.push(line);
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  /** 去掉流水线单行摘要（偶发落在章节外时） */
+  function stripPipelineSummaryLines(md) {
+    return String(md || "")
+      .split("\n")
+      .filter((line) => !/^\s*(MATCH_SUMMARY|PATH_SUMMARY)\s*:/i.test(line.trim()))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function markdownForCareerReportReading(md) {
+    return stripPipelineSummaryLines(stripMachineReadableSectionsFromMarkdown(md));
+  }
+
+  /** 顶层尚无合并正文时，按流水线顺序拼接各模块 Markdown，阅读态与单文件报告一致 */
+  function stitchModularMarkdownFromBundle(bundle) {
+    const sections = bundle?.report_document?.sections;
+    if (!sections || typeof sections !== "object" || Array.isArray(sections)) return "";
+    const navOrder = [
+      "executive_summary",
+      "macro_environment",
+      "personal_traits",
+      "target_job_analysis",
+      "matching_decision",
+      "gap_action_plan",
+      "risk_backup",
+      "appendix"
+    ];
+    const parts = [];
+    for (let i = 0; i < navOrder.length; i++) {
+      const key = navOrder[i];
+      const sec = sections[key];
+      if (!sec || typeof sec !== "object") continue;
+      const md = String(sec.markdown || "").trim();
+      if (!md) continue;
+      parts.push(md);
+    }
+    return parts.join("\n\n---\n\n").trim();
   }
 
   function computeGenerationPercent(progress) {
@@ -547,10 +873,35 @@
     return payload;
   }
 
+  function mergeCareerReportStatusForApply(payload) {
+    const st = payload?.state && typeof payload.state === "object" ? payload.state : {};
+    const jb = payload?.job && typeof payload.job === "object" ? payload.job : {};
+    const js = String(jb.status || "").trim().toLowerCase();
+    const normalizedJob = js === "completed" ? "ready" : js;
+    const merged = {
+      ...st,
+      status:
+        normalizedJob && normalizedJob !== "idle"
+          ? normalizedJob
+          : String(st.status || "").trim().toLowerCase(),
+      job_id: jb.job_id || st.job_id || "",
+      report_id: jb.report_id || st.report_id || "",
+      stage: jb.stage || st.stage || "",
+      stage_label: jb.stage_label || st.stage_label || "",
+      stage_detail: jb.stage_detail || jb.message || st.stage_detail || "",
+      progress: Array.isArray(jb.progress) && jb.progress.length ? jb.progress : st.progress || [],
+      model: jb.model || st.model || "",
+      generation_mode: jb.generation_mode || st.generation_mode || "",
+      error_message: st.error_message || (normalizedJob === "failed" ? jb.message || "" : "")
+    };
+    return merged;
+  }
+
   async function syncCareerReportStatus(jobId = "") {
     const suffix = jobId ? `?job_id=${encodeURIComponent(jobId)}` : "";
     const payload = await requestJsonSafe(`/api/career-report/generate/status${suffix}`);
-    applyCareerReportState(undefined, payload.state?.tracker || null, payload.state || null, {
+    const merged = mergeCareerReportStatusForApply(payload);
+    applyCareerReportState(undefined, merged.tracker || payload.state?.tracker || null, merged, {
       keepBundle: true,
       historical: window.appState?.careerReportViewingHistorical,
       userCenterRefresh: true
@@ -564,14 +915,16 @@
 
     try {
       const payload = await syncCareerReportStatus(jobId);
-      const status = String(payload.state?.status || payload.job?.status || "").trim().toLowerCase();
+      const merged = mergeCareerReportStatusForApply(payload);
+      const followId = String(merged.job_id || payload.job?.job_id || jobId || "").trim();
+      const status = String(merged.status || payload.job?.status || "").trim().toLowerCase();
       if (status === "queued" || status === "running") {
         reportRuntime.pollTimer = setTimeout(() => {
-          void pollCareerReportJob(jobId);
+          void pollCareerReportJob(followId || jobId);
         }, REPORT_POLL_INTERVAL_MS);
         return;
       }
-      if (status === "ready") {
+      if (status === "ready" || status === "completed") {
         await loadCurrentCareerReport({ userCenterRefresh: true });
         toast("职业报告已完成", "新的报告版本已经生成并同步到报告中心。", "success", 2200);
         // Notify learning plan to auto-refresh from new tracker data
@@ -579,7 +932,7 @@
         return;
       }
       if (status === "failed") {
-        toast("职业报告生成失败", payload.state?.error_message || "请稍后重试。", "error", 2600);
+        toast("职业报告生成失败", merged.error_message || "请稍后重试。", "error", 2600);
       }
     } catch (error) {
       reportRuntime.pollTimer = setTimeout(() => {
@@ -802,14 +1155,25 @@
   function renderReportSections4(bundle, sections, options = {}) {
     const requestedGroup = String(options.group || "").trim().toLowerCase();
     const groupConfig = REPORT_WORKSPACE_GROUPS[requestedGroup] || null;
-    const navOrder = ["industry_analysis", "career_positioning", "resume_evidence", "competency_profile", "role_match", "path_plan"];
+    const navOrder = [
+      "executive_summary",
+      "macro_environment",
+      "personal_traits",
+      "target_job_analysis",
+      "matching_decision",
+      "gap_action_plan",
+      "risk_backup",
+      "appendix"
+    ];
     const navMeta = {
-      "industry_analysis":  { label: "行业与需求侧判断", icon: "01", anchor: "cr-sec-industry",    kicker: "Industry Analyst",             accentClass: "cr-module-purple" },
-      "career_positioning": { label: "职业定位假设",     icon: "02", anchor: "cr-sec-positioning", kicker: "Career Positioning Advisor",   accentClass: "cr-module-blue" },
-      "resume_evidence":    { label: "简历证据链",       icon: "03", anchor: "cr-sec-resume",       kicker: "Resume Evidence Analyst",      accentClass: "cr-module-amber" },
-      "competency_profile": { label: "能力评估画像",     icon: "04", anchor: "cr-sec-competency",   kicker: "Competency Assessor",          accentClass: "cr-module-green" },
-      "role_match":         { label: "岗位匹配结论",     icon: "05", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
-      "path_plan":          { label: "阶段学习路径",     icon: "06", anchor: "cr-sec-path",         kicker: "Career Path Planner",          accentClass: "cr-module-teal" },
+      "executive_summary":    { label: "执行摘要",           icon: "01", anchor: "cr-sec-exec",         kicker: "Executive Summary",            accentClass: "cr-module-purple" },
+      "macro_environment":    { label: "宏观就业环境",       icon: "02", anchor: "cr-sec-industry",     kicker: "Industry Analyst",             accentClass: "cr-module-blue" },
+      "personal_traits":      { label: "个人特质与潜力",     icon: "03", anchor: "cr-sec-traits",       kicker: "Personal Profile",             accentClass: "cr-module-amber" },
+      "target_job_analysis":  { label: "目标企业与岗位分析", icon: "04", anchor: "cr-sec-target",       kicker: "Target Job Analysis",          accentClass: "cr-module-green" },
+      "matching_decision":    { label: "人岗匹配与决策建议", icon: "05", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
+      "gap_action_plan":      { label: "差距分析与行动计划", icon: "06", anchor: "cr-sec-gap",          kicker: "Gap & Action Plan",            accentClass: "cr-module-teal" },
+      "risk_backup":          { label: "风险管理与备选方案", icon: "07", anchor: "cr-sec-risk",         kicker: "Risk & Backup",                accentClass: "cr-module-rose" },
+      "appendix":             { label: "附录",               icon: "08", anchor: "cr-sec-appendix",     kicker: "Appendix",                     accentClass: "cr-module-slate" },
     };
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -1381,41 +1745,213 @@
         ${hardBlock}`;
     }
 
+    function renderExecutiveBody(data) {
+      const dashboard = data.dashboard_summary || {};
+      const headline = dashboard.headline || "";
+      const because = Array.isArray(dashboard.headline_because) ? dashboard.headline_because : [];
+      const cards = Array.isArray(dashboard.decision_cards) ? dashboard.decision_cards : [];
+      const fitScore = Number(dashboard.fit_score || 0);
+      const fitBandLabel = String(dashboard.fit_band_label || "").trim() || "待评估";
+      const scoreColor = fitScore >= 70 ? "#10b981" : fitScore >= 50 ? "#f59e0b" : "#ef4444";
+      const circum = 2 * Math.PI * 48;
+      const offset = circum * (1 - fitScore / 100);
+      const scoreRing = fitScore ? `
+        <div class="cr4-card cr4-match-score-card" style="max-width:220px">
+          <div class="cr4-match-circle" style="transform:scale(0.85)">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="48" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+              <circle cx="70" cy="70" r="48" fill="none" stroke="${scoreColor}" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="${circum.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+                transform="rotate(-90 70 70)"/>
+            </svg>
+            <div class="cr4-match-circle-text">
+              <div class="cr4-match-circle-value" style="color:${scoreColor};font-size:28px">${fitScore}</div>
+              <div class="cr4-match-circle-unit">/ 100</div>
+            </div>
+          </div>
+          <div style="margin-top:4px;text-align:center"><span class="cr4-badge ${fitScore >= 70 ? 'cr4-badge-green' : fitScore >= 50 ? 'cr4-badge-blue' : 'cr4-badge-amber'}">${esc(fitBandLabel)}</span></div>
+        </div>` : "";
+      const cardHtml = cards.map((c) => `
+        <div class="cr4-card ${c.tone === 'risk' ? 'cr4-card-risk' : ''}">
+          <div class="cr4-card-header"><div class="cr4-card-title">${esc(c.label || '决策')}</div><div class="cr4-card-sub">${esc(c.title || '')}</div></div>
+          ${c.summary ? `<p class="cr4-inline-note">${esc(c.summary)}</p>` : ''}
+          ${Array.isArray(c.items) && c.items.length ? `<div class="cr4-pill-row">${c.items.map(i => `<span class="cr4-tag">${esc(i)}</span>`).join('')}</div>` : ''}
+        </div>
+      `).join('');
+      return `
+        <div class="cr4-summary-banner" style="font-size:1.05rem">${esc(headline || data.executive_summary || "报告已整合多智能体分析结果，以下为结构化摘要。")}</div>
+        <div class="cr4-match-layout" style="align-items:flex-start;gap:18px;margin-top:10px">
+          ${scoreRing}
+          <div style="flex:1;min-width:0;display:grid;gap:12px">
+            ${because.length ? `<div class="cr4-card"><div class="cr4-card-header"><div class="cr4-card-title">判断依据</div></div>${because.map(b => `<div class="cr4-row-item"><span class="cr4-row-label">· ${esc(b)}</span></div>`).join('')}</div>` : ""}
+            ${cardHtml}
+          </div>
+        </div>`;
+    }
+
+    function renderPersonalTraitsBody(data) {
+      const pos = data.positioning || {};
+      const res = data.resume || {};
+      const comp = data.competency || {};
+      const posHtml = renderPositioningBody(pos);
+      const resHtml = renderResumeBody(res);
+      const compHtml = renderCompetencyBody(comp);
+      return `
+        <div class="cr4-nested-modules">
+          <details class="cr4-nested-mod" open>
+            <summary>职业定位假设</summary>
+            <div class="cr4-nested-body">${posHtml}</div>
+          </details>
+          <details class="cr4-nested-mod">
+            <summary>简历证据链</summary>
+            <div class="cr4-nested-body">${resHtml}</div>
+          </details>
+          <details class="cr4-nested-mod">
+            <summary>能力评估画像</summary>
+            <div class="cr4-nested-body">${compHtml}</div>
+          </details>
+        </div>`;
+    }
+
+    function renderTargetJobBody(data) {
+      const roles = Array.isArray(data.role_rankings) ? data.role_rankings : [];
+      const explainability = data.explainability || {};
+      const roleCards = roles.map((r, i) => {
+        const score = Math.max(0, Math.min(100, Number(r.overall_score ?? r.overallScore ?? 0)));
+        return `
+          <div class="cr4-card">
+            <div class="cr4-card-header">
+              <div class="cr4-card-title">${esc(r.name || r.title || "岗位")}</div>
+              <div class="cr4-card-sub">匹配得分 ${score}%</div>
+            </div>
+            ${Array.isArray(r.required_skills) && r.required_skills.length ? `
+              <div class="cr4-pill-row" style="margin-bottom:8px">
+                ${r.required_skills.map(s => `<span class="cr4-tag">${esc(s)}</span>`).join('')}
+              </div>
+            ` : ''}
+            ${Array.isArray(r.because) && r.because.length ? `<div class="cr4-inline-note">${esc(r.because.join('；'))}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+      return `
+        ${renderExplainabilityBlock(explainability)}
+        <div class="cr4-grid-2">${roleCards || '<p class="cr4-module-empty">目标岗位数据待补充</p>'}</div>
+      `;
+    }
+
+    function renderGapActionBody(data) {
+      const milestones = Array.isArray(data.milestones) ? data.milestones : [];
+      const gapMap = data.gap_map || {};
+      const explainability = data.explainability || {};
+      const timelineHtml = milestones.length ? milestones.slice(0, 5).map((m, i) => {
+        const stateClass = i === 0 ? "current" : "future";
+        return timelineItem(
+          m.horizon || `阶段${i + 1}`,
+          m.title || "",
+          "",
+          [m.reason, (m.actions || []).slice(0, 2).join("；")].filter(Boolean).join(" · "),
+          [...(m.metrics || []), ...(m.linked_gap ? [`关联差距：${m.linked_gap}`] : [])],
+          stateClass
+        );
+      }).join("") : "";
+      const gapPills = [
+        ...(Array.isArray(gapMap.risk_alerts) ? gapMap.risk_alerts : []),
+        ...(Array.isArray(gapMap.skill_gaps) ? gapMap.skill_gaps : []),
+        ...(Array.isArray(gapMap.evidence_gaps) ? gapMap.evidence_gaps : []),
+      ].slice(0, 6);
+      return `
+        ${renderExplainabilityBlock(explainability)}
+        <div class="cr4-grid-2">
+          ${timelineHtml ? `<div class="cr4-card cr4-card-full"><div class="cr4-card-header"><div class="cr4-card-title">行动计划时间线</div></div><div class="cr4-timeline">${timelineHtml}</div></div>` : ""}
+        </div>
+        ${gapPills.length ? `
+          <div class="cr4-card cr4-card-full" style="margin-top:12px">
+            <div class="cr4-card-header"><div class="cr4-card-title">关键差距项</div></div>
+            <div class="cr4-gap-grid">${gapPills.map((g, i) => gapPill(String(g), i === 0 ? "urgent" : "warn")).join("")}</div>
+          </div>
+        ` : ""}
+      `;
+    }
+
+    function renderRiskBackupBody(data) {
+      const industryRisks = Array.isArray(data.industry_risks) ? data.industry_risks : [];
+      const hardFails = Array.isArray(data.hard_failures) ? data.hard_failures : [];
+      const pathRisks = Array.isArray(data.path_risks) ? data.path_risks : [];
+      const contingency = Array.isArray(data.contingency) ? data.contingency : [];
+      const riskPills = [
+        ...industryRisks.map(r => ({ text: String(r), type: "warn" })),
+        ...hardFails.map(r => ({ text: String(r), type: "urgent" })),
+        ...pathRisks.map(r => ({ text: String(r), type: "warn" })),
+      ].slice(0, 8);
+      return `
+        <div class="cr4-stat-row">
+          ${statCard("宏观风险", industryRisks.length || "—", "项", "cr4-ac-amber")}
+          ${statCard("硬门槛缺口", hardFails.length || "0", "项", "cr4-ac-red")}
+          ${statCard("备选方案", contingency.length || "—", "条", "cr4-ac-green")}
+        </div>
+        ${riskPills.length ? `
+          <div class="cr4-card cr4-card-full">
+            <div class="cr4-card-header"><div class="cr4-card-title">风险清单</div></div>
+            <div class="cr4-gap-grid">${riskPills.map(r => gapPill(r.text, r.type)).join("")}</div>
+          </div>
+        ` : ""}
+        ${contingency.length ? `
+          <div class="cr4-card cr4-card-full" style="margin-top:12px">
+            <div class="cr4-card-header"><div class="cr4-card-title">B 计划 / 应急方案</div></div>
+            ${contingency.map(c => `<div class="cr4-row-item"><span class="cr4-row-label">· ${esc(String(c))}</span></div>`).join("")}
+          </div>
+        ` : ""}
+      `;
+    }
+
+    function renderAppendixBody(data) {
+      const techSkills = Array.isArray(data.technical_skills) ? data.technical_skills : [];
+      const genComp = Array.isArray(data.general_competencies) ? data.general_competencies : [];
+      const verifications = Array.isArray(data.verification_actions) ? data.verification_actions : [];
+      const evidenceRows = [
+        ...techSkills.map(s => ({ label: s.skill || "", strength: s.strength || "", ids: s.evidence_ids || [] })),
+        ...genComp.map(g => ({ label: g.competency || "", strength: g.strength || "", ids: g.evidence_ids || [] })),
+      ].slice(0, 10);
+      return `
+        ${evidenceRows.length ? `
+          <div class="cr4-card cr4-card-full">
+            <div class="cr4-card-header"><div class="cr4-card-title">证据映射清单</div></div>
+            <div class="cr4-detail-stack">
+              ${evidenceRows.map(e => `
+                <div class="cr4-detail-item">
+                  <div class="cr4-detail-head"><strong>${esc(e.label)}</strong><span class="cr4-badge cr4-badge-muted">${esc(e.strength)}</span></div>
+                  ${e.ids.length ? `<small>证据 ID：${esc(e.ids.join("、"))}</small>` : `<small>当前未识别到明确证据 ID</small>`}
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        ` : ""}
+        ${verifications.length ? `
+          <div class="cr4-card cr4-card-full" style="margin-top:12px">
+            <div class="cr4-card-header"><div class="cr4-card-title">验证建议清单</div></div>
+            ${verifications.map(v => `<div class="cr4-row-item"><span class="cr4-row-label">· ${esc(String(v))}</span></div>`).join("")}
+          </div>
+        ` : ""}
+      `;
+    }
+
     // ── render all sections ───────────────────────────────────────────────────
 
     const bodyRenderers = {
-      industry_analysis:  renderIndustryBody,
-      career_positioning: renderPositioningBody,
-      resume_evidence:    renderResumeBody,
-      competency_profile: renderCompetencyBody,
-      role_match:         renderMatchBody,
-      path_plan:          renderPathBody,
+      executive_summary:    renderExecutiveBody,
+      macro_environment:    renderIndustryBody,
+      personal_traits:      renderPersonalTraitsBody,
+      target_job_analysis:  renderTargetJobBody,
+      matching_decision:    renderMatchBody,
+      gap_action_plan:      renderGapActionBody,
+      risk_backup:          renderRiskBackupBody,
+      appendix:             renderAppendixBody,
     };
 
     const allowedKeys = groupConfig ? new Set(groupConfig.sectionKeys || []) : null;
     const availableModules = navOrder
       .map((key, idx) => ({ key, idx, meta: navMeta[key], section: sections[key] }))
       .filter((item) => Boolean(item.section) && (!allowedKeys || allowedKeys.has(item.key)));
-
-    const moduleIndexHtml = `
-      <section class="cr4-report-index">
-        <div>
-          <p class="cr4-report-index-kicker">职业报告</p>
-          <h3 class="cr4-report-index-title">报告模块目录</h3>
-          <p class="cr4-report-index-copy">每个模块都先展示判断，再展示因为、依据与可验证动作，避免黑箱式职业建议。</p>
-        </div>
-        <div class="cr4-report-index-tree">
-          <div class="cr4-report-index-root">职业报告</div>
-          ${availableModules.map(({ meta }, index) => `
-            <button type="button" class="cr4-report-index-item" data-report-scroll-target="${meta.anchor}">
-              <span>${String(index + 1).padStart(2, "0")}</span>
-              <strong>${esc(meta.label)}</strong>
-              <small>${esc(meta.kicker)}</small>
-            </button>
-          `).join("")}
-        </div>
-      </section>
-    `;
 
     const groupHeroHtml = groupConfig ? `
       <section class="cr4-group-hero">
@@ -1465,6 +2001,22 @@
       const body     = renderer ? renderer(data) : "";
       const polishTargetId = `cr4-polish-${key}`;
 
+      let bodyHtml = "";
+      let tailHtml = "";
+      if (markdown) {
+        bodyHtml = `
+          <div class="cr4-module-markdown cr4-module-markdown--primary career-report-md-article">${renderMarkdownBasic(markdownForCareerReportReading(markdown))}</div>
+          ${body ? `
+            <details class="cr4-module-structure">
+              <summary>结构化摘要（从正文提取，便于扫读）</summary>
+              <div class="cr4-module-structure-inner">${body}</div>
+            </details>` : ""}`;
+        tailHtml = "";
+      } else {
+        bodyHtml = body || `<p class="cr4-module-empty">该模块尚未生成内容</p>`;
+        tailHtml = "";
+      }
+
       return `
         <section id="${meta.anchor}" class="cr4-module ${meta.accentClass}">
           <div class="cr4-module-head">
@@ -1478,17 +2030,13 @@
             </div>
             <div class="cr4-module-num">${String(idx + 1).padStart(2, "0")}</div>
           </div>
-          <div class="cr4-module-body">${body}</div>
+          <div class="cr4-module-body">${bodyHtml}</div>
           <div id="${polishTargetId}" class="cr4-polish-output hidden"></div>
-          ${markdown ? `
-            <details class="cr4-module-detail">
-              <summary>查看完整分析文本</summary>
-              <div class="cr4-module-markdown">${renderMarkdownBasic(markdown)}</div>
-            </details>` : `<p class="cr4-module-empty">该模块尚未生成内容</p>`}
+          ${tailHtml}
         </section>`;
     }).filter(Boolean).join("");
 
-    return `<div class="cr4-report-modules ${groupConfig ? "is-grouped" : ""}">${groupConfig ? groupHeroHtml : moduleIndexHtml}${sectionHtml}</div>`;
+    return `<div class="cr4-report-modules ${groupConfig ? "is-grouped" : ""}">${groupConfig ? groupHeroHtml : ""}${sectionHtml}</div>`;
   }
 
   function renderHistoricalNotice() {
@@ -1521,7 +2069,7 @@
 
   function getUserCenterReportViewModeSafe() {
     return typeof window.getUserCenterReportViewMode === "function"
-      ? String(window.getUserCenterReportViewMode() || "dashboard").trim().toLowerCase()
+      ? String(window.getUserCenterReportViewMode() || "report").trim().toLowerCase()
       : "report";
   }
 
@@ -1672,7 +2220,7 @@
         <div class="ucrd-full-head-copy">
           <p class="ucrd-kicker">Complete Report</p>
           <h2 class="ucrd-full-head-title">${esc(meta.title || "职业规划报告")}</h2>
-          <p class="ucrd-full-head-summary">${formatText(bundle?.report_document?.executive_summary || meta.summary || "完整报告将按模块展开行业判断、能力证据、岗位匹配与路径规划。每个模块先展示判断，再展示因为、依据与可验证动作。")}</p>
+          <p class="ucrd-full-head-summary">${formatText(bundle?.report_document?.executive_summary || meta.summary || "以下为合并后的完整报告正文，按 Markdown 排版阅读。")}</p>
         </div>
         <div class="ucrd-full-head-meta">
           <span>主岗位：${esc(focusRole)}</span>
@@ -2582,12 +3130,14 @@
 
   // section definitions for nav
   const SECTION_NAV = [
-    { key: "industry_analysis",  label: "行业与需求侧判断", icon: "01", anchor: "cr-sec-industry" },
-    { key: "career_positioning", label: "职业定位假设",     icon: "02", anchor: "cr-sec-positioning" },
-    { key: "resume_evidence",    label: "简历证据链",       icon: "03", anchor: "cr-sec-resume" },
-    { key: "competency_profile", label: "能力评估画像",     icon: "04", anchor: "cr-sec-competency" },
-    { key: "role_match",         label: "岗位匹配结论",     icon: "05", anchor: "cr-sec-match" },
-    { key: "path_plan",          label: "阶段学习路径",     icon: "06", anchor: "cr-sec-path" },
+    { key: "executive_summary",    label: "执行摘要",           icon: "01", anchor: "cr-sec-exec" },
+    { key: "macro_environment",    label: "宏观就业环境",       icon: "02", anchor: "cr-sec-industry" },
+    { key: "personal_traits",      label: "个人特质与潜力",     icon: "03", anchor: "cr-sec-traits" },
+    { key: "target_job_analysis",  label: "目标企业与岗位分析", icon: "04", anchor: "cr-sec-target" },
+    { key: "matching_decision",    label: "人岗匹配与决策建议", icon: "05", anchor: "cr-sec-match" },
+    { key: "gap_action_plan",      label: "差距分析与行动计划", icon: "06", anchor: "cr-sec-gap" },
+    { key: "risk_backup",          label: "风险管理与备选方案", icon: "07", anchor: "cr-sec-risk" },
+    { key: "appendix",             label: "附录",               icon: "08", anchor: "cr-sec-appendix" },
   ];
 
   const REPORT_WORKSPACE_GROUPS = {
@@ -2595,19 +3145,19 @@
       label: "\u884c\u4e1a\u8d8b\u52bf",
       title: "\u884c\u4e1a\u5224\u65ad\u4e0e\u5f53\u524d\u804c\u4e1a\u5b9a\u4f4d",
       summary: "\u5148\u770b\u884c\u4e1a\u666f\u6c14\u5ea6\u3001\u5c97\u4f4d\u9700\u6c42\u53d8\u5316\u548c\u4f60\u5f53\u524d\u9002\u5408\u7684\u5207\u5165\u65b9\u5411\uff0c\u907f\u514d\u76f4\u63a5\u628a\u62a5\u544a\u53d8\u6210\u4e00\u6574\u9875\u5806\u5b57\u3002",
-      sectionKeys: ["industry_analysis", "career_positioning"]
+      sectionKeys: ["executive_summary", "macro_environment", "personal_traits"]
     },
     matching: {
       label: "\u5c97\u4f4d\u5339\u914d",
       title: "\u8bc1\u636e\u3001\u80fd\u529b\u4e0e\u76ee\u6807\u5c97\u4f4d\u7684\u5339\u914d\u5224\u65ad",
       summary: "\u628a\u7b80\u5386\u8bc1\u636e\u3001\u80fd\u529b\u753b\u50cf\u548c\u76ee\u6807\u5c97\u4f4d\u8981\u6c42\u62c6\u5f00\u5bf9\u7167\uff0c\u6e05\u6670\u770b\u5230\u5f53\u524d\u5dee\u8ddd\u3001\u4f18\u52bf\u4e0e\u9700\u8981\u8865\u8bc1\u7684\u70b9\u3002",
-      sectionKeys: ["resume_evidence", "competency_profile", "role_match"]
+      sectionKeys: ["target_job_analysis", "matching_decision"]
     },
     plan: {
       label: "\u89c4\u5212\u8def\u5f84",
       title: "\u5206\u9636\u6bb5\u8865\u9f50\u80fd\u529b\u5e76\u5f62\u6210\u6267\u884c\u8def\u7ebf",
       summary: "\u628a\u957f\u671f\u76ee\u6807\u62c6\u6210\u8fd1\u671f\u52a8\u4f5c\u3001\u9636\u6bb5\u76ee\u6807\u548c\u91cc\u7a0b\u7891\uff0c\u4fbf\u4e8e\u540e\u7eed\u7ee7\u7eed\u7f16\u8f91\u3001\u68c0\u67e5\u548c\u5bfc\u51fa\u3002",
-      sectionKeys: ["path_plan"]
+      sectionKeys: ["gap_action_plan", "risk_backup", "appendix"]
     }
   };
   window.CAREER_REPORT_WORKSPACE_GROUPS = REPORT_WORKSPACE_GROUPS;
@@ -2618,6 +3168,15 @@
   }
 
   function getReportTocItems(bundle) {
+    const markdown = String(bundle?.report_document?.markdown || "").trim();
+    if (markdown) {
+      return [{
+        id: "cr-full-markdown-anchor",
+        title: "完整 Markdown 报告",
+        kicker: "01",
+        index: 0
+      }];
+    }
     const sections = bundle?.report_document?.sections;
     if (sections && !Array.isArray(sections) && typeof sections === "object") {
       return SECTION_NAV
@@ -2663,12 +3222,18 @@
     const roleRankings = Array.isArray(bundle?.role_rankings) ? bundle.role_rankings.slice(0, 5) : [];
     const focusRole = bundle?.report_document?.focus_role_name || tracker?.focus_role_name || window.jobNameMap?.[window.appState?.focusedRoleId] || window.appState?.focusedRoleId || "待识别";
     const isModular = isModularBundle(bundle);
+    const markdownReady = Boolean(String(bundle?.report_document?.markdown || "").trim())
+      || Boolean(stitchModularMarkdownFromBundle(bundle));
     const matchOutput = bundle?.match_output || {};
     const fitScore = Number(matchOutput.fit_score || bundle?.role_rankings?.[0]?.overall_score || 0);
     const fitBand = String(matchOutput.fit_band || "");
     const fitBandLabel = {"strong": "强匹配", "moderate": "中等匹配", "weak": "弱匹配", "not_ready": "尚需准备"}[fitBand] || "--";
 
-    const moduleNavHtml = isModular ? `
+    const readingMdForToc = markdownReady ? getCareerReportReadingMarkdown(bundle) : "";
+    const tocBranches = readingMdForToc ? buildMarkdownTocBranches(readingMdForToc) : [];
+    const tocNavHtml = tocBranches.length ? renderMarkdownTocNavHtml(tocBranches, { variant: "aside" }) : "";
+
+    const moduleNavHtml = isModular && !markdownReady ? `
       <section class="career-report-side-card">
         <p class="career-report-side-kicker">Contents</p>
         <h3 class="career-report-side-title">章节目录</h3>
@@ -2689,6 +3254,7 @@
     ` : "";
 
     aside.innerHTML = `
+      ${tocNavHtml}
       <section class="career-report-side-card primary">
         <p class="career-report-side-kicker">Snapshot</p>
         <h3 class="career-report-side-title">${esc(bundle?.meta?.title || "职业报告")}</h3>
@@ -2738,13 +3304,8 @@
       ${renderReportFeedbackCard()}
     `;
 
-    aside.querySelectorAll("[data-report-scroll-target]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const targetId = String(button.dataset.reportScrollTarget || "").trim();
-        if (!targetId) return;
-        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
+    bindMarkdownTocScrollNav(aside, document.getElementById("careerReportMain"));
+    initCrMdTocToggles(aside);
 
     aside.querySelectorAll("[data-report-focus-role]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -2779,14 +3340,11 @@
     }
 
     const viewMode = getUserCenterReportViewModeSafe();
-    const activeGroup = typeof window.getUserCenterReportModule === "function"
-      ? String(window.getUserCenterReportModule() || "trends").trim().toLowerCase()
-      : "trends";
     main.innerHTML = viewMode === "report"
       ? `
         ${renderHistoricalNotice()}
         ${renderFullReportHeader(bundle, tracker)}
-        ${renderReportSections(bundle, { group: activeGroup })}
+        ${renderFullMarkdownReport(bundle)}
       `
       : `
         ${renderHistoricalNotice()}
@@ -2902,7 +3460,12 @@
     if (statTotal) statTotal.textContent = `共 ${Number(tracker?.total_count || 0)} 项任务`;
 
     if (toc) {
-      toc.innerHTML = `
+      const readingMdRv = bundle?.report_document ? getCareerReportReadingMarkdown(bundle) : "";
+      const branchesRv = readingMdRv ? buildMarkdownTocBranches(readingMdRv) : [];
+      if (branchesRv.length) {
+        toc.innerHTML = renderMarkdownTocNavHtml(branchesRv, { variant: "overlay" });
+      } else {
+        toc.innerHTML = `
         <div class="report-viewer-toc-label">目录</div>
         ${tocItems.map((section, index) => `
           <button type="button" class="rv-toc-item${index === 0 ? " active" : ""}" data-rv-target="${esc(section.id)}">
@@ -2911,6 +3474,7 @@
           </button>
         `).join("")}
       `;
+      }
     }
 
     if (taskList) {
@@ -2930,12 +3494,16 @@
 
     if (main) {
       main.innerHTML = bundle && bundle.report_document
-        ? `${renderHistoricalNotice()}${renderFullReportHeader(bundle, tracker)}${renderReportSections(bundle)}`
+        ? `${renderHistoricalNotice()}${renderFullReportHeader(bundle, tracker)}${renderFullMarkdownReport(bundle)}`
         : renderEmptyReportMain();
       if (bundle && bundle.report_document) {
         bindCareerReportFeedbackHandlers(main);
         bindReportPolishHandlers(main);
         bindReportScrollHandlers(main, main);
+        if (toc && toc.querySelector(".cr-md-toc")) {
+          bindMarkdownTocScrollNav(toc, main);
+          initCrMdTocToggles(toc);
+        }
       }
     }
 
@@ -2966,6 +3534,12 @@
       layout.classList.toggle("career-report-layout--generating", generating);
     }
     renderReportAside();
+    const reportLayout = document.querySelector("#report-workspace .career-report-layout");
+    if (reportLayout) {
+      const asideEl = document.getElementById("careerReportAside");
+      const hasMdToc = Boolean(asideEl?.querySelector?.(".cr-md-toc"));
+      reportLayout.classList.toggle("career-report-layout--md-toc", hasMdToc);
+    }
     renderReportMain();
     renderReportViewer();
     window.applyUserCenterReportReaderGate?.();
@@ -2997,31 +3571,116 @@
   function renderReportEditorSectionMap(source) {
     const host = document.getElementById("reportEditorSectionMap");
     if (!host) return;
-    const items = Array.isArray(source?.section_map) ? source.section_map : [];
-    host.innerHTML = items.length
-      ? items.map((item, index) => `
+    const md = String(source?.markdown || "").trim();
+    const reading = md ? markdownForCareerReportReading(md) : "";
+    const branches = reading ? buildMarkdownTocBranches(reading) : [];
+    if (branches.length) {
+      host.innerHTML = renderMarkdownTocNavHtml(branches, { variant: "editor" });
+    } else {
+      const items = Array.isArray(source?.section_map) ? source.section_map : [];
+      host.innerHTML = items.length
+        ? items.map((item, index) => `
           <button type="button" class="report-editor-section-item" data-editor-scroll-index="${index}">
             <strong>${esc(item?.label || `章节 ${index + 1}`)}</strong>
             <small>${esc(String(item?.markdown || "").slice(0, 60) || "点击快速定位")}</small>
           </button>
         `).join("")
-      : `<div class="report-editor-section-item active"><strong>暂无章节</strong><small>等待源文稿加载</small></div>`;
-
-    host.querySelectorAll("[data-editor-scroll-index]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.editorScrollIndex || 0);
-        const textarea = document.getElementById("reportEditorTextarea");
-        const section = items[index];
-        if (!textarea || !section) return;
-        const label = String(section.label || "").trim();
-        const anchor = label ? `## ${label}` : "";
-        const position = anchor ? textarea.value.indexOf(anchor) : -1;
-        if (position >= 0) {
-          textarea.focus();
-          textarea.setSelectionRange(position, position);
-        }
+        : `<div class="report-editor-section-item active"><strong>暂无章节</strong><small>等待源文稿加载</small></div>`;
+      host.querySelectorAll("[data-editor-scroll-index]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const index = Number(button.dataset.editorScrollIndex || 0);
+          const section = items[index];
+          if (!section) return;
+          const label = String(section.label || "").trim();
+          const segments = Array.isArray(reportRuntime.editorSegments) ? reportRuntime.editorSegments : [];
+          if (!segments.length) return;
+          const hitIndex = segments.findIndex((segment) => String(segment.text || "").includes(label));
+          if (hitIndex >= 0) {
+            reportRuntime.editorAnchorIndex = hitIndex;
+            selectCareerReportEditorSegmentRange(hitIndex, hitIndex);
+            const hostEl = document.getElementById("reportEditorRenderedDoc");
+            hostEl?.querySelector(`[data-editor-segment-index="${hitIndex}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
       });
-    });
+      return;
+    }
+
+    bindMarkdownTocEditorNav(host);
+    initCrMdTocToggles(host);
+  }
+
+  function updateReportEditorNavProgress(payload) {
+    const map = Array.isArray(payload?.section_map) ? payload.section_map : [];
+    const n = map.length;
+    const pctEl = document.getElementById("reportEditorProgressPct");
+    const fill = document.getElementById("reportEditorProgressFill");
+    const hint = document.getElementById("reportEditorProgressHint");
+    if (!pctEl && !fill && !hint) return;
+    const target = 8;
+    const pct = n ? Math.min(100, Math.round((n / target) * 100)) : 0;
+    if (pctEl) pctEl.textContent = n ? `${pct}%` : "—";
+    if (fill) fill.style.width = n ? `${pct}%` : "0%";
+    if (hint) {
+      hint.textContent = n
+        ? `已识别 ${n} 个章节区块，可点击左侧快速跳转`
+        : "章节结构加载中或暂不可用";
+    }
+  }
+
+  function getLastUserPromptFromChat() {
+    const messages = Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : [];
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (String(messages[i]?.role || "") === "user") {
+        return String(messages[i]?.body || "").trim();
+      }
+    }
+    return "";
+  }
+
+  function updateReportEditorAiIntentSummary() {
+    const bodyEl = document.getElementById("reportEditorAiIntentBody");
+    if (!bodyEl) return;
+
+    const selection = reportRuntime.editorSelection;
+    const length = Math.max(0, Number(selection?.end || 0) - Number(selection?.start || 0));
+    const scopeHtml =
+      selection && length > 0
+        ? `\u4fee\u6539\u8303\u56f4\uff1a<strong>${esc(selection.ref || "\u9009\u4e2d\u7247\u6bb5")}</strong>\uff08${length} \u5b57\u7b26\uff09`
+        : "\u4fee\u6539\u8303\u56f4\uff1a<strong>\u6574\u7bc7\u62a5\u544a\u6b63\u6587</strong>";
+
+    const typed = String(document.getElementById("reportEditorPromptInput")?.value || "").trim();
+    const lastChat = getLastUserPromptFromChat();
+    const userIntent = typed || lastChat;
+
+    const diff = reportRuntime.editorDiff;
+    const blocks = diff && Array.isArray(diff.diff_blocks) ? diff.diff_blocks : [];
+    const hasDiff = Boolean(diff && blocks.length);
+
+    if (hasDiff) {
+      const semantic = buildSemanticChangeSummary(blocks);
+      const narrativePlain = semantic.bullets.length
+        ? `${semantic.intro} \u4e3b\u8981\u8c03\u6574\u5305\u62ec\uff1a${semantic.bullets.slice(0, 3).join("\uff1b")}\u3002`
+        : semantic.intro;
+      const intentLine = userIntent
+        ? `\u4f60\u7684\u8bf4\u660e\uff1a${esc(clipReportEditorText(userIntent, 240))}`
+        : "\u672a\u9644\u989d\u5916\u6587\u5b57\u8bf4\u660e\uff08\u6216\u6cbf\u7528\u9ed8\u8ba4\u6da6\u8272\u63d0\u793a\uff09\u3002";
+      bodyEl.innerHTML = `
+        <p class="report-editor-ai-intent-scope">${scopeHtml}</p>
+        <p class="report-editor-ai-intent-user">${intentLine}</p>
+        <p class="report-editor-ai-intent-delta"><strong>\u672c\u6b21\u6539\u52a8\u8981\u70b9\uff1a</strong>${esc(narrativePlain)}</p>
+      `;
+      return;
+    }
+
+    bodyEl.innerHTML = userIntent
+      ? `<p class="report-editor-ai-intent-scope">${scopeHtml}</p><p class="report-editor-ai-intent-user"><strong>\u5f53\u524d\u9700\u6c42\uff1a</strong>${esc(clipReportEditorText(userIntent, 240))}</p><p class="report-editor-ai-intent-next">\u53d1\u9001\u6da6\u8272\u8bf7\u6c42\u540e\uff0c\u4e2d\u95f4\u680f\u5c06\u663e\u793a\u5bf9\u6bd1\u7a3f\uff1b\u91c7\u7eb3\u524d\u4e0d\u4f1a\u8986\u76d6\u6b63\u6587\u3002</p>`
+      : `<p class="report-editor-ai-intent-scope">${scopeHtml}</p><p class="report-editor-ai-intent-next">\u5728\u4e0b\u65b9\u8f93\u5165\u4fee\u6539\u610f\u56fe\u5e76\u53d1\u9001\uff1b\u4e2d\u95f4\u680f\u4e3a\u539f\u6587\u4e0e\u4fee\u6539\u5bf9\u6bd4\uff0c\u672c\u533a\u4f1a\u540c\u6b65\u6982\u62ec\u4f60\u7684\u76ee\u6807\u4e0e\u6539\u52a8\u8981\u70b9\u3002</p>`;
+  }
+
+  function setReportEditorRailTab() {
+    const chat = document.getElementById("reportEditorRailChat");
+    if (chat) chat.classList.remove("hidden");
   }
 
   function renderReportEditorSnapshotList(source) {
@@ -3063,12 +3722,351 @@
     return `${text.slice(0, Math.max(0, limit - 3))}...`;
   }
 
-  function appendReportEditorMessage(role, label, body, tone = role) {
+  function getEditorLineRange(text, start, end) {
+    const source = String(text || "");
+    const safeStart = Math.max(0, Math.min(Number(start) || 0, source.length));
+    const safeEnd = Math.max(safeStart, Math.min(Number(end) || 0, source.length));
+    const beforeStart = source.slice(0, safeStart);
+    const beforeEnd = source.slice(0, safeEnd);
+    const lineStart = beforeStart.split("\n").length;
+    const lineEnd = Math.max(lineStart, beforeEnd.split("\n").length);
+    return {
+      lineStart,
+      lineEnd,
+      ref: lineStart === lineEnd ? `原始文本第 ${lineStart} 行` : `原始文本第 ${lineStart}-${lineEnd} 行`
+    };
+  }
+
+  function normalizeCareerReportEditorViewMode(mode) {
+    return String(mode || "").trim().toLowerCase() === "markdown" ? "markdown" : "rendered";
+  }
+
+  function setCareerReportEditorViewMode(mode = "rendered") {
+    const nextMode = normalizeCareerReportEditorViewMode(mode);
+    reportRuntime.editorViewMode = nextMode;
+    const rendered = document.getElementById("reportEditorRenderedDoc");
+    const textarea = document.getElementById("reportEditorTextarea");
+    const toggleBtn = document.getElementById("reportEditorViewToggleBtn");
+    const modeHint = document.getElementById("reportEditorViewModeHint");
+    const shell = document.getElementById("reportEditorOverlay");
+    if (rendered) rendered.classList.toggle("hidden", nextMode !== "rendered");
+    if (textarea) textarea.classList.toggle("hidden", nextMode !== "markdown");
+    if (toggleBtn) toggleBtn.textContent = nextMode === "rendered" ? "切换到 Markdown" : "返回渲染视图";
+    if (modeHint) {
+      modeHint.textContent = nextMode === "rendered"
+        ? "双击正文切换为 Markdown 编辑"
+        : "当前为 Markdown 编辑；双击返回渲染视图";
+    }
+    if (shell) shell.dataset.editorViewMode = nextMode;
+    if (nextMode === "markdown") {
+      textarea?.focus();
+    }
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function findSelectionRangeInSource(source, selectedText) {
+    const text = String(source || "");
+    const query = String(selectedText || "").replace(/\u00a0/g, " ").trim();
+    if (!text || !query) return null;
+    let start = text.indexOf(query);
+    if (start >= 0) {
+      return { start, end: start + query.length };
+    }
+    const compact = query.replace(/\s+/g, " ").trim();
+    if (!compact) return null;
+    const fuzzy = new RegExp(escapeRegExp(compact).replace(/\s+/g, "\\s+"), "m");
+    const match = fuzzy.exec(text);
+    if (!match) return null;
+    return { start: match.index, end: match.index + match[0].length };
+  }
+
+  function setCareerReportEditorSelection(start, end, textOverride = "") {
+    const textarea = document.getElementById("reportEditorTextarea");
+    const source = String(textarea?.value || "");
+    const safeStart = Math.max(0, Math.min(Number(start) || 0, source.length));
+    const safeEnd = Math.max(safeStart, Math.min(Number(end) || 0, source.length));
+    if (safeEnd <= safeStart) {
+      clearCareerReportEditorSelection({ render: false });
+      return;
+    }
+    const range = getEditorLineRange(source, safeStart, safeEnd);
+    reportRuntime.editorSelectedRange = null;
+    reportRuntime.editorAnchorIndex = -1;
+    reportRuntime.editorSelection = {
+      start: safeStart,
+      end: safeEnd,
+      text: textOverride || source.slice(safeStart, safeEnd),
+      lineStart: range.lineStart,
+      lineEnd: range.lineEnd,
+      ref: range.ref
+    };
+    updateCareerReportEditorSelectionInfo();
+  }
+
+  function syncCareerReportEditorSelectionFromRendered() {
+    const host = document.getElementById("reportEditorRenderedDoc");
+    const textarea = document.getElementById("reportEditorTextarea");
+    if (!host || !textarea) return;
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount < 1) return;
+    const anchorNode = selection.anchorNode;
+    const focusNode = selection.focusNode;
+    if (!host.contains(anchorNode) || !host.contains(focusNode)) return;
+    if (selection.isCollapsed) {
+      clearCareerReportEditorSelection({ render: false });
+      return;
+    }
+    const text = String(selection.toString() || "").trim();
+    const hit = findSelectionRangeInSource(String(textarea.value || ""), text);
+    if (!hit) return;
+    setCareerReportEditorSelection(hit.start, hit.end, text);
+  }
+
+  function syncCareerReportEditorSelectionFromTextarea() {
+    const textarea = document.getElementById("reportEditorTextarea");
+    if (!textarea) return;
+    const start = Number(textarea.selectionStart || 0);
+    const end = Number(textarea.selectionEnd || 0);
+    if (end <= start) {
+      clearCareerReportEditorSelection({ render: false });
+      return;
+    }
+    setCareerReportEditorSelection(start, end, textarea.value.slice(start, end));
+  }
+
+  function renderReportEditorPromptSelectionPills() {
+    const host = document.getElementById("reportEditorPromptSelectionPills");
+    if (!host) return;
+    const selection = reportRuntime.editorSelection;
+    const length = Math.max(0, Number(selection?.end || 0) - Number(selection?.start || 0));
+    if (!selection || !length) {
+      host.classList.add("hidden");
+      host.innerHTML = "";
+      return;
+    }
+    const lineLabel = esc(selection.ref || "原始文本");
+    host.classList.remove("hidden");
+    host.innerHTML = `
+      <button type="button" class="report-editor-selection-pill is-active" data-editor-clear-pill="1">
+        <strong>${lineLabel}</strong>
+        <span>${length} 字符 · 已附带上下文</span>
+        <em>移除</em>
+      </button>
+    `;
+    host.querySelector("[data-editor-clear-pill]")?.addEventListener("click", () => {
+      clearCareerReportEditorSelection({ render: false });
+      updateCareerReportEditorSelectionInfo();
+    });
+  }
+
+  function autoResizeReportEditorPromptInput() {
+    const promptInput = document.getElementById("reportEditorPromptInput");
+    if (!promptInput) return;
+    const style = window.getComputedStyle(promptInput);
+    const lineHeight = parseFloat(style.lineHeight) || 22;
+    const padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    const minHeight = Math.round(lineHeight * 2 + padding);
+    const maxHeight = Math.round(lineHeight * 6 + padding);
+    promptInput.style.height = "auto";
+    const nextHeight = Math.max(minHeight, Math.min(promptInput.scrollHeight, maxHeight));
+    promptInput.style.height = `${nextHeight}px`;
+    promptInput.style.overflowY = promptInput.scrollHeight > maxHeight ? "auto" : "hidden";
+  }
+
+  function normalizeCareerReportEditorMode(mode) {
+    return String(mode || "").trim().toLowerCase() === "review" ? "review" : "edit";
+  }
+
+  function setCareerReportEditorMode(mode = "edit") {
+    const nextMode = normalizeCareerReportEditorMode(mode);
+    reportRuntime.editorMode = nextMode;
+    const editStage = document.getElementById("reportEditorEditStage");
+    const reviewStage = document.getElementById("reportEditorReviewStage");
+    if (editStage) editStage.classList.toggle("hidden", nextMode !== "edit");
+    if (reviewStage) reviewStage.classList.toggle("hidden", nextMode !== "review");
+    document.querySelectorAll("[data-editor-mode]").forEach((button) => {
+      const active = String(button.dataset.editorMode || "").trim() === nextMode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  function resolveEditorLineOffset(lines, lineNumber) {
+    let offset = 0;
+    const safeLine = Math.max(1, Math.min(Number(lineNumber) || 1, lines.length || 1));
+    for (let index = 1; index < safeLine; index += 1) {
+      offset += (lines[index - 1] || "").length;
+      offset += 1;
+    }
+    return offset;
+  }
+
+  function buildCareerReportEditorSegments(markdown) {
+    const lines = String(markdown || "").split("\n");
+    const segments = [];
+    let cursor = 0;
+    while (cursor < lines.length) {
+      while (cursor < lines.length && !String(lines[cursor] || "").trim()) {
+        cursor += 1;
+      }
+      if (cursor >= lines.length) break;
+      const startIndex = cursor;
+      cursor += 1;
+      while (cursor < lines.length) {
+        const current = String(lines[cursor] || "");
+        const previous = String(lines[cursor - 1] || "");
+        const headingBreak = /^#{1,4}\s+/.test(current) && previous.trim();
+        if (headingBreak || (!current.trim() && previous.trim())) break;
+        cursor += 1;
+      }
+      let endIndex = cursor - 1;
+      while (endIndex > startIndex && !String(lines[endIndex] || "").trim()) {
+        endIndex -= 1;
+      }
+      const startLine = startIndex + 1;
+      const endLine = endIndex + 1;
+      const startOffset = resolveEditorLineOffset(lines, startLine);
+      const endOffset = resolveEditorLineOffset(lines, endLine) + String(lines[endLine - 1] || "").length;
+      const text = String(markdown || "").slice(startOffset, endOffset);
+      segments.push({
+        index: segments.length,
+        startLine,
+        endLine,
+        startOffset,
+        endOffset,
+        text,
+        ref: `报告${startLine}-${endLine}行`
+      });
+      cursor = endIndex + 1;
+    }
+    return segments;
+  }
+
+  function clearCareerReportEditorSelection(options = {}) {
+    reportRuntime.editorSelection = null;
+    reportRuntime.editorSelectedRange = null;
+    reportRuntime.editorAnchorIndex = -1;
+    if (options.render !== false) {
+      renderCareerReportEditorDocument();
+    }
+    updateCareerReportEditorSelectionInfo();
+  }
+
+  function selectCareerReportEditorSegmentRange(leftIndex, rightIndex) {
+    const segments = Array.isArray(reportRuntime.editorSegments) ? reportRuntime.editorSegments : [];
+    if (!segments.length) {
+      clearCareerReportEditorSelection();
+      return;
+    }
+    const startIndex = Math.max(0, Math.min(Number(leftIndex) || 0, segments.length - 1));
+    const endIndex = Math.max(0, Math.min(Number(rightIndex) || 0, segments.length - 1));
+    const from = Math.min(startIndex, endIndex);
+    const to = Math.max(startIndex, endIndex);
+    const first = segments[from];
+    const last = segments[to];
+    if (!first || !last) return;
+    const textarea = document.getElementById("reportEditorTextarea");
+    const source = String(textarea?.value || "");
+    reportRuntime.editorSelectedRange = { from, to };
+    reportRuntime.editorSelection = {
+      start: first.startOffset,
+      end: last.endOffset,
+      text: source.slice(first.startOffset, last.endOffset),
+      lineStart: first.startLine,
+      lineEnd: last.endLine,
+      ref: `报告${first.startLine}-${last.endLine}行`
+    };
+    renderCareerReportEditorDocument();
+    updateCareerReportEditorSelectionInfo();
+  }
+
+  function renderCareerReportEditorDocument() {
+    const host = document.getElementById("reportEditorRenderedDoc");
+    const textarea = document.getElementById("reportEditorTextarea");
+    if (!host || !textarea) return;
+    const markdown = String(textarea.value || "");
+    reportRuntime.editorSegments = buildCareerReportEditorSegments(markdown);
+    host.innerHTML = markdown.trim()
+      ? `
+        <article class="report-editor-md-article report-editor-md-article--bare">
+          <div class="report-editor-md-article-body">${renderMarkdownBasic(markdown, { injectHeadingAnchors: true })}</div>
+        </article>
+      `
+      : `<div class="report-editor-md-empty-state"><strong>当前报告为空</strong><span>请先生成或加载报告内容。</span></div>`;
+    renderReportEditorSectionMap({
+      markdown,
+      section_map: Array.isArray(reportRuntime.editorSource?.section_map) ? reportRuntime.editorSource.section_map : []
+    });
+    setCareerReportEditorViewMode(reportRuntime.editorViewMode || "rendered");
+  }
+
+  function summarizeEditorDiffBlocks(diffBlocks) {
+    const blocks = Array.isArray(diffBlocks) ? diffBlocks : [];
+    let addLines = 0;
+    let delLines = 0;
+    const preview = [];
+    blocks.forEach((block) => {
+      const lines = Array.isArray(block?.lines) ? block.lines : [];
+      const type = String(block?.type || "equal").trim().toLowerCase();
+      if (type === "add") addLines += lines.length;
+      if (type === "delete") delLines += lines.length;
+      if (type !== "equal" && preview.length < 3) {
+        const text = clipReportEditorText(lines.join(" "), 72);
+        if (text) preview.push(`${type === "add" ? "+" : "-"} ${text}`);
+      }
+    });
+    return { addLines, delLines, preview };
+  }
+
+  function buildSemanticChangeSummary(diffBlocks) {
+    const blocks = Array.isArray(diffBlocks) ? diffBlocks : [];
+    const { addLines, delLines, preview } = summarizeEditorDiffBlocks(diffBlocks);
+    const intro = `模型对选中范围做了行文调整：约新增 ${addLines} 行、删减 ${delLines} 行（按行级 diff 统计）。`;
+    const bullets = [];
+    blocks.forEach((block) => {
+      const type = String(block?.type || "equal").trim().toLowerCase();
+      if (type === "equal") return;
+      const lines = Array.isArray(block?.lines) ? block.lines : [];
+      const joined = clipReportEditorText(lines.join(" ").replace(/\s+/g, " "), 96);
+      if (!joined || bullets.length >= 4) return;
+      if (type === "add") bullets.push(`补充或改写：${joined}`);
+      if (type === "delete") bullets.push(`删去原表述：${joined}`);
+    });
+    return { intro, bullets };
+  }
+
+  function renderUnifiedDiffMarkup(diffBlocks) {
+    const blocks = Array.isArray(diffBlocks) ? diffBlocks : [];
+    if (!blocks.length) return "";
+    const parts = [];
+    blocks.forEach((block) => {
+      const type = String(block?.type || "equal").trim().toLowerCase();
+      const lines = Array.isArray(block?.lines) ? block.lines : [];
+      const cls = type === "add" ? "report-editor-diff-line--add" : type === "delete" ? "report-editor-diff-line--del" : "report-editor-diff-line--eq";
+      lines.forEach((line) => {
+        parts.push(`<span class="report-editor-diff-line ${cls}">${esc(line)}</span>`);
+      });
+    });
+    return parts.join("\n");
+  }
+
+  function openReportEditorReviewPanel() {
+    if (!reportRuntime.editorDiff) return;
+    setCareerReportEditorMode("review");
+  }
+
+  function appendReportEditorMessage(role, label, body, tone = role, extra = {}) {
     const next = {
       role: String(role || "system"),
       tone: String(tone || role || "system"),
       label: String(label || role || "System"),
-      body: String(body || "").trim()
+      body: String(body || "").trim(),
+      selectionRef: extra.selectionRef || "",
+      selectionPreview: extra.selectionPreview || "",
+      diffSummary: extra.diffSummary && typeof extra.diffSummary === "object" ? extra.diffSummary : null
     };
     reportRuntime.editorConversation = [
       ...(Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : []),
@@ -3081,131 +4079,147 @@
     if (!host) return;
     const messages = Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : [];
     if (!messages.length) {
-      const selectionText = clipReportEditorText(reportRuntime.editorSelection?.text || "", 120);
-      const hint = selectionText
-        ? `\u5df2\u9009\u4e2d\u5185\u5bb9\uff1a${selectionText}\u3002\u5728\u53f3\u4fa7\u8f93\u5165\u4f60\u5e0c\u671b AI \u600e\u4e48\u4fee\uff0c\u7cfb\u7edf\u4f1a\u5148\u751f\u6210 diff \u5efa\u8bae\uff0c\u4e0d\u4f1a\u81ea\u52a8\u8986\u76d6\u6b63\u6587\u3002`
-        : "\u5148\u5728\u5de6\u4fa7\u9009\u4e2d\u9700\u8981\u4fee\u6539\u7684\u51e0\u884c\uff0c\u6216\u8005\u76f4\u63a5\u5bf9\u6574\u7bc7\u62a5\u544a\u53d1\u8d77\u6da6\u8272\u3002";
-      host.innerHTML = `
-        <div class="report-editor-chat-item system">
-          <span class="report-editor-chat-role">Workflow</span>
-          <p>${esc(hint)}</p>
-        </div>
-      `;
+      host.innerHTML = `<div class="report-editor-chat-item report-editor-chat-item--empty"><p>\u6682\u65e0\u5bf9\u8bdd\u8bb0\u5f55\u3002\u9876\u90e8\u300c\u5f53\u524d\u4fee\u6539\u610f\u56fe\u300d\u5df2\u6982\u62ec\u64cd\u4f5c\u63d0\u793a\u3002</p></div>`;
       return;
     }
     host.innerHTML = messages.map((item) => `
       <div class="report-editor-chat-item ${esc(item?.tone || item?.role || "system")}">
         <span class="report-editor-chat-role">${esc(item?.label || item?.role || "System")}</span>
+        ${item?.selectionRef ? `
+          <div class="report-editor-selection-ref">
+            <strong>${esc(item.selectionRef)}</strong>
+            <small>${esc(item.selectionPreview || "已按行附带原文上下文")}</small>
+          </div>
+        ` : ""}
         <p>${esc(item?.body || "")}</p>
+        ${item?.diffSummary ? `
+          <div class="report-editor-diff-mini">
+            <div class="report-editor-diff-mini-head">
+              <div class="report-editor-diff-mini-counts">
+                <span class="plus">+${Number(item.diffSummary.addLines || 0)}</span>
+                <span class="minus">-${Number(item.diffSummary.delLines || 0)}</span>
+              </div>
+              <button type="button" data-editor-open-review="1">Review 全屏</button>
+            </div>
+            <ul>
+              ${(Array.isArray(item.diffSummary.preview) ? item.diffSummary.preview : []).map((line) => `<li>${esc(line)}</li>`).join("")}
+            </ul>
+          </div>
+        ` : ""}
       </div>
     `).join("");
+    host.querySelectorAll("[data-editor-open-review]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openReportEditorReviewPanel();
+      });
+    });
     host.scrollTop = host.scrollHeight;
   }
 
-  function renderReportEditorCheckPanel(checkResult) {
-    const panel = document.getElementById("reportEditorCheckPanel");
-    if (!panel) return;
-    const result = checkResult && typeof checkResult === "object" ? checkResult : null;
-    const issues = Array.isArray(result?.issues) ? result.issues : [];
-    if (!result) {
-      panel.classList.add("hidden");
-      panel.innerHTML = "";
-      return;
-    }
-    const statusLabel = result.status === "pass"
-      ? "\u901a\u8fc7"
-      : `\u5f85\u5904\u7406 ${issues.length} \u9879`;
-    panel.classList.remove("hidden");
-    panel.innerHTML = `
-      <div class="report-editor-diff-head">
-        <div>
-          <p class="report-editor-kicker">Completeness Check</p>
-          <h3 class="report-editor-title">\u5185\u5bb9\u5b8c\u6574\u6027\u4e0e\u53ef\u89e3\u91ca\u6027\u68c0\u67e5</h3>
-        </div>
-        <span>${esc(statusLabel)}</span>
-      </div>
-      ${issues.length ? issues.map((item) => `
-        <div class="report-editor-check-item">
-          <strong>${esc(item?.type || "issue")}</strong>
-          <div>${esc(item?.message || "\u5b58\u5728\u5f85\u5904\u7406\u95ee\u9898")}</div>
-        </div>
-      `).join("") : `
-        <div class="report-editor-check-item">
-          <strong>\u68c0\u67e5\u901a\u8fc7</strong>
-          <div>\u5f53\u524d\u62a5\u544a\u7ed3\u6784\u5b8c\u6574\uff0c\u5173\u952e\u5224\u65ad\u4e0e\u8bc1\u636e\u94fe\u8def\u5df2\u8fbe\u5230\u57fa\u672c\u8981\u6c42\u3002</div>
-        </div>
-      `}
-    `;
-  }
-
   function renderReportEditorDiffPanel() {
-    const panel = document.getElementById("reportEditorDiffPanel");
-    if (!panel) return;
+    const proposedDiff = document.getElementById("reportEditorProposedDiff");
+    const proposedEmpty = document.getElementById("reportEditorProposedEmpty");
+    const changeSummary = document.getElementById("reportEditorChangeSummary");
+    const changeSummaryBody = document.getElementById("reportEditorChangeSummaryBody");
+    const changeSummaryList = document.getElementById("reportEditorChangeSummaryList");
+    const diffActions = document.getElementById("reportEditorDiffActions");
+    const reviewOriginal = document.getElementById("reportEditorReviewOriginalContent");
+    const reviewSuggested = document.getElementById("reportEditorReviewSuggestedContent");
+    const reviewSelectionRef = document.getElementById("reportEditorReviewSelectionRef");
+    const reviewDelta = document.getElementById("reportEditorReviewDeltaList");
+    const reviewAdd = document.getElementById("reportEditorReviewAddedStat");
+    const reviewDel = document.getElementById("reportEditorReviewDeletedStat");
     const diff = reportRuntime.editorDiff;
-    if (!diff || !Array.isArray(diff.diff_blocks) || !diff.diff_blocks.length) {
-      panel.classList.add("hidden");
-      panel.innerHTML = "";
+    const hasDiff = Boolean(diff && Array.isArray(diff.diff_blocks) && diff.diff_blocks.length);
+    const scopeHint = document.getElementById("reportEditorDiffScopeHint");
+    if (!hasDiff) {
+      if (scopeHint) {
+        scopeHint.textContent = "";
+        scopeHint.classList.add("hidden");
+      }
+      if (proposedDiff) {
+        proposedDiff.classList.add("hidden");
+        proposedDiff.innerHTML = "";
+      }
+      if (proposedEmpty) proposedEmpty.classList.remove("hidden");
+      if (changeSummary) changeSummary.classList.add("hidden");
+      if (changeSummaryBody) changeSummaryBody.textContent = "";
+      if (changeSummaryList) {
+        changeSummaryList.innerHTML = "";
+        changeSummaryList.classList.add("hidden");
+      }
+      if (diffActions) diffActions.classList.add("hidden");
+      if (reviewOriginal) reviewOriginal.textContent = "";
+      if (reviewSuggested) reviewSuggested.textContent = "";
+      if (reviewSelectionRef) reviewSelectionRef.textContent = "报告行段";
+      if (reviewDelta) reviewDelta.innerHTML = "<li>暂无待审阅改动</li>";
+      if (reviewAdd) reviewAdd.textContent = "+0";
+      if (reviewDel) reviewDel.textContent = "-0";
+      updateReportEditorAiIntentSummary();
       return;
     }
-    panel.classList.remove("hidden");
-    panel.innerHTML = `
-      <div class="report-editor-diff-head">
-        <div>
-          <p class="report-editor-kicker">Diff Review</p>
-          <h3 class="report-editor-title">AI \u6da6\u8272\u63d0\u6848</h3>
-          <p class="report-editor-meta">\u53f3\u4fa7\u662f\u5efa\u8bae\u7248\uff0c\u5de6\u4fa7\u662f\u539f\u6587\u3002\u4f60\u786e\u8ba4\u540e\u518d Keep All \u5199\u56de\u6b63\u6587\u3002</p>
-        </div>
-        <div class="report-editor-actions">
-          <button type="button" class="career-report-secondary-btn" id="reportEditorUndoBtn">Undo</button>
-          <button type="button" class="career-report-primary-btn" id="reportEditorKeepAllBtn">Keep All</button>
-        </div>
-      </div>
-      <div class="report-editor-diff-compare">
-        <div class="report-editor-diff-card original">
-          <span>Original</span>
-          <pre>${esc(String(diff.original || ""))}</pre>
-        </div>
-        <div class="report-editor-diff-card revised">
-          <span>Suggested</span>
-          <pre>${esc(String(diff.proposed || ""))}</pre>
-        </div>
-      </div>
-      ${diff.diff_blocks.map((block) => {
-        const type = String(block?.type || "equal");
-        const label = type === "add"
-          ? "\u65b0\u589e"
-          : type === "delete"
-            ? "\u5220\u9664"
-            : "\u4fdd\u7559";
-        return `
-          <div class="report-editor-diff-block ${esc(type)}">
-            <strong>${esc(label)}</strong>
-            <pre>${esc(Array.isArray(block?.lines) ? block.lines.join("\n") : "")}</pre>
-          </div>
-        `;
-      }).join("")}
-    `;
-    panel.querySelector("#reportEditorUndoBtn")?.addEventListener("click", () => {
-      clearCareerReportEditorDiff();
-    });
-    panel.querySelector("#reportEditorKeepAllBtn")?.addEventListener("click", () => {
-      applyCareerReportEditorDiff();
-    });
+    const diffSummary = summarizeEditorDiffBlocks(diff.diff_blocks);
+    const semantic = buildSemanticChangeSummary(diff.diff_blocks);
+    if (scopeHint) {
+      const ref = diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
+        ? getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref
+        : "";
+      scopeHint.textContent = ref
+        ? `\u5bf9\u7167\u8303\u56f4\uff1a${ref}\uff08\u4e0e\u5de6\u4fa7\u539f\u6587\u5e76\u6392\u67e5\u770b\uff09`
+        : "\u5bf9\u7167\u8303\u56f4\uff1a\u6574\u7bc7\u62a5\u544a\u6b63\u6587\uff08\u4e0e\u5de6\u4fa7\u5e76\u6392\uff09";
+      scopeHint.classList.remove("hidden");
+    }
+    if (proposedDiff) {
+      proposedDiff.classList.remove("hidden");
+      proposedDiff.innerHTML = renderUnifiedDiffMarkup(diff.diff_blocks);
+    }
+    if (proposedEmpty) proposedEmpty.classList.add("hidden");
+    if (changeSummary && changeSummaryBody) {
+      changeSummary.classList.remove("hidden");
+      const narrative = semantic.bullets.length
+        ? `${semantic.intro} \u4e3b\u8981\u8c03\u6574\u5305\u62ec\uff1a${semantic.bullets.slice(0, 4).join("\uff1b")}\u3002`
+        : semantic.intro;
+      changeSummaryBody.textContent = narrative;
+      if (changeSummaryList) {
+        if (semantic.bullets.length) {
+          changeSummaryList.classList.remove("hidden");
+          changeSummaryList.innerHTML = semantic.bullets.map((line) => `<li>${esc(line)}</li>`).join("");
+        } else {
+          changeSummaryList.classList.add("hidden");
+          changeSummaryList.innerHTML = "";
+        }
+      }
+    }
+    if (diffActions) diffActions.classList.remove("hidden");
+    if (reviewOriginal) reviewOriginal.textContent = String(diff.original || "");
+    if (reviewSuggested) reviewSuggested.textContent = String(diff.proposed || "");
+    if (reviewSelectionRef) {
+      const ref = diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
+        ? getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref
+        : "\u6574\u7bc7\u62a5\u544a";
+      reviewSelectionRef.textContent = ref;
+    }
+    if (reviewDelta) {
+      const lines = Array.isArray(diffSummary.preview) && diffSummary.preview.length
+        ? diffSummary.preview
+        : ["+ \u6539\u52a8\u5df2\u751f\u6210\uff0c\u8bf7\u67e5\u770b\u4e2d\u95f4\u5bf9\u6bd4\u5217", "- \u539f\u6587\u4ecd\u5728\u5de6\u4fa7\uff0c\u53ef\u968f\u65f6 Undo"];
+      reviewDelta.innerHTML = lines.map((line) => `<li>${esc(line)}</li>`).join("");
+    }
+    if (reviewAdd) reviewAdd.textContent = `+${Number(diffSummary.addLines || 0)}`;
+    if (reviewDel) reviewDel.textContent = `-${Number(diffSummary.delLines || 0)}`;
+    updateReportEditorAiIntentSummary();
   }
 
   function updateCareerReportEditorSelectionInfo() {
-    const textarea = document.getElementById("reportEditorTextarea");
     const info = document.getElementById("reportEditorSelectionInfo");
-    if (!textarea || !info) return;
-    const start = Number(textarea.selectionStart || 0);
-    const end = Number(textarea.selectionEnd || 0);
-    const length = Math.max(0, end - start);
-    reportRuntime.editorSelection = length > 0
-      ? { start, end, text: textarea.value.slice(start, end) }
-      : null;
-    info.textContent = length > 0
-      ? `\u5df2\u9009\u4e2d ${length} \u4e2a\u5b57\u7b26\uff0c\u53ef\u4ee5\u53ea\u9488\u5bf9\u5f53\u524d\u7247\u6bb5\u53d1\u8d77 AI \u6da6\u8272\u3002`
-      : "\u672a\u9009\u4e2d\u6587\u672c\uff0c\u53d1\u8d77\u6da6\u8272\u65f6\u4f1a\u9ed8\u8ba4\u9488\u5bf9\u6574\u7bc7\u62a5\u544a\u3002";
+    if (!info) return;
+    const selection = reportRuntime.editorSelection;
+    const length = Math.max(0, Number(selection?.end || 0) - Number(selection?.start || 0));
+    info.textContent = selection && length > 0
+      ? `${selection.ref || "\u9009\u4e2d\u7247\u6bb5"}（${length} 字符），发送后将作为引用上下文附带给 AI。`
+      : "\u672a\u9009\u4e2d\u5185\u5bb9\uff0c\u53d1\u8d77\u6da6\u8272\u65f6\u9ed8\u8ba4\u9488\u5bf9\u6574\u7bc7\u62a5\u544a\u3002";
+    updateReportEditorAiIntentSummary();
+    renderReportEditorPromptSelectionPills();
     renderReportEditorChatLog();
   }
 
@@ -3213,6 +4227,7 @@
     const hadDiff = Boolean(reportRuntime.editorDiff);
     reportRuntime.editorDiff = null;
     renderReportEditorDiffPanel();
+    if (!options.keepMode) setCareerReportEditorMode("edit");
     if (!options.silent && hadDiff) {
       appendReportEditorMessage("assistant", "Undo", "\u5df2\u64a4\u9500\u5f53\u524d\u6da6\u8272\u63d0\u6848\uff0c\u6b63\u6587\u672a\u53d1\u751f\u53d8\u5316\u3002");
     }
@@ -3225,15 +4240,13 @@
     if (!textarea || !diff) return;
     if (diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)) {
       textarea.value = `${textarea.value.slice(0, diff.selection.start)}${diff.proposed}${textarea.value.slice(diff.selection.end)}`;
-      const cursor = diff.selection.start + String(diff.proposed || "").length;
-      textarea.focus();
-      textarea.setSelectionRange(cursor, cursor);
     } else {
       textarea.value = String(diff.proposed || "");
-      textarea.focus();
-      textarea.setSelectionRange(0, 0);
     }
-    clearCareerReportEditorDiff({ silent: true });
+    clearCareerReportEditorDiff({ silent: true, keepMode: true });
+    clearCareerReportEditorSelection({ render: false });
+    renderCareerReportEditorDocument();
+    setCareerReportEditorMode("edit");
     appendReportEditorMessage("assistant", "Applied", "\u5df2\u5c06\u5f53\u524d AI \u5efa\u8bae\u5199\u56de\u7f16\u8f91\u533a\uff0c\u4f60\u53ef\u4ee5\u7ee7\u7eed\u4fee\u6539\u6216\u76f4\u63a5\u5bfc\u51fa DOCX\u3002");
     updateCareerReportEditorSelectionInfo();
     renderReportEditorChatLog();
@@ -3253,6 +4266,11 @@
     reportRuntime.editorDiff = null;
     reportRuntime.editorConversation = [];
     reportRuntime.editorSelection = null;
+    reportRuntime.editorSegments = [];
+    reportRuntime.editorSelectedRange = null;
+    reportRuntime.editorAnchorIndex = -1;
+    reportRuntime.editorMode = "edit";
+    reportRuntime.editorViewMode = "rendered";
     if (payload?.bundle && payload.bundle.meta) {
       window.appState.careerReport = payload.bundle;
       window.appState.reportReady = Boolean(payload.bundle.report_document);
@@ -3262,6 +4280,7 @@
     const metaEl = document.getElementById("reportEditorMeta");
     const textarea = document.getElementById("reportEditorTextarea");
     const promptInput = document.getElementById("reportEditorPromptInput");
+    const modelSelect = document.getElementById("reportEditorModelSelect");
     if (titleEl) titleEl.textContent = payload?.title || "\u804c\u4e1a\u62a5\u544a";
     if (metaEl) {
       metaEl.textContent = payload?.source_type === "formal_report"
@@ -3270,12 +4289,18 @@
     }
     if (textarea) textarea.value = String(payload?.markdown || "");
     if (promptInput) promptInput.value = "";
+    if (modelSelect) {
+      const remembered = String(window.localStorage?.getItem?.("career_report_polish_model") || "").trim();
+      modelSelect.value = remembered || "deepseek-chat";
+    }
     renderReportEditorSnapshotList(payload);
-    renderReportEditorSectionMap(payload);
-    renderReportEditorCheckPanel(payload?.completeness_check || null);
+    updateReportEditorNavProgress(payload);
+    renderCareerReportEditorDocument();
     renderReportEditorDiffPanel();
     updateCareerReportEditorSelectionInfo();
     renderReportEditorChatLog();
+    autoResizeReportEditorPromptInput();
+    setCareerReportEditorMode("edit");
     return payload;
   }
 
@@ -3290,6 +4315,8 @@
     reportRuntime.previousBodyOverflow = document.body.style.overflow || "";
     document.body.style.overflow = "hidden";
     overlay.classList.remove("hidden");
+    setReportEditorRailTab();
+    setCareerReportEditorMode("edit");
   }
 
   function closeCareerReportEditor() {
@@ -3297,76 +4324,76 @@
     if (!overlay) return;
     overlay.classList.add("hidden");
     document.body.style.overflow = reportRuntime.previousBodyOverflow;
-  }
-
-  async function checkCareerReportEditorCompleteness() {
-    const source = reportRuntime.editorSource || {};
-    const textarea = document.getElementById("reportEditorTextarea");
-    const payload = await requestJsonSafe("/api/career-report/snapshot/check", {
-      method: "POST",
-      body: {
-        report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
-        snapshot_id: source.snapshot_id || "",
-        markdown: textarea?.value || ""
-      }
-    });
-    if (source && typeof source === "object") {
-      source.completeness_check = payload?.completeness_check || null;
-    }
-    renderReportEditorCheckPanel(payload?.completeness_check || null);
-    appendReportEditorMessage("assistant", "Check", "\u5b8c\u6574\u6027\u68c0\u67e5\u5df2\u66f4\u65b0\uff0c\u53ef\u4ee5\u6839\u636e\u4e0b\u65b9\u95ee\u9898\u9879\u7ee7\u7eed\u8865\u5145\u6216\u4fee\u6539\u3002");
-    renderReportEditorChatLog();
-    toast("\u68c0\u67e5\u5b8c\u6210", "\u5df2\u66f4\u65b0\u5f53\u524d\u6587\u7a3f\u7684\u5b8c\u6574\u6027\u4e0e\u53ef\u89e3\u91ca\u6027\u68c0\u67e5\u7ed3\u679c\u3002", "success", 1800);
+    setCareerReportEditorMode("edit");
   }
 
   async function polishCareerReportEditorSelection() {
     const source = reportRuntime.editorSource || {};
     const textarea = document.getElementById("reportEditorTextarea");
     const promptInput = document.getElementById("reportEditorPromptInput");
+    const modelSelect = document.getElementById("reportEditorModelSelect");
     if (!textarea) return;
     const selection = reportRuntime.editorSelection;
     const targetText = selection?.text || textarea.value || "";
     const instruction = String(promptInput?.value || "").trim();
+    const model = String(modelSelect?.value || "deepseek-chat").trim() || "deepseek-chat";
+    if (window.localStorage?.setItem) {
+      window.localStorage.setItem("career_report_polish_model", model);
+    }
     if (!String(targetText).trim()) {
       toast("\u6682\u65e0\u53ef\u6da6\u8272\u5185\u5bb9", "\u8bf7\u5148\u9009\u62e9\u4e00\u6bb5\u6b63\u6587\uff0c\u6216\u786e\u4fdd\u7f16\u8f91\u533a\u91cc\u5df2\u6709\u62a5\u544a\u5185\u5bb9\u3002", "warning", 1800);
       return;
     }
     const selectionLabel = selection
-      ? `\u9009\u4e2d\u7247\u6bb5\uff1a${clipReportEditorText(selection.text, 96)}`
+      ? `${selection.ref || "\u9009\u4e2d\u7247\u6bb5"}`
       : "\u5f53\u524d\u6309\u6574\u7bc7\u62a5\u544a\u8fdb\u884c\u6da6\u8272";
     appendReportEditorMessage(
       "user",
       "Prompt",
       instruction
-        ? `${instruction}\n${selectionLabel}`
-        : `\u8bf7\u5e2e\u6211\u91cd\u5199\u8fd9\u90e8\u5206\uff0c\u4f46\u4e0d\u8981\u65b0\u589e\u4e8b\u5b9e\u3002\n${selectionLabel}`,
-      "user"
+        ? instruction
+        : "\u8bf7\u5e2e\u6211\u91cd\u5199\u8fd9\u90e8\u5206\uff0c\u4f46\u4e0d\u8981\u65b0\u589e\u4e8b\u5b9e\u3002",
+      "user",
+      {
+        selectionRef: selection ? (selection.ref || selectionLabel || "") : "",
+        selectionPreview: selection?.text ? `${Math.max(0, Number(selection.end || 0) - Number(selection.start || 0))} 字符 · 按行附带上下文` : ""
+      }
     );
     renderReportEditorChatLog();
+    updateReportEditorAiIntentSummary();
     const payload = await requestJsonSafe("/api/career-report/polish", {
       method: "POST",
       body: {
         section_key: source.section_map?.[0]?.key || "",
         selection: selection?.text || "",
         text: selection ? "" : textarea.value,
-        instruction
+        instruction,
+        model,
+        full_text: textarea.value || "",
+        selection_start: selection?.start,
+        selection_end: selection?.end
       }
     });
+    const diffBlocks = Array.isArray(payload?.diff_blocks) ? payload.diff_blocks : [];
     reportRuntime.editorDiff = {
       original: payload?.original || targetText,
       proposed: payload?.proposed || payload?.polished || "",
-      diff_blocks: Array.isArray(payload?.diff_blocks) ? payload.diff_blocks : [],
+      diff_blocks: diffBlocks,
       selection: selection ? { start: selection.start, end: selection.end } : null
     };
+    const diffSummary = summarizeEditorDiffBlocks(diffBlocks);
     appendReportEditorMessage(
       "assistant",
       "AI Draft",
       selection
-        ? "\u5df2\u751f\u6210\u5f53\u524d\u9009\u4e2d\u7247\u6bb5\u7684\u6da6\u8272\u5efa\u8bae\uff0c\u8bf7\u5148\u5bf9\u7167\u53f3\u4fa7 diff\uff0c\u518d\u9009\u62e9 Keep All \u6216 Undo\u3002"
-        : "\u5df2\u751f\u6210\u6574\u7bc7\u62a5\u544a\u7684\u6da6\u8272\u5efa\u8bae\uff0c\u8bf7\u5148\u5bf9\u7167 diff \u518d\u51b3\u5b9a\u662f\u5426\u5199\u56de\u6b63\u6587\u3002"
+        ? `已生成 ${selection.ref || "选中片段"} 的润色提案（${payload?.model || model}）。请在中栏查看绿/灰对比，在右栏阅读摘要后选择「全部采纳」或「撤销提案」。`
+        : `已生成整篇报告的润色提案（${payload?.model || model}）。请在中栏查看绿/灰对比，在右栏阅读摘要后选择「全部采纳」或「撤销提案」。`,
+      "assistant",
+      { diffSummary }
     );
     renderReportEditorDiffPanel();
     renderReportEditorChatLog();
+    setCareerReportEditorMode("edit");
     toast("\u6da6\u8272\u63d0\u6848\u5df2\u751f\u6210", "\u8bf7\u5148\u68c0\u67e5 diff\uff0c\u518d\u51b3\u5b9a\u662f\u5426\u4f7f\u7528 Keep All \u5199\u56de\u6b63\u6587\u3002", "success", 1800);
   }
 
@@ -3404,7 +4431,10 @@
     clearCareerReportEditorDiff({ silent: true });
     appendReportEditorMessage("assistant", "Snapshot", `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`);
     renderReportEditorSnapshotList(reportRuntime.editorSource);
-    renderReportEditorSectionMap(reportRuntime.editorSource);
+    renderReportEditorSectionMap({
+      ...reportRuntime.editorSource,
+      markdown: document.getElementById("reportEditorTextarea")?.value || ""
+    });
     renderReportEditorChatLog();
     window.renderUserCenterDashboard?.();
     toast("\u5feb\u7167\u5df2\u4fdd\u5b58", `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`, "success", 1800);
@@ -3432,23 +4462,227 @@
     anchor.remove();
   }
 
+  const REPORT_EDITOR_LAYOUT_KEY = "career_report_editor_col_layout_v1";
+
+  function applyReportEditorLayoutVars(shell, layout) {
+    if (!shell || !layout || typeof layout !== "object") return;
+    const nav = Number(layout.nav);
+    const rail = Number(layout.rail);
+    const split = Number(layout.split);
+    if (Number.isFinite(nav) && nav >= 160 && nav <= 520) {
+      shell.style.setProperty("--re-nav-w", `${Math.round(nav)}px`);
+    }
+    if (Number.isFinite(rail) && rail >= 200 && rail <= 640) {
+      shell.style.setProperty("--re-rail-w", `${Math.round(rail)}px`);
+    }
+    if (Number.isFinite(split) && split >= 22 && split <= 78) {
+      shell.style.setProperty("--re-compare-split-pct", `${Math.round(split * 100) / 100}%`);
+    }
+  }
+
+  function readReportEditorLayoutFromStorage() {
+    try {
+      const raw = window.localStorage?.getItem?.(REPORT_EDITOR_LAYOUT_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function persistReportEditorLayout(shell) {
+    if (!shell) return;
+    const cs = getComputedStyle(shell);
+    const nav = parseFloat(cs.getPropertyValue("--re-nav-w")) || 240;
+    const rail = parseFloat(cs.getPropertyValue("--re-rail-w")) || 300;
+    const sp = cs.getPropertyValue("--re-compare-split-pct").trim();
+    const split = parseFloat(sp) || 50;
+    try {
+      window.localStorage?.setItem?.(
+        REPORT_EDITOR_LAYOUT_KEY,
+        JSON.stringify({
+          nav: Math.round(nav),
+          rail: Math.round(rail),
+          split: Math.round(split * 10) / 10
+        })
+      );
+    } catch (_) {
+      /* ignore quota */
+    }
+  }
+
+  function initReportEditorColumnResizers() {
+    const shell = document.querySelector(".report-editor-shell.report-editor-shell--polish-v2");
+    if (!shell || shell.dataset.reportEditorResizersBound === "1") return;
+    shell.dataset.reportEditorResizersBound = "1";
+    applyReportEditorLayoutVars(shell, readReportEditorLayoutFromStorage());
+
+    const getBody = () => shell.querySelector(".report-editor-body");
+    const getNav = () => shell.querySelector(".report-editor-nav-rail");
+    const getRail = () => shell.querySelector(".report-editor-rail");
+    const getLcr = () => shell.querySelector(".report-editor-lcr");
+
+    function dragStyle(on) {
+      document.body.style.cursor = on ? "col-resize" : "";
+      document.body.style.userSelect = on ? "none" : "";
+    }
+
+    const navHandle = document.getElementById("reportEditorResizerNav");
+    if (navHandle) {
+      navHandle.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const b = getBody();
+        const nav = getNav();
+        if (!b || !nav) return;
+        const startX = e.clientX;
+        const startNav = nav.getBoundingClientRect().width;
+        const maxNav = Math.min(520, b.getBoundingClientRect().width * 0.48);
+        navHandle.classList.add("is-dragging");
+        dragStyle(true);
+        const onMove = (ev) => {
+          const dx = ev.clientX - startX;
+          let next = startNav + dx;
+          next = Math.max(160, Math.min(next, maxNav));
+          shell.style.setProperty("--re-nav-w", `${Math.round(next)}px`);
+        };
+        const onUp = () => {
+          navHandle.classList.remove("is-dragging");
+          dragStyle(false);
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          persistReportEditorLayout(shell);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+
+    const railHandle = document.getElementById("reportEditorResizerRail");
+    if (railHandle) {
+      const onRailPointerDown = (e) => {
+        if (!e.isPrimary || e.button !== 0) return;
+        e.preventDefault();
+        const b = getBody();
+        const rail = getRail();
+        if (!b || !rail) return;
+        const startX = e.clientX;
+        const cs = getComputedStyle(shell);
+        const parsed = parseFloat(cs.getPropertyValue("--re-rail-w"));
+        const startRail = Number.isFinite(parsed) && parsed > 0 ? parsed : rail.getBoundingClientRect().width;
+        const maxRail = Math.min(640, b.getBoundingClientRect().width * 0.55);
+        railHandle.classList.add("is-dragging");
+        dragStyle(true);
+        try {
+          railHandle.setPointerCapture(e.pointerId);
+        } catch (_) {
+          /* ignore */
+        }
+        const onMove = (ev) => {
+          if (ev.pointerId !== e.pointerId) return;
+          const dx = ev.clientX - startX;
+          let next = startRail + dx;
+          next = Math.max(200, Math.min(next, maxRail));
+          shell.style.setProperty("--re-rail-w", `${Math.round(next)}px`);
+        };
+        const onUp = (ev) => {
+          if (ev && ev.pointerId !== e.pointerId) return;
+          try {
+            railHandle.releasePointerCapture(e.pointerId);
+          } catch (_) {
+            /* ignore */
+          }
+          railHandle.classList.remove("is-dragging");
+          dragStyle(false);
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.removeEventListener("pointercancel", onUp);
+          persistReportEditorLayout(shell);
+        };
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp);
+        document.addEventListener("pointercancel", onUp);
+      };
+      railHandle.addEventListener("pointerdown", onRailPointerDown);
+    }
+
+    const cmpHandle = document.getElementById("reportEditorResizerCompare");
+    const lcrRow = getLcr();
+    if (cmpHandle && lcrRow) {
+      cmpHandle.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const startX = e.clientX;
+        const rowW = lcrRow.getBoundingClientRect().width;
+        const orig = shell.querySelector(".report-editor-compare-pane--orig");
+        if (!orig || rowW < 120) return;
+        const startPct = (orig.getBoundingClientRect().width / rowW) * 100;
+        cmpHandle.classList.add("is-dragging");
+        dragStyle(true);
+        const onMove = (ev) => {
+          const rw = lcrRow.getBoundingClientRect().width;
+          if (rw < 120) return;
+          const dx = ev.clientX - startX;
+          let next = startPct + (dx / rw) * 100;
+          next = Math.max(24, Math.min(next, 76));
+          shell.style.setProperty("--re-compare-split-pct", `${next.toFixed(2)}%`);
+        };
+        const onUp = () => {
+          cmpHandle.classList.remove("is-dragging");
+          dragStyle(false);
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          persistReportEditorLayout(shell);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+  }
+
   function bindCareerReportEditorEvents() {
     if (reportRuntime.editorEventsBound) return;
     reportRuntime.editorEventsBound = true;
-    const textarea = document.getElementById("reportEditorTextarea");
     const promptInput = document.getElementById("reportEditorPromptInput");
+    const renderedDoc = document.getElementById("reportEditorRenderedDoc");
+    const textarea = document.getElementById("reportEditorTextarea");
     const runPolish = () => {
       void polishCareerReportEditorSelection().catch((error) => {
         toast("\u6da6\u8272\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
       });
     };
-    textarea?.addEventListener("select", updateCareerReportEditorSelectionInfo);
-    textarea?.addEventListener("keyup", updateCareerReportEditorSelectionInfo);
-    textarea?.addEventListener("mouseup", updateCareerReportEditorSelectionInfo);
-    document.getElementById("reportEditorCheckBtn")?.addEventListener("click", () => {
-      void checkCareerReportEditorCompleteness().catch((error) => {
-        toast("\u68c0\u67e5\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+    document.querySelectorAll("[data-editor-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextMode = String(button.dataset.editorMode || "").trim().toLowerCase();
+        if (nextMode === "review" && !reportRuntime.editorDiff) {
+          toast("\u6682\u65e0\u53ef\u5ba1\u9605\u7684\u6539\u52a8", "\u8bf7\u5148\u53d1\u9001\u6da6\u8272\u8bf7\u6c42\uff0c\u751f\u6210 diff \u540e\u518d\u8fdb\u5165 Review\u3002", "warning", 2000);
+          return;
+        }
+        setCareerReportEditorMode(nextMode);
       });
+    });
+    document.getElementById("reportEditorBackToReportBtn")?.addEventListener("click", () => {
+      closeCareerReportEditor();
+    });
+    document.getElementById("reportEditorBackToEditBtn")?.addEventListener("click", () => {
+      setCareerReportEditorMode("edit");
+    });
+    document.getElementById("reportEditorUndoBtn")?.addEventListener("click", () => {
+      clearCareerReportEditorDiff();
+    });
+    document.getElementById("reportEditorKeepAllBtn")?.addEventListener("click", () => {
+      applyCareerReportEditorDiff();
+    });
+    document.getElementById("reportEditorUndoInlineBtn")?.addEventListener("click", () => {
+      clearCareerReportEditorDiff();
+    });
+    document.getElementById("reportEditorKeepAllInlineBtn")?.addEventListener("click", () => {
+      applyCareerReportEditorDiff();
+    });
+    document.getElementById("reportEditorClearSelectionBtn")?.addEventListener("click", () => {
+      clearCareerReportEditorSelection();
+    });
+    document.getElementById("reportEditorViewToggleBtn")?.addEventListener("click", () => {
+      setCareerReportEditorViewMode(reportRuntime.editorViewMode === "markdown" ? "rendered" : "markdown");
     });
     document.getElementById("reportEditorPolishBtn")?.addEventListener("click", runPolish);
     document.getElementById("reportEditorPromptSendBtn")?.addEventListener("click", runPolish);
@@ -3456,15 +4690,42 @@
       if (promptInput) {
         promptInput.value = "";
         promptInput.focus();
+        autoResizeReportEditorPromptInput();
       }
       appendReportEditorMessage("system", "Prompt", "\u5df2\u6e05\u7a7a\u5f53\u524d\u6da6\u8272\u6307\u4ee4\u3002", "system");
       renderReportEditorChatLog();
+      updateReportEditorAiIntentSummary();
     });
     promptInput?.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
         event.preventDefault();
         runPolish();
       }
+    });
+    promptInput?.addEventListener("input", () => {
+      autoResizeReportEditorPromptInput();
+      updateReportEditorAiIntentSummary();
+    });
+    renderedDoc?.addEventListener("mouseup", () => {
+      window.setTimeout(() => {
+        syncCareerReportEditorSelectionFromRendered();
+      }, 0);
+    });
+    renderedDoc?.addEventListener("dblclick", () => {
+      setCareerReportEditorViewMode("markdown");
+      const selection = reportRuntime.editorSelection;
+      if (textarea && selection && Number.isFinite(selection.start) && Number.isFinite(selection.end)) {
+        textarea.setSelectionRange(selection.start, selection.end);
+      }
+    });
+    textarea?.addEventListener("mouseup", syncCareerReportEditorSelectionFromTextarea);
+    textarea?.addEventListener("keyup", syncCareerReportEditorSelectionFromTextarea);
+    textarea?.addEventListener("input", () => {
+      renderCareerReportEditorDocument();
+      syncCareerReportEditorSelectionFromTextarea();
+    });
+    textarea?.addEventListener("dblclick", () => {
+      setCareerReportEditorViewMode("rendered");
     });
     document.getElementById("reportEditorSaveBtn")?.addEventListener("click", () => {
       void saveCareerReportEditorSnapshot().catch((error) => {
@@ -3479,6 +4740,8 @@
         closeCareerReportEditor();
       }
     });
+    autoResizeReportEditorPromptInput();
+    initReportEditorColumnResizers();
   }
 
   async function fetchCareerReportVersion(reportId) {
@@ -3516,10 +4779,19 @@
       : null;
     const roles = Array.isArray(window.appState?.matchingRoles) ? window.appState.matchingRoles : [];
     if (!profile || !roles.length) return null;
+    const focusId = String(window.appState?.focusedRoleId || roles[0]?.id || "").trim();
+    let role_rankings;
+    if (typeof window.buildReportRoleRankingsForPayload === "function") {
+      role_rankings = window.buildReportRoleRankingsForPayload(roles, focusId);
+    } else {
+      const focus = roles.find((r) => r && String(r.id) === focusId) || roles[0];
+      const rest = roles.filter((r) => r && String(r.id) !== String(focus.id));
+      role_rankings = rest.length ? [focus, rest[0]] : [focus];
+    }
     return {
       profile_snapshot: profile,
-      role_rankings: roles,
-      focus_role_id: String(window.appState?.focusedRoleId || roles[0]?.id || "").trim()
+      role_rankings: role_rankings,
+      focus_role_id: focusId
     };
   }
 
@@ -3584,13 +4856,14 @@
     toast("报告已自动保存", "每次生成完成后，系统都会自动写入新的报告版本。", "success", 2000);
   }
 
-  function exportReport(format = "html") {
+  function exportReport(format = "pdf") {
     if (!window.appState?.careerReport?.report_document) {
       toast("暂无可导出报告", "请先生成完整职业报告。", "warning", 1800);
       return;
     }
-    const normalized = String(format || "html").trim().toLowerCase();
-    const exportFormat = normalized === "md" ? "md" : normalized === "docx" ? "docx" : "html";
+    const normalized = String(format || "pdf").trim().toLowerCase();
+    const allowed = new Set(["md", "docx", "html", "pdf"]);
+    const exportFormat = allowed.has(normalized) ? normalized : "pdf";
     const reportId = String(window.appState?.careerReport?.meta?.report_id || "").trim();
     const url = new URL(resolveUrl("/api/career-report/export"), window.location.origin);
     url.searchParams.set("format", exportFormat);
@@ -3621,11 +4894,15 @@
     const displayName = user?.display_name || user?.displayName || user?.username || "U";
     const fallback = avatarState ? displayName.charAt(0).toUpperCase() : (user?.role === "super_admin" ? "管" : displayName.charAt(0).toUpperCase());
 
+    element.style.borderRadius = "50%";
+    element.style.overflow = "hidden";
+
     if (avatarState?.image_url) {
       element.textContent = "";
       element.style.backgroundImage = `url("${avatarState.image_url.replace(/"/g, "%22")}")`;
       element.style.backgroundSize = "cover";
       element.style.backgroundPosition = "center";
+      element.style.backgroundRepeat = "no-repeat";
       element.style.color = "transparent";
       return;
     }
@@ -3634,13 +4911,16 @@
     element.style.backgroundImage = "";
     element.style.backgroundSize = "";
     element.style.backgroundPosition = "";
+    element.style.backgroundRepeat = "";
     element.style.color = "";
   }
 
   function renderTopbarAvatar() {
     const user = currentUser();
     const avatar = avatarRuntime.state;
-    applyAvatarToElement(document.getElementById("currentUserAvatar"), avatar, user);
+    document.querySelectorAll("#currentUserAvatar").forEach((el) => {
+      applyAvatarToElement(el, avatar, user);
+    });
   }
 
   function getAccountAvatarState() {
@@ -4224,31 +5504,6 @@
     };
   }
 
-  function renderReportDashboardHero(data) {
-    return `
-      <section class="crdoc-hero crdoc-reveal is-visible">
-        <div class="crdoc-header-main">
-          <div class="crdoc-header-copy">
-            <span class="crdoc-header-bar" aria-hidden="true"></span>
-            <div>
-              <p class="crdoc-kicker">Career Report</p>
-              <h2>${esc(data.meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
-              <p class="crdoc-hero-summary">${esc(data.headline)}</p>
-              <p class="crdoc-hero-body">${esc(data.rationale)}</p>
-              ${data.headlineBecause.length ? `
-                <div class="crdoc-header-evidence">
-                  <span>\u4e3a\u4ec0\u4e48\u662f\u8fd9\u4e2a\u7ed3\u8bba</span>
-                  ${renderReportChipCloud(data.headlineBecause.map((item) => ({ title: item })), "muted")}
-                </div>
-              ` : ""}
-            </div>
-          </div>
-          ${renderReportFullHeaderMeta(data.bundle, data.tracker)}
-        </div>
-      </section>
-    `;
-  }
-
   function renderReportDashboardPositionSection(data) {
     const issueItems = normalizeReportDocItems(data.gaps).slice(0, 4);
     const evidenceTrace = normalizeReportDocItems(data.evidenceHealth.evidence_trace).slice(0, 3);
@@ -4559,26 +5814,153 @@
     `;
   }
 
+  function renderReportReaderTocIcon(targetId = "") {
+    const id = String(targetId || "").trim().toLowerCase();
+    if (id.includes("industry")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"></path><path d="M6 18V8"></path><path d="M12 18V5"></path><path d="M18 18v-7"></path></svg>`;
+    }
+    if (id.includes("position")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20v-6"></path><path d="M12 4 5 9l7 5 7-5-7-5Z"></path></svg>`;
+    }
+    if (id.includes("resume")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg>`;
+    }
+    if (id.includes("competency")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 6 7v5c0 4 2.8 6.5 6 8 3.2-1.5 6-4 6-8V7l-6-3Z"></path><path d="m9.5 12 1.7 1.7 3.3-3.4"></path></svg>`;
+    }
+    if (id.includes("match")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 9 17l11-11"></path><path d="M4 7.5 9 12"></path></svg>`;
+    }
+    if (id.includes("path")) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18c3.5 0 3.5-12 7-12s3.5 12 7 12"></path><circle cx="5" cy="18" r="1.6"></circle><circle cx="12" cy="6" r="1.6"></circle><circle cx="19" cy="18" r="1.6"></circle></svg>`;
+    }
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg>`;
+  }
+
+  function renderReportReaderHeroOrb(score = 0, label = "") {
+    const safeScore = Math.max(0, Math.min(100, Number(score || 0)));
+    const dash = ((safeScore / 100) * 264).toFixed(1);
+    return `
+      <div class="crdoc-reader-orb">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(148,163,184,0.24)" stroke-width="8"></circle>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="url(#crdocReaderOrbGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${dash} 264" transform="rotate(-90 50 50)"></circle>
+          <defs>
+            <linearGradient id="crdocReaderOrbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#2563eb"></stop>
+              <stop offset="100%" stop-color="#14b8a6"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="crdoc-reader-orb-copy">
+          <strong>${Math.round(safeScore)}%</strong>
+          <span>${esc(label || "匹配评估")}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderReportReaderToc(bundle) {
+    const items = getReportTocItems(bundle);
+    if (!items.length) return "";
+    return `
+      <nav class="crdoc-reader-toc" aria-label="职业报告目录">
+        ${items.map((item, index) => `
+          <button type="button" class="crdoc-reader-toc-btn" data-report-scroll-target="${esc(item.id || "")}">
+            <span class="crdoc-reader-toc-icon">${renderReportReaderTocIcon(item.id || item.title || "")}</span>
+            <span class="crdoc-reader-toc-copy">
+              <small>${String(index + 1).padStart(2, "0")}</small>
+              <strong>${esc(item.title || `章节 ${index + 1}`)}</strong>
+            </span>
+          </button>
+        `).join("")}
+      </nav>
+    `;
+  }
+
   function renderFullReportHeader(bundle, tracker) {
     const meta = bundle?.meta || {};
+    const reportDocument = bundle?.report_document || {};
+    const dashboardSummary = reportDocument.dashboard_summary || {};
+    const evidenceHealth = reportDocument.evidence_health || {};
+    const planBoard = reportDocument.plan_board || {};
+    const nextActions = reportDocument.next_actions || {};
+    const matchOutput = bundle?.match_output || {};
+    const focusRole = reportDocument.focus_role_name || meta.focus_role_name || tracker?.focus_role_name || "\u5f85\u8bc6\u522b";
+    const fitScore = Math.max(0, Math.min(100, Number(dashboardSummary.fit_score ?? matchOutput.fit_score ?? 0)));
+    const fitBandLabel = getReportUiText(dashboardSummary.fit_band_label) || ({
+      strong: "\u9ad8\u5339\u914d",
+      moderate: "\u4e2d\u7b49\u5339\u914d",
+      weak: "\u4f4e\u5339\u914d",
+      not_ready: "\u5c1a\u9700\u51c6\u5907"
+    }[String(dashboardSummary.fit_band || matchOutput.fit_band || "")] || "\u5f85\u8bc4\u4f30");
     const summary = getReportUiText(
-      bundle?.report_document?.executive_summary || meta.summary,
-      "\u62a5\u544a\u6309\u7167\u884c\u4e1a\u5224\u65ad\u3001\u80fd\u529b\u8bc1\u636e\u3001\u5c97\u4f4d\u5bf9\u6bd4\u548c\u804c\u4e1a\u8def\u5f84\u5c55\u5f00\u3002"
+      reportDocument.executive_summary || meta.summary,
+      "\u4e0b\u65b9\u4e3a\u5408\u5e76\u540e\u7684\u5b8c\u6574\u62a5\u544a\u6b63\u6587\uff0c\u6309\u7ae0\u8282\u9605\u8bfb\u3002"
     );
+    const highlights = normalizeReportDocItems(evidenceHealth.strengths).slice(0, 3);
+    const evidenceCount = Array.isArray(evidenceHealth.evidence_trace) ? evidenceHealth.evidence_trace.length : 0;
+    const actionItems = Array.isArray(planBoard.action_items) && planBoard.action_items.length
+      ? planBoard.action_items
+      : (Array.isArray(nextActions.action_items) ? nextActions.action_items : []);
+    const sectionCount = getReportTocItems(bundle).length || 1;
     return `
-      <section class="ucrd-full-head crdoc-full-head">
-        <div class="crdoc-header-main">
-          <div class="crdoc-header-copy">
+      <section class="ucrd-full-head crdoc-full-head crdoc-reader-hero">
+        <div class="crdoc-header-main crdoc-header-main--reader">
+          <div class="crdoc-header-copy crdoc-header-copy--reader">
             <span class="crdoc-header-bar" aria-hidden="true"></span>
-            <div>
-              <p class="ucrd-kicker">Career Report</p>
+            <div class="crdoc-reader-copy">
+              <p class="ucrd-kicker">Formal Career Report</p>
               <h2 class="ucrd-full-head-title">${esc(meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
               <p class="ucrd-full-head-summary">${esc(summary)}</p>
+              <div class="crdoc-reader-meta">
+                <span>\u4e3b\u7ebf\u5c97\u4f4d\u00a0\u00b7\u00a0${esc(focusRole)}</span>
+                <span>\u751f\u6210\u65f6\u95f4\u00a0\u00b7\u00a0${esc(meta.generated_at || "--")}</span>
+                <span>\u7248\u672c\u00a0\u00b7\u00a0${esc(`v${meta.version || "--"}`)}</span>
+              </div>
+              ${highlights.length ? `
+                <div class="crdoc-reader-highlights">
+                  ${highlights.map((item) => `<span class="crdoc-reader-highlight">${esc(item.title)}</span>`).join("")}
+                </div>
+              ` : ""}
             </div>
           </div>
-          ${renderReportFullHeaderMeta(bundle, tracker)}
+          <div class="crdoc-reader-aside">
+            ${renderReportReaderHeroOrb(fitScore, fitBandLabel)}
+            <div class="crdoc-reader-note">
+              <strong>AI 智能润色与导出</strong>
+              <p>右上角可以继续润色当前职业报告，并导出为 DOCX 或 HTML 版本。</p>
+            </div>
+          </div>
+        </div>
+        <div class="crdoc-reader-statbar">
+          ${renderReportMetricCard("\u76ee\u6807\u5c97\u4f4d", focusRole, "\u5f53\u524d\u62a5\u544a\u4e3b\u7ebf")}
+          ${renderReportMetricCard("\u8bc1\u636e\u7247\u6bb5", String(evidenceCount), evidenceCount ? "\u652f\u6491\u5173\u952e\u5224\u65ad" : "\u7b49\u5f85\u66f4\u591a\u8bc1\u636e", evidenceCount ? "success" : "warn")}
+          ${renderReportMetricCard("\u884c\u52a8\u5efa\u8bae", String(actionItems.length || sectionCount), actionItems.length ? "\u5df2\u53ef\u7ee7\u7eed\u6267\u884c" : "\u7ed3\u6784\u5316\u9605\u8bfb", actionItems.length ? "success" : "")}
         </div>
       </section>
+    `;
+  }
+
+  function renderFullMarkdownReport(bundle) {
+    let raw = String(bundle?.report_document?.markdown || "").trim();
+    if (!raw) {
+      raw = stitchModularMarkdownFromBundle(bundle);
+    }
+    if (raw) {
+      const readingMd = markdownForCareerReportReading(raw);
+      return `
+        <div class="crdoc-page crdoc-page--reader">
+          <section id="cr-full-markdown-anchor" class="career-report-section-card crdoc-article-card career-report-md-wrap">
+            <div class="cr4-module-markdown cr4-module-markdown--reader career-report-md-article">${renderMarkdownBasic(readingMd, { injectHeadingAnchors: true })}</div>
+          </section>
+        </div>
+      `;
+    }
+    return `
+      <div class="crdoc-page crdoc-page--reader">
+        ${renderReportSections(bundle)}
+      </div>
     `;
   }
 
@@ -4586,7 +5968,6 @@
     const data = buildReportDashboardUiData(bundle, tracker);
     return `
       <div class="crdoc-page">
-        ${renderReportDashboardHero(data)}
         <nav class="crdoc-nav" aria-label="\u62a5\u544a\u6bb5\u843d\u5bfc\u822a">
           <button type="button" class="crdoc-nav-btn active" data-report-doc-nav-target="reportDocSection-position" aria-pressed="true">01 \u5f53\u524d\u72b6\u6001</button>
           <button type="button" class="crdoc-nav-btn" data-report-doc-nav-target="reportDocSection-trends" aria-pressed="false">02 \u884c\u4e1a\u8d8b\u52bf</button>

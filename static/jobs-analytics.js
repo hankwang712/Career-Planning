@@ -13,10 +13,18 @@
 
   // ── 配色板 ────────────────────────────────────────────────────────────────
   const PAL = [
-    "#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-    "#ef4444", "#ec4899", "#0ea5e9", "#14b8a6", "#f97316",
-    "#84cc16", "#a855f7", "#64748b", "#eab308", "#22d3ee"
+    "#0f4c81", "#136f8a", "#1c8a8f", "#2e6f95", "#5b7c99",
+    "#7e9ab2", "#a8b9c9", "#d0dde7", "#f2b35d", "#db8a4a",
+    "#79a97d", "#46627d", "#5d7b8f", "#89a8b8", "#bfd2db"
   ];
+  const BRAND = {
+    rangeFill: "rgba(28, 111, 138, 0.20)",
+    rangeStroke: "#1c6f8a",
+    median: "#d8843f",
+    heatmap: "rgba(19, 111, 138, VAR_ALPHA)",
+    textStrong: "#163247",
+    grid: "rgba(148, 163, 184, 0.22)"
+  };
 
   // ── 状态 ──────────────────────────────────────────────────────────────────
   const S = { jobs: [], city: "all", tab: "salary", ready: false, charts: {} };
@@ -153,8 +161,8 @@
           {
             label: "P25-P75 薪资区间",
             data: ranges,
-            backgroundColor: "rgba(99,102,241,0.30)",
-            borderColor: "#6366f1",
+            backgroundColor: BRAND.rangeFill,
+            borderColor: BRAND.rangeStroke,
             borderWidth: 1.5,
             borderSkipped: false
           },
@@ -162,8 +170,8 @@
             type: "line",
             label: "中位月薪 (P50)",
             data: medians,
-            borderColor: "#f97316",
-            backgroundColor: "#f97316",
+            borderColor: BRAND.median,
+            backgroundColor: BRAND.median,
             pointRadius: 5,
             pointHoverRadius: 7,
             borderWidth: 2,
@@ -317,7 +325,7 @@
                 const v = matrix[city][sk];
                 const r = v / maxVal;
                 const alpha = r < 0.01 ? 0 : +(0.08 + r * 0.82).toFixed(2);
-                const fg = r > 0.55 ? "#fff" : "#374151";
+                const fg = r > 0.58 ? "#f8fbfd" : "#284255";
                 return `<td class="ac-hm-val" style="background:rgba(16,185,129,${alpha});color:${fg}" title="${esc(city)} · ${esc(sk)}: ${v}%">${v > 0 ? v + "%" : ""}</td>`;
               }).join("")}
             </tr>`).join("")}
@@ -363,7 +371,7 @@
 
   function _daysPerWeekChart(cities) {
     const dayLabels = ["灵活", "3天/周", "4天/周", "5天/周", "6天/周", "其他"];
-    const colors = ["#10b981", "#06b6d4", "#6366f1", "#f97316", "#ef4444", "#94a3b8"];
+    const colors = ["#6b8fa8", "#4d96b3", "#1c6f8a", "#d8843f", "#b86a5d", "#9aa9b7"];
     const datasets = dayLabels.map((lb, i) => ({
       label: lb,
       data: cities.map(city => {

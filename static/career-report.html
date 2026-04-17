@@ -585,73 +585,127 @@ const ACCENTS = [
   { c:'#f59e0b', glow:'rgba(245,158,11,.13)', shadow:'rgba(245,158,11,.26)', name:'amber'  },
 ];
 
-const DEMO = [
-  { id:'d1', title:'NLP/大模型算法工程师', city:'深圳', level:'L2', cluster:'算法序列',
-    overallScore:82, directionScore:88, skillScore:76, capabilityScore:72, experienceScore:65, majorScore:70, cityScore:100,
-    confidence:'高',
-    fitReason:'方向信号与大模型技术栈高度吻合，目标城市匹配，技能覆盖率良好，综合评分最优。',
-    missingSkills:['PyTorch 调优','分布式训练'],
-    capabilityGaps:['团队协作待加强'],
-    nextActions:['补足 PyTorch 实战项目证据','提升团队协作能力','验证大模型工程师的真实职责','更新简历关键词'],
-    pathOptions:[
-      { label:'晋升路径', text:'NLP/大模型算法工程师 → mcopilot算法工程师 → 图像算法工程师（深度学习）→ 运营总监' },
-      { label:'换岗路径', text:'NLP/大模型算法工程师 → nlp算法开发岗' }
-    ]
-  },
-  { id:'d2', title:'AI应用工程师实习生', city:'北京', level:'L1', cluster:'AI 工程序列',
-    overallScore:79, directionScore:82, skillScore:74, capabilityScore:68, experienceScore:80, majorScore:65, cityScore:62,
-    confidence:'中',
-    fitReason:'AI 应用方向与个人兴趣高度契合，入门级岗位门槛较低，城市偏好略有差距。',
-    missingSkills:['前端框架','API 设计'],
-    capabilityGaps:['工程规范待学习'],
-    nextActions:['完善 AI 应用作品集','学习主流 API 接入实践','联系在校校友了解实习情况'],
-    pathOptions:[
-      { label:'晋升路径', text:'AI应用工程师实习生 → AI开发工程师 → JAVA工程师 → java开发工程师' },
-      { label:'换岗路径', text:'AI应用工程师实习生 → AI开发实习生' }
-    ]
-  },
-  { id:'d3', title:'AI智能体实习生', city:'深圳', level:'L1', cluster:'AI 工程序列',
-    overallScore:84, directionScore:90, skillScore:80, capabilityScore:75, experienceScore:78, majorScore:68, cityScore:100,
-    confidence:'高',
-    fitReason:'智能体方向与个人对大模型工程的兴趣高度重合，城市匹配，综合评分本轮最高。',
-    missingSkills:['多智能体协调','工具链集成'],
-    capabilityGaps:['系统设计待加强'],
-    nextActions:['实现一个完整的 Agent 项目','学习 MCP 协议与工具调用','参与开源智能体框架贡献'],
-    pathOptions:[
-      { label:'晋升路径', text:'AI智能体实习生 → ai工程师 → php开发工程师 → 高级php开发工程师' },
-      { label:'换岗路径', text:'AI智能体实习生 → 游戏开发实习生' }
-    ]
-  },
-  { id:'d4', title:'AI视觉算法实习生(A01026)', city:'北京', level:'L1', cluster:'算法序列',
-    overallScore:72, directionScore:76, skillScore:68, capabilityScore:70, experienceScore:65, majorScore:75, cityScore:62,
-    confidence:'中',
-    fitReason:'视觉算法方向具备一定基础，城市偏好略有差距，需补充 CV 相关项目经验。',
-    missingSkills:['OpenCV 实战','目标检测项目'],
-    capabilityGaps:['实验设计能力待提升'],
-    nextActions:['完成一个完整的 CV 识别项目','学习 YOLO 等主流检测框架','补充数学基础：矩阵运算'],
-    pathOptions:[
-      { label:'晋升路径', text:'AI视觉算法实习生(A01026) → 视觉算法工程师(MJ000888) → Java后台开发 → 算法工程师' },
-      { label:'换岗路径', text:'AI视觉算法实习生 → AI视觉工程师' }
-    ]
-  },
-  { id:'d5', title:'C++软件应届毕业生', city:'上海', level:'L1', cluster:'系统开发序列',
-    overallScore:68, directionScore:65, skillScore:70, capabilityScore:68, experienceScore:72, majorScore:80, cityScore:72,
-    confidence:'中',
-    fitReason:'C++ 基础与系统方向有关联，专业匹配度较好，方向信号稍弱，需补充更多证据。',
-    missingSkills:['并发编程实战','嵌入式系统'],
-    capabilityGaps:['系统底层调试经验不足'],
-    nextActions:['完成一个并发或网络编程项目','补充嵌入式相关经验或课程','研究目标公司的技术栈'],
-    pathOptions:[
-      { label:'晋升路径', text:'C++软件应届毕业生 → C++初级工程师 → C++中级工程师' },
-      { label:'换岗路径', text:'C++软件应届毕业生 → 嵌入式工程师' }
-    ]
-  },
-];
-
 /* ── State ── */
-let results = DEMO;
+let results = [];
 let profileMeta = {};
 let selected = 0;
+
+if (typeof window.__API_BASE__ === "undefined") window.__API_BASE__ = "";
+
+function resolveApiUrl(path) {
+  const p = String(path || "").trim();
+  if (!p) return p;
+  if (/^https?:\/\//i.test(p)) return p;
+  const base = String(window.__API_BASE__ || "").trim().replace(/\/+$/, "");
+  if (p.startsWith("/")) return base ? base + p : p;
+  return base ? base + "/" + p : "/" + p;
+}
+
+function splitCityTokens(value) {
+  return String(value || "")
+    .split(/[,\u3001;；/|｜\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+/** 与岗位探索页同源：服务端 /api/career-graph/match 返回结构，补齐展示字段 */
+function normalizeGraphMatchItem(item) {
+  if (!item || typeof item !== "object") return null;
+  const reasonLines = Array.isArray(item.reasonLines) ? item.reasonLines.map(String) : [];
+  const pathOptions = Array.isArray(item.pathOptions) && item.pathOptions.length
+    ? item.pathOptions
+    : item.path
+      ? [{ label: "主路径", text: String(item.path) }]
+      : [];
+  return {
+    ...item,
+    title: item.title || item.name || "岗位",
+    cluster: item.cluster || item.directionLabel || "",
+    fitReason: item.fitReason || reasonLines.join("；") || "",
+    pathOptions,
+    missingSkills: Array.isArray(item.missingSkills) ? item.missingSkills : [],
+    capabilityGaps: Array.isArray(item.capabilityGaps) ? item.capabilityGaps : [],
+    nextActions: Array.isArray(item.nextActions) ? item.nextActions : []
+  };
+}
+
+function loadMatchResultsFromStorage() {
+  try {
+    let raw = sessionStorage.getItem("career_match_results");
+    let pRaw = sessionStorage.getItem("career_match_profile");
+    if (!raw) raw = localStorage.getItem("career_match_results");
+    if (!pRaw) pRaw = localStorage.getItem("career_match_profile");
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length) {
+      if (pRaw) profileMeta = JSON.parse(pRaw);
+      return parsed.map(normalizeGraphMatchItem).filter(Boolean);
+    }
+  } catch (_) {}
+  return [];
+}
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, {
+    credentials: "include",
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options && options.headers ? options.headers : {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || res.statusText || String(res.status));
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+/** 无本地缓存时：账户内已保存的图谱匹配 → 否则用当前画像调用服务端实时计算（与「开始匹配」一致） */
+async function loadMatchResultsFromServer() {
+  const cmPayload = await fetchJson(resolveApiUrl("/api/user-state/career_matching"));
+  const cm = cmPayload.data && typeof cmPayload.data === "object" ? cmPayload.data : {};
+  const bundle = cm.graph_match_bundle && typeof cm.graph_match_bundle === "object" ? cm.graph_match_bundle : {};
+  const savedResults = Array.isArray(bundle.results) ? bundle.results : [];
+
+  if (savedResults.length) {
+    const meta = bundle.meta && typeof bundle.meta === "object" ? bundle.meta : {};
+    profileMeta = {
+      ...profileMeta,
+      matchBasis: bundle.profile && typeof bundle.profile === "object" ? bundle.profile.matchBasis : profileMeta.matchBasis,
+      matchSource: meta.model ? `图谱匹配 · ${meta.mode || "rerank"} · ${meta.model}` : `图谱匹配 · ${meta.mode || "deterministic"}`,
+      matchSourceShort: meta.model ? "AI 重排" : "图谱评分"
+    };
+    return savedResults.map(normalizeGraphMatchItem).filter(Boolean);
+  }
+
+  const psPayload = await fetchJson(resolveApiUrl("/api/user-state/profile_snapshot"));
+  const snap = psPayload.data && typeof psPayload.data === "object" ? psPayload.data : {};
+  const profile = snap.profile && typeof snap.profile === "object" ? snap.profile : null;
+  if (!profile) return [];
+
+  const cityPreferences = Array.isArray(bundle.city_preferences) && bundle.city_preferences.length
+    ? bundle.city_preferences
+    : splitCityTokens(profile.basics && (profile.basics.target_city || profile.basics.targetCity));
+
+  const matchPayload = await fetchJson(resolveApiUrl("/api/career-graph/match"), {
+    method: "POST",
+    body: JSON.stringify({
+      profile,
+      cityPreferences,
+      limit: 8
+    })
+  });
+  const rec = Array.isArray(matchPayload.recommendations) ? matchPayload.recommendations : [];
+  const mode = matchPayload.mode || "";
+  const model = matchPayload.model || "";
+  profileMeta = {
+    ...profileMeta,
+    matchBasis: "服务端基于全国岗位图谱与当前画像字段实时计算（与岗位探索「开始匹配」同一接口）。",
+    matchSource: model ? `实时匹配 · ${mode} · ${model}` : `实时匹配 · ${mode || "deterministic"}`,
+    matchSourceShort: model ? "AI 重排" : "图谱评分"
+  };
+  return rec.map(normalizeGraphMatchItem).filter(Boolean);
+}
 
 /* ── Utils ── */
 function esc(s) {
@@ -901,29 +955,68 @@ function bindKeyboard() {
   });
 }
 
-/* ── Init ── */
-function init() {
-  try {
-    let raw = sessionStorage.getItem('career_match_results');
-    let pRaw = sessionStorage.getItem('career_match_profile');
-    if (!raw) raw = localStorage.getItem('career_match_results');
-    if (!pRaw) pRaw = localStorage.getItem('career_match_profile');
-    if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) results = parsed; }
-    if (pRaw) profileMeta = JSON.parse(pRaw);
-  } catch (_) {}
+/* ── Empty ── */
+function renderNoResults(message, sub) {
+  const detail = document.getElementById('detail');
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.innerHTML = '';
+  if (detail) {
+    detail.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <p>${esc(message)}${sub ? `<br><span style="font-size:13px;color:var(--t3)">${esc(sub)}</span>` : ''}</p>
+    </div>`;
+  }
+  const countEl = document.getElementById('nav-count');
+  const sourceEl = document.getElementById('ai-source');
+  if (countEl) countEl.textContent = '无推荐数据';
+  if (sourceEl) sourceEl.textContent = '—';
+  const subEl = document.getElementById('nav-subtitle');
+  if (subEl) subEl.textContent = '请从个人中心完成画像与岗位探索匹配';
+}
 
-  /* Nav labels */
+/* ── Init ── */
+async function init() {
+  const detail = document.getElementById('detail');
+  if (detail) {
+    detail.innerHTML = '<div class="empty-state"><p>正在加载真实匹配结果…</p></div>';
+  }
+
+  results = loadMatchResultsFromStorage();
+  if (!results.length) {
+    try {
+      results = await loadMatchResultsFromServer();
+    } catch (e) {
+      const st = e && e.status;
+      if (st === 401) {
+        renderNoResults('需要登录后查看', '请从个人中心登录，并在「岗位探索」完成「开始匹配」，或确保画像已同步。');
+        return;
+      }
+      renderNoResults('加载失败', e.message || '请检查网络后刷新，或从岗位探索页重新匹配。');
+      return;
+    }
+  }
+
+  if (!results.length) {
+    renderNoResults('暂无匹配岗位', '请先在个人中心「岗位探索」点击「开始匹配」，或完善画像后刷新本页。');
+    return;
+  }
+
   const countEl = document.getElementById('nav-count');
   const sourceEl = document.getElementById('ai-source');
   if (countEl) countEl.textContent = `共 ${results.length} 条推荐`;
-  if (sourceEl && profileMeta.matchSource) sourceEl.textContent = profileMeta.matchSource;
+  if (sourceEl) sourceEl.textContent = profileMeta.matchSourceShort || (profileMeta.matchSource ? '服务端' : '图谱');
+
+  const subEl = document.getElementById('nav-subtitle');
+  if (subEl && profileMeta.matchSource) {
+    subEl.textContent = profileMeta.matchSource.length > 42 ? profileMeta.matchSource.slice(0, 40) + '…' : profileMeta.matchSource;
+  }
 
   renderSidebar();
   selectCard(0);
   bindKeyboard();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => { void init(); });
 </script>
 </body>
 </html>

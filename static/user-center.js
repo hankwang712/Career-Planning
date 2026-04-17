@@ -13,7 +13,7 @@ const USER_CENTER_REPORT_MODULES = ["trends", "matching", "plan"];
 
 const userCenterState = {
   activeSection: USER_CENTER_DEFAULT_SECTION,
-  reportViewMode: "dashboard",
+  reportViewMode: "report",
   reportWorkspaceMode: "library",
   reportModule: "trends",
   deletingReportId: "",
@@ -63,7 +63,7 @@ function normalizeUserCenterSection(sectionId) {
 
 function normalizeUserCenterReportViewMode(viewMode) {
   const normalized = String(viewMode || "").trim().toLowerCase();
-  return USER_CENTER_REPORT_VIEW_MODES.includes(normalized) ? normalized : "dashboard";
+  return USER_CENTER_REPORT_VIEW_MODES.includes(normalized) ? normalized : "report";
 }
 
 function normalizeUserCenterReportWorkspaceMode(mode) {
@@ -149,29 +149,22 @@ function switchUserCenterSection(sectionId, options = {}) {
 }
 
 function syncUserCenterSidebarSubnav() {
-  const subnav = document.getElementById("ucReportWorkspaceSubnav");
-  if (!subnav) return;
-  const hasReport = Boolean(window.appState?.reportReady && window.appState?.careerReport?.report_document);
-  const shouldShow = userCenterState.activeSection === "report-workspace"
-    && normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail"
-    && hasReport;
-  subnav.classList.toggle("hidden", !shouldShow);
-  subnav.querySelectorAll("[data-uc-report-module]").forEach((button) => {
-    const moduleKey = String(button.dataset.ucReportModule || "").trim().toLowerCase();
-    const isEditor = moduleKey === "editor";
-    const active = !isEditor && normalizeUserCenterReportModule(userCenterState.reportModule) === moduleKey
-      && normalizeUserCenterReportViewMode(userCenterState.reportViewMode) === "report";
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", active ? "true" : "false");
-  });
+  /* 原侧栏「职业报告」子导航已移除；模块切换在报告阅览区内完成 */
 }
 
 function applyUserCenterReportWorkspaceMode() {
   const mode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
   const libraryShell = document.getElementById("userCenterReportLibraryShell");
   const detailShell = document.getElementById("userCenterReportDetailShell");
-  if (libraryShell) libraryShell.classList.remove("hidden");
-  if (detailShell) detailShell.classList.toggle("hidden", mode !== "detail");
+  const showDetail = mode === "detail";
+  if (libraryShell) {
+    libraryShell.classList.remove("hidden");
+    libraryShell.classList.toggle("uc-report-library-shell--with-detail", showDetail);
+  }
+  if (detailShell) {
+    detailShell.classList.toggle("hidden", !showDetail);
+    detailShell.setAttribute("aria-hidden", showDetail ? "false" : "true");
+  }
   syncUserCenterSidebarSubnav();
 }
 
@@ -193,6 +186,12 @@ function setUserCenterReportWorkspaceMode(mode, options = {}) {
 function openUserCenterReportLibrary() {
   switchUserCenterSection("report-workspace", { updateHash: true });
   setUserCenterReportWorkspaceMode("library");
+  window.requestAnimationFrame(() => {
+    document.getElementById("userCenterReportLibraryShell")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  });
 }
 
 function getUserCenterSelectedJobs() {
@@ -444,6 +443,7 @@ function setUserCenterReportModule(moduleKey, options = {}) {
 async function openUserCenterReportDetail(reportId = "") {
   switchUserCenterSection("report-workspace", { updateHash: true });
   setUserCenterReportWorkspaceMode("detail", { renderPanels: false });
+  setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
   const safeReportId = String(reportId || "").trim();
   const pack = typeof window.getCareerReportVersionList === "function" ? window.getCareerReportVersionList() : { canonicalReportId: "" };
   const canonical = String(pack.canonicalReportId || "").trim();
@@ -612,6 +612,8 @@ function applyUserCenterReportReaderGate() {
   const layout = document.querySelector("#report-workspace .career-report-layout");
   const viewerBtn = document.getElementById("userCenterOpenReportBtn");
   const editorBtn = document.getElementById("userCenterOpenEditorBtn");
+  const exportBtn = document.getElementById("userCenterExportDocxBtn");
+  const exportPdfBtn = document.getElementById("userCenterExportPdfBtn");
   const switchButtons = document.querySelectorAll("[data-user-center-report-view]");
   const workbench = document.querySelector("#report-workspace .uc-report-workbench");
 
@@ -629,6 +631,14 @@ function applyUserCenterReportReaderGate() {
   if (editorBtn) {
     editorBtn.classList.toggle("hidden", workspaceMode !== "detail");
     editorBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+  }
+  if (exportBtn) {
+    exportBtn.classList.toggle("hidden", workspaceMode !== "detail");
+    exportBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+  }
+  if (exportPdfBtn) {
+    exportPdfBtn.classList.toggle("hidden", workspaceMode !== "detail");
+    exportPdfBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
   }
   switchButtons.forEach((button) => {
     const active = String(button.dataset.userCenterReportView || "").trim() === viewMode;
@@ -651,76 +661,84 @@ function getUserCenterReportTone(roleName) {
   return "general";
 }
 
+function renderUserCenterAssetIcon(name, label = "", className = "") {
+  const safeName = String(name || "").trim();
+  if (!safeName) return "";
+  const safeClassName = String(className || "").trim();
+  const classAttr = safeClassName ? ` class="${safeClassName}"` : "";
+  return `<img${classAttr} src="/static/assets/icons/user-center-report/${encodeURIComponent(safeName)}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"${label ? ` data-label="${escHtml(label)}"` : ""}>`;
+}
+
 function renderUserCenterReportIcon(roleName) {
   const tone = getUserCenterReportTone(roleName);
-  if (tone === "tech") {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 7 4 12l4 5M16 7l4 5-4 5M14 4l-4 16"></path>
-      </svg>
-    `;
-  }
-  if (tone === "data") {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 19V9M12 19V5M19 19v-7"></path>
-        <path d="M3 19h18"></path>
-      </svg>
-    `;
-  }
-  if (tone === "content") {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="4" y="3" width="16" height="18" rx="2"></rect>
-        <path d="M8 8h8M8 12h8M8 16h5"></path>
-      </svg>
-    `;
-  }
-  if (tone === "strategy") {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6 19V5"></path>
-        <path d="M6 6h9l-1.6 3L15 12H6"></path>
-        <circle cx="18" cy="17" r="2"></circle>
-      </svg>
-    `;
-  }
-  return `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="5" y="4" width="14" height="16" rx="2"></rect>
-      <path d="M8 8h8M8 12h8M8 16h5"></path>
-    </svg>
-  `;
+  const iconName = `tone-${tone}`;
+  return renderUserCenterAssetIcon(iconName, tone, "uc-report-library-icon-asset uc-report-library-icon-asset--mark");
 }
 
 function renderUserCenterMetaIcon(type) {
-  if (type === "time") {
-    return `
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <circle cx="8" cy="8" r="5.5"></circle>
-        <path d="M8 5.2V8l2 1.3"></path>
-      </svg>
-    `;
-  }
-  if (type === "version") {
-    return `
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <rect x="3" y="3" width="10" height="10" rx="1.5"></rect>
-        <path d="M6 6h4v4H6z"></path>
-      </svg>
-    `;
-  }
+  const iconMap = {
+    latest: "latest",
+    history: "history",
+    time: "time",
+    version: "version",
+    fit: "fit",
+    gap: "gap",
+    action: "action",
+    section: "section",
+    role: "role",
+    major: "major",
+    open: "open",
+    delete: "delete",
+  };
+  return renderUserCenterAssetIcon(iconMap[type] || "open", type, "uc-report-library-icon-asset uc-report-library-icon-asset--meta");
+}
+
+function reportLibraryCardSparkles() {
   return `
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M3 8h10"></path>
-      <path d="M9 4l4 4-4 4"></path>
-    </svg>
+    <div class="uc-report-library-sparkles" aria-hidden="true">
+      <span class="uc-report-library-spark uc-report-library-spark--a"></span>
+      <span class="uc-report-library-spark uc-report-library-spark--b"></span>
+      <span class="uc-report-library-spark uc-report-library-spark--c"></span>
+    </div>`;
+}
+
+function getUserCenterReportSpecialty(title, focusRole = "") {
+  const segments = String(title || "")
+    .split(/[\u00b7\u2022|]/)
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  return segments.find((item) => item && item !== focusRole && !/\u62a5\u544a/.test(item)) || "";
+}
+
+function buildUserCenterReportSummary(item, focusRole, specialty) {
+  const summary = String(item?.summary_excerpt || "").trim();
+  if (summary) return summary;
+  const title = String(item?.title || "").trim();
+  if (!title) {
+    return `${focusRole || "\u8be5\u5c97\u4f4d"}\u5bf9\u5e94\u7684\u6b63\u5f0f\u804c\u4e1a\u62a5\u544a\uff0c\u652f\u6301\u67e5\u770b\u5b8c\u6574\u5185\u5bb9\u3001AI \u6da6\u8272\u4e0e\u591a\u683c\u5f0f\u5bfc\u51fa\u3002`;
+  }
+  const compact = title
+    .split(/[\u00b7\u2022|]/)
+    .map((part) => String(part || "").trim())
+    .filter((part) => part && part !== specialty && part !== focusRole && !/\u62a5\u544a/.test(part));
+  return compact.join(" \u00b7 ") || `${focusRole || "\u8be5\u5c97\u4f4d"}\u5bf9\u5e94\u7684\u6b63\u5f0f\u804c\u4e1a\u62a5\u544a\uff0c\u652f\u6301\u67e5\u770b\u5b8c\u6574\u5185\u5bb9\u3001AI \u6da6\u8272\u4e0e\u591a\u683c\u5f0f\u5bfc\u51fa\u3002`;
+}
+
+function renderUserCenterReportStat(label, value, iconType, tone = "") {
+  const safeTone = String(tone || "").trim();
+  return `
+    <div class="uc-report-library-stat${safeTone ? ` tone-${escHtml(safeTone)}` : ""}">
+      <span class="uc-report-library-stat-label">${renderUserCenterMetaIcon(iconType)}${escHtml(label)}</span>
+      <strong>${escHtml(value)}</strong>
+    </div>
   `;
 }
 
 function renderUserCenterReportLibrary() {
   const host = document.getElementById("userCenterReportLibrary");
   if (!host) return;
+  {
+
   const pack = typeof window.getCareerReportVersionList === "function"
     ? window.getCareerReportVersionList()
     : { versions: [], reportState: null, canonicalReportId: "" };
@@ -729,9 +747,11 @@ function renderUserCenterReportLibrary() {
   const deletingId = String(userCenterState.deletingReportId || "").trim();
   const detailMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail";
   const selectedId = detailMode ? String(appState?.careerReport?.meta?.report_id || "").trim() : "";
+
   const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
     ? `
       <article class="uc-report-library-card uc-report-library-card--pending">
+        ${reportLibraryCardSparkles()}
         <div class="uc-report-library-card-top">
           <div class="uc-report-library-card-mark tone-general">
             ${renderUserCenterReportIcon("")}
@@ -744,7 +764,8 @@ function renderUserCenterReportLibrary() {
             <h4>新的正式职业报告正在生成</h4>
           </div>
         </div>
-        <p class="uc-report-library-title">${escHtml(reportState.stage_detail || "系统正在串联多智能体分析与报告写作。")}</p>
+        <p class="uc-report-library-title">系统正在串联多智能体分析、证据整理与报告写作。</p>
+        <p class="uc-report-library-summary">${escHtml(reportState.stage_detail || "生成完成后，这张卡片会自动进入正式报告卡片库。")}</p>
       </article>
     `
     : "";
@@ -763,33 +784,70 @@ function renderUserCenterReportLibrary() {
     const isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
     const isActive = Boolean(selectedId && rid === selectedId);
     const isDeleting = Boolean(deletingId && rid === deletingId);
-    const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别";
+    const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
     const titleRaw = String(item?.title || "").trim();
     const version = escHtml(item?.version || "--");
     const generatedAt = escHtml(item?.generated_at || "--");
     const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
-    const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
-    const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
+    const specialty = getUserCenterReportSpecialty(titleRaw, focusRoleRaw);
+    const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展正式报告";
+    const summary = buildUserCenterReportSummary(item, focusRoleRaw, specialty);
+    const fitScore = Number(item?.fit_score);
+    const fitLabel = Number.isFinite(fitScore)
+      ? `${Math.round(fitScore)}%`
+      : (String(item?.fit_band_label || "").trim() || "待评估");
+    const fitTone = Number.isFinite(fitScore)
+      ? (fitScore >= 70 ? "high" : fitScore >= 45 ? "mid" : "low")
+      : "neutral";
+    const gapCount = Math.max(0, Number(item?.gap_count || 0));
+    const actionCount = Math.max(0, Number(item?.action_count || 0));
+    const sectionCount = Math.max(0, Number(item?.section_count || 0));
+    const strengthCount = Math.max(0, Number(item?.strength_count || 0));
+    const latestBadgeLabel = isLatest ? "最新版本" : "历史版本";
+    const latestBadgeIcon = isLatest ? "latest" : "history";
+    const summaryBody = clipUserCenterText(summary, 168);
+    const statActionValue = actionCount > 0 ? actionCount : sectionCount;
+
     return `
-      <article class="uc-report-library-card${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
+      <article class="uc-report-library-card tone-${escHtml(tone)}${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
         <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
-        <div class="uc-report-library-card-top">
-          <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
-            ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
-          </div>
-          <div class="uc-report-library-card-head">
-            <div class="uc-report-library-meta">
-              <span class="uc-report-library-badge${isLatest ? "" : " muted"}">${isLatest ? "最新" : "历史"}</span>
-              <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${generatedAt}</span>
+          ${reportLibraryCardSparkles()}
+          <div class="uc-report-library-card-top">
+            <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
+              ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
             </div>
-            <h4>${escHtml(focusRoleRaw)}</h4>
+            <div class="uc-report-library-card-head">
+              <div class="uc-report-library-meta">
+                <span class="uc-report-library-badge${isLatest ? "" : " muted"}">${renderUserCenterMetaIcon(latestBadgeIcon)}${latestBadgeLabel}</span>
+                <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${generatedAt}</span>
+              </div>
+              <h4>${escHtml(focusRoleRaw)}</h4>
+              <p class="uc-report-library-title">${escHtml(subtitle)}</p>
+            </div>
+          </div>
+          <div class="uc-report-library-outline">
+            <span class="uc-report-library-outline-item">${renderUserCenterMetaIcon("role")}${escHtml(focusRoleRaw)}</span>
+            ${specialty ? `<span class="uc-report-library-outline-item">${renderUserCenterMetaIcon("major")}${escHtml(specialty)}</span>` : ""}
+          </div>
+          <p class="uc-report-library-summary">${escHtml(summaryBody)}</p>
+          <div class="uc-report-library-stats">
+            ${renderUserCenterReportStat("契合度", fitLabel, "fit", fitTone)}
+            ${renderUserCenterReportStat("待补强", `${gapCount}`, "gap", gapCount > 0 ? "warn" : "high")}
+            ${renderUserCenterReportStat("行动项", `${statActionValue}`, actionCount > 0 ? "action" : "section", actionCount > 0 ? "accent" : "neutral")}
+          </div>
+        </button>
+        <div class="uc-report-library-foot">
+          <div class="uc-report-library-foot-chips">
+            <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
+            ${strengthCount > 0 ? `<span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("section")}优势 ${escHtml(String(strengthCount))}</span>` : ""}
+          </div>
+          <div class="uc-report-library-foot-actions">
+            <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" aria-label="删除这份报告卡片" ${!rid || isDeleting ? "disabled" : ""}>
+              ${renderUserCenterMetaIcon("delete")}${isDeleting ? "删除中..." : "删除"}
+            </button>
           </div>
         </div>
-        <p class="uc-report-library-title">${escHtml(subtitle)}</p>
-        <div class="uc-report-library-foot">
-          <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
-        </div>
-      </button>
+      </article>
     `;
   }).join("");
 
@@ -806,11 +864,8 @@ function renderUserCenterReportLibrary() {
       void deleteUserCenterReport(button.dataset.reportDeleteId || "");
     });
   });
-}
-
-function renderUserCenterReportLibrary() {
-  const host = document.getElementById("userCenterReportLibrary");
-  if (!host) return;
+  return;
+  }
 
   const pack = typeof window.getCareerReportVersionList === "function"
     ? window.getCareerReportVersionList()
@@ -824,6 +879,7 @@ function renderUserCenterReportLibrary() {
   const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
     ? `
       <article class="uc-report-library-card uc-report-library-card--pending">
+        ${reportLibraryCardSparkles()}
         <div class="uc-report-library-card-top">
           <div class="uc-report-library-card-mark tone-general">
             ${renderUserCenterReportIcon("")}
@@ -862,10 +918,14 @@ function renderUserCenterReportLibrary() {
     const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
     const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
     const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
+    const summaryExtra = titleRaw && titleRaw !== subtitle
+      ? clipUserCenterText(titleRaw, 120)
+      : "";
 
     return `
       <article class="uc-report-library-card${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
         <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
+          ${reportLibraryCardSparkles()}
           <div class="uc-report-library-card-top">
             <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
               ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
@@ -879,12 +939,17 @@ function renderUserCenterReportLibrary() {
             </div>
           </div>
           <p class="uc-report-library-title">${escHtml(subtitle)}</p>
+          ${summaryExtra ? `<p class="uc-report-library-summary">${escHtml(summaryExtra)}</p>` : ""}
         </button>
         <div class="uc-report-library-foot">
-          <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
-          <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
-            ${isDeleting ? "删除中..." : "删除卡片"}
-          </button>
+          <div class="uc-report-library-foot-chips">
+            <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
+          </div>
+          <div class="uc-report-library-foot-actions">
+            <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
+              ${isDeleting ? "删除中..." : "删除卡片"}
+            </button>
+          </div>
         </div>
       </article>
     `;
@@ -1077,8 +1142,8 @@ function renderUserCenterReportOverview() {
   }
   if (heroSublineEl) {
     heroSublineEl.textContent = workspaceMode === "library"
-      ? "先从正式报告卡片库进入，再下钻每一份报告的详情、编辑快照与导出。"
-      : "当前已进入报告详情页，先看概览视图，再下钻完整报告、编辑快照和导出。";
+      ? "先从正式报告卡片库进入，再下钻每一份报告的详情与导出。"
+      : "当前已进入报告详情页，可在概览与完整报告之间切换，并使用编辑与导出。";
   }
 
   if (sublineEl) {
@@ -1297,7 +1362,11 @@ async function saveUserCenterAvatarFromCropper() {
     updated_at: new Date().toLocaleString("zh-CN")
   });
 
-  if (typeof renderTopbarAvatar === "function") renderTopbarAvatar();
+  if (typeof loadAccountAvatarState === "function") {
+    await loadAccountAvatarState(true);
+  } else if (typeof renderTopbarAvatar === "function") {
+    renderTopbarAvatar();
+  }
   closeUserCenterAvatarCropper();
   renderUserCenterIdentity();
   showToast("头像已更新", "右上角头像和个人设置页已同步刷新。", "success", 1800);
@@ -1305,7 +1374,11 @@ async function saveUserCenterAvatarFromCropper() {
 
 async function clearUserCenterAvatar() {
   await saveScopedUserState("account_avatar", null);
-  if (typeof renderTopbarAvatar === "function") renderTopbarAvatar();
+  if (typeof loadAccountAvatarState === "function") {
+    await loadAccountAvatarState(true);
+  } else if (typeof renderTopbarAvatar === "function") {
+    renderTopbarAvatar();
+  }
   renderUserCenterIdentity();
   showToast("头像已移除", "已恢复为默认头像。", "success", 1600);
 }
@@ -1316,43 +1389,11 @@ function bindUserCenterEvents() {
       switchUserCenterSection(button.dataset.target, { updateHash: true });
     });
   });
-  document.querySelectorAll("[data-uc-report-module]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const moduleKey = String(button.dataset.ucReportModule || "").trim().toLowerCase();
-      if (moduleKey === "editor") {
-        if (!window.appState?.careerReport?.report_document && typeof window.restoreLatestCareerReportView === "function") {
-          await window.restoreLatestCareerReportView();
-        }
-        if (!window.appState?.careerReport?.report_document) {
-          showToast("鏆傛棤瀹屾暣鎶ュ憡", "璇峰厛鐢熸垚鑱屼笟鎶ュ憡鍐嶈繘鍏ユ櫤鑳芥鼎鑹层€?", "warning", 2200);
-          return;
-        }
-        setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
-        setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
-        renderUserCenterDashboard();
-        window.openCareerReportEditor?.();
-        return;
-      }
-      if (!window.appState?.careerReport?.report_document && typeof window.restoreLatestCareerReportView === "function") {
-        await window.restoreLatestCareerReportView();
-      }
-      if (!window.appState?.careerReport?.report_document) {
-        showToast("鏆傛棤瀹屾暣鎶ュ憡", "璇峰厛鐢熸垚鑱屼笟鎶ュ憡鍐嶆煡鐪嬬粨鏋溿€?", "warning", 2200);
-        return;
-      }
-      switchUserCenterSection("report-workspace", { updateHash: true });
-      setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
-      setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
-      setUserCenterReportModule(moduleKey, { renderPanels: false });
-      renderUserCenterDashboard();
-    });
-  });
-
   const addRoleButton = document.getElementById("userCenterTargetRoleAddBtn");
   addRoleButton?.addEventListener("click", promptAddUserCenterTargetRole);
   document.querySelectorAll("[data-user-center-report-view]").forEach((button) => {
     button.addEventListener("click", () => {
-      setUserCenterReportViewMode(button.dataset.userCenterReportView || "dashboard");
+      setUserCenterReportViewMode(button.dataset.userCenterReportView || "report");
     });
   });
 
@@ -1467,7 +1508,7 @@ function handleUserCenterUrlChange() {
   } else if (action === "generate") {
     switchUserCenterSection("report-workspace", { updateHash: false });
     setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
-    setUserCenterReportViewMode("dashboard", { renderPanels: false, renderOverview: false });
+    setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
     url.searchParams.delete("action");
     window.history.replaceState({}, "", url.toString());
     void startCareerReportGeneration();
@@ -1477,7 +1518,7 @@ function handleUserCenterUrlChange() {
 
   if (!reportIdOpen && hashSection === "report-workspace") {
     setUserCenterReportWorkspaceMode("library", { renderPanels: false, renderOverview: false });
-    setUserCenterReportViewMode(userCenterState.reportViewMode || "dashboard", { renderPanels: false, renderOverview: false });
+    setUserCenterReportViewMode(userCenterState.reportViewMode || "report", { renderPanels: false, renderOverview: false });
   }
   window.history.replaceState({}, "", url.toString());
   renderUserCenterDashboard();

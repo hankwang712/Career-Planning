@@ -31,9 +31,14 @@ CAREER_REPORT_STAGE_DEFS_LEGACY = [
 
 
 def build_stage_progress(stage_key: str) -> list[dict[str, Any]]:
+    # 与 orchestrator.notify("report_editor", ...) 一致：分章节写作/配图属于最终「报告合成」环节，
+    # 若按未知 key 处理会落到 active_index=0，错误地把行业分析标成进行中。
+    key = str(stage_key or "").strip()
+    if key == "report_editor":
+        key = "report_writer"
     active_index = 0
     for index, item in enumerate(CAREER_REPORT_STAGE_DEFS):
-        if item["key"] == stage_key:
+        if item["key"] == key:
             active_index = index
             break
     progress = []
@@ -71,7 +76,7 @@ def empty_report_state() -> dict[str, Any]:
         "focus_role_id": "",
         "title": "",
         "summary": "",
-        "export_formats": ["html", "md", "docx"],
+        "export_formats": ["pdf", "docx", "md", "html"],
         "tracker": None,
         "feedback": None,
     }

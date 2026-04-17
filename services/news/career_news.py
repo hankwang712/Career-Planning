@@ -30,13 +30,14 @@ CAREER_NEWS_LOCK = threading.Lock()
 
 CAREER_NEWS_TIMEZONE = ZoneInfo("Asia/Shanghai")
 CAREER_NEWS_REFRESH_HOUR = 12
-CAREER_NEWS_DISPLAY_LIMIT = 9
+CAREER_NEWS_DISPLAY_LIMIT = 10
 CAREER_NEWS_FETCH_LIMIT = 180
 CAREER_NEWS_MAX_ITEMS = 50
 CAREER_NEWS_TIMEOUT_SECONDS = 8
 CAREER_NEWS_EMPTY_RETRY_MINUTES = 20
 CAREER_NEWS_MAX_AGE_DAYS = 45
 CAREER_NEWS_DIRECT_MIN_TECH_HITS = 2
+CAREER_NEWS_SUMMARY_FETCH_LIMIT = 12
 CAREER_NEWS_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -799,33 +800,150 @@ def _build_preview_image(url: str) -> str:
     return f"https://s.wordpress.com/mshots/v1/{encoded}?w=1200"
 
 
-def _normalize_news_summary(summary: str, source_name: str, topic_label: str) -> str:
-    text = _clean_text(summary)
-    if text in {"点击查看原文", "点击查看原文>", "点击查看原文 >", "查看原文"}:
-        text = ""
-    if text:
-        return text
-    if source_name and topic_label:
-        return f"{source_name} · {topic_label} 快讯，点击查看原文获取完整内容。"
-    if source_name:
-        return f"{source_name} 快讯，点击查看原文获取完整内容。"
+def _summary_key(text: str) -> str:
+    cleaned = _clean_text(text)
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"[\s>＞:：|｜-]+", "", cleaned)
+    return cleaned.lower()
+
+
+def _is_placeholder_summary(text: str) -> bool:
+    return _summary_key(text) in {
+        "点击查看原文",
+        "点击查看原文>",
+        "查看原文",
+        "readmore",
+        "readmore>",
+        "vieworiginal",
+        "vieworiginal>",
+    }
+
+
+def _build_summary_from_text(text: str, limit: int = 180) -> str:
+    clean = _clean_text(text)
+    if not clean:
+        return ""
+    clean = re.sub(r"(?:查看(?:英文)?原文|read more|view original).*$", "", clean, flags=re.I).strip()
+    if not clean:
+        return ""
+    for sep in ("。", "！", "？", "! ", "? ", ". ", "；", "; "):
+        idx = clean.find(sep)
+        if idx >= 48:
+            candidate = clean[: idx + 1].strip()
+            if candidate and len(candidate) <= limit:
+                return candidate
+    if len(clean) <= limit:
+        return clean
+    return f"{clean[: limit - 1].rstrip()}…"
+
+
+def _build_store_summary_index() -> dict[str, str]:
+    try:
+        from .news_kb import _build_summary_from_content, _is_placeholder_summary as kb_is_placeholder, _load_news_store
+    except Exception:
+        return {}
+
+    index: dict[str, str] = {}
+    for entry in _load_news_store():
+        if not isinstance(entry, dict):
+            continue
+        title_key = _normalize_title_key(str(entry.get("title") or ""))
+        url_key = str(entry.get("url") or "").strip().lower()
+        summary = _clean_text(entry.get("summary"))
+        if not summary or kb_is_placeholder(summary):
+            summary = _build_summary_from_content(str(entry.get("content") or ""))
+        summary = _build_summary_from_text(summary)
+        if not summary:
+            continue
+        if url_key:
+            index[url_key] = summary
+        if title_key and title_key not in index:
+            index[title_key] = summary
+    return index
+
+
+def _lookup_cached_summary(item: dict, store_index: dict[str, str]) -> str:
+    if not store_index:
+        return ""
+    url_key = str(item.get("url") or "").strip().lower()
+    if url_key and store_index.get(url_key):
+        return store_index[url_key]
+    title_key = _normalize_title_key(str(item.get("title") or ""))
+    if title_key and store_index.get(title_key):
+        return store_index[title_key]
     return ""
 
 
-def _decorate_news_item(item: dict) -> dict:
+def _hydrate_item_summaries(items: list[dict]) -> list[dict]:
+    hydrated = [dict(item or {}) for item in list(items or [])]
+    if not hydrated:
+        return hydrated
+
+    store_index = _build_store_summary_index()
+    unresolved: list[dict] = []
+    for item in hydrated:
+        summary = _clean_text(item.get("summary"))
+        item["_requires_real_summary"] = not summary or _is_placeholder_summary(summary)
+        if summary and not _is_placeholder_summary(summary):
+            item["summary"] = summary
+            continue
+        cached = _lookup_cached_summary(item, store_index)
+        if cached:
+            item["summary"] = cached
+            continue
+        unresolved.append(item)
+
+    if unresolved:
+        try:
+            from .article_extract import extract_article_plaintext
+        except Exception:
+            extract_article_plaintext = None
+        if extract_article_plaintext is not None:
+            for item in unresolved[:CAREER_NEWS_SUMMARY_FETCH_LIMIT]:
+                url = str(item.get("url") or "").strip()
+                if not url:
+                    continue
+                text = extract_article_plaintext(url, timeout=CAREER_NEWS_TIMEOUT_SECONDS)
+                summary = _build_summary_from_text(text)
+                if summary:
+                    item["summary"] = summary
+    filtered: list[dict] = []
+    for item in hydrated:
+        requires_real_summary = bool(item.pop("_requires_real_summary", False))
+        summary = _clean_text(item.get("summary"))
+        if _is_placeholder_summary(summary):
+            summary = ""
+        if requires_real_summary and not summary:
+            continue
+        item["summary"] = summary
+        filtered.append(item)
+    return filtered
+
+
+def _normalize_news_summary(summary: str, source_name: str, topic_label: str) -> str:
+    text = _clean_text(summary)
+    if _is_placeholder_summary(text):
+        text = ""
+    if text:
+        return text
+    return ""
+
+
+def _decorate_news_item(item: dict, store_index: dict[str, str] | None = None) -> dict:
     enriched = dict(item or {})
     source_name, source_topic = _split_source_label(str(enriched.get("source") or ""))
     topic_label = str(enriched.get("topic") or source_topic or "").strip()
     domain_label = _extract_domain_label(str(enriched.get("url") or ""))
+    fallback_summary = _build_summary_from_text(str(enriched.get("content") or ""))
+    if not fallback_summary and store_index:
+        fallback_summary = _lookup_cached_summary(enriched, store_index)
     enriched["source_name"] = source_name or str(enriched.get("source") or "").strip()
     enriched["topic_label"] = topic_label
     enriched["domain_label"] = domain_label
     enriched["preview_image"] = _build_preview_image(str(enriched.get("url") or ""))
-    enriched["summary"] = _normalize_news_summary(
-        str(enriched.get("summary") or ""),
-        enriched["source_name"],
-        topic_label,
-    )
+    summary = _normalize_news_summary(str(enriched.get("summary") or ""), enriched["source_name"], topic_label)
+    enriched["summary"] = summary if summary else fallback_summary
     return enriched
 
 
@@ -844,6 +962,7 @@ def get_career_news_payload(
         else:
             items, source_stats = _fetch_latest_career_news()
             if items:
+                items = _hydrate_item_summaries(items)
                 payload = _build_ready_payload(window, items, source_stats, cached_items)
                 _newly_fetched = list(items)
             elif cached and isinstance(cached.get("items"), list) and cached.get("items"):
@@ -870,10 +989,18 @@ def get_career_news_payload(
         threading.Thread(target=_store_to_kb, args=(_newly_fetched,), daemon=True,
                          name="news-kb-store").start()
 
+    raw_items = _sort_and_trim_items_by_time(payload.get("items") if isinstance(payload.get("items"), list) else [])
+    store_index = _build_store_summary_index()
     items = [
-        _decorate_news_item(item)
-        for item in _sort_and_trim_items_by_time(payload.get("items") if isinstance(payload.get("items"), list) else [])
+        _decorate_news_item(item, store_index)
+        for item in raw_items
     ]
+    items = [item for item in items if str(item.get("summary") or "").strip()]
+    if items != raw_items:
+        payload["items"] = items
+        with CAREER_NEWS_LOCK:
+            _write_cached_snapshot(payload)
+
     visible_items, hidden_items = _split_visible_items(items, display_limit)
 
     payload["items"] = items

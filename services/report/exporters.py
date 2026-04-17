@@ -1,16 +1,173 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+
+
+def _strip_pipeline_summary_lines(text: str) -> str:
+    lines: list[str] = []
+    for line in str(text or "").splitlines():
+        t = line.strip()
+        if re.match(r"^(MATCH_SUMMARY|PATH_SUMMARY)\s*:", t, re.I):
+            continue
+        lines.append(line)
+    out = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
+
+
+def strip_machine_readable_markdown_sections(text: str) -> str:
+    """Remove markdown sections whose heading contains「机器可读」(pipeline JSON blocks)."""
+    lines = str(text or "").split("\n")
+    out: list[str] = []
+    skip_depth: Optional[int] = None
+    heading_re = re.compile(r"^(#{1,6})\s+(.*)$")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = heading_re.match(line)
+        if m:
+            depth = len(m.group(1))
+            title = m.group(2) or ""
+            if skip_depth is not None:
+                if depth <= skip_depth:
+                    skip_depth = None
+                    i -= 1
+                    continue
+                i += 1
+                continue
+            if "机器可读" in title:
+                skip_depth = depth
+                i += 1
+                continue
+        if skip_depth is not None:
+            i += 1
+            continue
+        out.append(line)
+        i += 1
+    joined = "\n".join(out)
+    return re.sub(r"\n{3,}", "\n\n", joined).strip()
+
+
+_BR_TAG_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def _is_gfm_table_separator_line(line: str) -> bool:
+    s = line.strip()
+    if not s.startswith("|"):
+        return False
+    return bool(re.search(r"\|\s*:?-{2,}", s))
+
+
+def _is_likely_gfm_table_row(line: str) -> bool:
+    s = line.strip()
+    if not s.startswith("|") or s.count("|") < 2:
+        return False
+    if _is_gfm_table_separator_line(line):
+        return False
+    return True
+
+
+def normalize_br_tags_in_markdown(text: str) -> str:
+    """将模型常输出的 HTML <br> 转为纯 Markdown 友好形式，避免 .md 源文件与简易 HTML 导出中出现裸标签。"""
+    lines = str(text or "").split("\n")
+    out: list[str] = []
+    in_fence = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if in_fence:
+            out.append(line)
+            continue
+        if _is_likely_gfm_table_row(line):
+            out.append(_BR_TAG_RE.sub("；", line))
+        else:
+            out.append(_BR_TAG_RE.sub("\n", line))
+    joined = "\n".join(out)
+    return re.sub(r"\n{3,}", "\n\n", joined)
+
+
+def _extract_inline_images_to_local(text: str) -> str:
+    """将 Markdown/HTML 中内嵌的 base64 图片保存到本地 static/img/report/ 并替换路径。"""
+    import base64
+    import random
+    import string
+
+    report_image_dir = Path(__file__).resolve().parent.parent.parent / "static" / "img" / "report"
+    report_image_dir.mkdir(parents=True, exist_ok=True)
+
+    md_pattern = re.compile(r"!\[([^\]]*)\]\((data:image/([a-zA-Z0-9+.-]+);base64,([^)\s]+))\)")
+    html_pattern = re.compile(r'<img[^>]*src="(data:image/([a-zA-Z0-9+.-]+);base64,([^"\s]+))"[^>]*>')
+
+    def _save(mime_subtype: str, encoded: str) -> str | None:
+        ext = mime_subtype.replace("jpeg", "jpg") if mime_subtype else "png"
+        if not ext or len(ext) > 5:
+            ext = "png"
+        rand = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        filename = f"inline_{rand}.{ext}"
+        target_path = report_image_dir / filename
+        try:
+            data = base64.b64decode(encoded)
+            target_path.write_bytes(data)
+            return f"/static/img/report/{filename}"
+        except Exception:
+            return None
+
+    def _md_replace(match):
+        alt = match.group(1)
+        mime = match.group(3)
+        encoded = match.group(4)
+        local = _save(mime, encoded)
+        return f"![{alt}]({local})" if local else match.group(0)
+
+    def _html_replace(match):
+        mime = match.group(3)
+        encoded = match.group(4)
+        local = _save(mime, encoded)
+        return f"![配图]({local})" if local else match.group(0)
+
+    text = md_pattern.sub(_md_replace, text)
+    text = html_pattern.sub(_html_replace, text)
+    return text
+
+
+def markdown_for_user_reading(text: str) -> str:
+    """HTML/DOCX export: same human-facing text as the report reader (no machine JSON sections)."""
+    cleaned = _extract_inline_images_to_local(text)
+    cleaned = strip_machine_readable_markdown_sections(cleaned)
+    cleaned = normalize_br_tags_in_markdown(cleaned)
+    return _strip_pipeline_summary_lines(cleaned)
+
+
+_DOCX_HEADING_LINE_RE = re.compile(r"^(##|###)\s+")
+
+
+def docx_prepare_markdown(text: str) -> str:
+    """DOCX 专用：在 ``##`` 与 ``###`` 标题前插入空行，便于 Word 中区段分隔。"""
+    lines = str(text or "").splitlines()
+    out: list[str] = []
+    for line in lines:
+        if _DOCX_HEADING_LINE_RE.match(line):
+            if out and out[-1].strip() != "":
+                out.append("")
+        out.append(line)
+    result = "\n".join(out)
+    if str(text or "").endswith("\n"):
+        result += "\n"
+    return result
 
 
 DOCX_MCP_CONDA_ENV = os.environ.get("CAREER_REPORT_DOCX_CONDA_ENV", "yolov11").strip() or "yolov11"
 DOCX_MCP_PYTHON = os.environ.get("CAREER_REPORT_DOCX_PYTHON", "").strip()
+PDF_EXPORT_CONDA_ENV = os.environ.get("CAREER_REPORT_PDF_CONDA_ENV", DOCX_MCP_CONDA_ENV).strip() or DOCX_MCP_CONDA_ENV
 
 
 def _resolve_docx_python(conda_env: str) -> str:
@@ -163,7 +320,7 @@ def _render_markdown_html(markdown_text: str) -> str:
 
 
 def render_markdown_export_html(markdown_text: str, *, title: str = "职业发展报告") -> str:
-    body = _render_markdown_html(markdown_text)
+    body = _render_markdown_html(markdown_for_user_reading(markdown_text))
     safe_title = escape(title or "职业发展报告")
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -239,25 +396,85 @@ def render_report_html(report: dict[str, Any]) -> str:
     return render_markdown_export_html(markdown_text, title=title)
 
 
+def render_html_to_pdf_bytes(html_text: str) -> bytes:
+    """将完整 HTML 转为 PDF。
+
+    使用 PyMuPDF 的 Story 排版（项目已依赖 ``PyMuPDF`` / ``pymupdf``），无需单独安装 WeasyPrint。
+    中文依赖系统已安装字体（如 Windows 下的「微软雅黑」等）。
+    """
+    import io
+
+    import pymupdf as fitz
+
+    text = str(html_text or "").strip()
+    if not text:
+        raise ValueError("empty html for pdf export")
+    mediabox = fitz.paper_rect("a4")
+    where = mediabox + (36, 36, -36, -36)
+    story = fitz.Story(html=text)
+    buf = io.BytesIO()
+    writer = fitz.DocumentWriter(buf)
+    more = 1
+    while more:
+        device = writer.begin_page(mediabox)
+        more, _ = story.place(where)
+        story.draw(device)
+        writer.end_page()
+    writer.close()
+    return buf.getvalue()
+
+
 def export_markdown_to_docx_bytes(
     markdown_text: str,
     *,
     conda_env: str = DOCX_MCP_CONDA_ENV,
     title: str = "career-report",
 ) -> bytes:
-    script = """
+    script = r"""
 from pathlib import Path
 import sys
 from docx_mcp.document import DocxDocument
 from docx_mcp.markdown import MarkdownConverter
 
+
+def _paragraph_has_image(paragraph):
+    for el in paragraph._element.iter():
+        tag = el.tag if isinstance(el.tag, str) else str(el.tag)
+        if tag.endswith("}drawing") or tag.endswith("drawing") or tag.endswith("}pict") or tag.endswith("pict"):
+            return True
+    return False
+
+
+def _center_images_in_docx(path):
+    try:
+        from docx import Document as DocxPy
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        return
+    try:
+        doc = DocxPy(str(path))
+        for p in doc.paragraphs:
+            if _paragraph_has_image(p):
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        if _paragraph_has_image(p):
+                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.save(str(path))
+    except Exception:
+        pass
+
+
 md_path = Path(sys.argv[1])
 docx_path = Path(sys.argv[2])
-markdown = md_path.read_text(encoding='utf-8')
+markdown = md_path.read_text(encoding="utf-8")
 document = DocxDocument.create(str(docx_path))
 MarkdownConverter.convert(document, markdown, base_dir=md_path.parent)
 document.save(str(docx_path))
 document.close()
+_center_images_in_docx(docx_path)
 """
     safe_title = "".join(
         ch if ch.isalnum() or ch in {"-", "_", "."} else "-"
@@ -268,7 +485,26 @@ document.close()
         temp_path = Path(temp_dir)
         md_path = temp_path / "career-report.md"
         docx_path = temp_path / f"{safe_title}.docx"
-        md_path.write_text(markdown_text or "", encoding="utf-8")
+
+        md_content = markdown_for_user_reading(markdown_text) or ""
+
+        # 处理报告本地图片：把 /static/img/report/xxx 复制到临时目录并改写路径
+        import re
+        import shutil
+        project_root = Path(__file__).resolve().parent.parent.parent
+        img_pattern = re.compile(r"!\[([^\]]*)\]\((/static/img/report/[^)]+)\)")
+        for alt, img_path in img_pattern.findall(md_content):
+            local_src = project_root / img_path.lstrip("/")
+            if local_src.exists():
+                dest = temp_path / local_src.name
+                shutil.copy2(str(local_src), str(dest))
+                md_content = md_content.replace(
+                    f"![{alt}]({img_path})",
+                    f"![{alt}](./{local_src.name})"
+                )
+
+        md_content = docx_prepare_markdown(md_content)
+        md_path.write_text(md_content, encoding="utf-8")
         process = subprocess.run(
             [python_exe, "-c", script, str(md_path), str(docx_path)],
             capture_output=True,
@@ -281,3 +517,47 @@ document.close()
         if not docx_path.exists():
             raise RuntimeError("Docx_MCP did not produce a .docx file")
         return docx_path.read_bytes()
+
+
+def export_markdown_to_pdf_via_docx_bytes(
+    markdown_text: str,
+    *,
+    conda_env: str = PDF_EXPORT_CONDA_ENV,
+    title: str = "career-report",
+) -> bytes:
+    """Generate PDF by converting the DOCX export through docx2pdf."""
+    safe_title = "".join(
+        ch if ch.isalnum() or ch in {"-", "_", "."} else "-"
+        for ch in str(title or "career-report")
+    ).strip("-") or "career-report"
+    python_exe = _resolve_docx_python(conda_env)
+    docx_bytes = export_markdown_to_docx_bytes(markdown_text, conda_env=conda_env, title=safe_title)
+    script = r"""
+from pathlib import Path
+import sys
+from docx2pdf import convert
+
+docx_path = Path(sys.argv[1])
+pdf_path = Path(sys.argv[2])
+convert(str(docx_path), str(pdf_path))
+"""
+    with tempfile.TemporaryDirectory(prefix="career-report-pdf-") as temp_dir:
+        temp_path = Path(temp_dir)
+        docx_path = temp_path / f"{safe_title}.docx"
+        pdf_path = temp_path / f"{safe_title}.pdf"
+        docx_path.write_bytes(docx_bytes)
+        process = subprocess.run(
+            [python_exe, "-c", script, str(docx_path), str(pdf_path)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if process.returncode != 0:
+            error = (process.stderr or process.stdout or "").strip()
+            raise RuntimeError(
+                error
+                or "docx2pdf conversion failed. On Windows, Microsoft Word must be installed."
+            )
+        if not pdf_path.exists():
+            raise RuntimeError("docx2pdf did not produce a .pdf file")
+        return pdf_path.read_bytes()
