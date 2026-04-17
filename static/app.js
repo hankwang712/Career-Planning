@@ -6463,17 +6463,20 @@ function _careerNewsScheduleAutoPlay() {
     if (bar) bar.style.width = "0%";
     return;
   }
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reducedMotion) {
     const bar = document.getElementById("careerNewsProgressBar");
     if (bar) bar.style.width = "100%";
-    return;
+    // 仍定时换焦点；仅跳过进度条 RAF（与无障碍「减少动态效果」一致，不停止轮播）
   }
   _careerNewsResetProgressEpoch();
   careerNewsState.autoPlayTimer = window.setInterval(() => {
     careerNewsSlide(1, { fromTimer: true });
     _careerNewsResetProgressEpoch();
   }, 10000);
-  _careerNewsStartProgressLoop();
+  if (!reducedMotion) {
+    _careerNewsStartProgressLoop();
+  }
 }
 
 function _applyCareerNewsBoard(options = {}) {
