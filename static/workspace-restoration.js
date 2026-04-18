@@ -26,10 +26,80 @@
     editorConversation: [],
     editorMode: "edit",
     editorViewMode: "rendered",
+    /** 正文区：preview | edit | diff（对齐 ai润色.html） */
+    editorDocMode: "preview",
     editorSegments: [],
     editorSelectedRange: null,
-    editorAnchorIndex: -1
+    editorAnchorIndex: -1,
+    /** 最近一次成功加载的 `reportId|snapshotId`，用于会话内跳过重复 GET */
+    editorSourceLoadKey: "",
+    /** 同 key 并发 in-flight 合并 */
+    editorSourceInflight: new Map(),
+    /** 右侧栏：chat | changes */
+    editorRailView: "chat",
+    /** 润色 API 请求中：对话区展示占位加载 */
+    editorPolishPending: false,
+    /** Keep All 后保留的 diff 快照，供中间区 Diff 与右侧「改动」继续展示增删 */
+    editorDiffArchive: null,
+    /** 每次「全部采纳」累积的改动条目（右侧列表） */
+    appliedChangeBullets: [],
+    /** 累计行级增删数（角标用） */
+    cumulativeDiffLines: 0,
+    /** 与上次成功「保存」或服务端加载一致的 Markdown 基线；未保存的本地修改不会写回阅览室正式稿 */
+    editorSavedMarkdown: "",
+    editorBeforeUnloadBound: false
   };
+
+  function normalizeEditorMarkdownBaseline(value) {
+    return String(value ?? "").replace(/\r\n/g, "\n");
+  }
+
+  function cloneCareerReportBundleForAppState(bundle) {
+    if (!bundle || typeof bundle !== "object") return bundle;
+    try {
+      return structuredClone(bundle);
+    } catch (_) {
+      try {
+        return JSON.parse(JSON.stringify(bundle));
+      } catch {
+        return bundle;
+      }
+    }
+  }
+
+  function isCareerReportEditorDirty() {
+    const ta = document.getElementById("reportEditorTextarea");
+    if (!ta) return false;
+    return (
+      normalizeEditorMarkdownBaseline(ta.value) !== normalizeEditorMarkdownBaseline(reportRuntime.editorSavedMarkdown)
+    );
+  }
+
+  function updateCareerReportEditorDirtyUi() {
+    const shell = document.querySelector(".report-editor-shell.report-editor-shell--polish-v2");
+    const saveBtn = document.getElementById("reportEditorSaveBtn");
+    const dirty = isCareerReportEditorDirty();
+    shell?.classList.toggle("report-editor-shell--unsaved", dirty);
+    if (saveBtn) {
+      saveBtn.title = dirty
+        ? "\u672a\u4fdd\u5b58\uff1a\u70b9\u300c\u4fdd\u5b58\u300d\u540e\u624d\u4f1a\u5199\u5165\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u9605\u89c8\u5ba4\uff09"
+        : "\u4fdd\u5b58\u7f16\u8f91\u5185\u5bb9\u5e76\u540c\u6b65\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u82e5\u5f53\u524d\u4e3a\u6b63\u5f0f\u7a3f\uff09";
+    }
+  }
+
+  function reportEditorBeforeUnloadHandler(event) {
+    const overlay = document.getElementById("reportEditorOverlay");
+    if (!overlay || overlay.classList.contains("hidden")) return;
+    if (!isCareerReportEditorDirty()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
+
+  function ensureReportEditorBeforeUnloadListener() {
+    if (reportRuntime.editorBeforeUnloadBound) return;
+    reportRuntime.editorBeforeUnloadBound = true;
+    window.addEventListener("beforeunload", reportEditorBeforeUnloadHandler);
+  }
 
   const avatarRuntime = {
     username: "",
@@ -135,13 +205,41 @@
     const variant = options.variant || "aside";
     if (!branches || !branches.length) return "";
     const subsClip = variant === "aside" ? 80 : 120;
+    if (variant === "editor") {
+      const rows = branches.map((br, bi) => {
+        const hasSubs = Array.isArray(br.subs) && br.subs.length > 0;
+        const startExpanded = bi === 0;
+        const line = Number(br.line) || 1;
+        const collapseCtrl = hasSubs
+          ? `<button type="button" class="collapse-icon${startExpanded ? " open" : ""}" aria-expanded="${startExpanded ? "true" : "false"}" aria-label="展开或收起子章节">▶</button>`
+          : `<span class="collapse-icon collapse-icon--placeholder" aria-hidden="true"></span>`;
+        const subsHtml = hasSubs
+          ? `<div class="tree-children${startExpanded ? "" : " collapsed"}">${br.subs
+              .map((s) => {
+                const shortTitle = s.title.length > subsClip ? `${s.title.slice(0, subsClip)}…` : s.title;
+                const sline = Number(s.line) || 1;
+                return `<div class="tree-item level-2" data-editor-goto-line="${sline}" role="button" tabindex="0">
+              <span class="toc-radio" aria-hidden="true"></span>
+              <span class="tree-label">${esc(shortTitle)}</span>
+            </div>`;
+              })
+              .join("")}</div>`
+          : "";
+        return `<div class="tree-toc-branch">
+        <div class="tree-item${hasSubs ? " tree-item--has-subs" : ""}" data-editor-goto-line="${line}" role="button" tabindex="0">
+          ${collapseCtrl}
+          <span class="toc-radio" aria-hidden="true"></span>
+          <span class="tree-label">${esc(br.title)}</span>
+        </div>
+        ${subsHtml}
+      </div>`;
+      }).join("");
+      return rows;
+    }
     const rows = branches.map((br) => {
       const hasSubs = Array.isArray(br.subs) && br.subs.length > 0;
-      const startExpanded = variant !== "editor";
-      const h2Btn =
-        variant === "editor"
-          ? `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-editor-goto-line="${Number(br.line) || 1}">${esc(br.title)}</button>`
-          : `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-report-scroll-target="${esc(br.id)}">${esc(br.title)}</button>`;
+      const startExpanded = true;
+      const h2Btn = `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-report-scroll-target="${esc(br.id)}">${esc(br.title)}</button>`;
       const toggle = hasSubs
         ? `<button type="button" class="cr-md-toc-toggle${startExpanded ? " is-open" : ""}" aria-expanded="${startExpanded ? "true" : "false"}" aria-label="展开或收起子章节"></button>`
         : `<span class="cr-md-toc-toggle-spacer" aria-hidden="true"></span>`;
@@ -149,9 +247,7 @@
         ? `<div class="cr-md-toc-subs"${startExpanded ? "" : " hidden"}>${br.subs
             .map((s) => {
               const shortTitle = s.title.length > subsClip ? `${s.title.slice(0, subsClip)}…` : s.title;
-              return variant === "editor"
-                ? `<button type="button" class="cr-md-toc-h3" data-editor-goto-line="${Number(s.line) || 1}">${esc(shortTitle)}</button>`
-                : `<button type="button" class="cr-md-toc-h3" data-report-scroll-target="${esc(s.id)}">${esc(shortTitle)}</button>`;
+              return `<button type="button" class="cr-md-toc-h3" data-report-scroll-target="${esc(s.id)}">${esc(shortTitle)}</button>`;
             })
             .join("")}</div>`
         : "";
@@ -170,14 +266,6 @@
         <div class="report-viewer-toc-label">目录</div>
         <div class="cr-md-toc-body">${rows}</div>
       </nav>`;
-    }
-    if (variant === "editor") {
-      return `<div class="report-editor-toc-wrap">
-      <nav class="cr-md-toc cr-md-toc--editor" aria-label="报告目录">
-        <p class="cr-md-toc-heading-label">导航</p>
-        <div class="cr-md-toc-body">${rows}</div>
-      </nav>
-      </div>`;
     }
     const kicker = "目录";
     return `
@@ -207,6 +295,25 @@
     });
   }
 
+  /** ai润色.html 风格章节树：collapse-icon + .tree-children.collapsed */
+  function initCareerReportEditorTreeToggles(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("button.collapse-icon").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const branch = btn.closest(".tree-toc-branch");
+        if (!branch) return;
+        const subs = branch.querySelector(".tree-children");
+        if (!subs) return;
+        subs.classList.toggle("collapsed");
+        const collapsed = subs.classList.contains("collapsed");
+        btn.classList.toggle("open", !collapsed);
+        btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      });
+    });
+  }
+
   function bindMarkdownTocScrollNav(root, scrollRoot) {
     if (!root || typeof root.querySelectorAll !== "function") return;
     const main = scrollRoot || document.getElementById("careerReportMain");
@@ -219,6 +326,28 @@
           main?.querySelector?.(`#${escapeSelectorId(targetId)}`) || document.getElementById(targetId);
         target?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+    });
+  }
+
+  function scrollMarkdownTextareaToLine(textarea, markdown, lineNo) {
+    if (!textarea) return;
+    const lines = String(markdown || "").split("\n");
+    const n = Math.max(1, Math.min(Number(lineNo) || 1, Math.max(1, lines.length)));
+    const offset = resolveEditorLineOffset(lines, n);
+    textarea.focus();
+    textarea.setSelectionRange(offset, offset);
+    window.requestAnimationFrame(() => {
+      try {
+        const cs = window.getComputedStyle(textarea);
+        const lh = parseFloat(cs.lineHeight);
+        const fs = parseFloat(cs.fontSize) || 13;
+        const lineHeight = Number.isFinite(lh) && lh > 0 ? lh : fs * 1.65;
+        const lineIdx = String(markdown || "").slice(0, offset).split("\n").length;
+        const targetTop = Math.max(0, (lineIdx - 1) * lineHeight - textarea.clientHeight * 0.25);
+        textarea.scrollTop = targetTop;
+      } catch (_) {
+        /* ignore */
+      }
     });
   }
 
@@ -235,8 +364,16 @@
         if (Number(sub.line) === n && sub.id) targetId = sub.id;
       });
     });
+    const docMode = normalizeCareerReportEditorDocMode(reportRuntime.editorDocMode);
+    if (docMode === "edit") {
+      scrollMarkdownTextareaToLine(textarea, markdown, n);
+      return;
+    }
+    if (docMode === "diff") {
+      setCareerReportEditorDocMode("preview");
+    }
     setCareerReportEditorViewMode("rendered");
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       if (targetId) {
         host?.querySelector?.(`#${escapeSelectorId(targetId)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
@@ -247,12 +384,18 @@
 
   function bindMarkdownTocEditorNav(root) {
     if (!root || typeof root.querySelectorAll !== "function") return;
-    root.querySelectorAll("[data-editor-goto-line]").forEach((button) => {
-      button.addEventListener("click", (e) => {
-        e.preventDefault();
-        const line = Number(button.dataset.editorGotoLine || 0);
+    root.querySelectorAll("[data-editor-goto-line]").forEach((el) => {
+      const go = (e) => {
+        if (e && e.target && e.target.closest && e.target.closest("button.collapse-icon")) return;
+        if (e && e.preventDefault) e.preventDefault();
+        const line = Number(el.dataset.editorGotoLine || el.getAttribute("data-editor-goto-line") || 0);
         if (!line) return;
         scrollCareerReportEditorToLine(line);
+      };
+      el.addEventListener("click", go);
+      el.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        go(e);
       });
     });
   }
@@ -3580,12 +3723,15 @@
       const items = Array.isArray(source?.section_map) ? source.section_map : [];
       host.innerHTML = items.length
         ? items.map((item, index) => `
-          <button type="button" class="report-editor-section-item" data-editor-scroll-index="${index}">
-            <strong>${esc(item?.label || `章节 ${index + 1}`)}</strong>
-            <small>${esc(String(item?.markdown || "").slice(0, 60) || "点击快速定位")}</small>
+          <button type="button" class="tree-item report-editor-section-item" data-editor-scroll-index="${index}">
+            <span class="toc-radio" aria-hidden="true"></span>
+            <span class="tree-label report-editor-section-item-body">
+              <strong>${esc(item?.label || `章节 ${index + 1}`)}</strong>
+              <small>${esc(String(item?.markdown || "").slice(0, 60) || "点击快速定位")}</small>
+            </span>
           </button>
         `).join("")
-        : `<div class="report-editor-section-item active"><strong>暂无章节</strong><small>等待源文稿加载</small></div>`;
+        : `<div class="tree-item report-editor-section-item report-editor-section-item--empty active" aria-disabled="true"><span class="toc-radio" aria-hidden="true"></span><span class="tree-label report-editor-section-item-body"><strong>暂无章节</strong><small>等待源文稿加载</small></span></div>`;
       host.querySelectorAll("[data-editor-scroll-index]").forEach((button) => {
         button.addEventListener("click", () => {
           const index = Number(button.dataset.editorScrollIndex || 0);
@@ -3598,6 +3744,28 @@
           if (hitIndex >= 0) {
             reportRuntime.editorAnchorIndex = hitIndex;
             selectCareerReportEditorSegmentRange(hitIndex, hitIndex);
+            const ta = document.getElementById("reportEditorTextarea");
+            const seg = segments[hitIndex];
+            const docMode = normalizeCareerReportEditorDocMode(reportRuntime.editorDocMode);
+            if (docMode === "edit" && ta && seg && Number.isFinite(seg.startOffset)) {
+              const md = String(ta.value || "");
+              ta.focus();
+              ta.setSelectionRange(seg.startOffset, seg.startOffset);
+              window.requestAnimationFrame(() => {
+                try {
+                  const before = md.slice(0, seg.startOffset);
+                  const lineIdx = before.split("\n").length;
+                  const cs = window.getComputedStyle(ta);
+                  const lh = parseFloat(cs.lineHeight);
+                  const fs = parseFloat(cs.fontSize) || 13;
+                  const lineHeight = Number.isFinite(lh) && lh > 0 ? lh : fs * 1.65;
+                  ta.scrollTop = Math.max(0, (lineIdx - 1) * lineHeight - ta.clientHeight * 0.25);
+                } catch (_) {
+                  /* ignore */
+                }
+              });
+              return;
+            }
             const hostEl = document.getElementById("reportEditorRenderedDoc");
             hostEl?.querySelector(`[data-editor-segment-index="${hitIndex}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
           }
@@ -3608,6 +3776,7 @@
 
     bindMarkdownTocEditorNav(host);
     initCrMdTocToggles(host);
+    initCareerReportEditorTreeToggles(host);
   }
 
   function updateReportEditorNavProgress(payload) {
@@ -3628,59 +3797,67 @@
     }
   }
 
-  function getLastUserPromptFromChat() {
-    const messages = Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : [];
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (String(messages[i]?.role || "") === "user") {
-        return String(messages[i]?.body || "").trim();
-      }
-    }
-    return "";
-  }
-
-  function updateReportEditorAiIntentSummary() {
-    const bodyEl = document.getElementById("reportEditorAiIntentBody");
-    if (!bodyEl) return;
-
-    const selection = reportRuntime.editorSelection;
-    const length = Math.max(0, Number(selection?.end || 0) - Number(selection?.start || 0));
-    const scopeHtml =
-      selection && length > 0
-        ? `\u4fee\u6539\u8303\u56f4\uff1a<strong>${esc(selection.ref || "\u9009\u4e2d\u7247\u6bb5")}</strong>\uff08${length} \u5b57\u7b26\uff09`
-        : "\u4fee\u6539\u8303\u56f4\uff1a<strong>\u6574\u7bc7\u62a5\u544a\u6b63\u6587</strong>";
-
-    const typed = String(document.getElementById("reportEditorPromptInput")?.value || "").trim();
-    const lastChat = getLastUserPromptFromChat();
-    const userIntent = typed || lastChat;
-
-    const diff = reportRuntime.editorDiff;
-    const blocks = diff && Array.isArray(diff.diff_blocks) ? diff.diff_blocks : [];
-    const hasDiff = Boolean(diff && blocks.length);
-
-    if (hasDiff) {
-      const semantic = buildSemanticChangeSummary(blocks);
-      const narrativePlain = semantic.bullets.length
-        ? `${semantic.intro} \u4e3b\u8981\u8c03\u6574\u5305\u62ec\uff1a${semantic.bullets.slice(0, 3).join("\uff1b")}\u3002`
-        : semantic.intro;
-      const intentLine = userIntent
-        ? `\u4f60\u7684\u8bf4\u660e\uff1a${esc(clipReportEditorText(userIntent, 240))}`
-        : "\u672a\u9644\u989d\u5916\u6587\u5b57\u8bf4\u660e\uff08\u6216\u6cbf\u7528\u9ed8\u8ba4\u6da6\u8272\u63d0\u793a\uff09\u3002";
-      bodyEl.innerHTML = `
-        <p class="report-editor-ai-intent-scope">${scopeHtml}</p>
-        <p class="report-editor-ai-intent-user">${intentLine}</p>
-        <p class="report-editor-ai-intent-delta"><strong>\u672c\u6b21\u6539\u52a8\u8981\u70b9\uff1a</strong>${esc(narrativePlain)}</p>
-      `;
-      return;
-    }
-
-    bodyEl.innerHTML = userIntent
-      ? `<p class="report-editor-ai-intent-scope">${scopeHtml}</p><p class="report-editor-ai-intent-user"><strong>\u5f53\u524d\u9700\u6c42\uff1a</strong>${esc(clipReportEditorText(userIntent, 240))}</p><p class="report-editor-ai-intent-next">\u53d1\u9001\u6da6\u8272\u8bf7\u6c42\u540e\uff0c\u4e2d\u95f4\u680f\u5c06\u663e\u793a\u5bf9\u6bd1\u7a3f\uff1b\u91c7\u7eb3\u524d\u4e0d\u4f1a\u8986\u76d6\u6b63\u6587\u3002</p>`
-      : `<p class="report-editor-ai-intent-scope">${scopeHtml}</p><p class="report-editor-ai-intent-next">\u5728\u4e0b\u65b9\u8f93\u5165\u4fee\u6539\u610f\u56fe\u5e76\u53d1\u9001\uff1b\u4e2d\u95f4\u680f\u4e3a\u539f\u6587\u4e0e\u4fee\u6539\u5bf9\u6bd4\uff0c\u672c\u533a\u4f1a\u540c\u6b65\u6982\u62ec\u4f60\u7684\u76ee\u6807\u4e0e\u6539\u52a8\u8981\u70b9\u3002</p>`;
-  }
-
   function setReportEditorRailTab() {
     const chat = document.getElementById("reportEditorRailChat");
     if (chat) chat.classList.remove("hidden");
+  }
+
+  function setReportEditorRailView(view) {
+    const chatTab = document.getElementById("reportEditorTabChat");
+    const chgTab = document.getElementById("reportEditorTabChanges");
+    const chatPanel = document.getElementById("reportEditorRailChat");
+    const chgPanel = document.getElementById("reportEditorRailViewChanges");
+    const v = String(view || "chat").trim().toLowerCase();
+    const isChat = v !== "changes";
+    if (chatTab) {
+      chatTab.classList.toggle("is-active", isChat);
+      chatTab.setAttribute("aria-selected", isChat ? "true" : "false");
+    }
+    if (chgTab) {
+      chgTab.classList.toggle("is-active", !isChat);
+      chgTab.setAttribute("aria-selected", !isChat ? "true" : "false");
+    }
+    if (chatPanel) chatPanel.classList.toggle("hidden", !isChat);
+    if (chgPanel) chgPanel.classList.toggle("hidden", isChat);
+    reportRuntime.editorRailView = isChat ? "chat" : "changes";
+  }
+
+  function setReportEditorPolishBusy(on) {
+    const shell = document.querySelector(".report-editor-shell.report-editor-shell--polish-v2");
+    if (shell) shell.classList.toggle("report-editor-polish-busy", Boolean(on));
+    document.querySelectorAll("#reportEditorQuickActionsBar [data-quick-action]").forEach((btn) => {
+      btn.disabled = Boolean(on);
+    });
+    const send = document.getElementById("reportEditorPromptSendBtn");
+    const sendIco = document.getElementById("reportEditorPromptSendIconBtn");
+    [send, sendIco].forEach((el) => {
+      if (el) el.disabled = Boolean(on);
+    });
+  }
+
+  function updateReportEditorChangesBadge() {
+    const badge = document.getElementById("reportEditorChangesBadge");
+    if (!badge) return;
+    const pending = reportRuntime.editorDiff;
+    const blocks = pending && Array.isArray(pending.diff_blocks) ? pending.diff_blocks : [];
+    if (blocks.length) {
+      const stats = summarizeEditorDiffBlocks(blocks);
+      let n = Number(stats.addLines || 0) + Number(stats.delLines || 0);
+      if (n < 1) n = Math.max(1, buildFullChangeLogEntries(blocks).length);
+      badge.textContent = String(Math.min(99, n));
+      badge.classList.remove("is-zero");
+      return;
+    }
+    const cum = Number(reportRuntime.cumulativeDiffLines || 0);
+    const histLen = Array.isArray(reportRuntime.appliedChangeBullets) ? reportRuntime.appliedChangeBullets.length : 0;
+    const n = cum > 0 ? cum : histLen;
+    if (n < 1) {
+      badge.textContent = "0";
+      badge.classList.add("is-zero");
+      return;
+    }
+    badge.textContent = String(Math.min(99, n));
+    badge.classList.remove("is-zero");
   }
 
   function renderReportEditorSnapshotList(source) {
@@ -3692,14 +3869,20 @@
     const activeFormal = !activeSnapshotId;
     const formalTitle = esc(window.appState?.careerReport?.meta?.title || "正式职业报告");
     host.innerHTML = `
-      <button type="button" class="report-editor-snapshot-item${activeFormal ? " active" : ""}" data-editor-source-report="${esc(reportId)}">
-        <strong>${formalTitle}</strong>
-        <small>正式报告基线</small>
+      <button type="button" class="version-toc-card${activeFormal ? " is-active" : ""}"${activeFormal ? ' aria-current="true"' : ""} data-editor-source-report="${esc(reportId)}">
+        <span class="toc-radio" aria-hidden="true"></span>
+        <span class="version-card-body">
+          <span class="version-card-title">${formalTitle}</span>
+          <span class="version-card-meta">正式报告基线</span>
+        </span>
       </button>
       ${snapshots.map((snapshot) => `
-        <button type="button" class="report-editor-snapshot-item${String(snapshot?.snapshot_id || "") === activeSnapshotId ? " active" : ""}" data-editor-source-snapshot="${esc(snapshot?.snapshot_id || "")}">
-          <strong>${esc(snapshot?.title || snapshot?.label || "编辑快照")}</strong>
-          <small>${esc(snapshot?.updated_at || snapshot?.created_at || "--")}</small>
+        <button type="button" class="version-toc-card${String(snapshot?.snapshot_id || "") === activeSnapshotId ? " is-active" : ""}"${String(snapshot?.snapshot_id || "") === activeSnapshotId ? ' aria-current="true"' : ""} data-editor-source-snapshot="${esc(snapshot?.snapshot_id || "")}">
+          <span class="toc-radio" aria-hidden="true"></span>
+          <span class="version-card-body">
+            <span class="version-card-title">${esc(snapshot?.title || snapshot?.label || "编辑快照")}</span>
+            <span class="version-card-meta">${esc(snapshot?.updated_at || snapshot?.created_at || "--")}</span>
+          </span>
         </button>
       `).join("")}
     `;
@@ -3741,26 +3924,47 @@
     return String(mode || "").trim().toLowerCase() === "markdown" ? "markdown" : "rendered";
   }
 
+  function normalizeCareerReportEditorDocMode(mode) {
+    const m = String(mode || "").trim().toLowerCase();
+    if (m === "preview" || m === "edit" || m === "diff") return m;
+    return "preview";
+  }
+
+  function setCareerReportEditorDocMode(mode = "preview") {
+    const next = normalizeCareerReportEditorDocMode(mode);
+    reportRuntime.editorDocMode = next;
+    reportRuntime.editorViewMode = next === "edit" ? "markdown" : "rendered";
+    const pv = document.getElementById("reportEditorPanePreview");
+    const ed = document.getElementById("reportEditorPaneEdit");
+    const df = document.getElementById("reportEditorPaneDiff");
+    if (pv) pv.classList.toggle("hidden", next !== "preview");
+    if (ed) ed.classList.toggle("hidden", next !== "edit");
+    if (df) df.classList.toggle("hidden", next !== "diff");
+    document.querySelectorAll(".report-editor-doc-mode-btn[data-doc-mode]").forEach((btn) => {
+      const active = String(btn.getAttribute("data-doc-mode") || "") === next;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    const shell = document.getElementById("reportEditorOverlay");
+    if (shell) {
+      shell.dataset.editorDocMode = next;
+      shell.dataset.editorViewMode = reportRuntime.editorViewMode;
+    }
+    const textarea = document.getElementById("reportEditorTextarea");
+    if (next === "edit" && textarea) {
+      window.requestAnimationFrame(() => {
+        try {
+          textarea.focus();
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    }
+  }
+
   function setCareerReportEditorViewMode(mode = "rendered") {
     const nextMode = normalizeCareerReportEditorViewMode(mode);
-    reportRuntime.editorViewMode = nextMode;
-    const rendered = document.getElementById("reportEditorRenderedDoc");
-    const textarea = document.getElementById("reportEditorTextarea");
-    const toggleBtn = document.getElementById("reportEditorViewToggleBtn");
-    const modeHint = document.getElementById("reportEditorViewModeHint");
-    const shell = document.getElementById("reportEditorOverlay");
-    if (rendered) rendered.classList.toggle("hidden", nextMode !== "rendered");
-    if (textarea) textarea.classList.toggle("hidden", nextMode !== "markdown");
-    if (toggleBtn) toggleBtn.textContent = nextMode === "rendered" ? "切换到 Markdown" : "返回渲染视图";
-    if (modeHint) {
-      modeHint.textContent = nextMode === "rendered"
-        ? "双击正文切换为 Markdown 编辑"
-        : "当前为 Markdown 编辑；双击返回渲染视图";
-    }
-    if (shell) shell.dataset.editorViewMode = nextMode;
-    if (nextMode === "markdown") {
-      textarea?.focus();
-    }
+    setCareerReportEditorDocMode(nextMode === "markdown" ? "edit" : "preview");
   }
 
   function escapeRegExp(value) {
@@ -4000,7 +4204,7 @@
       markdown,
       section_map: Array.isArray(reportRuntime.editorSource?.section_map) ? reportRuntime.editorSource.section_map : []
     });
-    setCareerReportEditorViewMode(reportRuntime.editorViewMode || "rendered");
+    setCareerReportEditorDocMode(reportRuntime.editorDocMode || "preview");
   }
 
   function summarizeEditorDiffBlocks(diffBlocks) {
@@ -4038,6 +4242,24 @@
     return { intro, bullets };
   }
 
+  /** 右侧「改动」列表：逐条记录每一处增/删块（与 Diff 行级块一一对应） */
+  function buildFullChangeLogEntries(diffBlocks) {
+    const blocks = Array.isArray(diffBlocks) ? diffBlocks : [];
+    const entries = [];
+    const maxEntries = 120;
+    blocks.forEach((block) => {
+      if (entries.length >= maxEntries) return;
+      const type = String(block?.type || "equal").trim().toLowerCase();
+      if (type === "equal") return;
+      const lines = Array.isArray(block?.lines) ? block.lines : [];
+      const joined = clipReportEditorText(lines.join(" ").replace(/\s+/g, " "), 200);
+      if (!joined) return;
+      if (type === "add") entries.push(`\u65b0\u589e\uff1a${joined}`);
+      if (type === "delete") entries.push(`\u5220\u9664\uff1a${joined}`);
+    });
+    return entries;
+  }
+
   function renderUnifiedDiffMarkup(diffBlocks) {
     const blocks = Array.isArray(diffBlocks) ? diffBlocks : [];
     if (!blocks.length) return "";
@@ -4054,9 +4276,16 @@
   }
 
   function openReportEditorReviewPanel() {
-    if (!reportRuntime.editorDiff) return;
+    if (!reportRuntime.editorDiff && !reportRuntime.editorDiffArchive) return;
     setCareerReportEditorMode("review");
   }
+
+  const REPORT_EDITOR_CHAT_AVATAR = {
+    assistant:
+      '<svg class="report-editor-chat-avatar-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M12 2.25l1.65 5.1L18.75 12l-5.1 1.65L12 18.75l-1.65-5.1L5.25 12l5.1-1.65L12 2.25z"/></svg>',
+    user: '<span class="report-editor-chat-avatar-me">\u6211</span>',
+    system: '<span class="report-editor-chat-avatar-dot" aria-hidden="true"></span>'
+  };
 
   function appendReportEditorMessage(role, label, body, tone = role, extra = {}) {
     const next = {
@@ -4064,6 +4293,7 @@
       tone: String(tone || role || "system"),
       label: String(label || role || "System"),
       body: String(body || "").trim(),
+      pill: Boolean(extra.pill),
       selectionRef: extra.selectionRef || "",
       selectionPreview: extra.selectionPreview || "",
       diffSummary: extra.diffSummary && typeof extra.diffSummary === "object" ? extra.diffSummary : null
@@ -4079,35 +4309,71 @@
     if (!host) return;
     const messages = Array.isArray(reportRuntime.editorConversation) ? reportRuntime.editorConversation : [];
     if (!messages.length) {
-      host.innerHTML = `<div class="report-editor-chat-item report-editor-chat-item--empty"><p>\u6682\u65e0\u5bf9\u8bdd\u8bb0\u5f55\u3002\u9876\u90e8\u300c\u5f53\u524d\u4fee\u6539\u610f\u56fe\u300d\u5df2\u6982\u62ec\u64cd\u4f5c\u63d0\u793a\u3002</p></div>`;
+      host.innerHTML = `<div class="report-editor-chat-item report-editor-chat-item--empty">
+        <div class="report-editor-chat-empty-visual" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M8 10h8"/><path d="M8 14h5"/></svg>
+        </div>
+        <p>\u6682\u65e0\u5bf9\u8bdd\u8bb0\u5f55\u3002\u53ef\u9009\u4e2d\u5de6\u4fa7\u6b63\u6587\u540e\u4f7f\u7528\u5feb\u6377\u6309\u94ae\uff0c\u6216\u5728\u4e0b\u65b9\u8f93\u5165\u4f18\u5316\u6307\u4ee4\u3002</p>
+      </div>`;
       return;
     }
-    host.innerHTML = messages.map((item) => `
-      <div class="report-editor-chat-item ${esc(item?.tone || item?.role || "system")}">
-        <span class="report-editor-chat-role">${esc(item?.label || item?.role || "System")}</span>
-        ${item?.selectionRef ? `
-          <div class="report-editor-selection-ref">
-            <strong>${esc(item.selectionRef)}</strong>
-            <small>${esc(item.selectionPreview || "已按行附带原文上下文")}</small>
-          </div>
-        ` : ""}
-        <p>${esc(item?.body || "")}</p>
-        ${item?.diffSummary ? `
-          <div class="report-editor-diff-mini">
-            <div class="report-editor-diff-mini-head">
-              <div class="report-editor-diff-mini-counts">
-                <span class="plus">+${Number(item.diffSummary.addLines || 0)}</span>
-                <span class="minus">-${Number(item.diffSummary.delLines || 0)}</span>
-              </div>
-              <button type="button" data-editor-open-review="1">Review 全屏</button>
+    const rowsHtml = messages.map((item) => {
+      const tone = String(item?.tone || item?.role || "system");
+      const isUser = tone === "user";
+      const isAssistant = tone === "assistant";
+      const rowMod = isUser ? "user" : isAssistant ? "assistant" : "system";
+      const avHtml = isUser
+        ? REPORT_EDITOR_CHAT_AVATAR.user
+        : isAssistant
+          ? REPORT_EDITOR_CHAT_AVATAR.assistant
+          : REPORT_EDITOR_CHAT_AVATAR.system;
+      const bodyHtml = item?.pill
+        ? `<span class="report-editor-chat-pill">${esc(item?.body || "")}</span>`
+        : `<p>${esc(item?.body || "")}</p>`;
+      return `
+      <div class="report-editor-chat-row report-editor-chat-row--${rowMod}">
+        <div class="report-editor-chat-avatar" aria-hidden="true">${avHtml}</div>
+        <div class="report-editor-chat-card">
+          <span class="report-editor-chat-role">${esc(item?.label || item?.role || "System")}</span>
+          ${item?.selectionRef ? `
+            <div class="report-editor-selection-ref">
+              <strong>${esc(item.selectionRef)}</strong>
+              <small>${esc(item.selectionPreview || "\u5df2\u6309\u884c\u9644\u5e26\u539f\u6587\u4e0a\u4e0b\u6587")}</small>
             </div>
-            <ul>
-              ${(Array.isArray(item.diffSummary.preview) ? item.diffSummary.preview : []).map((line) => `<li>${esc(line)}</li>`).join("")}
-            </ul>
+          ` : ""}
+          ${bodyHtml}
+          ${item?.diffSummary ? `
+            <div class="report-editor-diff-mini">
+              <div class="report-editor-diff-mini-head">
+                <div class="report-editor-diff-mini-counts">
+                  <span class="plus">+${Number(item.diffSummary.addLines || 0)}</span>
+                  <span class="minus">-${Number(item.diffSummary.delLines || 0)}</span>
+                </div>
+                <button type="button" data-editor-open-review="1">Review \u5168\u5c4f</button>
+              </div>
+              <ul>
+                ${(Array.isArray(item.diffSummary.preview) ? item.diffSummary.preview : []).map((line) => `<li>${esc(line)}</li>`).join("")}
+              </ul>
+            </div>
+          ` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    const pendingRow =
+      reportRuntime.editorPolishPending
+        ? `
+      <div class="report-editor-chat-row report-editor-chat-row--assistant report-editor-chat-row--pending">
+        <div class="report-editor-chat-avatar" aria-hidden="true">${REPORT_EDITOR_CHAT_AVATAR.assistant}</div>
+        <div class="report-editor-chat-card report-editor-chat-card--pending">
+          <span class="report-editor-chat-role">${esc("AI \u52a9\u624b")}</span>
+          <div class="report-editor-ai-spinner" role="status" aria-live="polite" aria-busy="true">
+            <span class="report-editor-ai-spinner-ring" aria-hidden="true"></span>
+            <span class="report-editor-ai-spinner-text">\u6b63\u5728\u751f\u6210\u2026</span>
           </div>
-        ` : ""}
-      </div>
-    `).join("");
+        </div>
+      </div>`
+        : "";
+    host.innerHTML = rowsHtml + pendingRow;
     host.querySelectorAll("[data-editor-open-review]").forEach((button) => {
       button.addEventListener("click", () => {
         openReportEditorReviewPanel();
@@ -4129,8 +4395,11 @@
     const reviewDelta = document.getElementById("reportEditorReviewDeltaList");
     const reviewAdd = document.getElementById("reportEditorReviewAddedStat");
     const reviewDel = document.getElementById("reportEditorReviewDeletedStat");
-    const diff = reportRuntime.editorDiff;
+    const pendingDiff = reportRuntime.editorDiff;
+    const archivedDiff = reportRuntime.editorDiffArchive;
+    const diff = pendingDiff || archivedDiff;
     const hasDiff = Boolean(diff && Array.isArray(diff.diff_blocks) && diff.diff_blocks.length);
+    const isPendingProposal = Boolean(pendingDiff);
     const scopeHint = document.getElementById("reportEditorDiffScopeHint");
     if (!hasDiff) {
       if (scopeHint) {
@@ -4142,11 +4411,23 @@
         proposedDiff.innerHTML = "";
       }
       if (proposedEmpty) proposedEmpty.classList.remove("hidden");
-      if (changeSummary) changeSummary.classList.add("hidden");
-      if (changeSummaryBody) changeSummaryBody.textContent = "";
+      if (changeSummary) changeSummary.classList.remove("hidden");
+      if (changeSummaryBody) {
+        const hist = Array.isArray(reportRuntime.appliedChangeBullets) ? reportRuntime.appliedChangeBullets : [];
+        changeSummaryBody.textContent =
+          hist.length > 0
+            ? `\u672c\u6b21\u4f1a\u8bdd\u5df2\u7d2f\u8ba1 ${hist.length} \u6761\u6539\u52a8\u8bb0\u5f55\uff08\u89c1\u4e0b\u65b9\u5217\u8868\uff09\u3002\u82e5\u9700\u65b0\u7684\u6da6\u8272\u5bf9\u7167\uff0c\u8bf7\u518d\u6b21\u53d1\u9001\u6da6\u8272\u3002`
+            : "\u6682\u65e0\u5f85\u5ba1\u9605\u6539\u52a8\u3002\u5728\u300c\u5bf9\u8bdd\u300d\u4e2d\u53d1\u9001\u6da6\u8272\u540e\uff0c\u8fd9\u91cc\u4f1a\u6c47\u603b\u6a21\u578b\u8c03\u6574\u8bf4\u660e\u3002";
+      }
       if (changeSummaryList) {
-        changeSummaryList.innerHTML = "";
-        changeSummaryList.classList.add("hidden");
+        const histOnly = Array.isArray(reportRuntime.appliedChangeBullets) ? reportRuntime.appliedChangeBullets : [];
+        if (histOnly.length) {
+          changeSummaryList.classList.remove("hidden");
+          changeSummaryList.innerHTML = histOnly.map((line) => `<li>${esc(line)}</li>`).join("");
+        } else {
+          changeSummaryList.innerHTML = "";
+          changeSummaryList.classList.add("hidden");
+        }
       }
       if (diffActions) diffActions.classList.add("hidden");
       if (reviewOriginal) reviewOriginal.textContent = "";
@@ -4155,59 +4436,80 @@
       if (reviewDelta) reviewDelta.innerHTML = "<li>暂无待审阅改动</li>";
       if (reviewAdd) reviewAdd.textContent = "+0";
       if (reviewDel) reviewDel.textContent = "-0";
-      updateReportEditorAiIntentSummary();
+      updateReportEditorChangesBadge();
       return;
     }
     const diffSummary = summarizeEditorDiffBlocks(diff.diff_blocks);
     const semantic = buildSemanticChangeSummary(diff.diff_blocks);
+    const changeEntries = isPendingProposal ? buildFullChangeLogEntries(diff.diff_blocks) : [];
+    const hist = Array.isArray(reportRuntime.appliedChangeBullets) ? reportRuntime.appliedChangeBullets : [];
+    const listCombined = [...hist, ...changeEntries];
     if (scopeHint) {
-      const ref = diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
-        ? getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref
-        : "";
-      scopeHint.textContent = ref
-        ? `\u5bf9\u7167\u8303\u56f4\uff1a${ref}\uff08\u4e0e\u5de6\u4fa7\u539f\u6587\u5e76\u6392\u67e5\u770b\uff09`
-        : "\u5bf9\u7167\u8303\u56f4\uff1a\u6574\u7bc7\u62a5\u544a\u6b63\u6587\uff08\u4e0e\u5de6\u4fa7\u5e76\u6392\uff09";
-      scopeHint.classList.remove("hidden");
+      if (!isPendingProposal && archivedDiff && archivedDiff.scopeLabel) {
+        scopeHint.textContent = `\u5df2\u91c7\u7eb3\u5199\u5165\u6b63\u6587 \u00b7 ${archivedDiff.scopeLabel} \u00b7 \u4ee5\u4e0b\u4e3a\u91c7\u7eb3\u524d\u7684\u884c\u7ea7\u589e\u5220\u5bf9\u7167`;
+        scopeHint.classList.remove("hidden");
+      } else if (isPendingProposal) {
+        const ref = diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
+          ? getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref
+          : "";
+        scopeHint.textContent = ref
+          ? `\u5bf9\u7167\u8303\u56f4\uff1a${ref}\uff08\u4e0e Preview \u6b63\u6587\u5bf9\u7167\uff09`
+          : "\u5bf9\u7167\u8303\u56f4\uff1a\u6574\u7bc7\u62a5\u544a\u6b63\u6587";
+        scopeHint.classList.remove("hidden");
+      } else {
+        scopeHint.textContent = "";
+        scopeHint.classList.add("hidden");
+      }
     }
     if (proposedDiff) {
       proposedDiff.classList.remove("hidden");
+      proposedDiff.classList.toggle("report-editor-proposed-diff--settled", !isPendingProposal);
       proposedDiff.innerHTML = renderUnifiedDiffMarkup(diff.diff_blocks);
     }
     if (proposedEmpty) proposedEmpty.classList.add("hidden");
     if (changeSummary && changeSummaryBody) {
       changeSummary.classList.remove("hidden");
-      const narrative = semantic.bullets.length
-        ? `${semantic.intro} \u4e3b\u8981\u8c03\u6574\u5305\u62ec\uff1a${semantic.bullets.slice(0, 4).join("\uff1b")}\u3002`
-        : semantic.intro;
-      changeSummaryBody.textContent = narrative;
+      if (isPendingProposal) {
+        changeSummaryBody.textContent = semantic.intro;
+      } else if (archivedDiff) {
+        changeSummaryBody.textContent = `${semantic.intro}\n\n\u6539\u52a8\u5df2\u5199\u5165\u6b63\u6587\u3002\u4e0b\u65b9\u5217\u8868\u4e3a\u672c\u6b21\u4f1a\u8bdd\u7d2f\u8ba1\u7684\u6539\u52a8\u8bb0\u5f55\uff08\u542b\u5df2\u91c7\u7eb3\u6761\u76ee\uff09\u3002`;
+      } else {
+        changeSummaryBody.textContent = semantic.intro;
+      }
       if (changeSummaryList) {
-        if (semantic.bullets.length) {
+        if (listCombined.length) {
           changeSummaryList.classList.remove("hidden");
-          changeSummaryList.innerHTML = semantic.bullets.map((line) => `<li>${esc(line)}</li>`).join("");
+          changeSummaryList.innerHTML = listCombined.map((line) => `<li>${esc(line)}</li>`).join("");
         } else {
           changeSummaryList.classList.add("hidden");
           changeSummaryList.innerHTML = "";
         }
       }
     }
-    if (diffActions) diffActions.classList.remove("hidden");
+    if (diffActions) {
+      if (isPendingProposal) diffActions.classList.remove("hidden");
+      else diffActions.classList.add("hidden");
+    }
     if (reviewOriginal) reviewOriginal.textContent = String(diff.original || "");
     if (reviewSuggested) reviewSuggested.textContent = String(diff.proposed || "");
     if (reviewSelectionRef) {
-      const ref = diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
-        ? getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref
-        : "\u6574\u7bc7\u62a5\u544a";
+      let ref = "\u6574\u7bc7\u62a5\u544a";
+      if (!isPendingProposal && archivedDiff && archivedDiff.scopeLabel) {
+        ref = archivedDiff.scopeLabel;
+      } else if (diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)) {
+        ref = getEditorLineRange(String(document.getElementById("reportEditorTextarea")?.value || ""), diff.selection.start, diff.selection.end).ref;
+      }
       reviewSelectionRef.textContent = ref;
     }
     if (reviewDelta) {
       const lines = Array.isArray(diffSummary.preview) && diffSummary.preview.length
         ? diffSummary.preview
-        : ["+ \u6539\u52a8\u5df2\u751f\u6210\uff0c\u8bf7\u67e5\u770b\u4e2d\u95f4\u5bf9\u6bd4\u5217", "- \u539f\u6587\u4ecd\u5728\u5de6\u4fa7\uff0c\u53ef\u968f\u65f6 Undo"];
+        : ["+ \u6539\u52a8\u5df2\u751f\u6210\uff0c\u8bf7\u5728\u4e2d\u95f4\u533a Diff \u67e5\u770b", "- \u539f\u6587\u4ecd\u5728 Preview\uff0c\u53ef\u968f\u65f6 Undo"];
       reviewDelta.innerHTML = lines.map((line) => `<li>${esc(line)}</li>`).join("");
     }
     if (reviewAdd) reviewAdd.textContent = `+${Number(diffSummary.addLines || 0)}`;
     if (reviewDel) reviewDel.textContent = `-${Number(diffSummary.delLines || 0)}`;
-    updateReportEditorAiIntentSummary();
+    updateReportEditorChangesBadge();
   }
 
   function updateCareerReportEditorSelectionInfo() {
@@ -4218,7 +4520,6 @@
     info.textContent = selection && length > 0
       ? `${selection.ref || "\u9009\u4e2d\u7247\u6bb5"}（${length} 字符），发送后将作为引用上下文附带给 AI。`
       : "\u672a\u9009\u4e2d\u5185\u5bb9\uff0c\u53d1\u8d77\u6da6\u8272\u65f6\u9ed8\u8ba4\u9488\u5bf9\u6574\u7bc7\u62a5\u544a\u3002";
-    updateReportEditorAiIntentSummary();
     renderReportEditorPromptSelectionPills();
     renderReportEditorChatLog();
   }
@@ -4227,43 +4528,70 @@
     const hadDiff = Boolean(reportRuntime.editorDiff);
     reportRuntime.editorDiff = null;
     renderReportEditorDiffPanel();
-    if (!options.keepMode) setCareerReportEditorMode("edit");
+    if (!options.keepMode) {
+      setCareerReportEditorMode("edit");
+      setCareerReportEditorDocMode("preview");
+    }
     if (!options.silent && hadDiff) {
       appendReportEditorMessage("assistant", "Undo", "\u5df2\u64a4\u9500\u5f53\u524d\u6da6\u8272\u63d0\u6848\uff0c\u6b63\u6587\u672a\u53d1\u751f\u53d8\u5316\u3002");
     }
     renderReportEditorChatLog();
+    updateCareerReportEditorDirtyUi();
   }
 
   function applyCareerReportEditorDiff() {
     const textarea = document.getElementById("reportEditorTextarea");
     const diff = reportRuntime.editorDiff;
     if (!textarea || !diff) return;
+    const taBefore = String(textarea.value || "");
+    const scopeLabel =
+      diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)
+        ? getEditorLineRange(taBefore, diff.selection.start, diff.selection.end).ref
+        : "\u6574\u7bc7\u62a5\u544a\u6b63\u6587";
+    const blocks = Array.isArray(diff.diff_blocks) ? diff.diff_blocks : [];
+    const stats = summarizeEditorDiffBlocks(blocks);
+    const newBullets = buildFullChangeLogEntries(blocks);
+    reportRuntime.appliedChangeBullets = [...(Array.isArray(reportRuntime.appliedChangeBullets) ? reportRuntime.appliedChangeBullets : []), ...newBullets].slice(-200);
+    reportRuntime.cumulativeDiffLines = Number(reportRuntime.cumulativeDiffLines || 0) + Number(stats.addLines || 0) + Number(stats.delLines || 0);
+
+    const archive = {
+      original: String(diff.original || ""),
+      proposed: String(diff.proposed || ""),
+      diff_blocks: blocks.map((b) => ({
+        type: String(b?.type || "equal"),
+        lines: Array.isArray(b?.lines) ? [...b.lines] : []
+      })),
+      selection: diff.selection ? { start: diff.selection.start, end: diff.selection.end } : null,
+      scopeLabel,
+      settledAt: Date.now()
+    };
+
     if (diff.selection && Number.isFinite(diff.selection.start) && Number.isFinite(diff.selection.end)) {
       textarea.value = `${textarea.value.slice(0, diff.selection.start)}${diff.proposed}${textarea.value.slice(diff.selection.end)}`;
     } else {
       textarea.value = String(diff.proposed || "");
     }
-    clearCareerReportEditorDiff({ silent: true, keepMode: true });
+
+    reportRuntime.editorDiff = null;
+    reportRuntime.editorDiffArchive = archive;
+    renderReportEditorDiffPanel();
     clearCareerReportEditorSelection({ render: false });
     renderCareerReportEditorDocument();
     setCareerReportEditorMode("edit");
-    appendReportEditorMessage("assistant", "Applied", "\u5df2\u5c06\u5f53\u524d AI \u5efa\u8bae\u5199\u56de\u7f16\u8f91\u533a\uff0c\u4f60\u53ef\u4ee5\u7ee7\u7eed\u4fee\u6539\u6216\u76f4\u63a5\u5bfc\u51fa DOCX\u3002");
+    setCareerReportEditorDocMode("preview");
     updateCareerReportEditorSelectionInfo();
     renderReportEditorChatLog();
+    updateReportEditorChangesBadge();
+    updateCareerReportEditorDirtyUi();
   }
 
-  async function loadCareerReportEditorSource(options = {}) {
-    const reportId = String(options.reportId || window.appState?.careerReport?.meta?.report_id || "").trim();
-    const snapshotId = String(options.snapshotId || "").trim();
-    if (!reportId && !window.appState?.careerReport?.report_document) {
-      throw new Error("\u5f53\u524d\u6ca1\u6709\u53ef\u7f16\u8f91\u7684\u804c\u4e1a\u62a5\u544a\u3002");
-    }
-    const url = new URL(resolveUrl("/api/career-report/source"), window.location.origin);
-    if (reportId) url.searchParams.set("report_id", reportId);
-    if (snapshotId) url.searchParams.set("snapshot_id", snapshotId);
-    const payload = await requestJsonSafe(`${url.pathname}${url.search}`);
+  function applyCareerReportEditorPayload(payload) {
     reportRuntime.editorSource = payload;
     reportRuntime.editorDiff = null;
+    reportRuntime.editorDiffArchive = null;
+    reportRuntime.appliedChangeBullets = [];
+    reportRuntime.cumulativeDiffLines = 0;
+    reportRuntime.editorPolishPending = false;
     reportRuntime.editorConversation = [];
     reportRuntime.editorSelection = null;
     reportRuntime.editorSegments = [];
@@ -4271,8 +4599,9 @@
     reportRuntime.editorAnchorIndex = -1;
     reportRuntime.editorMode = "edit";
     reportRuntime.editorViewMode = "rendered";
+    reportRuntime.editorDocMode = "preview";
     if (payload?.bundle && payload.bundle.meta) {
-      window.appState.careerReport = payload.bundle;
+      window.appState.careerReport = cloneCareerReportBundleForAppState(payload.bundle);
       window.appState.reportReady = Boolean(payload.bundle.report_document);
       window.appState.reportGenerated = Boolean(payload.bundle.report_document);
     }
@@ -4287,7 +4616,16 @@
         ? `\u6b63\u5f0f\u62a5\u544a | report_id ${payload?.report_id || "--"}`
         : `\u7f16\u8f91\u5feb\u7167 | snapshot_id ${payload?.snapshot_id || "--"}`;
     }
+    const verBadge = document.getElementById("reportEditorVersionBadge");
+    if (verBadge) {
+      const sid = String(payload?.snapshot_id || "").trim();
+      verBadge.textContent = sid ? "\u7f16\u8f91\u5feb\u7167" : "\u6b63\u5f0f\u62a5\u544a";
+      verBadge.title = sid
+        ? `snapshot_id: ${sid}`
+        : `report_id: ${String(payload?.report_id || "--")}`;
+    }
     if (textarea) textarea.value = String(payload?.markdown || "");
+    reportRuntime.editorSavedMarkdown = normalizeEditorMarkdownBaseline(textarea ? textarea.value : "");
     if (promptInput) promptInput.value = "";
     if (modelSelect) {
       const remembered = String(window.localStorage?.getItem?.("career_report_polish_model") || "").trim();
@@ -4301,25 +4639,206 @@
     renderReportEditorChatLog();
     autoResizeReportEditorPromptInput();
     setCareerReportEditorMode("edit");
-    return payload;
+    updateCareerReportEditorDirtyUi();
+    ensureReportEditorBeforeUnloadListener();
+  }
+
+  async function loadCareerReportEditorSource(options = {}) {
+    const reportId = String(options.reportId || window.appState?.careerReport?.meta?.report_id || "").trim();
+    const snapshotId = String(options.snapshotId || "").trim();
+    if (!reportId && !window.appState?.careerReport?.report_document) {
+      throw new Error("\u5f53\u524d\u6ca1\u6709\u53ef\u7f16\u8f91\u7684\u804c\u4e1a\u62a5\u544a\u3002");
+    }
+    const cacheKey = `${reportId}|${snapshotId}`;
+    const forceRefresh = Boolean(options.forceRefresh);
+
+    if (!forceRefresh) {
+      const inflight = reportRuntime.editorSourceInflight.get(cacheKey);
+      if (inflight) return inflight;
+    }
+
+    if (!forceRefresh && reportRuntime.editorSourceLoadKey === cacheKey && reportRuntime.editorSource) {
+      const ex = reportRuntime.editorSource;
+      if (String(ex?.report_id || "") === reportId && String(ex?.snapshot_id || "") === snapshotId) {
+        applyCareerReportEditorPayload(ex);
+        return ex;
+      }
+    }
+
+    const run = (async () => {
+      const url = new URL(resolveUrl("/api/career-report/source"), window.location.origin);
+      if (reportId) url.searchParams.set("report_id", reportId);
+      if (snapshotId) url.searchParams.set("snapshot_id", snapshotId);
+      const payload = await requestJsonSafe(`${url.pathname}${url.search}`);
+      applyCareerReportEditorPayload(payload);
+      reportRuntime.editorSourceLoadKey = cacheKey;
+      return payload;
+    })();
+
+    if (!forceRefresh) {
+      reportRuntime.editorSourceInflight.set(cacheKey, run);
+      run.finally(() => {
+        reportRuntime.editorSourceInflight.delete(cacheKey);
+      });
+    }
+
+    return run;
+  }
+
+  /**
+   * 打开润色页前尽量解析 report_id：界面已展示报告时，appState.careerReport 可能未带 meta，
+   * 但 canonical / 版本列表 / tracker 里仍有 id，避免误判「无报告」。
+   */
+  function resolveCareerReportIdForEditor(preferred = "") {
+    const direct = String(preferred || "").trim();
+    if (direct) return direct;
+    const cr = window.appState?.careerReport;
+    const fromMeta = String(cr?.meta?.report_id || "").trim();
+    if (fromMeta) return fromMeta;
+    const canon = String(window.appState?.careerReportCanonicalId || "").trim();
+    if (canon) return canon;
+    const pack = getCareerReportVersionList();
+    const fromPackCanon = String(pack?.canonicalReportId || "").trim();
+    if (fromPackCanon) return fromPackCanon;
+    const versions = Array.isArray(pack?.versions) ? pack.versions : [];
+    for (let i = 0; i < versions.length; i += 1) {
+      const rid = String(versions[i]?.report_id || "").trim();
+      if (rid) return rid;
+    }
+    const tr = window.appState?.careerReportTracker;
+    const fromTracker = String(tr?.report_id || "").trim();
+    if (fromTracker) return fromTracker;
+    const trVers = Array.isArray(tr?.versions) ? tr.versions : [];
+    for (let j = 0; j < trVers.length; j += 1) {
+      const rid = String(trVers[j]?.report_id || "").trim();
+      if (rid) return rid;
+    }
+    return "";
   }
 
   async function openCareerReportEditor(options = {}) {
-    const overlay = document.getElementById("reportEditorOverlay");
-    if (!overlay) return;
-    if (!window.appState?.careerReport?.report_document) {
+    const onPolishPage = Boolean(window.__CAREER_REPORT_POLISH_PAGE__);
+
+    let reportId = resolveCareerReportIdForEditor(options.reportId);
+    let cr = window.appState?.careerReport;
+    let hasBundle = Boolean(cr?.report_document);
+
+    if (!hasBundle && !reportId) {
+      try {
+        await loadCurrentCareerReport({ userCenterRefresh: false });
+      } catch (error) {
+        console.warn("openCareerReportEditor: loadCurrentCareerReport failed", error);
+      }
+      cr = window.appState?.careerReport;
+      reportId = resolveCareerReportIdForEditor(options.reportId);
+      hasBundle = Boolean(cr?.report_document);
+    }
+
+    if (!hasBundle && !reportId) {
       toast("\u6682\u65e0\u5b8c\u6574\u62a5\u544a", "\u8bf7\u5148\u751f\u6210\u804c\u4e1a\u62a5\u544a\uff0c\u518d\u8fdb\u5165\u5b8c\u6574\u62a5\u544a\u7684\u6da6\u8272\u4e0e\u7f16\u8f91\u89c6\u56fe\u3002", "warning", 2200);
       return;
     }
-    await loadCareerReportEditorSource(options);
+
+    const loadOpts = { ...options };
+    if (!String(loadOpts.reportId || "").trim() && reportId) {
+      loadOpts.reportId = reportId;
+    }
+
+    if (!onPolishPage) {
+      // 站内页面路径不要用 resolveUrl：否则会经 resolveApiUrl 拼上 __API_BASE__（如 /api），变成 /api/user-center/... 导致 404
+      const url = new URL("/user-center/career-report/polish.html", window.location.origin);
+      const ridQ = String(loadOpts.reportId || "").trim();
+      if (ridQ) url.searchParams.set("report_id", ridQ);
+      const sidQ = String(loadOpts.snapshotId || "").trim();
+      if (sidQ) url.searchParams.set("snapshot_id", sidQ);
+      window.location.assign(url.toString());
+      return;
+    }
+
+    const overlay = document.getElementById("reportEditorOverlay");
+    if (!overlay) {
+      toast(
+        "\u65e0\u6cd5\u6253\u5f00\u7f16\u8f91\u5668",
+        "\u9875\u9762\u672a\u52a0\u8f7d\u62a5\u544a\u7f16\u8f91\u5c42\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002",
+        "error",
+        2400
+      );
+      return;
+    }
+    const targetRidPre = String(loadOpts.reportId || "").trim();
+    const targetSidPre = String(loadOpts.snapshotId || "").trim();
+    const overlayAlreadyVisible = !overlay.classList.contains("hidden");
+    const prevSrc = reportRuntime.editorSource;
+    if (
+      onPolishPage &&
+      overlayAlreadyVisible &&
+      prevSrc &&
+      typeof prevSrc === "object" &&
+      `${String(prevSrc.report_id || "").trim()}|${String(prevSrc.snapshot_id || "").trim()}` !== `${targetRidPre}|${targetSidPre}` &&
+      isCareerReportEditorDirty()
+    ) {
+      if (
+        !window.confirm(
+          "\u5f53\u524d\u6b63\u6587\u6709\u672a\u4fdd\u5b58\u7684\u4fee\u6539\uff0c\u5207\u6362\u7248\u672c\u4f1a\u4e22\u5931\u8fd9\u4e9b\u66f4\u6539\u3002\u662f\u5426\u7ee7\u7eed\uff1f"
+        )
+      ) {
+        return;
+      }
+    }
     reportRuntime.previousBodyOverflow = document.body.style.overflow || "";
     document.body.style.overflow = "hidden";
     overlay.classList.remove("hidden");
-    setReportEditorRailTab();
-    setCareerReportEditorMode("edit");
+    const metaEl = document.getElementById("reportEditorMeta");
+    if (metaEl) metaEl.textContent = "\u6b63\u5728\u52a0\u8f7d\u6e90\u6587\u7a3f\u2026";
+    try {
+      await loadCareerReportEditorSource(loadOpts);
+      setReportEditorRailTab();
+      setReportEditorRailView("chat");
+      setCareerReportEditorMode("edit");
+      ensureReportEditorBeforeUnloadListener();
+    } catch (error) {
+      overlay.classList.add("hidden");
+      document.body.style.overflow = reportRuntime.previousBodyOverflow;
+      const raw = String(error?.message || error || "").trim() || "\u52a0\u8f7d\u5931\u8d25";
+      const msg = raw.length > 220 ? `${raw.slice(0, 220)}\u2026` : raw;
+      toast("\u65e0\u6cd5\u6253\u5f00\u6da6\u8272\u754c\u9762", msg, "error", 3600);
+    }
   }
 
   function closeCareerReportEditor() {
+    if (isCareerReportEditorDirty()) {
+      if (
+        !window.confirm(
+          "\u5f53\u524d\u7f16\u8f91\u5c1a\u672a\u4fdd\u5b58\u5230\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff0c\u5173\u95ed\u540e\u672a\u4fdd\u5b58\u7684\u4fee\u6539\u5c06\u4e22\u5931\u3002\u786e\u5b9a\u5173\u95ed\uff1f"
+        )
+      ) {
+        return;
+      }
+    }
+    if (window.__CAREER_REPORT_POLISH_PAGE__) {
+      const rid = String(
+        reportRuntime.editorSource?.report_id
+          || window.appState?.careerReport?.meta?.report_id
+          || new URLSearchParams(window.location.search).get("report_id")
+          || ""
+      ).trim();
+      if (rid) {
+        const back = new URL("/user-center", window.location.origin);
+        back.searchParams.set("report_id", rid);
+        back.hash = "#report-workspace";
+        window.location.assign(back.toString());
+      } else {
+        const fallback = String(window.__CAREER_REPORT_POLISH_RETURN__ || "").trim();
+        if (fallback) {
+          window.location.assign(fallback);
+        } else {
+          const fb = new URL("/user-center", window.location.origin);
+          fb.hash = "#report-workspace";
+          window.location.assign(fb.toString());
+        }
+      }
+      return;
+    }
     const overlay = document.getElementById("reportEditorOverlay");
     if (!overlay) return;
     overlay.classList.add("hidden");
@@ -4327,7 +4846,16 @@
     setCareerReportEditorMode("edit");
   }
 
-  async function polishCareerReportEditorSelection() {
+  const REPORT_EDITOR_QUICK_LABELS = {
+    professional: "\u66f4\u4e13\u4e1a",
+    concise: "\u66f4\u7cbe\u70bc",
+    bullets: "\u8f6c\u8981\u70b9",
+    evidence: "\u52a0\u5f3a\u8bba\u636e"
+  };
+
+  async function polishCareerReportEditorSelection(options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    const quickAction = String(opts.quickAction || "").trim().toLowerCase();
     const source = reportRuntime.editorSource || {};
     const textarea = document.getElementById("reportEditorTextarea");
     const promptInput = document.getElementById("reportEditorPromptInput");
@@ -4340,6 +4868,15 @@
     if (window.localStorage?.setItem) {
       window.localStorage.setItem("career_report_polish_model", model);
     }
+    if (quickAction && !(selection && String(selection.text || "").trim())) {
+      toast(
+        "\u8bf7\u5148\u9009\u4e2d\u6b63\u6587",
+        "\u5728\u5de6\u4fa7\u62a5\u544a\u4e2d\u62d6\u52a8\u9009\u62e9\u9700\u8981\u4f18\u5316\u7684\u6bb5\u843d\uff0c\u518d\u70b9\u5feb\u6377\u6309\u94ae\u3002",
+        "warning",
+        2200
+      );
+      return;
+    }
     if (!String(targetText).trim()) {
       toast("\u6682\u65e0\u53ef\u6da6\u8272\u5185\u5bb9", "\u8bf7\u5148\u9009\u62e9\u4e00\u6bb5\u6b63\u6587\uff0c\u6216\u786e\u4fdd\u7f16\u8f91\u533a\u91cc\u5df2\u6709\u62a5\u544a\u5185\u5bb9\u3002", "warning", 1800);
       return;
@@ -4347,34 +4884,57 @@
     const selectionLabel = selection
       ? `${selection.ref || "\u9009\u4e2d\u7247\u6bb5"}`
       : "\u5f53\u524d\u6309\u6574\u7bc7\u62a5\u544a\u8fdb\u884c\u6da6\u8272";
-    appendReportEditorMessage(
-      "user",
-      "Prompt",
-      instruction
-        ? instruction
-        : "\u8bf7\u5e2e\u6211\u91cd\u5199\u8fd9\u90e8\u5206\uff0c\u4f46\u4e0d\u8981\u65b0\u589e\u4e8b\u5b9e\u3002",
-      "user",
-      {
+    const quickLabel = quickAction ? REPORT_EDITOR_QUICK_LABELS[quickAction] || quickAction : "";
+    if (quickAction && quickLabel) {
+      appendReportEditorMessage("user", "\u4f60", quickLabel, "user", {
+        pill: true,
         selectionRef: selection ? (selection.ref || selectionLabel || "") : "",
-        selectionPreview: selection?.text ? `${Math.max(0, Number(selection.end || 0) - Number(selection.start || 0))} 字符 · 按行附带上下文` : ""
-      }
-    );
+        selectionPreview: selection?.text
+          ? `${Math.max(0, Number(selection.end || 0) - Number(selection.start || 0))} \u5b57\u7b26 \u00b7 \u6309\u884c\u9644\u5e26\u4e0a\u4e0b\u6587`
+          : ""
+      });
+    } else {
+      appendReportEditorMessage(
+        "user",
+        "Prompt",
+        instruction
+          ? instruction
+          : "\u8bf7\u5e2e\u6211\u91cd\u5199\u8fd9\u90e8\u5206\uff0c\u4f46\u4e0d\u8981\u65b0\u589e\u4e8b\u5b9e\u3002",
+        "user",
+        {
+          selectionRef: selection ? (selection.ref || selectionLabel || "") : "",
+          selectionPreview: selection?.text
+            ? `${Math.max(0, Number(selection.end || 0) - Number(selection.start || 0))} \u5b57\u7b26 \u00b7 \u6309\u884c\u9644\u5e26\u4e0a\u4e0b\u6587`
+            : ""
+        }
+      );
+    }
+    reportRuntime.editorPolishPending = true;
     renderReportEditorChatLog();
-    updateReportEditorAiIntentSummary();
-    const payload = await requestJsonSafe("/api/career-report/polish", {
-      method: "POST",
-      body: {
-        section_key: source.section_map?.[0]?.key || "",
-        selection: selection?.text || "",
-        text: selection ? "" : textarea.value,
-        instruction,
-        model,
-        full_text: textarea.value || "",
-        selection_start: selection?.start,
-        selection_end: selection?.end
-      }
-    });
+    setReportEditorPolishBusy(true);
+    let payload;
+    try {
+      payload = await requestJsonSafe("/api/career-report/polish", {
+        method: "POST",
+        body: {
+          section_key: source.section_map?.[0]?.key || "",
+          selection: selection?.text || "",
+          text: selection ? "" : textarea.value,
+          instruction,
+          quick_action: quickAction || undefined,
+          want_ai_summary: true,
+          model,
+          full_text: textarea.value || "",
+          selection_start: selection?.start,
+          selection_end: selection?.end
+        }
+      });
+    } finally {
+      reportRuntime.editorPolishPending = false;
+      setReportEditorPolishBusy(false);
+    }
     const diffBlocks = Array.isArray(payload?.diff_blocks) ? payload.diff_blocks : [];
+    reportRuntime.editorDiffArchive = null;
     reportRuntime.editorDiff = {
       original: payload?.original || targetText,
       proposed: payload?.proposed || payload?.polished || "",
@@ -4382,19 +4942,25 @@
       selection: selection ? { start: selection.start, end: selection.end } : null
     };
     const diffSummary = summarizeEditorDiffBlocks(diffBlocks);
+    const summaryFromApi = String(payload?.action_summary || "").trim();
+    const assistantBody = summaryFromApi
+      ? `${summaryFromApi}\n\n\uff08\u5df2\u751f\u6210\u63d0\u6848\uff0c\u8bf7\u5207\u81f3\u4e2d\u95f4\u533a Diff \u67e5\u770b\u884c\u7ea7\u5bf9\u7167\uff1b\u786e\u8ba4\u540e\u53ef\u300c\u5168\u90e8\u91c7\u7eb3\u300d\u6216\u300c\u64a4\u9500\u63d0\u6848\u300d\u3002\uff09`
+      : selection
+        ? `\u5df2\u751f\u6210 ${selection.ref || "\u9009\u4e2d\u7247\u6bb5"} \u7684\u6da6\u8272\u63d0\u6848\uff08${payload?.model || model}\uff09\u3002\u8bf7\u5207\u6362\u5230\u4e2d\u95f4\u533a Diff \u89c6\u56fe\u67e5\u770b\u884c\u7ea7\u5bf9\u7167\uff0c\u5728\u53f3\u4fa7\u9605\u8bfb\u6458\u8981\u540e\u9009\u62e9\u300c\u5168\u90e8\u91c7\u7eb3\u300d\u6216\u300c\u64a4\u9500\u63d0\u6848\u300d\u3002`
+        : `\u5df2\u751f\u6210\u6574\u7bc7\u62a5\u544a\u7684\u6da6\u8272\u63d0\u6848\uff08${payload?.model || model}\uff09\u3002\u8bf7\u5207\u6362\u5230\u4e2d\u95f4\u533a Diff \u89c6\u56fe\u67e5\u770b\u884c\u7ea7\u5bf9\u7167\uff0c\u5728\u53f3\u4fa7\u9605\u8bfb\u6458\u8981\u540e\u9009\u62e9\u300c\u5168\u90e8\u91c7\u7eb3\u300d\u6216\u300c\u64a4\u9500\u63d0\u6848\u300d\u3002`;
     appendReportEditorMessage(
       "assistant",
-      "AI Draft",
-      selection
-        ? `已生成 ${selection.ref || "选中片段"} 的润色提案（${payload?.model || model}）。请在中栏查看绿/灰对比，在右栏阅读摘要后选择「全部采纳」或「撤销提案」。`
-        : `已生成整篇报告的润色提案（${payload?.model || model}）。请在中栏查看绿/灰对比，在右栏阅读摘要后选择「全部采纳」或「撤销提案」。`,
+      "AI \u52a9\u624b",
+      assistantBody,
       "assistant",
       { diffSummary }
     );
     renderReportEditorDiffPanel();
     renderReportEditorChatLog();
+    setReportEditorRailView("chat");
     setCareerReportEditorMode("edit");
-    toast("\u6da6\u8272\u63d0\u6848\u5df2\u751f\u6210", "\u8bf7\u5148\u68c0\u67e5 diff\uff0c\u518d\u51b3\u5b9a\u662f\u5426\u4f7f\u7528 Keep All \u5199\u56de\u6b63\u6587\u3002", "success", 1800);
+    setCareerReportEditorDocMode("diff");
+    toast("\u6da6\u8272\u63d0\u6848\u5df2\u751f\u6210", "\u5df2\u5207\u81f3 Diff \u89c6\u56fe\uff1b\u8bf7\u68c0\u67e5\u5bf9\u7167\u540e\u518d Keep All \u6216\u64a4\u9500\u3002", "success", 1800);
   }
 
   async function saveCareerReportEditorSnapshot() {
@@ -4416,9 +4982,21 @@
         source: source.source_type === "formal_report" ? "manual" : (source.source_type || "manual"),
         title: label,
         markdown,
-        diff_blocks: reportRuntime.editorDiff?.diff_blocks || []
+        diff_blocks: reportRuntime.editorDiff?.diff_blocks || reportRuntime.editorDiffArchive?.diff_blocks || []
       }
     });
+    const formalUpdated = Boolean(payload?.formal_report_updated);
+    if (formalUpdated) {
+      try {
+        await loadCurrentCareerReport({ userCenterRefresh: true });
+      } catch (error) {
+        console.warn("saveCareerReportEditorSnapshot: refresh bundle failed", error);
+      }
+    }
+    reportRuntime.editorSavedMarkdown = normalizeEditorMarkdownBaseline(
+      String(document.getElementById("reportEditorTextarea")?.value || "")
+    );
+    updateCareerReportEditorDirtyUi();
     reportRuntime.editorSource = {
       ...(reportRuntime.editorSource || {}),
       ...(payload?.snapshot || {}),
@@ -4429,7 +5007,13 @@
       window.appState.careerReport.draft_snapshots = Array.isArray(payload?.draft_snapshots) ? payload.draft_snapshots : [];
     }
     clearCareerReportEditorDiff({ silent: true });
-    appendReportEditorMessage("assistant", "Snapshot", `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`);
+    appendReportEditorMessage(
+      "assistant",
+      "Snapshot",
+      formalUpdated
+        ? `\u5df2\u4fdd\u5b58\u5e76\u5c06\u6b64\u7a3f\u540c\u6b65\u4e3a\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u9605\u89c8\u5ba4\u4e0b\u6b21\u6253\u5f00\u5373\u4e3a\u6b64\u7248\u672c\uff09\u3002`
+        : `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`
+    );
     renderReportEditorSnapshotList(reportRuntime.editorSource);
     renderReportEditorSectionMap({
       ...reportRuntime.editorSource,
@@ -4437,7 +5021,14 @@
     });
     renderReportEditorChatLog();
     window.renderUserCenterDashboard?.();
-    toast("\u5feb\u7167\u5df2\u4fdd\u5b58", `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`, "success", 1800);
+    toast(
+      formalUpdated ? "\u5df2\u4fdd\u5b58" : "\u5feb\u7167\u5df2\u4fdd\u5b58",
+      formalUpdated
+        ? "\u6b63\u6587\u5df2\u66f4\u65b0\uff0c\u804c\u4e1a\u62a5\u544a\u9605\u89c8\u5c06\u663e\u793a\u6b64\u7a3f\u3002"
+        : `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`,
+      "success",
+      2200
+    );
   }
 
   function exportCareerReportSource(format = "docx") {
@@ -4519,8 +5110,6 @@
     const getBody = () => shell.querySelector(".report-editor-body");
     const getNav = () => shell.querySelector(".report-editor-nav-rail");
     const getRail = () => shell.querySelector(".report-editor-rail");
-    const getLcr = () => shell.querySelector(".report-editor-lcr");
-
     function dragStyle(on) {
       document.body.style.cursor = on ? "col-resize" : "";
       document.body.style.userSelect = on ? "none" : "";
@@ -4605,38 +5194,6 @@
       railHandle.addEventListener("pointerdown", onRailPointerDown);
     }
 
-    const cmpHandle = document.getElementById("reportEditorResizerCompare");
-    const lcrRow = getLcr();
-    if (cmpHandle && lcrRow) {
-      cmpHandle.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const startX = e.clientX;
-        const rowW = lcrRow.getBoundingClientRect().width;
-        const orig = shell.querySelector(".report-editor-compare-pane--orig");
-        if (!orig || rowW < 120) return;
-        const startPct = (orig.getBoundingClientRect().width / rowW) * 100;
-        cmpHandle.classList.add("is-dragging");
-        dragStyle(true);
-        const onMove = (ev) => {
-          const rw = lcrRow.getBoundingClientRect().width;
-          if (rw < 120) return;
-          const dx = ev.clientX - startX;
-          let next = startPct + (dx / rw) * 100;
-          next = Math.max(24, Math.min(next, 76));
-          shell.style.setProperty("--re-compare-split-pct", `${next.toFixed(2)}%`);
-        };
-        const onUp = () => {
-          cmpHandle.classList.remove("is-dragging");
-          dragStyle(false);
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-          persistReportEditorLayout(shell);
-        };
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-      });
-    }
   }
 
   function bindCareerReportEditorEvents() {
@@ -4646,18 +5203,24 @@
     const renderedDoc = document.getElementById("reportEditorRenderedDoc");
     const textarea = document.getElementById("reportEditorTextarea");
     const runPolish = () => {
-      void polishCareerReportEditorSelection().catch((error) => {
+      void polishCareerReportEditorSelection({}).catch((error) => {
         toast("\u6da6\u8272\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
       });
     };
     document.querySelectorAll("[data-editor-mode]").forEach((button) => {
       button.addEventListener("click", () => {
         const nextMode = String(button.dataset.editorMode || "").trim().toLowerCase();
-        if (nextMode === "review" && !reportRuntime.editorDiff) {
+        if (nextMode === "review" && !reportRuntime.editorDiff && !reportRuntime.editorDiffArchive) {
           toast("\u6682\u65e0\u53ef\u5ba1\u9605\u7684\u6539\u52a8", "\u8bf7\u5148\u53d1\u9001\u6da6\u8272\u8bf7\u6c42\uff0c\u751f\u6210 diff \u540e\u518d\u8fdb\u5165 Review\u3002", "warning", 2000);
           return;
         }
         setCareerReportEditorMode(nextMode);
+      });
+    });
+    document.querySelectorAll(".report-editor-doc-mode-btn[data-doc-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = String(button.getAttribute("data-doc-mode") || "").trim().toLowerCase();
+        if (next) setCareerReportEditorDocMode(next);
       });
     });
     document.getElementById("reportEditorBackToReportBtn")?.addEventListener("click", () => {
@@ -4682,10 +5245,21 @@
       clearCareerReportEditorSelection();
     });
     document.getElementById("reportEditorViewToggleBtn")?.addEventListener("click", () => {
-      setCareerReportEditorViewMode(reportRuntime.editorViewMode === "markdown" ? "rendered" : "markdown");
+      setCareerReportEditorDocMode(reportRuntime.editorDocMode === "edit" ? "preview" : "edit");
     });
-    document.getElementById("reportEditorPolishBtn")?.addEventListener("click", runPolish);
     document.getElementById("reportEditorPromptSendBtn")?.addEventListener("click", runPolish);
+    document.getElementById("reportEditorPromptSendIconBtn")?.addEventListener("click", runPolish);
+    document.getElementById("reportEditorTabChat")?.addEventListener("click", () => setReportEditorRailView("chat"));
+    document.getElementById("reportEditorTabChanges")?.addEventListener("click", () => setReportEditorRailView("changes"));
+    document.querySelectorAll("[data-quick-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qa = String(btn.getAttribute("data-quick-action") || "").trim().toLowerCase();
+        if (!qa) return;
+        void polishCareerReportEditorSelection({ quickAction: qa }).catch((error) => {
+          toast("\u6da6\u8272\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+        });
+      });
+    });
     document.getElementById("reportEditorClearPromptBtn")?.addEventListener("click", () => {
       if (promptInput) {
         promptInput.value = "";
@@ -4694,7 +5268,6 @@
       }
       appendReportEditorMessage("system", "Prompt", "\u5df2\u6e05\u7a7a\u5f53\u524d\u6da6\u8272\u6307\u4ee4\u3002", "system");
       renderReportEditorChatLog();
-      updateReportEditorAiIntentSummary();
     });
     promptInput?.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -4704,7 +5277,6 @@
     });
     promptInput?.addEventListener("input", () => {
       autoResizeReportEditorPromptInput();
-      updateReportEditorAiIntentSummary();
     });
     renderedDoc?.addEventListener("mouseup", () => {
       window.setTimeout(() => {
@@ -4723,6 +5295,7 @@
     textarea?.addEventListener("input", () => {
       renderCareerReportEditorDocument();
       syncCareerReportEditorSelectionFromTextarea();
+      updateCareerReportEditorDirtyUi();
     });
     textarea?.addEventListener("dblclick", () => {
       setCareerReportEditorViewMode("rendered");
@@ -4732,14 +5305,83 @@
         toast("\u4fdd\u5b58\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
       });
     });
-    document.getElementById("reportEditorExportDocxBtn")?.addEventListener("click", () => {
-      exportCareerReportSource("docx");
+    document.getElementById("reportEditorTocSearch")?.addEventListener("input", (event) => {
+      const q = String(event.target?.value || "").trim().toLowerCase();
+      const host = document.getElementById("reportEditorSectionMap");
+      if (!host) return;
+      host.querySelectorAll(".tree-toc-branch").forEach((branch) => {
+        const text = (branch.textContent || "").toLowerCase().replace(/\s+/g, " ");
+        branch.style.display = !q || text.includes(q) ? "" : "none";
+      });
+      host.querySelectorAll(".cr-md-toc-branch").forEach((branch) => {
+        const text = (branch.textContent || "").toLowerCase().replace(/\s+/g, " ");
+        branch.style.display = !q || text.includes(q) ? "" : "none";
+      });
+      host.querySelectorAll(".tree-item.report-editor-section-item").forEach((item) => {
+        const text = (item.textContent || "").toLowerCase().replace(/\s+/g, " ");
+        item.style.display = !q || text.includes(q) ? "" : "none";
+      });
     });
+    document.getElementById("reportEditorTocToggleAll")?.addEventListener("click", () => {
+      const host = document.getElementById("reportEditorSectionMap");
+      if (!host) return;
+      const treeBranches = host.querySelectorAll(".tree-toc-branch");
+      if (treeBranches.length) {
+        const allChildren = host.querySelectorAll(".tree-children");
+        const anyCollapsed = Array.from(allChildren).some((tc) => tc.classList.contains("collapsed"));
+        allChildren.forEach((tc) => {
+          if (anyCollapsed) tc.classList.remove("collapsed");
+          else tc.classList.add("collapsed");
+        });
+        host.querySelectorAll("button.collapse-icon").forEach((btn) => {
+          const br = btn.closest(".tree-toc-branch");
+          const subs = br?.querySelector(".tree-children");
+          if (!subs) return;
+          const collapsed = subs.classList.contains("collapsed");
+          btn.classList.toggle("open", !collapsed);
+          btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        });
+        return;
+      }
+      const branches = host.querySelectorAll(".cr-md-toc-branch");
+      if (!branches.length) return;
+      const anyCollapsed = Array.from(branches).some((b) => !b.classList.contains("is-open"));
+      branches.forEach((branch) => {
+        const subs = branch.querySelector(".cr-md-toc-subs");
+        const btn = branch.querySelector(".cr-md-toc-toggle");
+        if (anyCollapsed) {
+          branch.classList.add("is-open");
+          if (subs) subs.hidden = false;
+          btn?.classList.add("is-open");
+          btn?.setAttribute("aria-expanded", "true");
+        } else {
+          branch.classList.remove("is-open");
+          if (subs) subs.hidden = true;
+          btn?.classList.remove("is-open");
+          btn?.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        const overlay = document.getElementById("reportEditorOverlay");
+        if (!overlay || overlay.classList.contains("hidden")) return;
+        if ((event.metaKey || event.ctrlKey) && event.key === "p") {
+          const input = document.getElementById("reportEditorTocSearch");
+          if (!input) return;
+          event.preventDefault();
+          input.focus();
+        }
+      },
+      true
+    );
     document.getElementById("reportEditorOverlay")?.addEventListener("click", (event) => {
       if (event.target?.id === "reportEditorOverlay") {
         closeCareerReportEditor();
       }
     });
+    ensureReportEditorBeforeUnloadListener();
     autoResizeReportEditorPromptInput();
     initReportEditorColumnResizers();
   }
@@ -5894,10 +6536,7 @@
       weak: "\u4f4e\u5339\u914d",
       not_ready: "\u5c1a\u9700\u51c6\u5907"
     }[String(dashboardSummary.fit_band || matchOutput.fit_band || "")] || "\u5f85\u8bc4\u4f30");
-    const summary = getReportUiText(
-      reportDocument.executive_summary || meta.summary,
-      "\u4e0b\u65b9\u4e3a\u5408\u5e76\u540e\u7684\u5b8c\u6574\u62a5\u544a\u6b63\u6587\uff0c\u6309\u7ae0\u8282\u9605\u8bfb\u3002"
-    );
+    const summaryRaw = String(reportDocument.executive_summary || meta.summary || "").trim();
     const highlights = normalizeReportDocItems(evidenceHealth.strengths).slice(0, 3);
     const evidenceCount = Array.isArray(evidenceHealth.evidence_trace) ? evidenceHealth.evidence_trace.length : 0;
     const actionItems = Array.isArray(planBoard.action_items) && planBoard.action_items.length
@@ -5912,11 +6551,10 @@
             <div class="crdoc-reader-copy">
               <p class="ucrd-kicker">Formal Career Report</p>
               <h2 class="ucrd-full-head-title">${esc(meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
-              <p class="ucrd-full-head-summary">${esc(summary)}</p>
+              ${summaryRaw ? `<p class="ucrd-full-head-summary">${esc(summaryRaw)}</p>` : ""}
               <div class="crdoc-reader-meta">
                 <span>\u4e3b\u7ebf\u5c97\u4f4d\u00a0\u00b7\u00a0${esc(focusRole)}</span>
                 <span>\u751f\u6210\u65f6\u95f4\u00a0\u00b7\u00a0${esc(meta.generated_at || "--")}</span>
-                <span>\u7248\u672c\u00a0\u00b7\u00a0${esc(`v${meta.version || "--"}`)}</span>
               </div>
               ${highlights.length ? `
                 <div class="crdoc-reader-highlights">
@@ -5927,10 +6565,6 @@
           </div>
           <div class="crdoc-reader-aside">
             ${renderReportReaderHeroOrb(fitScore, fitBandLabel)}
-            <div class="crdoc-reader-note">
-              <strong>AI 智能润色与导出</strong>
-              <p>右上角可以继续润色当前职业报告，并导出为 DOCX 或 HTML 版本。</p>
-            </div>
           </div>
         </div>
         <div class="crdoc-reader-statbar">
@@ -6088,6 +6722,13 @@
       console.warn("workspace restoration init failed", error);
     } finally {
       scheduleRender(true);
+      if (window.__CAREER_REPORT_POLISH_PAGE__ && isAuthenticated()) {
+        const params = new URLSearchParams(window.location.search);
+        void openCareerReportEditor({
+          reportId: String(params.get("report_id") || "").trim(),
+          snapshotId: String(params.get("snapshot_id") || "").trim()
+        });
+      }
     }
   }
 

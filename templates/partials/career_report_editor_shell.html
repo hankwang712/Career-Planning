@@ -1,0 +1,208 @@
+{# Career report AI editor shell — DOM/类名对齐根目录 ai润色.html #}
+    <div id="reportEditorOverlay" class="{{ report_editor_overlay_class|default('report-editor-overlay hidden') }} ai-polish-parity-overlay" role="dialog" aria-modal="true" aria-label="报告优化">
+        <div class="report-editor-shell report-editor-shell--polish-v2 ai-polish-shell">
+            <header class="report-editor-topbar ai-polish-topbar topbar topbar--polish-v3">
+                <div class="topbar-start">
+                    <div class="topbar-brand-row">
+                        <span class="topbar-logo">报告优化</span>
+                    </div>
+                </div>
+                <div class="topbar-doc-modes" role="presentation">
+                    <div class="report-editor-doc-mode-tabs mode-switch" role="tablist" aria-label="正文视图">
+                        <button type="button" class="report-editor-doc-mode-btn mode-btn active" data-doc-mode="preview" role="tab" aria-selected="true">Preview</button>
+                        <button type="button" class="report-editor-doc-mode-btn mode-btn" data-doc-mode="edit" role="tab" aria-selected="false">Edit</button>
+                        <button type="button" class="report-editor-doc-mode-btn mode-btn" data-doc-mode="diff" role="tab" aria-selected="false">Diff</button>
+                    </div>
+                </div>
+                <div class="topbar-end">
+                    <span id="reportEditorVersionBadge" class="topbar-version-badge" aria-live="polite">—</span>
+                    <div class="report-editor-actions topbar-actions">
+                        <button type="button" class="career-report-secondary-btn topbar-btn" id="reportEditorBackToReportBtn">← 返回职业报告阅览室</button>
+                        <button type="button" class="career-report-primary-btn topbar-btn primary" id="reportEditorSaveBtn">保存</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="report-editor-body">
+                <aside class="report-editor-nav-rail sidebar">
+                    <div class="sidebar-nav-block">
+                        <div class="nav-intro">
+                            <p class="nav-kicker">章节与版本</p>
+                            <h3 class="nav-title">导航</h3>
+                            <p class="nav-hint">在下方章节地图中选择章节，正文将同步滚动定位。</p>
+                        </div>
+                        <div class="nav-group">
+                            <p class="nav-group-label">版本</p>
+                            <div id="reportEditorSnapshotList" class="report-editor-snapshot-list"></div>
+                        </div>
+                        <div class="nav-row">
+                            <p class="nav-group-label">章节地图</p>
+                            <button type="button" class="sidebar-toggle" id="reportEditorTocToggleAll" title="展开/折叠全部章节" aria-label="展开或折叠全部章节">▸</button>
+                        </div>
+                        <div id="reportEditorSectionMap" class="chapter-tree" aria-label="章节地图"></div>
+                    </div>
+                    <div class="sidebar-search">
+                        <input type="text" class="search-input" id="reportEditorTocSearch" placeholder="搜索章节 ⌘P" autocomplete="off" aria-label="搜索章节">
+                    </div>
+                </aside>
+
+                <div class="report-editor-col-resizer" id="reportEditorResizerNav" role="separator" aria-orientation="vertical" tabindex="0" aria-label="调整左侧导航栏宽度"></div>
+
+                <section class="report-editor-main-v2">
+                    <div id="reportEditorEditStage" class="report-editor-stage report-editor-stage--edit">
+                        <div class="report-editor-selection-bar report-editor-selection-bar--v2 editor-status-bar ai-polish-status-bar">
+                            <div class="flex items-center gap-2 text-xs" style="display:flex;align-items:center;gap:8px;">
+                                <span id="reportEditorSelectionInfo">未选中行段，发送后默认润色整篇报告。</span>
+                            </div>
+                            <div class="report-editor-selection-actions">
+                                <button type="button" class="report-editor-clear-selection-btn" id="reportEditorClearSelectionBtn">清除选段</button>
+                                <button type="button" class="report-editor-close-btn" onclick="closeCareerReportEditor()" aria-label="关闭报告编辑器">关闭</button>
+                            </div>
+                        </div>
+
+                        <div class="report-editor-center-area editor-area">
+                            <div class="report-editor-doc-heading ai-polish-doc-heading">
+                                <p class="report-editor-kicker">Career Report</p>
+                                <h2 id="reportEditorTitle" class="report-editor-doc-heading-title">职业报告</h2>
+                                <p id="reportEditorMeta" class="report-editor-doc-heading-meta">正在加载源文稿…</p>
+                                <p class="report-editor-doc-heading-hint">Preview 为排版正文；Edit 为 Markdown 源码；Diff 为 AI 提案的行级对照。点顶部「保存」后才会写回阅览室正式稿；未保存的修改仅在本页有效。</p>
+                            </div>
+                            <div class="report-editor-doc-panes">
+                                <div id="reportEditorPanePreview" class="report-editor-doc-pane report-editor-doc-pane--preview">
+                                    <div class="report-editor-rendered-wrap">
+                                        <div class="report-editor-surface">
+                                            <div id="reportEditorRenderedDoc" class="report-editor-rendered-doc"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="reportEditorPaneEdit" class="report-editor-doc-pane report-editor-doc-pane--edit hidden">
+                                    <textarea id="reportEditorTextarea" class="report-editor-textarea report-editor-textarea--full" spellcheck="false" placeholder="Markdown 源码…"></textarea>
+                                </div>
+                                <div id="reportEditorPaneDiff" class="report-editor-doc-pane report-editor-doc-pane--diff hidden">
+                                    <p id="reportEditorDiffScopeHint" class="report-editor-diff-scope-hint hidden" aria-live="polite"></p>
+                                    <div class="report-editor-proposed-viewport">
+                                        <div id="reportEditorProposedEmpty" class="report-editor-proposed-empty">
+                                            <div class="report-editor-empty-illus" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
+                                            </div>
+                                            <span><strong>尚无 AI 润色</strong>在右侧对话发送指令后，可在此查看行级 diff。</span>
+                                        </div>
+                                        <div id="reportEditorProposedDiff" class="report-editor-proposed-diff hidden" aria-label="润色行级对照"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="reportEditorReviewStage" class="report-editor-stage report-editor-stage--review hidden">
+                        <div class="report-editor-review-grid">
+                            <div class="report-editor-review-card original">
+                                <div class="report-editor-review-card-head">
+                                    <span>原始内容</span>
+                                    <small id="reportEditorReviewSelectionRef">报告行段</small>
+                                </div>
+                                <pre id="reportEditorReviewOriginalContent"></pre>
+                            </div>
+                            <div class="report-editor-review-card revised">
+                                <div class="report-editor-review-card-head">
+                                    <span>建议内容</span>
+                                    <div class="report-editor-review-stats">
+                                        <em id="reportEditorReviewAddedStat">+0</em>
+                                        <em id="reportEditorReviewDeletedStat">-0</em>
+                                    </div>
+                                </div>
+                                <pre id="reportEditorReviewSuggestedContent"></pre>
+                            </div>
+                        </div>
+                        <div class="report-editor-review-summary">
+                            <strong>本次改动摘要</strong>
+                            <ul id="reportEditorReviewDeltaList"></ul>
+                        </div>
+                        <div class="report-editor-review-actions">
+                            <button type="button" class="career-report-secondary-btn" id="reportEditorBackToEditBtn">返回润色模式</button>
+                            <button type="button" class="career-report-secondary-btn" id="reportEditorUndoBtn">Undo</button>
+                            <button type="button" class="career-report-primary-btn" id="reportEditorKeepAllBtn">Keep All</button>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="report-editor-col-resizer" id="reportEditorResizerRail" role="separator" aria-orientation="vertical" tabindex="0" aria-label="调整右侧 AI 对话栏宽度"></div>
+
+                <aside class="report-editor-rail right-panel">
+                    <div class="report-editor-rail-head" role="tablist" aria-label="右侧边栏">
+                        <button type="button" class="report-editor-rail-tab-btn is-active" id="reportEditorTabChat" role="tab" aria-selected="true" data-rail-view="chat">
+                            <svg class="report-editor-rail-tab-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span>对话</span>
+                        </button>
+                        <button type="button" class="report-editor-rail-tab-btn" id="reportEditorTabChanges" role="tab" aria-selected="false" data-rail-view="changes">
+                            <svg class="report-editor-rail-tab-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 2v4"/><path d="M15 2v4"/><path d="M9 14h6"/><path d="M9 18h4"/></svg>
+                            <span>改动</span>
+                            <span class="report-editor-rail-badge is-zero" id="reportEditorChangesBadge">0</span>
+                        </button>
+                    </div>
+                    <div id="reportEditorRailChat" class="report-editor-rail-view" data-rail-panel="chat">
+                        <div class="report-editor-quick-actions" id="reportEditorQuickActionsBar" aria-label="快捷优化指令">
+                            <button type="button" class="report-editor-quick-btn" data-quick-action="professional" title="请先选中左侧正文">
+                                <span class="report-editor-quick-ico-wrap report-editor-quick-ico-wrap--spark" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+                                </span>
+                                <span class="report-editor-quick-label">更专业</span>
+                            </button>
+                            <button type="button" class="report-editor-quick-btn" data-quick-action="concise" title="请先选中左侧正文">
+                                <span class="report-editor-quick-ico-wrap report-editor-quick-ico-wrap--cut" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="m14.8 14.8 4.2 4.2"/><path d="M20 20 8.12 8.12"/></svg>
+                                </span>
+                                <span class="report-editor-quick-label">更精炼</span>
+                            </button>
+                            <button type="button" class="report-editor-quick-btn" data-quick-action="bullets" title="请先选中左侧正文">
+                                <span class="report-editor-quick-ico-wrap report-editor-quick-ico-wrap--list" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
+                                </span>
+                                <span class="report-editor-quick-label">转要点</span>
+                            </button>
+                            <button type="button" class="report-editor-quick-btn" data-quick-action="evidence" title="请先选中左侧正文">
+                                <span class="report-editor-quick-ico-wrap report-editor-quick-ico-wrap--bulb" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.33V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.67A7 7 0 0 0 12 2z"/></svg>
+                                </span>
+                                <span class="report-editor-quick-label">加强论据</span>
+                            </button>
+                        </div>
+                        <div id="reportEditorChatLog" class="report-editor-chat-log"></div>
+                        <div class="report-editor-prompt-card">
+                            <p class="report-editor-prompt-label">优化指令</p>
+                            <div class="report-editor-model-row">
+                                <label for="reportEditorModelSelect">润色模型</label>
+                                <select id="reportEditorModelSelect" class="report-editor-model-select">
+                                    <option value="deepseek-chat">DeepSeek Chat（默认）</option>
+                                    <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+                                </select>
+                            </div>
+                            <div id="reportEditorPromptSelectionPills" class="report-editor-prompt-selection-pills hidden"></div>
+                            <div class="report-editor-prompt-input-row">
+                                <textarea id="reportEditorPromptInput" class="report-editor-prompt-input" rows="2" placeholder="输入优化指令…"></textarea>
+                                <button type="button" class="report-editor-prompt-send-icon" id="reportEditorPromptSendIconBtn" title="发送（⌘+Enter）" aria-label="发送润色指令">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                </button>
+                            </div>
+                            <p class="report-editor-prompt-hint"><kbd>⌘</kbd> + <kbd>Enter</kbd> 发送 · 快捷按钮将附带对应预设</p>
+                            <div class="report-editor-prompt-actions">
+                                <button type="button" class="career-report-primary-btn" id="reportEditorPromptSendBtn">发送润色要求</button>
+                                <button type="button" class="career-report-secondary-btn" id="reportEditorClearPromptBtn">清空指令</button>
+                            </div>
+                        </div>
+                        <div id="reportEditorDiffActions" class="report-editor-diff-actions hidden">
+                            <button type="button" class="career-report-secondary-btn" id="reportEditorUndoInlineBtn">撤销提案（Undo）</button>
+                            <button type="button" class="career-report-primary-btn" id="reportEditorKeepAllInlineBtn">全部采纳（Keep All）</button>
+                        </div>
+                    </div>
+                    <div id="reportEditorRailViewChanges" class="report-editor-rail-view hidden" data-rail-panel="changes">
+                        <div id="reportEditorChangeSummary" class="report-editor-change-summary report-editor-change-summary--rail" aria-live="polite">
+                            <strong>改动要点（概括）</strong>
+                            <p id="reportEditorChangeSummaryBody">暂无待审阅改动。在「对话」中发送润色后，这里会汇总模型调整说明。</p>
+                            <ul id="reportEditorChangeSummaryList" class="hidden"></ul>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>

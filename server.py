@@ -2844,6 +2844,33 @@ def _read_career_report_snapshot(username, report_id, snapshot_id):
     return None
 
 
+def _commit_career_report_markdown_to_store(username, report_id, markdown_text):
+    """将润色后的 Markdown 写回已存储的职业报告正文（阅览室与后续加载同源）。"""
+    safe_report_id = str(report_id or "").strip()
+    md = normalize_br_tags_in_markdown(str(markdown_text or "").strip())
+    if not safe_report_id or not md:
+        return False
+    paths = _career_report_file_paths(username)
+    with APP_DATA_LOCK:
+        bundle = _read_career_report_bundle_by_id(username, safe_report_id)
+        if not isinstance(bundle, dict) or not bundle.get("meta"):
+            return False
+        report_document = dict(bundle.get("report_document") or {})
+        report_document["markdown"] = md
+        bundle["report_document"] = report_document
+        prepared, md_out, html_out = _prepare_career_report_bundle_payload(bundle)
+        latest = _read_json_file(paths["json"], {})
+        latest_id = str((latest.get("meta") or {}).get("report_id") or "").strip()
+        if latest_id == safe_report_id:
+            _write_current_career_report_files(paths, prepared, md_out, html_out)
+            return True
+        archive_path = os.path.join(paths["versions_dir"], f"{safe_report_id}.json")
+        if os.path.isfile(archive_path):
+            _write_json_file(archive_path, prepared)
+            return True
+    return False
+
+
 def _save_career_report_snapshot(username, report_id, snapshot):
     safe_report_id = str(report_id or "").strip()
     if not safe_report_id:
@@ -2856,6 +2883,37 @@ def _save_career_report_snapshot(username, report_id, snapshot):
     with APP_DATA_LOCK:
         _write_json_file(target_path, normalized)
     return normalized
+
+
+_CAREER_REPORT_QUICK_POLISH = {
+    "professional": "请将目标段落改写为更专业、偏职场与学术书面语的表达；保持事实与结论不变，不新增数据或承诺。",
+    "concise": "请在保留关键信息的前提下删除冗余与重复表述，使行文更精炼。",
+    "bullets": "请将段落改写为条理清晰的项目符号或编号要点（使用 Markdown 列表语法），便于扫读。",
+    "evidence": "请在不杜撰量化数据的前提下强化论据：突出能力、经历与岗位/行业要求之间的对应关系。",
+}
+
+
+def _fallback_summary_career_quick_action(key: str) -> str:
+    return {
+        "professional": "已按「更专业」收紧措辞与论证语气，使之更符合职业报告书面表达；未新增事实。",
+        "concise": "已删减重复表述并压缩句子，使信息更集中；关键结论未改。",
+        "bullets": "已将段落改写为要点列表，便于快速扫读；原意保持不变。",
+        "evidence": "已强化论点与经历、岗位之间的对应表述；未虚构数据。",
+    }.get(key, "已完成本次润色，请对照 Diff 查看具体改动。")
+
+
+def _split_career_polish_output(raw: str):
+    """模型输出：先概括，再一行 <<<AI_BODY>>>，再润色正文。无标记时返回 ("", "")。"""
+    s = str(raw or "").strip()
+    mark = "<<<AI_BODY>>>"
+    if mark not in s:
+        return "", ""
+    head, tail = s.split(mark, 1)
+    body = tail.strip()
+    summary = head.strip()
+    if body:
+        return summary, body
+    return "", ""
 
 
 def _build_career_report_diff_blocks(original_text, proposed_text):
@@ -5340,6 +5398,14 @@ def user_center_page():
     return render_template("user_center.html")
 
 
+@app.route("/user-center/career-report/polish")
+@app.route("/user-center/career-report/polish.html")
+def career_report_polish_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return render_template("career_report_polish.html")
+
+
 @app.route("/resume-report")
 @app.route("/resume-report.html")
 def resume_report_page():
@@ -7725,7 +7791,16 @@ def api_career_report_polish():
     payload = request.get_json(silent=True) or {}
     section_key = str(payload.get("section_key") or "").strip()[:80]
     text = str(payload.get("selection") or payload.get("text") or "").strip()
-    instruction = str(payload.get("instruction") or "").strip()[:500]
+    instruction = str(payload.get("instruction") or "").strip()[:800]
+    quick_action = str(payload.get("quick_action") or "").strip().lower()[:32]
+    if quick_action in _CAREER_REPORT_QUICK_POLISH:
+        preset = _CAREER_REPORT_QUICK_POLISH[quick_action]
+        instruction = f"{preset}\n\n{instruction}".strip() if instruction else preset
+        instruction = instruction[:800]
+    want_ai_summary = (
+        quick_action in _CAREER_REPORT_QUICK_POLISH
+        or str(payload.get("want_ai_summary") or "").strip().lower() in ("1", "true", "yes")
+    )
     model_override = str(payload.get("model") or "").strip()[:120]
     full_text = str(payload.get("full_text") or "").strip()
     try:
@@ -7750,6 +7825,12 @@ def api_career_report_polish():
         "如果原文包含 JSON 或表格，只保留必要说明，不改动事实字段。"
         "需要注意段落连贯性，避免句子层面的孤立替换；若提供上下文，需与上下文语气、术语、叙事节奏一致。"
     )
+    if want_ai_summary:
+        system_prompt += (
+            "\n\n输出格式（必须遵守）：先用 2-4 句中文概括本次润色侧重点与结构调整（不要复述润色后的正文）。"
+            "然后单独一行输出分隔符 <<<AI_BODY>>>（仅此一行，勿加反引号），"
+            "换行后只输出润色后的正文，可使用 Markdown。"
+        )
     extra_instruction = f"\n\n用户额外要求：{instruction}" if instruction else ""
     context_hint = ""
     if full_text and selection_start >= 0 and selection_end > selection_start:
@@ -7763,11 +7844,19 @@ def api_career_report_polish():
                 f"--- 上文 ---\n{before or '（无）'}\n"
                 f"--- 下文 ---\n{after or '（无）'}\n"
             )
-    user_msg = (
-        f"模块：{section_key or '未指定'}{extra_instruction}{context_hint}\n\n"
-        "请只输出润色后的目标段落文本（不要附加解释），并保持与上下文衔接自然：\n\n"
-        f"{text}"
-    )
+    if want_ai_summary:
+        user_msg = (
+            f"模块：{section_key or '未指定'}{extra_instruction}{context_hint}\n\n"
+            "请严格按系统提示的格式输出：先概括，再输出 <<<AI_BODY>>> 分隔符，最后给出润色后的正文。\n\n"
+            "目标段落如下：\n\n"
+            f"{text}"
+        )
+    else:
+        user_msg = (
+            f"模块：{section_key or '未指定'}{extra_instruction}{context_hint}\n\n"
+            "请只输出润色后的目标段落文本（不要附加解释），并保持与上下文衔接自然：\n\n"
+            f"{text}"
+        )
     try:
         polished = _call_markdown_chat(
             base_url,
@@ -7775,19 +7864,36 @@ def api_career_report_polish():
             model,
             [{"role": "user", "content": user_msg}],
             system_prompt=system_prompt,
-            max_tokens=1800,
+            max_tokens=2400 if want_ai_summary else 1800,
         )
     except Exception as exc:
         app.logger.exception("career report polish failed")
         return jsonify({"message": str(exc)[:300] or "润色失败。"}), 500
 
+    action_summary = ""
+    proposed_text = polished.strip()
+    if want_ai_summary:
+        summary_part, body_part = _split_career_polish_output(polished)
+        if body_part:
+            proposed_text = body_part.strip()
+            action_summary = (summary_part or "").strip() or _fallback_summary_career_quick_action(quick_action)
+        else:
+            proposed_text = polished.strip()
+            action_summary = (
+                _fallback_summary_career_quick_action(quick_action)
+                if quick_action
+                else "已根据你的说明完成润色；未新增事实。请查看 Diff 了解具体修改。"
+            )
+
     return jsonify({
         "section_key": section_key,
         "model": model,
         "original": text,
-        "proposed": polished,
-        "polished": polished,
-        "diff_blocks": _build_career_report_diff_blocks(text, polished),
+        "proposed": proposed_text,
+        "polished": proposed_text,
+        "action_summary": action_summary,
+        "quick_action": quick_action or None,
+        "diff_blocks": _build_career_report_diff_blocks(text, proposed_text),
     })
 
 
@@ -7931,10 +8037,17 @@ def api_career_report_snapshot_save():
             "completeness_check": completeness_check,
         },
     )
+    # 从正式报告进入润色且未绑定旧快照时：保存同时写回该版本的报告正文，阅览室下次打开即为此稿。
+    formal_report_updated = False
+    if not str(payload.get("snapshot_id") or "").strip():
+        formal_report_updated = _commit_career_report_markdown_to_store(
+            user["username"], resolved_report_id, markdown_text
+        )
     return jsonify({
         "message": "编辑快照已保存。",
         "snapshot": _public_career_report_snapshot(snapshot, include_content=True),
         "draft_snapshots": _list_career_report_snapshots(user["username"], resolved_report_id),
+        "formal_report_updated": formal_report_updated,
     })
 
 

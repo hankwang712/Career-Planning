@@ -8249,7 +8249,7 @@ function updateProfilePortraitControls(profile, roles, synthesis) {
     } else if (portraitState?.status === "brief_ready") {
       statusLead.textContent = "任务名片已经生成，但海报渲染失败。你可以直接重试海报，不需要重新收敛整套输入。";
     } else if (portraitState?.image_url) {
-      statusLead.textContent = "首屏现在已经收敛成可对外展示的任务名片，你可以复制定位文案或重新渲染海报。";
+      statusLead.textContent = "";
     } else if (!hasGeneratedBrief) {
       statusLead.textContent = "这一页默认保持占位态，等你点击生成后再把结果压缩成首屏可读的任务名片。";
     } else {

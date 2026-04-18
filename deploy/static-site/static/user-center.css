@@ -336,10 +336,10 @@
 .uc-report-library-card,
 .uc-report-library-empty {
     display: grid;
-    gap: 0.9rem;
+    gap: 0.72rem;
     width: 100%;
     text-align: left;
-    padding: 1.2rem;
+    padding: 1rem 1.1rem 0.95rem;
     border-radius: 1.35rem;
     border: 1px solid rgba(148, 163, 184, 0.22);
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -633,11 +633,11 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    gap: 0.65rem;
+    gap: 0.45rem;
     margin-top: auto;
-    padding-top: 0.85rem;
+    padding-top: 0.55rem;
     min-height: 0;
-    border-top: 1px solid rgba(226, 232, 240, 0.92);
+    border-top: none;
     flex-shrink: 0;
     position: relative;
     z-index: 2;
@@ -717,10 +717,10 @@
 /* 正式报告卡片库：流式网格，单卡时铺满容器宽度（避免固定 520px 留白） */
 .uc-report-library-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-auto-rows: auto;
     justify-content: stretch;
-    gap: 1.2rem;
+    gap: 0.8rem;
     align-items: stretch;
     width: 100%;
 }
@@ -731,9 +731,9 @@
     min-width: 0;
     max-width: none;
     height: auto;
-    min-height: 260px;
+    min-height: 13.5rem;
     max-height: none;
-    padding: 1.2rem 1.25rem 1rem;
+    padding: 0.85rem 1.05rem 0.8rem;
     border-radius: 1.5rem;
     border: 1px solid rgba(203, 213, 225, 0.9);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.94));
@@ -786,7 +786,7 @@
 
 .uc-report-library-card-main {
     display: grid;
-    gap: 1rem;
+    gap: 0.52rem;
     z-index: 1;
     flex: 1 1 auto;
     min-height: 0;
@@ -794,14 +794,14 @@
 }
 
 .uc-report-library-card-top {
-    grid-template-columns: 3.8rem minmax(0, 1fr);
-    gap: 0.9rem;
-    align-items: center;
+    grid-template-columns: 3.9rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
 }
 
 .uc-report-library-card-mark {
-    width: 3.8rem;
-    height: 3.8rem;
+    width: 3.9rem;
+    height: 3.9rem;
     border-radius: 1.15rem;
     box-shadow: 0 16px 30px rgba(148, 163, 184, 0.18);
 }
@@ -823,24 +823,25 @@
 }
 
 .uc-report-library-card-head h4 {
-    font-size: 1.24rem;
-    line-height: 1.18;
+    font-size: 1.18rem;
+    line-height: 1.24;
 }
 
 .uc-report-library-title {
     min-height: 0;
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.93rem;
     font-weight: 800;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
     color: #64748b;
 }
 
 .uc-report-library-summary {
     margin: 0;
     color: #334155;
-    font-size: 0.92rem;
-    line-height: 1.65;
+    font-size: 0.88rem;
+    line-height: 1.55;
     min-height: 0;
     max-height: 5.4rem;
     word-break: break-word;
@@ -867,15 +868,15 @@
 .uc-report-library-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.65rem;
+    gap: 0.55rem;
     margin-top: 0.15rem;
 }
 
 .uc-report-library-stat {
     display: grid;
-    gap: 0.35rem;
-    min-height: 3.9rem;
-    padding: 0.68rem 0.75rem;
+    gap: 0.28rem;
+    min-height: 3.45rem;
+    padding: 0.52rem 0.58rem;
     border-radius: 1rem;
     border: 1px solid rgba(226, 232, 240, 0.96);
     background: rgba(255, 255, 255, 0.82);
@@ -1336,6 +1337,35 @@
     flex-wrap: wrap;
     margin-left: auto;
 }
+
+.uc-report-toolbar .career-report-secondary-btn.uc-toolbar-ai-gated {
+    opacity: 0.72;
+}
+
+/* 职业报告阅览室：导出 / AI 润色工具栏图标 */
+.uc-report-toolbar .uc-report-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+}
+
+.uc-report-toolbar .uc-btn-ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #64748b;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.uc-report-toolbar .uc-ico-svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    display: block;
+}
+
+/* 悬停与配色见下方「Career report reader」中 .uc-report-workbench .uc-report-toolbar */
 
 .uc-report-view-switch {
     display: inline-flex;
@@ -4729,6 +4759,17 @@
     box-shadow: 0 12px 24px rgba(99, 102, 241, 0.22);
 }
 
+/* 账户中心：上传头像 / 更新密码 / 打开配置 — 主色 #43607E */
+#account-center .career-report-primary-btn {
+    background: #43607E;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(67, 96, 126, 0.26);
+}
+
+#account-center .career-report-primary-btn:hover {
+    background: #3a556f;
+    box-shadow: 0 12px 24px rgba(67, 96, 126, 0.24);
+}
+
 .career-report-secondary-btn {
     border: 1px solid #e5e7eb;
     background: #ffffff;
@@ -5639,12 +5680,120 @@
     backdrop-filter: blur(18px);
 }
 
-.uc-report-toolbar {
-    padding: 0.32rem;
+.uc-report-workbench-head > div:first-child {
+    position: relative;
+    padding-left: 0.9rem;
+}
+
+.uc-report-workbench-head > div:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.15rem;
+    bottom: 0.15rem;
+    width: 3px;
     border-radius: 999px;
-    border: 1px solid rgba(203, 213, 225, 0.96);
+    background: linear-gradient(180deg, #2dd4bf 0%, #6366f1 100%);
+    opacity: 0.92;
+}
+
+.uc-report-toolbar {
+    gap: 0.12rem;
+    padding: 0.35rem 0.42rem;
+    border-radius: 1.05rem;
+    border: 1px solid rgba(167, 243, 208, 0.45);
+    background:
+        linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 250, 0.65) 48%, rgba(236, 253, 245, 0.88) 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.88) inset,
+        0 12px 32px rgba(15, 23, 42, 0.07),
+        0 2px 8px rgba(20, 184, 166, 0.06);
+}
+
+/* 阅览室工具栏：分段按钮 + 图标圆底（翡翠/青玉质感） */
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn.career-report-secondary-btn {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.42rem;
+    padding: 0.32rem 0.9rem 0.32rem 0.38rem;
+    margin: 0;
+    border: none;
+    border-radius: 0.82rem;
+    background: transparent;
+    color: #334155;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    box-shadow: none;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease, color 0.18s ease;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn.career-report-secondary-btn:hover {
+    transform: translateY(-1px);
     background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+    border-color: transparent;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-btn-ico {
+    width: 2.05rem;
+    height: 2.05rem;
+    border-radius: 0.68rem;
+    color: inherit;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-ico-svg {
+    width: 1.12rem;
+    height: 1.12rem;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--pdf .uc-btn-ico {
+    background: linear-gradient(145deg, #fef2f2 0%, #fee2e2 100%);
+    color: #b91c1c;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--docx .uc-btn-ico {
+    background: linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--ai .uc-btn-ico {
+    background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 55%, #e0e7ff 100%);
+    color: #0d9488;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--ai {
+    color: #0f766e;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--pdf:hover .uc-btn-ico {
+    color: #991b1b;
+    background: linear-gradient(145deg, #fff1f2 0%, #fecdd3 100%);
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--docx:hover .uc-btn-ico {
+    color: #1e40af;
+    background: linear-gradient(145deg, #f0f9ff 0%, #bfdbfe 100%);
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--ai:hover {
+    color: #0f766e;
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn--ai:hover .uc-btn-ico {
+    color: #0f766e;
+    background: linear-gradient(145deg, #ecfdf5 0%, #a7f3d0 45%, #c7d2fe 100%);
+    box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.35);
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn:hover .uc-btn-ico .uc-ico-svg {
+    transform: scale(1.06);
+}
+
+.uc-report-workbench .uc-report-toolbar .uc-report-toolbar-btn:not(:first-child) {
+    box-shadow: -1px 0 0 rgba(148, 163, 184, 0.22);
 }
 
 .uc-report-workbench .career-report-layout--report {
@@ -5819,6 +5968,32 @@
     color: rgba(241, 245, 249, 0.8);
     line-height: 1.7;
     font-size: 0.82rem;
+}
+
+.career-report-main .crdoc-reader-ai-entry {
+    margin-top: 0.2rem;
+    justify-self: start;
+    min-height: 2.1rem;
+    padding: 0.4rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    background: rgba(255, 255, 255, 0.14);
+    color: #f8fafc;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.career-report-main .crdoc-reader-ai-entry:hover {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.career-report-main .crdoc-reader-ai-entry:focus-visible {
+    outline: 2px solid rgba(251, 191, 36, 0.85);
+    outline-offset: 2px;
 }
 
 .career-report-main .crdoc-reader-statbar {
@@ -6527,64 +6702,55 @@
   margin-left: 0.85rem;
 }
 
-/* ── 报告编辑器 ·「原文」阅读区：段落卡片 + 与阅读态一致的 Markdown/表格排版 ── */
+/* ── 报告编辑器 ·「原文」阅读区：琉璃墨风段落卡片 + Markdown/表格排版 ── */
 #reportEditorOverlay .report-editor-compare-pane--orig .report-editor-pane-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.35rem;
-  padding: 0 0.15rem;
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #475569;
-}
-
-#reportEditorOverlay .report-editor-compare-pane--orig .report-editor-pane-label::before {
-  content: "";
-  width: 3px;
-  height: 14px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #3b82f6, #6366f1);
-  flex-shrink: 0;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: #1a1a1a;
 }
 
 #reportEditorOverlay .report-editor-rendered-wrap {
-  border-radius: 16px;
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 #reportEditorOverlay .report-editor-rendered-doc {
   padding: 1.1rem 1.15rem 1.35rem;
-  background: linear-gradient(165deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.98) 38%, #fafbfc 100%);
+  background: #fafaf7;
   scrollbar-gutter: stable;
 }
 
 #reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment {
   margin-bottom: 0.85rem;
   padding: 0.85rem 1rem 1rem;
-  border-radius: 14px;
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  border-left: 3px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border-left: 3px solid rgba(0, 0, 0, 0.06);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 #reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment:hover {
-  border-left-color: rgba(59, 130, 246, 0.55);
-  border-color: rgba(191, 219, 254, 0.65);
-  background: #fbfdff;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.07);
+  border-left-color: rgba(168, 135, 46, 0.45);
+  border-color: rgba(168, 135, 46, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(168, 135, 46, 0.07);
 }
 
 #reportEditorOverlay .report-editor-rendered-doc .report-editor-md-segment.selected {
-  border-left-color: #2563eb;
-  border-color: rgba(147, 197, 253, 0.85);
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.65) 0%, #ffffff 55%);
-  box-shadow: 0 0 0 2px rgba(191, 219, 254, 0.55), 0 6px 20px rgba(37, 99, 235, 0.08);
+  border-left-color: #a8872e;
+  border-color: rgba(168, 135, 46, 0.35);
+  background: linear-gradient(180deg, rgba(168, 135, 46, 0.1) 0%, #ffffff 55%);
+  box-shadow: 0 0 0 2px rgba(168, 135, 46, 0.12), 0 8px 22px rgba(168, 135, 46, 0.1);
 }
 
 #reportEditorOverlay .report-editor-segment-ref {
@@ -6599,9 +6765,9 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
-  color: #64748b;
-  background: rgba(241, 245, 249, 0.92);
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  color: #a8872e;
+  background: rgba(168, 135, 46, 0.1);
+  border: 1px solid rgba(168, 135, 46, 0.18);
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose {
@@ -6624,9 +6790,9 @@
   font-size: clamp(1.2rem, 2.2vw, 1.45rem);
   font-weight: 750;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: #1a1a1a;
   line-height: 1.28;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.28);
+  border-bottom: 1px solid rgba(168, 135, 46, 0.22);
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-h2 {
@@ -6635,10 +6801,10 @@
   padding: 0.35rem 0 0.35rem 0.7rem;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #1a1a1a;
   letter-spacing: -0.015em;
-  border-left: 3px solid #6366f1;
-  background: linear-gradient(90deg, rgba(238, 242, 255, 0.55), rgba(255, 255, 255, 0));
+  border-left: 3px solid #a8872e;
+  background: linear-gradient(90deg, rgba(168, 135, 46, 0.08), rgba(255, 255, 255, 0));
   border-radius: 0 0.4rem 0.4rem 0;
 }
 
@@ -6686,18 +6852,18 @@
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ul li::marker {
-  color: #818cf8;
+  color: #a8872e;
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-ol li::marker {
-  color: #6366f1;
+  color: #a8872e;
   font-weight: 600;
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table-wrap {
   margin: 0.85rem 0 1rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+  max-width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(226, 232, 240, 0.98);
   background: #fff;
@@ -6706,7 +6872,8 @@
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table {
   width: 100%;
-  min-width: 32rem;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
   line-height: 1.55;
@@ -6719,7 +6886,9 @@
   color: #1e293b;
   background: linear-gradient(180deg, #f8fafc, #f1f5f9);
   border-bottom: 1px solid #e2e8f0;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table td {
@@ -6727,6 +6896,8 @@
   border-bottom: 1px solid #f1f5f9;
   vertical-align: top;
   color: #475569;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-table tr:nth-child(even) td {
@@ -6741,9 +6912,9 @@
   padding: 0.1em 0.35em;
   border-radius: 0.3rem;
   font-size: 0.88em;
-  background: rgba(241, 245, 249, 0.95);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  color: #4338ca;
+  background: rgba(240, 238, 232, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #6b7e8a;
 }
 
 #reportEditorOverlay .report-editor-segment-body .career-report-md-prose .career-report-md-pre {
@@ -6765,4 +6936,175 @@
   border-radius: 10px;
   border: 1px solid rgba(203, 213, 225, 0.92);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+/* User center report layout fixes */
+#report-workspace .uc-report-library-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.72rem, 1vw, 0.95rem);
+}
+
+#report-workspace .uc-report-library-card,
+#report-workspace .uc-report-library-empty {
+  min-height: clamp(14.5rem, 20vw, 17rem);
+  padding: 0.95rem 1.15rem 0.85rem;
+}
+
+#report-workspace .uc-report-library-card-main {
+  gap: 0.58rem;
+}
+
+#report-workspace .uc-report-library-card-top {
+  grid-template-columns: 3.85rem minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: start;
+}
+
+#report-workspace .uc-report-library-card-mark {
+  width: 3.85rem;
+  height: 3.85rem;
+  border-radius: 1.05rem;
+}
+
+#report-workspace .uc-report-library-card-head h4 {
+  font-size: clamp(1.32rem, 1.22rem + 0.35vw, 1.58rem);
+  line-height: 1.22;
+}
+
+#report-workspace .uc-report-library-title {
+  font-size: 0.94rem;
+  -webkit-line-clamp: 3;
+}
+
+#report-workspace .uc-report-library-outline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+#report-workspace .uc-report-library-summary {
+  min-height: 0;
+  max-height: 4.75rem;
+  line-height: 1.45;
+  -webkit-line-clamp: 3;
+}
+
+#report-workspace .uc-report-library-stats {
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.48rem;
+  margin-top: 0;
+}
+
+#report-workspace .uc-report-library-stat {
+  min-height: 3.1rem;
+  padding: 0.4rem 0.48rem;
+}
+
+#report-workspace .uc-report-library-foot {
+  padding-top: 0.5rem;
+}
+
+#report-workspace .uc-report-library-foot-chips {
+  margin-top: 0.2rem;
+}
+
+#report-workspace .uc-report-workbench {
+  padding: clamp(1.25rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.8rem) 2rem;
+}
+
+#report-workspace .uc-report-workbench .career-report-layout--report {
+  width: min(100%, 88rem);
+  margin: 0 auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main {
+  width: 100%;
+  max-width: min(100%, 78rem);
+  margin: 0 auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-page,
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-full-head,
+#report-workspace .uc-report-workbench .career-report-main > .ucrd-full-head,
+#report-workspace .uc-report-workbench .career-report-main > .cr4-report-shell {
+  max-width: min(72rem, 100%);
+  margin-inline: auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main > .crdoc-page {
+  gap: clamp(2rem, 3vw, 2.8rem);
+}
+
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-hero,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-page--reader,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-toc,
+#report-workspace .uc-report-workbench .career-report-main .cr4-report-index,
+#report-workspace .uc-report-workbench .career-report-main .cr4-report-modules,
+#report-workspace .uc-report-workbench .career-report-main .career-report-section-card.crdoc-article-card {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+#report-workspace .uc-report-workbench .career-report-main .crdoc-header-main--reader,
+#report-workspace .uc-report-workbench .career-report-main .crdoc-reader-statbar {
+  width: 100%;
+  margin-inline: 0;
+}
+
+@media (max-width: 1100px) {
+  #report-workspace .uc-report-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #report-workspace .uc-report-workbench .career-report-main > .crdoc-page,
+  #report-workspace .uc-report-workbench .career-report-main > .crdoc-full-head,
+  #report-workspace .uc-report-workbench .career-report-main > .ucrd-full-head,
+  #report-workspace .uc-report-workbench .career-report-main > .cr4-report-shell,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-reader-hero,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-page--reader,
+  #report-workspace .uc-report-workbench .career-report-main .crdoc-reader-toc,
+  #report-workspace .uc-report-workbench .career-report-main .cr4-report-index,
+  #report-workspace .uc-report-workbench .career-report-main .cr4-report-modules,
+  #report-workspace .uc-report-workbench .career-report-main .career-report-section-card.crdoc-article-card {
+    width: min(100%, 66rem);
+  }
+}
+
+@media (max-width: 900px) {
+  #report-workspace .uc-report-library-card,
+  #report-workspace .uc-report-library-empty {
+    min-height: auto;
+  }
+
+  #report-workspace .uc-report-library-card-top {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  #report-workspace .uc-report-library-stats {
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+
+  #report-workspace .uc-report-workbench {
+    padding-inline: 0.9rem;
+  }
+
+}
+
+@media (max-width: 640px) {
+  #report-workspace .uc-report-library-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #report-workspace .uc-report-library-card-top {
+    grid-template-columns: 1fr;
+  }
+
+  #report-workspace .uc-report-library-card-mark {
+    width: 3.8rem;
+    height: 3.8rem;
+  }
+
+  #report-workspace .uc-report-library-summary {
+    min-height: 0;
+  }
 }

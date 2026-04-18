@@ -1,0 +1,824 @@
+/**
+ * 与仓库根目录 ai润色.html 对齐的润色全屏视觉层
+ * 依赖：#reportEditorOverlay.ai-polish-parity-overlay + .ai-polish-shell
+ * 字体：模板中需引入 Noto Serif SC（与 ai润色.html 一致）
+ */
+#reportEditorOverlay.ai-polish-parity-overlay {
+  --ap-bg-main: #e8f0ec;
+  --ap-bg-panel: rgba(252, 253, 252, 0.5);
+  --ap-bg-card: rgba(255, 255, 255, 0.78);
+  --ap-bg-input: rgba(240, 247, 244, 0.85);
+  --ap-glass-edge: rgba(255, 255, 255, 0.42);
+  --ap-glass-inset: rgba(255, 255, 255, 0.55);
+  --ap-edge-light: rgba(80, 110, 100, 0.08);
+  --ap-edge-glow: rgba(100, 130, 118, 0.14);
+  --ap-text-1: #1a1a1a;
+  --ap-text-2: #5a5750;
+  --ap-text-3: #9a958d;
+  --ap-text-ph: #c0bbb2;
+  --ap-accent: #43607e;
+  --ap-accent-light: #5b7490;
+  --ap-accent-dim: rgba(67, 96, 126, 0.12);
+  --ap-accent-dim2: rgba(67, 96, 126, 0.07);
+  --ap-font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --ap-font-head: "Noto Serif SC", "Songti SC", serif;
+  --ap-font-mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", monospace;
+}
+
+/* 液态玉白底（对齐 ai润色.html body） */
+#reportEditorOverlay.ai-polish-parity-overlay.report-editor-overlay {
+  background:
+    radial-gradient(ellipse 110% 90% at 8% -5%, rgba(255, 255, 255, 0.95) 0%, transparent 58%),
+    radial-gradient(ellipse 85% 70% at 96% 92%, rgba(220, 238, 230, 0.85) 0%, transparent 52%),
+    radial-gradient(ellipse 55% 50% at 45% 48%, rgba(255, 255, 255, 0.4) 0%, transparent 68%),
+    linear-gradient(168deg, #dde8e3 0%, #f0f6f3 38%, #e3ede9 100%);
+  background-color: var(--ap-bg-main);
+  isolation: isolate;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  opacity: 0.45;
+  mix-blend-mode: soft-light;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    185deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 28%,
+    transparent 42%,
+    transparent 65%,
+    rgba(210, 228, 220, 0.18) 100%
+  );
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .ai-polish-shell {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: var(--ap-text-1);
+  font-family: var(--ap-font-body);
+  font-size: 14px;
+  line-height: 1.7;
+  --re-nav-w: 228px;
+  --re-rail-w: 330px;
+}
+
+/* —— 顶栏 topbar（对齐参考图：左品牌+面包屑 · 中置 Preview/Edit/Diff · 右操作） —— */
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-topbar.ai-polish-topbar.topbar {
+  position: relative;
+  height: 56px;
+  padding: 0 14px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(252, 254, 253, 0.55) 100%);
+  backdrop-filter: blur(22px) saturate(1.16);
+  -webkit-backdrop-filter: blur(22px) saturate(1.16);
+  border-bottom: 1px solid var(--ap-glass-edge);
+  box-shadow: inset 0 1px 0 var(--ap-glass-inset), 0 6px 28px rgba(45, 72, 62, 0.05);
+  border-radius: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-topbar.topbar--polish-v3 {
+  flex-wrap: nowrap;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-topbar.ai-polish-topbar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ap-accent-light), transparent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-start {
+  flex: 1 1 0;
+  min-width: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-brand-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-logo {
+  font-family: var(--ap-font-head);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ap-accent);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-breadcrumb {
+  font-size: 12px;
+  color: var(--ap-text-3);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-breadcrumb .bc-dot {
+  color: var(--ap-text-ph);
+  padding: 0 5px;
+  user-select: none;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-doc-modes {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-doc-modes .report-editor-doc-mode-tabs {
+  pointer-events: auto;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-end {
+  flex: 1 1 0;
+  min-width: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-polish-mode-switch.mode-switch {
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-version-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--ap-accent);
+  background: var(--ap-accent-dim);
+  border: 1px solid rgba(67, 96, 126, 0.2);
+  font-family: var(--ap-font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-mode-tabs.mode-switch {
+  display: flex;
+  align-items: center;
+  background: var(--ap-bg-input);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+  border: 1px solid var(--ap-edge-light);
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-mode-tabs.mode-switch {
+  display: flex;
+  align-items: center;
+  background: var(--ap-bg-input);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+  border: 1px solid var(--ap-edge-light);
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-mode-btn.mode-btn,
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-mode-btn.mode-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ap-text-3);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--ap-font-body);
+  font-weight: 500;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-mode-btn.mode-btn {
+  padding: 5px 14px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-mode-btn.mode-btn:hover,
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-mode-btn.mode-btn:hover {
+  color: var(--ap-text-2);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-mode-btn.mode-btn.active,
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-mode-btn.mode-btn.active {
+  color: var(--ap-accent);
+  background: var(--ap-bg-card);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .career-report-secondary-btn,
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .topbar-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ap-text-2);
+  background: var(--ap-bg-card);
+  border: 1px solid var(--ap-edge-light);
+  border-radius: 6px;
+  font-family: var(--ap-font-body);
+  font-weight: 500;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .career-report-secondary-btn:hover {
+  border-color: var(--ap-edge-glow);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .career-report-primary-btn,
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .topbar-btn.primary {
+  background: var(--ap-accent);
+  color: #fff;
+  border-color: var(--ap-accent);
+  font-weight: 600;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .topbar-actions .career-report-primary-btn:hover {
+  background: var(--ap-accent-light);
+  filter: none;
+}
+
+/* —— 左侧 sidebar —— */
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail.sidebar {
+  width: var(--re-nav-w);
+  flex: 0 0 var(--re-nav-w);
+  padding: 0;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.68) 0%, rgba(246, 250, 248, 0.45) 100%);
+  backdrop-filter: blur(26px) saturate(1.12);
+  -webkit-backdrop-filter: blur(26px) saturate(1.12);
+  border-right: 1px solid var(--ap-glass-edge);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.45);
+}
+
+/* —— 左侧栏：结构与 ai润色.html sidebar 一致 —— */
+
+#reportEditorOverlay.ai-polish-parity-overlay .sidebar-nav-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .sidebar-nav-block .nav-intro {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 -1px 0 rgba(80, 110, 100, 0.06);
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-kicker {
+  font-size: 11px;
+  color: var(--ap-text-3);
+  letter-spacing: 0.02em;
+  margin: 0 0 4px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ap-text-1);
+  font-family: var(--ap-font-head);
+  margin: 0 0 4px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-hint {
+  font-size: 11px;
+  color: var(--ap-text-ph);
+  line-height: 1.45;
+  margin: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-group {
+  padding: 10px 12px 0;
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-group-label {
+  font-size: 11px;
+  color: var(--ap-text-3);
+  margin: 0 0 8px;
+  letter-spacing: 0.04em;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-snapshot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(252, 254, 253, 0.72) 100%);
+  box-shadow:
+    0 2px 12px rgba(45, 75, 65, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card:hover {
+  border-color: rgba(67, 96, 126, 0.22);
+  box-shadow:
+    0 4px 16px rgba(45, 72, 62, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card.is-active,
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card[aria-current="true"] {
+  border-color: rgba(67, 96, 126, 0.28);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82) 0%, var(--ap-accent-dim2) 100%);
+  box-shadow:
+    0 0 0 1px rgba(67, 96, 126, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card .toc-radio {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid #c5ccd4;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card.is-active .toc-radio,
+#reportEditorOverlay.ai-polish-parity-overlay button.version-toc-card[aria-current="true"] .toc-radio {
+  border-color: var(--ap-accent);
+  background: radial-gradient(circle at 50% 50%, rgba(67, 96, 126, 0.22) 0%, rgba(67, 96, 126, 0.22) 42%, transparent 43%);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .version-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .version-card-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ap-text-1);
+  line-height: 1.45;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .version-card-meta {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--ap-accent);
+  background: var(--ap-accent-dim);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: var(--ap-font-mono);
+  width: fit-content;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .nav-row .nav-group-label {
+  margin-bottom: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .chapter-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(67, 96, 126, 0.42) transparent;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .chapter-tree::-webkit-scrollbar {
+  width: 8px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .chapter-tree::-webkit-scrollbar-thumb {
+  background: rgba(67, 96, 126, 0.32);
+  border-radius: 999px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .chapter-tree::-webkit-scrollbar-thumb:hover {
+  background: rgba(67, 96, 126, 0.48);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-toc-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  position: relative;
+  gap: 10px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88) 0%, rgba(250, 252, 251, 0.65) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  box-shadow:
+    0 2px 10px rgba(45, 72, 62, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px) saturate(1.04);
+  -webkit-backdrop-filter: blur(8px) saturate(1.04);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item:hover {
+  border-color: rgba(67, 96, 126, 0.22);
+  box-shadow:
+    0 4px 16px rgba(45, 72, 62, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item:focus-visible {
+  outline: 2px solid rgba(67, 96, 126, 0.35);
+  outline-offset: 1px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item .toc-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #c5ccd4;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item .tree-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ap-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item.level-2 {
+  margin-left: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item.level-2 .tree-label {
+  font-size: 11px;
+  color: var(--ap-text-3);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-item .tree-count {
+  font-size: 10px;
+  color: var(--ap-accent);
+  font-family: var(--ap-font-mono);
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.collapse-icon {
+  width: 14px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--ap-text-ph);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, color 0.15s ease;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay button.collapse-icon.open {
+  transform: rotate(90deg);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .collapse-icon--placeholder {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-children {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .tree-children.collapsed {
+  display: none;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail .sidebar-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--ap-edge-light);
+  background: var(--ap-bg-input);
+  color: var(--ap-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail .sidebar-toggle:hover {
+  color: var(--ap-text-2);
+  background: var(--ap-bg-card);
+  border-color: var(--ap-edge-glow);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail .sidebar-search {
+  border-top-color: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(248, 252, 250, 0.4) 100%);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail .sidebar-search .search-input {
+  border-color: var(--ap-edge-light);
+  background: var(--ap-bg-input);
+  color: var(--ap-text-2);
+  font-family: var(--ap-font-body);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-nav-rail .sidebar-search .search-input:focus {
+  border-color: var(--ap-accent);
+  background: var(--ap-bg-card);
+  color: var(--ap-text-1);
+}
+
+/* —— 主编辑区 —— */
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-main-v2 {
+  background: linear-gradient(185deg, rgba(255, 255, 255, 0.42) 0%, rgba(242, 248, 245, 0.38) 45%, rgba(236, 244, 240, 0.36) 100%);
+  backdrop-filter: blur(14px) saturate(1.06);
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-selection-bar.editor-status-bar {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(252, 254, 253, 0.48) 100%);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  border-bottom: 1px solid var(--ap-glass-edge);
+  color: var(--ap-text-3);
+  font-size: 11px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-center-area {
+  --report-editor-doc-max: min(1320px, 100%);
+  padding: 0 16px 18px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-heading.ai-polish-doc-heading {
+  text-align: center;
+  max-width: var(--report-editor-doc-max);
+  margin: 0 auto;
+  padding: 14px 12px 12px;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-heading .report-editor-kicker {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ap-text-3);
+  margin: 0;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-heading-title {
+  margin: 6px 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ap-text-2);
+  font-family: var(--ap-font-head);
+  line-height: 1.35;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-heading-meta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ap-text-3);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-doc-heading-hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--ap-text-ph);
+  line-height: 1.5;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rendered-wrap {
+  border-radius: 14px;
+  border: 1px solid var(--ap-edge-light);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-proposed-viewport {
+  border-radius: 12px;
+  border: 1px solid var(--ap-edge-light);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-pane-icon {
+  color: var(--ap-accent);
+  border-color: var(--ap-edge-light);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-pane-head--compare .report-editor-pane-label {
+  color: var(--ap-text-1);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-pane-sub {
+  color: var(--ap-text-3);
+}
+
+/* —— 右侧 right-panel —— */
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail.right-panel {
+  width: var(--re-rail-w);
+  flex: 0 0 var(--re-rail-w);
+  background: linear-gradient(200deg, rgba(255, 255, 255, 0.66) 0%, rgba(246, 250, 248, 0.44) 100%);
+  backdrop-filter: blur(26px) saturate(1.12);
+  -webkit-backdrop-filter: blur(26px) saturate(1.12);
+  border-left: 1px solid var(--ap-glass-edge);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-tabs.panel-tabs {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(252, 254, 253, 0.38) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--ap-glass-edge);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-tab {
+  color: var(--ap-text-3);
+  font-family: var(--ap-font-body);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-tab--active {
+  color: var(--ap-accent);
+  border-bottom-color: var(--ap-accent);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-head {
+  border-bottom-color: var(--ap-glass-edge);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(252, 254, 253, 0.38) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-tab-btn {
+  color: var(--ap-text-3);
+  font-family: var(--ap-font-body);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-rail-tab-btn.is-active {
+  color: var(--ap-accent);
+  border-bottom-color: var(--ap-accent);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-quick-btn {
+  border-color: var(--ap-edge-light);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay #reportEditorRailChat .report-editor-prompt-card {
+  border: 1px solid var(--ap-glass-edge);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-chat-row--assistant .report-editor-chat-card {
+  border-color: var(--ap-edge-light);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-prompt-label {
+  color: var(--ap-text-3);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .career-report-primary-btn {
+  background: linear-gradient(180deg, var(--ap-accent-light), var(--ap-accent));
+  border-color: var(--ap-accent);
+  color: #fff;
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-col-resizer:hover,
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-col-resizer.is-dragging {
+  background: rgba(67, 96, 126, 0.22);
+}
+
+#reportEditorOverlay.ai-polish-parity-overlay .report-editor-col-resizer:focus-visible {
+  outline: 2px solid rgba(67, 96, 126, 0.45);
+}
+
+@media (max-width: 900px) {
+  #reportEditorOverlay.ai-polish-parity-overlay .report-editor-topbar.topbar--polish-v3 {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    padding-bottom: 10px;
+  }
+
+  #reportEditorOverlay.ai-polish-parity-overlay .topbar-doc-modes {
+    position: static;
+    transform: none;
+    flex: 1 1 100%;
+    order: 3;
+    display: flex;
+    justify-content: center;
+    margin-top: 6px;
+    pointer-events: auto;
+  }
+}
+
+/* 独立润色页 body 与遮罩同底 */
+html.career-report-polish-page body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 110% 90% at 8% -5%, rgba(255, 255, 255, 0.95) 0%, transparent 58%),
+    radial-gradient(ellipse 85% 70% at 96% 92%, rgba(220, 238, 230, 0.85) 0%, transparent 52%),
+    linear-gradient(168deg, #dde8e3 0%, #f0f6f3 38%, #e3ede9 100%);
+  background-color: #e8f0ec;
+}

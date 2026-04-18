@@ -9219,6 +9219,11 @@ body.career-interview-open {
     color: #516173;
 }
 
+#profilePortraitStatusLead:empty {
+    display: none;
+    margin: 0;
+}
+
 .profile-portrait-action-row {
     display: flex;
     flex-wrap: wrap;

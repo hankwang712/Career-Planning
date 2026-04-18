@@ -603,6 +603,13 @@ function renderUserCenterTargetRoles() {
   });
 }
 
+function careerReportToolbarActionsAvailable() {
+  const cr = appState?.careerReport;
+  if (!cr) return false;
+  if (cr.report_document) return true;
+  return Boolean(String(cr.meta?.report_id || "").trim());
+}
+
 function applyUserCenterReportReaderGate() {
   const onUserCenter = typeof isUserCenterPage === "function" && isUserCenterPage();
   if (!onUserCenter) return;
@@ -616,6 +623,7 @@ function applyUserCenterReportReaderGate() {
   const exportPdfBtn = document.getElementById("userCenterExportPdfBtn");
   const switchButtons = document.querySelectorAll("[data-user-center-report-view]");
   const workbench = document.querySelector("#report-workspace .uc-report-workbench");
+  const canAct = careerReportToolbarActionsAvailable();
 
   if (layout) {
     layout.classList.toggle("career-report-layout--dashboard", viewMode === "dashboard");
@@ -626,19 +634,23 @@ function applyUserCenterReportReaderGate() {
   }
   if (viewerBtn) {
     viewerBtn.classList.toggle("hidden", workspaceMode !== "detail" || viewMode !== "report");
-    viewerBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    viewerBtn.disabled = !canAct;
   }
   if (editorBtn) {
     editorBtn.classList.toggle("hidden", workspaceMode !== "detail");
-    editorBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    // 不要用 disabled：禁用态会吞掉 click，内联 onclick 永不触发，用户会感觉「点了没反应」。
+    // 无可用报告时交给 openCareerReportEditor 用 toast 说明即可。
+    editorBtn.disabled = false;
+    editorBtn.setAttribute("aria-disabled", canAct ? "false" : "true");
+    editorBtn.classList.toggle("uc-toolbar-ai-gated", !canAct);
   }
   if (exportBtn) {
     exportBtn.classList.toggle("hidden", workspaceMode !== "detail");
-    exportBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    exportBtn.disabled = !canAct;
   }
   if (exportPdfBtn) {
     exportPdfBtn.classList.toggle("hidden", workspaceMode !== "detail");
-    exportPdfBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    exportPdfBtn.disabled = !canAct;
   }
   switchButtons.forEach((button) => {
     const active = String(button.dataset.userCenterReportView || "").trim() === viewMode;
@@ -786,7 +798,6 @@ function renderUserCenterReportLibrary() {
     const isDeleting = Boolean(deletingId && rid === deletingId);
     const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
     const titleRaw = String(item?.title || "").trim();
-    const version = escHtml(item?.version || "--");
     const generatedAt = escHtml(item?.generated_at || "--");
     const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
     const specialty = getUserCenterReportSpecialty(titleRaw, focusRoleRaw);
@@ -837,10 +848,10 @@ function renderUserCenterReportLibrary() {
           </div>
         </button>
         <div class="uc-report-library-foot">
+          ${strengthCount > 0 ? `
           <div class="uc-report-library-foot-chips">
-            <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
-            ${strengthCount > 0 ? `<span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("section")}优势 ${escHtml(String(strengthCount))}</span>` : ""}
-          </div>
+            <span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("section")}优势 ${escHtml(String(strengthCount))}</span>
+          </div>` : ""}
           <div class="uc-report-library-foot-actions">
             <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" aria-label="删除这份报告卡片" ${!rid || isDeleting ? "disabled" : ""}>
               ${renderUserCenterMetaIcon("delete")}${isDeleting ? "删除中..." : "删除"}
@@ -913,7 +924,6 @@ function renderUserCenterReportLibrary() {
     const isDeleting = Boolean(deletingId && rid === deletingId);
     const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
     const titleRaw = String(item?.title || "").trim();
-    const version = escHtml(item?.version || "--");
     const generatedAt = escHtml(item?.generated_at || "--");
     const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
     const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
@@ -942,9 +952,6 @@ function renderUserCenterReportLibrary() {
           ${summaryExtra ? `<p class="uc-report-library-summary">${escHtml(summaryExtra)}</p>` : ""}
         </button>
         <div class="uc-report-library-foot">
-          <div class="uc-report-library-foot-chips">
-            <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
-          </div>
           <div class="uc-report-library-foot-actions">
             <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
               ${isDeleting ? "删除中..." : "删除卡片"}
@@ -1131,7 +1138,7 @@ function renderUserCenterReportOverview() {
   if (completionEl) completionEl.textContent = progressText;
   if (versionEl) versionEl.textContent = String(versionCount);
   if (viewerBtn) {
-    viewerBtn.disabled = !Boolean(appState?.reportReady && reportData?.report_document);
+    viewerBtn.disabled = !careerReportToolbarActionsAvailable();
     viewerBtn.classList.toggle("hidden", viewMode !== "report");
   }
   if (generateBtn) {

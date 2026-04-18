@@ -1,12 +1,409 @@
 {
-  "window_snapshot_key": "2026-04-17",
-  "window_snapshot_label": "2026-04-17 12:00",
-  "next_refresh_label": "2026-04-18 12:00",
+  "window_snapshot_key": "2026-04-18",
+  "window_snapshot_label": "2026-04-18 12:00",
+  "next_refresh_label": "2026-04-19 12:00",
   "refresh_rule": "每日 12:00 更新",
-  "snapshot_key": "2026-04-17",
-  "snapshot_label": "2026-04-17 12:00",
-  "generated_at": "2026-04-17 13:00",
+  "snapshot_key": "2026-04-18",
+  "snapshot_label": "2026-04-18 12:00",
+  "generated_at": "2026-04-18 18:01",
   "items": [
+    {
+      "title": "谷歌基于Apache 2.0协议开源Gemma 4，搭载多模态与智能体能力",
+      "url": "https://www.infoq.cn/article/ry64GrNLAEEf1qdZABb0?utm_source=rss&utm_medium=article",
+      "summary": "谷歌近期发布了 Gemma 4 系列开源权重模型，其中包含高效的 2B 和 4B 边缘端版本、一个 26B 混合专家（MoE）模型，以及一个 31B 稠密模型，所有模型均基于 Apache 2.0 许可开源。",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-18T18:00:00+08:00",
+      "published_label": "04-18 18:00",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "InfoQ",
+      "topic_label": "技术趋势",
+      "domain_label": "infoq.cn",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2Fry64GrNLAEEf1qdZABb0%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
+    },
+    {
+      "title": "谁能现场拿下名企Offer？“你好！面试官”带来实战体验 - 搜狐网",
+      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxNQ2pjdGQ0VWNWUE1rRWM3RVRoRFhOLURNTjQ5eUFheERLSkJGRVFSWFJKTlZQZEF6S0wzcXJqV2xhcHU5ZENDVlRkanNVSVRrSnR0dkp1ekRyVy1XZVNjWFYtOFBzSkxhdjYwRVJ2bzJabDVNNmFFcnF6WWlvWmtxTmJQZUJQTW1W?oc=5",
+      "summary": "谁能现场拿下名企Offer？“你好！面试官”带来实战体验 搜狐网",
+      "source": "Google News / 求职就业",
+      "published_at": "2026-04-18T16:53:12+08:00",
+      "published_label": "04-18 16:53",
+      "topic": "求职就业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career"
+      ],
+      "source_name": "Google News",
+      "topic_label": "求职就业",
+      "domain_label": "news.google.com",
+      "preview_image": ""
+    },
+    {
+      "title": "OpenAI 政策主管：行业领袖面临人身攻击，AI 公司需要“把 AI 讲好”",
+      "url": "https://www.ithome.com/0/940/705.htm",
+      "summary": "IT之家 4 月 18 日消息，据《财富》杂志网站 4 月 17 日报道，科技大佬们关于 AI 如何影响就业和生活的密集表态，在一定程度上支撑了公司的高估值，同时也加剧了公众反感情绪。NBC…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T16:14:49+08:00",
+      "published_label": "04-18 16:14",
+      "topic": "科技行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F705.htm?w=1200"
+    },
+    {
+      "title": "外媒实测 Claude Design AI 工具：5 分钟生成网页原型，但 25 分钟耗尽 80% 周配额",
+      "url": "https://www.ithome.com/0/940/694.htm",
+      "summary": "IT之家 4 月 18 日消息，科技媒体 PCWORLD 今天（4 月 18 日）发布博文，测试显示 Anthropic 发布的 AI 设计工具 Claude Design 功能强大，但词元…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T15:19:39+08:00",
+      "published_label": "04-18 15:19",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F694.htm?w=1200"
+    },
+    {
+      "title": "英伟达黄仁勋：AI 普及速度创历史之最，掌握 AI 工具是职场生存关键",
+      "url": "https://www.ithome.com/0/940/685.htm",
+      "summary": "IT之家 4 月 18 日消息，英伟达官方账号今天（4 月 18 日）在 X 平台发布推文，分享了一段英伟达首席执行官黄仁勋的演讲视频，指出 AI 浪潮下， 每个人都应该使用 AI，应用能力…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T14:42:56+08:00",
+      "published_label": "04-18 14:42",
+      "topic": "科技行业",
+      "relevance_score": 3,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F685.htm?w=1200"
+    },
+    {
+      "title": "奥尔特曼旗下公司推出 Concert Kit，可遏制演唱会黄牛问题",
+      "url": "https://www.ithome.com/0/940/681.htm",
+      "summary": "IT之家 4 月 18 日消息，科技媒体 TechCrunch 今天（4 月 18 日）发布博文，报道称 OpenAI 首席执行官山姆 · 奥尔特曼（Sam Altman）旗下的身份验证公司…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T14:12:43+08:00",
+      "published_label": "04-18 14:12",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F681.htm?w=1200"
+    },
+    {
+      "title": "英国启动 5 亿英镑“主权 AI 基金”投资，科技大臣呼吁公众拥抱 AI",
+      "url": "https://www.ithome.com/0/940/679.htm",
+      "summary": "IT之家 4 月 18 日消息，据英国《卫报》报道，英国科技事务大臣莉兹 · 肯德尔表示，应推动“让 AI 为英国服务”，并淡化外界对其对就业和网络安全影响的担忧。 与此同时，该国政府宣布启…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T14:06:47+08:00",
+      "published_label": "04-18 14:06",
+      "topic": "科技行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F679.htm?w=1200"
+    },
+    {
+      "title": "因AI，软件工程师的我被裁了。投身蓝领工作一年后，我感到前所未有的快乐 - 风闻",
+      "url": "https://news.google.com/rss/articles/CBMiW0FVX3lxTFB5Yjh4QWJhWEZaeTNicHdnbzZSNWp6aHpWVjdPc0N2a0ZlUWh5aXlab09qRzhLbGJwQmJOOHJmTEsycmplNzFDbkJxd2lTXzZ0QUNOZDhoT0ZwcWc?oc=5",
+      "summary": "因AI，软件工程师的我被裁了。投身蓝领工作一年后，我感到前所未有的快乐 风闻",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-18T13:43:00+08:00",
+      "published_label": "04-18 13:43",
+      "topic": "科技行业变化",
+      "relevance_score": 5,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "Google News",
+      "topic_label": "科技行业变化",
+      "domain_label": "news.google.com",
+      "preview_image": ""
+    },
+    {
+      "title": "英伟达 CEO 黄仁勋：AI 不会取代你，但会用 AI 的人可能会取代你",
+      "url": "https://www.ithome.com/0/940/663.htm",
+      "summary": "IT之家 4 月 18 日消息，当地时间 4 月 17 日，据外媒 Wccftech 报道，英伟达 CEO 黄仁勋在斯坦福大学商学院发言时表示，人工智能不会取代人类，而将成为新的工作平台，…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T12:51:01+08:00",
+      "published_label": "04-18 12:51",
+      "topic": "科技行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F663.htm?w=1200"
+    },
+    {
+      "title": "消息称 OpenAI 股东考虑换掉奥尔特曼：精力放在“副业”上，能否带领公司上市",
+      "url": "https://www.ithome.com/0/940/659.htm",
+      "summary": "IT之家 4 月 18 日消息，曾解雇过 CEO 奥尔特曼的 OpenAI 股东，现在打算“再来一次”。 北京时间今天上午，《华尔街日报》报道称，一些投资者开始质疑，当前将精力日益分散于各类…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T12:35:00+08:00",
+      "published_label": "04-18 12:35",
+      "topic": "科技行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F659.htm?w=1200"
+    },
+    {
+      "title": "微软首日集成 Claude Opus 4.7，GitHub Copilot 等 9 大 AI 工具全面接入",
+      "url": "https://www.ithome.com/0/940/642.htm",
+      "summary": "IT之家 4 月 18 日消息，科技媒体 NeoWin 昨日（4 月 17 日）发布博文，报道称在 Anthropic 发布 Claude Opus 4.7 模型后，微软打破与 OpenAI…",
+      "source": "IT之家 / 科技行业",
+      "published_at": "2026-04-18T10:48:00+08:00",
+      "published_label": "04-18 10:48",
+      "topic": "科技行业",
+      "relevance_score": 4,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "IT之家",
+      "topic_label": "科技行业",
+      "domain_label": "ithome.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F940%2F642.htm?w=1200"
+    },
+    {
+      "title": "OpenAI’s former Sora boss is leaving",
+      "url": "https://www.theverge.com/ai-artificial-intelligence/914463/openai-sora-bill-peebles-kevin-weil-leaving-departing",
+      "summary": "Last month, OpenAI gave up on its Sora video generation tool, and on Friday, the Sora team's le…",
+      "source": "The Verge / 科技职场",
+      "published_at": "2026-04-18T05:13:25+08:00",
+      "published_label": "04-18 05:13",
+      "topic": "科技职场",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "The Verge",
+      "topic_label": "科技职场",
+      "domain_label": "theverge.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.theverge.com%2Fai-artificial-intelligence%2F914463%2Fopenai-sora-bill-peebles-kevin-weil-leaving-departing?w=1200"
+    },
+    {
+      "title": "Kevin Weil and Bill Peebles exit OpenAI as company continues to shed ‘side quests’",
+      "url": "https://techcrunch.com/2026/04/17/kevin-weil-and-bill-peebles-exit-openai-as-company-continues-to-shed-side-quests/",
+      "summary": "Kevin Weil and Bill Peebles are leaving OpenAI as the company shuts down Sora and folds its sci…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-18T04:38:17+08:00",
+      "published_label": "04-18 04:38",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "TechCrunch",
+      "topic_label": "全球科技",
+      "domain_label": "techcrunch.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F17%2Fkevin-weil-and-bill-peebles-exit-openai-as-company-continues-to-shed-side-quests%2F?w=1200"
+    },
+    {
+      "title": "Anthropic’s new cybersecurity model could get it back in the government’s good graces",
+      "url": "https://www.theverge.com/ai-artificial-intelligence/914229/tides-turning-anthropic-trump-administration-cybersecurity-mythos-preview",
+      "summary": "The Trump administration has spent nearly two months fighting with AI company Anthropic. It's d…",
+      "source": "The Verge / 科技职场",
+      "published_at": "2026-04-18T04:14:21+08:00",
+      "published_label": "04-18 04:14",
+      "topic": "科技职场",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "The Verge",
+      "topic_label": "科技职场",
+      "domain_label": "theverge.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.theverge.com%2Fai-artificial-intelligence%2F914229%2Ftides-turning-anthropic-trump-administration-cybersecurity-mythos-preview?w=1200"
+    },
+    {
+      "title": "OpenAI Executive Kevin Weil Is Leaving the Company",
+      "url": "https://www.wired.com/story/openai-executive-kevin-weil-is-leaving-the-company/",
+      "summary": "The former Instagram VP is departing the ChatGPT-maker, which is folding the AI science applica…",
+      "source": "Wired / AI 与工作",
+      "published_at": "2026-04-18T03:56:42+08:00",
+      "published_label": "04-18 03:56",
+      "topic": "AI 与工作",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "Wired",
+      "topic_label": "AI 与工作",
+      "domain_label": "wired.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fopenai-executive-kevin-weil-is-leaving-the-company%2F?w=1200"
+    },
+    {
+      "title": "试点走向规模化盈利：生成式 AI 与智能体 AI 的 ROI 兑现路径 ｜ 技术趋势",
+      "url": "https://www.infoq.cn/article/TilQABTIBywUBmxJAFNG?utm_source=rss&utm_medium=article",
+      "summary": "2026 年，智能体将在企业级应用中取得哪些实质性突破？点击下载《2026 年 AI 与数据发展预测》白皮书，获悉专家一手前瞻，抢先拥抱新的工作方式！人工智能不再停留在试点阶段——它正在交付可衡量的底线影响。",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-18T03:35:02+08:00",
+      "published_label": "04-18 03:35",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "InfoQ",
+      "topic_label": "技术趋势",
+      "domain_label": "infoq.cn",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2FTilQABTIBywUBmxJAFNG%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
+    },
+    {
+      "title": "‘Tokenmaxxing’ is making developers less productive than they think",
+      "url": "https://techcrunch.com/2026/04/17/tokenmaxxing-is-making-developers-less-productive-than-they-think/",
+      "summary": "There's a lot more code — but it's a lot more expensive and requires a lot more rewriting.",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-18T02:42:45+08:00",
+      "published_label": "04-18 02:42",
+      "topic": "全球科技",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "TechCrunch",
+      "topic_label": "全球科技",
+      "domain_label": "techcrunch.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F17%2Ftokenmaxxing-is-making-developers-less-productive-than-they-think%2F?w=1200"
+    },
+    {
+      "title": "Meta's AI spending spree is helping make its Quest headsets more expensive",
+      "url": "https://arstechnica.com/ai/2026/04/metas-ai-spending-spree-is-helping-make-its-quest-headsets-more-expensive/",
+      "summary": "Prices for \"critical components\" are surging because of massive data center investments.",
+      "source": "Ars Technica / 开发与行业",
+      "published_at": "2026-04-18T00:23:20+08:00",
+      "published_label": "04-18 00:23",
+      "topic": "开发与行业",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "Ars Technica",
+      "topic_label": "开发与行业",
+      "domain_label": "arstechnica.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Farstechnica.com%2Fai%2F2026%2F04%2Fmetas-ai-spending-spree-is-helping-make-its-quest-headsets-more-expensive%2F?w=1200"
+    },
+    {
+      "title": "Chef Robotics escaped the robot cooking graveyard and says it’s thriving — here’s why",
+      "url": "https://techcrunch.com/2026/04/17/chef-robotics-escaped-the-robot-cooking-graveyard-and-says-its-thriving-heres-why/",
+      "summary": "The company, which deploys AI-guided robot arms for food production, says it is looking to expa…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-18T00:15:50+08:00",
+      "published_label": "04-18 00:15",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "TechCrunch",
+      "topic_label": "全球科技",
+      "domain_label": "techcrunch.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F17%2Fchef-robotics-escaped-the-robot-cooking-graveyard-and-says-its-thriving-heres-why%2F?w=1200"
+    },
+    {
+      "title": "OpenAI 也把工程师经验“蒸馏”进 skill 了！Harness 爆文作者曝内部玩法：一个百万行代码系统，全程零人工编码和审核",
+      "url": "https://www.infoq.cn/article/xeXddcuzu78D7mC5wyBy?utm_source=rss&utm_medium=article",
+      "summary": "最近，OpenAI 的 Ryan Lopopolo 前不久发了一篇很长的文章《Harness engineering》，成为圈子里的热门话题。",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-18T00:01:16+08:00",
+      "published_label": "04-18 00:01",
+      "topic": "技术趋势",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "InfoQ",
+      "topic_label": "技术趋势",
+      "domain_label": "infoq.cn",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2FxeXddcuzu78D7mC5wyBy%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
+    },
+    {
+      "title": "Anthropic launches Claude Design, a new product for creating quick visuals",
+      "url": "https://techcrunch.com/2026/04/17/anthropic-launches-claude-design-a-new-product-for-creating-quick-visuals/",
+      "summary": "The company says Claude Design is intended to help people like founders and product managers wi…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-17T23:00:00+08:00",
+      "published_label": "04-17 23:00",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "TechCrunch",
+      "topic_label": "全球科技",
+      "domain_label": "techcrunch.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F17%2Fanthropic-launches-claude-design-a-new-product-for-creating-quick-visuals%2F?w=1200"
+    },
+    {
+      "title": "Loop raises $95M to build supply chain AI that predicts disruptions",
+      "url": "https://techcrunch.com/2026/04/17/loop-raises-95m-to-build-supply-chain-ai-that-predicts-disruptions/",
+      "summary": "The San Francisco startup closed a Series C funding round led by Antonio Gracias' firm Valor, w…",
+      "source": "TechCrunch / 全球科技",
+      "published_at": "2026-04-17T21:00:00+08:00",
+      "published_label": "04-17 21:00",
+      "topic": "全球科技",
+      "relevance_score": 2,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "TechCrunch",
+      "topic_label": "全球科技",
+      "domain_label": "techcrunch.com",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F17%2Floop-raises-95m-to-build-supply-chain-ai-that-predicts-disruptions%2F?w=1200"
+    },
+    {
+      "title": "科技行业掀大规模裁员潮！员工成AI训练燃料：被裁前最后一刻还在帮助公司优化AI - 凤凰网",
+      "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE4yRV9PYlFVYUhOcFlzUzh1WWxZTUlSZkh0S0EyS1g1MTJ2X1otYUtkZXRGZFJHcjlJUEkzR0dGdk5mT2hZSHdvNw?oc=5",
+      "summary": "科技行业掀大规模裁员潮！员工成AI训练燃料：被裁前最后一刻还在帮助公司优化AI 凤凰网",
+      "source": "Google News / 科技行业变化",
+      "published_at": "2026-04-17T14:19:18+08:00",
+      "published_label": "04-17 14:19",
+      "topic": "科技行业变化",
+      "relevance_score": 7,
+      "match_tags": [
+        "career",
+        "tech"
+      ],
+      "source_name": "Google News",
+      "topic_label": "科技行业变化",
+      "domain_label": "news.google.com",
+      "preview_image": ""
+    },
     {
       "title": "爱奇艺创始人龚宇：现在电影电视剧亏损是大概率，未来一到三年内大规模运用 AI，成本会暴跌",
       "url": "https://www.ithome.com/0/940/296.htm",
@@ -268,6 +665,23 @@
       "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F16%2Feuropean-police-email-75000-people-asking-them-to-stop-ddos-attacks%2F?w=1200"
     },
     {
+      "title": "代码通过即拿奖！OpenCloud 40+超热门AI工具等你来贡献",
+      "url": "https://xie.infoq.cn/article/4940bd7d8d430c84ad94ca6b4?utm_source=rss&utm_medium=article",
+      "summary": "OpenCloudOS × InfoQ 「Agentic AI容器计划」即日上线，首批任务开放认领，完成即奖励 点击查看原文>",
+      "source": "InfoQ / 技术趋势",
+      "published_at": "2026-04-17T02:10:27+08:00",
+      "published_label": "04-17 02:10",
+      "topic": "技术趋势",
+      "relevance_score": 3,
+      "match_tags": [
+        "tech"
+      ],
+      "source_name": "InfoQ",
+      "topic_label": "技术趋势",
+      "domain_label": "xie.infoq.cn",
+      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fxie.infoq.cn%2Farticle%2F4940bd7d8d430c84ad94ca6b4%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
+    },
+    {
       "title": "The Battle for OpenAI’s Soul",
       "url": "https://www.wired.com/story/musk-v-altman-trial-openai-xai/",
       "summary": "In Musk v. Altman, a jury will soon determine whether OpenAI has strayed from its founding miss…",
@@ -456,418 +870,6 @@
       "topic_label": "科技行业",
       "domain_label": "ithome.com",
       "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F939%2F714.htm?w=1200"
-    },
-    {
-      "title": "Amazon-backed X-energy files to raise up to $800M in IPO",
-      "url": "https://techcrunch.com/2026/04/15/amazon-backed-x-energy-files-to-raise-up-to-800m-in-ipo/",
-      "summary": "Nuclear startup X-energy hit the road today to sell prospective investors on its initial public…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T06:44:26+08:00",
-      "published_label": "04-16 06:44",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Famazon-backed-x-energy-files-to-raise-up-to-800m-in-ipo%2F?w=1200"
-    },
-    {
-      "title": "Monarch Tractor’s collapse ends with an acquisition by Caterpillar",
-      "url": "https://techcrunch.com/2026/04/15/monarch-tractors-collapse-ends-in-with-an-acquisition-by-caterpillar/",
-      "summary": "The startup had faced mounting pressure from dealers, farmers, and a co-founder who complained…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T05:05:21+08:00",
-      "published_label": "04-16 05:05",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Fmonarch-tractors-collapse-ends-in-with-an-acquisition-by-caterpillar%2F?w=1200"
-    },
-    {
-      "title": "OpenAI updates its Agents SDK to help enterprises build safer, more capable agents",
-      "url": "https://techcrunch.com/2026/04/15/openai-updates-its-agents-sdk-to-help-enterprises-build-safer-more-capable-agents/",
-      "summary": "OpenAI has expanded the capabilities of its agent-building toolkit, as agentic AI continues to…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T03:28:36+08:00",
-      "published_label": "04-16 03:28",
-      "topic": "全球科技",
-      "relevance_score": 4,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Fopenai-updates-its-agents-sdk-to-help-enterprises-build-safer-more-capable-agents%2F?w=1200"
-    },
-    {
-      "title": "Hightouch reaches $100M ARR fueled by marketing tools powered by AI",
-      "url": "https://techcrunch.com/2026/04/15/hightouch-reaches-100m-arr-fueled-by-marketing-tools-powered-by-ai/",
-      "summary": "The startup says it grew its ARR by $70 million in just 20 months after launching an AI agent p…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T02:55:12+08:00",
-      "published_label": "04-16 02:55",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Fhightouch-reaches-100m-arr-fueled-by-marketing-tools-powered-by-ai%2F?w=1200"
-    },
-    {
-      "title": "LinkedIn data shows AI isn’t to blame for hiring decline… yet",
-      "url": "https://techcrunch.com/2026/04/15/linkedin-data-shows-ai-isnt-to-blame-for-hiring-decline-yet/",
-      "summary": "LinkedIn says hiring is down 20% since 2022, but blames higher interest rates — not AI — for th…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T02:51:54+08:00",
-      "published_label": "04-16 02:51",
-      "topic": "全球科技",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Flinkedin-data-shows-ai-isnt-to-blame-for-hiring-decline-yet%2F?w=1200"
-    },
-    {
-      "title": "Feds will require data centers to show their power bills",
-      "url": "https://techcrunch.com/2026/04/15/feds-will-require-data-centers-to-show-their-power-bills/",
-      "summary": "In a first, the U.S. Energy Information Agency said it will require data centers to disclose de…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T02:50:48+08:00",
-      "published_label": "04-16 02:50",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Ffeds-will-require-data-centers-to-show-their-power-bills%2F?w=1200"
-    },
-    {
-      "title": "Can AI judge journalism? A Thiel-backed startup says yes, even if it risks chilling whistleblowers",
-      "url": "https://techcrunch.com/2026/04/15/can-ai-judge-journalism-a-thiel-backed-startup-says-yes-even-if-it-risks-chilling-whistleblowers/",
-      "summary": "Objection, a Thiel-backed startup, aims to use AI to judge journalism, letting users pay to cha…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T02:33:20+08:00",
-      "published_label": "04-16 02:33",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Fcan-ai-judge-journalism-a-thiel-backed-startup-says-yes-even-if-it-risks-chilling-whistleblowers%2F?w=1200"
-    },
-    {
-      "title": "AI Could Democratize One of Tech's Most Valuable Resources",
-      "url": "https://www.wired.com/story/ai-could-democratize-one-of-techs-most-valuable-resources/",
-      "summary": "AI is making it easier to design chips and optimize software for different silicon. Some startu…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-16T02:00:00+08:00",
-      "published_label": "04-16 02:00",
-      "topic": "AI 与工作",
-      "relevance_score": 4,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fai-could-democratize-one-of-techs-most-valuable-resources%2F?w=1200"
-    },
-    {
-      "title": "This Khosla-backed autonomous pod startup just raised $170M — now it’s aiming for more",
-      "url": "https://techcrunch.com/2026/04/15/this-khosla-backed-autonomous-pod-startup-just-raised-170m-now-its-aiming-for-more/",
-      "summary": "Glydways is in talks to raise another $250 million as it prepares to launch three pilot program…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T01:46:28+08:00",
-      "published_label": "04-16 01:46",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Fthis-khosla-backed-autonomous-pod-startup-just-raised-170m-now-its-aiming-for-more%2F?w=1200"
-    },
-    {
-      "title": "Microsoft Surface PCs Are Getting Big Price Hikes, and the Cheaper Models Are Going Away",
-      "url": "https://www.wired.com/story/microsoft-surface-price-hikes-cheaper-models-going-away/",
-      "summary": "The price increases range from $200 to $300, and Microsoft doesn’t sell a sub-$1,000 Surface an…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-16T01:28:30+08:00",
-      "published_label": "04-16 01:28",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fmicrosoft-surface-price-hikes-cheaper-models-going-away%2F?w=1200"
-    },
-    {
-      "title": "India’s vibe-coding startup Emergent enters OpenClaw-like AI agent space",
-      "url": "https://techcrunch.com/2026/04/15/indias-vibe-coding-startup-emergent-enters-openclaw-like-ai-agent-space/",
-      "summary": "Emergent's Wingman lets users manage and automate tasks through chat on platforms like WhatsApp…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-16T01:24:18+08:00",
-      "published_label": "04-16 01:24",
-      "topic": "全球科技",
-      "relevance_score": 4,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F15%2Findias-vibe-coding-startup-emergent-enters-openclaw-like-ai-agent-space%2F?w=1200"
-    },
-    {
-      "title": "网易智企发布企业级 AI Agent 管理平台：一人指挥一整支“龙虾军团”",
-      "url": "https://www.infoq.cn/article/wSpS6icWMeyHS7jmYGbK?utm_source=rss&utm_medium=article",
-      "summary": "近日，网易智企正式发布企业级 AI Agent 管理平台——帝王蟹 ClawHive。如果说此前大火的 OpenClaw（龙虾）是单个执行力极强的 AI 助手，那么网易智企发布的“帝王蟹”就是指挥整个龙虾军团协同作战的管理平台。在生成式人工智能持续演进的背景下，AI Agent 正从早期的个人效率工具，逐步进入企业核心业务流程。但与技术快速渗透相伴的，是企…",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-16T00:56:11+08:00",
-      "published_label": "04-16 00:56",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "InfoQ",
-      "topic_label": "技术趋势",
-      "domain_label": "infoq.cn",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2FwSpS6icWMeyHS7jmYGbK%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
-    },
-    {
-      "title": "Adobe takes Creative Cloud into Claude Code-esque territory",
-      "url": "https://arstechnica.com/ai/2026/04/adobe-takes-creative-cloud-into-claude-code-esque-territory/",
-      "summary": "This is a big step in a new strategic direction for Adobe.",
-      "source": "Ars Technica / 开发与行业",
-      "published_at": "2026-04-16T00:54:33+08:00",
-      "published_label": "04-16 00:54",
-      "topic": "开发与行业",
-      "relevance_score": 3,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Ars Technica",
-      "topic_label": "开发与行业",
-      "domain_label": "arstechnica.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Farstechnica.com%2Fai%2F2026%2F04%2Fadobe-takes-creative-cloud-into-claude-code-esque-territory%2F?w=1200"
-    },
-    {
-      "title": "The US Government Will Ask Data Centers How Much Power They Use",
-      "url": "https://www.wired.com/story/the-us-government-to-ask-data-centers-how-much-power-they-use/",
-      "summary": "In a letter obtained by WIRED, the Energy Information Administration tells two senators that it…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-16T00:00:27+08:00",
-      "published_label": "04-16 00:00",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fthe-us-government-to-ask-data-centers-how-much-power-they-use%2F?w=1200"
-    },
-    {
-      "title": "Anthropic 推出 Claude Mythos 预览版，强化网络安全，仅限合作方访问",
-      "url": "https://www.infoq.cn/article/0ERlUO96S3XjvTgekpru?utm_source=rss&utm_medium=article",
-      "summary": "Claude 开发商 Anthropic 推出 Claude Mythos 预览版模型，这是其迄今能力最强的前沿模型，在推理、编程及网络安全领域均有显著提升。",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-15T22:00:00+08:00",
-      "published_label": "04-15 22:00",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "InfoQ",
-      "topic_label": "技术趋势",
-      "domain_label": "infoq.cn",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2F0ERlUO96S3XjvTgekpru%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
-    },
-    {
-      "title": "25.6万个招聘岗位虚位以待 湖南为大学生创业就业“铺路架桥” - 搜狐网",
-      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxPSHNBTlpiMHJURzdHbkJVd3ZUSmo3LXJaMUZDd1RWeUxxa0phZjVRcG9feWJDM3UxdFdJeUdERllYZzNfeFNYZHM4dE50aVlRakM2UHhNS2NuWTVNaXF1MFVDRFVzakY1QlJ6NEl1c3hKS0M2Sk1KWThCamlpbkZnaW1mSzQwNkdj?oc=5",
-      "summary": "25.6万个招聘岗位虚位以待 湖南为大学生创业就业“铺路架桥” 搜狐网",
-      "source": "Google News / 求职就业",
-      "published_at": "2026-04-15T21:41:20+08:00",
-      "published_label": "04-15 21:41",
-      "topic": "求职就业",
-      "relevance_score": 7,
-      "match_tags": [
-        "career"
-      ],
-      "source_name": "Google News",
-      "topic_label": "求职就业",
-      "domain_label": "news.google.com",
-      "preview_image": ""
-    },
-    {
-      "title": "科技行业裁员潮：2026 年时间线 - MSN",
-      "url": "https://news.google.com/rss/articles/CBMipAJBVV95cUxPZWFuRXE3NHJRbFd5ZlM0eWI2eVhxMmdQNElyUkxENG9XS21QTktaYm9BZ3BLTjdNNzFEUksxZ3kwU1F3YVNVUGtiZjRORGNjRXBZUmJFT0JrWTNfODBtUGJHZmt0a09HaVhWeWsyeFg3dE9YWm9DNVNvWk5laHpsc2JLNURtR3dDTk5PSmZ2aG43SzVNUndTdzZ6VjhqbDJlR2F6OF9oWGVFZVcteU5nSC1NMWpLc2FpZ2lPcnFIRU11emI4UzhMV081dVo3aTdhQUZuSWRSRGdfQkdNcnRkd2xMWjZZaTVyUjBnZUM5aWJPWHJTZjB1NC1UZ29xN1hYeDlYUDMtQXlhTVVDdU1SOHFtaGFyTGJpeWttTm9sTHd1Smdw?oc=5",
-      "summary": "科技行业裁员潮：2026 年时间线 MSN",
-      "source": "Google News / 科技行业变化",
-      "published_at": "2026-04-15T20:26:32+08:00",
-      "published_label": "04-15 20:26",
-      "topic": "科技行业变化",
-      "relevance_score": 4,
-      "match_tags": [
-        "career",
-        "tech"
-      ],
-      "source_name": "Google News",
-      "topic_label": "科技行业变化",
-      "domain_label": "news.google.com",
-      "preview_image": ""
-    },
-    {
-      "title": "Best GoPro Camera (2026): Compact, Budget, Accessories",
-      "url": "https://www.wired.com/gallery/best-gopro-hero-camera/",
-      "summary": "You’re an action hero, and you need a camera to match. We guide you through all the models, plu…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-15T19:30:00+08:00",
-      "published_label": "04-15 19:30",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fgallery%2Fbest-gopro-hero-camera%2F?w=1200"
-    },
-    {
-      "title": "Agent 下一战，决胜“记忆”之巅——AICon 深度专题前瞻",
-      "url": "https://www.infoq.cn/article/BFfOpHfuRzyMGE4ZL7lU?utm_source=rss&utm_medium=article",
-      "summary": "当 AI 的发展浪潮从“聊天写诗”的通用大模型涌向“干活办事”的自主智能体，我们正站在一个全新的技术分水岭。",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-15T19:11:49+08:00",
-      "published_label": "04-15 19:11",
-      "topic": "技术趋势",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "InfoQ",
-      "topic_label": "技术趋势",
-      "domain_label": "infoq.cn",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2FBFfOpHfuRzyMGE4ZL7lU%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
-    },
-    {
-      "title": "AI Slop Is Making the Internet Fake-Happy",
-      "url": "https://www.wired.com/story/ai-slop-is-changing-the-internet-just-not-how-you-might-think/",
-      "summary": "A new study examines the impact of the rise of AI-generated websites on the internet—and found…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-15T19:00:00+08:00",
-      "published_label": "04-15 19:00",
-      "topic": "AI 与工作",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fai-slop-is-changing-the-internet-just-not-how-you-might-think%2F?w=1200"
-    },
-    {
-      "title": "Google Cloud介绍了对PostgreSQL核心功能的工作",
-      "url": "https://www.infoq.cn/article/2dOQmLigLm6DSDMxDxFm?utm_source=rss&utm_medium=article",
-      "summary": "Google Cloud介绍了 他们近期对 PostgreSQL 的技术贡献，重点在逻辑复制、升级流程和整体系统稳定性方面进行改进。",
-      "source": "InfoQ / 技术趋势",
-      "published_at": "2026-04-15T18:00:00+08:00",
-      "published_label": "04-15 18:00",
-      "topic": "技术趋势",
-      "relevance_score": 3,
-      "match_tags": [
-        "career",
-        "tech"
-      ],
-      "source_name": "InfoQ",
-      "topic_label": "技术趋势",
-      "domain_label": "infoq.cn",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.infoq.cn%2Farticle%2F2dOQmLigLm6DSDMxDxFm%3Futm_source%3Drss%26utm_medium%3Darticle?w=1200"
-    },
-    {
-      "title": "Corsair Discount Code: Save Up to 50% on Gaming Gear in April 2026",
-      "url": "https://www.wired.com/story/corsair-coupon/",
-      "summary": "Upgrade your gaming setup or PC build for less with these verified Corsair coupon codes, studen…",
-      "source": "Wired / AI 与工作",
-      "published_at": "2026-04-15T13:00:00+08:00",
-      "published_label": "04-15 13:00",
-      "topic": "AI 与工作",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "Wired",
-      "topic_label": "AI 与工作",
-      "domain_label": "wired.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.wired.com%2Fstory%2Fcorsair-coupon%2F?w=1200"
-    },
-    {
-      "title": "Anthropic 增长迅猛，OpenAI 超 8000 亿美元估值遭部分投资者质疑",
-      "url": "https://www.ithome.com/0/939/294.htm",
-      "summary": "IT之家 4 月 15 日消息，当地时间 4 月 14 日，据英国《金融时报》报道，OpenAI 当前约 8520 亿美元（IT之家注：现汇率约合 5.82 万亿元人民币）的估值正开始受到部…",
-      "source": "IT之家 / 科技行业",
-      "published_at": "2026-04-15T11:58:29+08:00",
-      "published_label": "04-15 11:58",
-      "topic": "科技行业",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "IT之家",
-      "topic_label": "科技行业",
-      "domain_label": "ithome.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Fwww.ithome.com%2F0%2F939%2F294.htm?w=1200"
-    },
-    {
-      "title": "Anthropic’s rise is giving some OpenAI investors second thoughts",
-      "url": "https://techcrunch.com/2026/04/14/anthropics-rise-is-giving-some-openai-investors-second-thoughts/",
-      "summary": "One investor who has backed both companies told the FT that justifying OpenAI's recent round re…",
-      "source": "TechCrunch / 全球科技",
-      "published_at": "2026-04-15T10:31:04+08:00",
-      "published_label": "04-15 10:31",
-      "topic": "全球科技",
-      "relevance_score": 2,
-      "match_tags": [
-        "tech"
-      ],
-      "source_name": "TechCrunch",
-      "topic_label": "全球科技",
-      "domain_label": "techcrunch.com",
-      "preview_image": "https://s.wordpress.com/mshots/v1/https%3A%2F%2Ftechcrunch.com%2F2026%2F04%2F14%2Fanthropics-rise-is-giving-some-openai-investors-second-thoughts%2F?w=1200"
     }
   ],
   "status": "ready",
@@ -880,8 +882,8 @@
       "topic": "职业规划",
       "kind": "search",
       "status": "ok",
-      "raw_count": 47,
-      "kept_count": 11,
+      "raw_count": 45,
+      "kept_count": 9,
       "error": ""
     },
     {
@@ -890,7 +892,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 34,
+      "kept_count": 42,
       "error": ""
     },
     {
@@ -898,8 +900,8 @@
       "topic": "程序员就业",
       "kind": "search",
       "status": "ok",
-      "raw_count": 82,
-      "kept_count": 6,
+      "raw_count": 78,
+      "kept_count": 5,
       "error": ""
     },
     {
@@ -908,7 +910,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 29,
+      "kept_count": 18,
       "error": ""
     },
     {
@@ -917,7 +919,7 @@
       "kind": "search",
       "status": "ok",
       "raw_count": 100,
-      "kept_count": 11,
+      "kept_count": 13,
       "error": ""
     },
     {
@@ -926,7 +928,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 2,
+      "kept_count": 4,
       "error": ""
     },
     {
@@ -935,7 +937,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 60,
-      "kept_count": 5,
+      "kept_count": 8,
       "error": ""
     },
     {
@@ -944,7 +946,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 8,
+      "kept_count": 5,
       "error": ""
     },
     {
@@ -953,7 +955,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 50,
-      "kept_count": 8,
+      "kept_count": 2,
       "error": ""
     },
     {
@@ -962,7 +964,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 20,
-      "kept_count": 2,
+      "kept_count": 3,
       "error": ""
     },
     {
@@ -971,7 +973,7 @@
       "kind": "direct",
       "status": "ok",
       "raw_count": 10,
-      "kept_count": 1,
+      "kept_count": 2,
       "error": ""
     }
   ]

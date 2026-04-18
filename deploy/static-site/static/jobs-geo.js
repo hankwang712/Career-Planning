@@ -419,7 +419,7 @@
     setText("jobGeoCityTitle", city.city);
     setText(
       "jobGeoNarrative",
-      `${city.city} 共收录 ${city.jobCount} 个岗位样本，平均折算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。其中 ${formatPercent(city.dailyShare)} 来自日薪岗位折算。`
+      `${city.city} 共收录 ${city.jobCount} 个岗位样本，平均折算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。`
     );
 
     const sampleEl = document.getElementById("jobGeoSampleCount");

@@ -461,7 +461,7 @@
     setText("jobGeoCityTitle", city.city);
     setText(
       "jobGeoNarrative",
-      `${city.city} 共收录 ${city.jobCount} 个岗位样本，估算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。日薪岗位优先按岗位天/周估算，未注明时按 ${DEFAULT_WORKDAYS_PER_MONTH} 个工作日/月。`
+      `${city.city} 共收录 ${city.jobCount} 个岗位样本，估算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。`
     );
 
     const sampleEl = document.getElementById("jobGeoSampleCount");
@@ -471,7 +471,7 @@
     const salaryEl = document.getElementById("jobGeoAvgSalary");
     countUp(salaryEl, city.averageAnnualized, 800, (v) => formatSalaryK(v));
     setText("jobGeoSalaryText", `均值区间 ${formatRange(city.averageLow, city.averageHigh)} · 中位 ${formatSalaryK(city.medianAnnualized)}`);
-    setText("jobGeoSalaryPolicy", `日薪按 ${DEFAULT_WORKDAYS_PER_MONTH} 工作日/月或岗位天/周估算`);
+    setText("jobGeoSalaryPolicy", "");
     const salaryMix = document.getElementById("jobGeoSalaryMix");
     if (salaryMix) salaryMix.innerHTML = renderSalaryMix(city);
 

@@ -602,6 +602,13 @@ function renderUserCenterTargetRoles() {
   });
 }
 
+function careerReportToolbarActionsAvailable() {
+  const cr = appState?.careerReport;
+  if (!cr) return false;
+  if (cr.report_document) return true;
+  return Boolean(String(cr.meta?.report_id || "").trim());
+}
+
 function applyUserCenterReportReaderGate() {
   const onUserCenter = typeof isUserCenterPage === "function" && isUserCenterPage();
   if (!onUserCenter) return;
@@ -613,6 +620,7 @@ function applyUserCenterReportReaderGate() {
   const editorBtn = document.getElementById("userCenterOpenEditorBtn");
   const switchButtons = document.querySelectorAll("[data-user-center-report-view]");
   const workbench = document.querySelector("#report-workspace .uc-report-workbench");
+  const canAct = careerReportToolbarActionsAvailable();
 
   if (layout) {
     layout.classList.toggle("career-report-layout--dashboard", viewMode === "dashboard");
@@ -623,11 +631,13 @@ function applyUserCenterReportReaderGate() {
   }
   if (viewerBtn) {
     viewerBtn.classList.toggle("hidden", workspaceMode !== "detail" || viewMode !== "report");
-    viewerBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    viewerBtn.disabled = !canAct;
   }
   if (editorBtn) {
     editorBtn.classList.toggle("hidden", workspaceMode !== "detail");
-    editorBtn.disabled = !Boolean(appState?.reportReady && appState?.careerReport?.report_document);
+    editorBtn.disabled = false;
+    editorBtn.setAttribute("aria-disabled", canAct ? "false" : "true");
+    editorBtn.classList.toggle("uc-toolbar-ai-gated", !canAct);
   }
   switchButtons.forEach((button) => {
     const active = String(button.dataset.userCenterReportView || "").trim() === viewMode;
@@ -776,7 +786,6 @@ function renderUserCenterReportLibrary() {
     const isDeleting = Boolean(deletingId && rid === deletingId);
     const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
     const titleRaw = String(item?.title || "").trim();
-    const version = escHtml(item?.version || "--");
     const generatedAt = escHtml(item?.generated_at || "--");
     const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
     const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
@@ -805,9 +814,6 @@ function renderUserCenterReportLibrary() {
           ${summaryExtra ? `<p class="uc-report-library-summary">${escHtml(summaryExtra)}</p>` : ""}
         </button>
         <div class="uc-report-library-foot">
-          <div class="uc-report-library-foot-chips">
-            <span class="uc-report-library-chip">${renderUserCenterMetaIcon("version")}版本 ${version}</span>
-          </div>
           <div class="uc-report-library-foot-actions">
             <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
               ${isDeleting ? "删除中..." : "删除卡片"}
@@ -994,7 +1000,7 @@ function renderUserCenterReportOverview() {
   if (completionEl) completionEl.textContent = progressText;
   if (versionEl) versionEl.textContent = String(versionCount);
   if (viewerBtn) {
-    viewerBtn.disabled = !Boolean(appState?.reportReady && reportData?.report_document);
+    viewerBtn.disabled = !careerReportToolbarActionsAvailable();
     viewerBtn.classList.toggle("hidden", viewMode !== "report");
   }
   if (generateBtn) {
