@@ -1,5 +1,200 @@
 [
   {
+    "id": "99219c1782f2bcb8",
+    "title": "Schematik Is ‘Cursor for Hardware.’ Anthropic Wants In",
+    "url": "https://www.wired.com/story/schematik-is-cursor-for-hardware-anthropic-wants-in-on-it/",
+    "summary": "Schematik is a program that aims to help people vibe code for physical devices. Hopefully, it w…",
+    "content": "“There's no blocker for your creativity anymore,” says Vermeeren, who is now also investing in Schematik. “That's why I'm so excited about it and building stuff constantly.”He’s not the only one. On Thursday, Anthropic engineer Felix Rieseberg posted on X to announce that Anthropic has now enabled “a little Bluetooth API for makers and developers, allowing you to build hardware devices that interact with Claude.” He also shared a picture and a GitHub link for a device that looks very similar to Vermeeren’s Clawy, though Rieseberg and Anthropic did not reply to WIRED’s request for comment about whether it was directly inspired by Beek’s or Vermeeren’s work.“If I inspired someone with it, I’m proud,” Vermeeren says. “If Anthropic built an official feature because of it, I’m even prouder.”Just about every AI tech company seems to be making some kind of hardware device, whether it’s a giant like OpenAI, the big chipmakers, or more niche wearables. Beyond that, there have always been crowds of tinkerers and makers looking to build tech, whether it’s to turn vapes into synthesizers or push back against ICE.“The big problem in hardware is that it's very gatekept and that very few people can do it,” Beek says. “I really hope that my tool can help enable more people to build, either with the tool or to learn how to build hardware through the tool.”The Tamagotchi-style device Vermeeren built, called Clawy, to help manage Claude coding sessions. Photograph: Marc VermeerenVibe coding in software has its own sort of bad rap, given that it can lead to big vulnerabilities in software. It’s possible that vibe coding hardware gets to that point too, or devolves into a slog of infinite hardware-slop.“With languages or images, LLMs are much more subjective about what’s right or wrong,” Beek says. “The nice thing about electronics is that it's pure physics, so you can actually check.”",
+    "source": "Wired / AI 与工作",
+    "topic": "AI 与工作",
+    "published_at": "2026-04-18T18:30:00+08:00",
+    "published_label": "04-18 18:30",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:16:09.384788"
+  },
+  {
+    "id": "04e9b942288cb462",
+    "title": "Anthropic MCP 协议被指存在设计缺陷，服务器可被诱导执行任意代码",
+    "url": "https://www.ithome.com/0/940/797.htm",
+    "summary": "IT之家 4 月 18 日消息，安全研究团队 OX Security 本周（4 月 15 日）发现，Anthropic 创建、维护的行业标准 AI 通信协议 MCP（IT之家注：Model…",
+    "content": "IT之家 4 月 18 日消息，安全研究团队 OX Security 本周（4 月 15 日）发现，Anthropic 创建、维护的行业标准 AI 通信协议 MCP（IT之家注：Model Context Protocol）存在设计缺陷，可导致服务器被诱导执行任意代码（RCE）。据介绍，该漏洞并非普通的疏忽，而是架构层面的设计缺陷并存在于官方 MCP SDK 中。影响 Python、TypeScript、Java 和 Rust 等所有支持语言，等于说任何基于 MCP 构建的项目都存在这一风险。研究人员主要识别出未认证 UI 注入攻击、安全加固绕过、提示词注入、恶意插件分发等四种主流攻击路径，并在多个真实生产环境中成功利用漏洞。目前，该机构已在 LiteLLM、LangChain、IBM LangFlow 等主流项目中发现关键漏洞，目前已分配 10 个 CVE 编号且仍在不断增加，均属“严重”级别。研究团队透露，他们曾多次联系 Anthropic 并希望修复漏洞。但对方拒绝修改架构，并称该行为属于“预期设计”。团队随后告知公司，将公开研究成果。对方未提出异议。团队建议，所有用户都不应该将大语言模型、AI 工具等暴露在公网环境，并且将 MCP 输入直接视为不可信数据，防止提示词注入。同时启用沙箱环境运行服务并时刻更新最新软件，将权限锁住。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-18T22:07:29+08:00",
+    "published_label": "04-18 22:07",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:16:02.463532"
+  },
+  {
+    "id": "993a08068c709fdf",
+    "title": "DeepSeek 被曝启动首次外部融资，国资消息人士称完全投不进去",
+    "url": "https://www.ithome.com/0/940/804.htm",
+    "summary": "IT之家 4 月 18 日消息，昨日，一则关于国内 AI 大模型独角兽企业 DeepSeek（深度求索）启动首次外部融资的消息在投资圈和科技界迅速传播。 据 The Information…",
+    "content": "IT之家 4 月 18 日消息，昨日，一则关于国内 AI 大模型独角兽企业 DeepSeek（深度求索）启动首次外部融资的消息在投资圈和科技界迅速传播。据 The Information 报道，DeepSeek 正与投资者洽谈首轮外部股权融资，计划以不低于 100 亿美元（IT之家注：现汇率约合 683.41 亿元人民币）的估值，募集不少于 3 亿美元资金。若该消息属实，这将标志着这家长期以“不融资”著称的 AI 明星公司，正式向资本市场敞开大门。对于该传闻，DeepSeek 及幻方量化方面目前尚未作出官方回应。不过，某大型国资股权机构人士向中国证券报透露，该消息“很可能属实”，但“目前完全投不进去”，至于“更多信息不便透露”。与此同时，多位创投机构人士也表示，对于 DeepSeek 这类热门项目，融资份额通常需要“抢”。尽管外界对 DeepSeek 能否在保持技术独立性与拥抱资本之间找到平衡仍有观望，但其转向外部融资的举动，无疑预示着中国 AI 行业已从单纯的技术狂热，迈入了更加务实的商业化深水区。作为由量化私募巨头幻方量化于 2023 年孵化的人工智能公司，DeepSeek 凭借 DeepSeek-V3 和 DeepSeek-R1 等模型的开源与卓越性能，在 2025 年一度成为全球 AI 领域的技术标杆。其创始人梁文锋也因坚持技术独立性，曾多次婉拒国内头部风险投资机构与科技巨头的入股邀约。相关阅读：广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-18T23:08:51+08:00",
+    "published_label": "04-18 23:08",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:15:57.383949"
+  },
+  {
+    "id": "efe07e3885d2bd06",
+    "title": "消息称 AI 编程初创企业 Cursor 即将完成 20 亿美元融资，估值达 500 亿美元",
+    "url": "https://www.ithome.com/0/940/814.htm",
+    "summary": "IT之家 4 月 19 日消息，据 Techcrunch 报道，四位知情人士透露，人工智能编程初创企业 Cursor 即将完成新一轮融资，这家成立四年的公司将筹集至少 20 亿美元（IT之家…",
+    "content": "IT之家 4 月 19 日消息，据 Techcrunch 报道，四位知情人士透露，人工智能编程初创企业 Cursor 即将完成新一轮融资，这家成立四年的公司将筹集至少 20 亿美元（IT之家注：现汇率约合 136.68 亿元人民币）新资金。知情人士称，现有投资方 Thrive 和安德森 · 霍洛维茨基金（Andreessen Horowitz）预计将牵头此次融资，融资前估值为 500 亿美元（现汇率约合 3417.05 亿元人民币）。据两位消息源透露，新晋投资方 Battery Ventures 也可能参与本轮融资。另有一人表示，战略投资方英伟达（Nvidia）亦计划出资。尽管本轮融资已获超额认购，但交易条款尚未最终敲定，仍存在调整可能。若融资顺利完成，Cursor 的估值将较六个月前上一轮融资后 293 亿美元的估值近乎翻倍。尽管面临来自 Anthropic 的 Claude Code、OpenAI 升级后的 Codex 等其他 AI 编程产品的激烈竞争，Cursor 的营收仍在快速增长。两位知情人士称，Cursor 预计 2026 年底年化营收规模将突破 60 亿美元。这一发展轨迹意味着，公司预计未来 10 个月内年化营收至少增长两倍。彭博社此前报道，今年 2 月，Cursor 年化营收已达 20 亿美元，该数据是根据其近期月度销售额推算得出。与许多依赖第三方模型的 AI 编程初创企业一样，Cursor 直到近期仍处于毛利率为负的状态，即产品运营成本高于其收费收入。知情人士表示，去年 11 月自研 Composer 模型的推出，加上调用 Kimi 等成本更低模型的能力，帮助公司实现了小幅毛利率盈利。更具体来看，一位消息人士透露，公司面向大型企业客户的销售已实现正毛利率，但面向个人开发者账户的业务仍处于亏损状态。通过减少对外部供应商的依赖，Cursor 正试图避免被自身供应商取代，其中最主要的便是 Anthropic，其推出的 Claude Code 已成为该初创公司的核心竞争对手。Cursor 前身为 Anysphere，由迈克尔 · 特鲁埃尔（Michael Truell）、苏莱 · 阿西夫（Sualeh Asif）、阿尔维德 · 伦马克（Arvid Lunnemark）和阿曼 · 桑格（Aman Sanger）于 2022 年在麻省理工学院就读期间联合创立。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T07:27:10+08:00",
+    "published_label": "04-19 07:27",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:15:52.177241"
+  },
+  {
+    "id": "e735ed5575e81d91",
+    "title": "AI 编程工具盛行，代码产量提升却暗藏高返工率困境",
+    "url": "https://www.ithome.com/0/940/817.htm",
+    "summary": "IT之家 4 月 19 日消息，几十年来，软件工程师们一直在争论生产力衡量指标，最早就是从代码行数开始的。但随着新一代 AI 编程助手生成的代码量远超以往，管理者究竟应该衡量什么，反而变得不…",
+    "content": "IT之家 4 月 19 日消息，几十年来，软件工程师们一直在争论生产力衡量指标，最早就是从代码行数开始的。但随着新一代 AI 编程助手生成的代码量远超以往，管理者究竟应该衡量什么，反而变得不那么清晰了。IT之家注意到，庞大的词元（Token）额度 —— 本质上就是开发者被授权使用的 AI 算力总量，已经成了硅谷开发者之间的荣誉勋章。但 Techcrunch 称，用这种方式衡量生产力实在很奇怪。如果你更关心产出，却去衡量流程中的投入，这基本没什么意义。除非你是想鼓励更多人使用 AI（或是销售 Token），否则对提升效率毫无帮助。我们可以看看一批新兴的「开发者生产力分析」公司给出的证据。他们发现，使用 Claude Code、Cursor、Codex 这类工具的开发者，被采纳的代码量比过去多得多。但同时，工程师后续需要返工修改这些已采纳代码的频率也大幅上升，这直接削弱了所谓「生产力提升」的说法。Waydev 首席执行官兼创始人亚历克斯・西尔切伊正在搭建一套智能分析层，用来追踪这些变化；他的公司服务着 50 家客户，旗下软件工程师总数超过 1 万人。他表示，工程管理者看到的代码采纳率通常在 80% 到 90% 之间 —— 也就是开发者认可并保留的 AI 生成代码比例。但他们忽略了后续几周内工程师不得不反复修改代码带来的代码流失，这会让 AI 代码的实际有效采纳率降至 10% 到 30%。AI 编程工具的兴起，让成立于 2017 年、专注于开发者数据分析的 Waydev 在过去半年彻底重构了平台，以应对快速编码工具的普及。如今，该公司推出了新工具，能够追踪 AI 助手生成的元数据，对代码质量与成本进行分析，帮助工程管理者更清晰地了解 AI 的应用情况与实际效果。尽管数据分析公司天然有动力强调自己发现的问题，但越来越多的证据表明，大型企业仍在摸索如何高效使用 AI 工具。不少巨头已经注意到这一点，Atlassian 去年以 10 亿美元收购了另一家工程智能初创公司 DX，帮助其客户评估编程助手的投资回报率。整个行业的数据都指向同一个结论：写出来的代码变多了，但真正能留存下来的比例却低得不成比例。同领域的另一家公司 GitClear 在 1 月发布报告称，AI 工具确实提升了生产力，但其数据同时显示：经常使用 AI 的开发者，代码修改率是非 AI 用户的 9.4 倍，这一数字远超工具带来的两倍生产力提升。工程分析平台 Faros AI 基于两年客户数据，发布了 2026 年 3 月的报告。结论是：在 AI 高使用率场景下，代码变更率（即删除代码行数与新增代码行数之比）上升了 861%。自称 AI 集成工程智能平台的 Jellyfish，在 2026 年第一季度收集了 7548 名工程师的数据。研究发现，Token 额度最高的工程师提交的合并请求（对共享代码库的修改提议）最多，但生产力提升并未与成本成正比：吞吐量提升了 2 倍，Token 成本却增加了 10 倍。换句话说，这些工具带来的只是数量，而非价值。这类数据和开发者的实际感受完全吻合。尽管他们享受着新工具带来的便捷，但代码审查与技术债务也在不断堆积。一个普遍现象是资深工程师与初级工程师的差异：后者采纳的 AI 生成代码多得多，随之而来的是需要重写的代码量也更大。即便如此，开发者们一边努力搞清楚 AI 助手到底在做什么，一边也并不打算很快放弃这些工具。“这是软件开发的新时代，你必须适应，企业也被迫去适应。”西尔切伊表示，“这不会是一阵风潮，很快就过去。”广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T07:49:55+08:00",
+    "published_label": "04-19 07:49",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:15:47.110984"
+  },
+  {
+    "id": "27f0beb8fd2c5b00",
+    "title": "多云时代AI Agent治理难题，亚马逊云科技想用一个注册表解决",
+    "url": "https://www.infoq.cn/article/gL44mioSTWOY6WAClSAl?utm_source=rss&utm_medium=article",
+    "summary": "亚马逊云科技近期在 Amazon Bedrock AgentCore 中以公开预览形式发布了 Agent Registry，为企业提供一个集中式目录，用于在组织内发现、共享并治理 AI Agent、工具、MCP 服务器以及 agent skills。",
+    "content": "亚马逊云科技近期在 Amazon Bedrock AgentCore 中以公开预览形式发布了 Agent Registry，为企业提供一个集中式目录，用于在组织内发现、共享并治理 AI Agent、工具、MCP 服务器以及 agent skills。该注册表可以索引运行在任何位置的 agent，无论是在 亚马逊云科技、其他云服务提供商，还是本地部署环境。它所解决的问题，对于任何见过 agent 数量不断增长的平台团队来说都非常熟悉：没人知道都有哪些东西存在、谁在负责、是否已获批准，或者隔壁团队是否已经做过同样的事情。agent 的扩散会迅速叠加，随之而来的是合规漏洞，以及开发资源浪费在重复工作上。记录的注册方式有两种。团队可以通过控制台、SDK 或 API 手动提供元数据，指定所有权、能力描述以及合规状态。也可以指向一个 MCP 或 A2A 端点，让注册表自动拉取相关细节。每条记录都会包含发布者信息、实现的协议、对外提供的能力，以及调用方式。查找已有内容依赖于混合搜索机制，结合了关键词匹配与语义匹配。例如，对“payment processing”的搜索，即使名称不一致，也可能返回标记为“billing”或“invoicing”的工具。该注册表可通过 AgentCore 控制台、API 访问，同时自身也作为 MCP 服务器存在，因此任何兼容 MCP 的客户端（包括 Kiro 和 Claude Code）都可以直接查询。对于使用自定义身份提供方的组织，基于 OAuth 的访问方式允许团队在无需 IAM 凭证的情况下构建自己的发现界面。在治理层面，记录遵循审批流程。它们从草稿状态开始，进入待审批状态，只有在通过审核后才会变为可被发现。管理员通过 IAM 策略控制谁可以注册以及谁可以发现内容。版本管理会追踪随时间的变更，组织也可以废弃不再需要的记录。自定义元数据字段允许团队附加诸如成本中心、部署环境或安全分类等信息。解决方案架构师 Shinya Tahara 对该注册表进行了实际测试，并发现了一些值得注意的不足之处。语义搜索在英文查询下表现良好，但在仅有英文元数据的情况下处理日文查询时效果不佳。在三条日文测试查询中，有一条没有返回任何结果。增加双语描述后问题得到解决，这对计划在全球范围内部署的组织具有参考意义。Tahara 还发现，将过滤条件嵌入自然语言查询会显著降低精度，结果会返回所有已注册记录，而非目标对象。此外，任何记录更新都会将其状态重置为 DRAFT，这意味着需要重新提交并重新审批。频繁更新 agent 的团队需要在工作流程中考虑这一摩擦成本。Southwest Airlines AI 与智能平台副总裁 Justin Bundick 在发布中描述了该注册表的价值：AWS Agent Registry 在 AgentCore 中解决了关键的可发现性问题，使团队能够发现并复用已有 agent，而不是从头重建能力。通过跨多个平台的托管治理，每个 agent 都携带标准化的所有权元数据与策略执行信息。Zuora 也是早期采用者之一。该公司在销售、财务、产品和开发团队中部署了 50 个 agent。Zuora 首席产品与技术官 Pete Hirsch 指出，该注册表为首席架构师提供了统一视图，用于发现、管理和编目所有正在使用的 agent、工具和技能，并通过标准化元数据确保整个生态中的所有权与能力信息一致。展望未来，其路线图包括：在 agent 部署后立即自动索引、跨注册表联合（federation）以实现多注册表统一搜索、自定义分类与本体结构，以及将 AgentCore Observability 中的运行数据（包括调用次数、延迟、可用性和使用模式）直接集成到注册表记录中。此外，亚马逊云科技 还提到已有合作伙伴表达兴趣，希望连接外部目录，实现跨技术栈的集中发现。亚马逊云科技并不是唯一提供 agent registry 解决方案的超大规模云厂商。例如，微软提供 Entra Agent Registry 和 Azure Agent Registry。此外，Google Cloud 也有自己的 Agent Registry，同时在协议层面也存在诸如 Agent Client Protocol（ACP）Registry 的相关工作。亚马逊云科技 方案的区别在于其提供了与厂商无关的索引能力，并原生支持 MCP 与 A2A 协议，使其能够编目构建在亚马逊云科技生态之外的 agent。Agent Registry 当前已在五个亚马逊云科技 区域以预览版提供：美国东部（弗吉尼亚北部）、美国西部（俄勒冈）、亚太地区（悉尼）、亚太地区（东京）以及欧洲（爱尔兰）。原文链接：https://www.infoq.com/news/2026/04/aws-agent-registry-preview/",
+    "source": "InfoQ / 技术趋势",
+    "topic": "技术趋势",
+    "published_at": "2026-04-19T16:00:00+08:00",
+    "published_label": "04-19 16:00",
+    "relevance_score": 2,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:15:41.823823"
+  },
+  {
+    "id": "54734c90404a41c9",
+    "title": "OpenAI 剥离“副业项目”：公司科学研究项目负责人与 Sora 研究员双双离职",
+    "url": "https://www.ithome.com/0/940/812.htm",
+    "summary": "IT之家 4 月 19 日消息，OpenAI 旗下两大核心项目的关键负责人双双离职。该公司科学研究项目负责人凯文 · 威尔，以及人工智能视频工具 Sora 背后的研究员比尔 · 皮布尔斯，均…",
+    "content": "IT之家 4 月 19 日消息，OpenAI 旗下两大核心项目的关键负责人双双离职。该公司科学研究项目负责人凯文 · 威尔，以及人工智能视频工具 Sora 背后的研究员比尔 · 皮布尔斯，均于当地时间周五宣布离职。此次人事变动正值 OpenAI 聚焦企业级人工智能业务，并筹备推出其即将面世的“超级应用”之际。此前，OpenAI 已决定缩减各类“次要项目”，其中就包括面向用户的 Sora 和 OpenAI 科学研究项目。据估算，Sora 每日算力成本高达 100 万美元（IT之家注：现汇率约合 683.4 万元人民币），已于上月关停。OpenAI 科学研究部门是人工智能平台 Prism 的研发团队，该平台旨在加速科学研究进程。威尔在社交媒体发布离职声明时透露，该团队将被并入“其他研究团队”。“过去两年令人眼界大开，从首席产品官到加入研究团队、创立 OpenAI 科学研究项目，这段经历意义非凡。”威尔写道，“推动科学进步，将是我们迈向通用人工智能过程中，最具积极意义的成果之一。”该团队自 2025 年 10 月正式成立后，发展历程短暂且波折不断。威尔曾发布推文称，GPT-5 攻克了 10 道此前未解的埃尔德什数学难题，但在运营 erdosproblems.com 网站的数学家公开质疑后，该说法迅速不攻自破，威尔也删除了这条推文。就在威尔离职的前一天，其团队刚发布了 GPT-Rosalind 模型，这一全新模型旨在加速生命科学研究与药物研发。皮布尔斯在社交媒体的离职声明中表示，Sora 的出现“推动了整个行业在视频领域的大量投资”，并认为研发这类视频工具所需的研究，需要脱离公司核心业务路线，拥有独立的发展空间。他写道：“保持研究的多元与发散性，是一家实验室实现长期蓬勃发展的唯一途径。”据《连线》杂志报道，OpenAI 企业应用首席技术官斯里尼瓦斯 · 纳拉亚南也将离职。据悉，纳拉亚南已在内部宣布离职消息，称此举是为了有更多时间陪伴家人。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T07:20:49+08:00",
+    "published_label": "04-19 07:20",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:13:30.203901"
+  },
+  {
+    "id": "69282206a7b62bd3",
+    "title": "上线五个月，《Arc Raiders》流失八成 Steam 活跃玩家",
+    "url": "https://www.ithome.com/0/940/819.htm",
+    "summary": "IT之家 4 月 19 日消息，《Arc Raiders》近期经历了一系列波折，其开发工作室已收回对 AI 技术的使用，将 AI 生成的配音替换为真人演员配音。该游戏取得的成绩也为团队的两个…",
+    "content": "IT之家 4 月 19 日消息，《Arc Raiders》近期经历了一系列波折，其开发工作室已收回对 AI 技术的使用，将 AI 生成的配音替换为真人演员配音。该游戏取得的成绩也为团队的两个新项目提供了资金支持。然而，这款游戏的未来如今却显得相当黯淡。上线仅五个月，《Arc Raiders》在 Steam 平台的玩家数量就已较历史峰值暴跌超八成。尽管长线运营型游戏出现玩家流失本在意料之中，但此次流失的规模之大、速度之快，已经在玩家社区拉响了警报。IT之家注意到，Steam 数据统计平台 SteamDB 显示，该游戏在 11 月中旬创下 48.1 万的历史在线峰值，而这一庞大数字目前已锐减至仅 9.2 万（24 小时活跃玩家数）。虽说这一数据依旧亮眼，但每日玩家数量的持续流失是值得警惕的问题。值得注意的是，就在两个月前，这款游戏的日均玩家数量还接近 30 万，曾被誉为运营最稳定的长线服务型游戏之一。如今短短八周内，就有超过 20 万曾频繁游玩《Arc Raiders》的玩家转投其他游戏。对比近三个月的数据图表也能清晰看出明显的下滑趋势。因此，即便官方承诺会推出更多内容更新，《Arc Raiders》的前景也已不再像社区最初预想的那般光明。长期以来，《Arc Raiders》饱受外挂作弊问题困扰，作弊者彻底破坏了游戏体验，导致大量玩家流失。许多玩家对游戏当前的状态也颇为不满，这一点从其在 Steam 上的评价已降至“多半好评”便可看出。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T08:20:38+08:00",
+    "published_label": "04-19 08:20",
+    "relevance_score": 3,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:13:25.026209"
+  },
+  {
+    "id": "7216d77b63452114",
+    "title": "Panic 出手整治：Playdate 掌机游戏不许用 AI 搞美术音乐，代码辅助除外",
+    "url": "https://www.ithome.com/0/940/844.htm",
+    "summary": "IT之家 4 月 19 日消息，Panic 公司将不再允许开发者在其 Playdate 应用商店 Catalog 上架使用生成式人工智能工具创作美术、音频、音乐、文本或对话内容的游戏作品。…",
+    "content": "IT之家 4 月 19 日消息，Panic 公司将不再允许开发者在其 Playdate 应用商店 Catalog 上架使用生成式人工智能工具创作美术、音频、音乐、文本或对话内容的游戏作品。该公司在 Bluesky 平台发布的帖子中同时确认，Playdate 第三季游戏合集（一款每周推出新游戏的付费游戏包）将不会收录任何以任何形式使用生成式人工智能开发的游戏。此消息发布前，曾有一款名为《Wheelsprung》的游戏入选 Playdate 第二季游戏合集，该游戏在代码编写与文案创作环节借助了 Github Copilot 与 ChatGPT 等生成式人工智能工具。据电子游戏杂志《Exp.》报道，Panic 公司表示，《Wheelsprung》之所以能通过审核，是因为公司当时完全没有想到第二季的合作开发者会使用大语言模型。Panic 联合创始人卡贝尔 · 萨瑟当时坦言：“现在回想起来，我们的想法太过天真，对此我们承担全部责任。”如今，Panic 已发布官方人工智能使用声明，明确将禁止在 Playdate 应用商店中使用绝大多数形式的生成式人工智能，不过使用人工智能代码辅助工具的游戏作品可获得豁免。声明中写道：“自 2026 年 4 月起，Catalog 应用商店将不再接受使用‘生成式人工智能’制作美术、音频、音乐、文本或对话内容的游戏作品。全球有众多创作者满怀热忱，愿意为你的 Playdate 游戏创作优质的音乐、美术与文字内容。”“…… 目前，所有此前已通过审核或已上线的、使用‘生成式人工智能’的 Catalog 商店游戏仍可正常下载，平台会对这类作品进行标注，并说明人工智能的具体使用方式。”“现阶段，我们允许在代码编写环节使用人工智能辅助工具的游戏登陆 Catalog 商店，但会对这类作品进行标注，并明确人工智能的使用程度（例如‘Lua 代码调试’），以便玩家自主选择是否支持。相关规则仍在持续讨论中，随时可能调整，后续如有变更，我们将更新本声明页面。”IT之家注意到，Panic 明确了其对生成式人工智能的界定范围，包括 ChatGPT、DeepSeek、Gemini 等大语言模型；Stable Diffusion、DALL-E 等人工智能图像生成模型；以及 MuseNet、Suno、Udio 等人工智能音频生成模型。该界定范围不包含为实现游戏内行为逻辑而编写的自定义功能代码。相关阅读：广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T11:12:16+08:00",
+    "published_label": "04-19 11:12",
+    "relevance_score": 3,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:13:10.139730"
+  },
+  {
+    "id": "58ed69d80de2395d",
+    "title": "Anthropic CEO 达里奥 · 阿莫迪：AI 发展永无止境，未来五年或取代半数初级白领岗位",
+    "url": "https://www.ithome.com/0/940/785.htm",
+    "summary": "IT之家 4 月 18 日消息，据科技媒体 The Decoder 今天报道，Anthropic CEO 达里奥 · 阿莫迪（Dario Amodei）最近在接受采访时认为， AI 仍存在巨…",
+    "content": "IT之家 4 月 18 日消息，据科技媒体 The Decoder 今天报道，Anthropic CEO 达里奥 · 阿莫迪（Dario Amodei）最近在接受采访时认为，AI 仍存在巨大发展空间，如彩虹一般没有尽头，并且算力还有很长的增长路径。IT之家援引 The Decoder，阿莫迪在谈到 AI 对就业市场的影响时表示，当前社会对 AI 的信任仍然不足，导致这项技术只能以信任的速度扩散。这其中的部分问题在于，行业并未兑现以前的乐观承诺，但各种风险警告已经不断累积。他对此解释道：“人们会怀疑我们吹的东西只是空中楼阁，因此我们必须真正把想的东西做出来”。同时他坚信，AI 将在未来五年内，取代最多 50% 的初级白领岗位。行业不能淡化这种冲击，必须让 AI 带来更大的正面价值。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-18T20:12:44+08:00",
+    "published_label": "04-18 20:12",
+    "relevance_score": 4,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:12:59.939393"
+  },
+  {
+    "id": "58dc158d54af51f4",
+    "title": "AI chip startup Cerebras files for IPO",
+    "url": "https://techcrunch.com/2026/04/18/ai-chip-startup-cerebras-files-for-ipo/",
+    "summary": "In recent months, the company announced an agreement with Amazon Web Services to use Cerebras c…",
+    "content": "Cerebras Systems, a startup building what CEO Andrew Feldman describes as “the fastest AI hardware for training and inference,” has filed to go public. The company previously filed for an initial public offering in 2024, but that was delayed due to a federal review of an investment from Abu Dhabi-based G42 and was ultimately withdrawn. Cerebras raised a $1.1 billion Series G last year, followed by a $1 billion Series H in February at a $23 billion valuation, according to the Wall Street Journal. In recent months, the company announced an agreement with Amazon Web Services to use Cerebras chips in Amazon data centers, as well as a deal with OpenAI reportedly worth more than $10 billion. In a recent interview with the WSJ, Feldman boasted, “Obviously, [Nvidia] didn’t want to lose the fast inference business at OpenAI, and we took that from them.” Cerebras brought in $510 million in revenue in 2025, according to the filing, with a net income of $237.8 million (excluding certain one-time items, it was a non-GAAP net loss of $75.7 million). A company has not disclosed how much it hopes to raise in the IPO. A spokesperson said the offering is planned for mid-May.",
+    "source": "TechCrunch / 全球科技",
+    "topic": "全球科技",
+    "published_at": "2026-04-19T03:19:11+08:00",
+    "published_label": "04-19 03:19",
+    "relevance_score": 4,
+    "match_tags": [
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:12:54.620355"
+  },
+  {
+    "id": "236357b5ac42825f",
+    "title": "游戏行业裁员潮持续，近半数开发者因就业不稳定考虑离职",
+    "url": "https://www.ithome.com/0/940/824.htm",
+    "summary": "IT之家 4 月 19 日消息，过去几年，裁员已成游戏行业的常态。仅今年一年，Epic 就大幅裁员 1000 名开发人员，而蒙特利尔 Eidos 工作室、Crystal Dynamics 工…",
+    "content": "IT之家 4 月 19 日消息，过去几年，裁员已成游戏行业的常态。仅今年一年，Epic 就大幅裁员 1000 名开发人员，而蒙特利尔 Eidos 工作室、Crystal Dynamics 工作室等也在上个月进行了裁员。随着育碧等大型发行商不断宣扬“裁员是公司发展的唯一途径”，游戏开发者们难免感到缺乏职业安全感。如今一项新研究显示，正因这种就业不稳定的状况，行业内近半数从业者想要离职。IT之家注意到，招聘公司 Skillsearch 在一项新研究中指出，游戏行业 44% 的开发者因大规模裁员计划离职。该研究采访了全球游戏行业 1000 名从业者，涵盖编程、美术、设计等多个领域。在过去 12 个月里，仅有 35% 的受访者未受裁员影响，其余人要么被解雇，要么所在工作室面临裁员。此外，在所有被裁的游戏开发者中，仅 45% 找到了新工作，其中四分之一的人耗时超过 6 个月才重新就业。该研究还显示，游戏行业近半数从业者对开发工作中人工智能的应用存在质疑，64% 的人认为 AI 实际上会削弱创作力。从业者最普遍的担忧，是 AI 带来的就业保障下降，以及该技术应用的伦理问题。不过，尽管存在这些顾虑，仍有超半数开发者承认在日常工作中使用 AI 工具，部分开发者表示，其所在工作室对 AI 技术的使用制定了严格的伦理规范。广告声明：文内含有的对外跳转链接（包括不限于超链接、二维码、口令等形式），用于传递更多信息，节省甄选时间，结果仅供参考，IT之家所有文章均包含本声明。",
+    "source": "IT之家 / 科技行业",
+    "topic": "科技行业",
+    "published_at": "2026-04-19T08:58:32+08:00",
+    "published_label": "04-19 08:58",
+    "relevance_score": 7,
+    "match_tags": [
+      "career",
+      "tech"
+    ],
+    "stored_at": "2026-04-19T12:10:28.991239"
+  },
+  {
     "id": "9b71ef46cd2953c7",
     "title": "Loop raises $95M to build supply chain AI that predicts disruptions",
     "url": "https://techcrunch.com/2026/04/17/loop-raises-95m-to-build-supply-chain-ai-that-predicts-disruptions/",

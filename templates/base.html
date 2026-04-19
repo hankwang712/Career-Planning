@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>职业规划智能体｜今天也要Debug</title>
+    <title>智航生涯｜AI 大学生职业规划智能体</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png" sizes="any">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -45,15 +46,11 @@
         <div class="startup-layout">
             <header class="startup-topbar">
                 <div class="startup-brand">
-                    <div class="startup-logo app-brand-mark">
-                        <svg viewBox="0 0 32 32" aria-hidden="true">
-                            <path d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"></path>
-                            <circle cx="16" cy="16" r="3.2"></circle>
-                            <path d="M16 12.8 23 9.5M16 19.2l7 3.3M13.2 17.7 8.8 20.4"></path>
-                        </svg>
+                    <div class="startup-logo app-brand-mark app-brand-mark--img" aria-hidden="true">
+                        <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="48" height="48" decoding="async">
                     </div>
                     <div>
-                        <p class="startup-brand-name">职业规划智能体</p>
+                        <p class="startup-brand-name">智航生涯</p>
                         <p class="startup-brand-sub">AI career planning platform for students and early-career talent</p>
                     </div>
                 </div>
@@ -129,42 +126,55 @@
 
                     <aside id="startupLogin" class="startup-card">
                         <div class="startup-auth-head">
-                            <span class="startup-auth-kicker">Workspace Access</span>
-                            <h3 class="startup-auth-title">登录工作台</h3>
-                            <p class="startup-auth-text">当前环境仅开放预置账号体验。登录后只会看到各自账号的数据和访谈内容。</p>
+                            <span class="startup-auth-kicker">Clean Web Access</span>
+                            <h3 class="startup-auth-title">登录或创建你的专属账户</h3>
+                            <p class="startup-auth-text">参考 clean login 的桌面端布局，当前支持邮箱 + 密码直接注册。创建后会自动进入你的个人工作台，测评与报告也会按账户独立保存。</p>
                         </div>
 
-                        <div class="auth-tabs auth-tabs--single">
+                        <div class="auth-tabs">
                             <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
-                            <button id="registerTabBtn" class="auth-tab hidden" type="button" onclick="switchAuthTab('register')">注册</button>
+                            <button id="registerTabBtn" class="auth-tab" type="button" onclick="switchAuthTab('register')">注册</button>
                         </div>
 
                         <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-                            <label class="auth-label" for="loginUsername">用户名</label>
-                            <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名" value="system">
-                            <label class="auth-label" for="loginPassword">密码</label>
-                            <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码" value="123456">
-                            <button class="auth-submit" type="submit">进入系统</button>
-                            <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填充超级用户</button>
+                            <div class="auth-field">
+                                <label class="auth-label" for="loginUsername">邮箱或用户名</label>
+                                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="邮箱或演示账号 system">
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="loginPassword">密码</label>
+                                <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="输入你的登录密码">
+                            </div>
+                            <div class="auth-meta-row">
+                                <span class="auth-meta-text">已有演示账号也可以继续登录</span>
+                                <button class="auth-link-btn" type="button" onclick="fillSuperUser()">填充演示账号</button>
+                            </div>
+                            <button class="auth-submit" type="submit">登录工作台</button>
                         </form>
 
                         <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-                            <label class="auth-label" for="registerUsername">注册用户名</label>
-                            <input id="registerUsername" class="auth-input" type="text" autocomplete="username" placeholder="例如：student01">
-                            <label class="auth-label" for="registerPassword">登录密码</label>
-                            <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
-                            <label class="auth-label" for="registerConfirmPassword">确认密码</label>
-                            <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="请再次输入密码">
-                            <button class="auth-submit" type="submit">创建普通用户</button>
-                            <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerUsername">邮箱地址</label>
+                                <input id="registerUsername" class="auth-input" type="email" autocomplete="username" placeholder="you@school.edu 或 you@example.com">
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerPassword">登录密码</label>
+                                <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="至少 6 位">
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerConfirmPassword">确认密码</label>
+                                <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="再次输入密码">
+                            </div>
+                            <button class="auth-submit" type="submit">创建账户并进入</button>
+                            <p class="register-note">注册成功后会自动登录。后续你的访谈、测评与职业报告都会绑定到这个邮箱账户。</p>
                         </form>
 
                         <div class="startup-auth-foot">
-                            <span class="startup-auth-chip">预置账号</span>
-                            <span class="startup-auth-chip">system / 123456</span>
-                            <span class="startup-auth-chip">可切换其他演示账号</span>
+                            <span class="startup-auth-chip">玉白玻璃感</span>
+                            <span class="startup-auth-chip">邮箱自助注册</span>
+                            <span class="startup-auth-chip">独立数据空间</span>
                         </div>
-                        <p id="authMessage" class="auth-message">已自动填充预置账号：system，密码：123456。也可以切换为其他预置账号登录。</p>
+                        <p id="authMessage" class="auth-message">使用邮箱和密码登录，或直接创建一个新账户。演示账号 `system / 123456` 仍然可用。</p>
                     </aside>
                 </div>
             </section>
@@ -270,15 +280,11 @@
             <div class="flex items-center min-h-[4.55rem] gap-5 py-2">
                 <!-- 品牌区 -->
                 <div class="flex items-center gap-3 flex-shrink-0">
-                    <div class="app-brand-mark nav-brand-mark">
-                        <svg viewBox="0 0 32 32" aria-hidden="true">
-                            <path d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"></path>
-                            <circle cx="16" cy="16" r="3.2"></circle>
-                            <path d="M16 12.8 23 9.5M16 19.2l7 3.3M13.2 17.7 8.8 20.4"></path>
-                        </svg>
+                    <div class="app-brand-mark nav-brand-mark app-brand-mark--img" aria-hidden="true">
+                        <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="40" height="40" decoding="async">
                     </div>
                     <div class="leading-tight">
-                        <h1 class="text-base font-bold whitespace-nowrap">职业规划智能体</h1>
+                        <h1 class="text-base font-bold whitespace-nowrap">智航生涯</h1>
                         <p class="text-xs text-purple-200 whitespace-nowrap">双图谱 · 大模型推理 · <span class="team-badge-inline">今天也要Debug</span></p>
                     </div>
                 </div>
@@ -413,11 +419,11 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div>
                     <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                            <span class="text-purple-600 font-bold text-xl">MS</span>
+                        <div class="w-10 h-10 rounded-lg overflow-hidden ring-1 ring-white/15 shrink-0 bg-slate-900">
+                            <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="智航生涯" class="w-full h-full object-cover" width="40" height="40" loading="lazy" decoding="async">
                         </div>
                         <div>
-                            <h3 class="font-bold">明杉科技</h3>
+                            <h3 class="font-bold">智航生涯</h3>
                             <p class="text-xs text-gray-400">AI 大学生职业规划智能体</p>
                             <p class="footer-team">队伍：今天也要Debug</p>
                         </div>
@@ -453,7 +459,7 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-                <p>© <span id="footerYear">2025</span> 明杉科技 版权所有 | 中国大学生服务外包创新创业大赛参赛作品</p>
+                <p>© <span id="footerYear">2025</span> 智航生涯 版权所有 | 中国大学生服务外包创新创业大赛参赛作品</p>
             </div>
         </div>
     </footer>
@@ -465,7 +471,7 @@
                 <div class="flex justify-between items-start">
                     <div>
                         <h3 class="text-2xl font-bold" id="modalJobTitle">机器学习工程师</h3>
-                        <p class="text-purple-200" id="modalJobCompany">明杉科技 · 北京</p>
+                        <p class="text-purple-200" id="modalJobCompany">智航生涯 · 北京</p>
                     </div>
                     <button onclick="closeModal('jobDetailModal')" class="text-white hover:text-purple-200 text-2xl">&times;</button>
                 </div>
@@ -694,7 +700,7 @@
     <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20260412-assessment-storage-user-v1"></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260414-pet-size-v1"></script>
     <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20260412-deeptest-submit-main-v1"></script>
-    <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260321-analytics-v1"></script>
+    <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260419-analytics-salary-wan-v1"></script>
     <script src="{{ url_for('static', filename='tour.js') }}?v=20260408-tour-v2"></script>
 </body>
 </html>

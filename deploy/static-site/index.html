@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>职业规划智能体｜今天也要Debug</title>
+    <title>智航生涯｜AI 大学生职业规划智能体</title>
+    <link rel="icon" href="/static/brand/icon.png" type="image/png" sizes="any">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@7/dist/fuse.min.js"></script>
@@ -34,13 +35,15 @@
     <div id="startupScreen" class="startup-screen">
         <div class="startup-card">
             <div class="startup-brand">
-                <div class="startup-logo">DP</div>
+                <div class="startup-logo w-12 h-12 rounded-2xl overflow-hidden shrink-0 ring-1 ring-white/10" aria-hidden="true">
+                    <img src="/static/brand/icon.png" alt="" class="w-full h-full object-cover" width="48" height="48" decoding="async">
+                </div>
                 <div>
-                    <p class="startup-brand-name">职业规划智能体</p>
+                    <p class="startup-brand-name">智航生涯</p>
                     <p class="startup-brand-sub">开发版产品 · 今天也要Debug</p>
                 </div>
             </div>
-            <h2 class="startup-title">欢迎进入职业规划智能体</h2>
+            <h2 class="startup-title">欢迎进入智航生涯</h2>
             <p class="startup-subtitle">请使用预置账号登录。每个账号只会看到自己的访谈与测评内容。</p>
 
             <div class="auth-tabs">
@@ -49,8 +52,8 @@
             </div>
 
             <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-                <label class="auth-label" for="loginUsername">用户名</label>
-                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名">
+                <label class="auth-label" for="loginUsername">邮箱或用户名</label>
+                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="邮箱或演示账号 system">
                 <label class="auth-label" for="loginPassword">密码</label>
                 <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码">
                 <button class="auth-submit" type="submit">进入系统</button>
@@ -77,9 +80,11 @@
         <div class="topbar-shell">
             <div class="topbar-row">
                 <div class="topbar-brand">
-                    <div class="topbar-brand-mark">DP</div>
+                    <div class="topbar-brand-mark w-10 h-10 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/10" aria-hidden="true">
+                        <img src="/static/brand/icon.png" alt="" class="w-full h-full object-cover" width="40" height="40" decoding="async">
+                    </div>
                     <div class="topbar-brand-copy">
-                        <h1>职业规划智能体</h1>
+                        <h1>智航生涯</h1>
                         <p>学生职业决策操作台</p>
                     </div>
                 </div>
@@ -2816,9 +2821,11 @@
         <div class="site-footer-shell">
             <div class="site-footer-head">
                 <div class="site-footer-brand">
-                    <div class="site-footer-mark">DP</div>
+                    <div class="site-footer-mark w-10 h-10 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/15" aria-hidden="true">
+                        <img src="/static/brand/icon.png" alt="" class="w-full h-full object-cover" width="40" height="40" decoding="async">
+                    </div>
                     <div>
-                        <h3>职业规划智能体</h3>
+                        <h3>智航生涯</h3>
                         <p>把岗位、能力与规划结果放进同一个决策界面。</p>
                     </div>
                 </div>
@@ -2855,7 +2862,7 @@
             </div>
 
             <div class="site-footer-bottom">
-                <p>© <span id="footerYear">2025</span> 明杉科技 版权所有</p>
+                <p>© <span id="footerYear">2025</span> 智航生涯 版权所有</p>
                 <p>中国大学生服务外包创新创业大赛参赛作品</p>
             </div>
         </div>
@@ -2868,7 +2875,7 @@
                 <div class="flex justify-between items-start">
                     <div>
                         <h3 class="text-2xl font-bold" id="modalJobTitle">机器学习工程师</h3>
-                        <p class="text-purple-200" id="modalJobCompany">明杉科技 · 北京</p>
+                        <p class="text-purple-200" id="modalJobCompany">智航生涯 · 北京</p>
                     </div>
                     <button type="button" onclick="closeModal('jobDetailModal')" class="text-white hover:text-purple-200 text-2xl" aria-label="关闭岗位详情">&times;</button>
                 </div>
@@ -3104,6 +3111,6 @@
     <script src="/static/assessment-hub.js?v=20260322-top-model-status-v1"></script>
     <script src="/static/deep-test-hub.js?v=20260401-deep-test-v5"></script>
     <script src="/static/assessment-pet.js?v=20260414-pet-size-v1"></script>
-    <script src="/static/jobs-analytics.js?v=20260321-analytics-v1"></script>
+    <script src="/static/jobs-analytics.js?v=20260419-analytics-salary-wan-v1"></script>
 </body>
 </html>

@@ -89,6 +89,7 @@ from services.resume.diagnosis_ui import (
     normalize_diagnosis_ui,
 )
 from services.tools import generate_text_to_image, get_text_to_image_runtime
+from services import db as _app_db
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("application/javascript", ".mjs")
@@ -98,6 +99,9 @@ mimetypes.add_type("application/json", ".json")
 # 路径配置
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 BOSS_INFO_DIR = os.path.join(BASE_DIR, "boss_info")
+OTHER_CITY_BOSS_JOBS_FILE = os.path.join(BASE_DIR, "data", "cleaned", "other_city_boss_format.json")
+# 仅出现在补充数据中的城市：样本数低于该阈值的不进入下拉列表，避免一次性加载过多城市拖慢 bootstrap。
+SUPPLEMENT_EXTRA_CITY_MIN_JOBS = int(os.environ.get("SUPPLEMENT_EXTRA_CITY_MIN_JOBS", "5"))
 APP_DATA_DIR = os.path.join(BASE_DIR, "app_data")
 USER_STATE_DIR = os.path.join(APP_DATA_DIR, "user_state")
 USERS_FILE = os.path.join(APP_DATA_DIR, "users.json")
@@ -117,6 +121,7 @@ APP_DATA_LOCK = threading.Lock()
 USER_STATE_LOCK = threading.Lock()
 ASSESSMENT_DATA_LOCK = threading.Lock()
 JOB_FILE_CACHE = {}
+SUPPLEMENT_JOBS_CACHE = {"signature": None, "by_city": None}
 ASSESSMENT_DATA_CACHE = {"signature": None, "payload": {}}
 USERS_CACHE = None
 RESUME_ANALYSIS_LOCK = threading.Lock()
@@ -485,6 +490,7 @@ VALID_USER_STATE_SCOPES = {
 }
 VALID_LLM_CONFIG_SCOPES = {"career_interview", "assessment_hub"}
 COMMUNITY_FORUM_BOARD_OPTIONS = ("面经互助", "简历门诊", "实习内推", "选岗热议", "职场日常")
+EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 
 
 def _default_llm_configs():
@@ -508,17 +514,15 @@ def _normalized_resume_llm_config(raw_config):
 
 
 def _load_resume_llm_config():
-    _ensure_app_storage()
-    with APP_DATA_LOCK:
-        raw = _read_json_file(RESUME_LLM_CONFIG_FILE, _default_resume_llm_config())
+    raw = _app_db.load_resume_llm_config()
+    if not raw:
+        raw = _default_resume_llm_config()
     return _normalized_resume_llm_config(raw)
 
 
 def _save_resume_llm_config(config):
-    _ensure_app_storage()
     normalized = _normalized_resume_llm_config(config)
-    with APP_DATA_LOCK:
-        _write_json_file(RESUME_LLM_CONFIG_FILE, normalized)
+    _app_db.save_resume_llm_config(normalized)
     return normalized
 
 
@@ -580,45 +584,13 @@ def _public_provider(provider, is_admin=False):
 
 
 def _load_providers():
-    """Load provider configs and transparently migrate legacy storage."""
-    _ensure_app_storage()
-    with APP_DATA_LOCK:
-        # 优先读取独立 providers 文件。
-        stored = _read_json_file(LLM_PROVIDERS_FILE, None)
-        if stored is None:
-            # 兼容旧文件：可能存的是 {"providers": [...]} 或旧 scope 结构。
-            stored = _read_json_file(LLM_CONFIG_FILE, {})
-
-    if not isinstance(stored, dict):
-        return []
-
-    # 旧格式迁移：如果有 career_interview 键，说明是旧数据。
-    if "career_interview" in stored or "assessment_hub" in stored:
-        ref = stored.get("career_interview") or stored.get("assessment_hub") or {}
-        base_url = str(ref.get("base_url") or "").strip()
-        api_key = str(ref.get("api_key") or "").strip()
-        providers = []
-        if base_url and api_key:
-            providers.append({
-                "id": str(uuid.uuid4())[:8],
-                "name": "默认 API",
-                "base_url": base_url,
-                "api_key": api_key,
-            })
-        with APP_DATA_LOCK:
-            _write_json_file(LLM_PROVIDERS_FILE, {"providers": providers})
-        return providers
-
-    raw_list = stored.get("providers") or []
-    if not isinstance(raw_list, list):
-        return []
-    return [_normalized_provider(p) for p in raw_list if isinstance(p, dict) and p.get("id")]
+    providers = _app_db.load_providers()
+    return [_normalized_provider(p) for p in providers if isinstance(p, dict) and p.get("id")]
 
 
 def _save_providers(providers):
     normalized = [_normalized_provider(p) for p in providers if isinstance(p, dict) and p.get("id")]
-    with APP_DATA_LOCK:
-        _write_json_file(LLM_PROVIDERS_FILE, {"providers": normalized})
+    _app_db.save_providers(normalized)
     return normalized
 def _get_active_provider_and_model(selection=None):
     """Read provider/model from an explicit selection or the current session."""
@@ -731,57 +703,79 @@ def _normalized_llm_config(raw_config):
 
 
 def _load_llm_configs():
-    _ensure_app_storage()
-    with APP_DATA_LOCK:
-        stored = _read_json_file(LLM_CONFIG_FILE, {})
-        configs = _default_llm_configs()
-        if isinstance(stored, dict):
-            for scope in VALID_LLM_CONFIG_SCOPES:
-                configs[scope] = _normalized_llm_config(stored.get(scope))
+    stored = _app_db.load_llm_configs()
+    configs = _default_llm_configs()
+    if isinstance(stored, dict):
+        for scope in VALID_LLM_CONFIG_SCOPES:
+            configs[scope] = _normalized_llm_config(stored.get(scope))
 
-        # If one scope is configured and the other is empty, keep them aligned.
-        reference = next(
-            (c for c in configs.values() if c.get("base_url") and c.get("api_key")),
-            None,
-        )
-        if reference:
-            changed = False
-            for scope in VALID_LLM_CONFIG_SCOPES:
-                c = configs[scope]
-                if not (c.get("base_url") and c.get("api_key")):
-                    c["base_url"] = reference["base_url"]
-                    c["api_key"] = reference["api_key"]
-                    if not c.get("model") or c["model"] in ("gpt-4o-mini",):
-                        c["model"] = reference["model"]
-                    changed = True
-            if changed:
-                _write_json_file(LLM_CONFIG_FILE, configs)
+    # If one scope is configured and the other is empty, keep them aligned.
+    reference = next(
+        (c for c in configs.values() if c.get("base_url") and c.get("api_key")),
+        None,
+    )
+    if reference:
+        changed = False
+        for scope in VALID_LLM_CONFIG_SCOPES:
+            c = configs[scope]
+            if not (c.get("base_url") and c.get("api_key")):
+                c["base_url"] = reference["base_url"]
+                c["api_key"] = reference["api_key"]
+                if not c.get("model") or c["model"] in ("gpt-4o-mini",):
+                    c["model"] = reference["model"]
+                changed = True
+        if changed:
+            _app_db.save_llm_configs(configs)
 
-        if stored != configs:
-            _write_json_file(LLM_CONFIG_FILE, configs)
-        return configs
+    if stored != configs:
+        _app_db.save_llm_configs(configs)
+    return configs
 
 
 def _save_llm_configs(configs):
-    _ensure_app_storage()
     normalized = _default_llm_configs()
     for scope in VALID_LLM_CONFIG_SCOPES:
         normalized[scope] = _normalized_llm_config(configs.get(scope))
-    with APP_DATA_LOCK:
-        _write_json_file(LLM_CONFIG_FILE, normalized)
+    _app_db.save_llm_configs(normalized)
     return normalized
+
+
+def _normalize_login_identifier(value):
+    raw = str(value or "").strip()
+    if "@" in raw:
+        return raw.lower()
+    return raw
+
+
+def _looks_like_email(value):
+    return bool(EMAIL_PATTERN.match(str(value or "").strip()))
+
+
+def _default_display_name(identifier):
+    raw = str(identifier or "").strip()
+    if "@" in raw:
+        raw = raw.split("@", 1)[0]
+    cleaned = re.sub(r"[\W_]+", " ", raw, flags=re.UNICODE).strip()
+    return (cleaned[:32] or str(identifier or "").strip())[:48]
+
+
+def _normalize_display_name(value, fallback_identifier=""):
+    raw = str(value or "").strip()
+    if not raw:
+        return _default_display_name(fallback_identifier)
+    return raw[:48]
 
 
 def _normalized_user_record(raw_user):
     raw = raw_user if isinstance(raw_user, dict) else {}
-    username = str(raw.get("username") or "").strip()
+    username = _normalize_login_identifier(raw.get("username"))
     if not username:
         return None
     return {
         "username": username,
         "password_hash": str(raw.get("password_hash") or "").strip(),
         "role": str(raw.get("role") or "user").strip() or "user",
-        "display_name": str(raw.get("display_name") or raw.get("displayName") or username).strip() or username,
+        "display_name": _normalize_display_name(raw.get("display_name") or raw.get("displayName") or username, username),
     }
 
 
@@ -789,34 +783,31 @@ def _load_users():
     global USERS_CACHE
     if USERS_CACHE is not None:
         return USERS_CACHE
-    _ensure_app_storage()
-    with APP_DATA_LOCK:
-        raw_users = _read_json_file(USERS_FILE, [])
-        merged = {}
-        if isinstance(raw_users, list):
-            for item in raw_users:
-                normalized = _normalized_user_record(item)
-                if normalized:
-                    merged[normalized["username"]] = normalized
+    raw_users = _app_db.load_users()
+    merged = {}
+    for item in raw_users:
+        normalized = _normalized_user_record(item)
+        if normalized:
+            merged[normalized["username"]] = normalized
 
-        for spec in DEFAULT_USER_SPECS:
-            existing = merged.get(spec["username"]) or {}
-            password_hash = str(existing.get("password_hash") or "").strip()
-            # Avoid recomputing password hashes on every request.
-            if not password_hash:
-                password_hash = generate_password_hash(spec["password"])
-            merged[spec["username"]] = {
-                "username": spec["username"],
-                "password_hash": password_hash,
-                "role": spec["role"],
-                "display_name": spec["display_name"],
-            }
+    for spec in DEFAULT_USER_SPECS:
+        existing = merged.get(spec["username"]) or {}
+        password_hash = str(existing.get("password_hash") or "").strip()
+        # Avoid recomputing password hashes on every request.
+        if not password_hash:
+            password_hash = generate_password_hash(spec["password"])
+        merged[spec["username"]] = {
+            "username": spec["username"],
+            "password_hash": password_hash,
+            "role": spec["role"],
+            "display_name": spec["display_name"],
+        }
 
-        users = sorted(merged.values(), key=lambda item: (item["role"] != "super_admin", item["username"]))
-        if raw_users != users:
-            _write_json_file(USERS_FILE, users)
-        USERS_CACHE = users
-        return USERS_CACHE
+    users = sorted(merged.values(), key=lambda item: (item["role"] != "super_admin", item["username"]))
+    if raw_users != users:
+        _app_db.save_users(users)
+    USERS_CACHE = users
+    return USERS_CACHE
 
 
 def _save_users(users):
@@ -833,21 +824,16 @@ def _save_users(users):
         seen.add(username)
         normalized_users.append(normalized)
     normalized_users.sort(key=lambda item: (item["role"] != "super_admin", item["username"]))
-    _ensure_app_storage()
-    with APP_DATA_LOCK:
-        _write_json_file(USERS_FILE, normalized_users)
+    _app_db.save_users(normalized_users)
     USERS_CACHE = normalized_users
     return USERS_CACHE
 
 
 def _find_user(username):
-    normalized_name = str(username or "").strip()
+    normalized_name = _normalize_login_identifier(username)
     if not normalized_name:
         return None
-    for user in _load_users():
-        if user["username"] == normalized_name:
-            return user
-    return None
+    return _app_db.find_user(normalized_name)
 
 
 def _public_user(user):
@@ -893,19 +879,13 @@ def _user_state_path(username):
 
 
 def _load_user_state(username):
-    _ensure_app_storage()
-    path = _user_state_path(username)
-    with USER_STATE_LOCK:
-        state = _read_json_file(path, {})
-        return state if isinstance(state, dict) else {}
+    state = _app_db.load_user_state(username)
+    return state if isinstance(state, dict) else {}
 
 
 def _save_user_state(username, payload):
-    _ensure_app_storage()
     normalized = payload if isinstance(payload, dict) else {}
-    path = _user_state_path(username)
-    with USER_STATE_LOCK:
-        _write_json_file(path, normalized)
+    _app_db.save_user_state(username, normalized)
     return normalized
 
 
@@ -1134,31 +1114,27 @@ def _default_community_forum_payload():
 
 
 def _load_community_forum_store():
-    _ensure_app_storage()
-    with COMMUNITY_FORUM_LOCK:
-        stored = _read_json_file(COMMUNITY_FORUM_FILE, None)
-        created = not isinstance(stored, dict)
-        payload = stored if isinstance(stored, dict) else _default_community_forum_payload()
-        posts = []
-        for item in payload.get("posts") or []:
-            normalized_post = _forum_normalize_post(item)
-            if normalized_post:
-                posts.append(normalized_post)
-        normalized = {"posts": posts}
-        if created:
-            _write_json_file(COMMUNITY_FORUM_FILE, normalized)
-        return normalized
+    stored = _app_db.load_community_forum()
+    created = not isinstance(stored, dict)
+    payload = stored if isinstance(stored, dict) else _default_community_forum_payload()
+    posts = []
+    for item in payload.get("posts") or []:
+        normalized_post = _forum_normalize_post(item)
+        if normalized_post:
+            posts.append(normalized_post)
+    normalized = {"posts": posts}
+    if created:
+        _app_db.save_community_forum(normalized)
+    return normalized
 
 
 def _save_community_forum_store(payload):
-    _ensure_app_storage()
     normalized = {"posts": []}
     for item in (payload or {}).get("posts") or []:
         normalized_post = _forum_normalize_post(item)
         if normalized_post:
             normalized["posts"].append(normalized_post)
-    with COMMUNITY_FORUM_LOCK:
-        _write_json_file(COMMUNITY_FORUM_FILE, normalized)
+    _app_db.save_community_forum(normalized)
     return normalized
 
 
@@ -4562,6 +4538,104 @@ def _list_city_files():
     return sorted(f for f in os.listdir(BOSS_INFO_DIR) if f.endswith(".json"))
 
 
+def _other_city_jobs_file_signature():
+    """用于缓存失效：补充岗位文件不存在时返回稳定占位签名。"""
+    if not os.path.isfile(OTHER_CITY_BOSS_JOBS_FILE):
+        return ("missing", 0, 0)
+    stat = os.stat(OTHER_CITY_BOSS_JOBS_FILE)
+    return ("ok", stat.st_mtime_ns, stat.st_size)
+
+
+def _load_supplement_jobs_by_city():
+    """读取 other_city 清洗结果，按城市分组；整文件解析结果带签名缓存。"""
+    sig = _other_city_jobs_file_signature()
+    with JOB_CACHE_LOCK:
+        if SUPPLEMENT_JOBS_CACHE.get("signature") == sig and SUPPLEMENT_JOBS_CACHE.get("by_city") is not None:
+            return SUPPLEMENT_JOBS_CACHE["by_city"]
+    if sig[0] == "missing":
+        empty = {}
+        with JOB_CACHE_LOCK:
+            SUPPLEMENT_JOBS_CACHE["signature"] = sig
+            SUPPLEMENT_JOBS_CACHE["by_city"] = empty
+        return empty
+    try:
+        with open(OTHER_CITY_BOSS_JOBS_FILE, "r", encoding="utf-8") as fp:
+            all_jobs = json.load(fp)
+    except Exception as exc:
+        app.logger.warning("读取补充岗位文件失败 %s：%s", OTHER_CITY_BOSS_JOBS_FILE, exc)
+        empty = {}
+        with JOB_CACHE_LOCK:
+            SUPPLEMENT_JOBS_CACHE["signature"] = sig
+            SUPPLEMENT_JOBS_CACHE["by_city"] = empty
+        return empty
+    if not isinstance(all_jobs, list):
+        all_jobs = []
+    by_city = {}
+    for job in all_jobs:
+        if not isinstance(job, dict):
+            continue
+        c = str(job.get("城市") or job.get("采集城市") or "").strip()
+        if not c:
+            continue
+        by_city.setdefault(c, []).append(job)
+    with JOB_CACHE_LOCK:
+        SUPPLEMENT_JOBS_CACHE["signature"] = sig
+        SUPPLEMENT_JOBS_CACHE["by_city"] = by_city
+    return by_city
+
+
+def _merge_job_records_dedupe(base_jobs, extra_jobs):
+    """合并 boss 与补充数据，按公司与岗位等简单指纹去重。
+
+    返回值第二项为「来自补充文件且未被指纹判重剔除」的条数，用于前端标注热门城市。
+    """
+    seen = set()
+    out = []
+    supplement_appended = 0
+
+    def fingerprint(job):
+        if not isinstance(job, dict):
+            return None
+        return (
+            str(job.get("公司名称") or ""),
+            str(job.get("岗位名称") or ""),
+            str(job.get("薪资") or ""),
+            str(job.get("城市") or job.get("采集城市") or ""),
+        )
+
+    for job in base_jobs or []:
+        fp = fingerprint(job)
+        if fp is None or fp in seen:
+            continue
+        seen.add(fp)
+        out.append(job)
+    for job in extra_jobs or []:
+        fp = fingerprint(job)
+        if fp is None or fp in seen:
+            continue
+        seen.add(fp)
+        out.append(job)
+        supplement_appended += 1
+    return out, supplement_appended
+
+
+def _list_job_cities():
+    """岗位 API 使用的城市列表：boss_info 文件名 + 补充数据中样本足够的非重复城市。"""
+    base = [fname[:-5] for fname in _list_city_files()]
+    base_set = set(base)
+    try:
+        supplement = _load_supplement_jobs_by_city()
+    except Exception as exc:
+        app.logger.warning("分组补充岗位数据失败：%s", exc)
+        supplement = {}
+    extra = [
+        name
+        for name, rows in supplement.items()
+        if rows and name not in base_set and len(rows) >= SUPPLEMENT_EXTRA_CITY_MIN_JOBS
+    ]
+    return sorted(set(base) | set(extra))
+
+
 def _job_id(city, index):
     return f"{city}:{index}"
 
@@ -4580,24 +4654,39 @@ def _get_city_cache_entry(city):
 
     fname = f"{city_name}.json"
     fpath = os.path.join(BOSS_INFO_DIR, fname)
-    if not os.path.exists(fpath):
+    boss_exists = os.path.isfile(fpath)
+    supplement_sig = _other_city_jobs_file_signature()
+    supplement_by_city = _load_supplement_jobs_by_city()
+    supplement_rows = supplement_by_city.get(city_name, [])
+
+    if not boss_exists and not supplement_rows:
         raise FileNotFoundError(fname)
 
-    stat = os.stat(fpath)
-    signature = (stat.st_mtime_ns, stat.st_size)
+    boss_sig = None
+    if boss_exists:
+        stat = os.stat(fpath)
+        boss_sig = (stat.st_mtime_ns, stat.st_size)
+    combined_signature = (city_name, boss_sig, supplement_sig)
 
     with JOB_CACHE_LOCK:
         cached = JOB_FILE_CACHE.get(city_name)
-        if cached and cached.get("signature") == signature:
+        if cached and cached.get("signature") == combined_signature:
             return cached
 
-    with open(fpath, "r", encoding="utf-8") as fp:
-        jobs = json.load(fp)
+    jobs_boss = []
+    if boss_exists:
+        with open(fpath, "r", encoding="utf-8") as fp:
+            jobs_boss = json.load(fp)
+        if not isinstance(jobs_boss, list):
+            jobs_boss = []
+
+    jobs, supplement_added = _merge_job_records_dedupe(jobs_boss, supplement_rows)
 
     entry = {
-        "signature": signature,
+        "signature": combined_signature,
         "jobs": jobs,
         "summaries": None,
+        "supplement_added_count": supplement_added,
     }
     with JOB_CACHE_LOCK:
         JOB_FILE_CACHE[city_name] = entry
@@ -5364,6 +5453,8 @@ def _normalize_mbti_clarifier_payload(raw_payload):
 @app.route("/main.html")
 def index():
     user = _current_user()
+    if not user:
+        return render_template("login.html", initial_user=None)
     return render_template(
         "base.html",
         career_news=get_career_news_payload(),
@@ -6423,14 +6514,18 @@ def api_news_kb_search():
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
     payload = request.get_json(silent=True) or {}
-    username = str(payload.get("username") or "").strip()
+    username = _normalize_login_identifier(payload.get("username"))
     password = str(payload.get("password") or "")
     if not username or not password:
-        return jsonify({"message": "请输入用户名和密码。"}), 400
+        return jsonify({"message": "请输入账号和密码。"}), 400
 
     user = _find_user(username)
-    if not user or not check_password_hash(user.get("password_hash") or "", password):
-        return jsonify({"message": "用户名或密码错误。"}), 401
+    if not user:
+        if _looks_like_email(username):
+            return jsonify({"message": "该邮箱尚未注册，请先注册后再登录。"}), 401
+        return jsonify({"message": "该用户名尚未注册，请先注册后再登录。"}), 401
+    if not check_password_hash(user.get("password_hash") or "", password):
+        return jsonify({"message": "账号或密码错误，请检查后重试。"}), 401
 
     session.clear()
     session.permanent = True
@@ -6439,6 +6534,44 @@ def api_auth_login():
         "message": "登录成功",
         "user": _public_user(user),
     })
+
+
+@app.route("/api/auth/register", methods=["POST"])
+def api_auth_register():
+    payload = request.get_json(silent=True) or {}
+    email = _normalize_login_identifier(payload.get("email") or payload.get("username"))
+    password = str(payload.get("password") or "")
+    confirm_password = str(payload.get("confirm_password") or payload.get("confirmPassword") or "")
+    display_name = _normalize_display_name(payload.get("display_name") or payload.get("displayName"), email)
+
+    if not email or not password:
+        return jsonify({"message": "请输入邮箱和密码。"}), 400
+    if not _looks_like_email(email):
+        return jsonify({"message": "请输入有效的邮箱地址。"}), 400
+    if len(password) < 6:
+        return jsonify({"message": "密码至少需要 6 位。"}), 400
+    if confirm_password and confirm_password != password:
+        return jsonify({"message": "两次输入的密码不一致。"}), 400
+    if _find_user(email):
+        return jsonify({"message": "这个邮箱已经注册过了。"}), 409
+
+    users = list(_load_users())
+    created_user = {
+        "username": email,
+        "password_hash": generate_password_hash(password),
+        "role": "user",
+        "display_name": display_name,
+    }
+    users.append(created_user)
+    _save_users(users)
+
+    session.clear()
+    session.permanent = True
+    session["username"] = created_user["username"]
+    return jsonify({
+        "message": "注册成功",
+        "user": _public_user(created_user),
+    }), 201
 
 
 @app.route("/api/auth/logout", methods=["POST"])
@@ -8349,23 +8482,42 @@ def api_career_graph_match():
 
 @app.route("/api/cities")
 def api_cities():
-    cities = [fname[:-5] for fname in _list_city_files()]
+    cities = _list_job_cities()
     return _cache_json_response(cities, max_age=3600)
+
+
+def _jobs_bootstrap_payload():
+    """聚合 bootstrap 岗位摘要，并附带 boss_info 城市列表与补充数据热度信息。"""
+    cities = _list_job_cities()
+    boss_cities = [fname[:-5] for fname in _list_city_files()]
+    jobs = []
+    city_supplement_extra_count = {}
+    boss_city_set = set(boss_cities)
+    for city_name in cities:
+        try:
+            summaries = _get_city_job_summaries(city_name)
+            jobs.extend(summaries)
+            if city_name in boss_city_set:
+                entry = _get_city_cache_entry(city_name)
+                n = int(entry.get("supplement_added_count") or 0)
+                if n > 0:
+                    city_supplement_extra_count[city_name] = n
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            app.logger.warning("读取 %s 失败：%s", city_name, exc)
+    return {
+        "cities": cities,
+        "boss_cities": boss_cities,
+        "city_supplement_extra_count": city_supplement_extra_count,
+        "jobs": jobs,
+    }
 
 
 @app.route("/api/jobs/bootstrap")
 def api_jobs_bootstrap():
     """Return cities and job summaries in one payload for bootstrap usage."""
-    cities = [fname[:-5] for fname in _list_city_files()]
-    jobs = []
-    for city_name in cities:
-        try:
-            jobs.extend(_get_city_job_summaries(city_name))
-        except FileNotFoundError:
-            continue
-        except Exception as exc:
-            app.logger.warning("读取 %s 失败：%s", city_name, exc)
-    return _cache_json_response({"cities": cities, "jobs": jobs})
+    return _cache_json_response(_jobs_bootstrap_payload())
 
 
 # API：岗位数据
@@ -8374,19 +8526,10 @@ def api_jobs():
     city = str(request.args.get("city", "all") or "all").strip() or "all"
     view = str(request.args.get("view", "full") or "full").strip().lower()
     if view == "bootstrap":
-        cities = [fname[:-5] for fname in _list_city_files()]
-        jobs = []
-        for city_name in cities:
-            try:
-                jobs.extend(_get_city_job_summaries(city_name))
-            except FileNotFoundError:
-                continue
-            except Exception as exc:
-                app.logger.warning("读取 %s 失败：%s", city_name, exc)
-        return _cache_json_response({"cities": cities, "jobs": jobs})
+        return _cache_json_response(_jobs_bootstrap_payload())
     jobs = []
 
-    cities = [fname[:-5] for fname in _list_city_files()] if city == "all" else [city]
+    cities = _list_job_cities() if city == "all" else [city]
 
     for city_name in cities:
         try:
@@ -8639,8 +8782,8 @@ def open_browser():
     webbrowser.open("http://localhost:8080")
 
 _ensure_app_storage()
+_app_db.init_db()
 _load_users()
-_load_providers()   # 触发旧格式迁移。
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
     port = int(os.environ.get("PORT", "8080"))

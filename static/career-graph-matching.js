@@ -431,12 +431,12 @@
   }
 
   function resolveNodeVisualState(nodeId, context) {
-    if (nodeId === context.selectedId) return "selected";
+    if (nodeId === context.focusId) return "selected";
     if (context.promotionIds.has(nodeId)) return "promotion";
     if (context.transferIds.has(nodeId)) return "transfer";
     if (context.queryIds.size) return context.queryIds.has(nodeId) ? "query" : "muted";
     if (context.recommendationIds.has(nodeId)) return "recommended";
-    if (context.selectedId) return "muted";
+    if (context.focusId) return "muted";
     return "default";
   }
 
@@ -445,9 +445,10 @@
     const targetId = edgeNodeId(edge.target);
     if (!sourceId || !targetId) return false;
 
-    if (context.selectedId) {
-      if (sourceId === context.selectedId || targetId === context.selectedId) return true;
-      if (edge.relation === "promotion" && context.trailIds.has(sourceId) && context.trailIds.has(targetId)) return true;
+    if (context.focusId) {
+      if (sourceId === context.focusId || targetId === context.focusId) return true;
+      if (edge.relation === "promotion" && context.promotionCluster.has(sourceId) && context.promotionCluster.has(targetId)) return true;
+      if (edge.relation === "substitution" && context.transferCluster.has(sourceId) && context.transferCluster.has(targetId)) return true;
       return false;
     }
 
@@ -694,6 +695,19 @@
     return edge.source === nodeId ? edge.target : edge.source;
   }
 
+  function getCurrentFocusNodeId() {
+    if (state.selectedNodeId && state.nodeMap.has(state.selectedNodeId)) return state.selectedNodeId;
+    const firstMatch = state.matchResults[0]?.id;
+    if (firstMatch && state.nodeMap.has(firstMatch)) return String(firstMatch);
+    return "";
+  }
+
+  function getActiveNodeLimit() {
+    if (state.searchQuery || state.selectedNodeId || state.pathOnly) return GRAPH_NODE_LIMIT;
+    if (state.matchResults.length) return Math.min(GRAPH_NODE_LIMIT, 360);
+    return Math.min(GRAPH_NODE_LIMIT, 260);
+  }
+
   function buildPromotionTrail(nodeId, direction = "out", maxHops = 4) {
     const trail = [];
     let currentId = String(nodeId || "");
@@ -744,6 +758,7 @@
 
   function computeDisplayNodeIds() {
     const relationFilter = state.relationFilter === "all" ? "all" : state.relationFilter;
+    const activeLimit = getActiveNodeLimit();
     const queryMatches = state.searchQuery ? searchAllNodes(state.searchQuery, state.nodeMap.size || 2000) : [];
     state.queryResultIds = new Set(queryMatches.map((node) => node.id));
 
@@ -754,7 +769,7 @@
         ...buildPromotionTrail(state.selectedNodeId, "in", 3),
         ...getEdgesForNode(state.selectedNodeId, relationFilter).map((edge) => getOtherNodeId(edge, state.selectedNodeId))
       ];
-      return expandContext(seeds, { limit: GRAPH_NODE_LIMIT, includeBaseFill: false, relationFilter });
+      return expandContext(seeds, { limit: activeLimit, includeBaseFill: false, relationFilter });
     }
 
     if (state.selectedNodeId) {
@@ -766,7 +781,7 @@
         ...selectedEdges.map((edge) => getOtherNodeId(edge, state.selectedNodeId))
       ];
       return expandContext(seeds, {
-        limit: GRAPH_NODE_LIMIT,
+        limit: activeLimit,
         includeBaseFill: false,
         relationFilter
       });
@@ -774,7 +789,7 @@
 
     if (queryMatches.length) {
       return expandContext(queryMatches.map((node) => node.id), {
-        limit: GRAPH_NODE_LIMIT,
+        limit: activeLimit,
         includeBaseFill: false,
         relationFilter
       });
@@ -786,13 +801,13 @@
 
     if (focusSeeds.length) {
       return expandContext(focusSeeds, {
-        limit: GRAPH_NODE_LIMIT,
+        limit: activeLimit,
         includeBaseFill: true,
         relationFilter
       });
     }
 
-    return state.baseNodeIds.slice(0, GRAPH_NODE_LIMIT);
+    return state.baseNodeIds.slice(0, activeLimit);
   }
 
   function renderSearchResults(matches) {
@@ -821,10 +836,11 @@
     const info = getEl("knowledgeBaseBottomInfo");
     const connected = getEl("knowledgeBaseConnected");
     const totalNodes = state.nodeMap.size;
+    const activeLimit = getActiveNodeLimit();
     const queryCount = state.queryResultIds.size;
     if (info) {
       const extra = queryCount ? ` · 搜索命中 ${queryCount}` : "";
-      info.textContent = `Nodes ${displayNodes.length} / ${Math.min(GRAPH_NODE_LIMIT, totalNodes)} · Edges ${displayEdges.length}${extra}`;
+      info.textContent = `Nodes ${displayNodes.length} / ${Math.min(activeLimit, totalNodes)} · Edges ${displayEdges.length}${extra}`;
     }
     if (connected) {
       connected.lastElementChild.textContent = `职业图谱在线 · 全量 ${totalNodes} 节点 · 当前上限 ${GRAPH_NODE_LIMIT}`;
@@ -1202,18 +1218,24 @@
       }));
     state.currentDisplayEdges = displayEdges; // 缓存给 updateVisualStates 使用
 
+    const focusId = getCurrentFocusNodeId();
     const selectedId = state.selectedNodeId;
-    const trailIds = new Set(selectedId ? [selectedId, ...buildPromotionTrail(selectedId, "out", 4), ...buildPromotionTrail(selectedId, "in", 3)] : []);
+    const trailIds = new Set(focusId ? [focusId, ...buildPromotionTrail(focusId, "out", 4), ...buildPromotionTrail(focusId, "in", 3)] : []);
     const recommendationIds = state.recommendationIds;
     const queryIds = state.queryResultIds;
-    const selectedContext = buildSelectedContext(displayEdges, selectedId, trailIds);
+    const selectedContext = buildSelectedContext(displayEdges, focusId, trailIds);
+    const promotionCluster = new Set([focusId, ...trailIds, ...selectedContext.promotionIds].filter(Boolean));
+    const transferCluster = new Set([focusId, ...selectedContext.transferIds].filter(Boolean));
     const visualContext = {
       selectedId,
+      focusId,
       trailIds,
       queryIds,
       recommendationIds,
       promotionIds: selectedContext.promotionIds,
-      transferIds: selectedContext.transferIds
+      transferIds: selectedContext.transferIds,
+      promotionCluster,
+      transferCluster
     };
 
     displayNodes.forEach((node, index) => {
@@ -1238,22 +1260,24 @@
     const nodeCount = displayNodes.length;
     const heavyGraph = nodeCount > 200;
     const manyCharge = d3.forceManyBody()
-      .strength(nodeCount > 550 ? -90 : -220)
-      .theta(heavyGraph ? 0.92 : 0.9);
-    const collideRadius = (d) => levelRadius(d.level) + 12;
+      .strength(nodeCount > 450 ? -190 : -250)
+      .theta(heavyGraph ? 0.94 : 0.9)
+      .distanceMax(Math.min(width, height) * 0.52);
+    const collideRadius = (d) => levelRadius(d.level) + 10;
     const collisionForce = d3.forceCollide()
       .radius(collideRadius)
       .iterations(heavyGraph ? 1 : 2)
-      .strength(0.92);
+      .strength(0.86);
 
     state.simulation = d3.forceSimulation(displayNodes)
-      .force("link", d3.forceLink(displayEdges).id((d) => d.id).distance((d) => d.relation === "promotion" ? 110 : 170).strength((d) => d.relation === "promotion" ? 0.72 : 0.42))
+      .force("link", d3.forceLink(displayEdges).id((d) => d.id).distance((d) => d.relation === "promotion" ? 146 : 240).strength((d) => d.relation === "promotion" ? 0.58 : 0.32))
       .force("charge", manyCharge)
       .force("collision", collisionForce)
       .force("center", d3.forceCenter(width * 0.42, height * 0.5))
-      .velocityDecay(heavyGraph ? 0.58 : 0.48)
-      .alphaDecay(heavyGraph ? 0.052 : 0.038)
-      .alphaMin(0.012);
+      .force("radialSpread", d3.forceRadial(Math.min(width, height) * 0.32, width * 0.42, height * 0.5).strength(heavyGraph ? 0.08 : 0.04))
+      .velocityDecay(heavyGraph ? 0.64 : 0.54)
+      .alphaDecay(heavyGraph ? 0.068 : 0.048)
+      .alphaMin(0.02);
 
     if (state.layoutMode === "radial") {
       state.simulation
@@ -1282,17 +1306,21 @@
       .attr("marker-end", (d) => `url(#kb-arrow-${d.relation}${edgeIsContextual(d, visualContext) ? "" : "-muted"})`);
     state.graphLayer.linkSel = links; // 保存供 updateVisualStates 使用
 
-    const linkLabels = state.graphLayer.labels.selectAll("text")
-      .data(displayEdges)
-      .enter()
-      .append("text")
-      .attr("class", (d) => {
-        const visible = edgeIsContextual(d, visualContext) && (selectedId || (queryIds.size && queryIds.size <= 8));
-        return `kb-link-label${visible ? "" : " is-hidden"}`;
-      })
-      .attr("fill", (d) => edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#80849a") : "#94a3b8")
-      .attr("text-anchor", "middle")
-      .text((d) => RELATION_META[d.relation]?.label || "");
+    let linkLabels = null;
+    const shouldRenderLinkLabels = Boolean(focusId || (queryIds.size && queryIds.size <= 8)) && displayEdges.length <= 850;
+    if (shouldRenderLinkLabels) {
+      linkLabels = state.graphLayer.labels.selectAll("text")
+        .data(displayEdges)
+        .enter()
+        .append("text")
+        .attr("class", (d) => {
+          const visible = edgeIsContextual(d, visualContext) && (focusId || (queryIds.size && queryIds.size <= 8));
+          return `kb-link-label${visible ? "" : " is-hidden"}`;
+        })
+        .attr("fill", (d) => edgeIsContextual(d, visualContext) ? (RELATION_META[d.relation]?.color || "#80849a") : "#94a3b8")
+        .attr("text-anchor", "middle")
+        .text((d) => RELATION_META[d.relation]?.label || "");
+    }
     state.graphLayer.linkLabelSel = linkLabels; // 保存供 updateVisualStates 使用
 
     const nodeGroups = state.graphLayer.nodes.selectAll("g")
@@ -1301,7 +1329,7 @@
       .append("g")
       .attr("class", (d) => {
         const classes = ["kb-node-group", `is-${d.visualState}`];
-        if (d.visualState === "muted" && selectedId) classes.push("is-dimmed");
+        if (d.visualState === "muted" && focusId) classes.push("is-dimmed");
         if (d.visualState === "muted" && queryIds.size) classes.push("is-faded");
         if (trailIds.has(d.id)) classes.push("is-path");
         return classes.join(" ");
@@ -1339,11 +1367,13 @@
       .attr("stroke", (d) => d.visual.coreStroke)
       .attr("stroke-width", 1.2);
 
+    const hideMutedLabels = nodeCount > 260 && !focusId && !queryIds.size;
     nodeGroups.append("text")
       .attr("class", "kb-node-label")
       .attr("text-anchor", "middle")
       .attr("dy", (d) => levelRadius(d.level) + 16)
       .attr("fill", (d) => d.visual.label)
+      .attr("opacity", (d) => (hideMutedLabels && d.visualState === "muted" ? 0 : 1))
       .text((d) => d.title);
     state.graphLayer.nodeGroupSel = nodeGroups; // 保存供 updateVisualStates 使用
 
@@ -1371,18 +1401,26 @@
         void focusNode(d.id);
       });
 
+    let tickFrame = 0;
     state.simulation.on("tick", () => {
+      if (heavyGraph && tickFrame++ % 2 === 1) return;
       links
         .attr("x1", (d) => d.source.x)
         .attr("y1", (d) => d.source.y)
         .attr("x2", (d) => d.target.x)
         .attr("y2", (d) => d.target.y);
 
-      linkLabels
-        .attr("x", (d) => (d.source.x + d.target.x) / 2)
-        .attr("y", (d) => (d.source.y + d.target.y) / 2 - 6);
+      if (linkLabels) {
+        linkLabels
+          .attr("x", (d) => (d.source.x + d.target.x) / 2)
+          .attr("y", (d) => (d.source.y + d.target.y) / 2 - 6);
+      }
 
       nodeGroups.attr("transform", (d) => `translate(${d.x},${d.y})`);
+
+      if (heavyGraph && tickFrame > 90 && state.simulation.alpha() < 0.035) {
+        state.simulation.stop();
+      }
     });
 
     state.simulation.on("end", () => {
@@ -1407,21 +1445,27 @@
       return;
     }
 
+    const focusId = getCurrentFocusNodeId();
     const selectedId = state.selectedNodeId;
     const displayEdges = state.currentDisplayEdges;
     const trailIds = new Set(
-      selectedId
-        ? [selectedId, ...buildPromotionTrail(selectedId, "out", 4), ...buildPromotionTrail(selectedId, "in", 3)]
+      focusId
+        ? [focusId, ...buildPromotionTrail(focusId, "out", 4), ...buildPromotionTrail(focusId, "in", 3)]
         : []
     );
-    const selectedContext = buildSelectedContext(displayEdges, selectedId, trailIds);
+    const selectedContext = buildSelectedContext(displayEdges, focusId, trailIds);
+    const promotionCluster = new Set([focusId, ...trailIds, ...selectedContext.promotionIds].filter(Boolean));
+    const transferCluster = new Set([focusId, ...selectedContext.transferIds].filter(Boolean));
     const visualContext = {
       selectedId,
+      focusId,
       trailIds,
       queryIds: state.queryResultIds,
       recommendationIds: state.recommendationIds,
       promotionIds: selectedContext.promotionIds,
       transferIds: selectedContext.transferIds,
+      promotionCluster,
+      transferCluster,
     };
 
     // 1. 更新每个节点的 visualState & visual 数据
@@ -1433,7 +1477,7 @@
     // 2. 更新节点组 CSS 类（控制 opacity/scale 动画）
     state.graphLayer.nodeGroupSel.attr("class", (d) => {
       const classes = ["kb-node-group", `is-${d.visualState}`];
-      if (d.visualState === "muted" && selectedId) classes.push("is-dimmed");
+      if (d.visualState === "muted" && focusId) classes.push("is-dimmed");
       if (d.visualState === "muted" && state.queryResultIds.size) classes.push("is-faded");
       if (trailIds.has(d.id)) classes.push("is-path");
       return classes.join(" ");
@@ -1452,7 +1496,11 @@
 
     // 5. 更新标签颜色
     state.graphLayer.nodeGroupSel.select(".kb-node-label")
-      .attr("fill", (d) => d.visual.label);
+      .attr("fill", (d) => d.visual.label)
+      .attr("opacity", (d) => {
+        const hideMutedLabels = state.displayNodeIds.length > 260 && !focusId && !state.queryResultIds.size;
+        return hideMutedLabels && d.visualState === "muted" ? 0 : 1;
+      });
 
     // 6. 更新边的颜色/可见性
     state.graphLayer.linkSel
@@ -1470,7 +1518,7 @@
       state.graphLayer.linkLabelSel.attr("class", (d) => {
         const visible =
           edgeIsContextual(d, visualContext) &&
-          (selectedId || (state.queryResultIds.size && state.queryResultIds.size <= 8));
+          (focusId || (state.queryResultIds.size && state.queryResultIds.size <= 8));
         return `kb-link-label${visible ? "" : " is-hidden"}`;
       });
     }
@@ -1584,10 +1632,14 @@
     const cityInput = getEl("knowledgeBaseCityInput");
     const cityAdd = getEl("knowledgeBaseCityAdd");
     const cityClear = getEl("knowledgeBaseCityClear");
+    let searchDebounceTimer = 0;
     if (searchInput) {
       searchInput.addEventListener("input", () => {
-        state.searchQuery = searchInput.value.trim();
-        renderGraph();
+        window.clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = window.setTimeout(() => {
+          state.searchQuery = searchInput.value.trim();
+          renderGraph();
+        }, 120);
       });
     }
 
@@ -1712,8 +1764,13 @@
       });
     }
 
+    let resizeRaf = 0;
     window.addEventListener("resize", () => {
-      renderGraph();
+      if (resizeRaf) window.cancelAnimationFrame(resizeRaf);
+      resizeRaf = window.requestAnimationFrame(() => {
+        renderGraph();
+        resizeRaf = 0;
+      });
     });
   }
 

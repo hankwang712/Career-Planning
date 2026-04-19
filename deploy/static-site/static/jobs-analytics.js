@@ -1,7 +1,9 @@
 /**
  * 城市招聘全景分析仪表盘
  * 依赖：Chart.js（已在 base.html 引入）
- * 入口：window.initJobsAnalytics(jobs)
+ * 入口：window.initJobsAnalytics(jobs, options?)
+ * options.boss_cities：仅用于本面板的 boss_info 城市顺序（与岗位探索全量城市解耦）
+ * options.city_supplement_extra_count：各 boss 城市合并的补充样本条数，用于「热门」标注
  *
  * 关键设计原则：
  *   1. 先销毁所有 Chart.js 实例，再替换 innerHTML——避免 canvas context 泄漏导致白屏
@@ -13,18 +15,46 @@
 
   // ── 配色板 ────────────────────────────────────────────────────────────────
   const PAL = [
-    "#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-    "#ef4444", "#ec4899", "#0ea5e9", "#14b8a6", "#f97316",
-    "#84cc16", "#a855f7", "#64748b", "#eab308", "#22d3ee"
+    "#0f4c81", "#136f8a", "#1c8a8f", "#2e6f95", "#5b7c99",
+    "#7e9ab2", "#a8b9c9", "#d0dde7", "#f2b35d", "#db8a4a",
+    "#79a97d", "#46627d", "#5d7b8f", "#89a8b8", "#bfd2db"
   ];
+  const BRAND = {
+    rangeFill: "rgba(28, 111, 138, 0.20)",
+    rangeStroke: "#1c6f8a",
+    median: "#d8843f",
+    heatmap: "rgba(19, 111, 138, VAR_ALPHA)",
+    textStrong: "#163247",
+    grid: "rgba(148, 163, 184, 0.22)"
+  };
 
   // ── 状态 ──────────────────────────────────────────────────────────────────
-  const S = { jobs: [], city: "all", tab: "salary", ready: false, charts: {} };
+  const S = {
+    jobs: [],
+    city: "all",
+    tab: "salary",
+    ready: false,
+    charts: {},
+    bossCitiesOrdered: null,
+    citySupplementExtra: null
+  };
+
+  /** 与 boss_info/*.json 文件名一致时的默认顺序（接口未返回 boss_cities 时兜底） */
+  const DEFAULT_BOSS_CITY_ORDER = [
+    "上海", "北京", "厦门", "天津", "广州", "成都", "杭州", "武汉",
+    "深圳", "苏州", "西安", "郑州", "重庆", "长沙"
+  ];
 
   // ── 工具函数 ──────────────────────────────────────────────────────────────
   function cityOf(j) { return (String(j["城市"] || j["采集城市"] || "")).trim(); }
   function byCity(jobs, c) { return c === "all" ? jobs : jobs.filter(j => cityOf(j) === c); }
-  function getCities(jobs) { return [...new Set(jobs.map(cityOf).filter(Boolean))].sort(); }
+  /** 全景分析图表/城市芯片使用的城市列表（仅 boss 城市，避免补充数据里上百城市挤爆 UI） */
+  function chartCities() {
+    if (Array.isArray(S.bossCitiesOrdered) && S.bossCitiesOrdered.length) {
+      return S.bossCitiesOrdered.slice();
+    }
+    return DEFAULT_BOSS_CITY_ORDER.slice();
+  }
   function countBy(jobs, fn) {
     const m = {};
     jobs.forEach(j => { const k = fn(j); if (k) m[k] = (m[k] || 0) + 1; });
@@ -48,10 +78,18 @@
 
   // ── 薪资解析 ──────────────────────────────────────────────────────────────
   function parseSalary(s) {
-    const str = String(s || "").trim();
-    const km = str.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)K/);
+    const raw = String(s || "").trim().replace(/\s/g, "");
+    if (!raw) return null;
+    const body = raw.replace(/·\d+薪.*$/i, "");
+    const wanR = body.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)万(?:\/月)?/i);
+    if (wanR) return { lo: +wanR[1] * 10, hi: +wanR[2] * 10 };
+    const wanOne = body.match(/^(\d+(?:\.\d+)?)万(?:\/月)?$/i);
+    if (wanOne) return { lo: +wanOne[1] * 10, hi: +wanOne[1] * 10 };
+    const ym = body.match(/(\d+)\s*-\s*(\d+)元\/月/i);
+    if (ym) return { lo: +ym[1] / 1000, hi: +ym[2] / 1000 };
+    const km = body.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)K/i);
     if (km) return { lo: +km[1], hi: +km[2] };
-    const dm = str.match(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)元\/天/);
+    const dm = body.match(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)元\/天/);
     if (dm) return { lo: +(+dm[1] * 22 / 1000).toFixed(1), hi: +(+dm[2] * 22 / 1000).toFixed(1) };
     return null;
   }
@@ -106,7 +144,7 @@
   // ══════════════════════════════════════════════════════════════════════════
   function renderSalaryTab() {
     destroyAllCharts();   // ① 先销毁
-    const cities = getCities(S.jobs);
+    const cities = chartCities();
     // 高度按城市数量动态计算，避免 canvas 截断
     const srH = Math.max(320, cities.length * 36);
     const sdH = Math.max(280, cities.length * 28);
@@ -153,8 +191,8 @@
           {
             label: "P25-P75 薪资区间",
             data: ranges,
-            backgroundColor: "rgba(99,102,241,0.30)",
-            borderColor: "#6366f1",
+            backgroundColor: BRAND.rangeFill,
+            borderColor: BRAND.rangeStroke,
             borderWidth: 1.5,
             borderSkipped: false
           },
@@ -162,8 +200,8 @@
             type: "line",
             label: "中位月薪 (P50)",
             data: medians,
-            borderColor: "#f97316",
-            backgroundColor: "#f97316",
+            borderColor: BRAND.median,
+            backgroundColor: BRAND.median,
             pointRadius: 5,
             pointHoverRadius: 7,
             borderWidth: 2,
@@ -193,7 +231,7 @@
   }
 
   function _salaryDist(cities) {
-    cities = cities || getCities(S.jobs);
+    cities = cities || chartCities();
     const brackets = ["<5K", "5-8K", "8-12K", "12-20K", ">20K"];
     const datasets = brackets.map((lb, i) => ({
       label: lb,
@@ -235,7 +273,7 @@
 
   function _companyScale() {
     const scaleOrder = ["0-20人", "20-99人", "100-499人", "500-999人", "1000-9999人", "10000人以上"];
-    const cities = getCities(S.jobs);
+    const cities = chartCities();
     const datasets = scaleOrder.map((s, i) => ({
       label: s,
       data: cities.map(city => { const cj = byCity(S.jobs, city); return cj.length ? +((cj.filter(j => j["公司规模"] === s).length / cj.length * 100).toFixed(1)) : 0; }),
@@ -286,7 +324,7 @@
   function _skillHeatmap() {
     const el = document.getElementById("acSkillHeatmap");
     if (!el) return;
-    const cities = getCities(S.jobs);
+    const cities = chartCities();
     const topSkills = topN(getSkillMap(S.jobs), 15).map(([k]) => k);
     if (!topSkills.length) { el.innerHTML = '<p class="ac-empty">暂无技能数据</p>'; return; }
 
@@ -317,7 +355,7 @@
                 const v = matrix[city][sk];
                 const r = v / maxVal;
                 const alpha = r < 0.01 ? 0 : +(0.08 + r * 0.82).toFixed(2);
-                const fg = r > 0.55 ? "#fff" : "#374151";
+                const fg = r > 0.58 ? "#f8fbfd" : "#284255";
                 return `<td class="ac-hm-val" style="background:rgba(16,185,129,${alpha});color:${fg}" title="${esc(city)} · ${esc(sk)}: ${v}%">${v > 0 ? v + "%" : ""}</td>`;
               }).join("")}
             </tr>`).join("")}
@@ -348,7 +386,7 @@
 
   function renderThresholdTab() {
     destroyAllCharts();
-    const cities = getCities(S.jobs);
+    const cities = chartCities();
     const h = Math.max(280, cities.length * 26);
     const cityLabel = S.city === "all" ? "全国" : S.city;
     setPanel(grid2(
@@ -363,7 +401,7 @@
 
   function _daysPerWeekChart(cities) {
     const dayLabels = ["灵活", "3天/周", "4天/周", "5天/周", "6天/周", "其他"];
-    const colors = ["#10b981", "#06b6d4", "#6366f1", "#f97316", "#ef4444", "#94a3b8"];
+    const colors = ["#6b8fa8", "#4d96b3", "#1c6f8a", "#d8843f", "#b86a5d", "#9aa9b7"];
     const datasets = dayLabels.map((lb, i) => ({
       label: lb,
       data: cities.map(city => {
@@ -418,10 +456,16 @@
   function renderCityChips() {
     const el = document.getElementById("analyticsCityChips");
     if (!el) return;
-    const cities = ["all", ...getCities(S.jobs)];
-    el.innerHTML = cities.map(c => {
+    const cities = ["all", ...chartCities()];
+    el.innerHTML = cities.map((c) => {
       const label = c === "all" ? "全部城市" : c;
-      return `<button class="ac-city-chip${c === S.city ? " active" : ""}" onclick="analyticsSelectCity('${esc(c)}')">${esc(label)}</button>`;
+      const extra = c !== "all" ? Number(S.citySupplementExtra && S.citySupplementExtra[c]) || 0 : 0;
+      const hotCls = extra > 0 ? " ac-city-chip--hot" : "";
+      const badge =
+        extra > 0
+          ? ` <span class="ac-city-chip-badge" title="已合并 ${extra} 条补充招聘样本">热门</span>`
+          : "";
+      return `<button type="button" class="ac-city-chip${c === S.city ? " active" : ""}${hotCls}" onclick="analyticsSelectCity('${esc(c)}')">${esc(label)}${badge}</button>`;
     }).join("");
   }
 
@@ -442,18 +486,27 @@
   // ══════════════════════════════════════════════════════════════════════════
   // 公开 API
   // ══════════════════════════════════════════════════════════════════════════
-  function init(jobs) {
+  function init(jobs, options) {
     if (!Array.isArray(jobs) || !jobs.length) return;
     if (S.ready) return;   // 防重复初始化（section 切换不触发重复 init）
 
-    S.jobs = jobs;
+    const opt = options && typeof options === "object" ? options : {};
+    const bossSrc = opt.bossCities || opt.boss_cities;
+    S.bossCitiesOrdered =
+      Array.isArray(bossSrc) && bossSrc.length ? bossSrc.slice() : DEFAULT_BOSS_CITY_ORDER.slice();
+    const extraSrc = opt.citySupplementExtra || opt.city_supplement_extra_count;
+    S.citySupplementExtra = extraSrc && typeof extraSrc === "object" ? extraSrc : {};
+
+    const bossSet = new Set(S.bossCitiesOrdered);
+    const scoped = jobs.filter((j) => bossSet.has(cityOf(j)));
+    S.jobs = scoped.length ? scoped : jobs.slice();
     S.ready = true;
 
     const hub = document.getElementById("jobsAnalyticsHub");
     if (hub) hub.classList.remove("hidden");
 
     const counter = document.getElementById("analyticsJobCount");
-    if (counter) counter.textContent = `共 ${jobs.length} 条样本`;
+    if (counter) counter.textContent = `共 ${S.jobs.length} 条样本`;
 
     renderCityChips();
     renderTab("salary");

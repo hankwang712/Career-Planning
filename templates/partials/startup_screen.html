@@ -1,40 +1,181 @@
-<div id="startupScreen" class="startup-screen{% if initial_user %} hidden{% endif %}">
-    <div class="startup-card">
-        <div class="startup-brand">
-            <div class="startup-logo">DP</div>
-            <div>
-                <p class="startup-brand-name">职业规划智能体</p>
-                <p class="startup-brand-sub">开发版产品 · 今天也要 Debug</p>
+<div id="startupScreen" class="startup-screen auth-mode-login{% if initial_user %} hidden{% endif %}">
+    <div class="auth-stage">
+        <section class="auth-visual" aria-hidden="true">
+            <div class="auth-visual-arch"></div>
+            <img
+                class="auth-visual-img auth-visual-img--login"
+                src="https://www.figma.com/api/mcp/asset/d491d13d-40b5-4318-a3cd-c94210487f9c"
+                alt=""
+            >
+            <img
+                class="auth-visual-img auth-visual-img--register"
+                src="https://www.figma.com/api/mcp/asset/677a22c4-6169-4f36-af15-dfbeeb341e72"
+                alt=""
+            >
+        </section>
+
+        <section class="auth-panel">
+            <div class="auth-form-stack">
+                <form id="loginForm" class="auth-form auth-form--login" autocomplete="off" onsubmit="handleLogin(event)">
+                    <h1 class="auth-title">Welcome Back!</h1>
+
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">邮箱或用户名</span>
+                        <span class="auth-pill-row">
+                            <span class="auth-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="3.5" y="5.5" width="17" height="13" rx="3.5"></rect>
+                                    <path d="M6.5 8.5 12 12.5 17.5 8.5"></path>
+                                </svg>
+                            </span>
+                            <input id="loginUsername" class="auth-input" type="text" autocomplete="username" inputmode="text" spellcheck="false" placeholder="邮箱或演示账号 system">
+                        </span>
+                    </label>
+
+                    <div class="auth-pill">
+                        <span class="auth-pill-label" id="loginPasswordLabel">Password</span>
+                        <span class="auth-pill-row" role="group" aria-labelledby="loginPasswordLabel">
+                            <span class="auth-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="5" y="10" width="14" height="10" rx="2.5"></rect>
+                                    <path d="M8 10V7.5a4 4 0 1 1 8 0V10"></path>
+                                </svg>
+                            </span>
+                            <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="Enter your password">
+                            <button
+                                type="button"
+                                class="auth-password-toggle auth-icon auth-icon--trailing"
+                                data-password-toggle-for="loginPassword"
+                                aria-label="显示密码"
+                                aria-pressed="false"
+                            >
+                                <span class="auth-password-toggle__icon auth-password-toggle__icon--off" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none">
+                                        <path d="M3 3l18 18"></path>
+                                        <path d="M10.6 10.7a3 3 0 0 0 4.1 4.1"></path>
+                                        <path d="M9.9 5.1A10.9 10.9 0 0 1 12 4.9c5 0 8.8 3.4 10 7.1a11.7 11.7 0 0 1-3 4.6"></path>
+                                        <path d="M6.2 6.3A12 12 0 0 0 2 12c1.2 3.7 5 7.1 10 7.1 1.6 0 3-.3 4.3-.9"></path>
+                                    </svg>
+                                </span>
+                                <span class="auth-password-toggle__icon auth-password-toggle__icon--on" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none">
+                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </span>
+                            </button>
+                        </span>
+                    </div>
+
+                    <div id="loginAuthFeedback" class="auth-feedback" aria-live="polite" role="status"></div>
+
+                    <button class="auth-inline-link auth-inline-link--forgot" type="button">Forgot Password?</button>
+                    <button class="auth-submit" type="submit">Login</button>
+
+                    <div class="auth-divider" aria-hidden="true">- or -</div>
+                    <div class="auth-socials" aria-label="Alternative sign-in options">
+                        <button class="auth-social auth-social--google" type="button" aria-label="Continue with Google">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.2 14.6 2.3 12 2.3A9.7 9.7 0 0 0 2.3 12 9.7 9.7 0 0 0 12 21.7c5.6 0 9.3-3.9 9.3-9.4 0-.6-.1-1.1-.2-1.6z"></path>
+                                <path fill="#4285F4" d="M21.3 12.3c0-.6-.1-1.1-.2-1.6H12v3.9h5.5c-.3 1.4-1.1 2.5-2.3 3.3l3 2.3c1.7-1.6 3.1-4 3.1-7.9z"></path>
+                                <path fill="#FBBC05" d="M6 14.2a5.9 5.9 0 0 1 0-4.4L3 7.5a9.7 9.7 0 0 0 0 8.9z"></path>
+                                <path fill="#34A853" d="M12 21.7c2.6 0 4.8-.9 6.4-2.4l-3-2.3c-.8.6-1.9 1-3.4 1-2.5 0-4.7-1.7-5.4-4L3 16.4a9.7 9.7 0 0 0 9 5.3z"></path>
+                            </svg>
+                        </button>
+                        <button class="auth-social auth-social--facebook" type="button" aria-label="Continue with Facebook">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" fill="#1877F2"></circle>
+                                <path fill="#fff" d="M13.3 20v-7.1h2.4l.4-2.8h-2.8V8.3c0-.8.2-1.4 1.4-1.4h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8v2.8h2.3V20z"></path>
+                            </svg>
+                        </button>
+                        <button class="auth-social auth-social--apple" type="button" aria-label="Continue with Apple">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="currentColor" d="M15.2 3.8c0 1-.4 1.9-1 2.6-.8.8-1.8 1.3-2.9 1.2-.1-1 .3-2 1-2.7.7-.8 1.9-1.3 2.9-1.1zM19 16.7c-.4.9-.9 1.8-1.5 2.6-.8 1.1-1.6 2.3-2.9 2.3s-1.6-.7-3-.7-1.8.7-3 .7-2.1-1.1-2.9-2.2C4 16.9 3 13.9 4.7 11.4c.8-1.3 2.2-2.1 3.7-2.2 1.2 0 2.3.8 3 .8s2.1-1 3.6-.8c.6 0 2.5.2 3.7 2-3.2 1.8-2.7 6.3.3 7.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="auth-footer">
+                        <span>Don't have an account?</span>
+                        <button id="registerTabBtn" class="auth-inline-link" type="button" onclick="switchAuthTab('register')">Sign up</button>
+                    </div>
+                </form>
+
+                <form id="registerForm" class="auth-form auth-form--register" autocomplete="off" onsubmit="handleRegister(event)">
+                    <h1 class="auth-title">Create Account</h1>
+
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">Email</span>
+                        <span class="auth-pill-row">
+                            <span class="auth-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="3.5" y="5.5" width="17" height="13" rx="3.5"></rect>
+                                    <path d="M6.5 8.5 12 12.5 17.5 8.5"></path>
+                                </svg>
+                            </span>
+                            <input id="registerUsername" class="auth-input" type="email" autocomplete="off" inputmode="email" spellcheck="false" placeholder="email@gmail.com">
+                        </span>
+                    </label>
+
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">Password</span>
+                        <span class="auth-pill-row">
+                            <span class="auth-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="5" y="10" width="14" height="10" rx="2.5"></rect>
+                                    <path d="M8 10V7.5a4 4 0 1 1 8 0V10"></path>
+                                </svg>
+                            </span>
+                            <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="Enter your password">
+                        </span>
+                    </label>
+
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">Confirm Password</span>
+                        <span class="auth-pill-row">
+                            <span class="auth-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="5" y="10" width="14" height="10" rx="2.5"></rect>
+                                    <path d="M8 10V7.5a4 4 0 1 1 8 0V10"></path>
+                                </svg>
+                            </span>
+                            <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="Confirm your password">
+                        </span>
+                    </label>
+
+                    <div id="registerAuthFeedback" class="auth-feedback" aria-live="polite" role="status"></div>
+
+                    <button class="auth-submit" type="submit">Create Account</button>
+
+                    <div class="auth-divider" aria-hidden="true">- or -</div>
+                    <div class="auth-socials" aria-label="Alternative sign-up options">
+                        <button class="auth-social auth-social--google" type="button" aria-label="Continue with Google">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.2 14.6 2.3 12 2.3A9.7 9.7 0 0 0 2.3 12 9.7 9.7 0 0 0 12 21.7c5.6 0 9.3-3.9 9.3-9.4 0-.6-.1-1.1-.2-1.6z"></path>
+                                <path fill="#4285F4" d="M21.3 12.3c0-.6-.1-1.1-.2-1.6H12v3.9h5.5c-.3 1.4-1.1 2.5-2.3 3.3l3 2.3c1.7-1.6 3.1-4 3.1-7.9z"></path>
+                                <path fill="#FBBC05" d="M6 14.2a5.9 5.9 0 0 1 0-4.4L3 7.5a9.7 9.7 0 0 0 0 8.9z"></path>
+                                <path fill="#34A853" d="M12 21.7c2.6 0 4.8-.9 6.4-2.4l-3-2.3c-.8.6-1.9 1-3.4 1-2.5 0-4.7-1.7-5.4-4L3 16.4a9.7 9.7 0 0 0 9 5.3z"></path>
+                            </svg>
+                        </button>
+                        <button class="auth-social auth-social--facebook" type="button" aria-label="Continue with Facebook">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" fill="#1877F2"></circle>
+                                <path fill="#fff" d="M13.3 20v-7.1h2.4l.4-2.8h-2.8V8.3c0-.8.2-1.4 1.4-1.4h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8v2.8h2.3V20z"></path>
+                            </svg>
+                        </button>
+                        <button class="auth-social auth-social--apple" type="button" aria-label="Continue with Apple">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="currentColor" d="M15.2 3.8c0 1-.4 1.9-1 2.6-.8.8-1.8 1.3-2.9 1.2-.1-1 .3-2 1-2.7.7-.8 1.9-1.3 2.9-1.1zM19 16.7c-.4.9-.9 1.8-1.5 2.6-.8 1.1-1.6 2.3-2.9 2.3s-1.6-.7-3-.7-1.8.7-3 .7-2.1-1.1-2.9-2.2C4 16.9 3 13.9 4.7 11.4c.8-1.3 2.2-2.1 3.7-2.2 1.2 0 2.3.8 3 .8s2.1-1 3.6-.8c.6 0 2.5.2 3.7 2-3.2 1.8-2.7 6.3.3 7.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="auth-footer">
+                        <span>Already have an account?</span>
+                        <button id="loginTabBtn" class="auth-inline-link" type="button" onclick="switchAuthTab('login')">Sign in</button>
+                    </div>
+                </form>
             </div>
-        </div>
-        <h2 class="startup-title">欢迎进入职业规划智能体</h2>
-        <p class="startup-subtitle">请使用预置账号登录。每个账号只会看到自己的访谈与测评内容。</p>
-
-        <div class="auth-tabs">
-            <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
-            <button id="registerTabBtn" class="auth-tab hidden" type="button" onclick="switchAuthTab('register')">注册</button>
-        </div>
-
-        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-            <label class="auth-label" for="loginUsername">用户名</label>
-            <input id="loginUsername" class="auth-input" type="text" autocomplete="username" placeholder="请输入用户名">
-            <label class="auth-label" for="loginPassword">密码</label>
-            <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="请输入密码">
-            <button class="auth-submit" type="submit">进入系统</button>
-            <button class="auth-link-btn" type="button" onclick="fillSuperUser()">一键填入超级用户</button>
-        </form>
-
-        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-            <label class="auth-label" for="registerUsername">注册用户名</label>
-            <input id="registerUsername" class="auth-input" type="text" autocomplete="username" placeholder="例如：student01">
-            <label class="auth-label" for="registerPassword">登录密码</label>
-            <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="建议至少 6 位">
-            <label class="auth-label" for="registerConfirmPassword">确认密码</label>
-            <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="请再次输入密码">
-            <button class="auth-submit" type="submit">创建普通用户</button>
-            <p class="register-note">当前环境仅开放预置账号登录，不支持普通用户自助注册。</p>
-        </form>
-
-        <p id="authMessage" class="auth-message">预置账号：system、23030134、24110403、24030115、24151007，密码均为 123456。</p>
+        </section>
     </div>
 </div>

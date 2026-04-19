@@ -1,6 +1,6 @@
 {
   "assessment_hub": {
-    "savedAt": 1776531799779,
+    "savedAt": 1776532011486,
     "mbti": {
       "currentIndex": 0,
       "answers": {},
@@ -2919,7 +2919,7 @@
       "saved_at": "2026/4/16 15:03:35",
       "version": "2026.04-graph-match-v1"
     },
-    "profile_summary": "访谈已启动，系统正在根据回答逐步生成职业兴趣画像。",
+    "profile_summary": "专业 智能科学与技术专业，学历 本科，目标方向 AI 产品运营，简历画像 Sime，已提取 1 段经历和 3 个项目，当前优势更偏向 NLP-大模型算法工程师，如果你还没确定职业方向，可以优先尝试 AI 产品运营、后端开发、算法 / AI 应用。。当前画像已可用于岗位初筛，缺失项会在匹配和报告中显式标记。",
     "role_rankings": [
       {
         "id": "job_195",
@@ -3234,7 +3234,7 @@
       }
     ],
     "source": "unified_experience",
-    "updated_at": "2026/4/19 01:06:52",
+    "updated_at": "2026/4/19 10:46:05",
     "version": "2026.04-career-matching-v1"
   },
   "news_context": {

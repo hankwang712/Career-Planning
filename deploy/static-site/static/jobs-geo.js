@@ -18,6 +18,8 @@
 
   const BACHELOR_PLUS = new Set(["本科", "硕士", "博士"]);
   const EMPTY_HTML = '<p class="jobs-geo-empty">当前维度暂无足够样本。</p>';
+  const DEFAULT_WORKDAYS_PER_MONTH = 22;
+  const WEEKS_PER_MONTH = 4.33;
 
   const HIGH_VALUE_BENEFITS = new Set([
     "股票期权", "期权", "上市公司", "13薪", "14薪", "15薪", "16薪",
@@ -33,6 +35,93 @@
     "成都": [104.07, 30.67], "西安": [108.93, 34.27],
     "郑州": [113.65, 34.76], "苏州": [120.59, 31.30]
   });
+
+  /** 补充采集里常见城市：省份用于聚合，坐标用于散点（与 boss 十四城对齐 ECharts 省级名称） */
+  const GEO_CITY_EXTRA = Object.freeze({
+    南京: { province: "江苏", coord: [118.80, 32.06] },
+    无锡: { province: "江苏", coord: [120.29, 31.59] },
+    徐州: { province: "江苏", coord: [117.18, 34.26] },
+    常州: { province: "江苏", coord: [119.95, 31.79] },
+    南通: { province: "江苏", coord: [120.86, 32.01] },
+    扬州: { province: "江苏", coord: [119.42, 32.39] },
+    盐城: { province: "江苏", coord: [120.16, 33.35] },
+    泰州: { province: "江苏", coord: [119.92, 32.49] },
+    镇江: { province: "江苏", coord: [119.44, 32.20] },
+    合肥: { province: "安徽", coord: [117.23, 31.82] },
+    芜湖: { province: "安徽", coord: [118.38, 31.33] },
+    南昌: { province: "江西", coord: [115.89, 28.68] },
+    赣州: { province: "江西", coord: [114.93, 25.83] },
+    福州: { province: "福建", coord: [119.30, 26.08] },
+    泉州: { province: "福建", coord: [118.68, 24.87] },
+    漳州: { province: "福建", coord: [117.65, 24.51] },
+    济南: { province: "山东", coord: [117.00, 36.65] },
+    青岛: { province: "山东", coord: [120.38, 36.09] },
+    烟台: { province: "山东", coord: [121.39, 37.54] },
+    潍坊: { province: "山东", coord: [119.11, 36.71] },
+    临沂: { province: "山东", coord: [118.35, 35.05] },
+    淄博: { province: "山东", coord: [118.05, 36.81] },
+    济宁: { province: "山东", coord: [116.59, 35.41] },
+    威海: { province: "山东", coord: [122.12, 37.51] },
+    东莞: { province: "广东", coord: [113.75, 23.02] },
+    佛山: { province: "广东", coord: [113.11, 23.02] },
+    珠海: { province: "广东", coord: [113.58, 22.27] },
+    惠州: { province: "广东", coord: [114.42, 23.11] },
+    中山: { province: "广东", coord: [113.39, 22.52] },
+    江门: { province: "广东", coord: [113.08, 22.58] },
+    汕头: { province: "广东", coord: [116.68, 23.35] },
+    湛江: { province: "广东", coord: [110.36, 21.27] },
+    南宁: { province: "广西", coord: [108.37, 22.82] },
+    柳州: { province: "广西", coord: [109.43, 24.33] },
+    桂林: { province: "广西", coord: [110.28, 25.29] },
+    海口: { province: "海南", coord: [110.33, 20.03] },
+    三亚: { province: "海南", coord: [109.51, 18.25] },
+    石家庄: { province: "河北", coord: [114.48, 38.03] },
+    唐山: { province: "河北", coord: [118.18, 39.63] },
+    保定: { province: "河北", coord: [115.48, 38.87] },
+    廊坊: { province: "河北", coord: [116.70, 39.52] },
+    太原: { province: "山西", coord: [112.53, 37.87] },
+    洛阳: { province: "河南", coord: [112.45, 34.62] },
+    南阳: { province: "河南", coord: [112.53, 33.00] },
+    襄阳: { province: "湖北", coord: [112.12, 32.01] },
+    宜昌: { province: "湖北", coord: [111.29, 30.70] },
+    衡阳: { province: "湖南", coord: [112.57, 26.90] },
+    株洲: { province: "湖南", coord: [113.13, 27.83] },
+    常德: { province: "湖南", coord: [111.69, 29.03] },
+    绵阳: { province: "四川", coord: [104.68, 31.47] },
+    德阳: { province: "四川", coord: [104.40, 31.13] },
+    南充: { province: "四川", coord: [106.08, 30.80] },
+    昆明: { province: "云南", coord: [102.71, 25.04] },
+    曲靖: { province: "云南", coord: [103.80, 25.49] },
+    贵阳: { province: "贵州", coord: [106.71, 26.57] },
+    遵义: { province: "贵州", coord: [106.93, 27.70] },
+    兰州: { province: "甘肃", coord: [103.82, 36.06] },
+    乌鲁木齐: { province: "新疆", coord: [87.62, 43.83] },
+    银川: { province: "宁夏", coord: [106.27, 38.47] },
+    西宁: { province: "青海", coord: [101.78, 36.62] },
+    拉萨: { province: "西藏", coord: [91.11, 29.97] },
+    呼和浩特: { province: "内蒙古", coord: [111.65, 40.82] },
+    包头: { province: "内蒙古", coord: [109.84, 40.66] },
+    长春: { province: "吉林", coord: [125.32, 43.88] },
+    哈尔滨: { province: "黑龙江", coord: [126.63, 45.75] },
+    沈阳: { province: "辽宁", coord: [123.43, 41.80] },
+    大连: { province: "辽宁", coord: [121.62, 38.92] },
+    宁波: { province: "浙江", coord: [121.54, 29.87] },
+    温州: { province: "浙江", coord: [120.70, 28.00] },
+    嘉兴: { province: "浙江", coord: [120.76, 30.77] },
+    绍兴: { province: "浙江", coord: [120.58, 30.01] },
+    金华: { province: "浙江", coord: [119.65, 29.08] },
+    台州: { province: "浙江", coord: [121.42, 28.66] },
+    湖州: { province: "浙江", coord: [120.09, 30.89] },
+    义乌: { province: "浙江", coord: [120.08, 29.31] },
+    石河子: { province: "新疆", coord: [86.03, 44.30] }
+  });
+
+  const MAP_PROVINCES = new Set([
+    "北京", "上海", "天津", "重庆", "河北", "山西", "辽宁", "吉林", "黑龙江",
+    "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "广东",
+    "海南", "四川", "贵州", "云南", "陕西", "甘肃", "青海", "香港", "澳门", "台湾",
+    "内蒙古", "广西", "西藏", "宁夏", "新疆"
+  ]);
 
   const state = {
     chart: null,
@@ -69,27 +158,101 @@
   }
 
   function getProvinceName(city) {
-    return CITY_PROVINCE_MAP[city] || "";
+    if (!city) return "";
+    if (CITY_PROVINCE_MAP[city]) return CITY_PROVINCE_MAP[city];
+    const row = GEO_CITY_EXTRA[city];
+    return row ? row.province : "";
   }
 
-  function parseSalary(text) {
+  function getCityCoord(city) {
+    if (!city) return null;
+    if (CITY_COORDS[city]) return CITY_COORDS[city];
+    const row = GEO_CITY_EXTRA[city];
+    return row ? row.coord : null;
+  }
+
+  function normalizeProvinceToken(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    const special = [
+      ["新疆维吾尔自治区", "新疆"],
+      ["内蒙古自治区", "内蒙古"],
+      ["广西壮族自治区", "广西"],
+      ["西藏自治区", "西藏"],
+      ["宁夏回族自治区", "宁夏"],
+      ["香港特别行政区", "香港"],
+      ["澳门特别行政区", "澳门"]
+    ];
+    for (let i = 0; i < special.length; i += 1) {
+      if (s === special[i][0] || s.startsWith(special[i][0])) return special[i][1];
+    }
+    if (s.endsWith("省")) {
+      const core = s.slice(0, -1);
+      return MAP_PROVINCES.has(core) ? core : "";
+    }
+    const muni = s.match(/^(北京|上海|天津|重庆)市?$/);
+    if (muni) return muni[1];
+    if (MAP_PROVINCES.has(s)) return s;
+    return "";
+  }
+
+  /** 工作地址形如「广东-东莞-镇区」时推断省/市，补全仅有城市名却不在字典里的样本 */
+  function inferRegionFromWorkAddress(job) {
+    const addr = String(job["工作地址"] || "").trim();
+    if (!addr) return null;
+    const parts = addr.split(/[-－]/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const province = normalizeProvinceToken(parts[0]);
+    if (!province || !MAP_PROVINCES.has(province)) return null;
+    const cityGuess = String(parts[1] || "").replace(/市辖区$/, "").replace(/市$/, "").trim();
+    if (!cityGuess) return null;
+    return { province, city: cityGuess };
+  }
+
+  function estimateMonthlyWorkdays(contextText) {
+    const text = String(contextText || "");
+    const match = text.match(/([1-7])\s*天\/周/);
+    if (!match) return DEFAULT_WORKDAYS_PER_MONTH;
+    return Math.max(4, Math.min(31, Number(match[1]) * WEEKS_PER_MONTH));
+  }
+
+  function parseSalary(text, contextText = "") {
     const raw = String(text || "").replace(/\s/g, "");
     if (!raw || raw === "面议") return null;
 
     const payMonths = Number((raw.match(/·(\d+)薪/) || [])[1] || 12);
     const isDaily = /元\/天/.test(raw);
+    const workdaysPerMonth = isDaily ? estimateMonthlyWorkdays(contextText) : null;
     let low = null;
     let high = null;
 
     if (isDaily) {
       const match = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)元\/天/);
       if (!match) return null;
-      low = Number(match[1]) * 30 / 1000;
-      high = Number(match[2]) * 30 / 1000;
+      low = Number(match[1]) * workdaysPerMonth / 1000;
+      high = Number(match[2]) * workdaysPerMonth / 1000;
     } else {
-      const rangeMatch = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)K/i);
-      const singleMatch = raw.match(/(\d+(?:\.\d+)?)K/i);
-      if (rangeMatch) {
+      // 去掉「·13薪」等后缀，仅对数字区间做匹配（payMonths 仍从完整 raw 读取）
+      const salaryBody = raw.replace(/·\d+薪.*$/i, "").trim();
+
+      const wanRange = salaryBody.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)万(?:\/月)?/i);
+      const wanSingle = !wanRange && salaryBody.match(/^(\d+(?:\.\d+)?)万(?:\/月)?$/i);
+      const yuanMonthRange = salaryBody.match(/(\d+)\s*-\s*(\d+)元\/月/i);
+      const yuanMonthSingle = !yuanMonthRange && salaryBody.match(/^(\d+)元\/月$/i);
+      const rangeMatch = salaryBody.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)K/i);
+      const singleMatch = salaryBody.match(/(\d+(?:\.\d+)?)K/i);
+
+      if (wanRange) {
+        low = Number(wanRange[1]) * 10;
+        high = Number(wanRange[2]) * 10;
+      } else if (wanSingle) {
+        low = high = Number(wanSingle[1]) * 10;
+      } else if (yuanMonthRange) {
+        low = Number(yuanMonthRange[1]) / 1000;
+        high = Number(yuanMonthRange[2]) / 1000;
+      } else if (yuanMonthSingle) {
+        low = high = Number(yuanMonthSingle[1]) / 1000;
+      } else if (rangeMatch) {
         low = Number(rangeMatch[1]);
         high = Number(rangeMatch[2]);
       } else if (singleMatch) {
@@ -108,6 +271,7 @@
       monthlyMid,
       annualizedMid: monthlyMid * payMonths / 12,
       payMonths,
+      workdaysPerMonth,
       salaryType: isDaily ? "daily" : "monthly"
     };
   }
@@ -179,11 +343,15 @@
   }
 
   function summarizeBucket(label, jobs) {
-    const salaryRecords = jobs.map((job) => parseSalary(job["薪资"])).filter(Boolean);
+    const salaryRecords = jobs.map((job) => parseSalary(job["薪资"], job["经验要求"])).filter(Boolean);
     const lowValues = salaryRecords.map((item) => item.low);
     const highValues = salaryRecords.map((item) => item.high);
     const annualizedValues = salaryRecords.map((item) => item.annualizedMid);
     const dailyCount = salaryRecords.filter((item) => item.salaryType === "daily").length;
+    const monthlyCount = salaryRecords.filter((item) => item.salaryType === "monthly").length;
+    const dailyWorkdayValues = salaryRecords
+      .filter((item) => item.salaryType === "daily" && Number.isFinite(item.workdaysPerMonth))
+      .map((item) => item.workdaysPerMonth);
     const campusCount = jobs.filter((job) => {
       const text = String(job["经验要求"] || "");
       return text.includes("在校") || text.includes("应届") || /天\/周/.test(text);
@@ -194,10 +362,14 @@
       label,
       jobCount: jobs.length,
       salaryCount: salaryRecords.length,
+      salaryCoverageShare: jobs.length ? salaryRecords.length / jobs.length : 0,
       averageLow: average(lowValues),
       averageHigh: average(highValues),
       averageAnnualized: average(annualizedValues),
       medianAnnualized: median(annualizedValues),
+      monthlyCount,
+      dailyCount,
+      averageDailyWorkdays: average(dailyWorkdayValues) || DEFAULT_WORKDAYS_PER_MONTH,
       dailyShare: salaryRecords.length ? dailyCount / salaryRecords.length : 0,
       campusShare: jobs.length ? campusCount / jobs.length : 0,
       bachelorPlusShare: jobs.length ? bachelorPlusCount / jobs.length : 0,
@@ -214,8 +386,14 @@
     const mappedCities = new Set();
 
     jobs.forEach((job) => {
-      const city = getCityName(job);
-      const province = getProvinceName(city);
+      let city = getCityName(job);
+      let province = getProvinceName(city);
+      if (!province) {
+        const inferred = inferRegionFromWorkAddress(job);
+        if (!inferred) return;
+        province = inferred.province;
+        if (!city) city = inferred.city;
+      }
       if (!city || !province) return;
 
       mappedCities.add(city);
@@ -270,8 +448,13 @@
       })
       .sort((a, b) => (b.jobCount - a.jobCount) || (b.averageAnnualized - a.averageAnnualized));
 
+    let mappedJobCount = 0;
+    provinces.forEach((p) => {
+      mappedJobCount += p.jobCount;
+    });
+
     return {
-      totalJobs: jobs.length,
+      totalJobs: mappedJobCount,
       totalCities: mappedCities.size,
       totalProvinces: provinces.length,
       provinces,
@@ -318,6 +501,29 @@
         </div>
       `;
     }).join("");
+  }
+
+  function renderSalaryMix(city) {
+    const dailyDays = Number.isFinite(city.averageDailyWorkdays)
+      ? `${city.averageDailyWorkdays.toFixed(1)} 天/月`
+      : `${DEFAULT_WORKDAYS_PER_MONTH} 天/月`;
+    return `
+      <div class="jobs-geo-salary-row">
+        <span>有效薪资样本</span>
+        <strong>${city.salaryCount || 0}/${city.jobCount || 0}</strong>
+        <small>${formatPercent(city.salaryCoverageShare)} 可用于薪资估算</small>
+      </div>
+      <div class="jobs-geo-salary-row">
+        <span>月薪岗位</span>
+        <strong>${city.monthlyCount || 0}</strong>
+        <small>按 K/月原始区间读取</small>
+      </div>
+      <div class="jobs-geo-salary-row">
+        <span>日薪岗位</span>
+        <strong>${city.dailyCount || 0}</strong>
+        <small>${dailyDays} 估算</small>
+      </div>
+    `;
   }
 
   function renderCityTabs(province, selectedCity) {
@@ -419,7 +625,7 @@
     setText("jobGeoCityTitle", city.city);
     setText(
       "jobGeoNarrative",
-      `${city.city} 共收录 ${city.jobCount} 个岗位样本，平均折算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。`
+      `${city.city} 共收录 ${city.jobCount} 个岗位样本，估算月薪 ${formatSalaryK(city.averageAnnualized)}，平均薪资区间 ${formatRange(city.averageLow, city.averageHigh)}。`
     );
 
     const sampleEl = document.getElementById("jobGeoSampleCount");
@@ -429,6 +635,9 @@
     const salaryEl = document.getElementById("jobGeoAvgSalary");
     countUp(salaryEl, city.averageAnnualized, 800, (v) => formatSalaryK(v));
     setText("jobGeoSalaryText", `均值区间 ${formatRange(city.averageLow, city.averageHigh)} · 中位 ${formatSalaryK(city.medianAnnualized)}`);
+    setText("jobGeoSalaryPolicy", "");
+    const salaryMix = document.getElementById("jobGeoSalaryMix");
+    if (salaryMix) salaryMix.innerHTML = renderSalaryMix(city);
 
     const annualTag = document.getElementById("jobGeoAnnualTag");
     const annualEl = document.getElementById("jobGeoAnnualSalary");
@@ -445,7 +654,7 @@
 
     const campusEl = document.getElementById("jobGeoCampusShare");
     countUp(campusEl, city.campusShare * 100, 700, (v) => `${Math.round(v)}%`);
-    setText("jobGeoCampusText", `日薪折算样本 ${formatPercent(city.dailyShare)}`);
+    setText("jobGeoCampusText", `日薪样本 ${formatPercent(city.dailyShare)}`);
 
     const degreeEl = document.getElementById("jobGeoDegreeShare");
     countUp(degreeEl, city.bachelorPlusShare * 100, 700, (v) => `${Math.round(v)}%`);
@@ -457,6 +666,16 @@
     const expContainer = document.getElementById("jobGeoExperienceList");
     if (expContainer) {
       expContainer.innerHTML = renderBarList(city.experience, {
+        limit: 4,
+        label: (item) => item.name,
+        value: (item) => item.count,
+        valueText: (item) => `${item.count} · ${formatPercent(item.ratio)}`
+      });
+    }
+
+    const educationContainer = document.getElementById("jobGeoEducationList");
+    if (educationContainer) {
+      educationContainer.innerHTML = renderBarList(city.education, {
         limit: 4,
         label: (item) => item.name,
         value: (item) => item.count,
@@ -498,7 +717,7 @@
   function buildCityScatterData() {
     if (!state.insights) return [];
     return state.insights.provinces.flatMap((province) => province.cities.map((city) => {
-      const coords = CITY_COORDS[city.city];
+      const coords = getCityCoord(city.city);
       if (!coords) return null;
       return {
         name: city.city,
@@ -543,39 +762,34 @@
     const minValue = salaryValues.length ? Math.floor(Math.min(...salaryValues)) : 0;
     const maxValue = salaryValues.length ? Math.ceil(Math.max(...salaryValues)) : 1;
     const mapLayout = {
-      layoutCenter: ["45%", "52%"],
-      layoutSize: "118%",
+      layoutCenter: ["46%", "52%"],
+      layoutSize: "108%",
       aspectScale: 0.95
     };
 
-    const activeCityScatter = Object.entries(CITY_COORDS)
-      .filter(([city]) => {
-        const province = state.insights.provinceMap.get(
-          Object.entries({ "北京": "北京", "上海": "上海", "天津": "天津", "重庆": "重庆",
-            "广州": "广东", "深圳": "广东", "杭州": "浙江", "厦门": "福建",
-            "武汉": "湖北", "长沙": "湖南", "成都": "四川", "西安": "陕西",
-            "郑州": "河南", "苏州": "江苏" }).find(([c]) => c === city)?.[1] || ""
-        );
-        return !!province;
-      })
-      .map(([city, coords]) => ({
-        name: city,
-        value: coords,
-        symbolSize: 6
-      }));
+    const maxCityJobs = Math.max(1, ...state.insights.provinces.flatMap((province) => province.cities.map((city) => city.jobCount || 0)));
+    const activeCityScatter = buildCityScatterData().map((item) => ({
+      ...item,
+      symbolSize: Math.max(7, Math.min(18, 7 + (item.jobCount / maxCityJobs) * 12))
+    }));
 
     state.chart.setOption({
       tooltip: {
         trigger: "item",
-        backgroundColor: "rgba(3, 10, 22, 0.97)",
-        borderColor: "rgba(34, 211, 238, 0.4)",
+        backgroundColor: "rgba(248, 250, 252, 0.98)",
+        borderColor: "rgba(148, 163, 184, 0.42)",
         borderWidth: 1,
         padding: [10, 14],
-        textStyle: { color: "#e2f3ff", fontSize: 13 },
-        extraCssText: "box-shadow: 0 8px 28px rgba(0,0,0,0.5); border-radius: 10px;",
+        textStyle: { color: "#1e293b", fontSize: 13 },
+        extraCssText: "box-shadow: 0 14px 34px rgba(15,23,42,0.16); border-radius: 10px;",
         formatter(params) {
           if (params.seriesType === "effectScatter") {
-            return `<strong style="color:#22d3ee">${safeHtml(params.name)}</strong>`;
+            const salary = Number(params.data?.averageAnnualized || params.value?.[2] || 0);
+            return [
+              `<strong style="color:#0f766e">${safeHtml(params.name)}</strong>`,
+              `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${safeHtml(params.data?.jobCount || "--")}</span>`,
+              `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e">${formatSalaryK(salary)}</strong>`
+            ].join("<br/>");
           }
           const province = state.insights.provinceMap.get(params.name);
           if (!province || !params.name) {
@@ -584,11 +798,11 @@
               : null;
           }
           return [
-            `<strong style="color:#67e8f9;font-size:14px">${safeHtml(province.name)}</strong>`,
-            `<span style="color:#7aa3bc;font-size:12px">岗位样本：</span><span style="color:#e0f7ff">${province.jobCount}</span>`,
-            `<span style="color:#7aa3bc;font-size:12px">覆盖城市：</span><span style="color:#e0f7ff">${safeHtml(province.cityNames.join("、"))}</span>`,
-            `<span style="color:#7aa3bc;font-size:12px">平均折算月薪：</span><strong style="color:#22d3ee;font-size:14px">${formatSalaryK(province.averageAnnualized)}</strong>`,
-            `<span style="color:#7aa3bc;font-size:12px">实习/应届占比：</span><span style="color:#e0f7ff">${formatPercent(province.campusShare)}</span>`
+            `<strong style="color:#1a365d;font-size:14px">${safeHtml(province.name)}</strong>`,
+            `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${province.jobCount}</span>`,
+            `<span style="color:#64748b;font-size:12px">覆盖城市：</span><span>${safeHtml(province.cityNames.join("、"))}</span>`,
+            `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e;font-size:14px">${formatSalaryK(province.averageAnnualized)}</strong>`,
+            `<span style="color:#64748b;font-size:12px">实习/应届占比：</span><span>${formatPercent(province.campusShare)}</span>`
           ].join("<br/>");
         }
       },
@@ -607,7 +821,7 @@
         max: maxValue,
         calculable: false,
         inRange: {
-          color: ["#083352", "#0c5080", "#0e7ab0", "#0ea5e9", "#22d3ee"]
+          color: ["#c6d4e2", "#93adc6", "#5f8eb3", "#2f789f", "#0d5c78"]
         }
       },
       series: [
@@ -620,7 +834,7 @@
           ...mapLayout,
           label: {
             show: true,
-            color: "#4a7a94",
+            color: "#496377",
             fontSize: 10,
             formatter(params) {
               if (!params.name) return "";
@@ -629,25 +843,27 @@
                 : (params.name.length <= 3 ? params.name : "");
             },
             rich: {
-              active: { color: "#7ec8e0", fontWeight: 600, fontSize: 11 }
+              active: { color: "#0f3554", fontWeight: 800, fontSize: 11 }
             }
           },
           itemStyle: {
-            areaColor: "#071828",
-            borderColor: "rgba(14, 165, 233, 0.45)",
-            borderWidth: 1.2
+            areaColor: "#cdd9e5",
+            borderColor: "rgba(248, 250, 252, 0.96)",
+            borderWidth: 1.2,
+            shadowBlur: 14,
+            shadowColor: "rgba(15, 45, 72, 0.14)"
           },
           emphasis: {
             label: {
-              show: true, color: "#ffffff", fontWeight: 700, fontSize: 12,
-              rich: { active: { color: "#ffffff", fontWeight: 700, fontSize: 12 } }
+              show: true, color: "#0f172a", fontWeight: 800, fontSize: 12,
+              rich: { active: { color: "#0f172a", fontWeight: 800, fontSize: 12 } }
             },
             itemStyle: {
-              areaColor: "#0c4878",
-              borderColor: "#38bdf8",
+              areaColor: "#3d93b6",
+              borderColor: "#ffffff",
               borderWidth: 2,
-              shadowBlur: 18,
-              shadowColor: "rgba(56, 189, 248, 0.45)"
+              shadowBlur: 20,
+              shadowColor: "rgba(13, 92, 120, 0.34)"
             }
           },
           select: {
@@ -656,11 +872,11 @@
               rich: { active: { color: "#ffffff", fontWeight: 700, fontSize: 12 } }
             },
             itemStyle: {
-              areaColor: "#0369a1",
-              borderColor: "#7dd3fc",
+              areaColor: "#0d5c78",
+              borderColor: "#ffffff",
               borderWidth: 2,
-              shadowBlur: 32,
-              shadowColor: "rgba(34, 211, 238, 0.7)"
+              shadowBlur: 30,
+              shadowColor: "rgba(13, 92, 120, 0.46)"
             }
           },
           data: state.insights.provinces.map((province) => ({
@@ -674,19 +890,21 @@
           geoIndex: 0,
           z: 5,
           data: activeCityScatter,
-          symbolSize: 6,
+          symbolSize: (value, params) => params.data?.symbolSize || 7,
           showEffectOn: "render",
           rippleEffect: {
             brushType: "stroke",
-            scale: 4.5,
-            period: 2.2,
-            color: "rgba(255, 60, 60, 0.65)"
+            scale: 3.2,
+            period: 2.6,
+            color: "rgba(11, 114, 133, 0.5)"
           },
           label: { show: false },
           itemStyle: {
-            color: "#ff3c3c",
+            color: "#0b7285",
+            borderColor: "#ffffff",
+            borderWidth: 2,
             shadowBlur: 14,
-            shadowColor: "rgba(255, 60, 60, 0.9)"
+            shadowColor: "rgba(11, 114, 133, 0.58)"
           }
         }
       ]

@@ -37,16 +37,21 @@ let jobCurrentPage = 1;
 const JOB_PAGE_SIZE  = 12;
 let fuseIndex = null;
 
+/** 城市招聘全景分析：仅展示 boss_info 城市；由 bootstrap 的 boss_cities 注入 */
+let jobsAnalyticsBossCities = null;
+/** 各 boss 城市合并的补充岗位条数，用于全景面板「热门」标注 */
+let jobsAnalyticsCitySupplementExtra = null;
+
 let jobsGeoAssetsPromise = null;
 let careerGraphAssetsPromise = null;
 const JOBS_CACHE_TTL_MS = 15 * 60 * 1000;
-const JOBS_CACHE_VERSION = "v4";
+const JOBS_CACHE_VERSION = "v6";
 const JOBS_CITIES_CACHE_KEY = `ms_jobs_cities_${JOBS_CACHE_VERSION}`;
 const JOBS_LIST_CACHE_PREFIX = `ms_jobs_list_${JOBS_CACHE_VERSION}_`;
 const JOBS_DETAIL_CACHE_PREFIX = `ms_jobs_detail_${JOBS_CACHE_VERSION}_`;
 
 const authConfig = {
-  allowSelfRegister: false,
+  allowSelfRegister: true,
   superUser: {
     username: "system",
     password: "123456",
@@ -410,12 +415,41 @@ function addMonths(date, count) {
   return d;
 }
 
+function getActiveAuthFeedbackEl() {
+  if (!document.getElementById("loginAuthFeedback")) {
+    return document.getElementById("authMessage");
+  }
+  const startupScreen = document.getElementById("startupScreen");
+  const isLogin = startupScreen ? startupScreen.classList.contains("auth-mode-login") : true;
+  return document.getElementById(isLogin ? "loginAuthFeedback" : "registerAuthFeedback");
+}
+
+function clearInactiveAuthFeedback(isLogin) {
+  const otherId = isLogin ? "registerAuthFeedback" : "loginAuthFeedback";
+  const other = document.getElementById(otherId);
+  if (!other) return;
+  other.textContent = "";
+  other.className = "auth-feedback";
+  other.setAttribute("role", "status");
+}
+
 function showAuthMessage(message, type = "info") {
-  const el = document.getElementById("authMessage");
+  const el = getActiveAuthFeedbackEl();
   if (!el) return;
-  el.textContent = message;
-  el.className = "auth-message";
-  if (type === "success" || type === "error" || type === "warning") el.classList.add(type);
+  const isInline = el.id === "loginAuthFeedback" || el.id === "registerAuthFeedback";
+  el.textContent = message || "";
+  if (isInline) {
+    el.className = "auth-feedback";
+    if (type === "success") el.classList.add("success");
+    else if (type === "error") el.classList.add("error");
+    else if (type === "warning") el.classList.add("warning");
+    else el.classList.add("is-muted");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+  } else {
+    el.className = "auth-message";
+    if (type === "success" || type === "error" || type === "warning") el.classList.add(type);
+  }
 }
 
 function showToast(title, text = "", type = "info", duration = 2200) {
@@ -463,7 +497,7 @@ async function ensureJobsGeoAssets() {
     jobsGeoAssetsPromise = (async () => {
       await loadScriptOnce("/static/vendor/echarts.min.js?v=20260319-lazy-geo", "echarts");
       await loadScriptOnce("/static/vendor/china.js?v=20260318-geo", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js?v=20260414-geo-resize-observer-v1", "jobs-geo");
+      await loadScriptOnce("/static/jobs-geo.js?v=20260419-geo-salary-wan-v1", "jobs-geo");
     })().catch((error) => {
       jobsGeoAssetsPromise = null;
       throw error;
@@ -4865,7 +4899,14 @@ function scheduleGeoInsightsInit(jobs) {
 
 function scheduleAnalyticsInit(jobs) {
   if (typeof window.initJobsAnalytics !== "function") return;
-  const runner = () => window.initJobsAnalytics(jobs);
+  const opts = {};
+  if (Array.isArray(jobsAnalyticsBossCities) && jobsAnalyticsBossCities.length) {
+    opts.bossCities = jobsAnalyticsBossCities;
+  }
+  if (jobsAnalyticsCitySupplementExtra && typeof jobsAnalyticsCitySupplementExtra === "object") {
+    opts.citySupplementExtra = jobsAnalyticsCitySupplementExtra;
+  }
+  const runner = () => window.initJobsAnalytics(jobs, opts);
   if (typeof window.requestIdleCallback === "function") {
     window.requestIdleCallback(runner, { timeout: 2000 });
     return;
@@ -10243,12 +10284,16 @@ function switchAuthTab(tab) {
   registerForm.classList.toggle("hidden", isLogin);
   loginBtn.classList.toggle("active", isLogin);
   registerBtn.classList.toggle("active", !isLogin);
+  const startupScreen = document.getElementById("startupScreen");
+  if (startupScreen && document.getElementById("loginAuthFeedback")) {
+    startupScreen.classList.toggle("auth-mode-login", isLogin);
+    startupScreen.classList.toggle("auth-mode-register", !isLogin);
+    clearInactiveAuthFeedback(isLogin);
+  }
   if (isLogin) {
-    showAuthMessage("已自动填充预置账号：system，密码：123456。");
-  } else if (!authConfig.allowSelfRegister) {
-    showAuthMessage("当前环境仅开放预置账号登录，普通用户不支持自助注册。", "warning");
+    showAuthMessage("使用邮箱和密码登录，演示账号 system / 123456 也仍然可用。");
   } else {
-    showAuthMessage("创建普通用户账号。");
+    showAuthMessage("输入邮箱和密码即可创建账户，注册成功后会自动登录。");
   }
 }
 
@@ -10341,7 +10386,7 @@ async function handleLogin(event) {
   event.preventDefault();
   const username = (document.getElementById("loginUsername")?.value || "").trim();
   const password = document.getElementById("loginPassword")?.value || "";
-  if (!username || !password) return showAuthMessage("请输入用户名和密码。", "error");
+  if (!username || !password) return showAuthMessage("请输入账号和密码。", "error");
   try {
     await requestJson("/api/auth/login", {
       method: "POST",
@@ -10359,14 +10404,34 @@ async function handleLogin(event) {
     }
     window.setTimeout(() => window.location.reload(), 180);
   } catch (error) {
-    showAuthMessage(error.message || "用户名或密码错误。", "error");
+    showAuthMessage(error.message || "登录失败，请稍后重试。", "error");
   }
 }
 
-function handleRegister(event) {
+async function handleRegister(event) {
   event.preventDefault();
-  if (!authConfig.allowSelfRegister) return showAuthMessage("当前环境仅开放预置账号登录，不支持自助注册。", "warning");
-  showAuthMessage("注册入口后续开放。", "warning");
+  const email = (document.getElementById("registerUsername")?.value || "").trim();
+  const password = document.getElementById("registerPassword")?.value || "";
+  const confirmPassword = document.getElementById("registerConfirmPassword")?.value || "";
+  if (!email || !password || !confirmPassword) {
+    showAuthMessage("请完整填写邮箱和密码。", "error");
+    return;
+  }
+  showAuthMessage("正在创建账户，请稍候……");
+  try {
+    await requestJson("/api/auth/register", {
+      method: "POST",
+      body: {
+        email,
+        password,
+        confirm_password: confirmPassword
+      }
+    });
+    showAuthMessage("注册成功，正在进入你的独立空间……", "success");
+    window.setTimeout(() => window.location.reload(), 180);
+  } catch (error) {
+    showAuthMessage(error.message || "注册失败，请稍后重试。", "error");
+  }
 }
 
 async function logout() {
@@ -10464,7 +10529,6 @@ async function initAuth() {
     }
     lockApp();
     switchAuthTab("login");
-    fillSuperUser();
     emitAuthStateChange();
     return null;
   })();
@@ -10858,6 +10922,11 @@ async function loadJobs() {
     if (Array.isArray(jobsBootstrap?.cities) && Array.isArray(jobsBootstrap?.jobs)) {
       cities = jobsBootstrap.cities;
       jobs = jobsBootstrap.jobs;
+      jobsAnalyticsBossCities = Array.isArray(jobsBootstrap.boss_cities) ? jobsBootstrap.boss_cities : null;
+      jobsAnalyticsCitySupplementExtra =
+        jobsBootstrap.city_supplement_extra_count && typeof jobsBootstrap.city_supplement_extra_count === "object"
+          ? jobsBootstrap.city_supplement_extra_count
+          : null;
     } else {
       const [citiesData, jobsData] = await Promise.all([
         fetchJsonWithSessionCache("/api/cities", JOBS_CITIES_CACHE_KEY, 60 * 60 * 1000),
@@ -10865,6 +10934,8 @@ async function loadJobs() {
       ]);
       cities = Array.isArray(citiesData) ? citiesData : [];
       jobs = Array.isArray(jobsData) ? jobsData : [];
+      jobsAnalyticsBossCities = null;
+      jobsAnalyticsCitySupplementExtra = null;
     }
     const citySelect = document.getElementById("cityFilter");
     if (citySelect) {

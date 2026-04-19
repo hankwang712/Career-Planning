@@ -75,9 +75,24 @@
       low = Number(match[1]) * 30 / 1000;
       high = Number(match[2]) * 30 / 1000;
     } else {
-      const rangeMatch = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)K/i);
-      const singleMatch = raw.match(/(\d+(?:\.\d+)?)K/i);
-      if (rangeMatch) {
+      const salaryBody = raw.replace(/·\d+薪.*$/i, "").trim();
+      const wanRange = salaryBody.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)万(?:\/月)?/i);
+      const wanSingle = !wanRange && salaryBody.match(/^(\d+(?:\.\d+)?)万(?:\/月)?$/i);
+      const yuanMonthRange = salaryBody.match(/(\d+)\s*-\s*(\d+)元\/月/i);
+      const yuanMonthSingle = !yuanMonthRange && salaryBody.match(/^(\d+)元\/月$/i);
+      const rangeMatch = salaryBody.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)K/i);
+      const singleMatch = salaryBody.match(/(\d+(?:\.\d+)?)K/i);
+      if (wanRange) {
+        low = Number(wanRange[1]) * 10;
+        high = Number(wanRange[2]) * 10;
+      } else if (wanSingle) {
+        low = high = Number(wanSingle[1]) * 10;
+      } else if (yuanMonthRange) {
+        low = Number(yuanMonthRange[1]) / 1000;
+        high = Number(yuanMonthRange[2]) / 1000;
+      } else if (yuanMonthSingle) {
+        low = high = Number(yuanMonthSingle[1]) / 1000;
+      } else if (rangeMatch) {
         low = Number(rangeMatch[1]);
         high = Number(rangeMatch[2]);
       } else if (singleMatch) {
