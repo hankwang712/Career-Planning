@@ -72,8 +72,9 @@
     if (isDaily) {
       const match = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)元\/天/);
       if (!match) return null;
-      low = Number(match[1]) * 30 / 1000;
-      high = Number(match[2]) * 30 / 1000;
+      // 统一按 22 天/月折算为月薪
+      low = Number(match[1]) * 22 / 1000;
+      high = Number(match[2]) * 22 / 1000;
     } else {
       const salaryBody = raw.replace(/·\d+薪.*$/i, "").trim();
       const wanRange = salaryBody.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)万(?:\/月)?/i);

@@ -6,6 +6,12 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         
+        /* 岗位详情弹窗头部 - 使用 #356994 */
+        #jobDetailModal .job-detail-header,
+        #jobDetailModal > div > div:first-child {
+            background-color: #356994 !important;
+        }
+        
         .gradient-text {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;

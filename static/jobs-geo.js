@@ -123,6 +123,17 @@
     "内蒙古", "广西", "西藏", "宁夏", "新疆"
   ]);
 
+  /** 省会城市/首府/直辖市：地图散点仅标注这些城市 */
+  const PROVINCIAL_CAPITALS = new Set([
+    "北京", "上海", "天津", "重庆",
+    "石家庄", "太原", "沈阳", "长春", "哈尔滨",
+    "南京", "杭州", "合肥", "福州", "南昌", "济南",
+    "郑州", "武汉", "长沙", "广州", "海口",
+    "成都", "贵阳", "昆明", "西安", "兰州", "西宁", "拉萨",
+    "南宁", "呼和浩特", "乌鲁木齐", "银川",
+    "台北", "香港", "澳门"
+  ]);
+
   const state = {
     chart: null,
     insights: null,
@@ -217,20 +228,19 @@
   }
 
   function parseSalary(text, contextText = "") {
+    void contextText;
     const raw = String(text || "").replace(/\s/g, "");
     if (!raw || raw === "面议") return null;
 
     const payMonths = Number((raw.match(/·(\d+)薪/) || [])[1] || 12);
-    const isDaily = /元\/天/.test(raw);
-    const workdaysPerMonth = isDaily ? estimateMonthlyWorkdays(contextText) : null;
     let low = null;
     let high = null;
 
-    if (isDaily) {
-      const match = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)元\/天/);
-      if (!match) return null;
-      low = Number(match[1]) * workdaysPerMonth / 1000;
-      high = Number(match[2]) * workdaysPerMonth / 1000;
+    // 日薪统一按 22 天/月折算为月薪，不再区分 daily/monthly
+    const dailyMatch = raw.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)元\/天/);
+    if (dailyMatch) {
+      low = Number(dailyMatch[1]) * 22 / 1000;
+      high = Number(dailyMatch[2]) * 22 / 1000;
     } else {
       // 去掉「·13薪」等后缀，仅对数字区间做匹配（payMonths 仍从完整 raw 读取）
       const salaryBody = raw.replace(/·\d+薪.*$/i, "").trim();
@@ -271,8 +281,8 @@
       monthlyMid,
       annualizedMid: monthlyMid * payMonths / 12,
       payMonths,
-      workdaysPerMonth,
-      salaryType: isDaily ? "daily" : "monthly"
+      workdaysPerMonth: null,
+      salaryType: "monthly"
     };
   }
 
@@ -716,18 +726,22 @@
 
   function buildCityScatterData() {
     if (!state.insights) return [];
-    return state.insights.provinces.flatMap((province) => province.cities.map((city) => {
-      const coords = getCityCoord(city.city);
-      if (!coords) return null;
-      return {
-        name: city.city,
-        city: city.city,
-        province: province.name,
-        jobCount: city.jobCount,
-        averageAnnualized: city.averageAnnualized,
-        value: [...coords, city.averageAnnualized]
-      };
-    })).filter(Boolean);
+    return state.insights.provinces.flatMap((province) =>
+      province.cities
+        .filter((city) => PROVINCIAL_CAPITALS.has(city.city))
+        .map((city) => {
+          const coords = getCityCoord(city.city);
+          if (!coords) return null;
+          return {
+            name: city.city,
+            city: city.city,
+            province: province.name,
+            jobCount: city.jobCount,
+            averageAnnualized: city.averageAnnualized,
+            value: [...coords, city.averageAnnualized]
+          };
+        })
+    ).filter(Boolean);
   }
 
   function renderMap() {

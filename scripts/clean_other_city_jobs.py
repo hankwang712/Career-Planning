@@ -36,12 +36,18 @@ def first_industry_segment(industry: str) -> str:
 
 def normalize_salary_range(raw: str) -> str:
     """
-    将 other_city 常见薪资文案转为与 boss 侧接近的「K/月」形式，便于前端 parseSalary 与各图表统计。
-    例：1-1.2万·13薪 -> 10-12K·13薪；8000-12000元/月 -> 8-12K
+    将 other_city 常见薪资文案统一转为「K/月」月薪形式，便于前端 parseSalary 与各图表统计。
+    处理范围：
+      - 万/月      -> K/月（例：1-1.2万·13薪 -> 10-12K·13薪）
+      - 元/月      -> K/月（例：8000-12000元/月 -> 8-12K）
+      - 元（无后缀）-> 视为月薪，转 K/月（例：3000-4000元 -> 3-4K）
+      - 元/天      -> 按 22 天/月折算为月薪 K/月（例：100-150元/天 -> 2.2-3.3K）
+      - 面议       -> 原样返回
     """
     s = str(raw or "").strip().replace(" ", "")
     if not s or s == "面议":
         return str(raw or "").strip()
+
     pay_suffix = ""
     m_pay = re.search(r"(·\d+薪)$", s, flags=re.I)
     if m_pay:
@@ -56,6 +62,7 @@ def normalize_salary_range(raw: str) -> str:
         t = f"{x:.2f}".rstrip("0").rstrip(".")
         return t
 
+    # 1) 万/月 或 万
     wan_r = re.match(r"^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)万(?:/月)?$", s_body, flags=re.I)
     if wan_r:
         lo = float(wan_r.group(1)) * 10
@@ -65,11 +72,46 @@ def normalize_salary_range(raw: str) -> str:
     if wan_one:
         v = float(wan_one.group(1)) * 10
         return f"{fmt_k(v)}K{pay_suffix}"
+
+    # 2) 元/月
     ym_r = re.match(r"^(\d+)\s*-\s*(\d+)元/月$", s_body, flags=re.I)
     if ym_r:
         lo = int(ym_r.group(1)) / 1000
         hi = int(ym_r.group(2)) / 1000
         return f"{fmt_k(lo)}-{fmt_k(hi)}K{pay_suffix}"
+    ym_one = re.match(r"^(\d+)元/月$", s_body, flags=re.I)
+    if ym_one:
+        v = int(ym_one.group(1)) / 1000
+        return f"{fmt_k(v)}K{pay_suffix}"
+
+    # 3) 元/天 -> 按 22 天/月折算为月薪
+    DAILY_TO_MONTHLY_DAYS = 22
+    daily_r = re.match(r"^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)元/天$", s_body, flags=re.I)
+    if daily_r:
+        lo = float(daily_r.group(1)) * DAILY_TO_MONTHLY_DAYS / 1000
+        hi = float(daily_r.group(2)) * DAILY_TO_MONTHLY_DAYS / 1000
+        return f"{fmt_k(lo)}-{fmt_k(hi)}K{pay_suffix}"
+    daily_one = re.match(r"^(\d+(?:\.\d+)?)元/天$", s_body, flags=re.I)
+    if daily_one:
+        v = float(daily_one.group(1)) * DAILY_TO_MONTHLY_DAYS / 1000
+        return f"{fmt_k(v)}K{pay_suffix}"
+
+    # 4) 纯 元（无 /月、/天 后缀）-> 视为月薪处理
+    yuan_r = re.match(r"^(\d+)\s*-\s*(\d+)元$", s_body, flags=re.I)
+    if yuan_r:
+        lo = int(yuan_r.group(1)) / 1000
+        hi = int(yuan_r.group(2)) / 1000
+        return f"{fmt_k(lo)}-{fmt_k(hi)}K{pay_suffix}"
+    yuan_one = re.match(r"^(\d+)元$", s_body, flags=re.I)
+    if yuan_one:
+        v = int(yuan_one.group(1)) / 1000
+        return f"{fmt_k(v)}K{pay_suffix}"
+    yuan_below = re.match(r"^(\d+)元以下$", s_body, flags=re.I)
+    if yuan_below:
+        v = int(yuan_below.group(1)) / 1000
+        return f"{fmt_k(v)}K{pay_suffix}"
+
+    # 5) 已经含 K/k/元/天/万/元/月 但未能被上面规则捕获的，原样保留
     if re.search(r"K|k|元/天|万|元/月", s_body):
         return str(raw or "").strip()
     return str(raw or "").strip()
@@ -117,7 +159,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input",
-        default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "other_city.json"),
+        default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "raw", "other_city.json"),
         help="原始 other_city.json 路径",
     )
     parser.add_argument(

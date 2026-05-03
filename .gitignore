@@ -1,12 +1,31 @@
-*.doc
-*.md
 __pycache__/
+*.py[cod]
+*.pyo
 *.ipynb
-.claude/
-.clawhub/
 node_modules/
 
-# AI tools
+# Environment and OS
+.env
+.env.*
+.venv/
+venv/
+Thumbs.db
+.DS_Store
+
+# Local AI / editor tooling
 .claude/
+.clawhub/
 .cursor/
 .codex/
+.impeccable.md
+
+# Runtime app data
+app_data/
+
+# Generated frontend and export outputs
+static/dist/
+deploy/static-site/
+artifacts/
+
+# Logs
+*.log

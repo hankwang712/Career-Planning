@@ -47,6 +47,7 @@
     cumulativeDiffLines: 0,
     /** 与上次成功「保存」或服务端加载一致的 Markdown 基线；未保存的本地修改不会写回阅览室正式稿 */
     editorSavedMarkdown: "",
+    editorSavePending: false,
     editorBeforeUnloadBound: false
   };
 
@@ -85,6 +86,15 @@
         ? "\u672a\u4fdd\u5b58\uff1a\u70b9\u300c\u4fdd\u5b58\u300d\u540e\u624d\u4f1a\u5199\u5165\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u9605\u89c8\u5ba4\uff09"
         : "\u4fdd\u5b58\u7f16\u8f91\u5185\u5bb9\u5e76\u540c\u6b65\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u82e5\u5f53\u524d\u4e3a\u6b63\u5f0f\u7a3f\uff09";
     }
+  }
+
+  function setCareerReportEditorSavePending(pending) {
+    reportRuntime.editorSavePending = Boolean(pending);
+    const saveBtn = document.getElementById("reportEditorSaveBtn");
+    if (!saveBtn) return;
+    saveBtn.disabled = reportRuntime.editorSavePending;
+    saveBtn.setAttribute("aria-busy", reportRuntime.editorSavePending ? "true" : "false");
+    saveBtn.textContent = reportRuntime.editorSavePending ? "保存中..." : "保存";
   }
 
   function reportEditorBeforeUnloadHandler(event) {
@@ -4964,6 +4974,9 @@
   }
 
   async function saveCareerReportEditorSnapshot() {
+    if (reportRuntime.editorSavePending) {
+      return;
+    }
     const source = reportRuntime.editorSource || {};
     const textarea = document.getElementById("reportEditorTextarea");
     const markdown = String(textarea?.value || "").trim();
@@ -4971,65 +4984,80 @@
       toast("\u65e0\u6cd5\u4fdd\u5b58", "\u5f53\u524d\u7f16\u8f91\u533a\u4e3a\u7a7a\u3002", "warning", 1800);
       return;
     }
+    setCareerReportEditorSavePending(true);
     const label = source?.snapshot_id
       ? String(source?.title || "\u7f16\u8f91\u5feb\u7167").trim()
       : `\u7f16\u8f91\u5feb\u7167 ${new Date().toLocaleString("zh-CN")}`;
-    const payload = await requestJsonSafe("/api/career-report/snapshot/save", {
-      method: "POST",
-      body: {
+    try {
+      const payload = await requestJsonSafe("/api/career-report/snapshot/save", {
+        method: "POST",
+        body: {
+          report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
+          snapshot_id: source.snapshot_id || "",
+          source: source.source_type === "formal_report" ? "manual" : (source.source_type || "manual"),
+          title: label,
+          markdown,
+          diff_blocks: reportRuntime.editorDiff?.diff_blocks || reportRuntime.editorDiffArchive?.diff_blocks || []
+        }
+      });
+      const formalUpdated = Boolean(payload?.formal_report_updated);
+      if (formalUpdated) {
+        try {
+          await loadCurrentCareerReport({ userCenterRefresh: true });
+        } catch (error) {
+          console.warn("saveCareerReportEditorSnapshot: refresh bundle failed", error);
+        }
+      }
+      reportRuntime.editorSavedMarkdown = normalizeEditorMarkdownBaseline(
+        String(document.getElementById("reportEditorTextarea")?.value || "")
+      );
+      updateCareerReportEditorDirtyUi();
+      reportRuntime.editorSource = {
+        ...(reportRuntime.editorSource || {}),
+        ...(payload?.snapshot || {}),
         report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
-        snapshot_id: source.snapshot_id || "",
-        source: source.source_type === "formal_report" ? "manual" : (source.source_type || "manual"),
-        title: label,
-        markdown,
-        diff_blocks: reportRuntime.editorDiff?.diff_blocks || reportRuntime.editorDiffArchive?.diff_blocks || []
+        source_type: payload?.snapshot?.snapshot_id ? "snapshot" : (payload?.snapshot?.source || "manual")
+      };
+      if (window.appState?.careerReport) {
+        window.appState.careerReport.draft_snapshots = Array.isArray(payload?.draft_snapshots) ? payload.draft_snapshots : [];
       }
-    });
-    const formalUpdated = Boolean(payload?.formal_report_updated);
-    if (formalUpdated) {
-      try {
-        await loadCurrentCareerReport({ userCenterRefresh: true });
-      } catch (error) {
-        console.warn("saveCareerReportEditorSnapshot: refresh bundle failed", error);
-      }
+      clearCareerReportEditorDiff({ silent: true });
+      appendReportEditorMessage(
+        "assistant",
+        "Snapshot",
+        formalUpdated
+          ? `\u5df2\u4fdd\u5b58\u5e76\u5c06\u6b64\u7a3f\u540c\u6b65\u4e3a\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u9605\u89c8\u5ba4\u4e0b\u6b21\u6253\u5f00\u5373\u4e3a\u6b64\u7248\u672c\uff09\u3002`
+          : `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`
+      );
+      renderReportEditorSnapshotList(reportRuntime.editorSource);
+      renderReportEditorSectionMap({
+        ...reportRuntime.editorSource,
+        markdown: document.getElementById("reportEditorTextarea")?.value || ""
+      });
+      renderReportEditorChatLog();
+      window.renderUserCenterDashboard?.();
+      toast(
+        formalUpdated ? "\u5df2\u4fdd\u5b58" : "\u5feb\u7167\u5df2\u4fdd\u5b58",
+        formalUpdated
+          ? "\u6b63\u6587\u5df2\u66f4\u65b0\uff0c\u804c\u4e1a\u62a5\u544a\u9605\u89c8\u5c06\u663e\u793a\u6b64\u7a3f\u3002"
+          : `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`,
+        "success",
+        2200
+      );
+    } finally {
+      setCareerReportEditorSavePending(false);
     }
-    reportRuntime.editorSavedMarkdown = normalizeEditorMarkdownBaseline(
-      String(document.getElementById("reportEditorTextarea")?.value || "")
-    );
-    updateCareerReportEditorDirtyUi();
-    reportRuntime.editorSource = {
-      ...(reportRuntime.editorSource || {}),
-      ...(payload?.snapshot || {}),
-      report_id: source.report_id || window.appState?.careerReport?.meta?.report_id || "",
-      source_type: payload?.snapshot?.snapshot_id ? "snapshot" : (payload?.snapshot?.source || "manual")
-    };
-    if (window.appState?.careerReport) {
-      window.appState.careerReport.draft_snapshots = Array.isArray(payload?.draft_snapshots) ? payload.draft_snapshots : [];
-    }
-    clearCareerReportEditorDiff({ silent: true });
-    appendReportEditorMessage(
-      "assistant",
-      "Snapshot",
-      formalUpdated
-        ? `\u5df2\u4fdd\u5b58\u5e76\u5c06\u6b64\u7a3f\u540c\u6b65\u4e3a\u804c\u4e1a\u62a5\u544a\u6b63\u6587\uff08\u9605\u89c8\u5ba4\u4e0b\u6b21\u6253\u5f00\u5373\u4e3a\u6b64\u7248\u672c\uff09\u3002`
-        : `\u5df2\u5c06\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u4fdd\u5b58\u4e3a\u5feb\u7167\uff1a${label}`
-    );
-    renderReportEditorSnapshotList(reportRuntime.editorSource);
-    renderReportEditorSectionMap({
-      ...reportRuntime.editorSource,
-      markdown: document.getElementById("reportEditorTextarea")?.value || ""
-    });
-    renderReportEditorChatLog();
-    window.renderUserCenterDashboard?.();
-    toast(
-      formalUpdated ? "\u5df2\u4fdd\u5b58" : "\u5feb\u7167\u5df2\u4fdd\u5b58",
-      formalUpdated
-        ? "\u6b63\u6587\u5df2\u66f4\u65b0\uff0c\u804c\u4e1a\u62a5\u544a\u9605\u89c8\u5c06\u663e\u793a\u6b64\u7a3f\u3002"
-        : `\u5df2\u6309\u300c${label}\u300d\u4fdd\u5b58\u5f53\u524d\u7f16\u8f91\u5185\u5bb9\u3002`,
-      "success",
-      2200
-    );
   }
+
+  function triggerCareerReportEditorSave(event) {
+    if (event?.preventDefault) event.preventDefault();
+    if (reportRuntime.editorSavePending) return;
+    void saveCareerReportEditorSnapshot().catch((error) => {
+      toast("\u4fdd\u5b58\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
+    });
+  }
+
+  window.triggerCareerReportEditorSave = triggerCareerReportEditorSave;
 
   function exportCareerReportSource(format = "docx") {
     const source = reportRuntime.editorSource || {};
@@ -5300,11 +5328,7 @@
     textarea?.addEventListener("dblclick", () => {
       setCareerReportEditorViewMode("rendered");
     });
-    document.getElementById("reportEditorSaveBtn")?.addEventListener("click", () => {
-      void saveCareerReportEditorSnapshot().catch((error) => {
-        toast("\u4fdd\u5b58\u5931\u8d25", error.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002", "error", 2200);
-      });
-    });
+    document.getElementById("reportEditorSaveBtn")?.addEventListener("click", triggerCareerReportEditorSave);
     document.getElementById("reportEditorTocSearch")?.addEventListener("input", (event) => {
       const q = String(event.target?.value || "").trim().toLowerCase();
       const host = document.getElementById("reportEditorSectionMap");

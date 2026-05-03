@@ -1,7 +1,22 @@
 (function initCareerGraphMatchingModule() {
-  const LS_MATCH_RESULTS = "career_match_results";
-  const LS_MATCH_PROFILE = "career_match_profile";
-  const LS_MATCH_META = "career_match_meta";
+  function resolveCurrentUsername() {
+    let user = "guest";
+    try {
+      if (typeof window.getCurrentUser === "function") {
+        const u = window.getCurrentUser();
+        if (u && u.username) user = String(u.username);
+      }
+    } catch (_) {}
+    return user;
+  }
+
+  function lsMatchResults() { return `career_match_results_${resolveCurrentUsername()}`; }
+  function lsMatchProfile() { return `career_match_profile_${resolveCurrentUsername()}`; }
+  function lsMatchMeta()     { return `career_match_meta_${resolveCurrentUsername()}`; }
+
+  const LS_MATCH_RESULTS_LEGACY = "career_match_results";
+  const LS_MATCH_PROFILE_LEGACY = "career_match_profile";
+  const LS_MATCH_META_LEGACY = "career_match_meta";
 
   const GRAPH_NODE_LIMIT = 500;
   const DEFAULT_SEARCH_RESULT_LIMIT = 10;
@@ -137,11 +152,17 @@
   function clearCareerMatchStorage(options = {}) {
     const shouldClearRemote = Boolean(options && options.clearRemote);
     try {
-      localStorage.removeItem(LS_MATCH_RESULTS);
-      localStorage.removeItem(LS_MATCH_PROFILE);
-      localStorage.removeItem(LS_MATCH_META);
-      sessionStorage.removeItem(LS_MATCH_RESULTS);
-      sessionStorage.removeItem(LS_MATCH_PROFILE);
+      localStorage.removeItem(lsMatchResults());
+      localStorage.removeItem(lsMatchProfile());
+      localStorage.removeItem(lsMatchMeta());
+      sessionStorage.removeItem(lsMatchResults());
+      sessionStorage.removeItem(lsMatchProfile());
+      // 同时清理旧的无用户隔离 key（兼容历史数据）
+      localStorage.removeItem(LS_MATCH_RESULTS_LEGACY);
+      localStorage.removeItem(LS_MATCH_PROFILE_LEGACY);
+      localStorage.removeItem(LS_MATCH_META_LEGACY);
+      sessionStorage.removeItem(LS_MATCH_RESULTS_LEGACY);
+      sessionStorage.removeItem(LS_MATCH_PROFILE_LEGACY);
     } catch (_) { /* ignore */ }
     if (
       shouldClearRemote
@@ -215,11 +236,11 @@
       const metaStr = JSON.stringify(state.matchMeta || {});
       const resultsStr = JSON.stringify(state.matchResults);
       const profileStr = JSON.stringify(profilePayload);
-      localStorage.setItem(LS_MATCH_RESULTS, resultsStr);
-      localStorage.setItem(LS_MATCH_PROFILE, profileStr);
-      localStorage.setItem(LS_MATCH_META, metaStr);
-      sessionStorage.setItem(LS_MATCH_RESULTS, resultsStr);
-      sessionStorage.setItem(LS_MATCH_PROFILE, profileStr);
+      localStorage.setItem(lsMatchResults(), resultsStr);
+      localStorage.setItem(lsMatchProfile(), profileStr);
+      localStorage.setItem(lsMatchMeta(), metaStr);
+      sessionStorage.setItem(lsMatchResults(), resultsStr);
+      sessionStorage.setItem(lsMatchProfile(), profileStr);
     } catch (_) { /* quota / private mode */ }
     persistCareerMatchBundleToAccount(profilePayload);
   }
@@ -245,15 +266,15 @@
       }
     } catch (_) { /* ignore account scope restore */ }
     try {
-      const raw = localStorage.getItem(LS_MATCH_RESULTS);
+      const raw = localStorage.getItem(lsMatchResults());
       if (!raw) return;
       const results = JSON.parse(raw);
       if (!Array.isArray(results) || !results.length) return;
       state.matchResults = results;
-      const metaRaw = localStorage.getItem(LS_MATCH_META);
+      const metaRaw = localStorage.getItem(lsMatchMeta());
       state.matchMeta = metaRaw ? JSON.parse(metaRaw) : null;
       state.recommendationIds = new Set(state.matchResults.map((item) => item.id).filter(Boolean));
-      const pRaw = localStorage.getItem(LS_MATCH_PROFILE);
+      const pRaw = localStorage.getItem(lsMatchProfile());
       if (pRaw) {
         const p = JSON.parse(pRaw);
         if (Array.isArray(p.cityPreferences) && p.cityPreferences.length) {
@@ -877,7 +898,7 @@
     const hasMem = state.matchResults.length > 0;
     let hasStored = false;
     try {
-      hasStored = Boolean(localStorage.getItem(LS_MATCH_RESULTS));
+      hasStored = Boolean(localStorage.getItem(lsMatchResults()));
     } catch (_) {
       hasStored = false;
     }
@@ -1825,13 +1846,13 @@
   function openCareerReport() {
     if (!state.matchResults.length) {
       try {
-        const raw = localStorage.getItem(LS_MATCH_RESULTS);
-        const pRaw = localStorage.getItem(LS_MATCH_PROFILE);
+        const raw = localStorage.getItem(lsMatchResults());
+        const pRaw = localStorage.getItem(lsMatchProfile());
         if (raw && pRaw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length) {
-            sessionStorage.setItem(LS_MATCH_RESULTS, raw);
-            sessionStorage.setItem(LS_MATCH_PROFILE, pRaw);
+            sessionStorage.setItem(lsMatchResults(), raw);
+            sessionStorage.setItem(lsMatchProfile(), pRaw);
             window.open("/static/career-report.html", "_blank");
             return;
           }
@@ -1842,8 +1863,10 @@
     }
     try {
       const profilePayload = buildMatchProfilePayload();
-      sessionStorage.setItem(LS_MATCH_RESULTS, JSON.stringify(state.matchResults));
-      sessionStorage.setItem(LS_MATCH_PROFILE, JSON.stringify(profilePayload));
+      const resultsStr = JSON.stringify(state.matchResults);
+      const profileStr = JSON.stringify(profilePayload);
+      sessionStorage.setItem(lsMatchResults(), resultsStr);
+      sessionStorage.setItem(lsMatchProfile(), profileStr);
       persistCareerMatchBundle();
     } catch (_) { /* sessionStorage unavailable */ }
     window.open("/static/career-report.html", "_blank");

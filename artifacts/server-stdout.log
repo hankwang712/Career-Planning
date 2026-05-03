@@ -1,9 +1,0 @@
-==================================================
-  职业规划智能体 · Flask 服务
-  访问地址：http://0.0.0.0:8080
-  数据目录： C:\Users\rog\Desktop\web\boss_info
-  用户数据目录： C:\Users\rog\Desktop\web\app_data
-  按 Ctrl+C 停止
-==================================================
- * Serving Flask app 'server'
- * Debug mode: off

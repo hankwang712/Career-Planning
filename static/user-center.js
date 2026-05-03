@@ -1,5 +1,5 @@
 const USER_CENTER_DEFAULT_SECTION = "report-workspace";
-const USER_CENTER_SECTIONS = ["report-workspace", "plan-workspace", "account-center"];
+const USER_CENTER_SECTIONS = ["report-workspace", "plan-workspace", "account-center", "account-admin"];
 const USER_CENTER_ROLE_FILTERS = {
   all: "全部",
   employed: "在职",
@@ -18,6 +18,14 @@ const userCenterState = {
   reportModule: "trends",
   deletingReportId: "",
   roleBoardExpanded: false,
+  adminAccounts: {
+    loading: false,
+    loaded: false,
+    error: "",
+    deletingKey: "",
+    items: [],
+    summary: null
+  },
   cropper: {
     fileName: "",
     image: null,
@@ -39,6 +47,21 @@ const USER_CENTER_ROLE_STATUS_ORDER = ["expected", "reapply", "employed", "left"
 const USER_CENTER_ROLE_BOARD_STORAGE_KEY_PREFIX = "uc_role_board_v1_";
 userCenterState.roleBoard = null;
 
+// 报告中心主区域的生成报告按钮点击处理
+function handleUserCenterGenerateReport() {
+  // 直接调用主站 app.js 中暴露的 startCareerReportGeneration
+  if (typeof window.startCareerReportGeneration === "function") {
+    window.startCareerReportGeneration();
+  } else {
+    // 如果主站函数不可用，跳转到主站的报告生成页面
+    if (window.location.href.includes("/user-center")) {
+      window.location.href = window.location.origin + "/#report";
+    } else {
+      window.showSection?.("report");
+    }
+  }
+}
+
 function resetUserCenterRoleBoardCache() {
   userCenterState.roleBoard = null;
 }
@@ -58,7 +81,16 @@ function normalizeUserCenterTargetRoleName(value) {
 
 function normalizeUserCenterSection(sectionId) {
   const normalized = String(sectionId || "").trim().replace(/^#/, "");
-  return USER_CENTER_SECTIONS.includes(normalized) ? normalized : USER_CENTER_DEFAULT_SECTION;
+  const resolved = USER_CENTER_SECTIONS.includes(normalized) ? normalized : USER_CENTER_DEFAULT_SECTION;
+  if (resolved === "account-admin" && !canAccessUserCenterAdminSection()) {
+    return "account-center";
+  }
+  return resolved;
+}
+
+function canAccessUserCenterAdminSection() {
+  const user = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  return Boolean(user && user.role === "super_admin");
 }
 
 function normalizeUserCenterReportViewMode(viewMode) {
@@ -143,6 +175,11 @@ function switchUserCenterSection(sectionId, options = {}) {
 
   if (nextSection === "account-center") {
     renderUserCenterIdentity();
+  }
+
+  if (nextSection === "account-admin") {
+    renderUserCenterAdminAccounts();
+    void loadUserCenterAdminAccounts();
   }
 
   syncUserCenterSidebarSubnav();
@@ -1130,6 +1167,8 @@ function renderUserCenterReportOverview() {
   const generateBtn = document.getElementById("userCenterGenerateReportBtn");
   const heroSublineEl = document.getElementById("userCenterReportSubline");
   const versionCount = Number(versions.length || (reportData?.report_document ? 1 : 0));
+  // 检查是否有正式报告：versions数量、careerReport对象存在、或有report_document
+  const hasFormalReport = versionCount > 0 || careerReportToolbarActionsAvailable() || Boolean(reportData?.report_document);
   const viewMode = normalizeUserCenterReportViewMode(userCenterState.reportViewMode);
   const workspaceMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
 
@@ -1145,7 +1184,7 @@ function renderUserCenterReportOverview() {
     generateBtn.disabled = Boolean(reportState?.status === "running" || reportState?.status === "queued");
     generateBtn.textContent = reportState?.status === "running" || reportState?.status === "queued"
       ? "生成中..."
-      : appState?.reportReady ? "重新生成职业报告" : "生成职业报告";
+      : hasFormalReport ? "重新生成职业报告" : "生成职业报告";
   }
   if (heroSublineEl) {
     heroSublineEl.textContent = workspaceMode === "library"
@@ -1171,12 +1210,183 @@ function renderUserCenterReportOverview() {
   }
 }
 
+function getUserCenterAdminStatusLabel(statusValue) {
+  const status = String(statusValue || "").trim().toLowerCase();
+  if (status === "completed" || status === "ready") return "已完成";
+  if (status === "running" || status === "queued") return "进行中";
+  if (status === "failed" || status === "error") return "失败";
+  if (status === "partial") return "进行过";
+  return "未开始";
+}
+
+function renderUserCenterAdminAccounts() {
+  const navBtn = document.getElementById("userCenterAdminNavBtn");
+  const section = document.getElementById("account-admin");
+  const isAdmin = canAccessUserCenterAdminSection();
+  if (navBtn) navBtn.classList.toggle("hidden", !isAdmin);
+  if (section) section.classList.toggle("hidden", !isAdmin);
+  if (!isAdmin) return;
+
+  const state = userCenterState.adminAccounts || {};
+  const summary = state.summary || {};
+  const listEl = document.getElementById("userCenterAdminAccounts");
+  const statusEl = document.getElementById("userCenterAdminStatus");
+  const totalEl = document.getElementById("userCenterAdminSummaryTotal");
+  const registeredEl = document.getElementById("userCenterAdminSummaryRegistered");
+  const dataOnlyEl = document.getElementById("userCenterAdminSummaryDataOnly");
+  const completedEl = document.getElementById("userCenterAdminSummaryCompleted");
+
+  if (totalEl) totalEl.textContent = String(summary.total_accounts || 0);
+  if (registeredEl) registeredEl.textContent = String(summary.registered_accounts || 0);
+  if (dataOnlyEl) dataOnlyEl.textContent = String(summary.data_only_accounts || 0);
+  if (completedEl) completedEl.textContent = String(summary.completed_reports || 0);
+
+  if (statusEl) {
+    if (state.loading && !state.loaded) {
+      statusEl.textContent = "正在加载账号列表...";
+    } else if (state.error) {
+      statusEl.textContent = state.error;
+    } else {
+      const runningReports = Number(summary.running_reports || 0);
+      statusEl.textContent = runningReports > 0
+        ? `当前有 ${runningReports} 个账号正在生成报告。`
+        : "可以在这里查看账号进度，并删除无效账号或残留数据。";
+    }
+  }
+
+  if (!listEl) return;
+  if (state.loading && !state.loaded) {
+    listEl.innerHTML = `<div class="uc-admin-empty">正在加载账号数据...</div>`;
+    return;
+  }
+  if (state.error) {
+    listEl.innerHTML = `<div class="uc-admin-empty">${escHtml(state.error)}</div>`;
+    return;
+  }
+
+  const items = Array.isArray(state.items) ? state.items : [];
+  if (!items.length) {
+    listEl.innerHTML = `<div class="uc-admin-empty">当前还没有可管理的账号数据。</div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map((item) => {
+    const completion = item?.completion || {};
+    const reportStatus = item?.report_status || {};
+    const dataFlags = item?.data_flags || {};
+    const username = String(item?.username || item?.account_key || "").trim();
+    const displayName = String(item?.display_name || username || "").trim() || "未命名账号";
+    const note = item?.data_only
+      ? "仅发现本地残留数据，未匹配到注册账号。"
+      : `用户名：${username}`;
+    const percent = Math.max(0, Math.min(100, Number(completion.percent || 0)));
+    const status = String(completion.status || "empty").trim().toLowerCase();
+    const reportLabel = getUserCenterAdminStatusLabel(reportStatus.status || status);
+    const milestones = Array.isArray(completion.milestones) ? completion.milestones : [];
+    const isDeleting = state.deletingKey && state.deletingKey === item.account_key;
+    const canDelete = username !== "system";
+    const deleteLabel = encodeURIComponent(displayName);
+    return `
+      <article class="uc-admin-account-item">
+        <div class="uc-admin-account-head">
+          <div class="uc-admin-account-name">
+            <strong>${escHtml(displayName)}</strong>
+            <span>${escHtml(note)}</span>
+          </div>
+          <div class="uc-admin-account-meta">
+            <span class="uc-admin-pill ${item?.role === "super_admin" ? "is-role-admin" : ""}">${escHtml(item?.role === "super_admin" ? "system" : item?.data_only ? "残留数据" : "普通账号")}</span>
+            <span class="uc-admin-pill ${item?.data_only ? "is-data-only" : ""}">${escHtml(item?.registered ? "已注册" : "未注册")}</span>
+            <span class="uc-admin-pill is-status-${escHtml(status)}">${escHtml(reportLabel)}</span>
+            <span class="uc-admin-pill">${escHtml(item?.last_activity_at || "无活动记录")}</span>
+          </div>
+        </div>
+        <div class="uc-admin-account-progress">
+          <div class="uc-admin-progress-copy">
+            <strong>完成度 ${percent}%</strong>
+            <span>正式报告：${reportStatus.generated ? "已生成" : reportStatus.detail || "未生成"}；报告版本 ${Number(dataFlags.report_versions || 0)} 份，上传文件 ${Number(dataFlags.uploads_count || 0)} 个。</span>
+          </div>
+          <div class="uc-admin-progress-track" aria-hidden="true">
+            <div class="uc-admin-progress-fill" style="width:${percent}%"></div>
+          </div>
+        </div>
+        <div class="uc-admin-account-milestones">
+          ${milestones.map((milestone) => `
+            <span class="uc-admin-mile ${milestone?.done ? "is-done" : "is-empty"}">${escHtml(milestone?.label || milestone?.key || "")}</span>
+          `).join("")}
+        </div>
+        <div class="uc-admin-account-actions">
+          <button
+            type="button"
+            class="career-report-secondary-btn"
+            ${canDelete && !isDeleting ? `onclick="window.deleteUserCenterAdminAccount?.('${item.account_key}', decodeURIComponent('${deleteLabel}'))"` : "disabled"}
+          >${isDeleting ? "删除中..." : canDelete ? "删除账号" : "系统保留"}</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadUserCenterAdminAccounts(force = false) {
+  if (!canAccessUserCenterAdminSection()) return null;
+  if (userCenterState.adminAccounts.loading) return null;
+  if (!force && userCenterState.adminAccounts.loaded) {
+    renderUserCenterAdminAccounts();
+    return userCenterState.adminAccounts.items;
+  }
+  userCenterState.adminAccounts.loading = true;
+  userCenterState.adminAccounts.error = "";
+  renderUserCenterAdminAccounts();
+  try {
+    const payload = await requestJson("/api/admin/accounts");
+    userCenterState.adminAccounts.items = Array.isArray(payload?.accounts) ? payload.accounts : [];
+    userCenterState.adminAccounts.summary = payload?.summary || null;
+    userCenterState.adminAccounts.loaded = true;
+    return userCenterState.adminAccounts.items;
+  } catch (error) {
+    userCenterState.adminAccounts.error = error.message || "账号列表加载失败";
+    return null;
+  } finally {
+    userCenterState.adminAccounts.loading = false;
+    renderUserCenterAdminAccounts();
+  }
+}
+
+async function deleteUserCenterAdminAccount(accountKey = "", displayName = "") {
+  const safeKey = String(accountKey || "").trim();
+  if (!safeKey || !canAccessUserCenterAdminSection()) return;
+  const label = String(displayName || safeKey).trim() || safeKey;
+  const confirmed = window.confirm(`确认删除“${label}”吗？\n这会同时清理该账号的本地状态、上传文件和职业报告，且不可恢复。`);
+  if (!confirmed) return;
+
+  userCenterState.adminAccounts.deletingKey = safeKey;
+  renderUserCenterAdminAccounts();
+  try {
+    const payload = await requestJson(`/api/admin/accounts/${encodeURIComponent(safeKey)}`, {
+      method: "DELETE"
+    });
+    userCenterState.adminAccounts.items = Array.isArray(payload?.accounts) ? payload.accounts : [];
+    userCenterState.adminAccounts.summary = payload?.summary || null;
+    userCenterState.adminAccounts.loaded = true;
+    showToast("账号已删除", payload?.message || `${label} 已被移除`, "success", 1800);
+  } catch (error) {
+    showToast("删除失败", error.message || "请稍后重试", "error", 2200);
+  } finally {
+    userCenterState.adminAccounts.deletingKey = "";
+    renderUserCenterAdminAccounts();
+  }
+}
+
 function getUserCenterAvatarState() {
   return typeof getAccountAvatarState === "function" ? getAccountAvatarState() : null;
 }
 
 function renderUserCenterIdentity() {
   const user = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  const adminNavBtn = document.getElementById("userCenterAdminNavBtn");
+  const adminSection = document.getElementById("account-admin");
+  const isAdmin = Boolean(user && user.role === "super_admin");
+  if (adminNavBtn) adminNavBtn.classList.toggle("hidden", !isAdmin);
+  if (adminSection) adminSection.classList.toggle("hidden", !isAdmin);
   if (!user) return;
 
   const displayName = user.display_name || user.displayName || user.username || "用户";
@@ -1240,6 +1450,10 @@ function renderUserCenterIdentity() {
         <span>不可用</span>
       `;
     }
+  }
+
+  if (!isAdmin && userCenterState.activeSection === "account-admin") {
+    switchUserCenterSection("account-center", { updateHash: true });
   }
 }
 
@@ -1452,6 +1666,14 @@ function bindUserCenterEvents() {
   window.addEventListener("popstate", () => handleUserCenterUrlChange());
   window.addEventListener("app:auth-changed", () => {
     resetUserCenterRoleBoardCache();
+    userCenterState.adminAccounts = {
+      loading: false,
+      loaded: false,
+      error: "",
+      deletingKey: "",
+      items: [],
+      summary: null
+    };
     if (typeof getCurrentUser === "function" && getCurrentUser() && typeof loadAccountAvatarState === "function") {
       void loadAccountAvatarState(false).finally(() => renderUserCenterDashboard());
       return;
@@ -1537,6 +1759,7 @@ function renderUserCenterDashboard() {
   renderUserCenterTargetRoles();
   renderUserCenterReportOverview();
   renderUserCenterIdentity();
+  renderUserCenterAdminAccounts();
   if (typeof _updateLifeProgress === "function") _updateLifeProgress();
   if (typeof _updatePlanStats === "function") _updatePlanStats();
   applyUserCenterReportWorkspaceMode();
@@ -1557,6 +1780,8 @@ window.getUserCenterReportViewMode = () => normalizeUserCenterReportViewMode(use
 window.getUserCenterReportWorkspaceMode = () => normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
 window.getUserCenterReportModule = () => normalizeUserCenterReportModule(userCenterState.reportModule);
 window.submitUserCenterPassword = submitUserCenterPassword;
+window.reloadUserCenterAdminAccounts = loadUserCenterAdminAccounts;
+window.deleteUserCenterAdminAccount = deleteUserCenterAdminAccount;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindUserCenterEvents();

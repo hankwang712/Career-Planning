@@ -476,7 +476,7 @@ def load_community_forum():
             return json.loads(row["payload"])
         except json.JSONDecodeError:
             return {}
-    return {}
+    return None
 
 
 def save_community_forum(payload):

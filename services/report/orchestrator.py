@@ -34,7 +34,7 @@ import random
 import re
 import string
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
 from time import perf_counter
 from typing import Any, Callable
@@ -55,6 +55,11 @@ from .agents import (
 )
 from .exporters import normalize_br_tags_in_markdown
 from .schemas import REPORT_VERSION
+
+PARALLEL_AGENT_WAIT_SECONDS = max(
+    30,
+    int(os.environ.get("CAREER_REPORT_PARALLEL_AGENT_WAIT_SECONDS", "170")),
+)
 
 try:
     from services.tools.text_to_image import (
@@ -240,6 +245,28 @@ def _build_logger(runtime_llm: dict[str, Any] | None) -> Callable[..., None]:
     if isinstance(runtime_llm, dict) and callable(runtime_llm.get("logger")):
         return runtime_llm["logger"]
     return lambda message, **fields: None
+
+
+def _resolve_future_with_fallback(
+    future,
+    *,
+    timeout_seconds: int,
+    logger: Callable[..., None],
+    label: str,
+    fallback: Callable[[], Any],
+) -> Any:
+    try:
+        return future.result(timeout=timeout_seconds)
+    except FutureTimeoutError:
+        try:
+            future.cancel()
+        except Exception:
+            pass
+        logger("Agent 超时，启用降级输出", agent=label, timeout=f"{timeout_seconds}s")
+        return fallback()
+    except Exception as exc:
+        logger("Agent 异常，启用降级输出", agent=label, error=str(exc)[:160])
+        return fallback()
 
 
 def _run_logged_step(logger: Callable[..., None], label: str, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
@@ -2014,10 +2041,22 @@ def generate_career_report_bundle(
                 "简历证据分析官-初筛",
                 _run_resume_pass1_step,
             )
-            industry_brief = industry_future.result()
+            industry_brief = _resolve_future_with_fallback(
+                industry_future,
+                timeout_seconds=PARALLEL_AGENT_WAIT_SECONDS,
+                logger=logger,
+                label="行业分析师",
+                fallback=lambda: _fallback_industry_brief(profile_payload),
+            )
             shared_pool["outputs"]["industry_analysis"] = industry_brief
 
-            news_rag_aligned = rag_future.result()
+            news_rag_aligned = _resolve_future_with_fallback(
+                rag_future,
+                timeout_seconds=PARALLEL_AGENT_WAIT_SECONDS,
+                logger=logger,
+                label="画像对齐RAG",
+                fallback=lambda: "",
+            )
             shared_pool["inputs"]["news_rag_aligned"] = news_rag_aligned
             if news_rag_aligned:
                 logger("画像对齐 RAG 就绪", chars=len(news_rag_aligned))
@@ -2037,12 +2076,18 @@ def generate_career_report_bundle(
                     news_rag_aligned,
                 ),
             )
-            resume_evidence_pass1 = resume_future.result()
+            resume_evidence_pass1 = _resolve_future_with_fallback(
+                resume_future,
+                timeout_seconds=PARALLEL_AGENT_WAIT_SECONDS,
+                logger=logger,
+                label="简历证据分析官-初筛",
+                fallback=lambda: _fallback_resume_evidence(profile_payload),
+            )
             shared_pool["outputs"]["career_positioning"] = positioning_output
             shared_pool["outputs"]["resume_evidence_pass1"] = resume_evidence_pass1
             logger("并行阶段汇合")
         finally:
-            executor.shutdown(wait=True)
+            executor.shutdown(wait=False, cancel_futures=True)
     else:
         industry_brief = _run_logged_step(logger, "行业分析师-fallback", _run_industry_step)
         resume_evidence_pass1 = _run_logged_step(logger, "简历证据分析官-初筛-fallback", _run_resume_pass1_step)

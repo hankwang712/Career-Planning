@@ -93,6 +93,16 @@
     return `dp_workspace_guide_${GUIDE_VERSION}_${username}`;
   }
 
+  function consumeForceWorkspaceGuideFlag() {
+    try {
+      const forced = sessionStorage.getItem("app_force_workspace_guide") === "1";
+      if (forced) sessionStorage.removeItem("app_force_workspace_guide");
+      return forced;
+    } catch (_) {
+      return false;
+    }
+  }
+
   if (typeof window.hasSeenWorkspaceGuide !== "function") {
     window.hasSeenWorkspaceGuide = function hasSeenWorkspaceGuide() {
       try {
@@ -750,12 +760,13 @@
   function tryAutoOpenGuide() {
     if (guideState.autoOpened) return;
     if (!isAuthenticatedSafe()) return;
-    if (window.hasSeenWorkspaceGuide?.()) return;
+    const forceOpen = consumeForceWorkspaceGuideFlag();
+    if (!forceOpen && window.hasSeenWorkspaceGuide?.()) return;
     const overlay = document.getElementById("workspaceGuideOverlay");
     if (!overlay) return;
     guideState.autoOpened = true;
     window.setTimeout(() => {
-      window.openWorkspaceGuide?.(false);
+      window.openWorkspaceGuide?.(forceOpen);
     }, 420);
   }
 

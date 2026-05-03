@@ -5,6 +5,14 @@
 访问地址：http://localhost:8080
 """
 
+import sys
+
+# Windows 控制台默认 GBK，强制 stdout/stderr 使用 UTF-8，避免中文日志乱码
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 import gzip
 import io
 import json
@@ -134,6 +142,10 @@ RESUME_MAX_FILE_SIZE = 12 * 1024 * 1024
 RESUME_MAX_PAGES = 20
 RESUME_OCR_TIMEOUT_SECONDS = 35
 RESUME_MAX_TEXT_CHARS = 24000
+CAREER_REPORT_LLM_TIMEOUT_SECONDS = max(
+    30,
+    int(os.environ.get("CAREER_REPORT_LLM_TIMEOUT_SECONDS", "180")),
+)
 CAREER_GRAPH_FILE = os.path.join(BASE_DIR, "data", "career_graph.json")
 CAREER_GRAPH_LOCK = threading.Lock()
 CAREER_GRAPH_CACHE = {
@@ -790,7 +802,8 @@ def _load_users():
         if normalized:
             merged[normalized["username"]] = normalized
 
-    for spec in DEFAULT_USER_SPECS:
+    seed_specs = DEFAULT_USER_SPECS if not merged else DEFAULT_USER_SPECS[:1]
+    for spec in seed_specs:
         existing = merged.get(spec["username"]) or {}
         password_hash = str(existing.get("password_hash") or "").strip()
         # Avoid recomputing password hashes on every request.
@@ -878,6 +891,10 @@ def _user_state_path(username):
     return os.path.join(USER_STATE_DIR, f"{safe_name}.json")
 
 
+def _user_storage_key(username):
+    return re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
+
+
 def _load_user_state(username):
     state = _app_db.load_user_state(username)
     return state if isinstance(state, dict) else {}
@@ -888,6 +905,276 @@ def _save_user_state(username, payload):
     _app_db.save_user_state(username, normalized)
     return normalized
 
+
+def _account_storage_paths(storage_key):
+    safe_key = _user_storage_key(storage_key)
+    return {
+        "storage_key": safe_key,
+        "state": os.path.join(USER_STATE_DIR, f"{safe_key}.json"),
+        "reports": os.path.join(CAREER_REPORT_DIR, safe_key),
+        "uploads": os.path.join(RESUME_UPLOAD_DIR, safe_key),
+    }
+
+
+def _iter_known_account_storage_keys():
+    keys = set()
+    for user in _load_users():
+        keys.add(_user_storage_key(user.get("username")))
+
+    if os.path.isdir(USER_STATE_DIR):
+        for name in os.listdir(USER_STATE_DIR):
+            if not name.lower().endswith(".json"):
+                continue
+            keys.add(os.path.splitext(name)[0])
+
+    for base_dir in (CAREER_REPORT_DIR, RESUME_UPLOAD_DIR):
+        if not os.path.isdir(base_dir):
+            continue
+        for name in os.listdir(base_dir):
+            if not name:
+                continue
+            full_path = os.path.join(base_dir, name)
+            if os.path.isdir(full_path):
+                keys.add(name)
+
+    return sorted(key for key in keys if key)
+
+
+def _safe_int_values(*values):
+    result = []
+    for value in values:
+        try:
+            parsed = int(float(value))
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            result.append(parsed)
+    return result
+
+
+def _max_timestamp_label(*values):
+    candidates = _safe_int_values(*values)
+    if not candidates:
+        return ""
+    try:
+        return datetime.fromtimestamp(max(candidates)).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+
+def _build_admin_account_completion(user=None, storage_key=""):
+    registered_user = user if isinstance(user, dict) else None
+    safe_storage_key = _user_storage_key(storage_key or (registered_user or {}).get("username"))
+    lookup_name = (registered_user or {}).get("username") or safe_storage_key
+
+    state = _load_user_state(lookup_name)
+    bundle = _read_career_report_bundle(lookup_name)
+    report_state, _ = _sanitize_transient_career_report_state(
+        lookup_name,
+        state.get("career_report"),
+        bundle,
+    )
+    report_versions = _list_career_report_version_summaries(lookup_name, include_latest=True)
+    upload_dir = _user_upload_dir(lookup_name)
+
+    profile_scope = state.get("profile_snapshot") if isinstance(state.get("profile_snapshot"), dict) else {}
+    profile_payload = _saved_profile_snapshot_payload(profile_scope)
+    profile_ready = bool(profile_payload)
+
+    resume_scope = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
+    resume_status = str(resume_scope.get("status") or "").strip().lower()
+    resume_ready = resume_status in {"analyzed", "ready", "completed"}
+
+    matching_scope = state.get("career_matching") if isinstance(state.get("career_matching"), dict) else {}
+    matching_roles = matching_scope.get("role_rankings") if isinstance(matching_scope.get("role_rankings"), list) else []
+    matching_ready = bool(
+        matching_roles
+        or str(matching_scope.get("focus_role_id") or "").strip()
+        or (matching_scope.get("graph_match_bundle") if isinstance(matching_scope.get("graph_match_bundle"), dict) else {})
+    )
+
+    report_meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
+    report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
+    report_generated = bool(str(report_meta.get("report_id") or "").strip() and report_document)
+    report_runtime_status = str(report_state.get("status") or "").strip().lower()
+    report_running = report_runtime_status in {"queued", "running"}
+    report_failed = report_runtime_status in {"failed", "error"}
+
+    uploads_count = 0
+    if os.path.isdir(upload_dir):
+        try:
+            uploads_count = sum(1 for name in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, name)))
+        except OSError:
+            uploads_count = 0
+
+    milestones = [
+        {
+            "key": "profile",
+            "label": "档案画像",
+            "done": profile_ready,
+            "status": "completed" if profile_ready else "empty",
+        },
+        {
+            "key": "resume",
+            "label": "简历解析",
+            "done": resume_ready,
+            "status": resume_status or ("uploaded" if uploads_count else "empty"),
+        },
+        {
+            "key": "matching",
+            "label": "岗位匹配",
+            "done": matching_ready,
+            "status": "completed" if matching_ready else "empty",
+        },
+        {
+            "key": "report",
+            "label": "正式报告",
+            "done": report_generated,
+            "status": "running" if report_running else "failed" if report_failed else "completed" if report_generated else report_runtime_status or "empty",
+        },
+    ]
+
+    completed_count = sum(1 for item in milestones if item["done"])
+    completion_percent = int(round((completed_count / max(len(milestones), 1)) * 100))
+    if report_running:
+        overall_status = "running"
+    elif report_failed:
+        overall_status = "failed"
+    elif completion_percent >= 100:
+        overall_status = "completed"
+    elif completion_percent <= 0:
+        overall_status = "empty"
+    else:
+        overall_status = "partial"
+
+    last_activity_at = _max_timestamp_label(
+        profile_scope.get("updated_at"),
+        resume_scope.get("uploaded_at"),
+        resume_scope.get("analyzed_at"),
+        matching_scope.get("updated_at"),
+        report_state.get("updated_at"),
+        report_meta.get("generated_at"),
+    )
+
+    data_paths = _account_storage_paths(safe_storage_key)
+    has_state = os.path.isfile(data_paths["state"])
+    has_reports = os.path.isdir(data_paths["reports"]) and any(os.scandir(data_paths["reports"]))
+    has_uploads = os.path.isdir(data_paths["uploads"]) and any(os.scandir(data_paths["uploads"]))
+
+    return {
+        "account_key": safe_storage_key,
+        "username": str((registered_user or {}).get("username") or "").strip(),
+        "display_name": str((registered_user or {}).get("display_name") or safe_storage_key).strip() or safe_storage_key,
+        "role": str((registered_user or {}).get("role") or "data_only").strip() or "data_only",
+        "registered": bool(registered_user),
+        "data_only": not bool(registered_user),
+        "data_flags": {
+            "has_state": bool(has_state),
+            "has_reports": bool(has_reports),
+            "has_uploads": bool(has_uploads),
+            "uploads_count": uploads_count,
+            "report_versions": len(report_versions),
+        },
+        "completion": {
+            "percent": completion_percent,
+            "completed_count": completed_count,
+            "total_count": len(milestones),
+            "status": overall_status,
+            "milestones": milestones,
+        },
+        "report_status": {
+            "status": report_runtime_status or ("completed" if report_generated else "empty"),
+            "stage": str(report_state.get("stage") or "").strip(),
+            "detail": str(report_state.get("stage_detail") or report_state.get("detail") or "").strip(),
+            "generated": report_generated,
+            "generated_at": str(report_meta.get("generated_at") or "").strip(),
+            "report_id": str(report_meta.get("report_id") or "").strip(),
+        },
+        "last_activity_at": last_activity_at,
+    }
+
+
+def _list_admin_accounts():
+    users_by_key = {
+        _user_storage_key(item.get("username")): item
+        for item in _load_users()
+        if isinstance(item, dict)
+    }
+    accounts = []
+    for storage_key in _iter_known_account_storage_keys():
+        entry = _build_admin_account_completion(users_by_key.get(storage_key), storage_key)
+        accounts.append(entry)
+
+    def _sort_key(item):
+        return (
+            item.get("role") != "super_admin",
+            item.get("data_only"),
+            -(item.get("completion", {}) or {}).get("percent", 0),
+            str(item.get("username") or item.get("account_key") or ""),
+        )
+
+    accounts.sort(key=_sort_key)
+    summary = {
+        "total_accounts": len(accounts),
+        "registered_accounts": sum(1 for item in accounts if item.get("registered")),
+        "data_only_accounts": sum(1 for item in accounts if item.get("data_only")),
+        "completed_reports": sum(1 for item in accounts if (item.get("report_status") or {}).get("generated")),
+        "running_reports": sum(1 for item in accounts if (item.get("report_status") or {}).get("status") in {"queued", "running"}),
+    }
+    return {"accounts": accounts, "summary": summary}
+
+
+def _remove_account_runtime_jobs(lookup_name):
+    lookup_names = {str(lookup_name or "").strip(), _user_storage_key(lookup_name)}
+    lookup_names.discard("")
+
+    with RESUME_ANALYSIS_LOCK:
+        stale_resume_jobs = [
+            job_id
+            for job_id, job in RESUME_ANALYSIS_JOBS.items()
+            if str((job or {}).get("username") or "").strip() in lookup_names
+        ]
+        for job_id in stale_resume_jobs:
+            RESUME_ANALYSIS_JOBS.pop(job_id, None)
+
+    with CAREER_REPORT_LOCK:
+        stale_report_jobs = [
+            job_id
+            for job_id, job in CAREER_REPORT_JOBS.items()
+            if str((job or {}).get("username") or "").strip() in lookup_names
+        ]
+        for job_id in stale_report_jobs:
+            CAREER_REPORT_JOBS.pop(job_id, None)
+
+
+def _delete_admin_account(account_key, acting_username=""):
+    safe_key = _user_storage_key(account_key)
+    if not safe_key:
+        raise ValueError("缺少账号标识")
+
+    users = list(_load_users())
+    registered_user = next((item for item in users if _user_storage_key(item.get("username")) == safe_key), None)
+    registered_username = str((registered_user or {}).get("username") or "").strip()
+
+    if registered_username == "system":
+        raise PermissionError("system 账号不能删除")
+    if registered_username and registered_username == str(acting_username or "").strip():
+        raise PermissionError("不能删除当前登录账号")
+
+    if registered_user:
+        _save_users([item for item in users if str(item.get("username") or "").strip() != registered_username])
+
+    lookup_name = registered_username or safe_key
+    paths = _account_storage_paths(safe_key)
+    for target in (paths["state"],):
+        if os.path.isfile(target):
+            os.remove(target)
+    for target in (paths["reports"], paths["uploads"]):
+        if os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)
+
+    _remove_account_runtime_jobs(lookup_name)
+    return _build_admin_account_completion(None, safe_key)
 
 def _saved_profile_snapshot_payload(raw_scope):
     scope = raw_scope if isinstance(raw_scope, dict) else {}
@@ -3093,6 +3380,23 @@ def _public_career_report_state(raw_state):
     return state
 
 
+def _sanitize_transient_career_report_state(username, raw_state, current_bundle=None):
+    state = raw_state if isinstance(raw_state, dict) else {}
+    status = str(state.get("status") or "").strip().lower()
+    if status not in {"canceled", "cancelled", "failed"}:
+        return state, False
+
+    bundle = current_bundle if isinstance(current_bundle, dict) else _read_career_report_bundle(username)
+    if isinstance(bundle, dict) and bundle.get("meta"):
+        return state, False
+
+    cleaned = empty_report_state()
+    feedback = _normalize_career_report_feedback(state.get("feedback"))
+    if feedback is not None:
+        cleaned["feedback"] = feedback
+    return cleaned, True
+
+
 def _public_career_report_job(raw_job):
     job = empty_report_job()
     if isinstance(raw_job, dict):
@@ -3509,6 +3813,30 @@ def _sync_career_report_tracker_state(username, bundle, current_capabilities=Non
         _save_user_state(username, state)
 
     return state, report_state, tracker
+
+
+def _merge_stage_progress(job_id, new_stage_key):
+    """Build progress that marks new_stage_key as active but preserves other active stages.
+
+    Prevents parallel agents from overwriting each other's 'active' status with 'done'.
+    """
+    new_progress = build_stage_progress(new_stage_key)
+    with CAREER_REPORT_LOCK:
+        job = CAREER_REPORT_JOBS.get(job_id)
+        existing = list(job.get("progress") or []) if isinstance(job, dict) else []
+    existing_map = {str(item.get("key") or ""): str(item.get("status") or "") for item in existing}
+    merged = []
+    for item in new_progress:
+        key = str(item.get("key") or "")
+        new_status = str(item.get("status") or "")
+        existing_status = existing_map.get(key, "")
+        # Don't downgrade an active parallel stage to done; it will become done
+        # naturally once the next serial stage notifies.
+        if new_status == "done" and existing_status == "active":
+            merged.append({**item, "status": "active"})
+        else:
+            merged.append(item)
+    return merged
 
 
 def _update_career_report_job(job_id, **fields):
@@ -5302,7 +5630,12 @@ def _normalize_profile(raw_payload):
 def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max_tokens=480,
                           max_retries=3, base_delay=1.5):
     base = _normalize_sdk_base_url(base_url)
-    client = OpenAI(api_key=api_key, base_url=base)
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base,
+        timeout=CAREER_REPORT_LLM_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
     try:
         merged_messages = [{"role": "system", "content": system_prompt}] + messages
         resp = _safe_create_chat_completion(
@@ -5376,7 +5709,12 @@ def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max
 def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, max_tokens=3200,
                         max_retries=3, base_delay=1.5):
     base = _normalize_sdk_base_url(base_url)
-    client = OpenAI(api_key=api_key, base_url=base)
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base,
+        timeout=CAREER_REPORT_LLM_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
     merged_messages = list(messages or [])
     if system_prompt:
         merged_messages = [{"role": "system", "content": system_prompt}] + merged_messages
@@ -5457,12 +5795,12 @@ def index():
         return render_template("login.html", initial_user=None)
     return render_template(
         "base.html",
-        career_news=get_career_news_payload(),
         initial_user=_public_user(user),
     )
 
 
 @app.route("/app_data/<path:filename>")
+@_login_required
 def app_data_asset(filename):
     safe_name = str(filename or "").strip()
     if not safe_name:
@@ -5479,6 +5817,18 @@ def app_data_asset(filename):
     directory = os.path.dirname(full_path)
     name = os.path.basename(full_path)
     return send_from_directory(directory, name, conditional=True)
+
+
+@app.route("/multi-agent-workflow")
+@app.route("/multi-agent-workflow.html")
+def multi_agent_workflow_page():
+    if not _current_user():
+        return redirect(url_for("index"))
+    return send_from_directory(
+        os.path.join(BASE_DIR, "static"),
+        "multi-agent-workflow.html",
+        mimetype="text/html"
+    )
 
 
 @app.route("/user-center")
@@ -6415,6 +6765,15 @@ def api_auth_status():
         state = _load_user_state(user["username"])
         resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
         career_report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+        career_report_bundle = _read_career_report_bundle(user["username"])
+        career_report_state, career_report_state_changed = _sanitize_transient_career_report_state(
+            user["username"],
+            career_report_state,
+            current_bundle=career_report_bundle,
+        )
+        if career_report_state_changed:
+            state["career_report"] = career_report_state
+            _save_user_state(user["username"], state)
         payload["llm"] = {
             "selection": selection,
             "providers": [_public_provider(p, is_admin) for p in providers],
@@ -6458,6 +6817,15 @@ def api_bootstrap():
     state = _load_user_state(user["username"])
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
     career_report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    career_report_bundle = _read_career_report_bundle(user["username"])
+    career_report_state, career_report_state_changed = _sanitize_transient_career_report_state(
+        user["username"],
+        career_report_state,
+        current_bundle=career_report_bundle,
+    )
+    if career_report_state_changed:
+        state["career_report"] = career_report_state
+        _save_user_state(user["username"], state)
 
     return jsonify({
         "authenticated": True,
@@ -6564,6 +6932,7 @@ def api_auth_register():
     }
     users.append(created_user)
     _save_users(users)
+    _save_user_state(created_user["username"], {})
 
     session.clear()
     session.permanent = True
@@ -6609,6 +6978,31 @@ def api_auth_password():
         updated_users.append(next_item)
     _save_users(updated_users)
     return jsonify({"message": "密码已更新。"})
+
+
+@app.route("/api/admin/accounts", methods=["GET"])
+@_super_admin_required
+def api_admin_accounts():
+    return jsonify(_list_admin_accounts())
+
+
+@app.route("/api/admin/accounts/<path:account_key>", methods=["DELETE"])
+@_super_admin_required
+def api_admin_account_delete(account_key):
+    acting_user = _current_user() or {}
+    try:
+        deleted = _delete_admin_account(account_key, acting_username=acting_user.get("username"))
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"message": str(exc)}), 403
+    return jsonify(
+        {
+            "message": "账号及关联数据已删除。",
+            "deleted": deleted,
+            **_list_admin_accounts(),
+        }
+    )
 
 
 @app.route("/api/user-state/<scope>", methods=["GET", "PUT"])
@@ -7487,7 +7881,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             stage_label=stage_label,
             stage_detail=detail,
             message=detail,
-            progress=build_stage_progress(stage_key),
+            progress=_merge_stage_progress(job_id, stage_key),
         )
         _save_career_report_progress(
             username,
@@ -7773,6 +8167,12 @@ def api_career_report_generate_cancel():
         report_id=str(selected_job.get("report_id") or ""),
     )
 
+    current_bundle = _read_career_report_bundle(username)
+    if not (isinstance(current_bundle, dict) and current_bundle.get("meta")):
+        state = _load_user_state(username)
+        state["career_report"] = empty_report_state()
+        _save_user_state(username, state)
+
     return jsonify({
         "message": "已停止本次职业报告生成。正在进行中的模型请求如果稍后返回，也不会写入报告。",
         "job": _public_career_report_job(selected_job),
@@ -7819,6 +8219,7 @@ def api_career_report_generate_status():
     state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
     report_status = str(report_state.get("status") or "")
+    current_bundle = _read_career_report_bundle(username)
     if not selected and report_status in {"queued", "running"}:
         report_state.update({
             "status": "canceled",
@@ -7854,6 +8255,15 @@ def api_career_report_generate_status():
                 }
             )
 
+    merged_state, merged_state_changed = _sanitize_transient_career_report_state(
+        username,
+        merged_state,
+        current_bundle=current_bundle,
+    )
+    if merged_state_changed:
+        state["career_report"] = merged_state
+        _save_user_state(username, state)
+
     return jsonify({
         "job": _public_career_report_job(selected),
         "state": _public_career_report_state(merged_state),
@@ -7871,6 +8281,14 @@ def api_career_report_current():
     else:
         state = _load_user_state(user["username"])
         report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+        report_state, report_state_changed = _sanitize_transient_career_report_state(
+            user["username"],
+            report_state,
+            current_bundle=bundle,
+        )
+        if report_state_changed:
+            state["career_report"] = report_state
+            _save_user_state(user["username"], state)
     data = _public_career_report_bundle(bundle) if isinstance(bundle, dict) and bundle.get("meta") else None
     return jsonify({
         "data": data,
@@ -8781,9 +9199,28 @@ def open_browser():
     time.sleep(1.0)
     webbrowser.open("http://localhost:8080")
 
+def _prewarm_caches():
+    """后台预热重载数据，避免首次请求阻塞。"""
+    def _warm_news():
+        try:
+            get_career_news_payload()
+        except Exception:
+            pass
+
+    def _warm_jobs():
+        try:
+            _jobs_bootstrap_payload()
+        except Exception:
+            pass
+
+    threading.Thread(target=_warm_news, daemon=True, name="prewarm-news").start()
+    threading.Thread(target=_warm_jobs, daemon=True, name="prewarm-jobs").start()
+
+
 _ensure_app_storage()
 _app_db.init_db()
 _load_users()
+_prewarm_caches()
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
     port = int(os.environ.get("PORT", "8080"))

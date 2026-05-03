@@ -1107,6 +1107,10 @@
                     <span class="uc-nav-icon">👤</span>
                     <span>账户中心</span>
                 </button>
+                <button type="button" class="uc-nav-link hidden" id="userCenterAdminNavBtn" data-target="account-admin">
+                    <span class="uc-nav-icon">🛠️</span>
+                    <span>账号管理</span>
+                </button>
             </nav>
 
             <div class="uc-sidebar-note">
@@ -1150,6 +1154,10 @@
                                     <p class="uc-section-kicker">Career Report</p>
                                     <h2 class="uc-section-title">职业报告中心</h2>
                                     <p id="userCenterReportSubline" class="uc-section-subline">先选择一份正式报告。</p>
+                                </div>
+                                <div class="uc-hero-actions">
+                                    <button id="userCenterOpenReportBtn" type="button" class="career-report-secondary-btn" onclick="window.openUserCenterReportLibrary?.()" disabled>查看报告</button>
+                                    <button id="userCenterGenerateReportBtn" type="button" class="career-report-primary-btn" onclick="handleUserCenterGenerateReport()">生成报告</button>
                                 </div>
                             </div>
                         </section>
@@ -1591,6 +1599,52 @@
                         </section>
                     </div>
                 </section>
+
+                <section id="account-admin" class="uc-section">
+                    <div class="uc-section-shell">
+                        <section class="uc-surface">
+                            <div class="uc-section-head">
+                                <div>
+                                    <p class="uc-section-kicker">Admin Console</p>
+                                    <h2 class="uc-section-title">账号管理</h2>
+                                    <p class="uc-section-copy">这里只对 system 开放。可以查看当前账号完成度、识别残留数据账号，并手动删除不再需要的账号数据。</p>
+                                </div>
+                                <div class="uc-admin-actions">
+                                    <button type="button" class="career-report-secondary-btn" onclick="window.reloadUserCenterAdminAccounts?.(true)">刷新列表</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="uc-admin-summary-grid">
+                            <article class="uc-surface uc-admin-summary-card">
+                                <span>当前账号</span>
+                                <strong id="userCenterAdminSummaryTotal">0</strong>
+                            </article>
+                            <article class="uc-surface uc-admin-summary-card">
+                                <span>已注册账号</span>
+                                <strong id="userCenterAdminSummaryRegistered">0</strong>
+                            </article>
+                            <article class="uc-surface uc-admin-summary-card">
+                                <span>残留数据</span>
+                                <strong id="userCenterAdminSummaryDataOnly">0</strong>
+                            </article>
+                            <article class="uc-surface uc-admin-summary-card">
+                                <span>已出正式报告</span>
+                                <strong id="userCenterAdminSummaryCompleted">0</strong>
+                            </article>
+                        </div>
+
+                        <section class="uc-surface uc-admin-account-surface">
+                            <div class="uc-account-card-head">
+                                <div>
+                                    <h3>账号列表</h3>
+                                    <p id="userCenterAdminStatus" class="uc-muted-copy">正在整理账号数据...</p>
+                                </div>
+                            </div>
+                            <div id="userCenterAdminAccounts" class="uc-admin-account-list" aria-live="polite"></div>
+                        </section>
+                    </div>
+                </section>
             </main>
         </div>
     </div>
@@ -1675,9 +1729,60 @@
     <script src="{{ url_for('static', filename='app.js') }}?v=20260419-career-news-autoplay-fix"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20260401-app-hotfix-v2"></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20260418-editor-save-baseline-v1"></script>
-    <script src="{{ url_for('static', filename='user-center.js') }}?v=20260426-report-card-compact-v1"></script>
+    <script src="{{ url_for('static', filename='user-center.js') }}?v=20260420-admin-account-console-v1"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20260402-learning-path-fusion-v1"></script>
     <style>
+      /* ── 报告中心主区域按钮样式 ── */
+      #report-workspace .uc-section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .uc-hero-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+      .uc-hero-actions .career-report-primary-btn,
+      .uc-hero-actions .career-report-secondary-btn {
+        min-width: 120px;
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .uc-hero-actions .career-report-primary-btn {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: #fff;
+        border: none;
+      }
+      .uc-hero-actions .career-report-primary-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      }
+      .uc-hero-actions .career-report-primary-btn:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+      .uc-hero-actions .career-report-secondary-btn {
+        background: #fff;
+        color: #3b82f6;
+        border: 1.5px solid #3b82f6;
+      }
+      .uc-hero-actions .career-report-secondary-btn:hover:not(:disabled) {
+        background: rgba(59, 130, 246, 0.05);
+      }
+      .uc-hero-actions .career-report-secondary-btn:disabled {
+        color: #94a3b8;
+        border-color: #cbd5e1;
+        cursor: not-allowed;
+      }
+
       /* ── 报告列表视图 ── */
       .uc-rpt-card-grid {
         display: grid;
@@ -3166,6 +3271,202 @@
         #plan-workspace .lp-overview-stats,
         #plan-workspace .lp-grid--fusion {
           grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <style>
+      .uc-admin-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .uc-admin-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      .uc-admin-summary-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 112px;
+        justify-content: center;
+      }
+
+      .uc-admin-summary-card span {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      .uc-admin-summary-card strong {
+        color: #0f172a;
+        font-size: 32px;
+        line-height: 1;
+      }
+
+      .uc-admin-account-surface {
+        margin-top: 18px;
+      }
+
+      .uc-admin-account-list {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .uc-admin-account-item {
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 20px;
+        padding: 18px 20px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94));
+      }
+
+      .uc-admin-account-head,
+      .uc-admin-account-meta,
+      .uc-admin-account-progress,
+      .uc-admin-account-milestones {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .uc-admin-account-head {
+        justify-content: space-between;
+      }
+
+      .uc-admin-account-name {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .uc-admin-account-name strong {
+        color: #0f172a;
+        font-size: 18px;
+      }
+
+      .uc-admin-account-name span,
+      .uc-admin-account-note {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      .uc-admin-account-meta,
+      .uc-admin-account-milestones {
+        margin-top: 12px;
+      }
+
+      .uc-admin-pill,
+      .uc-admin-mile {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: rgba(226, 232, 240, 0.8);
+        color: #475569;
+      }
+
+      .uc-admin-pill.is-role-admin,
+      .uc-admin-pill.is-status-completed,
+      .uc-admin-mile.is-done {
+        background: rgba(16, 185, 129, 0.14);
+        color: #047857;
+      }
+
+      .uc-admin-pill.is-data-only,
+      .uc-admin-pill.is-status-running {
+        background: rgba(59, 130, 246, 0.14);
+        color: #1d4ed8;
+      }
+
+      .uc-admin-pill.is-status-failed {
+        background: rgba(248, 113, 113, 0.14);
+        color: #b91c1c;
+      }
+
+      .uc-admin-pill.is-status-empty,
+      .uc-admin-mile.is-empty {
+        background: rgba(226, 232, 240, 0.72);
+        color: #64748b;
+      }
+
+      .uc-admin-account-progress {
+        margin-top: 14px;
+        justify-content: space-between;
+      }
+
+      .uc-admin-progress-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 180px;
+      }
+
+      .uc-admin-progress-copy strong {
+        color: #0f172a;
+        font-size: 16px;
+      }
+
+      .uc-admin-progress-copy span {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      .uc-admin-progress-track {
+        flex: 1;
+        min-width: 220px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(226, 232, 240, 0.86);
+        overflow: hidden;
+      }
+
+      .uc-admin-progress-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22c55e, #0ea5e9);
+      }
+
+      .uc-admin-account-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 14px;
+      }
+
+      .uc-admin-empty {
+        padding: 28px 20px;
+        border: 1px dashed rgba(148, 163, 184, 0.45);
+        border-radius: 18px;
+        color: #64748b;
+        text-align: center;
+      }
+
+      @media (max-width: 1100px) {
+        .uc-admin-summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .uc-admin-summary-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .uc-admin-account-progress {
+          align-items: flex-start;
+        }
+
+        .uc-admin-progress-track {
+          width: 100%;
+          min-width: 0;
         }
       }
     </style>

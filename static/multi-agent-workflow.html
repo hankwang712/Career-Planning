@@ -317,21 +317,21 @@
     <script>
         const agents = [
             { id: '01', name: '画像输入', role: 'Profile Intake', status: 'completed', type: 'profile', metrics: [{text:'✅ 数据已录入',cls:'green'}] },
-            { id: '02', name: '行业分析师', role: 'Industry Analyst', status: 'completed', type: 'analyst', metrics: [{text:'📊 12行业',cls:'blue'},{text:'📈 3趋势',cls:'green'}] },
-            { id: '03', name: '简历证据分析官', role: 'Resume Evidence', status: 'completed', type: 'evidence', metrics: [{text:'📄 8证据',cls:'green'},{text:'🎯 5映射',cls:'blue'}] },
-            { id: '04', name: '职业定位顾问', role: 'Career Positioning', status: 'completed', type: 'advisor', isHub: true, metrics: [{text:'🔄 融合完成',cls:'pink'},{text:'💡 3方向',cls:'blue'}] },
-            { id: '05', name: '能力评估官', role: 'Competency Assessor', status: 'completed', type: 'assessor', metrics: [{text:'🎨 画像',cls:'pink'},{text:'📐 Gap',cls:'blue'}] },
-            { id: '06', name: '证据复核', role: 'Evidence Reviewer', status: 'active', type: 'reviewer', metrics: [{text:'⏳ 处理中',cls:'yellow'}], hasLoading: true },
+            { id: '02', name: '行业分析师', role: 'Industry Analyst', status: 'pending', type: 'analyst', metrics: [{text:'💤 等待中',cls:'gray'}] },
+            { id: '03', name: '简历证据分析官', role: 'Resume Evidence', status: 'pending', type: 'evidence', metrics: [{text:'💤 等待中',cls:'gray'}] },
+            { id: '04', name: '职业定位顾问', role: 'Career Positioning', status: 'pending', type: 'advisor', isHub: true, metrics: [{text:'💤 等待中',cls:'gray'}] },
+            { id: '05', name: '能力评估官', role: 'Competency Assessor', status: 'pending', type: 'assessor', metrics: [{text:'💤 等待中',cls:'gray'}] },
+            { id: '06', name: '证据复核', role: 'Evidence Reviewer', status: 'pending', type: 'reviewer', metrics: [{text:'💤 等待中',cls:'gray'}] },
             { id: '07', name: '岗位匹配官', role: 'Role Mapping', status: 'pending', type: 'matcher', metrics: [{text:'💤 等待中',cls:'gray'}] },
         ];
 
         const connections = [
-            { from: '01', to: '02', status: 'completed' },
-            { from: '01', to: '03', status: 'completed' },
-            { from: '02', to: '04', status: 'completed' },
-            { from: '03', to: '04', status: 'completed' },
-            { from: '04', to: '05', status: 'completed' },
-            { from: '04', to: '06', status: 'active' },
+            { from: '01', to: '02', status: 'pending' },
+            { from: '01', to: '03', status: 'pending' },
+            { from: '02', to: '04', status: 'pending' },
+            { from: '03', to: '04', status: 'pending' },
+            { from: '04', to: '05', status: 'pending' },
+            { from: '04', to: '06', status: 'pending' },
             { from: '05', to: '07', status: 'pending' },
             { from: '06', to: '07', status: 'pending' },
         ];
@@ -1034,20 +1034,202 @@
             drawConnections();
         }
 
-        window.addEventListener('load', () => {
-            setTimeout(initConnections, 600);
-        });
         window.addEventListener('resize', () => {
             if (connAnimFrame) cancelAnimationFrame(connAnimFrame);
             resizeConnCanvas();
             drawConnections();
         });
 
-        function restartGen() {
-            const btn = document.querySelector('.btn-primary');
-            btn.style.transform = 'scale(0.95)';
-            setTimeout(() => { btn.style.transform = ''; }, 150);
+        // ===== 流程动画控制 =====
+        let workflowActive = false;
+        let currentAgentIndex = 0;
+        let workflowTimer = null;
+
+        const statusBarIcon = document.querySelector('.status-icon');
+        const statusBarTitle = document.querySelector('.status-text h3');
+        const statusBarDesc = document.querySelector('.status-text p');
+        const statusBarTime = document.querySelector('.status-time .time');
+        const statusBarTimeLabel = document.querySelector('.status-time .label');
+
+        function updateStatusBar(icon, title, desc) {
+            statusBarIcon.textContent = icon;
+            statusBarTitle.textContent = title;
+            statusBarDesc.textContent = desc;
+            statusBarTime.textContent = new Date().toLocaleString('zh-CN');
         }
+
+        function updateAgentStatus(index, status) {
+            const agent = agents[index];
+            agent.status = status;
+            
+            const card = document.querySelector(`[data-node-id="${agent.id}"]`);
+            if (card) {
+                card.className = `agent-card ${status}${agent.isHub ? ' hub' : ''}`;
+                
+                const statusBadge = card.querySelector('.status-badge');
+                if (statusBadge) {
+                    statusBadge.className = `status-badge ${status}`;
+                    statusBadge.textContent = status === 'completed' ? '已完成' : status === 'active' ? '处理中' : '待启动';
+                }
+                
+                const loadingBar = card.querySelector('.loading-bar');
+                if (status === 'active' && !loadingBar) {
+                    const metricsDiv = card.querySelector('.agent-metrics');
+                    if (metricsDiv) {
+                        const loadingHTML = '<div class="loading-bar"><div class="loading-bar-fill"></div></div>';
+                        metricsDiv.insertAdjacentHTML('beforebegin', loadingHTML);
+                    }
+                } else if (status === 'completed' && loadingBar) {
+                    loadingBar.remove();
+                    // 更新指标显示
+                    const metricsDiv = card.querySelector('.agent-metrics');
+                    if (metricsDiv) {
+                        metricsDiv.innerHTML = agent.metrics.map(m => `<span class="metric-tag ${m.cls}">${m.text}</span>`).join('');
+                    }
+                }
+                
+                // 更新连接线状态
+                updateConnectionStatus(agent.id, status);
+            }
+        }
+
+        function updateConnectionStatus(fromId, status) {
+            const fromAgent = agents.find(a => a.id === fromId);
+            if (!fromAgent) return;
+            
+            connections.forEach(conn => {
+                if (conn.from === fromId) {
+                    conn.status = status === 'completed' ? 'completed' : status === 'active' ? 'active' : 'pending';
+                }
+            });
+            
+            // 重新初始化流动粒子
+            initFlowParticles();
+        }
+
+        function resetWorkflow() {
+            workflowActive = false;
+            currentAgentIndex = 0;
+            if (workflowTimer) {
+                clearInterval(workflowTimer);
+                workflowTimer = null;
+            }
+            
+            // 重置所有agent状态（除了第一个）
+            for (let i = 1; i < agents.length; i++) {
+                agents[i].status = 'pending';
+                agents[i].metrics = [{text:'💤 等待中',cls:'gray'}];
+            }
+            
+            // 重置连接线
+            connections.forEach((conn, idx) => {
+                if (idx < 5) {
+                    conn.status = 'completed';
+                } else {
+                    conn.status = 'pending';
+                }
+            });
+            
+            // 更新UI
+            document.querySelectorAll('.agent-card').forEach((card, idx) => {
+                const status = idx === 0 ? 'completed' : 'pending';
+                const agent = agents[idx];
+                card.className = `agent-card ${status}${agent.isHub ? ' hub' : ''}`;
+                
+                const statusBadge = card.querySelector('.status-badge');
+                if (statusBadge) {
+                    statusBadge.className = `status-badge ${status}`;
+                    statusBadge.textContent = status === 'completed' ? '已完成' : status === 'active' ? '处理中' : '待启动';
+                }
+                
+                // 移除加载条
+                const loadingBar = card.querySelector('.loading-bar');
+                if (loadingBar) loadingBar.remove();
+                
+                // 重置指标
+                const metricsDiv = card.querySelector('.agent-metrics');
+                if (metricsDiv && idx > 0) {
+                    metricsDiv.innerHTML = '<span class="metric-tag gray">💤 等待中</span>';
+                }
+            });
+            
+            // 重置按钮
+            const btn = document.querySelector('.btn-primary');
+            btn.textContent = '🚀 启动生成';
+            btn.onclick = startWorkflow;
+            
+            updateStatusBar('⏸️', '本次生成已停止', '旧任务已停止，不会写入报告；可以重新启动一次新的多智能体生成。');
+            statusBarTimeLabel.textContent = '更新时间';
+            
+            // 重置连接线
+            initFlowParticles();
+        }
+
+        function startWorkflow() {
+            if (workflowActive) return;
+            
+            workflowActive = true;
+            currentAgentIndex = 1; // 从第二个agent开始（第一个已完成）
+            
+            const btn = document.querySelector('.btn-primary');
+            btn.textContent = '⏳ 生成中...';
+            btn.onclick = () => {};
+            
+            updateStatusBar('⚡', '正在生成中...', '多智能体协作流运行中，请稍候...');
+            
+            // 每40秒处理一个agent
+            workflowTimer = setInterval(() => {
+                if (currentAgentIndex < agents.length) {
+                    const agent = agents[currentAgentIndex];
+                    
+                    // 当前agent变为处理中
+                    if (agent.status !== 'active') {
+                        updateAgentStatus(currentAgentIndex, 'active');
+                    }
+                    
+                    // 上一个agent完成
+                    if (currentAgentIndex > 1) {
+                        updateAgentStatus(currentAgentIndex - 1, 'completed');
+                    }
+                    
+                    currentAgentIndex++;
+                    updateStatusBar('⚡', `正在处理: ${agent.name}`, `已完成 ${currentAgentIndex - 2}/${agents.length - 1} 个智能体...`);
+                    
+                } else {
+                    // 所有agent完成
+                    clearInterval(workflowTimer);
+                    workflowTimer = null;
+                    workflowActive = false;
+                    
+                    // 最后一个agent也标记为完成
+                    updateAgentStatus(agents.length - 1, 'completed');
+                    
+                    // 改变按钮为重新生成
+                    const btn = document.querySelector('.btn-primary');
+                    btn.textContent = '🔄 重新生成';
+                    btn.onclick = resetWorkflow;
+                    
+                    updateStatusBar('✅', '生成已完成', '所有智能体处理完毕，报告已生成！');
+                }
+            }, 40000); // 40秒间隔
+        }
+
+        // 重写 restartGen 函数
+        function restartGen() {
+            resetWorkflow();
+            startWorkflow();
+        }
+
+        // 初始化：设置第一个按钮为启动生成
+        window.addEventListener('load', () => {
+            const btn = document.querySelector('.btn-primary');
+            if (btn) {
+                btn.textContent = '🚀 启动生成';
+                btn.onclick = startWorkflow;
+            }
+            
+            setTimeout(initConnections, 600);
+        });
     </script>
 </body>
 </html>

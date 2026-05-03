@@ -630,12 +630,29 @@ function normalizeGraphMatchItem(item) {
   };
 }
 
+function resolveCurrentUsername() {
+  let user = "guest";
+  try {
+    if (typeof window.getCurrentUser === "function") {
+      const u = window.getCurrentUser();
+      if (u && u.username) user = String(u.username);
+    } else if (window.opener && typeof window.opener.getCurrentUser === "function") {
+      const u = window.opener.getCurrentUser();
+      if (u && u.username) user = String(u.username);
+    }
+  } catch (_) {}
+  return user;
+}
+
 function loadMatchResultsFromStorage() {
   try {
-    let raw = sessionStorage.getItem("career_match_results");
-    let pRaw = sessionStorage.getItem("career_match_profile");
-    if (!raw) raw = localStorage.getItem("career_match_results");
-    if (!pRaw) pRaw = localStorage.getItem("career_match_profile");
+    const user = resolveCurrentUsername();
+    // 优先读取 sessionStorage 中按用户隔离的 key（跨页面传递）
+    let raw = sessionStorage.getItem(`career_match_results_${user}`);
+    let pRaw = sessionStorage.getItem(`career_match_profile_${user}`);
+    // 其次读取按用户隔离的 localStorage key
+    if (!raw) raw = localStorage.getItem(`career_match_results_${user}`);
+    if (!pRaw) pRaw = localStorage.getItem(`career_match_profile_${user}`);
     const parsed = raw ? JSON.parse(raw) : null;
     if (Array.isArray(parsed) && parsed.length) {
       if (pRaw) profileMeta = JSON.parse(pRaw);

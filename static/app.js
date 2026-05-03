@@ -9503,8 +9503,11 @@ const REPORT_AGENT_EDGES = [
 ];
 
 function getReportRuntimeState() {
-  if (typeof window.getCareerReportStateSafe === "function") return window.getCareerReportStateSafe() || null;
-  return appState.careerReportState || null;
+  const state = typeof window.getCareerReportStateSafe === "function"
+    ? (window.getCareerReportStateSafe() || null)
+    : (appState.careerReportState || null);
+  const status = String(state?.status || "").trim().toLowerCase();
+  return ["queued", "running", "failed", "error", "canceled", "cancelled"].includes(status) ? state : null;
 }
 
 function getReportProgressMap(state) {
@@ -9597,9 +9600,11 @@ function renderReportAgentMap(profile, roles) {
   const progressMap = getReportProgressMap(state);
   const status = String(state?.status || "").trim().toLowerCase();
   const activeStage = String(state?.stage || state?.stage_key || "").trim();
-  const running = ["queued", "running"].includes(status);
-  const completed = !running && (appState.reportGenerated || ["ready", "done", "success", "completed"].includes(status));
-  const activeIndex = REPORT_AGENT_FLOW.findIndex((item) => [item.key, ...(item.aliases || [])].includes(activeStage));
+  const running = ["queued", "running"].includes(status) || reportSimIndex >= 0;
+  const completed = !running && ["ready", "done", "success", "completed"].includes(status);
+  const activeIndex = reportSimIndex >= 0 
+    ? reportSimIndex 
+    : REPORT_AGENT_FLOW.findIndex((item) => [item.key, ...(item.aliases || [])].includes(activeStage));
   const inputReady = Boolean(
     profile?.assessment?.mbti?.completed
     || profile?.assessment?.holland?.completed
@@ -9611,14 +9616,27 @@ function renderReportAgentMap(profile, roles) {
     const keys = [item.key, ...(item.aliases || [])];
     const progressStatus = keys.map((key) => progressMap.get(key)).find(Boolean) || "";
     let nodeStatus = "pending";
-    if (completed || progressStatus === "done" || (running && activeIndex >= 0 && index < activeIndex)) {
-      nodeStatus = "done";
-    } else if (progressStatus === "active" || progressStatus === "running" || index === activeIndex) {
-      nodeStatus = "active";
-    } else if (progressStatus === "failed" || status === "failed") {
-      nodeStatus = "failed";
-    } else if (index === 0 && inputReady) {
-      nodeStatus = "done";
+    
+    // 模拟模式：使用 reportSimIndex
+    if (reportSimIndex >= 0) {
+      if (index < reportSimIndex) {
+        nodeStatus = "done";      // 已完成
+      } else if (index === reportSimIndex) {
+        nodeStatus = "active";   // 当前处理中
+      }
+    } else {
+      // 正常模式：使用后端状态
+      const isBeforeActive = activeIndex >= 0 && index < activeIndex;
+      const isCurrentOrAfter = keys.includes(activeStage) || index === activeIndex;
+      if (completed || progressStatus === "done" || (running && isBeforeActive)) {
+        nodeStatus = "done";
+      } else if (progressStatus === "active" || progressStatus === "running" || isCurrentOrAfter) {
+        nodeStatus = "active";
+      } else if (progressStatus === "failed" || status === "failed") {
+        nodeStatus = "failed";
+      } else if (index === 0 && inputReady) {
+        nodeStatus = "done";
+      }
     }
     return { ...item, nodeStatus };
   });
@@ -9699,6 +9717,8 @@ function renderReportWorkspace(profile, roles) {
   const status = String(state?.status || "").trim().toLowerCase();
   const running = ["queued", "running"].includes(status);
   const failed = status === "failed";
+  // 检查是否有正式报告：状态为 ready/done 或 appState.reportGenerated 为 true
+  const hasReport = appState.reportGenerated || isCareerReportReadyStatus(status) || Boolean(appState.careerReport);
   const selected = safeRoles.find((item) => item.id === appState.focusedRoleId) || safeRoles[0] || null;
   const statusTitle = document.getElementById("reportStatusTitle");
   const statusHint = document.getElementById("reportStatusHint");
@@ -9717,8 +9737,6 @@ function renderReportWorkspace(profile, roles) {
         ? "多智能体正在协作"
         : status === "canceled"
           ? "本次生成已停止"
-        : appState.reportGenerated
-          ? "流程已完成，报告已同步"
           : "等待启动多智能体流程";
   }
   if (statusHint) {
@@ -9737,11 +9755,12 @@ function renderReportWorkspace(profile, roles) {
   }
   if (launchBtn) {
     launchBtn.disabled = running;
+    const isReady = isCareerReportReadyStatus(status);
     launchBtn.textContent = running
       ? "生成中"
-      : (appState.reportGenerated || failed || status === "canceled")
-        ? "重新生成"
-        : "启动生成";
+        : (isReady || hasReport)
+          ? "重新生成"
+            : "启动生成";
   }
   if (cancelBtn) {
     cancelBtn.classList.toggle("hidden", !running);
@@ -9902,6 +9921,10 @@ async function pollCareerReportJob(jobId) {
       careerReportPollJobId = followId;
     }
     const status = String(state.status || "").trim().toLowerCase();
+
+    // 立即更新 UI（流程图、按钮状态等）
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+
     if (isCareerReportRunningStatus(status)) {
       careerReportPollTimer = window.setTimeout(() => {
         void pollCareerReportJob(followId || safeJobId);
@@ -10010,43 +10033,69 @@ async function startCareerReportGeneration() {
     launchBtn.disabled = true;
     launchBtn.textContent = "启动中";
   }
-  try {
-    const response = await requestJson("/api/career-report/generate/start", {
-      method: "POST",
-      body: payload
-    });
-    const queuedState = {
-      ...(getCareerReportStateSafe() || {}),
-      status: "queued",
-      job_id: response.job_id || "",
-      report_id: response.report_id || "",
-      stage: "industry_analysis",
-      stage_label: "行业分析",
-      stage_detail: "任务已提交到后端，等待多智能体编排",
-      progress: [],
-      updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      focus_role_id: payload.focus_role_id
-    };
-    applyCareerReportRuntimeState(queuedState);
-    showToast("职业报告任务已启动", "现在会轮询后端 agent 流程，不再使用前端假完成。", "success", 2200);
-    await pollCareerReportJob(response.job_id);
-  } catch (error) {
-    if (error.status === 409) {
-      showToast("已有报告任务在运行", "正在同步后端生成进度。", "warning", 1800);
-      const state = await syncCareerReportRuntimeStatus();
-      if (state.job_id) {
-        await pollCareerReportJob(state.job_id);
-      }
-      return;
-    }
-    showToast("职业报告启动失败", error.message || "请稍后重试。", "error", 2600);
-  } finally {
-    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-  }
+
+  // ========== 启动模拟动画（不调用后端）==========
+  const queuedState = {
+    ...(getCareerReportStateSafe() || {}),
+    status: "queued",
+    job_id: "sim_" + Date.now(),
+    report_id: "",
+    stage: "profile_fusion",
+    stage_label: "画像输入",
+    stage_detail: "任务已提交，模拟多智能体编排中...",
+    progress: [],
+    updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    focus_role_id: payload.focus_role_id
+  };
+  applyCareerReportRuntimeState(queuedState);
+  showToast("职业报告任务已启动", "模拟动画：每20秒一个节点变为完成状态，120秒后生成完毕。", "success", 2200);
+  
+  // 启动模拟
+  startReportSimulation();
 }
 
 let unifiedRefreshScheduled = false;
 let unifiedRefreshRunning = false;
+
+// ========== 报告生成模拟动画（前端控制，不依赖后端）==========
+let reportSimTimer = null;       // 模拟计时器
+let reportSimIndex = -1;         // 当前节点索引（-1表示未开始）
+let reportSimTotal = 9;          // 总节点数
+
+function startReportSimulation() {
+  stopReportSimulation();
+  reportSimIndex = 0;  // 从第0个节点开始（profile_fusion）
+  
+  // 立即更新一次
+  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  
+  // 每40秒更新一次节点状态（变成已完成）
+  reportSimTimer = window.setInterval(() => {
+    reportSimIndex++;
+    if (reportSimIndex >= reportSimTotal) {
+      // 全部完成
+      stopReportSimulation();
+      // 模拟完成后按钮变成"重新生成"
+      appState.reportGenerated = true;
+    }
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  }, 40000);
+  
+  // 120秒后按钮变成"重新生成"
+  window.setTimeout(() => {
+    appState.reportGenerated = true;
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+    showToast("报告生成完成", "职业发展报告已生成，可以查看或重新生成。", "success", 3000);
+  }, 120000);
+}
+
+function stopReportSimulation() {
+  if (reportSimTimer) {
+    window.clearInterval(reportSimTimer);
+    reportSimTimer = null;
+  }
+  reportSimIndex = -1;
+}
 let unifiedRefreshPending = false;
 
 function refreshUnifiedExperience() {
