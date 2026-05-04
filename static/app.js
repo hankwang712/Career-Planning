@@ -10392,6 +10392,9 @@ function lockApp() {
     avatar.textContent = "人";
   }
   closeNavWorkspaceMenu();
+  if (typeof window.__hidePageLoader === "function") {
+    requestAnimationFrame(() => window.__hidePageLoader());
+  }
 }
 
 function unlockAppForUser(user) {
@@ -10424,6 +10427,9 @@ function unlockAppForUser(user) {
   }
   emitAuthStateChange();
   if (redirectAfterUnlock()) return;
+  if (typeof window.__hidePageLoader === "function") {
+    requestAnimationFrame(() => window.__hidePageLoader());
+  }
 }
 
 async function handleLogin(event) {
@@ -10431,6 +10437,12 @@ async function handleLogin(event) {
   const username = (document.getElementById("loginUsername")?.value || "").trim();
   const password = document.getElementById("loginPassword")?.value || "";
   if (!username || !password) return showAuthMessage("请输入账号和密码。", "error");
+  const submitBtn = event.target?.querySelector?.('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.dataset.originalLabel = submitBtn.textContent;
+    submitBtn.textContent = "登录中…";
+  }
   try {
     await requestJson("/api/auth/login", {
       method: "POST",
@@ -10441,13 +10453,25 @@ async function handleLogin(event) {
     } catch (_) {
       // ignore
     }
+    if (typeof window.__showPageLoader === "function") {
+      window.__showPageLoader({
+        brand: shouldForceRelock() ? "解 锁 成 功" : "登 录 成 功",
+        tip: shouldForceRelock()
+          ? "正在返回上一界面 · Restoring your session"
+          : "正在进入你的工作台 · Preparing your workspace"
+      });
+    }
     if (shouldForceRelock()) {
       showAuthMessage("解锁成功，正在返回上一界面……", "success");
     } else {
       showAuthMessage("登录成功，正在进入你的独立空间……", "success");
     }
-    window.setTimeout(() => window.location.reload(), 180);
+    window.setTimeout(() => window.location.reload(), 360);
   } catch (error) {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      if (submitBtn.dataset.originalLabel) submitBtn.textContent = submitBtn.dataset.originalLabel;
+    }
     showAuthMessage(error.message || "登录失败，请稍后重试。", "error");
   }
 }
@@ -10461,6 +10485,12 @@ async function handleRegister(event) {
     showAuthMessage("请完整填写邮箱和密码。", "error");
     return;
   }
+  const submitBtn = event.target?.querySelector?.('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.dataset.originalLabel = submitBtn.textContent;
+    submitBtn.textContent = "创建中…";
+  }
   showAuthMessage("正在创建账户，请稍候……");
   try {
     await requestJson("/api/auth/register", {
@@ -10471,14 +10501,30 @@ async function handleRegister(event) {
         confirm_password: confirmPassword
       }
     });
+    if (typeof window.__showPageLoader === "function") {
+      window.__showPageLoader({
+        brand: "注 册 成 功",
+        tip: "正在初始化你的独立空间 · Initializing your workspace"
+      });
+    }
     showAuthMessage("注册成功，正在进入你的独立空间……", "success");
-    window.setTimeout(() => window.location.reload(), 180);
+    window.setTimeout(() => window.location.reload(), 360);
   } catch (error) {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      if (submitBtn.dataset.originalLabel) submitBtn.textContent = submitBtn.dataset.originalLabel;
+    }
     showAuthMessage(error.message || "注册失败，请稍后重试。", "error");
   }
 }
 
 async function logout() {
+  if (typeof window.__showPageLoader === "function") {
+    window.__showPageLoader({
+      brand: "正 在 退 出",
+      tip: "正在安全退出当前会话 · Signing you out"
+    });
+  }
   try {
     await requestJson("/api/auth/logout", { method: "POST" });
   } catch (_) {

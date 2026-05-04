@@ -10,7 +10,8 @@ const isWin = process.platform === "win32";
 const pythonCmd = isWin ? "python" : "python3";
 const viteBin = path.resolve(repoRoot, "node_modules", "vite", "bin", "vite.js");
 const viteOrigin = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
-const host = process.env.HOST || "127.0.0.1";
+
+const host = process.env.HOST || "0.0.0.0"; 
 const port = process.env.PORT || "8080";
 
 // 强制 Node.js 标准流使用 UTF-8，避免 Windows 控制台中文乱码
@@ -107,7 +108,7 @@ const pythonProc = spawnTagged(
 
 const viteProc = spawnTagged(
   process.execPath,
-  [viteBin, "--host", "127.0.0.1", "--port", "5173"],
+  [viteBin, "--host", "0.0.0.0", "--port", "5173"], 
   "vite"
 );
 

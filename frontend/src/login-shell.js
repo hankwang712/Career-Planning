@@ -144,6 +144,21 @@ function switchAuthTab(tab) {
   }
 }
 
+function disableSubmitButton(form, label) {
+  const btn = form?.querySelector?.('button[type="submit"]');
+  if (!btn) return null;
+  btn.disabled = true;
+  if (!btn.dataset.originalLabel) btn.dataset.originalLabel = btn.textContent;
+  btn.textContent = label;
+  return btn;
+}
+
+function restoreSubmitButton(btn) {
+  if (!btn) return;
+  btn.disabled = false;
+  if (btn.dataset.originalLabel) btn.textContent = btn.dataset.originalLabel;
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const username = (document.getElementById("loginUsername")?.value || "").trim();
@@ -153,6 +168,7 @@ async function handleLogin(event) {
     return;
   }
 
+  const submitBtn = disableSubmitButton(event.target, "登录中…");
   showAuthMessage("正在登录…", "info");
   try {
     await requestJson("/api/auth/login", {
@@ -160,9 +176,16 @@ async function handleLogin(event) {
       body: { username, password }
     });
     persistLoginEmail(username);
+    if (typeof window.__showPageLoader === "function") {
+      window.__showPageLoader({
+        brand: "登 录 成 功",
+        tip: "正在进入你的工作台 · Preparing your workspace"
+      });
+    }
     showAuthMessage("登录成功，正在跳转…", "success");
-    window.setTimeout(() => window.location.reload(), 180);
+    window.setTimeout(() => window.location.reload(), 360);
   } catch (error) {
+    restoreSubmitButton(submitBtn);
     showAuthMessage(error.message || "登录失败，请稍后重试。", "error");
   }
 }
@@ -178,6 +201,7 @@ async function handleRegister(event) {
     return;
   }
 
+  const submitBtn = disableSubmitButton(event.target, "创建中…");
   showAuthMessage("正在创建账户…", "info");
   try {
     await requestJson("/api/auth/register", {
@@ -189,9 +213,16 @@ async function handleRegister(event) {
       }
     });
     persistLoginEmail(email);
+    if (typeof window.__showPageLoader === "function") {
+      window.__showPageLoader({
+        brand: "注 册 成 功",
+        tip: "正在初始化你的独立空间 · Initializing your workspace"
+      });
+    }
     showAuthMessage("注册成功，正在跳转…", "success");
-    window.setTimeout(() => window.location.reload(), 180);
+    window.setTimeout(() => window.location.reload(), 360);
   } catch (error) {
+    restoreSubmitButton(submitBtn);
     showAuthMessage(error.message || "注册失败，请稍后重试。", "error");
   }
 }

@@ -125,9 +125,9 @@
     <div class="apl-orb">
       <div class="apl-orb-core"></div>
     </div>
-    <div class="apl-brand">智 航 生 涯</div>
+    <div class="apl-brand" data-apl-brand>智 航 生 涯</div>
     <div class="apl-bar"></div>
-    <div class="apl-tip">正在为你准备工作台 · Loading workspace</div>
+    <div class="apl-tip" data-apl-tip>正在为你准备工作台 · Loading workspace</div>
   </div>
 </div>
 <script>
@@ -136,26 +136,62 @@
     html.classList.add("app-loading");
     var loader = document.getElementById("appPageLoader");
     if (!loader) return;
-    var hidden = false;
+    var autoHideTimer = null;
+    var fallbackTimer = null;
+    var defaultBrand = "智 航 生 涯";
+    var defaultTip = "正在为你准备工作台 · Loading workspace";
+    function setText(opts) {
+      opts = opts || {};
+      var brandEl = loader.querySelector("[data-apl-brand]");
+      var tipEl = loader.querySelector("[data-apl-tip]");
+      if (brandEl) brandEl.textContent = opts.brand || defaultBrand;
+      if (tipEl) tipEl.textContent = opts.tip || defaultTip;
+    }
+    function showLoader(opts) {
+      opts = opts || {};
+      if (autoHideTimer) { clearTimeout(autoHideTimer); autoHideTimer = null; }
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+      setText(opts);
+      loader.removeAttribute("data-state");
+      html.classList.add("app-loading");
+      if (typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) {
+        fallbackTimer = setTimeout(hideLoader, opts.timeoutMs);
+      }
+    }
     function hideLoader() {
-      if (hidden) return;
-      hidden = true;
+      if (loader.getAttribute("data-state") === "hidden") return;
       loader.setAttribute("data-state", "hidden");
       html.classList.remove("app-loading");
-      setTimeout(function () {
-        if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
-      }, 520);
+      if (autoHideTimer) { clearTimeout(autoHideTimer); autoHideTimer = null; }
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    }
+    function authCheckingActive() {
+      return !!(document.body && document.body.classList.contains("auth-checking"));
+    }
+    function attemptAutoHide() {
+      if (!authCheckingActive()) {
+        hideLoader();
+        return;
+      }
+      var observer = new MutationObserver(function () {
+        if (!authCheckingActive()) {
+          observer.disconnect();
+          hideLoader();
+        }
+      });
+      observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     }
     window.__hidePageLoader = hideLoader;
+    window.__showPageLoader = showLoader;
     if (document.readyState === "complete") {
-      requestAnimationFrame(hideLoader);
+      requestAnimationFrame(attemptAutoHide);
     } else {
       window.addEventListener("load", function () {
         requestAnimationFrame(function () {
-          setTimeout(hideLoader, 120);
+          autoHideTimer = setTimeout(attemptAutoHide, 120);
         });
       });
     }
-    setTimeout(hideLoader, 7000);
+    fallbackTimer = setTimeout(hideLoader, 9000);
   })();
 </script>

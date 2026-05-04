@@ -249,8 +249,13 @@ body.shell-body {
 
 .auth-password-toggle {
   margin-left: auto;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 1.8rem;
+  width: 1.8rem;
+  height: 1.8rem;
   border: 0;
-  padding: 0.2rem;
+  padding: 0;
   margin-right: -0.15rem;
   background: transparent;
   cursor: pointer;
@@ -272,20 +277,21 @@ body.shell-body {
 
 .auth-password-toggle__icon {
   display: block;
+  grid-area: 1 / 1;
   width: 1.4rem;
   height: 1.4rem;
 }
 
 .auth-password-toggle__icon--on {
-  display: none;
+  display: none !important;
 }
 
 .auth-password-toggle.is-password-visible .auth-password-toggle__icon--off {
-  display: none;
+  display: none !important;
 }
 
 .auth-password-toggle.is-password-visible .auth-password-toggle__icon--on {
-  display: block;
+  display: block !important;
 }
 
 .auth-input {
@@ -300,6 +306,13 @@ body.shell-body {
   letter-spacing: 0.2px;
   color: #5f6d79;
   outline: none;
+}
+
+.auth-input::-ms-reveal,
+.auth-input::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .auth-input::placeholder {
