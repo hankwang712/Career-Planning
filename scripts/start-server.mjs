@@ -9,7 +9,11 @@ const repoRoot = path.resolve(__dirname, "..");
 const isWin = process.platform === "win32";
 const pythonCmd = isWin ? "python" : "python3";
 const viteBin = path.resolve(repoRoot, "node_modules", "vite", "bin", "vite.js");
-const viteOrigin = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
+const explicitViteOrigin = (process.env.VITE_DEV_SERVER_URL || "").trim().replace(/\/+$/, "");
+const useViteDevServer =
+  Boolean(explicitViteOrigin) ||
+  ["1", "true", "yes"].includes(String(process.env.USE_VITE_DEV_SERVER || "").toLowerCase());
+const viteOrigin = explicitViteOrigin || "http://127.0.0.1:5173";
 
 const host = process.env.HOST || "0.0.0.0"; 
 const port = process.env.PORT || "8080";
@@ -42,9 +46,11 @@ function ensureAvailable() {
   if (pythonCheck.error || pythonCheck.status !== 0) {
     fail("Python 不可用，无法启动 Flask 服务。");
   }
-  const viteCheck = runCheck(process.execPath, [viteBin, "--version"]);
-  if (viteCheck.error || viteCheck.status !== 0) {
-    fail("Vite 不可用，请先执行 npm install。");
+  if (useViteDevServer) {
+    const viteCheck = runCheck(process.execPath, [viteBin, "--version"]);
+    if (viteCheck.error || viteCheck.status !== 0) {
+      fail("Vite 不可用，请先执行 npm install。");
+    }
   }
 }
 
@@ -92,7 +98,11 @@ if (isWin) {
 }
 
 log(`Starting Flask on http://${host}:${port}`);
-log(`Starting Vite on ${viteOrigin}`);
+if (useViteDevServer) {
+  log(`Starting Vite on ${viteOrigin}`);
+} else {
+  log("Using built frontend assets from static/dist");
+}
 
 const pythonProc = spawnTagged(
   pythonCmd,
@@ -101,23 +111,25 @@ const pythonProc = spawnTagged(
   {
     HOST: host,
     PORT: port,
-    VITE_DEV_SERVER_URL: viteOrigin,
+    VITE_DEV_SERVER_URL: useViteDevServer ? viteOrigin : "",
     PYTHONIOENCODING: "utf-8"
   }
 );
 
-const viteProc = spawnTagged(
-  process.execPath,
-  [viteBin, "--host", "0.0.0.0", "--port", "5173"], 
-  "vite"
-);
+const viteProc = useViteDevServer
+  ? spawnTagged(
+      process.execPath,
+      [viteBin, "--host", "0.0.0.0", "--port", "5173"],
+      "vite"
+    )
+  : null;
 
 let shuttingDown = false;
 
 function shutdown(reasonCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  for (const proc of [pythonProc, viteProc]) {
+  for (const proc of [pythonProc, viteProc].filter(Boolean)) {
     if (proc && !proc.killed) {
       proc.kill("SIGTERM");
     }
@@ -132,12 +144,14 @@ pythonProc.on("exit", (code) => {
   }
 });
 
-viteProc.on("exit", (code) => {
-  if (!shuttingDown) {
-    process.stderr.write(`[vite] exited with code ${code ?? 0}\n`);
-    shutdown(code ?? 0);
-  }
-});
+if (viteProc) {
+  viteProc.on("exit", (code) => {
+    if (!shuttingDown) {
+      process.stderr.write(`[vite] exited with code ${code ?? 0}\n`);
+      shutdown(code ?? 0);
+    }
+  });
+}
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => shutdown(0));
