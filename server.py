@@ -5796,6 +5796,7 @@ def index():
     return render_template(
         "base.html",
         initial_user=_public_user(user),
+        career_news=get_career_news_payload(),
     )
 
 
