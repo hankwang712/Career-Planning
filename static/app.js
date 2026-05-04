@@ -25,11 +25,6 @@ const appState = {
   weights: { "特质匹配": 30, "能力匹配": 40, "专业匹配": 15, "意愿匹配": 15 }
 };
 
-const DASHBOARD_PORTRAIT_ASSETS = {
-  male: "/app_data/man.png",
-  female: "/app_data/woman.png"
-};
-
 // 岗位数据（从 /api/jobs 加载）
 let allJobsData = [];
 let filteredJobsData = [];
@@ -10632,19 +10627,15 @@ function updateDashboardPortraitVisual() {
   const badgeEl = document.getElementById("dashboardPortraitBadge");
   const toneEl = document.getElementById("dashboardPortraitTone");
   const visualEl = document.getElementById("dashboardPortraitVisual");
-  if (!imageEl) return;
-  const gender = resolveDashboardPortraitGender();
-  const isFemale = gender === "female";
-  const src = isFemale ? DASHBOARD_PORTRAIT_ASSETS.female : DASHBOARD_PORTRAIT_ASSETS.male;
-  if (imageEl.getAttribute("src") !== src) imageEl.setAttribute("src", src);
-  imageEl.setAttribute("alt", isFemale ? "女性职业画像" : "男性职业画像");
-  if (badgeEl) badgeEl.textContent = isFemale ? "女性画像" : "男性画像";
-  if (toneEl) toneEl.textContent = isFemale
-    ? "系统结合测评和基础信息，匹配当前女性人物画像。"
-    : "系统结合测评和基础信息，匹配当前男性人物画像。";
+  if (imageEl) {
+    imageEl.removeAttribute("src");
+    imageEl.setAttribute("alt", "");
+    imageEl.hidden = true;
+  }
+  if (badgeEl) badgeEl.textContent = "";
+  if (toneEl) toneEl.textContent = "";
   if (visualEl) {
-    visualEl.classList.toggle("is-female", isFemale);
-    visualEl.classList.toggle("is-male", !isFemale);
+    visualEl.classList.remove("is-female", "is-male");
   }
 }
 

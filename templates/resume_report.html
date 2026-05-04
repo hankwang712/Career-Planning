@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>简历深度审计报告</title>
-<link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/index.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.16/index.css" rel="stylesheet">
-<script src="{{ url_for('static', filename='return-nav.js') }}?v=20260412-return-nav-skip-test-v1"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/index.css" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.16/index.css" rel="stylesheet" media="print" onload="this.media='all'">
+<script src="{{ url_for('static', filename='return-nav.js') }}?v=20260412-return-nav-skip-test-v1" defer></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}">
 <style>
@@ -930,7 +931,7 @@ body.resume-deep-audit-standalone .main-content {
 </style>
 </head>
 <body class="resume-deep-audit-standalone">
-
+{% include "partials/page_loader.html" %}
 <div class="bg-canvas">
   <div class="bg-orb"></div>
   <div class="bg-orb"></div>

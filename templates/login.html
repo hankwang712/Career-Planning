@@ -16,6 +16,7 @@
     {{ vite_asset_tags('frontend/src/entries/login.js') }}
 </head>
 <body class="shell-body auth-locked page-login">
+    {% include "partials/page_loader.html" %}
     {% include "partials/startup_screen.html" %}
 </body>
 </html>

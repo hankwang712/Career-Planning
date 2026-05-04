@@ -12,6 +12,7 @@
     {{ vite_asset_tags('frontend/src/entries/test-runner.js') }}
 </head>
 <body class="tr-page" data-page="test-runner">
+    {% include "partials/page_loader.html" %}
     <div class="tr-layout">
         <aside class="tr-sidebar">
             <a class="tr-brand" href="{{ url_for('index') }}">
