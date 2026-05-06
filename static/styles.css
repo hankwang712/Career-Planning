@@ -52,16 +52,6 @@
             background: rgba(255,255,255,0.12);
         }
 
-        /* 行内版队伍标签 */
-        .team-badge-inline {
-            display: inline;
-            font-size: 0.65rem;
-            background: rgba(255,255,255,0.2);
-            border-radius: 4px;
-            padding: 0 4px;
-            color: #e9d5ff;
-        }
-
         /* 隐藏滚动条但保留滚动功能 */
         .scrollbar-none {
             -ms-overflow-style: none;
@@ -1014,12 +1004,6 @@ footer {
     min-height: 160px;
     display: flex;
     flex-direction: column;
-}
-
-.footer-team {
-    margin-top: 0.5rem;
-    font-size: 12px;
-    color: #cbd5e1;
 }
 
 @media (max-width: 1024px) {
@@ -16276,12 +16260,6 @@ nav.gradient-bg h1 {
 nav.gradient-bg p,
 nav.gradient-bg .text-purple-200 {
     color: var(--cs-muted) !important;
-}
-
-nav.gradient-bg .team-badge-inline {
-    background: var(--cs-teal-soft);
-    border: 1px solid #b2f5ea;
-    color: #2c7a7b;
 }
 
 nav.gradient-bg .w-px {

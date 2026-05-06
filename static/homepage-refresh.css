@@ -916,8 +916,7 @@ nav.gradient-bg h1 {
   letter-spacing: -0.04em;
 }
 
-nav.gradient-bg .text-purple-200,
-nav.gradient-bg .team-badge-inline {
+nav.gradient-bg .text-purple-200 {
   color: #70839a !important;
 }
 
@@ -1585,8 +1584,7 @@ nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
   color: #8fb0d1 !important;
 }
 
-#site-footer .text-purple-200,
-#site-footer .footer-team {
+#site-footer .text-purple-200 {
   color: rgba(180, 201, 222, 0.72) !important;
 }
 
