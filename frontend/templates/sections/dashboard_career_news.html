@@ -1,0 +1,96 @@
+{% set news = career_news or {} %}
+{% set all_items = news.get('visible_items', []) + news.get('hidden_items', []) %}
+{% macro news_story(item, variant='', rank=1) %}
+    {% set source_name = item.source_name or item.source or '新闻来源' %}
+    {% set topic = item.topic_label or item.topic or '行业动态' %}
+    {% set text = (item.title ~ ' ' ~ topic)|lower %}
+    {% if '职业规划' in text or '职业发展' in text or '面试' in text or '简历' in text or '技能提升' in text %}
+        {% set category = 'growth' %}{% set category_label = '职业成长' %}
+    {% elif '招聘' in text or '就业' in text or '裁员' in text or '薪资' in text or '校招' in text or '岗位' in text %}
+        {% set category = 'hiring' %}{% set category_label = '就业观察' %}
+    {% elif 'ai' in text or '人工智能' in text or '大模型' in text or '智能体' in text %}
+        {% set category = 'ai' %}{% set category_label = 'AI 与前沿' %}
+    {% else %}
+        {% set category = 'tech' %}{% set category_label = '科技行业' %}
+    {% endif %}
+    <a class="career-news-item nd-story {{ variant }}" href="{{ item.url }}" target="_blank" rel="noopener noreferrer"
+       data-published="{{ item.published_at }}" data-category="{{ category }}">
+        <div class="nd-cover" data-art="{{ category }}" aria-hidden="true">
+            <span class="nd-cover-grid"></span><span class="nd-cover-orbit"></span>
+            <span class="nd-cover-caption">{{ category_label }} / INSIGHTS</span>
+            <svg class="nd-cover-art" viewBox="0 0 240 160" fill="none"><use href="#nd-art-{{ category }}"/></svg>
+            <span class="nd-cover-word">{{ {'ai':'AI', 'tech':'TECH', 'hiring':'WORK', 'growth':'GROW'}[category] }}</span>
+            <span class="nd-cover-source">{{ source_name }}</span>
+            <span class="nd-cover-corner">↗</span>
+        </div>
+        <div class="nd-story-top">
+            <span class="nd-tag" data-tone="{{ category }}"><span aria-hidden="true"></span>{{ category_label }}</span>
+            <span class="nd-story-number" aria-hidden="true">{{ '%02d'|format(rank) }}</span>
+        </div>
+        <h4 class="nd-story-title">{{ item.title }}</h4>
+        {% if item.summary %}<p class="nd-story-summary">{{ item.summary }}</p>{% endif %}
+        <div class="nd-story-bottom">
+            <div class="nd-byline"><span class="nd-source-mark" aria-hidden="true">{{ source_name[:1] }}</span><span class="nd-source-name">{{ source_name }}</span><span class="nd-byline-dot" aria-hidden="true">·</span><time datetime="{{ item.published_at }}">{{ item.published_label }}</time></div>
+            <span class="nd-story-arrow" aria-hidden="true">↗</span>
+        </div>
+    </a>
+{% endmacro %}
+
+<section id="careerNewsBoard" class="nd-board" data-layout="brief" data-display-limit="7" aria-labelledby="careerNewsHeading">
+    <svg class="nd-art-library" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+        <symbol id="nd-art-ai" viewBox="0 0 240 160"><g stroke="currentColor" stroke-width="1.3"><path d="M45 95 120 137 195 95 120 53Z" fill="currentColor" fill-opacity=".07"/><path d="m45 79 75 43 75-43-75-43Z" fill="currentColor" fill-opacity=".12"/><path d="M80 52 120 29 160 52 120 75Z" fill="currentColor" fill-opacity=".2"/><path d="M80 52v42l40 24V75M160 52v42l-40 24" fill="currentColor" fill-opacity=".08"/><path d="m120 6 0 13M177 26l-9 9M200 58h-15M63 26l9 9M40 58h15M74 127l-10 8M166 127l10 8" stroke-opacity=".5"/><circle cx="120" cy="6" r="3" fill="currentColor"/><circle cx="200" cy="58" r="3" fill="currentColor"/></g><text x="120" y="59" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="19" fill="currentColor">AI</text></symbol>
+        <symbol id="nd-art-tech" viewBox="0 0 240 160"><g stroke="currentColor" stroke-width="1.2"><circle cx="126" cy="76" r="51" fill="currentColor" fill-opacity=".06"/><ellipse cx="126" cy="76" rx="24" ry="51"/><ellipse cx="126" cy="76" rx="51" ry="21"/><path d="M75 76h102M126 25v102"/><ellipse cx="126" cy="76" rx="91" ry="28" transform="rotate(-27 126 76)" stroke-dasharray="3 5" stroke-opacity=".6"/><circle cx="55" cy="110" r="6" fill="currentColor"/><circle cx="193" cy="39" r="4" fill="currentColor"/><path d="m88 143 38 9 38-9M126 133v19" stroke-opacity=".4"/></g></symbol>
+        <symbol id="nd-art-hiring" viewBox="0 0 240 160"><g stroke="currentColor" stroke-width="1.2"><path d="m47 127 79 25 77-45-77-24Z" fill="currentColor" fill-opacity=".05"/><path d="m65 115 22 7V87l-22-7Zm22 7 19-11V76L87 87M65 80l20-11 21 7" fill="currentColor" fill-opacity=".16"/><path d="m111 125 22 7V67l-22-7Zm22 7 19-11V56l-19 11M111 60l20-11 21 7" fill="currentColor" fill-opacity=".23"/><path d="m157 115 22 7V39l-22-7Zm22 7 19-11V28l-19 11M157 32l20-11 21 7" fill="currentColor" fill-opacity=".12"/><path d="m55 65 39-24 27 1 50-29m-17 0h17v16" stroke-width="2"/></g></symbol>
+        <symbol id="nd-art-growth" viewBox="0 0 240 160"><g stroke="currentColor" stroke-width="1.2"><circle cx="126" cy="80" r="57" fill="currentColor" fill-opacity=".05"/><circle cx="126" cy="80" r="44" stroke-dasharray="2 6"/><path d="m126 34 10 36 34 10-34 10-10 36-10-36-34-10 34-10Z" fill="currentColor" fill-opacity=".18"/><path d="m126 80 33-34-24 43-9-9-10-9 43-25" fill="currentColor" fill-opacity=".25"/><path d="M126 14v9M126 137v9M60 80h9M183 80h9"/><circle cx="126" cy="80" r="4" fill="currentColor"/><path d="m53 137 18-9M186 32l14-9" stroke-opacity=".6"/></g></symbol>
+    </defs></svg>
+    <header class="nd-header">
+        <div>
+            <div class="nd-eyebrow"><span class="nd-eyebrow-line" aria-hidden="true"></span>THE CAREER BRIEF<span class="nd-eyebrow-divider" aria-hidden="true">/</span><span>行业与职业快报</span></div>
+            <h3 id="careerNewsHeading">职业规划与<span>计算机行业快报</span></h3>
+            <p class="nd-intro">关注技术的下一步，也关注你的下一步。</p>
+        </div>
+        <div class="nd-edition">
+            <span class="nd-edition-label">YOUR DAILY PERSPECTIVE</span>
+            <span class="nd-edition-date">{{ (news.get('snapshot_label') or news.get('window_snapshot_label') or '')[:10]|replace('-', ' / ') }}</span>
+            <span class="nd-update{% if news.get('is_stale') %} is-stale{% endif %}"><i aria-hidden="true"></i>{{ '沿用上一期内容' if news.get('is_stale') else news.get('refresh_rule', '每日 12:00 更新') }}</span>
+        </div>
+    </header>
+
+    {% if news.get('stale_reason') %}<p class="nd-notice">{{ news.get('stale_reason') }}</p>{% endif %}
+
+    {% if all_items %}
+    <div class="nd-toolbar">
+        <div class="nd-filters" role="group" aria-label="资讯分类">
+            <button type="button" class="nd-filter is-active" data-news-filter="all" aria-pressed="true">全部资讯<span>{{ all_items|length }}</span></button>
+            <button type="button" class="nd-filter" data-news-filter="ai" aria-pressed="false">AI 与前沿</button>
+            <button type="button" class="nd-filter" data-news-filter="tech" aria-pressed="false">科技行业</button>
+            <button type="button" class="nd-filter" data-news-filter="hiring" aria-pressed="false">就业观察</button>
+            <button type="button" class="nd-filter" data-news-filter="growth" aria-pressed="false">职业成长</button>
+        </div>
+        <span class="nd-sort"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h11M4 18h6"/></svg>最新发布</span>
+        <div class="nd-deck-nav" aria-label="焦点新闻切换"><button type="button" id="careerNewsPauseBtn" aria-label="暂停自动切换" aria-pressed="false" title="暂停自动切换">Ⅱ</button><button type="button" id="careerNewsPrevBtn" aria-label="上一条焦点新闻">←</button><span id="careerNewsSpotlightPos">01 / {{ all_items|length }}</span><button type="button" id="careerNewsNextBtn" aria-label="下一条焦点新闻">→</button></div>
+    </div>
+
+    <div id="careerNewsPool" hidden aria-hidden="true">
+        {% for item in all_items %}{{ news_story(item, '', loop.index) }}{% endfor %}
+    </div>
+    <div id="careerNewsBriefContent">
+        <div class="nd-deck" aria-label="焦点新闻">
+            {% if all_items|length > 1 %}{{ news_story(all_items[1], 'nd-story--side', 2) }}{% endif %}
+            {{ news_story(all_items[0], 'nd-story--lead', 1) }}
+            {% if all_items|length > 2 %}{{ news_story(all_items[2], 'nd-story--side', 3) }}{% endif %}
+        </div>
+        {% if all_items|length > 3 %}
+        <div class="nd-section-label"><span>更多新鲜视角</span><span>KEEP EXPLORING</span></div>
+        <div class="nd-grid">{% for item in all_items[3:7] %}{{ news_story(item, '', loop.index + 3) }}{% endfor %}</div>
+        {% endif %}
+    </div>
+    <footer class="nd-footer">
+        <span id="careerNewsShowingCount" role="status" aria-live="polite">已呈现 {{ [7, all_items|length]|min }} / {{ all_items|length }} 则资讯</span>
+        <button id="careerNewsMoreBtn" type="button"{% if all_items|length <= 7 %} hidden{% endif %}>发现更多资讯 <span aria-hidden="true">↓</span></button>
+        <span class="nd-footer-note">每一次阅读，向未来靠近一点。<span aria-hidden="true">✳</span></span>
+    </footer>
+    {% else %}
+    <div class="nd-empty"><span class="nd-empty-symbol" aria-hidden="true">↗</span><h4>新的视角，即将抵达</h4><p>{{ news.get('empty_reason') or '本期资讯正在整理中，稍后再来看看。' }}</p></div>
+    {% endif %}
+</section>

@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智航生涯｜AI 大学生职业规划智能体</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png" sizes="any">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <style>
+      :root {
+        --app-font-stack: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        --app-display-stack: "Space Grotesk", "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+        --app-editorial-stack: "Noto Serif SC", "Songti SC", "STSong", serif;
+        --product-accent: #355b82;
+        --product-accent-hover: #274766;
+        --product-bg: #edf2f7;
+        --product-card: #f8fbff;
+        --product-text: #1f2c3a;
+        --product-muted: #617487;
+        --product-border: #d6e0ea;
+      }
+
+      html,
+      body,
+      button,
+      input,
+      textarea,
+      select {
+        font-family: var(--app-font-stack);
+      }
+    </style>
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260418-nav-workspace-pill-light-v7">
+        <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}?v=20260418-career-news-grid-margin-v16">
+        <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}?v=20261016-cards-autoplay">
+        <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
+        <link rel="stylesheet" href="{{ url_for('static', filename='auth-security.css') }}">
+</head>
+<body class="bg-gray-50 scroll-smooth auth-checking">
+    {% include "partials/page_loader.html" %}
+    <div class="ambient-orb a"></div>
+    <div class="ambient-orb b"></div>
+    <div class="ambient-orb c"></div>
+    
+    <!-- 启动登录界面 -->
+    <div id="startupScreen" class="startup-screen">
+        <div class="startup-layout">
+            <header class="startup-topbar">
+                <div class="startup-brand">
+                    <div class="startup-logo app-brand-mark app-brand-mark--img" aria-hidden="true">
+                        <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="48" height="48" decoding="async">
+                    </div>
+                    <div>
+                        <p class="startup-brand-name">智航生涯</p>
+                        <p class="startup-brand-sub">AI career planning platform for students and early-career talent</p>
+                    </div>
+                </div>
+                <div class="startup-topbar-actions">
+                    <span class="startup-topbar-note">开发版产品</span>
+                    <a class="startup-topbar-link" href="#startupLogin">登录工作台</a>
+                </div>
+            </header>
+
+            <section class="startup-hero">
+                <div class="startup-copy">
+                    <span class="startup-badge">职业规划平台</span>
+                    <h2 class="startup-title">把测评、岗位匹配和行动规划，收成一条清晰的职业推进线</h2>
+
+                    <div class="startup-actions">
+                        <a class="startup-primary-cta" href="#startupLogin">立即登录</a>
+                        <a class="startup-secondary-cta" href="#platformPreview">查看平台能力</a>
+                    </div>
+
+                    <div class="startup-stat-grid" aria-label="平台概览">
+                        <article class="startup-stat">
+                            <strong>01</strong>
+                            <span>了解能力与兴趣</span>
+                        </article>
+                        <article class="startup-stat">
+                            <strong>02</strong>
+                            <span>探索适合的岗位</span>
+                        </article>
+                        <article class="startup-stat">
+                            <strong>03</strong>
+                            <span>制定职业行动计划</span>
+                        </article>
+                    </div>
+
+                    <div class="startup-proof-list">
+                        <span>适合高校学生、应届生和转型中的早期人才</span>
+                    </div>
+                </div>
+
+                <div class="startup-hero-side">
+                    <div class="startup-visual-card">
+                        <div class="startup-visual-copy">
+                            <span class="startup-visual-kicker">Platform Flow</span>
+                            <h3>先判断方向，再组织行动</h3>
+                        </div>
+                        <img
+                            class="startup-visual-illustration"
+                            src="{{ url_for('static', filename='assets/illustrations/undraw-career-development-hero.svg') }}"
+                            alt="职业规划平台的流程示意插画"
+                        >
+                        <div class="startup-visual-panel">
+                            <div class="startup-visual-item">
+                                <strong>Assess</strong>
+                                <span>能力画像与兴趣判断</span>
+                            </div>
+                            <div class="startup-visual-item">
+                                <strong>Match</strong>
+                                <span>目标岗位与市场信号</span>
+                            </div>
+                            <div class="startup-visual-item">
+                                <strong>Execute</strong>
+                                <span>阶段性行动清单与报告</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside id="startupLogin" class="startup-card">
+                        <div class="startup-auth-head">
+                            <span class="startup-auth-kicker">Clean Web Access</span>
+                            <h3 class="startup-auth-title">登录或创建你的专属账户</h3>
+                            <p class="startup-auth-text">登录后，你的测评、简历和职业报告都会保存在专属工作台中。</p>
+                        </div>
+
+                        <div class="auth-tabs">
+                            <button id="loginTabBtn" class="auth-tab active" type="button" onclick="switchAuthTab('login')">登录</button>
+                            <button id="registerTabBtn" class="auth-tab" type="button" onclick="switchAuthTab('register')">注册</button>
+                        </div>
+
+                        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+                            <div class="auth-field">
+                                <label class="auth-label" for="loginUsername">邮箱或用户名</label>
+                                <input id="loginUsername" class="auth-input" type="text" autocomplete="username" maxlength="254" placeholder="输入已注册的账号" required>
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="loginPassword">密码</label>
+                                <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="输入你的登录密码" required>
+                            </div>
+                            {% set captcha_purpose = "login" %}
+                            {% include "partials/auth_captcha.html" %}
+                            <button class="auth-submit" type="submit">登录工作台</button>
+                        </form>
+
+                        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerUsername">邮箱地址</label>
+                                <input id="registerUsername" class="auth-input" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required>
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerPassword">登录密码</label>
+                                <input id="registerPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="设置登录密码" required>
+                            </div>
+                            <div class="auth-field">
+                                <label class="auth-label" for="registerConfirmPassword">确认密码</label>
+                                <input id="registerConfirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="再次输入密码" required>
+                            </div>
+                            {% set captcha_purpose = "register" %}
+                            {% include "partials/auth_captcha.html" %}
+                            <button class="auth-submit" type="submit">创建账户并进入</button>
+                            <p class="register-note">注册成功后会自动登录。后续你的访谈、测评与职业报告都会绑定到这个邮箱账户。</p>
+                        </form>
+
+                        <div class="startup-auth-foot">
+                            <span class="startup-auth-chip">玉白玻璃感</span>
+                            <span class="startup-auth-chip">邮箱自助注册</span>
+                            <span class="startup-auth-chip">独立数据空间</span>
+                        </div>
+                        <p id="authMessage" class="auth-message" role="status" aria-live="polite">使用账号和密码登录，并完成安全验证。</p>
+                    </aside>
+                </div>
+            </section>
+
+            <section id="platformPreview" class="startup-section startup-section--soft">
+                <div class="startup-section-head">
+                    <span class="startup-section-kicker">Platform Preview</span>
+                    <h3>你的职业规划之旅</h3>
+                </div>
+                <div class="startup-flow-grid">
+                    <article class="startup-flow-step">
+                        <span>01</span>
+                        <strong>能力盘点</strong>
+                        <p>先确认技能结构、兴趣和证据，建立基础判断。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>02</span>
+                        <strong>岗位雷达</strong>
+                        <p>把个人优势和岗位要求放在同一层比对，聚焦高价值方向。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>03</span>
+                        <strong>市场热度</strong>
+                        <p>结合城市与行业信号，筛掉不值得投入的目标池。</p>
+                    </article>
+                    <article class="startup-flow-step">
+                        <span>04</span>
+                        <strong>行动规划</strong>
+                        <p>把方向转成报告、阶段任务和真正可以执行的下一步。</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="startup-section">
+                <div class="startup-section-head">
+                    <span class="startup-section-kicker">Module Snapshot</span>
+                    <h3>能力评估、岗位匹配与行动规划</h3>
+                </div>
+                <div class="startup-preview-grid">
+                    <article class="startup-preview-card">
+                        <strong>评估层</strong>
+                        <ul class="startup-preview-list">
+                            <li>多维度能力画像</li>
+                            <li>访谈与测评结果整合</li>
+                            <li>进度状态可追踪</li>
+                        </ul>
+                    </article>
+                    <article class="startup-preview-card">
+                        <strong>匹配层</strong>
+                        <ul class="startup-preview-list">
+                            <li>高匹配岗位优先呈现</li>
+                            <li>市场热度同步参考</li>
+                        </ul>
+                    </article>
+                    <article class="startup-preview-card">
+                        <strong>规划层</strong>
+                        <ul class="startup-preview-list">
+                            <li>短中长期行动建议</li>
+                            <li>报告生成与版本沉淀</li>
+                            <li>工作台继续执行闭环</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="startup-bottom-cta">
+                <div>
+                    <span class="startup-section-kicker">Start From Here</span>
+                    <h3>开启你的职业探索之旅</h3>
+                </div>
+                <a class="startup-primary-cta" href="#startupLogin">进入平台</a>
+            </section>
+        </div>
+    </div>
+    
+    <!-- 顶部导航 -->
+    <nav class="gradient-bg text-white shadow-lg fixed w-full z-50">
+        <div class="w-full px-4 lg:px-8">
+            <div class="flex items-center min-h-[4.55rem] gap-5 py-2">
+                <!-- 品牌区 -->
+                <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="app-brand-mark nav-brand-mark app-brand-mark--img" aria-hidden="true">
+                        <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="40" height="40" decoding="async">
+                    </div>
+                    <div class="leading-tight">
+                        <h1 class="text-base font-bold whitespace-nowrap">智航生涯</h1>
+                        <p class="text-xs text-purple-200 whitespace-nowrap">双图谱 · 大模型推理</p>
+                    </div>
+                </div>
+
+                <!-- 分隔线 -->
+                <div class="w-px h-8 bg-white/25 flex-shrink-0"></div>
+
+                <!-- 导航标签区：flex-1 自适应宽度，单行不换行 -->
+                <div class="nav-tab-strip flex items-center gap-2 flex-1 overflow-x-auto scrollbar-none">
+                    <button onclick="showSection('dashboard')" data-section="dashboard" class="nav-item active px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                        </svg>
+                        智能仪表盘
+                    </button>
+                    <button onclick="showSection('jobs')" data-section="jobs" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="7"></circle>
+                            <path d="m20 20-4.2-4.2"></path>
+                        </svg>
+                        岗位探索
+                    </button>
+                    <button onclick="showSection('profile')" data-section="profile" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        能力画像
+                    </button>
+                    <button onclick="showSection('matching')" data-section="matching" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        人岗匹配
+                    </button>
+                    <button onclick="showSection('report')" data-section="report" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6"></path>
+                            <path d="M8 13h8"></path>
+                            <path d="M8 17h8"></path>
+                        </svg>
+                        规划报告
+                    </button>
+                    <button onclick="showSection('forum')" data-section="forum" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                            <path d="M6 1v3"></path>
+                            <path d="M10 1v3"></path>
+                            <path d="M14 1v3"></path>
+                        </svg>
+                        Offer 茶水间
+                    </button>
+                </div>
+
+                <!-- 右侧操作区：时钟 + 深色工作区胶囊（参考 Notion/Linear 工作区切换器） -->
+                <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
+                    <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
+                    <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
+                        <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区与账号菜单">
+                            <span class="nav-workspace-avatar-wrap">
+                                <span id="currentUserAvatar" class="nav-workspace-avatar-inner">人</span>
+                            </span>
+                            <span id="navWorkspaceTitle" class="nav-workspace-title">Personal</span>
+                            <svg class="nav-workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M6 9l6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div id="navWorkspaceMenu" class="nav-workspace-menu hidden" role="menu" aria-labelledby="navWorkspaceToggle">
+                            <div class="nav-workspace-menu-header">
+                                <span id="currentUserLabel" class="nav-workspace-menu-label">未登录</span>
+                            </div>
+                            <div class="nav-workspace-menu-divider" role="presentation"></div>
+                            <button type="button" id="notificationBtn" class="nav-workspace-menu-row" role="menuitem" data-tooltip="系统通知">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">系统通知</span>
+                                <span id="notificationCount" class="nav-workspace-menu-badge">3</span>
+                            </button>
+                            <a href="/user-center.html#report-workspace" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" title="个人中心">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">个人中心</span>
+                            </a>
+                            <button type="button" class="nav-workspace-menu-row" role="menuitem" onclick="closeNavWorkspaceMenu(); toggleSettingsPanel(event);" title="模型设置">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 0 1 7.04 4.3l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.49 1 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
+                                </svg>
+                                <span class="nav-workspace-menu-row-text">模型设置</span>
+                            </button>
+                            <div class="nav-workspace-menu-divider" role="presentation"></div>
+                            <button type="button" id="logoutBtn" onclick="logout()" class="nav-workspace-menu-row nav-workspace-menu-danger" role="menuitem">退出登录</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="pt-20 pb-10">
+        <!-- 仪表盘 -->
+
+        {% include "sections/dashboard.html" %}
+        {% include "sections/jobs.html" %}
+        {% include "sections/profile.html" %}
+        {% include "sections/matching.html" %}
+        {% include "sections/report.html" %}
+        {% include "sections/forum.html" %}
+
+    </main>
+
+    {% include "sections/career_interview_modal.html" %}
+
+    {% include "sections/job_modal.html" %}
+    {% include "sections/assessment_modal.html" %}
+
+    {% include "partials/workspace_guide.html" %}
+
+    <footer id="site-footer" class="bg-gray-800 text-white py-8">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg overflow-hidden ring-1 ring-white/15 shrink-0 bg-slate-900">
+                            <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="智航生涯" class="w-full h-full object-cover" width="40" height="40" loading="lazy" decoding="async">
+                        </div>
+                        <div>
+                            <h3 class="font-bold">智航生涯</h3>
+                            <p class="text-xs text-gray-400">AI 大学生职业规划智能体</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-400">应用创新科技推进现代教育，数据融合推动未来发展</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-3">产品服务</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" onclick="showSection('jobs')" class="hover:text-white transition-all">岗位探索</a></li>
+                        <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
+                        <li><a href="#" onclick="showSection('matching')" class="hover:text-white transition-all">人岗匹配</a></li>
+                        <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
+                        <li><a href="#" onclick="showSection('forum')" class="hover:text-white transition-all">Offer 茶水间</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-3">支持资源</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-all">使用指南</a></li>
+                        <li><a href="#" class="hover:text-white transition-all">常见问题</a></li>
+                        <li><a href="#" class="hover:text-white transition-all">联系客服</a></li>
+                        <li><a href="#" class="hover:text-white transition-all">反馈建议</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-3">联系我们</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li>📧 support@mingshan.com</li>
+                        <li>📞 400-XXX-XXXX</li>
+                        <li>🏢 深圳市南山区科技园</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
+                <p>© <span id="footerYear">2025</span> 智航生涯 版权所有</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 岗位详情弹窗 -->
+    <div id="jobDetailModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="job-detail-header p-6 text-white rounded-t-2xl" style="background-color: #356994;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-2xl font-bold" id="modalJobTitle">机器学习工程师</h3>
+                        <p class="opacity-80" id="modalJobCompany" style="color: #b3d4f5;">智航生涯 · 北京</p>
+                    </div>
+                    <button onclick="closeModal('jobDetailModal')" class="text-white opacity-80 hover:opacity-100 text-2xl">&times;</button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-500">薪资范围</p>
+                        <p class="font-bold text-purple-600">20-35K</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-500">经验要求</p>
+                        <p class="font-bold text-purple-600">1-3 年</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-500">学历要求</p>
+                        <p class="font-bold text-purple-600">本科+</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-500">您的匹配</p>
+                        <p class="font-bold text-green-600">94%</p>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3">岗位画像维度</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>专业技能</span>
+                                <span class="text-purple-600 font-medium">85%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>证书要求</span>
+                                <span class="text-purple-600 font-medium">70%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 70%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>创新能力</span>
+                                <span class="text-purple-600 font-medium">75%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 75%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>沟通能力</span>
+                                <span class="text-purple-600 font-medium">65%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 65%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3">晋升路径</h4>
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div class="text-center px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                            <p class="text-xs text-gray-500">初级</p>
+                            <p class="font-bold text-green-600 text-sm">工程师</p>
+                        </div>
+                        <span class="text-purple-600">→</span>
+                        <div class="text-center px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                            <p class="text-xs text-gray-500">中级</p>
+                            <p class="font-bold text-purple-600 text-sm">工程师</p>
+                        </div>
+                        <span class="text-purple-600">→</span>
+                        <div class="text-center px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                            <p class="text-xs text-gray-500">高级</p>
+                            <p class="font-bold text-purple-600 text-sm">工程师</p>
+                        </div>
+                        <span class="text-purple-600">→</span>
+                        <div class="text-center px-3 py-2 bg-purple-100 rounded-lg border border-purple-300">
+                            <p class="text-xs text-gray-500">专家</p>
+                            <p class="font-bold text-purple-800 text-sm">架构师</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button onclick="addToReport('ml')" class="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-all font-medium">
+                        加入报告目标岗位
+                    </button>
+                    <button onclick="closeModal('jobDetailModal')" class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 头像设置面板 -->
+    <!-- ══ 模型设置面板 ══ -->
+    <div id="settingsPanel" class="hidden fixed top-14 right-2 z-[200] w-[24rem] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden" onclick="event.stopPropagation()">
+        <!-- 标题栏 -->
+        <div class="gradient-bg px-5 py-4 text-white">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">⚙️</span>
+                    <h3 class="font-bold text-sm">API 配置</h3>
+                </div>
+                <button onclick="closeSettingsPanel()" class="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <p id="settingsPanelUserLabel" class="text-xs text-purple-200 mt-1">未登录</p>
+        </div>
+
+        <div class="p-4 space-y-3 max-h-[85vh] overflow-y-auto">
+
+            <!-- 已配置的 Provider 列表 -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-widest">已配置的 API</span>
+                    <span id="settingsAdminAddBtn" class="hidden">
+                        <button onclick="openAddProviderForm()"
+                                class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
+                            ＋ 添加
+                        </button>
+                    </span>
+                </div>
+                <div id="settingsProviderList" class="space-y-2">
+                    <p class="text-xs text-gray-400 text-center py-3">正在加载...</p>
+                </div>
+            </div>
+
+            <!-- 管理员：添加新 Provider 表单（默认隐藏） -->
+            <div id="settingsAddProviderForm" class="hidden space-y-2 border border-purple-100 rounded-xl p-3 bg-purple-50">
+                <p class="text-xs font-semibold text-purple-700">添加新 API</p>
+                <input id="spfName" type="text" placeholder="名称（如：DeepSeek / OpenRouter）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <input id="spfBaseUrl" type="text" placeholder="Base URL（如：https://api.deepseek.com/v1）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <input id="spfApiKey" type="password" placeholder="API Key（sk-...）"
+                       class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <div class="flex gap-2">
+                    <button onclick="submitAddProvider()"
+                            class="flex-1 rounded-lg bg-purple-600 text-white text-xs font-semibold py-1.5 hover:bg-purple-700 transition-all">
+                        确认添加
+                    </button>
+                    <button onclick="closeAddProviderForm()"
+                            class="flex-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold py-1.5 hover:bg-gray-200 transition-all">
+                        取消
+                    </button>
+                </div>
+            </div>
+
+            <!-- 提示语 -->
+            <p class="text-[10px] text-gray-400 text-center pt-1">
+                在各功能界面点击「选择模型」按钮选择使用哪个 API 和哪个模型
+            </p>
+        </div>
+    </div>
+
+    <!-- ══ 模型选择器弹窗（使用点触发）══ -->
+    <div id="modelPickerOverlay" class="hidden fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onclick="closeModelPicker()">
+        <div class="bg-white rounded-2xl shadow-2xl w-[26rem] max-w-[95vw] overflow-hidden" onclick="event.stopPropagation()">
+            <div class="gradient-bg px-5 py-4 text-white">
+                <h3 class="font-bold text-sm">选择 API 和模型</h3>
+            </div>
+            <div class="p-4 space-y-3">
+                <!-- Provider 选择 -->
+                <div>
+                    <label class="text-xs font-medium text-gray-600 block mb-1">API 提供商</label>
+                    <select id="mpProviderSelect"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+                            onchange="onPickerProviderChange()">
+                        <option value="">-- 请先配置 API --</option>
+                    </select>
+                </div>
+                <!-- 模型选择 -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs font-medium text-gray-600">模型</label>
+                        <button id="mpFetchBtn" onclick="fetchPickerModels()"
+                                class="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg hover:bg-purple-50 transition-all">
+                            🔄 获取列表
+                        </button>
+                    </div>
+                    <select id="mpModelSelect"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
+                        <option value="">-- 点击「获取列表」--</option>
+                    </select>
+                </div>
+                <!-- 当前选择提示 -->
+                <p id="mpCurrentHint" class="text-[10px] text-gray-400"></p>
+                <!-- 确认按钮 -->
+                <div class="flex gap-2 pt-1">
+                    <button onclick="confirmModelPicker()"
+                            class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold py-2.5 hover:opacity-90 transition-all">
+                        确认使用
+                    </button>
+                    <button onclick="closeModelPicker()"
+                            class="flex-1 rounded-xl bg-gray-100 text-gray-600 text-sm font-semibold py-2.5 hover:bg-gray-200 transition-all">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <script>
+      window.__API_BASE__ = window.__API_BASE__ || "";
+    </script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260414-auth-checking-nav-v1" defer></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20261016-category-polish-v1" defer></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261016-clean-interface" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261016-assessment-v1">
+    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20261016-assessment-v1" defer></script>
+    <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260414-pet-size-v1" defer></script>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20261016-clean-interface" defer></script>
+    <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260419-analytics-salary-wan-v1" defer></script>
+    <script src="{{ url_for('static', filename='tour.js') }}?v=20261016-clean-interface" defer></script>
+</body>
+</html>

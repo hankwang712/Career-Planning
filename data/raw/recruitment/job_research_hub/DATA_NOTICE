@@ -1,0 +1,9 @@
+# Data notice
+
+The MIT license in this repository applies to the source code and original project documentation. It does not grant rights to third-party job descriptions, company names, trademarks, or source-site content contained in the dataset.
+
+The dataset is a time-bounded research snapshot assembled from publicly reachable pages on BOSS, Liepin, Nowcoder, and official company career sites. Source URLs and collection metadata are retained where available so users can verify provenance.
+
+Users are responsible for complying with source-site terms, robots.txt, privacy rules, database rights, copyright law, and local regulations. Do not use the dataset to contact individuals, automate applications, profile protected characteristics, or make consequential employment decisions without independent review.
+
+For a correction or removal request, identify the affected `record_id` and source URL in an issue or maintainer contact channel configured by the eventual repository owner.

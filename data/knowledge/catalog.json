@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "downloaded_on": "2026-10-16",
+  "search_integration_status": "downloaded_only_not_integrated",
+  "sources": [
+    {
+      "id": "china_occupations_2022_community",
+      "name": "Chinese occupational classification (2022), community transcription",
+      "source_url": "https://github.com/Optima-Chat/china-jobs",
+      "download_url": "https://raw.githubusercontent.com/Optima-Chat/china-jobs/main/data/occupations_raw.json",
+      "language": "zh-CN",
+      "license": "MIT (declared in upstream README)",
+      "license_reference": "https://github.com/Optima-Chat/china-jobs#license",
+      "license_note": "No standalone LICENSE file was found. The transcription is a community dataset, not an official government release.",
+      "counts": {
+        "major_categories": 8,
+        "middle_categories": 79,
+        "minor_categories": 450,
+        "occupations": 1639
+      },
+      "files": [
+        {
+          "path": "data/knowledge/china_occupations_2022/occupations_community.json",
+          "bytes": 268727,
+          "sha256": "b6a39a3d93323017edb304198de3c153e8e83f761dec94f12249c9b20aec9a71"
+        }
+      ]
+    },
+    {
+      "id": "china_industries_2017",
+      "name": "Chinese industry classification and explanatory notes (2017), community transcription",
+      "source_url": "https://github.com/yinleiCoder/economic-explanatory-notes",
+      "official_reference": "https://www.stats.gov.cn/xxgk/tjbz/gjtjbz/202008/t20200811_1782332.html",
+      "download_url": "https://raw.githubusercontent.com/yinleiCoder/economic-explanatory-notes/main/%E5%9B%BD%E6%B0%91%E7%BB%8F%E6%B5%8E%E8%A1%8C%E4%B8%9A%E5%88%86%E7%B1%BB%E6%B3%A8%E9%87%8A.json",
+      "language": "zh-CN",
+      "license": "MIT",
+      "license_note": "The repository's MIT license is retained. Government source material is identified separately; the repository license does not establish additional rights to third-party material.",
+      "counts": {
+        "sections": 20,
+        "divisions": 97,
+        "groups": 473,
+        "classes": 1183,
+        "total_nodes": 1773,
+        "nodes_with_descriptions": 1556
+      },
+      "files": [
+        {
+          "path": "data/knowledge/china_industries/industries.json",
+          "bytes": 1786116,
+          "sha256": "c86e092c7354285cddd9bf796b32ed54a08fc487eadabb9748aa6dc6e0adaad9"
+        },
+        {
+          "path": "data/knowledge/china_industries/LICENSE",
+          "bytes": 1063,
+          "sha256": "44fda03cda02194064e4f416f2e6f84686e935dc3c97a2e85b5a402194cabcdb"
+        }
+      ]
+    },
+    {
+      "id": "common_chinese_occupations",
+      "name": "Common Chinese occupational categories",
+      "source_url": "https://github.com/applyfly/chinese-occcupational-categories",
+      "download_url": "https://raw.githubusercontent.com/applyfly/chinese-occcupational-categories/master/occupational-uncompressed.json",
+      "language": "zh-CN",
+      "license": "MIT",
+      "counts": {
+        "top_level_categories": 27,
+        "total_entries": 229
+      },
+      "quality_note": "A small, older community taxonomy; not the official 2022 occupational classification.",
+      "files": [
+        {
+          "path": "data/knowledge/chinese_occupations/LICENSE",
+          "bytes": 1090,
+          "sha256": "c6d850e80b3741d64a030c0eafa43f6e21388a755fec9bb2799e3a7ba6adc58b"
+        },
+        {
+          "path": "data/knowledge/chinese_occupations/occupations.json",
+          "bytes": 21237,
+          "sha256": "3d1b146b7f55ea1bec8bb90d47f1807e810071e14ea07a9e7410a5b5b6e7ab3d"
+        }
+      ]
+    },
+    {
+      "id": "china_occupations_2022_public_consultation_pdf",
+      "name": "Occupational Classification of the People's Republic of China (2022), public consultation draft",
+      "source_url": "https://srsj.cngy.gov.cn/Files/UploadFile/SiteFile/20160720104022026/2026/04/14/8a8384d8e7d34d90b1a8e191a4f585cb.pdf",
+      "language": "zh-CN",
+      "license": null,
+      "access": "Publicly downloadable from a government site; no explicit open-data reuse license was established.",
+      "edition_note": "The cover explicitly identifies this PDF as a public consultation draft, not the final published edition.",
+      "counts": {
+        "pages": 570
+      },
+      "files": [
+        {
+          "path": "data/knowledge/china_occupations_2022/catalogue.pdf",
+          "bytes": 9450957,
+          "sha256": "4b3af986925b9abc2fe048d50c56b3fc7b0781e6de3fbb21f8a6b3feffebd3ce"
+        }
+      ]
+    },
+    {
+      "id": "onet_30_2_existing",
+      "name": "O*NET 30.2 Database",
+      "status": "already_present",
+      "source_url": "https://www.onetcenter.org/database.html",
+      "license": "CC-BY-4.0",
+      "license_reference": "https://www.onetcenter.org/license_db.html",
+      "attribution": "O*NET 30.2 Database, U.S. Department of Labor, Employment and Training Administration. Original local data retained without modification.",
+      "language": "en",
+      "directory": "data/onet",
+      "counts": {
+        "excel_tables": 40
+      }
+    }
+  ],
+  "additional_resources": [
+    {
+      "name": "O*NET 31.0 Database",
+      "source_url": "https://www.onetcenter.org/database.html",
+      "license": "CC-BY-4.0",
+      "status": "not_downloaded",
+      "reason": "Full ZIP transfers stalled. Incomplete files were removed; the existing 30.2 database was preserved."
+    },
+    {
+      "name": "ESCO 1.2.1",
+      "source_url": "https://esco.ec.europa.eu/en/use-esco/download",
+      "status": "not_downloaded",
+      "reason": "The current download workflow requests a privacy acknowledgement and an email address. No user email was submitted.",
+      "languages_note": "ESCO's supported languages do not include Chinese."
+    }
+  ],
+  "downloaded_total_bytes": 11529190
+}

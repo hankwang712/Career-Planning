@@ -1,0 +1,35 @@
+<div id="datasetBrowser" class="dataset-browser" data-style-url="{{ url_for('static', filename='dataset-browser.css') }}?v=20261016-category-polish-v1" data-detail-style-url="{{ url_for('static', filename='job-detail.css') }}?v=20261016-readable-v2">
+    <div class="dataset-heading">
+        <div>
+            <h3>选择探索方向</h3>
+        </div>
+    </div>
+    <div id="datasetCategories" class="dataset-categories" aria-label="数据分类"></div>
+    <form id="datasetSearchForm" class="dataset-search" role="search">
+        <label for="datasetSearch">寻找你的下一站</label>
+        <div class="ds-search-row">
+            <div class="ds-search-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input id="datasetSearch" type="search" maxlength="100" placeholder="搜索岗位、技能、公司、职业或行业…" autocomplete="off"></div>
+            <button type="submit">搜索<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+        </div>
+    </form>
+    <div class="dataset-feedback">
+        <p id="datasetStatus" role="status" aria-live="polite">正在读取数据分类…</p>
+        <button id="datasetRetry" type="button" hidden>重试</button>
+    </div>
+    <div id="datasetResults" class="dataset-results"></div>
+    <nav id="datasetPagination" class="dataset-pagination" aria-label="数据分页" hidden>
+        <button type="button" data-dataset-action="previous">上一页</button>
+        <span id="datasetPageInfo"></span>
+        <button type="button" data-dataset-action="next">下一页</button>
+    </nav>
+    <dialog id="datasetDetail" class="dataset-detail" aria-labelledby="datasetDetailTitle">
+        <div class="dataset-detail-shell">
+            <header id="datasetDetailHeader" class="dataset-detail-head">
+                <h3 id="datasetDetailTitle">数据详情</h3>
+                <button type="button" data-dataset-action="close" autofocus aria-label="关闭详情">关闭</button>
+            </header>
+            <div id="datasetDetailBody"></div>
+            <footer id="datasetDetailFooter" hidden></footer>
+        </div>
+    </dialog>
+</div>

@@ -10,7 +10,7 @@ const LEGACY_BUNDLES = {
   profile: [
     { key: "assessment-hub", src: "/static/assessment-hub.js?v=20260322-top-model-status-v1" },
     { key: "assessment-pet", src: "/static/assessment-pet.js?v=20260330-pet-v1" },
-    { key: "deep-test-hub", src: "/static/deep-test-hub.js?v=20260401-deep-test-v5" }
+    { key: "deep-test-hub", src: "/static/deep-test-hub.js?v=20261016-clean-interface" }
   ]
 };
 

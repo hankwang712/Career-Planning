@@ -1,0 +1,9 @@
+<div class="auth-captcha" data-auth-captcha="{{ captcha_purpose }}">
+    <label class="auth-captcha-title" for="{{ captcha_purpose }}Captcha">安全验证</label>
+    <div class="auth-captcha-row">
+        <img class="auth-captcha-image" width="210" height="72" alt="人机验证码，请输入图片中的字符">
+        <button class="auth-captcha-refresh" type="button" data-captcha-refresh="{{ captcha_purpose }}" aria-label="刷新验证码">换一张</button>
+    </div>
+    <input id="{{ captcha_purpose }}Captcha" class="auth-captcha-input" type="text" name="captcha" autocomplete="off" spellcheck="false" maxlength="5" pattern="[A-Za-z0-9]{5}" placeholder="输入 5 位验证码" aria-describedby="{{ captcha_purpose }}CaptchaStatus" required disabled>
+    <p id="{{ captcha_purpose }}CaptchaStatus" class="auth-captcha-status" data-captcha-status aria-live="polite">正在加载验证码…</p>
+</div>

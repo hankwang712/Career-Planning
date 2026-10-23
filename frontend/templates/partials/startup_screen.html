@@ -1,0 +1,72 @@
+<div id="startupScreen" class="startup-screen auth-mode-login{% if initial_user %} hidden{% endif %}">
+    <div class="auth-stage">
+        <section class="auth-visual" aria-hidden="true">
+            <div class="auth-visual-arch"></div>
+            <img class="auth-visual-img auth-visual-img--login" src="{{ url_for('static', filename='assets/auth-login-figure.png') }}" alt="">
+            <img class="auth-visual-img auth-visual-img--register" src="{{ url_for('static', filename='assets/auth-register-figure.png') }}" alt="">
+        </section>
+        <section class="auth-panel" aria-label="账户登录与注册">
+            <div class="auth-form-stack">
+                <form id="loginForm" class="auth-form auth-form--login" onsubmit="handleLogin(event)">
+                    <div>
+                        <h1 class="auth-title">欢迎回到智航生涯</h1>
+                        <p class="auth-description">登录你的专属工作台，继续探索职业方向。</p>
+                    </div>
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">邮箱或用户名</span>
+                        <span class="auth-pill-row">
+                            <input id="loginUsername" class="auth-input" name="username" type="text" autocomplete="username" maxlength="254" placeholder="输入已注册的账号" required>
+                        </span>
+                    </label>
+                    <div class="auth-pill">
+                        <label class="auth-pill-label" for="loginPassword">登录密码</label>
+                        <span class="auth-pill-row">
+                            <input id="loginPassword" class="auth-input" name="password" type="password" autocomplete="current-password" placeholder="输入你的登录密码" required>
+                            <button type="button" class="auth-password-toggle" data-password-toggle-for="loginPassword" aria-label="显示密码" aria-pressed="false">显示</button>
+                        </span>
+                    </div>
+                    {% set captcha_purpose = "login" %}
+                    {% include "partials/auth_captcha.html" %}
+                    <div id="loginAuthFeedback" class="auth-feedback" aria-live="polite" role="status"></div>
+                    <button class="auth-submit" type="submit">安全登录</button>
+                    <div class="auth-footer">
+                        <span>还没有账户？</span>
+                        <button id="registerTabBtn" class="auth-inline-link" type="button" onclick="switchAuthTab('register')">创建账户</button>
+                    </div>
+                </form>
+                <form id="registerForm" class="auth-form auth-form--register" onsubmit="handleRegister(event)">
+                    <div>
+                        <h1 class="auth-title">开启你的职业旅程</h1>
+                        <p class="auth-description">创建账户，保存你的测评、简历和职业报告。</p>
+                    </div>
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">邮箱地址</span>
+                        <span class="auth-pill-row">
+                            <input id="registerUsername" class="auth-input" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required>
+                        </span>
+                    </label>
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">设置密码</span>
+                        <span class="auth-pill-row">
+                            <input id="registerPassword" class="auth-input" name="password" type="password" autocomplete="new-password" placeholder="设置登录密码" required>
+                        </span>
+                    </label>
+                    <label class="auth-pill">
+                        <span class="auth-pill-label">确认密码</span>
+                        <span class="auth-pill-row">
+                            <input id="registerConfirmPassword" class="auth-input" name="confirm_password" type="password" autocomplete="new-password" placeholder="再次输入密码" required>
+                        </span>
+                    </label>
+                    {% set captcha_purpose = "register" %}
+                    {% include "partials/auth_captcha.html" %}
+                    <div id="registerAuthFeedback" class="auth-feedback" aria-live="polite" role="status"></div>
+                    <button class="auth-submit" type="submit">创建账户并登录</button>
+                    <div class="auth-footer">
+                        <span>已有账户？</span>
+                        <button id="loginTabBtn" class="auth-inline-link" type="button" onclick="switchAuthTab('login')">返回登录</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>

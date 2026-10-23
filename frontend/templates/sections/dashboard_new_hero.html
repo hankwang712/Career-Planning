@@ -1,0 +1,153 @@
+            <section class="cs-hero" id="dashboardHero">
+                <canvas class="cs-hero-canvas" id="heroCanvas" aria-hidden="true"></canvas>
+                <div class="cs-hero-glow" aria-hidden="true"></div>
+
+                <div class="cs-hero-main">
+                    <div class="cs-hero-badge" id="heroBadge">
+                        <span class="cs-hero-badge-dot"></span>
+                        <span>AI 驱动的职业路径规划</span>
+                    </div>
+                    <h2 id="welcomeTitle">早上好，同学</h2>
+                    <p id="welcomeSubtitle" class="cs-hero-subtitle">
+                        系统正在同步你的最新画像、岗位匹配和报告状态。
+                    </p>
+                    <p class="cs-hero-subtitle-en">
+                        Your career exploration status is updated from profile, job matching and report data.
+                    </p>
+
+                    <div class="cs-hero-stats" aria-label="职业探索关键指标">
+                        <div class="cs-stat-item">
+                            <div class="cs-stat-icon" aria-hidden="true">◎</div>
+                            <div class="cs-stat-body">
+                                <span id="pendingTaskCount" class="cs-stat-value">3</span>
+                                <span class="cs-stat-label">待完成任务<small id="pendingTaskHint">点击查看</small></span>
+                            </div>
+                        </div>
+                        <div class="cs-stat-item">
+                            <div class="cs-stat-icon" aria-hidden="true">◈</div>
+                            <div class="cs-stat-body">
+                                <span id="exploredJobsCount" class="cs-stat-value">12</span>
+                                <span class="cs-stat-label">推荐岗位<small>Recommended</small></span>
+                            </div>
+                        </div>
+                        <div class="cs-stat-item">
+                            <div class="cs-stat-icon" aria-hidden="true">◉</div>
+                            <div class="cs-stat-body">
+                                <span id="topMatchRate" class="cs-stat-value">94%</span>
+                                <span class="cs-stat-label">最高匹配<small id="topMatchRole">机器学习工程师</small></span>
+                            </div>
+                        </div>
+                        <div class="cs-stat-item">
+                            <div class="cs-stat-icon" aria-hidden="true">◐</div>
+                            <div class="cs-stat-body">
+                                <span id="dashboardScore" class="cs-stat-value">44%</span>
+                                <span class="cs-stat-label">整体进度<small id="scoreTrend">等待画像输入</small></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cs-hero-actions">
+                        <button type="button" class="cs-btn cs-btn-primary" onclick="showSection('profile')">
+                            <span>继续测评</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        </button>
+                        <button type="button" class="cs-btn cs-btn-secondary" onclick="showSection('matching')">查看岗位推荐</button>
+                        <button type="button" class="cs-btn cs-btn-ghost" onclick="TourGuide.start()">使用引导 →</button>
+                    </div>
+                </div>
+
+                <div id="dashboardPortraitVisual" class="cs-hero-visual" aria-live="polite">
+                    <svg class="cs-hero-constellation" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="gradNode" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#60a5fa"/>
+                                <stop offset="100%" stop-color="#a78bfa"/>
+                            </linearGradient>
+                            <linearGradient id="gradPath" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.4"/>
+                                <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.8"/>
+                            </linearGradient>
+                            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+
+                        <!-- 背景轨道圆环 -->
+                        <circle cx="200" cy="200" r="140" stroke="url(#gradPath)" stroke-width="1" stroke-dasharray="8 8" opacity="0.35"/>
+                        <circle cx="200" cy="200" r="100" stroke="url(#gradPath)" stroke-width="1" opacity="0.25"/>
+
+                        <!-- 职业路径阶梯 -->
+                        <g class="constellation-path">
+                            <path d="M120 280 L160 240 L160 200 L200 170 L200 130 L240 100 L280 80" stroke="url(#gradPath)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <!-- 节点 -->
+                            <circle cx="120" cy="280" r="6" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="0"/>
+                            <circle cx="160" cy="240" r="5" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="0.2"/>
+                            <circle cx="160" cy="200" r="5" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="0.4"/>
+                            <circle cx="200" cy="170" r="6" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="0.6"/>
+                            <circle cx="200" cy="130" r="5" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="0.8"/>
+                            <circle cx="240" cy="100" r="5" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="1.0"/>
+                            <circle cx="280" cy="80" r="8" fill="url(#gradNode)" filter="url(#glow)" class="cnode" data-delay="1.2"/>
+                        </g>
+
+                        <!-- 抽象人物轮廓 -->
+                        <g class="constellation-figure" transform="translate(0, 10)">
+                            <!-- 头部 -->
+                            <circle cx="152" cy="210" r="14" stroke="#94a3b8" stroke-width="1.5" fill="rgba(148,163,184,0.08)"/>
+                            <!-- 身体 -->
+                            <path d="M152 228 L152 260" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            <!-- 手臂 -->
+                            <path d="M152 238 L170 250" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M152 238 L140 252" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            <!-- 腿部 -->
+                            <path d="M152 260 L140 280" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M152 260 L164 280" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                        </g>
+
+                        <!-- 悬浮粒子 -->
+                        <g class="constellation-particles" opacity="0.6">
+                            <circle cx="80" cy="120" r="2" fill="#60a5fa" class="cparticle" data-speed="1.2"/>
+                            <circle cx="320" cy="140" r="2.5" fill="#a78bfa" class="cparticle" data-speed="0.9"/>
+                            <circle cx="340" cy="280" r="2" fill="#60a5fa" class="cparticle" data-speed="1.5"/>
+                            <circle cx="60" cy="240" r="2.5" fill="#a78bfa" class="cparticle" data-speed="1.1"/>
+                            <circle cx="280" cy="320" r="2" fill="#60a5fa" class="cparticle" data-speed="0.8"/>
+                            <circle cx="120" cy="340" r="2" fill="#a78bfa" class="cparticle" data-speed="1.3"/>
+                        </g>
+
+                        <!-- 连接线 -->
+                        <g class="constellation-links" stroke="#c4b5fd" stroke-width="1" opacity="0.4">
+                            <line x1="120" y1="280" x2="152" y2="266"/>
+                            <line x1="200" y1="170" x2="170" y2="150"/>
+                            <line x1="280" y1="80" x2="240" y2="60"/>
+                            <line x1="240" y1="100" x2="260" y2="130"/>
+                        </g>
+                    </svg>
+                    <div class="cs-hero-visual-caption">
+                        <span class="cs-hero-visual-dot"></span>
+                        <span>职业画像生成中</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 快速通道 -->
+            <div class="cs-hero-quickbar">
+                <button type="button" class="cs-quick-item" onclick="showSection('profile')">
+                    <span class="cs-quick-icon" style="--quick-color:#3b82f6">1</span>
+                    <span class="cs-quick-label">能力测评</span>
+                </button>
+                <button type="button" class="cs-quick-item" onclick="showSection('matching')">
+                    <span class="cs-quick-icon" style="--quick-color:#14b8a6">2</span>
+                    <span class="cs-quick-label">岗位匹配</span>
+                </button>
+                <button type="button" class="cs-quick-item" onclick="showSection('report')">
+                    <span class="cs-quick-icon" style="--quick-color:#f59e0b">3</span>
+                    <span class="cs-quick-label">发展规划</span>
+                </button>
+                <button type="button" class="cs-quick-item" onclick="showSection('jobs')">
+                    <span class="cs-quick-icon" style="--quick-color:#8b5cf6">4</span>
+                    <span class="cs-quick-label">岗位探索</span>
+                </button>
+            </div>

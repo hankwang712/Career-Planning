@@ -1,4 +1,4 @@
 @import "./tailwind.css";
-@import "../../../static/styles.css";
-@import "../../../static/workspace-shell.css";
-@import "../../../static/user-center.css";
+@import "../../static/styles.css";
+@import "../../static/workspace-shell.css";
+@import "../../static/user-center.css";

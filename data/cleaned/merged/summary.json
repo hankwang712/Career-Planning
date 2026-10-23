@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "jobs": {
+    "input_by_source": {
+      "city_jobs": 4040,
+      "other_city": 3089,
+      "job_research_hub": 74655
+    },
+    "input_records": 81784,
+    "output_records": 81296,
+    "duplicates_by_source": {
+      "city_jobs": 3,
+      "other_city": 356,
+      "job_research_hub": 58
+    },
+    "rejected_by_source": {
+      "other_city": 48,
+      "job_research_hub": 23
+    },
+    "output_by_source": {
+      "city_jobs": 4037,
+      "other_city": 2685,
+      "job_research_hub": 74574
+    },
+    "exact_duplicates": 367,
+    "cross_source_merges": 0,
+    "rejected": 71,
+    "formatting_duplicates": 50
+  },
+  "knowledge": {
+    "input_by_source": {
+      "china_occupations_2022": 1639,
+      "common_chinese_occupations": 202,
+      "china_industries_2017": 1773
+    },
+    "input_records": 3614,
+    "output_records": 3600,
+    "merged_equivalent_names": 14,
+    "output_by_kind": {
+      "occupation": 1827,
+      "industry": 1773
+    }
+  },
+  "rejection_reasons": {
+    "missing_description": 48,
+    "missing_title": 23
+  },
+  "job_quality_flags": {
+    "missing_source_url": 6769,
+    "missing_location": 18928,
+    "missing_salary": 27826
+  },
+  "skipped_derived_sources": [
+    {
+      "path": "data/cleaned/other_city_boss_format.json",
+      "records": 2181,
+      "reason": "Derived from data/raw/other_city.json; raw input is included instead."
+    }
+  ],
+  "input_sha256": {
+    "data/jobs/上海.json": "510c4c1492711bd752a60097daebb8564a253bbf1b0611cd6714fde2e86c5ab9",
+    "data/jobs/北京.json": "5b5c8645f2246f4c43d5ebda3d1c955e752e4220ca99942dc55e79f10144f2d6",
+    "data/jobs/厦门.json": "1b75c7cb1d74b81c7a40a0ba382a50b42ca8c048f081decbf2b7d35b8eead802",
+    "data/jobs/天津.json": "4490840ec3cf1659c54d86ea2f72c96befce2d89fb8d4ed4ba6fb8d1d517281c",
+    "data/jobs/广州.json": "2071edce78543babf86a25948316d8686e81929e76a96bf13838d6171d18b8b6",
+    "data/jobs/成都.json": "6d0729562734aaf34eeac6d9edc77c55a2197ad36ce2ae5e08774fc03af38753",
+    "data/jobs/杭州.json": "be4448aa28cf204307d6511795215cc81ac1dd4a2d4b02bffb8fe49a4859856d",
+    "data/jobs/武汉.json": "0f8225e1c19d17585c4b0ce3500ff8e1f9ce71c927f1f863ba475370a0bed416",
+    "data/jobs/深圳.json": "f947447d80236825932c1faa6b943b17fc375cfab8715c34cc26df3aa8022138",
+    "data/jobs/苏州.json": "0be427911b48018ca1196706d5d62109804bd432c13493ccf0eb95ce6bbfb341",
+    "data/jobs/西安.json": "2885d6115f5af10b114908a89f24954f7dedf6052351d82d644a22e7f4b955ea",
+    "data/jobs/郑州.json": "f99ba3423bb4705bb426377c038892473616cab65fb884abfcf61bf209943c8a",
+    "data/jobs/重庆.json": "0adba89df1b696603b7213b77419184c2153246bc5af863b0876b7eb1feb42d9",
+    "data/jobs/长沙.json": "b32c965f7cec7313e71779b89ca4b9896b1a296c8d66d850517ce75f0a82cd0e",
+    "data/raw/other_city.json": "ca5c305a6671f9d9844bf748faad9216d2d26f1ad0c2ffc5d605c767a8cceef5",
+    "data/raw/recruitment/job_research_hub/jobs-000.jsonl.gz": "6a463c31e28884547f947e05ebb41aaa4287184c74e74a11bd310b162798dfb9",
+    "data/raw/recruitment/job_research_hub/jobs-001.jsonl.gz": "ec5ba493ef92391a12d623db5fbc7ac551b3915669bfd8a4e605f4ace57998ea",
+    "data/raw/recruitment/job_research_hub/jobs-002.jsonl.gz": "450d4ecb556a6f2c46960d8e0b70eb87839df66a108f4a3a2f520ce5cb3b954b",
+    "data/raw/recruitment/job_research_hub/jobs-003.jsonl.gz": "591b10ad1f0f34bbb584c54bc0c47ae00f8208fe8bc829a04aebdcf8e874f65d",
+    "data/raw/recruitment/job_research_hub/jobs-004.jsonl.gz": "55622866684549cc14e83b79732b6b3dc455a4bdd5d39cb1cade7c6542aee1d8",
+    "data/raw/recruitment/job_research_hub/jobs-005.jsonl.gz": "04f462f769cc457fc259c0ac69df3ad43c5beeaf7f106cb5463603c5f3634b52",
+    "data/raw/recruitment/job_research_hub/jobs-006.jsonl.gz": "195b0adec9e8dcc7b2bc5c9b63c835060f591ee6d679c8255e6bfbb0c33717bb",
+    "data/raw/recruitment/job_research_hub/jobs-007.jsonl.gz": "676cd8fead8f8eddce46c0682e4dcd822d0e6c46f1958896b8b031ce7ac399b0",
+    "data/raw/recruitment/job_research_hub/jobs-008.jsonl.gz": "fd433b27518609b7fe08485a1a97452d5ae0404e361f884271ba995c9f9cb438",
+    "data/raw/recruitment/job_research_hub/jobs-009.jsonl.gz": "ea2ed5bafa6868d04ea7cb1aea79a2404b7bf211d8d992d2ea7cf04922e11b4f",
+    "data/raw/recruitment/job_research_hub/jobs-010.jsonl.gz": "525d0b7edfa10564fbe1083dcd8d6be54093b827994555a1937290d3065785f6",
+    "data/raw/recruitment/job_research_hub/jobs-011.jsonl.gz": "75ce87a0da46aab76935d4ade059300057b582abbc11f89262e24a8a380a6f00",
+    "data/raw/recruitment/job_research_hub/jobs-012.jsonl.gz": "d3fcd105c828ebd61be57570ed937dcf24d9f60f5a8daf2e9772c5138e76cb32",
+    "data/raw/recruitment/job_research_hub/jobs-013.jsonl.gz": "c779f5935b95a78706ad556ac6a2656fcf02526e111775ac8a1fa89e5e032d05",
+    "data/raw/recruitment/job_research_hub/jobs-014.jsonl.gz": "2392cf72c49ae648a0f836eb34548ff56bd8dfacbb7b6be1991511252e8d3127",
+    "data/knowledge/china_occupations_2022/occupations_community.json": "b6a39a3d93323017edb304198de3c153e8e83f761dec94f12249c9b20aec9a71",
+    "data/knowledge/chinese_occupations/occupations.json": "3d1b146b7f55ea1bec8bb90d47f1807e810071e14ea07a9e7410a5b5b6e7ab3d",
+    "data/knowledge/china_industries/industries.json": "c86e092c7354285cddd9bf796b32ed54a08fc487eadabb9748aa6dc6e0adaad9"
+  },
+  "policy": "Merge only matching company, title, location and full JD after whitespace/punctuation normalization. Keep conflicting salary, education, experience, recruitment cohort, work address or publication year separate. Retain all source references. Industry codes and occupation types are never merged together.",
+  "source_catalogs": [
+    "data/knowledge/catalog.json",
+    "data/raw/recruitment/catalog.json"
+  ],
+  "application_integration": "On-demand dataset browser; original city analytics sources are unchanged."
+}

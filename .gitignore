@@ -20,10 +20,12 @@ Thumbs.db
 .impeccable.md
 
 # Runtime app data
-app_data/
+data/app_data/
+data/cleaned/merged/*.sqlite3
+data/public/img/report/inline_*
 
 # Generated frontend and export outputs
-static/dist/
+frontend/static/dist/
 deploy/static-site/
 artifacts/
 

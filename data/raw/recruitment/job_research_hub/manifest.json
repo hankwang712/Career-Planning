@@ -1,0 +1,110 @@
+{
+  "schema_version": "2.0",
+  "generated_at": "2026-08-25T16:03:51.938291+00:00",
+  "format": "gzip-compressed JSON Lines",
+  "record_order": "company directory name, then source record order",
+  "records_per_shard": 5000,
+  "jobs": 74655,
+  "companies": 2333,
+  "all_jobs_have_full_jd": true,
+  "reconstructed_full_jd": 0,
+  "data_quality_corrections": {
+    "misattributed_company": "로보티즈（乐博益思）",
+    "correct_company": "海柔创新",
+    "duplicate_records_removed": 90
+  },
+  "primary_source_counts": {
+    "official": 33140,
+    "nowcoder": 19852,
+    "liepin": 17177,
+    "boss": 4486
+  },
+  "source_presence_counts": {
+    "official": 33140,
+    "nowcoder": 19852,
+    "liepin": 17177,
+    "boss": 4486
+  },
+  "shards": [
+    {
+      "path": "jobs-000.jsonl.gz",
+      "bytes": 3258838,
+      "sha256": "6a463c31e28884547f947e05ebb41aaa4287184c74e74a11bd310b162798dfb9"
+    },
+    {
+      "path": "jobs-001.jsonl.gz",
+      "bytes": 2423384,
+      "sha256": "ec5ba493ef92391a12d623db5fbc7ac551b3915669bfd8a4e605f4ace57998ea"
+    },
+    {
+      "path": "jobs-002.jsonl.gz",
+      "bytes": 2655428,
+      "sha256": "450d4ecb556a6f2c46960d8e0b70eb87839df66a108f4a3a2f520ce5cb3b954b"
+    },
+    {
+      "path": "jobs-003.jsonl.gz",
+      "bytes": 2614841,
+      "sha256": "591b10ad1f0f34bbb584c54bc0c47ae00f8208fe8bc829a04aebdcf8e874f65d"
+    },
+    {
+      "path": "jobs-004.jsonl.gz",
+      "bytes": 2283613,
+      "sha256": "55622866684549cc14e83b79732b6b3dc455a4bdd5d39cb1cade7c6542aee1d8"
+    },
+    {
+      "path": "jobs-005.jsonl.gz",
+      "bytes": 2532043,
+      "sha256": "04f462f769cc457fc259c0ac69df3ad43c5beeaf7f106cb5463603c5f3634b52"
+    },
+    {
+      "path": "jobs-006.jsonl.gz",
+      "bytes": 2484864,
+      "sha256": "195b0adec9e8dcc7b2bc5c9b63c835060f591ee6d679c8255e6bfbb0c33717bb"
+    },
+    {
+      "path": "jobs-007.jsonl.gz",
+      "bytes": 2603959,
+      "sha256": "676cd8fead8f8eddce46c0682e4dcd822d0e6c46f1958896b8b031ce7ac399b0"
+    },
+    {
+      "path": "jobs-008.jsonl.gz",
+      "bytes": 2956843,
+      "sha256": "fd433b27518609b7fe08485a1a97452d5ae0404e361f884271ba995c9f9cb438"
+    },
+    {
+      "path": "jobs-009.jsonl.gz",
+      "bytes": 2830679,
+      "sha256": "ea2ed5bafa6868d04ea7cb1aea79a2404b7bf211d8d992d2ea7cf04922e11b4f"
+    },
+    {
+      "path": "jobs-010.jsonl.gz",
+      "bytes": 3050217,
+      "sha256": "525d0b7edfa10564fbe1083dcd8d6be54093b827994555a1937290d3065785f6"
+    },
+    {
+      "path": "jobs-011.jsonl.gz",
+      "bytes": 3000622,
+      "sha256": "75ce87a0da46aab76935d4ade059300057b582abbc11f89262e24a8a380a6f00"
+    },
+    {
+      "path": "jobs-012.jsonl.gz",
+      "bytes": 2535986,
+      "sha256": "d3fcd105c828ebd61be57570ed937dcf24d9f60f5a8daf2e9772c5138e76cb32"
+    },
+    {
+      "path": "jobs-013.jsonl.gz",
+      "bytes": 2553934,
+      "sha256": "c779f5935b95a78706ad556ac6a2656fcf02526e111775ac8a1fa89e5e032d05"
+    },
+    {
+      "path": "jobs-014.jsonl.gz",
+      "bytes": 2553089,
+      "sha256": "2392cf72c49ae648a0f836eb34548ff56bd8dfacbb7b6be1991511252e8d3127"
+    }
+  ],
+  "removed_redundancy": [
+    "raw collector responses",
+    "generated per-company Markdown",
+    "duplicate per-source aggregate databases"
+  ]
+}

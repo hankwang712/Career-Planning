@@ -1,24 +1,14 @@
 {
-  "name": "career-planner-web",
+  "name": "career-planner",
   "private": true,
+  "workspaces": ["frontend"],
   "scripts": {
-    "start": "node scripts/start-server.mjs",
-    "start:check": "node scripts/start-server.mjs --check",
-    "dev": "vite",
-    "build": "node scripts/sync-vendors.mjs && vite build",
-    "sync:vendors": "node scripts/sync-vendors.mjs",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@gsap/react": "^2.1.2",
-    "chart.js": "^4.5.0",
-    "fuse.js": "^7.1.0",
-    "gsap": "^3.15.0"
-  },
-  "devDependencies": {
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "vite": "^6.2.0"
+    "start": "node backend/scripts/start-server.mjs",
+    "start:check": "node backend/scripts/start-server.mjs --check",
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "sync:vendors": "npm run sync:vendors --workspace frontend",
+    "preview": "npm run preview --workspace frontend",
+    "export:static": "python frontend/scripts/export_static_site.py"
   }
 }

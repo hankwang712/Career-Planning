@@ -1,0 +1,27 @@
+<div id="workspaceGuideOverlay" class="workspace-guide-overlay hidden" onclick="handleWorkspaceGuideBackdropClick(event)">
+    <div id="workspaceGuideFullFrost" class="workspace-guide-full-frost hidden" aria-hidden="true"></div>
+    <div id="workspaceGuideFrostFrame" class="workspace-guide-frost-frame hidden" aria-hidden="true">
+        <div class="workspace-guide-frost-bar workspace-guide-frost-top"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-left"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-right"></div>
+        <div class="workspace-guide-frost-bar workspace-guide-frost-bottom"></div>
+    </div>
+    <div class="workspace-guide-highlight" id="workspaceGuideHighlight"></div>
+    <div class="workspace-guide-card" id="workspaceGuideCard" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="workspaceGuideTitle">
+        <div class="workspace-guide-top">
+            <span id="workspaceGuideStepLabel">01 / 06</span>
+            <button type="button" onclick="closeWorkspaceGuide(true)">跳过</button>
+        </div>
+        <p class="workspace-guide-kicker" id="workspaceGuideKicker">首次进入引导</p>
+        <h3 id="workspaceGuideTitle">先看你的当前阶段</h3>
+        <div class="workspace-guide-copy" id="workspaceGuideCopy">这里会结合画像完成度、目标岗位和职业报告，告诉你现在最值得先做什么。</div>
+        <p class="workspace-guide-meta" id="workspaceGuideMeta"></p>
+        <div class="workspace-guide-actions">
+            <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrimaryBtn" onclick="handleWorkspaceGuidePrimary()">去这里看看</button>
+            <div class="workspace-guide-actions-end">
+                <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrevBtn" onclick="prevWorkspaceGuideStep()">上一步</button>
+                <button type="button" class="workspace-guide-btn" id="workspaceGuideNextBtn" onclick="nextWorkspaceGuideStep()">下一步</button>
+            </div>
+        </div>
+    </div>
+</div>

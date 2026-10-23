@@ -1,0 +1,89 @@
+.auth-captcha {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid #d6e3ed;
+  border-radius: 16px;
+  background: rgba(246, 250, 253, 0.9);
+  color: #314250;
+}
+
+.auth-captcha-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.auth-captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.auth-captcha-image {
+  display: block;
+  width: 168px;
+  height: 58px;
+  border-radius: 8px;
+  background: #eaf2f8;
+}
+
+.auth-captcha-refresh {
+  border: 0;
+  padding: 0.4rem;
+  color: #346995;
+  background: transparent;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.auth-captcha-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #c3d3e0;
+  border-radius: 10px;
+  color: #314250;
+  background: #fff;
+  letter-spacing: 0.2em;
+  font-size: 1rem;
+}
+
+.auth-captcha-input:focus-visible,
+.auth-captcha-refresh:focus-visible {
+  outline: 2px solid #4b7fb0;
+  outline-offset: 3px;
+}
+
+.auth-captcha-status,
+.auth-description,
+.auth-password-help {
+  margin: 0;
+  color: #617487;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.page-login .auth-form-stack {
+  min-height: 820px;
+}
+
+.page-login .startup-screen {
+  position: relative;
+  min-height: 100vh;
+}
+
+body.page-login {
+  overflow: auto;
+}
+
+.page-login .auth-password-toggle {
+  width: 3rem;
+  flex-basis: 3rem;
+  font-size: 0.8rem;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

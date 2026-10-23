@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "downloaded_on": "2026-10-16",
+  "search_integration_status": "downloaded_only_not_integrated",
+  "sources": [
+    {
+      "id": "job_research_hub_2026_08_25",
+      "name": "JobResearchHub Chinese recruitment JD snapshot",
+      "source_url": "https://github.com/zeitvex/JobResearchHub",
+      "download_base_url": "https://raw.githubusercontent.com/zeitvex/JobResearchHub/main/data/main/",
+      "snapshot_generated_at": "2026-08-25T16:03:51.938291+00:00",
+      "directory": "data/raw/recruitment/job_research_hub",
+      "upstream_manifest": "data/raw/recruitment/job_research_hub/manifest.json",
+      "data_notice": "data/raw/recruitment/job_research_hub/DATA_NOTICE",
+      "repository_license": "data/raw/recruitment/job_research_hub/LICENSE",
+      "language": "primarily zh-CN",
+      "data_license": null,
+      "license_scope": "The upstream MIT license covers code and original project documentation. Third-party job descriptions and source-site content are not relicensed by it; original source rights and terms apply.",
+      "format": "gzip-compressed UTF-8 JSON Lines",
+      "counts": {
+        "records": 74655,
+        "unique_record_ids": 74655,
+        "unique_company_names": 2333,
+        "gzip_shards": 15,
+        "compressed_data_bytes": 40338340,
+        "records_with_nonempty_jd": 74655,
+        "records_with_skill_tags": 12300,
+        "records_without_valid_http_source_url": 47,
+        "records_without_title": 23,
+        "records_without_collection_timestamp": 0
+      },
+      "primary_source_counts": {
+        "official": 33140,
+        "nowcoder": 19852,
+        "liepin": 17177,
+        "boss": 4486
+      },
+      "available_fields": [
+        "record_id",
+        "company_name",
+        "title",
+        "locations",
+        "salary",
+        "education",
+        "graduation_year",
+        "recruitment_type",
+        "company_scale",
+        "skills",
+        "published_at",
+        "updated_at",
+        "responsibilities",
+        "requirements",
+        "full_jd",
+        "source"
+      ],
+      "validation": {
+        "compressed_sizes_match_upstream_manifest": true,
+        "sha256_hashes_match_upstream_manifest": true,
+        "all_gzip_streams_read_to_end": true,
+        "all_records_parse_as_json": true,
+        "record_ids_unique": true,
+        "record_and_source_counts_match_upstream_manifest": true
+      },
+      "usage_notes": [
+        "Historical recruitment snapshot; current availability of any position has not been checked.",
+        "Downloaded as a separate raw source. Existing city job files and production search were not modified.",
+        "Source-platform labels were inherited from upstream, not independently verified against each source URL."
+      ]
+    }
+  ]
+}

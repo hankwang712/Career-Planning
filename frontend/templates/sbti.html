@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBTI 完整版测试 | 智航生涯</title>
+    {% include "partials/head_fonts.html" %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260410-sbti-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sbti-lite.css') }}?v=20260410-sbti-v1">
+</head>
+<body class="sbti-page">
+    {% include "partials/page_loader.html" %}
+    <main class="sbti-shell">
+        <section class="sbti-hero">
+            <div>
+                <p class="sbti-kicker">Personality Expansion</p>
+                <h1 class="sbti-title">SBTI 人格扩展（完整版）</h1>
+                <p class="sbti-copy">当前为完整题库与完整匹配逻辑版本，并支持点击选项后自动进入下一题。</p>
+            </div>
+            <div class="sbti-hero-actions">
+                <a class="sbti-btn ghost" href="/">返回工作台</a>
+                <button id="sbtiRestartBtn" class="sbti-btn secondary" type="button">重新测试</button>
+            </div>
+        </section>
+
+        <section id="sbtiQuestionCard" class="sbti-card">
+            <div class="sbti-progress-row">
+                <div class="sbti-progress-track">
+                    <i id="sbtiProgressBar" style="width: 0%;"></i>
+                </div>
+                <span id="sbtiProgressText">0 / 15</span>
+            </div>
+            <h2 id="sbtiQuestionTitle" class="sbti-question-title">准备开始</h2>
+            <p id="sbtiQuestionMeta" class="sbti-question-meta">每题选择最贴近你的一项</p>
+            <div id="sbtiOptionList" class="sbti-options"></div>
+            <div class="sbti-nav-row">
+                <button id="sbtiPrevBtn" class="sbti-btn ghost" type="button">上一题</button>
+                <button id="sbtiNextBtn" class="sbti-btn primary" type="button">下一题</button>
+            </div>
+        </section>
+
+        <section id="sbtiResultCard" class="sbti-card hidden">
+            <div class="sbti-result-head">
+                <p class="sbti-kicker">SBTI Result</p>
+                <h2 id="sbtiResultTitle" class="sbti-result-title">你的 SBTI 画像</h2>
+                <span id="sbtiResultMatch" class="sbti-result-badge">匹配度 0%</span>
+            </div>
+            <p id="sbtiResultSummary" class="sbti-copy"></p>
+            <div id="sbtiDimList" class="sbti-dim-grid"></div>
+            <div class="sbti-nav-row">
+                <a class="sbti-btn secondary" href="/">回到能力画像中心</a>
+                <button id="sbtiReTakeBtn" class="sbti-btn ghost" type="button">再测一次</button>
+            </div>
+        </section>
+    </main>
+    <script src="{{ url_for('static', filename='sbti-lite.js') }}?v=20261016-clean-interface"></script>
+</body>
+</html>

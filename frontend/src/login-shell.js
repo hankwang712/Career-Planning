@@ -8,6 +8,9 @@ function resolveApiUrl(path) {
 async function requestJson(path, options = {}) {
   const method = options.method || "GET";
   const headers = { ...(options.headers || {}) };
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(method.toUpperCase())) {
+    Object.assign(headers, await window.CareerAuth.headers());
+  }
   const init = {
     method,
     credentials: options.credentials || "include",
@@ -52,6 +55,7 @@ function wirePasswordVisibilityToggles() {
       btn.classList.toggle("is-password-visible", nextVisible);
       btn.setAttribute("aria-pressed", nextVisible ? "true" : "false");
       btn.setAttribute("aria-label", nextVisible ? "隐藏密码" : "显示密码");
+      btn.textContent = nextVisible ? "隐藏" : "显示";
     });
   });
 }
@@ -138,7 +142,7 @@ function switchAuthTab(tab) {
   clearInactiveAuthFeedback(isLogin);
 
   if (isLogin) {
-    showAuthMessage("支持邮箱或演示账号 system 登录。", "info");
+    showAuthMessage("使用你的账号和密码登录，完成安全验证后进入工作台。", "info");
   } else {
     showAuthMessage("请使用邮箱与密码完成注册。", "info");
   }
@@ -173,7 +177,7 @@ async function handleLogin(event) {
   try {
     await requestJson("/api/auth/login", {
       method: "POST",
-      body: { username, password }
+      body: { username, password, ...await window.CareerAuth.credentials("login") }
     });
     persistLoginEmail(username);
     if (typeof window.__showPageLoader === "function") {
@@ -187,6 +191,7 @@ async function handleLogin(event) {
   } catch (error) {
     restoreSubmitButton(submitBtn);
     showAuthMessage(error.message || "登录失败，请稍后重试。", "error");
+    void window.CareerAuth.refresh("login");
   }
 }
 
@@ -209,7 +214,8 @@ async function handleRegister(event) {
       body: {
         email,
         password,
-        confirm_password: confirmPassword
+        confirm_password: confirmPassword,
+        ...await window.CareerAuth.credentials("register")
       }
     });
     persistLoginEmail(email);
@@ -224,6 +230,7 @@ async function handleRegister(event) {
   } catch (error) {
     restoreSubmitButton(submitBtn);
     showAuthMessage(error.message || "注册失败，请稍后重试。", "error");
+    void window.CareerAuth.refresh("register");
   }
 }
 
