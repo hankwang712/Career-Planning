@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,10 +16,7 @@ class AgentResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     agent: str
-    status: Literal[
-        "ok", "insufficient_evidence", "execution_limit",
-        "model_error", "validation_failed",
-    ]
+    status: str = Field(min_length=1, description="由 Agent 定义状态，API 对未单独分类的失败统一处理")
     data: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
@@ -56,10 +53,10 @@ class BaseAgentAPI(ABC):
             "model_error": (502, "模型执行失败"),
             "validation_failed": (502, "模型输出校验失败"),
         }
-        # 未知状态也视为内部错误；响应不包含底层异常详情。
-        if not isinstance(status, str):
+        # 业务错误不在公共层逐项登记；响应不包含底层异常详情。
+        if not isinstance(status, str) or not status.strip():
             raise HTTPException(status_code=500, detail="Agent 返回状态错误")
-        status_code, message = errors.get(status, (500, "Agent 返回状态错误"))
+        status_code, message = errors.get(status, (502, "Agent 执行失败"))
         raise HTTPException(
             status_code=status_code,
             detail={"status": status, "message": message},

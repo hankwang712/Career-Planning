@@ -1,15 +1,29 @@
 
 import json
+import logging
 from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, ValidationError
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents.middleware import ModelCallLimitMiddleware, after_model
 from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
 from langchain.agents.structured_output import StructuredOutputError
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.errors import GraphRecursionError
+
+logger = logging.getLogger(__name__)
+
+
+@after_model
+def check_model_output(state, runtime):
+    message = state["messages"][-1]
+    if not isinstance(message, AIMessage):
+        return
+    if message.response_metadata.get("finish_reason") == "length":
+        raise ValueError("模型输出达到长度上限，结构化结果可能被截断。请精简输出或检查模型接口的输出 token 限制")
+    if message.invalid_tool_calls:
+        raise ValueError("模型返回了无法解析的工具参数 JSON，请检查原始响应中的 invalid_tool_calls")
 
 
 class BaseAgent(ABC):
@@ -55,6 +69,7 @@ class BaseAgent(ABC):
             system_prompt=self.system_prompt,
             response_format=self.get_output_schema(prepared),
             middleware=[
+                check_model_output,
                 ModelCallLimitMiddleware(
                     run_limit=self.max_model_calls,
                     exit_behavior="error"
@@ -65,10 +80,6 @@ class BaseAgent(ABC):
         )
 
     # ============== 结果处理 ==============
-
-    def validate_result(self, draft, prepared: dict):
-        """子类可结合本次输入校验结果；不在实例上保存请求状态。"""
-        return draft
 
     def format_result(self, draft=None, error=None):
         if error is None:
@@ -115,7 +126,8 @@ class BaseAgent(ABC):
                 self.make_inputs(prepared),
                 config=config
             )
-            draft = self.validate_result(state.get("structured_response"), prepared)
+            draft = state.get("structured_response")
             return self.format_result(draft)
         except Exception as error:
+            logger.exception("Agent 执行失败：%s", self.name)
             return self.format_result(error=error)
