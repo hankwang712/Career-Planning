@@ -17,6 +17,31 @@ class AIConfig:
     model: str
 
 
+@dataclass(frozen=True)
+class JobRAGConfig:
+    base_url: str = "http://127.0.0.1:9621"
+    workspace: str = "career_jd"
+    api_key: str = field(default="", repr=False)
+    timeout: float = 180
+
+
+def get_job_rag_config() -> JobRAGConfig:
+    """Agent 只连接 LightRAG 服务；数据库和 embedding 配置仍由研究目录管理。"""
+    values = dotenv_values(ENV_FILE, encoding="utf-8-sig")
+    defaults = JobRAGConfig()
+
+    def read(name: str, default: str) -> str:
+        value = os.environ.get(name, values.get(name))
+        return (default if value is None else value).strip()
+
+    return JobRAGConfig(
+        base_url=read("LIGHTRAG_BASE_URL", defaults.base_url).rstrip("/"),
+        workspace=read("LIGHTRAG_WORKSPACE", defaults.workspace),
+        api_key=read("LIGHTRAG_API_KEY", defaults.api_key),
+        timeout=float(read("LIGHTRAG_TIMEOUT", str(defaults.timeout))),
+    )
+
+
 def get_ai_config(capability: str, *, default_base_url: str = "", default_model: str = "") -> AIConfig:
     """例如 chat、embedding、ocr；新增用途可直接复用此入口。"""
     capability = capability.strip().upper()

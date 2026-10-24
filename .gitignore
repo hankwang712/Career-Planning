@@ -1,33 +1,33 @@
+# 1. 两套实际使用的环境配置
+/experiments/.env
+/artifacts/research/.env
+
+# 2. Python 缓存与本机开发配置
 __pycache__/
-*.py[cod]
-*.pyo
-*.ipynb
+/.ruff_cache/
+/.vscode/
+
+# 3. 前端依赖与构建输出
 node_modules/
+/frontend/static/dist/
+/deploy/static-site/
 
-# Environment and OS
-.env
-.env.*
-.venv/
-venv/
-Thumbs.db
-.DS_Store
+# 4. 主站运行数据、生成的报告图片与岗位浏览索引
+/data/app_data/
+/data/public/img/report/
+/data/cleaned/merged/browse.sqlite3*
 
-# Local AI / editor tooling
-.claude/
-.clawhub/
-.cursor/
-.codex/
-.impeccable.md
+# 5. Agent 实验输出与本地 JD 语料
+/experiments/output/
+/job_descriptions.txt
 
-# Runtime app data
-data/app_data/
-data/cleaned/merged/*.sqlite3
-data/public/img/report/inline_*
+# 6. LightRAG 本地依赖与运行数据
+# job_graph.py 和 compose.postgres.yml 是必要源码，不忽略
+/artifacts/research/LightRAG/
+/artifacts/research/.job_graph/
+/artifacts/research/backups/
+/artifacts/research/inputs/
+/artifacts/research/jd_rag_storage/
 
-# Generated frontend and export outputs
-frontend/static/dist/
-deploy/static-site/
-artifacts/
-
-# Logs
-*.log
+# 7. 当前项目的临时文件目录
+/tmp/
