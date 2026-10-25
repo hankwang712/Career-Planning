@@ -1,5 +1,3 @@
-"""本项目的固定评价权重；模型只输出等级与依据，不决定权重。"""
-
 RESUME_WEIGHTS = {
     "experience_quality": 35,
     "skills_evidence": 20,

@@ -1,5 +1,3 @@
-"""按用途读取 AI_<用途>_{API_KEY,BASE_URL,MODEL}，环境变量优先于 .env。"""
-
 import os
 import re
 from dataclasses import dataclass, field

@@ -8,6 +8,7 @@ from ..prompt.resume_analysis import RESUME_ANALYSIS_PROMPT
 from ..resume_rubric import DEFAULT_EXPERIENCE_WEIGHTS, EXPERIENCE_WEIGHTS, RESUME_WEIGHTS
 from ..schemas.resume import ResumeAnalysis, ResumeInput
 from ..tools.document import read_document
+from ..utils.dates import resume_date_context
 from .base import BaseAgent
 
 
@@ -103,7 +104,9 @@ class ResumeAnalysisAgent(BaseAgent):
             "experiences": EXPERIENCE_WEIGHTS,
             "default_experience": DEFAULT_EXPERIENCE_WEIGHTS,
         }
-        prepared["analysis_date"] = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        analysis_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+        prepared["analysis_date"] = analysis_date.isoformat()
+        prepared["date_context"] = resume_date_context(prepared["raw_resume"], analysis_date)
         return prepared
 
     def should_run(self, prepared: dict) -> bool:

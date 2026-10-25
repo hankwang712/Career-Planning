@@ -1,5 +1,3 @@
-"""仅供岗位检索使用：复用 LightRAG，未运行时后台启动，不导入或修改 JD。"""
-
 import asyncio
 import os
 from pathlib import Path

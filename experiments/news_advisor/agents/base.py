@@ -14,7 +14,7 @@ from langgraph.errors import GraphRecursionError
 logger = logging.getLogger(__name__)
 
 
-@after_model
+@after_model(can_jump_to=["model"])
 def check_model_output(state, runtime):
     message = state["messages"][-1]
     if not isinstance(message, AIMessage):
@@ -22,7 +22,16 @@ def check_model_output(state, runtime):
     if message.response_metadata.get("finish_reason") == "length":
         raise ValueError("模型输出达到长度上限，结构化结果可能被截断。请精简输出或检查模型接口的输出 token 限制")
     if message.invalid_tool_calls:
-        raise ValueError("模型返回了无法解析的工具参数 JSON，请检查原始响应中的 invalid_tool_calls")
+        # 替换损坏的工具调用，避免下一次请求包含未配对的 tool_call；原始响应由调用方诊断记录保存。
+        if not message.id:
+            raise ValueError("模型返回了无法解析的工具参数 JSON，且消息缺少用于替换的 ID")
+        return {
+            "messages": [
+                AIMessage(content="上一条结构化输出的工具参数不是有效 JSON，已拒绝执行。", id=message.id),
+                HumanMessage(content="请重新提交完整的结构化工具参数，使用严格有效的 JSON。字符串内的引号、反斜杠和换行必须正确转义，不要添加 Markdown 围栏。保持原有事实和原文证据，不要为避免格式错误删减关键要求。"),
+            ],
+            "jump_to": "model",
+        }
 
 
 class BaseAgent(ABC):
@@ -113,8 +122,10 @@ class BaseAgent(ABC):
     # ============== 异步调用 ==============
 
     async def arun(self, payload: dict, config: RunnableConfig | None = None) -> dict:
-        prepared = self.prepare(payload)
+        return await self._arun_prepared(self.prepare(payload), config=config)
 
+    async def _arun_prepared(self, prepared: dict, config: RunnableConfig | None = None) -> dict:
+        """执行已整理的输入，供需要基于同一份材料校验结果的子类复用。"""
         if not self.should_run(prepared):
             return self.format_result()
 
