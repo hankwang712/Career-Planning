@@ -744,14 +744,47 @@
     ).filter(Boolean);
   }
 
+  const MAP_ZOOM_LIMIT = Object.freeze({ min: 1, max: 5 });
+
+  function updateMapControls() {
+    const zoom = state.chart?.getOption()?.geo?.[0]?.zoom || 1;
+    const stage = document.getElementById("jobsChinaMap")?.closest(".jobs-geo-stage");
+    if (!stage) return;
+    stage.querySelector('[data-job-geo-action="zoom-in"]').disabled = zoom >= MAP_ZOOM_LIMIT.max;
+    stage.querySelector('[data-job-geo-action="zoom-out"]').disabled = zoom <= MAP_ZOOM_LIMIT.min;
+  }
+
+  function bindMapControls(mapEl) {
+    const stage = mapEl.closest(".jobs-geo-stage");
+    if (!stage || stage.dataset.zoomBound) return;
+    stage.dataset.zoomBound = "true";
+    stage.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-job-geo-action]");
+      if (!button || !state.chart) return;
+      const action = button.dataset.jobGeoAction;
+      if (action === "reset") {
+        state.chart.setOption({ geo: { center: null, zoom: 1 } });
+      } else {
+        const zoom = state.chart.getOption().geo[0].zoom || 1;
+        const next = Math.max(MAP_ZOOM_LIMIT.min, Math.min(MAP_ZOOM_LIMIT.max,
+          zoom * (action === "zoom-in" ? 1.25 : 0.8)));
+        state.chart.dispatchAction({ type: "geoRoam", componentType: "geo", geoIndex: 0,
+          zoom: next / zoom, originX: state.chart.getWidth() / 2, originY: state.chart.getHeight() / 2 });
+      }
+      updateMapControls();
+    });
+  }
+
   function renderMap() {
     const mapEl = document.getElementById("jobsChinaMap");
     if (!mapEl || !window.echarts || !state.insights) return;
 
     bindResize();
+    bindMapControls(mapEl);
 
     if (!state.chart) {
       state.chart = window.echarts.init(mapEl, null, { renderer: "canvas" });
+      state.chart.on("georoam", updateMapControls);
       state.chart.on("click", (params) => {
         const hint = document.getElementById("jobsGeoHint");
         if (hint) hint.style.display = "none";
@@ -775,77 +808,7 @@
     const salaryValues = activeProvinces.map((item) => item.averageAnnualized);
     const minValue = salaryValues.length ? Math.floor(Math.min(...salaryValues)) : 0;
     const maxValue = salaryValues.length ? Math.ceil(Math.max(...salaryValues)) : 1;
-    const mapLayout = {
-      layoutCenter: ["46%", "52%"],
-      layoutSize: "108%",
-      aspectScale: 0.95
-    };
-
-    const maxCityJobs = Math.max(1, ...state.insights.provinces.flatMap((province) => province.cities.map((city) => city.jobCount || 0)));
-    const activeCityScatter = buildCityScatterData().map((item) => ({
-      ...item,
-      symbolSize: Math.max(7, Math.min(18, 7 + (item.jobCount / maxCityJobs) * 12))
-    }));
-
-    state.chart.setOption({
-      tooltip: {
-        trigger: "item",
-        backgroundColor: "rgba(248, 250, 252, 0.98)",
-        borderColor: "rgba(148, 163, 184, 0.42)",
-        borderWidth: 1,
-        padding: [10, 14],
-        textStyle: { color: "#1e293b", fontSize: 13 },
-        extraCssText: "box-shadow: 0 14px 34px rgba(15,23,42,0.16); border-radius: 10px;",
-        formatter(params) {
-          if (params.seriesType === "effectScatter") {
-            const salary = Number(params.data?.averageAnnualized || params.value?.[2] || 0);
-            return [
-              `<strong style="color:#0f766e">${safeHtml(params.name)}</strong>`,
-              `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${safeHtml(params.data?.jobCount || "--")}</span>`,
-              `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e">${formatSalaryK(salary)}</strong>`
-            ].join("<br/>");
-          }
-          const province = state.insights.provinceMap.get(params.name);
-          if (!province || !params.name) {
-            return params.name
-              ? `<span style="color:#64748b">${safeHtml(params.name)}</span><br/><span style="color:#475569;font-size:11px">暂无采集样本</span>`
-              : null;
-          }
-          return [
-            `<strong style="color:#1a365d;font-size:14px">${safeHtml(province.name)}</strong>`,
-            `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${province.jobCount}</span>`,
-            `<span style="color:#64748b;font-size:12px">覆盖城市：</span><span>${safeHtml(province.cityNames.join("、"))}</span>`,
-            `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e;font-size:14px">${formatSalaryK(province.averageAnnualized)}</strong>`,
-            `<span style="color:#64748b;font-size:12px">实习/应届占比：</span><span>${formatPercent(province.campusShare)}</span>`
-          ].join("<br/>");
-        }
-      },
-      geo: {
-        map: "china",
-        roam: false,
-        silent: true,
-        z: 0,
-        ...mapLayout,
-        itemStyle: { opacity: 0 },
-        label: { show: false }
-      },
-      visualMap: {
-        show: false,
-        min: minValue,
-        max: maxValue,
-        calculable: false,
-        inRange: {
-          color: ["#c6d4e2", "#93adc6", "#5f8eb3", "#2f789f", "#0d5c78"]
-        }
-      },
-      series: [
-        {
-          type: "map",
-          map: "china",
-          roam: false,
-          selectedMode: "single",
-          z: 2,
-          ...mapLayout,
+    const regionStyle = {
           label: {
             show: true,
             color: "#496377",
@@ -893,6 +856,80 @@
               shadowColor: "rgba(13, 92, 120, 0.46)"
             }
           },
+    };
+    const previousGeo = state.chart.getOption()?.geo?.[0];
+    const mapView = { zoom: previousGeo?.zoom || 1 };
+    if (previousGeo?.center) mapView.center = previousGeo.center;
+    const mapLayout = {
+      layoutCenter: ["46%", "52%"],
+      layoutSize: "108%",
+      aspectScale: 0.95
+    };
+
+    const maxCityJobs = Math.max(1, ...state.insights.provinces.flatMap((province) => province.cities.map((city) => city.jobCount || 0)));
+    const activeCityScatter = buildCityScatterData().map((item) => ({
+      ...item,
+      symbolSize: Math.max(7, Math.min(18, 7 + (item.jobCount / maxCityJobs) * 12))
+    }));
+
+    state.chart.setOption({
+      tooltip: {
+        trigger: "item",
+        backgroundColor: "rgba(248, 250, 252, 0.98)",
+        borderColor: "rgba(148, 163, 184, 0.42)",
+        borderWidth: 1,
+        padding: [10, 14],
+        textStyle: { color: "#1e293b", fontSize: 13 },
+        extraCssText: "box-shadow: 0 14px 34px rgba(15,23,42,0.16); border-radius: 10px;",
+        formatter(params) {
+          if (params.seriesType === "effectScatter") {
+            const salary = Number(params.data?.averageAnnualized || params.value?.[2] || 0);
+            return [
+              `<strong style="color:#0f766e">${safeHtml(params.name)}</strong>`,
+              `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${safeHtml(params.data?.jobCount || "--")}</span>`,
+              `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e">${formatSalaryK(salary)}</strong>`
+            ].join("<br/>");
+          }
+          const province = state.insights.provinceMap.get(params.name);
+          if (!province || !params.name) {
+            return params.name
+              ? `<span style="color:#64748b">${safeHtml(params.name)}</span><br/><span style="color:#475569;font-size:11px">暂无采集样本</span>`
+              : null;
+          }
+          return [
+            `<strong style="color:#1a365d;font-size:14px">${safeHtml(province.name)}</strong>`,
+            `<span style="color:#64748b;font-size:12px">岗位样本：</span><span>${province.jobCount}</span>`,
+            `<span style="color:#64748b;font-size:12px">覆盖城市：</span><span>${safeHtml(province.cityNames.join("、"))}</span>`,
+            `<span style="color:#64748b;font-size:12px">平均折算月薪：</span><strong style="color:#0f766e;font-size:14px">${formatSalaryK(province.averageAnnualized)}</strong>`,
+            `<span style="color:#64748b;font-size:12px">实习/应届占比：</span><span>${formatPercent(province.campusShare)}</span>`
+          ].join("<br/>");
+        }
+      },
+      geo: {
+        map: "china",
+        roam: true,
+        scaleLimit: MAP_ZOOM_LIMIT,
+        selectedMode: "single",
+        z: 2,
+        ...mapLayout,
+        ...mapView,
+        ...regionStyle
+      },
+      visualMap: {
+        show: false,
+        seriesIndex: 0,
+        min: minValue,
+        max: maxValue,
+        calculable: false,
+        inRange: {
+          color: ["#c6d4e2", "#93adc6", "#5f8eb3", "#2f789f", "#0d5c78"]
+        }
+      },
+      series: [
+        {
+          type: "map",
+          map: "china",
+          geoIndex: 0,
           data: state.insights.provinces.map((province) => ({
             name: province.name,
             value: Number(province.averageAnnualized.toFixed(2))
@@ -923,13 +960,14 @@
         }
       ]
     }, true);
+    updateMapControls();
 
     window.requestAnimationFrame(() => {
       if (state.chart) state.chart.resize();
     });
 
     if (state.selectedProvince && state.insights.provinceMap.has(state.selectedProvince)) {
-      state.chart.dispatchAction({ type: "select", seriesIndex: 0, name: state.selectedProvince });
+      state.chart.dispatchAction({ type: "geoSelect", geoIndex: 0, name: state.selectedProvince });
     }
   }
 
@@ -943,7 +981,7 @@
     renderPanel(province, city);
 
     if (state.chart) {
-      state.chart.dispatchAction({ type: "select", seriesIndex: 0, name: province.name });
+      state.chart.dispatchAction({ type: "geoSelect", geoIndex: 0, name: province.name });
     }
   }
 

@@ -98,7 +98,8 @@ class CareerDecisionAgent(BaseAgent):
     name = "career_decision"
     system_prompt = CAREER_DECISION_PROMPT
 
-    def prepare(self, payload: dict) -> dict:
+    @staticmethod
+    def prepare(payload: dict) -> dict:
         request = CareerDecisionInput.model_validate(payload)
         analysis_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
         sources = [
@@ -109,6 +110,10 @@ class CareerDecisionAgent(BaseAgent):
                 ("P1", "preferences", request.preferences),
             ) if content
         ]
+        sources.extend({
+            "source_id": f"U{index + 2}", "kind": "additional_evidence",
+            "content": item.answer, "question": item.question,
+        } for index, item in enumerate(request.clarifications))
         targets, limitations = [], []
         document = request.resume_analysis.get("document") or {}
         if document.get("status") == "partial":

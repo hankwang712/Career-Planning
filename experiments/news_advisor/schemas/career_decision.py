@@ -2,6 +2,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .followup import Clarification
+
 
 Text = Annotated[str, Field(min_length=1)]
 
@@ -23,6 +25,7 @@ class CareerDecisionInput(DecisionRecord):
     preferences: str = ""
     question: str = ""
     resume_analysis: dict[str, Any] = Field(default_factory=dict)
+    clarifications: list[Clarification] = Field(default_factory=list)
     targets: list[CareerTarget] = Field(min_length=1, max_length=5)
 
     @model_validator(mode="after")

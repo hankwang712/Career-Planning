@@ -174,7 +174,7 @@
         selector: "#workspaceJourneyBand",
         kicker: "Step 01",
         title: "总览工作台流程",
-        copy: "先看 01-06 的全链路，你会知道每一块在什么时候做最有效。",
+        copy: "先看 01-05 的全链路，你会知道每一块在什么时候做最有效。",
         meta: "",
         actionLabel: "去工作台",
         onPrimary: () => window.showSection?.("dashboard")
@@ -211,18 +211,8 @@
       },
       {
         phase: "spotlight",
-        selector: 'button[data-section="matching"]',
-        kicker: "Step 05",
-        title: "人岗匹配",
-        copy: "查看候选岗位与能力差距，确认当前最值得推进的一条线。",
-        meta: "这一步会直接影响报告结论。",
-        actionLabel: "去人岗匹配",
-        onPrimary: () => window.showSection?.("matching")
-      },
-      {
-        phase: "spotlight",
         selector: 'button[data-section="report"]',
-        kicker: "Step 06",
+        kicker: "Step 05",
         title: "职业报告",
         copy: "在这里进入报告工作区，查看版本、结论和行动清单。",
         meta: "支持持续迭代，不是一次性输出。",
@@ -232,7 +222,7 @@
       {
         phase: "spotlight",
         selector: ".topbar-avatar-btn",
-        kicker: "Step 08",
+        kicker: "Step 06",
         title: "个人中心入口",
         copy: "点击头像进入新界面，可看你的岗位板、计划和账号配置。",
         meta: "你可以随时重新打开本引导。",

@@ -76,9 +76,6 @@
                                     继续测评
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                                 </button>
-                                <button type="button" class="cs-btn-product cs-btn-product-secondary" onclick="showSection('matching')">
-                                    查看岗位推荐
-                                </button>
                                 <button type="button" class="cs-btn-product cs-btn-product-ghost" onclick="TourGuide.start()">使用引导</button>
                             </div>
                         </div>
@@ -147,18 +144,8 @@
                         <p>先确认你的技能结构、兴趣重心和优势证据，避免一开始就在岗位列表里盲选。</p>
                         <button type="button" class="cs-kimi-step-link" onclick="showSection('profile')">进入能力画像</button>
                     </article>
-                    <article class="cs-kimi-step-card cs-kimi-step-card--match">
-                        <span class="cs-kimi-step-num">2</span>
-                        <div class="cs-kimi-step-visual" aria-hidden="true">
-                            <img src="{{ url_for('static', filename='assets/illustrations/undraw-job-offers-hero.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
-                        </div>
-                        <span class="cs-kimi-step-tag">Match</span>
-                        <h4>岗位雷达</h4>
-                        <p>把可迁移能力和目标岗位放在一起比对，优先找出最值得追的方向，而不是平均铺开。</p>
-                        <button type="button" class="cs-kimi-step-link" onclick="showSection('matching')">查看匹配结果</button>
-                    </article>
                     <article class="cs-kimi-step-card cs-kimi-step-card--explore">
-                        <span class="cs-kimi-step-num">3</span>
+                        <span class="cs-kimi-step-num">2</span>
                         <div class="cs-kimi-step-visual" aria-hidden="true">
                             <img src="{{ url_for('static', filename='assets/illustrations/undraw-resume-folder-explore.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
                         </div>
@@ -168,7 +155,7 @@
                         <button type="button" class="cs-kimi-step-link" onclick="showSection('jobs')">查看市场热度</button>
                     </article>
                     <article class="cs-kimi-step-card cs-kimi-step-card--execute">
-                        <span class="cs-kimi-step-num">4</span>
+                        <span class="cs-kimi-step-num">3</span>
                         <div class="cs-kimi-step-visual" aria-hidden="true">
                             <img src="{{ url_for('static', filename='assets/illustrations/undraw-progress-overview-execute.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
                         </div>
@@ -183,7 +170,6 @@
                         <p>立即开始你的旅程，发现更多可能。让 AI 协助你完成评估、匹配与规划。</p>
                         <div class="cs-kimi-bottom-cta-actions">
                             <button type="button" class="cs-kimi-bottom-cta-primary" onclick="showSection('profile')">开始探索</button>
-                            <button type="button" class="cs-kimi-bottom-cta-secondary" onclick="showSection('matching')">查看岗位匹配</button>
                         </div>
                         <ul class="cs-kimi-bottom-cta-trust">
                             <li>免费使用核心功能</li>
@@ -234,15 +220,6 @@
                         <span>Multi-Dimensional Assessment</span>
                         <p>整合基础信息、简历、访谈和测评结果，沉淀可解释的能力画像。</p>
                         <em>开始测评 →</em>
-                    </button>
-                    <button type="button" class="cs-product-feature-card" onclick="showSection('matching')">
-                        <div class="cs-product-feature-icon" style="--icon-bg:#edf3f8;--icon-color:#4b6887">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                        </div>
-                        <strong>智能岗位匹配</strong>
-                        <span>AI Job Matching</span>
-                        <p>基于岗位要求和个人能力画像，筛选更适合的目标岗位。</p>
-                        <em>查看推荐 →</em>
                     </button>
                     <button type="button" class="cs-product-feature-card" onclick="showSection('report')">
                         <div class="cs-product-feature-icon" style="--icon-bg:#eff4fa;--icon-color:#5c7692">

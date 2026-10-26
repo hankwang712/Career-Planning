@@ -25,6 +25,8 @@ CAREER_DECISION_PROMPT = """
   对这里已判定为过去、且 valid_order 为真的项目，不能声称晚于分析日期或怀疑其是未来计划。
 - sources 是允许引用的原文：resume 是简历，additional_evidence 是补充事实，
   preferences 是明确意愿与限制，job 是岗位原文；每条有 source_id，job 还带 target_id。
+  补充回答来源可能带 question，仅帮助理解回答；可引用的用户事实只在 content 中，不能引用问题中的假设。
+  新回答与旧材料冲突时标为待核实；明确说明是对旧信息的纠正时，说明更新依据后采用新信息。
 - resume_analysis 只包含上游执行状态和文档读取元数据，质量诊断意见不参与本次事实判断。
 - targets 含 target_id、title、target_type、job_analysis、source_ids。
   job 表示单条具体岗位，direction 表示方向检索样本。上游概括要回到原文核对。

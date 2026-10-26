@@ -58,9 +58,13 @@ def _validate_findings(analysis: RecruitmentSearchResult, prepared: dict) -> Non
         errors.append("findings 超出用户指定的 limit")
     if prepared["request"]["days"] is not None and analysis.intent.days != prepared["request"]["days"]:
         errors.append("intent.days 必须保留显式传入的时间范围")
+    user_request = "\n".join([
+        prepared["request"]["request"],
+        *(item["answer"] for item in prepared["request"]["clarifications"]),
+    ])
     for cohort in analysis.intent.graduation_cohorts:
         years = re.findall(r"(?<!\d)\d{2,4}(?!\d)", cohort)
-        if years and not all(_requested_cohort(year, prepared["request"]["request"]) for year in years):
+        if years and not all(_requested_cohort(year, user_request) for year in years):
             errors.append("用户未指定该毕业届别，intent.graduation_cohorts 应留空；文章中的届别只写在结果说明中")
     seen = set()
     for finding in analysis.findings:
@@ -155,7 +159,11 @@ class RecruitmentSearchAgent(BaseAgent):
                 prepared["_tool_runs"].append(record)
                 if raw_tool.name.startswith("search_"):
                     years = re.findall(r"(?<!\d)(\d{2,4})\s*届", arguments.get("query", ""))
-                    if any(not _requested_cohort(year, prepared["request"]["request"]) for year in years):
+                    user_request = "\n".join([
+                        prepared["request"]["request"],
+                        *(item["answer"] for item in prepared["request"]["clarifications"]),
+                    ])
+                    if any(not _requested_cohort(year, user_request) for year in years):
                         record.update(status="invalid_scope", error="用户没有指定该毕业届别，不应自行加上届别过滤；请简化查询")
                         return {**record, "sources": []}
                 try:

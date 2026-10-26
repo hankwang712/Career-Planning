@@ -2,37 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-REPORT_VERSION = "2026.04-v3"
+REPORT_VERSION = "2026.10-langgraph-v1"
 
-# v2 pipeline: 6-agent system
 CAREER_REPORT_STAGE_DEFS = [
-    {"key": "industry_analysis",  "label": "行业分析",     "agent": "行业分析师"},
-    {"key": "resume_evidence",    "label": "简历证据解析", "agent": "简历证据分析官"},
-    {"key": "career_positioning", "label": "职业定位",     "agent": "职业定位顾问"},
-    {"key": "resume_evidence_2",  "label": "证据对齐复核", "agent": "简历证据分析官(复核)"},
-    {"key": "competency_assess",  "label": "能力评估",     "agent": "能力评估官"},
-    {"key": "role_match",         "label": "岗位匹配",     "agent": "岗位匹配官"},
-    {"key": "path_planning",      "label": "路径规划",     "agent": "路径规划师"},
-    {"key": "report_writer",      "label": "报告合成",     "agent": "报告合成器"},
-]
-
-# Legacy stage defs kept for backward compatibility with old reports
-CAREER_REPORT_STAGE_DEFS_LEGACY = [
-    {"key": "profile_fusion", "label": "画像融合", "agent": "Profile Fusion Agent"},
-    {"key": "role_retrieval", "label": "目标职业提取", "agent": "Role Retrieval Agent"},
-    {"key": "onet_enrichment", "label": "O*NET岗位数据融合", "agent": "O*NET Enrichment Agent"},
-    {"key": "trend_intelligence", "label": "趋势情报提炼", "agent": "Trend Intelligence Agent"},
-    {"key": "gap_analysis", "label": "差距分析", "agent": "Gap Analysis Agent"},
-    {"key": "career_path", "label": "职业路径构建", "agent": "Career Path Agent"},
-    {"key": "stage_planning", "label": "阶段规划", "agent": "Stage Planning Agent"},
-    {"key": "report_writer", "label": "报告撰写", "agent": "Report Writer Agent"},
-    {"key": "critic", "label": "一致性校验", "agent": "Critic Agent"},
+    {"key": "resume_analysis", "label": "简历分析", "agent": "ResumeAnalysisAgent"},
+    {"key": "job_analysis", "label": "岗位分析", "agent": "JobAnalysisAgent"},
+    {"key": "recruitment_search", "label": "招聘搜索", "agent": "RecruitmentSearchAgent"},
+    {"key": "career_decision", "label": "职业决策", "agent": "CareerDecisionAgent"},
+    {"key": "review", "label": "补充与确认", "agent": "用户确认"},
+    {"key": "action_planning", "label": "行动规划", "agent": "ActionPlanningAgent"},
+    {"key": "report_writer", "label": "报告合成", "agent": "报告合成器"},
 ]
 
 
 def build_stage_progress(stage_key: str) -> list[dict[str, Any]]:
-    # 与 orchestrator.notify("report_editor", ...) 一致：分章节写作/配图属于最终「报告合成」环节，
-    # 若按未知 key 处理会落到 active_index=0，错误地把行业分析标成进行中。
+    # 历史报告编辑阶段仍映射到合成节点。
     key = str(stage_key or "").strip()
     if key == "report_editor":
         key = "report_writer"

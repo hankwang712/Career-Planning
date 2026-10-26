@@ -2,7 +2,6 @@ const appState = {
   currentSection: "dashboard",
   selectedJobs: [],
   profileComplete: false,
-  matchingComplete: false,
   reportGenerated: false,
   careerReport: null,
   careerReportState: null,
@@ -21,8 +20,7 @@ const appState = {
   profileRadarChart: null,
   derivedProfile: null,
   matchingRoles: [],
-  focusedRoleId: "",
-  weights: { "特质匹配": 30, "能力匹配": 40, "专业匹配": 15, "意愿匹配": 15 }
+  focusedRoleId: ""
 };
 
 // 岗位数据（从 /api/jobs 加载）
@@ -38,7 +36,6 @@ let jobsAnalyticsBossCities = null;
 let jobsAnalyticsCitySupplementExtra = null;
 
 let jobsGeoAssetsPromise = null;
-let careerGraphAssetsPromise = null;
 const JOBS_CACHE_TTL_MS = 15 * 60 * 1000;
 const JOBS_CACHE_VERSION = "v6";
 const JOBS_CITIES_CACHE_KEY = `ms_jobs_cities_${JOBS_CACHE_VERSION}`;
@@ -90,6 +87,7 @@ const userWorkspaceState = {
     news_context: false
   }
 };
+let accountRequestEpoch = 0;
 const inFlightGetRequests = new Map();
 
 const jobNameMap = { ml: "Machine Learning Engineer", da: "Data Analyst", pm: "AI Product Manager", fe: "Frontend Engineer" };
@@ -316,14 +314,6 @@ const PROFILE_BASIC_LABELS = {
   target_city: "目标城市",
   target_direction: "目标方向"
 };
-const PROFILE_FLOW_STEPS = [1, 2, 3, 4];
-const profileFlowState = {
-  currentStep: 1,
-  skippedSteps: [],
-  completedSteps: [],
-  touched: false
-};
-
 function getDefaultProfileBasics() {
   return {
     gender: "",
@@ -482,7 +472,7 @@ async function ensureJobsGeoAssets() {
     jobsGeoAssetsPromise = (async () => {
       await loadScriptOnce("/static/vendor/echarts.min.js?v=20260319-lazy-geo", "echarts");
       await loadScriptOnce("/static/vendor/china.js?v=20260318-geo", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js?v=20260419-geo-salary-wan-v1", "jobs-geo");
+      await loadScriptOnce("/static/jobs-geo.js?v=20261026-map-zoom", "jobs-geo");
     })().catch((error) => {
       jobsGeoAssetsPromise = null;
       throw error;
@@ -490,64 +480,6 @@ async function ensureJobsGeoAssets() {
   }
   return jobsGeoAssetsPromise;
 }
-
-function getCareerGraphMatchingApi() {
-  return window.__careerGraphMatchingApi || null;
-}
-
-async function ensureCareerGraphMatchingAssets() {
-  if (getCareerGraphMatchingApi()) return getCareerGraphMatchingApi();
-  if (!careerGraphAssetsPromise) {
-    careerGraphAssetsPromise = (async () => {
-      if (!window.d3) {
-        await loadScriptOnce("/static/vendor/d3.v7.min.js?v=20260404-kb-v1", "d3");
-      }
-      await loadScriptOnce("/static/career-graph-matching.js?v=20260412-match-persist-v1", "career-graph-matching");
-      const api = getCareerGraphMatchingApi();
-      if (!api) {
-        throw new Error("职业图谱模块已加载，但没有成功完成初始化");
-      }
-      return api;
-    })().catch((error) => {
-      careerGraphAssetsPromise = null;
-      throw error;
-    });
-  }
-  return careerGraphAssetsPromise;
-}
-
-window.startCareerGraphMatching = function startCareerGraphMatching(force = false) {
-  return ensureCareerGraphMatchingAssets()
-    .then((api) => api?.startMatch?.({ force }))
-    .catch((error) => {
-      showToast("职业匹配加载失败", error.message, "error", 2200);
-    });
-};
-
-/** 清除本地保存的上次匹配结果并强制重新请求 API */
-window.rematchCareerGraphMatching = function rematchCareerGraphMatching() {
-  return ensureCareerGraphMatchingAssets()
-    .then((api) => api?.rematchCareerMatching?.())
-    .catch((error) => {
-      showToast("重新匹配失败", error.message, "error", 2200);
-    });
-};
-
-window.focusCareerGraphNodeById = function focusCareerGraphNodeById(nodeId) {
-  return ensureCareerGraphMatchingAssets()
-    .then((api) => api?.focusNode?.(nodeId))
-    .catch((error) => {
-      showToast("图谱加载失败", error.message, "warning", 2200);
-    });
-};
-
-window.resetCareerGraphLayout = function resetCareerGraphLayout() {
-  return ensureCareerGraphMatchingAssets()
-    .then((api) => api?.resetLayout?.())
-    .catch((error) => {
-      showToast("图谱布局重置失败", error.message, "warning", 2200);
-    });
-};
 
 function getDefaultCareerInterviewConfig() {
   return {
@@ -586,6 +518,9 @@ function emitAuthStateChange() {
 }
 
 async function requestJson(url, options = {}) {
+  const owner = getCurrentUser()?.username || "";
+  const epoch = accountRequestEpoch;
+  const accountBound = /^\/api\/(user-state\/|resume\/|career-report\/|profile|account|community-feed|career-interview|llm|resume-llm|deep-test|tools\/)/.test(url);
   const method = String(options.method || "GET").toUpperCase();
   const headers = { ...(options.headers || {}) };
   if (url.startsWith("/api/auth/") && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
@@ -597,7 +532,7 @@ async function requestJson(url, options = {}) {
     body = JSON.stringify(body);
   }
   const isGetWithoutBody = method === "GET" && !body;
-  const dedupeKey = isGetWithoutBody ? `${method}::${url}::${JSON.stringify(headers)}` : "";
+  const dedupeKey = isGetWithoutBody ? `${owner}::${epoch}::${method}::${url}::${JSON.stringify(headers)}` : "";
   if (isGetWithoutBody && inFlightGetRequests.has(dedupeKey)) {
     return inFlightGetRequests.get(dedupeKey);
   }
@@ -612,6 +547,15 @@ async function requestJson(url, options = {}) {
     });
 
     const payload = await response.json().catch(() => ({}));
+    const responseOwner = decodeURIComponent(response.headers.get("X-Workspace-Owner") || "");
+    if (!url.startsWith("/api/auth/") && (accountBound || responseOwner)) {
+      if (owner !== (getCurrentUser()?.username || "") || epoch !== accountRequestEpoch || (responseOwner && responseOwner !== owner)) {
+        const error = new Error("账号已切换，本次请求的结果已丢弃。");
+        error.code = "ACCOUNT_CHANGED";
+        if (responseOwner && responseOwner !== owner && epoch === accountRequestEpoch) window.location.reload();
+        throw error;
+      }
+    }
     if (!response.ok) {
       if (response.status === 401) {
         userWorkspaceState.currentUser = null;
@@ -645,9 +589,7 @@ async function requestJson(url, options = {}) {
 
   if (isGetWithoutBody) {
     inFlightGetRequests.set(dedupeKey, runner);
-    runner.finally(() => {
-      inFlightGetRequests.delete(dedupeKey);
-    });
+    runner.then(() => inFlightGetRequests.delete(dedupeKey), () => inFlightGetRequests.delete(dedupeKey));
   }
   return runner;
 }
@@ -8520,113 +8462,10 @@ function copyProfilePortraitSummary() {
   return copyPlainText(buildProfilePortraitCopyText(brief), "定位文案已复制", "任务名片文案已经复制到剪贴板。");
 }
 
-function getProfileFlowCompletion(profile) {
-  const p = profile || deriveUnifiedProfile();
-  const basicsReady = PROFILE_BASIC_FIELDS.every((key) => p?.basics?.[key]);
-  const step1Complete = Boolean(p?.assessment?.mbti?.completed && p?.assessment?.holland?.completed);
-  const step2Complete = String(p?.resume?.status || "") === "analyzed";
-  const step3Complete = Boolean((p?.interview?.isComplete || Number(p?.interview?.completionScore || 0) >= 70) && basicsReady);
-  return {
-    1: step1Complete,
-    2: step2Complete,
-    3: step3Complete,
-    4: step1Complete || step2Complete || step3Complete
-  };
-}
-
-function getRecommendedProfileStep(completion) {
-  const done = completion || getProfileFlowCompletion();
-  for (const step of [1, 2, 3]) {
-    if (!done[step] && !profileFlowState.skippedSteps.includes(step)) return step;
-  }
-  return 4;
-}
-
-function normalizeProfileFlowState(profile) {
-  const completion = getProfileFlowCompletion(profile);
-  profileFlowState.completedSteps = PROFILE_FLOW_STEPS.filter((step) => Boolean(completion[step]));
-  profileFlowState.skippedSteps = profileFlowState.skippedSteps
-    .filter((step) => PROFILE_FLOW_STEPS.includes(step) && step < 4 && !profileFlowState.completedSteps.includes(step));
-  if (!PROFILE_FLOW_STEPS.includes(profileFlowState.currentStep)) profileFlowState.currentStep = 1;
-  if (!profileFlowState.touched) profileFlowState.currentStep = getRecommendedProfileStep(completion);
-}
-
-function initProfileFlow(force = false) {
-  if (force) {
-    profileFlowState.currentStep = 1;
-    profileFlowState.skippedSteps = [];
-    profileFlowState.completedSteps = [];
-    profileFlowState.touched = false;
-  }
-  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
-}
-
-function renderProfileFlow(profile) {
-  const p = profile || appState.derivedProfile || deriveUnifiedProfile();
-  normalizeProfileFlowState(p);
-  const progressText = document.getElementById("profileFlowProgressText");
-  if (progressText) {
-    progressText.textContent = `当前步骤：${profileFlowState.currentStep} / 4`;
-  }
-
-  PROFILE_FLOW_STEPS.forEach((step) => {
-    const panel = document.getElementById(`profileFlowStep${step}`);
-    if (panel) panel.classList.toggle("hidden", step !== profileFlowState.currentStep);
-    const navBtn = document.querySelector(`.profile-flow-step[data-step="${step}"]`);
-    const statusEl = document.getElementById(`profileFlowStepStatus${step}`);
-    const isDone = profileFlowState.completedSteps.includes(step);
-    const isSkipped = profileFlowState.skippedSteps.includes(step);
-    const isActive = step === profileFlowState.currentStep;
-    if (navBtn) {
-      navBtn.classList.toggle("is-active", isActive);
-      navBtn.classList.toggle("is-done", isDone);
-      navBtn.classList.toggle("is-skipped", isSkipped);
-    }
-    if (statusEl) {
-      if (step === 4) {
-        statusEl.textContent = "总览";
-      } else if (isDone) {
-        statusEl.textContent = "已完成";
-      } else if (isSkipped) {
-        statusEl.textContent = "已跳过";
-      } else if (isActive) {
-        statusEl.textContent = "进行中";
-      } else {
-        statusEl.textContent = "待开始";
-      }
-    }
-  });
-}
-
-function goProfileStep(step) {
-  const target = Number(step || 1);
-  if (!PROFILE_FLOW_STEPS.includes(target)) return;
-  profileFlowState.currentStep = target;
-  profileFlowState.touched = true;
-  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
-}
-
-function skipProfileStep(step) {
-  const target = Number(step || profileFlowState.currentStep || 1);
-  if (!PROFILE_FLOW_STEPS.includes(target) || target === 4) return;
-  if (!profileFlowState.completedSteps.includes(target) && !profileFlowState.skippedSteps.includes(target)) {
-    profileFlowState.skippedSteps.push(target);
-  }
-  profileFlowState.currentStep = Math.min(4, target + 1);
-  profileFlowState.touched = true;
-  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
-  showToast("已跳过当前步骤", "你可以随时返回补充，结果页会保留缺失提示。", "info", 1500);
-}
-
-function nextProfileStep() {
-  profileFlowState.currentStep = Math.min(4, Number(profileFlowState.currentStep || 1) + 1);
-  profileFlowState.touched = true;
-  renderProfileFlow(appState.derivedProfile || deriveUnifiedProfile());
-}
-
 function getAssessmentHubSnapshotSafe() {
   try {
-    return typeof window.getAssessmentHubSnapshot === "function" ? window.getAssessmentHubSnapshot() : null;
+    const snapshot = typeof window.getAssessmentHubSnapshot === "function" ? window.getAssessmentHubSnapshot() : null;
+    return snapshot?.owner === (getCurrentUser()?.username || "guest") ? snapshot : null;
   } catch (error) {
     console.error("read assessment snapshot failed", error);
     return null;
@@ -8876,101 +8715,15 @@ function deriveUnifiedProfile() {
   };
 }
 
-/** 供职业图谱等模块在请求前拉取最新画像（含简历 matcher 等）；每次现算，避免缓存画像缺字段 */
+/** 读取最新统一画像，包含简历解析结果。 */
 window.getLatestUnifiedProfile = function getLatestUnifiedProfile() {
   return deriveUnifiedProfile();
 };
 
-/**
- * 将职业图谱 /api/career-graph/match 返回的 recommendations 转为与人岗 UI、报告 payload 兼容的结构。
- */
-function graphMatchResultsToRoleRankings(raw) {
-  const list = Array.isArray(raw) ? raw : [];
-  return list
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const name = String(item.title || item.name || "").trim() || "未命名岗位";
-      const id = String(item.id || item.node_id || "").trim()
-        || `graph_${Math.abs([...name].reduce((h, c) => Math.imul(31, h) + c.charCodeAt(0), 0))}`;
-      const skills = Array.isArray(item.skills) ? item.skills.map((s) => String(s)) : [];
-      const reasonLines = Array.isArray(item.reasonLines) ? item.reasonLines.map((s) => String(s)) : [];
-      const nextActions = Array.isArray(item.nextActions) ? item.nextActions.map((s) => String(s)) : [];
-      const os = Number(item.overallScore);
-      const overallScore = Number.isFinite(os) ? Math.round(os) : null;
-      const ds = item.directionScore != null ? Number(item.directionScore) : null;
-      const cs = item.capabilityScore != null ? Number(item.capabilityScore) : null;
-      const ms = item.majorScore != null ? Number(item.majorScore) : null;
-      const skillHits = Array.isArray(item.skillHits) ? item.skillHits.map((s) => String(s)) : [];
-      const capGaps = Array.isArray(item.capabilityGaps) ? item.capabilityGaps.map((s) => String(s)) : [];
-      const trait = {
-        score: Number.isFinite(ds) ? Math.round(ds) : null,
-        reason: reasonLines[0] || "方向契合度由职业图谱与画像信号计算。"
-      };
-      const ability = {
-        score: Number.isFinite(cs) ? Math.round(cs) : null,
-        reason: skillHits.length ? `技能重合：${skillHits.slice(0, 4).join("、")}` : "能力维度由图谱侧与画像能力模型估算。",
-        gaps: capGaps.slice(0, 4)
-      };
-      const major = {
-        score: Number.isFinite(ms) ? Math.round(ms) : null,
-        reason: "专业匹配由图谱侧估算。"
-      };
-      const willingness = {
-        score: null,
-        reason: "求职意愿请结合「目标方向」与职业访谈理解。"
-      };
-      return {
-        id,
-        name,
-        category: String(item.cluster || item.directionLabel || "").trim() || "职业图谱",
-        majors: [],
-        requiredSkills: skills.slice(0, 12),
-        certificates: [],
-        requirements: {},
-        recommendedHolland: [],
-        recommendedMbti: [],
-        workValues: skills.slice(0, 4),
-        path: String(item.path || ""),
-        trait,
-        ability,
-        major,
-        willingness,
-        coverageWeight: 100,
-        overallScore,
-        confidence: item.confidence || "中",
-        summary: reasonLines.filter(Boolean).join("；") || `图谱推荐：${name}`,
-        nextActions: nextActions.length
-          ? nextActions
-          : [`在岗位探索中查看「${name}」的路径与要求`],
-        matchSource: "career_graph",
-        graph: {
-          city: item.city || "",
-          level: item.level || "",
-          directionLabel: item.directionLabel || ""
-        }
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
-}
-
-window.graphMatchResultsToRoleRankings = graphMatchResultsToRoleRankings;
-
-/** 岗位列表仅来自职业图谱「开始匹配」结果，不再使用本地预制岗位库。 */
 function computeRoleMatches(profile) {
   void profile;
-  const scoped = userWorkspaceState?.scopedData?.career_matching;
-  const graphBundle = scoped?.graph_match_bundle;
-  const fromBundle = Array.isArray(graphBundle?.results) ? graphBundle.results : [];
-  if (fromBundle.length) {
-    return graphMatchResultsToRoleRankings(fromBundle);
-  }
-  const saved = Array.isArray(scoped?.role_rankings) ? scoped.role_rankings : [];
-  const legacyGraph = saved.filter((r) => r && r.matchSource === "career_graph");
-  if (legacyGraph.length) {
-    return legacyGraph.slice().sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
-  }
-  return [];
+  const saved = userWorkspaceState?.scopedData?.career_matching?.role_rankings;
+  return (Array.isArray(saved) ? saved : []).filter((role) => role && role.matchSource !== "career_graph");
 }
 
 function buildAgentModuleStates(profile, roles) {
@@ -9178,465 +8931,42 @@ function renderCapabilityCorrelation(profile, roles) {
   }).join("");
 }
 
-function renderProfileWorkspace(profile, roles) {
-  syncProfileBasicsForm();
-  const topRoles = roles.slice(0, 3);
-  const synthesis = buildUnifiedProfileSynthesis(profile, roles);
-  const resumeTraits = buildResumePortraitTraits(userWorkspaceState.scopedData.resume_profile || null);
-  const readinessEl = document.getElementById("profileReadinessValue");
-  const archetypeVisualEl = document.getElementById("profileArchetypeVisual");
-  const briefCardEl = document.getElementById("profilePortraitBriefCard");
-  const portraitOutputBoardEl = document.getElementById("profilePortraitOutputBoard");
-  const archetypeNameEl = document.getElementById("profileArchetypeName");
-  const archetypeDigestEl = document.getElementById("profileArchetypeDigest");
-  const archetypeSummaryEl = document.getElementById("profileArchetypeSummary");
-  const summaryEl = document.getElementById("profileUnifiedSummary");
-  const assessmentEl = document.getElementById("profileAssessmentDigest");
-  const valuesEl = document.getElementById("profileWorkValueTags");
-  const roleClusterEl = document.getElementById("profileRoleClusterTags");
-  const axisEl = document.getElementById("profileFeatureAxisList");
-  const workstyleEl = document.getElementById("profileWorkstyleCards");
-  const evidenceEl = document.getElementById("profileEvidenceMatrix");
-  const uncertaintyEl = document.getElementById("profileUncertaintyList");
-  const topRoleEl = document.getElementById("profileTopRoleTags");
-  const nextStepEl = document.getElementById("profileNextStepList");
-  const missingEl = document.getElementById("profileMissingList");
-  const capabilityEl = document.getElementById("profileCapabilityList");
-  const correlationEl = document.getElementById("profileCapabilityCorrelation");
-  const modulesEl = document.getElementById("agentModuleGrid");
-  const portraitState = getProfilePortraitState();
-  const portraitBrief = getResolvedProfilePortraitBrief(profile, roles, synthesis, portraitState);
-  const portraitOutputCards = buildProfilePortraitOutputCards(profile, roles, synthesis, portraitState, resumeTraits);
-  const assessmentItems = [];
-  if (profile.assessment?.mbti?.completed) assessmentItems.push(`MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}`);
-  if (profile.assessment?.holland?.completed) assessmentItems.push(`霍兰德：${profile.assessment.holland.code}`);
-  if (profile.basics.major) assessmentItems.push(`专业：${profile.basics.major}`);
-  if (profile.basics.grade) assessmentItems.push(`学历：${profile.basics.grade}`);
-  if (profile.resume?.status === "analyzed") assessmentItems.push("简历：已解析");
-  else if (profile.resume?.status === "uploaded") assessmentItems.push("简历：待解析");
-  const assessmentDigest = assessmentItems.length ? assessmentItems.join("｜") : "尚未形成足够的基础画像。";
-
-  if (readinessEl) readinessEl.textContent = `${appState.profileCompletion}%`;
-  renderProfilePortraitVisual(archetypeVisualEl, portraitState, synthesis, portraitBrief);
-  renderProfilePortraitBriefCard(briefCardEl, portraitState, portraitBrief);
-  // 输入输出链路移至折叠区
-  renderProfilePortraitOutputBoard(portraitOutputBoardEl, portraitOutputCards);
-  // 新增：数据来源状态条 / 六维能力速览 / 关键证据&信息缺口
-  renderProfileSourcePills(document.getElementById("profileSourcePills"), profile);
-  const portraitLoading = Boolean(profilePortraitTaskState.loading);
-  const capStripSection = document.getElementById("profileCapabilityStripSection");
-  if (capStripSection) {
-    capStripSection.classList.toggle("is-generating", portraitLoading);
-    const copyEl = capStripSection.querySelector(".profile-capability-strip-copy");
-    if (copyEl) {
-      copyEl.textContent = portraitLoading
-        ? "任务海报生成期间暂缓展示下方分数；完成后会显示基于当前测评、简历与访谈综合推断的六维结果（因人而异）。"
-        : "基于测评、简历与访谈综合推断，有实证支撑的维度会标注来源，待补充的维度可通过继续访谈提升精度。";
-    }
-  }
-  renderProfileCapabilityStrip(document.getElementById("profileCapabilityStrip"), profile, portraitLoading);
-  renderProfileEvidenceGaps(document.getElementById("profileEvidenceGapsContent"), profile, portraitLoading);
-  if (archetypeNameEl) archetypeNameEl.textContent = portraitBrief?.title || synthesis.archetype.name;
-  if (archetypeDigestEl) archetypeDigestEl.textContent = assessmentDigest;
-  if (archetypeSummaryEl) archetypeSummaryEl.textContent = portraitBrief?.positioning || synthesis.thesis;
-  if (summaryEl) summaryEl.textContent = profile.summary;
-  if (assessmentEl) assessmentEl.textContent = assessmentDigest;
-  if (valuesEl) valuesEl.innerHTML = careerTagHtml(profile.workValues, "待补充工作价值观", "soft");
-  if (roleClusterEl) roleClusterEl.innerHTML = careerTagHtml(
-    uniqueValues([portraitBrief?.primary_role, ...(portraitBrief?.support_roles || []), ...(synthesis.roleCluster || [])], 5),
-    "等待角色原型收敛",
-    "accent"
-  );
-  if (axisEl) axisEl.innerHTML = renderUnifiedFeatureAxes(synthesis.axes);
-  if (workstyleEl) workstyleEl.innerHTML = renderUnifiedWorkstyleCards(synthesis.workstyleCards);
-  if (evidenceEl) evidenceEl.innerHTML = renderUnifiedEvidenceMatrix(synthesis.evidenceRows);
-  if (uncertaintyEl) uncertaintyEl.innerHTML = renderUnifiedUncertaintyList(synthesis.uncertainty);
-  if (topRoleEl) topRoleEl.innerHTML = careerTagHtml(uniqueValues([...profile.recommendedRoles, ...topRoles.map((item) => item.name)], 5), "待生成岗位方向", "accent");
-  if (nextStepEl) nextStepEl.innerHTML = careerListHtml(uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6), "等待画像完善后生成行动建议");
-  if (missingEl) missingEl.innerHTML = careerListHtml(profile.missingItems, "暂无待补充项");
-  if (capabilityEl) capabilityEl.innerHTML = renderCapabilityList(profile);
-  if (correlationEl) correlationEl.innerHTML = renderCapabilityCorrelation(profile, roles);
-  if (modulesEl) {
-    modulesEl.innerHTML = buildAgentModuleStates(profile, roles).map((item) => {
-      const statusClass = item.status === "available"
-        ? "bg-emerald-100 text-emerald-700"
-        : item.status === "placeholder"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-slate-200 text-slate-600";
-      return `
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center justify-between gap-3 mb-3">
-            <h4 class="text-base font-semibold text-slate-900">${escHtml(item.title)}</h4>
-            <span class="rounded-full px-3 py-1 text-xs font-medium ${statusClass}">${escHtml(item.action_label)}</span>
-          </div>
-          ${item.reason ? `<p class="text-sm text-slate-600 leading-6">${escHtml(item.reason)}</p>` : ""}
-        </div>
-      `;
-    }).join("");
-  }
-  updateProfileRadarChart({
-    dimensions: [
-      { name: "专业技能", score: profile.capabilities.professional.score || 0 },
-      { name: "学习能力", score: profile.capabilities.learning.score || 0 },
-      { name: "沟通能力", score: profile.capabilities.communication.score || 0 },
-      { name: "创新能力", score: profile.capabilities.innovation.score || 0 },
-      { name: "抗压能力", score: profile.capabilities.stress_tolerance.score || 0 },
-      { name: "实践能力", score: profile.capabilities.internship.score || 0 },
-      { name: "执行能力", score: profile.capabilities.execution.score || 0 }
-    ]
-  });
-  updateProfilePortraitControls(profile, roles, synthesis);
-  renderResumeProfileSection(getResumeProfileFromCache());
-  renderProfileFlow(profile);
-}
-
-function renderMatchingWorkspace(profile, roles) {
-  const topRole = roles[0] || null;
-  const focused = roles.find((item) => item.id === appState.focusedRoleId) || topRole;
-  const overviewEl = document.getElementById("matchingOverviewCards");
-  const listEl = document.getElementById("matchingRoleList");
-  const detailEl = document.getElementById("matchingRoleDetail");
-  const moduleEl = document.getElementById("matchingPlaceholderModules");
-  const totalEl = document.getElementById("weightTotal");
-  if (totalEl) totalEl.textContent = `${Object.values(appState.weights).reduce((sum, value) => sum + Number(value || 0), 0)}%`;
-
-  if (overviewEl) {
-    const cards = [
-      { label: "当前 Top1", value: topRole?.overallScore !== null && topRole?.overallScore !== undefined ? `${topRole.overallScore}%` : "初步推荐", hint: topRole ? `${topRole.name} · 置信度${topRole.confidence}` : "等待画像输入" },
-      { label: "岗位覆盖", value: `${roles.length}`, hint: "来自岗位探索「开始匹配」结果，无预制岗位表" },
-      { label: "关键差距", value: `${focused?.ability?.gaps?.length || 0}`, hint: focused ? `聚焦 ${focused.name}` : "等待选择岗位" },
-      { label: "状态提示", value: profile.missingItems.length ? "待补充" : "已就绪", hint: profile.missingItems.length ? profile.missingItems[0] : "可进入报告页查看行动计划" }
-    ];
-    overviewEl.innerHTML = cards.map((card) => `
-      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p class="text-sm text-slate-500">${escHtml(card.label)}</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${escHtml(card.value)}</p>
-        <p class="mt-2 text-xs text-slate-500 leading-5">${escHtml(card.hint)}</p>
-      </div>
-    `).join("");
-  }
-
-  if (listEl) {
-    listEl.innerHTML = roles.map((role) => {
-      const active = role.id === focused?.id;
-      return `
-        <div class="rounded-2xl border ${active ? "border-sky-400 bg-sky-50/70" : "border-slate-200 bg-white"} p-5 shadow-sm">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase">${escHtml(role.category)}</p>
-              <h4 class="mt-1 text-lg font-semibold text-slate-900">${escHtml(role.name)}</h4>
-              <p class="mt-2 text-sm text-slate-600 leading-6">${escHtml(role.summary || "等待更多输入提升解释性。")}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-2xl font-bold text-sky-700">${role.overallScore === null ? "初筛" : `${role.overallScore}%`}</p>
-              <p class="text-xs text-slate-500">置信度 ${escHtml(role.confidence)}</p>
-            </div>
-          </div>
-          <div class="mt-4 grid gap-2 md:grid-cols-2">
-            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">特质匹配：${role.trait.score === null ? "待补充" : `${role.trait.score}%`}</div>
-            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">能力匹配：${role.ability.score === null ? "待补充" : `${role.ability.score}%`}</div>
-            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">专业匹配：${role.major.score === null ? "待补充" : `${role.major.score}%`}</div>
-            <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">意愿匹配：${role.willingness.score === null ? "待补充" : `${role.willingness.score}%`}</div>
-          </div>
-          <div class="mt-4 flex flex-wrap gap-3">
-            <button type="button" onclick="focusMatchingRole('${role.id}')" class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-all">查看解释</button>
-            <button type="button" onclick="openMatchingRoleReport('${role.id}')" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 transition-all">写入报告</button>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  if (detailEl) {
-    detailEl.innerHTML = focused ? `
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-xs font-semibold tracking-[0.18em] text-slate-400 uppercase">Focused Role</p>
-            <h3 class="mt-1 text-xl font-semibold text-slate-900">${escHtml(focused.name)}</h3>
-            <p class="mt-2 text-sm text-slate-600 leading-6">${escHtml(focused.path)}</p>
-          </div>
-          <div class="text-right">
-            <p class="text-3xl font-bold text-slate-900">${focused.overallScore === null ? "初筛" : `${focused.overallScore}%`}</p>
-            <p class="text-xs text-slate-500">覆盖权重 ${focused.coverageWeight}%</p>
-          </div>
-        </div>
-        <div class="mt-5 grid gap-5 lg:grid-cols-3">
-          <div>
-            <p class="text-sm font-semibold text-slate-800">匹配理由</p>
-            <div class="mt-3">${careerListHtml([focused.trait.reason, focused.major.reason, focused.willingness.reason], "等待更多解释")}</div>
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-slate-800">能力差距</p>
-            <div class="mt-3">${careerListHtml(focused.ability.gaps, "当前没有明显硬缺口，建议继续用经历加固。")}</div>
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-slate-800">建议动作</p>
-            <div class="mt-3">${careerListHtml(focused.nextActions, "等待生成行动建议")}</div>
-          </div>
-        </div>
-      </div>
-    ` : `
-      <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-        当前还没有可解释的岗位结果，请先完成测评并补充基础信息。
-      </div>
-    `;
-  }
-
-  if (moduleEl) {
-    const placeholders = [
-      { title: "资源推荐工具", action: "待接入" },
-      { title: "趋势分析工具", action: "待接入" },
-      { title: "提醒追踪工具", action: "即将上线" }
-    ];
-    moduleEl.innerHTML = placeholders.map((item) => `
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-        <div class="flex items-center justify-between gap-3">
-          <h4 class="text-base font-semibold text-slate-900">${escHtml(item.title)}</h4>
-          <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">${escHtml(item.action)}</span>
-        </div>
-      </div>
-    `).join("");
-  }
-}
-
-function renderMatchingWorkspace(profile, roles) {
-  const metricsEl = document.getElementById("careerGraphMetrics");
-  const signalsEl = document.getElementById("matchingProfileSignals");
-  const summaryEl = document.getElementById("careerGraphProfileSummary");
-  const statusEl = document.getElementById("careerGraphStatusBadge");
-  const sublineEl = document.getElementById("careerGraphSubline");
-  const hintEl = document.getElementById("matchingSectionHint");
-
-  const capabilityCount = Object.values(profile.capabilities || {}).filter((item) => item?.score !== null && item?.score !== undefined).length;
-  const topRole = roles[0] || null;
-  const cards = [
-    {
-      label: "画像完整度",
-      value: `${Math.max(0, Math.min(100, Number(appState.profileCompletion || 0)))}%`,
-      hint: profile.missingItems?.length ? `待补充：${profile.missingItems[0]}` : "已可用于职业图谱匹配"
-    },
-    {
-      label: "方向信号",
-      value: `${Math.max(1, (profile.recommendedRoles || []).length)}`,
-      hint: (profile.recommendedRoles || []).slice(0, 2).join("、") || "等待从测评、访谈或简历中收敛"
-    },
-    {
-      label: "能力维度",
-      value: `${capabilityCount}/7`,
-      hint: capabilityCount ? "已接入统一画像能力轴" : "能力轴仍在等待更多输入"
-    },
-    {
-      label: "旧版参考",
-      value: topRole?.overallScore != null ? `${topRole.overallScore}%` : "待生成",
-      hint: topRole ? `推荐岗位：${topRole.name}` : "暂无推荐岗位"
-    }
-  ];
-
-  if (metricsEl) {
-    metricsEl.innerHTML = cards.map((card) => `
-      <article class="career-graph-metric-card">
-        <span class="career-graph-metric-label">${escHtml(card.label)}</span>
-        <strong class="career-graph-metric-value">${escHtml(card.value)}</strong>
-        <p class="career-graph-metric-note">${escHtml(card.hint)}</p>
-      </article>
-    `).join("");
-  }
-
-  if (signalsEl) {
-    const tags = [
-      profile.basics?.target_direction ? `目标方向：${profile.basics.target_direction}` : "",
-      profile.basics?.target_city ? `目标城市：${profile.basics.target_city}` : "",
-      profile.basics?.major ? `专业：${profile.basics.major}` : "",
-      profile.assessment?.mbti?.completed ? `MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}` : "",
-      profile.assessment?.holland?.completed ? `霍兰德：${profile.assessment.holland.code}` : "",
-      ...(profile.recommendedRoles || []).slice(0, 3)
-    ].filter(Boolean);
-    signalsEl.innerHTML = tags.length
-      ? tags.map((tag) => `<span class="career-graph-signal-chip">${escHtml(tag)}</span>`).join("")
-      : `<span class="career-graph-empty-inline">先补充测评、简历或目标方向，匹配结果会更稳。</span>`;
-  }
-
-  if (summaryEl) {
-    summaryEl.textContent = profile.summary || "图谱会把岗位节点关系、当前画像和推荐方向联动展示在同一页。";
-  }
-  if (statusEl) {
-    statusEl.textContent = "图谱准备中";
-    statusEl.dataset.state = profile.missingItems?.length ? "warning" : "ready";
-  }
-  if (sublineEl) {
-    sublineEl.textContent = "岗位全部以节点呈现，支持缩放、拖拽、点击查看详情，并在图谱下方生成 5 条职业方向推荐。";
-  }
-  if (hintEl) {
-    hintEl.textContent = profile.missingItems?.length
-      ? `当前仍缺少 ${profile.missingItems.length} 项输入，系统会继续给出结果，但推荐可信度会下降。`
-      : "当前画像已满足基础匹配条件，可以直接开始职业匹配。";
-  }
-
-  void ensureCareerGraphMatchingAssets()
-    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
-    .catch((error) => {
-      if (statusEl) {
-        statusEl.textContent = "图谱加载失败";
-        statusEl.dataset.state = "error";
-      }
-      const resultsEl = document.getElementById("careerGraphResults");
-      if (resultsEl) {
-        resultsEl.innerHTML = `<div class="career-graph-results-empty">职业图谱模块加载失败：${escHtml(error.message)}</div>`;
-      }
-    });
-}
-
-function renderMatchingWorkspace(profile, roles) {
-  const metricsEl = document.getElementById("careerGraphMetrics");
-  const signalsEl = document.getElementById("matchingProfileSignals");
-  const summaryEl = document.getElementById("careerGraphProfileSummary");
-  const statusEl = document.getElementById("careerGraphStatusBadge");
-  const sublineEl = document.getElementById("careerGraphSubline");
-  const hintEl = document.getElementById("matchingSectionHint");
-
-  const capabilityCount = Object.values(profile.capabilities || {}).filter((item) => item?.score !== null && item?.score !== undefined).length;
-  const topRole = roles[0] || null;
-  const cards = [
-    {
-      label: "画像完整度",
-      value: `${Math.max(0, Math.min(100, Number(appState.profileCompletion || 0)))}%`,
-      hint: profile.missingItems?.length ? `待补充：${profile.missingItems[0]}` : "已经满足图谱检索的基础条件"
-    },
-    {
-      label: "方向信号",
-      value: `${Math.max(1, (profile.recommendedRoles || []).length)}`,
-      hint: (profile.recommendedRoles || []).slice(0, 2).join("、") || "等待从测评、访谈或简历中收敛"
-    },
-    {
-      label: "能力维度",
-      value: `${capabilityCount}/7`,
-      hint: capabilityCount ? "已接入统一画像能力轴" : "能力信号仍在等待更多输入"
-    },
-    {
-      label: "旧版参照",
-      value: topRole?.overallScore != null ? `${topRole.overallScore}%` : "待生成",
-      hint: topRole ? `推荐岗位：${topRole.name}` : "暂无推荐岗位"
-    }
-  ];
-
-  if (metricsEl) {
-    metricsEl.innerHTML = cards.map((card) => `
-      <article class="career-graph-metric-card">
-        <span class="career-graph-metric-label">${escHtml(card.label)}</span>
-        <strong class="career-graph-metric-value">${escHtml(card.value)}</strong>
-        <p class="career-graph-metric-note">${escHtml(card.hint)}</p>
-      </article>
-    `).join("");
-  }
-
-  if (signalsEl) {
-    const tags = [
-      profile.basics?.target_direction ? `目标方向：${profile.basics.target_direction}` : "",
-      profile.basics?.target_city ? `目标城市：${profile.basics.target_city}` : "",
-      profile.basics?.major ? `专业：${profile.basics.major}` : "",
-      profile.assessment?.mbti?.completed ? `MBTI：${profile.assessment.mbti.display_type || profile.assessment.mbti.final_type}` : "",
-      profile.assessment?.holland?.completed ? `霍兰德：${profile.assessment.holland.code}` : "",
-      ...(profile.recommendedRoles || []).slice(0, 3)
-    ].filter(Boolean);
-    signalsEl.innerHTML = tags.length
-      ? tags.map((tag) => `<span class="career-graph-signal-chip">${escHtml(tag)}</span>`).join("")
-      : `<span class="career-graph-empty-inline">先补充测评、简历或目标方向，匹配结果会更稳定。</span>`;
-  }
-
-  if (summaryEl) {
-    summaryEl.textContent = profile.summary || "系统会把岗位节点关系、当前画像和推荐方向联动展示在同一页。";
-  }
-  if (statusEl) {
-    statusEl.textContent = "图谱准备中";
-    statusEl.dataset.state = profile.missingItems?.length ? "warning" : "ready";
-  }
-  if (sublineEl) {
-    sublineEl.textContent = "所有岗位都会作为节点出现在图谱里，支持缩放、拖拽、点击查看详情，并在下方生成 5 条职业方向推荐。";
-  }
-  if (hintEl) {
-    hintEl.textContent = profile.missingItems?.length
-      ? `当前仍缺少 ${profile.missingItems.length} 项输入，系统仍会给出结果，但推荐可信度会下降。`
-      : "当前画像已经满足基础匹配条件，可以直接开始职业匹配。";
-  }
-
-  void ensureCareerGraphMatchingAssets()
-    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
-    .catch((error) => {
-      if (statusEl) {
-        statusEl.textContent = "图谱加载失败";
-        statusEl.dataset.state = "error";
-      }
-      const resultsEl = document.getElementById("careerGraphResults");
-      if (resultsEl) {
-        resultsEl.innerHTML = `<div class="career-graph-results-empty">职业图谱模块加载失败：${escHtml(error.message)}</div>`;
-      }
-    });
-}
-
-function renderMatchingWorkspace(profile, roles) {
-  void ensureCareerGraphMatchingAssets()
-    .then((api) => api?.render?.({ profile, legacyRoles: roles, currentSection: appState.currentSection }))
-    .catch((error) => {
-      const statusEl = document.getElementById("knowledgeBaseStatus");
-      const panelBody = document.getElementById("knowledgeBasePanelBody");
-      if (statusEl) statusEl.textContent = "图谱加载失败";
-      if (panelBody) {
-        panelBody.innerHTML = `<p class="kb-empty-copy">职业图谱模块加载失败：${escHtml(error.message)}</p>`;
-      }
-    });
+function renderProfileWorkspace() {
+  window.AssessmentCenter?.refresh();
 }
 
 /** 与「多智能体图片」PNG 对应（报告合成等无图则回退 SVG） */
 const REPORT_AGENT_IMAGE_URL = {
-  profile_fusion: null,
-  industry_analysis: "/static/img/multi-agent/industry-analyst.png",
-  resume_evidence: "/static/img/multi-agent/resume-analyst.png",
-  career_positioning: "/static/img/multi-agent/career-advisor.png",
-  competency_assess: "/static/img/multi-agent/competency-assessor.png",
-  resume_evidence_2: "/static/img/multi-agent/resume-analyst.png",
-  role_match: "/static/img/multi-agent/role-match.png",
-  path_planning: "/static/img/multi-agent/path-planner.png",
+  resume_analysis: "/static/img/multi-agent/resume-analyst.png",
+  job_analysis: "/static/img/multi-agent/role-match.png",
+  recruitment_search: "/static/img/multi-agent/industry-analyst.png",
+  career_decision: "/static/img/multi-agent/career-advisor.png",
+  action_planning: "/static/img/multi-agent/path-planner.png",
   report_writer: "/static/img/multi-agent/report-writer.png"
 };
 
 const REPORT_AGENT_FLOW = [
-  { key: "profile_fusion", title: "画像输入", role: "Profile Intake", detail: "测评、简历、访谈与目标岗位快照", icon: "profile", x: 72, y: 282 },
-  { key: "industry_analysis", title: "行业分析师", role: "Industry Analyst", detail: "外部趋势与需求侧判断", icon: "trend", x: 360, y: 112, aliases: ["trend_intelligence"] },
-  { key: "resume_evidence", title: "简历证据分析官", role: "Resume Evidence Analyst", detail: "初筛经历证据与能力线索", icon: "file", x: 360, y: 452, aliases: ["resume_evidence_1"] },
-  { key: "career_positioning", title: "职业定位顾问", role: "Career Positioning Advisor", detail: "生成方向假设与硬约束", icon: "target", x: 650, y: 282, aliases: ["role_retrieval"] },
-  { key: "competency_assess", title: "能力评估官", role: "Competency Assessor", detail: "构建就业能力画像", icon: "radar", x: 950, y: 112, aliases: ["gap_analysis"] },
-  { key: "resume_evidence_2", title: "证据复核", role: "Resume Evidence Analyst", detail: "按 must_prove 二次校验", icon: "verify", x: 950, y: 452 },
-  { key: "role_match", title: "岗位匹配官", role: "Role Match Officer", detail: "对齐岗位矩阵与差距项", icon: "match", x: 1240, y: 282 },
-  { key: "path_planning", title: "路径规划师", role: "Career Path Planner", detail: "差距驱动行动计划与复查节点", icon: "route", x: 1530, y: 282, aliases: ["stage_planning"] },
-  { key: "report_writer", title: "报告合成", role: "Student Report", detail: "合成可阅读职业报告", icon: "report", x: 1810, y: 282, aliases: ["critic", "report_editor"] }
+  { key: "resume_analysis", title: "简历分析", role: "ResumeAnalysisAgent", detail: "诊断简历证据与待补充事实", icon: "file", x: 20, y: 282 },
+  { key: "job_analysis", title: "岗位分析", role: "JobAnalysisAgent", detail: "检索 JD 样本并核对原文引证", icon: "match", x: 310, y: 282 },
+  { key: "recruitment_search", title: "招聘搜索", role: "RecruitmentSearchAgent", detail: "按需搜索招聘信息与核实条件", icon: "trend", x: 600, y: 282 },
+  { key: "career_decision", title: "职业决策", role: "CareerDecisionAgent", detail: "逐项对照岗位要求与候选人事实", icon: "target", x: 890, y: 282 },
+  { key: "review", title: "补充与确认", role: "用户确认", detail: "回答追问，选择目标和时间安排", icon: "verify", x: 1180, y: 282 },
+  { key: "action_planning", title: "行动规划", role: "ActionPlanningAgent", detail: "安排依赖、工时、交付物与验收标准", icon: "route", x: 1470, y: 282 },
+  { key: "report_writer", title: "报告合成", role: "结果整理", detail: "整理已校验结果供阅读与导出", icon: "report", x: 1760, y: 282 }
 ];
 
 const REPORT_AGENT_NODE_WIDTH = 220;
 const REPORT_AGENT_NODE_MID_Y = 118;
-/** 协作图画布逻辑尺寸（与 SVG viewBox、CSS 一致；窄屏整体缩放以消除横向滚动条） */
 const REPORT_AGENT_MAP_W = 2040;
 const REPORT_AGENT_MAP_H = 780;
-
-const REPORT_AGENT_EDGES = [
-  ["profile_fusion", "industry_analysis"],
-  ["profile_fusion", "resume_evidence"],
-  ["industry_analysis", "career_positioning"],
-  ["resume_evidence", "career_positioning"],
-  ["career_positioning", "competency_assess"],
-  ["career_positioning", "resume_evidence_2"],
-  ["resume_evidence_2", "competency_assess"],
-  ["competency_assess", "role_match"],
-  ["role_match", "path_planning"],
-  ["path_planning", "report_writer"]
-];
+const REPORT_AGENT_EDGES = REPORT_AGENT_FLOW.slice(1).map((item, index) => [REPORT_AGENT_FLOW[index].key, item.key]);
 
 function getReportRuntimeState() {
   const state = typeof window.getCareerReportStateSafe === "function"
     ? (window.getCareerReportStateSafe() || null)
     : (appState.careerReportState || null);
   const status = String(state?.status || "").trim().toLowerCase();
-  return ["queued", "running", "failed", "error", "canceled", "cancelled"].includes(status) ? state : null;
+  return ["queued", "running", "waiting_input", "ready", "completed", "failed", "error", "canceled", "cancelled"].includes(status) ? state : null;
 }
 
 function getReportProgressMap(state) {
@@ -9729,11 +9059,9 @@ function renderReportAgentMap(profile, roles) {
   const progressMap = getReportProgressMap(state);
   const status = String(state?.status || "").trim().toLowerCase();
   const activeStage = String(state?.stage || state?.stage_key || "").trim();
-  const running = ["queued", "running"].includes(status) || reportSimIndex >= 0;
+  const running = ["queued", "running", "waiting_input"].includes(status);
   const completed = !running && ["ready", "done", "success", "completed"].includes(status);
-  const activeIndex = reportSimIndex >= 0 
-    ? reportSimIndex 
-    : REPORT_AGENT_FLOW.findIndex((item) => [item.key, ...(item.aliases || [])].includes(activeStage));
+  const activeIndex = REPORT_AGENT_FLOW.findIndex((item) => item.key === activeStage);
   const inputReady = Boolean(
     profile?.assessment?.mbti?.completed
     || profile?.assessment?.holland?.completed
@@ -9746,26 +9074,13 @@ function renderReportAgentMap(profile, roles) {
     const progressStatus = keys.map((key) => progressMap.get(key)).find(Boolean) || "";
     let nodeStatus = "pending";
     
-    // 模拟模式：使用 reportSimIndex
-    if (reportSimIndex >= 0) {
-      if (index < reportSimIndex) {
-        nodeStatus = "done";      // 已完成
-      } else if (index === reportSimIndex) {
-        nodeStatus = "active";   // 当前处理中
-      }
-    } else {
-      // 正常模式：使用后端状态
-      const isBeforeActive = activeIndex >= 0 && index < activeIndex;
-      const isCurrentOrAfter = keys.includes(activeStage) || index === activeIndex;
-      if (completed || progressStatus === "done" || (running && isBeforeActive)) {
-        nodeStatus = "done";
-      } else if (progressStatus === "active" || progressStatus === "running" || isCurrentOrAfter) {
-        nodeStatus = "active";
-      } else if (progressStatus === "failed" || status === "failed") {
-        nodeStatus = "failed";
-      } else if (index === 0 && inputReady) {
-        nodeStatus = "done";
-      }
+    const isBeforeActive = activeIndex >= 0 && index < activeIndex;
+    if (completed || progressStatus === "done" || (running && isBeforeActive)) {
+      nodeStatus = "done";
+    } else if (index === activeIndex && status === "failed") {
+      nodeStatus = "failed";
+    } else if ((running && index === activeIndex) || progressStatus === "active") {
+      nodeStatus = "active";
     }
     return { ...item, nodeStatus };
   });
@@ -9786,7 +9101,7 @@ function renderReportAgentMap(profile, roles) {
     .map((item, index) => {
       const step = String(index + 1).padStart(2, "0");
       const maStatus = reportMaLegendStatusClass(item.nodeStatus);
-      const hub = item.key === "career_positioning" ? " hub" : "";
+      const hub = item.key === "career_decision" ? " hub" : "";
       return `
     <article class="report-agent-node report-ma-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
       <div class="report-ma-badge">${step}</div>
@@ -9841,11 +9156,12 @@ function ensureReportAgentMapFitObserver() {
 }
 
 function renderReportWorkspace(profile, roles) {
-  const safeRoles = Array.isArray(roles) ? roles : [];
+  const safeRoles = (Array.isArray(roles) ? roles : []).filter((role) => role && role.matchSource !== "career_graph");
   const state = getReportRuntimeState();
   const status = String(state?.status || "").trim().toLowerCase();
   const running = ["queued", "running"].includes(status);
   const failed = status === "failed";
+  const waiting = status === "waiting_input";
   // 检查是否有正式报告：状态为 ready/done 或 appState.reportGenerated 为 true
   const hasReport = appState.reportGenerated || isCareerReportReadyStatus(status) || Boolean(appState.careerReport);
   const selected = safeRoles.find((item) => item.id === appState.focusedRoleId) || safeRoles[0] || null;
@@ -9860,24 +9176,24 @@ function renderReportWorkspace(profile, roles) {
   const gapCount = Array.isArray(selected?.ability?.gaps) ? selected.ability.gaps.length : 0;
 
   if (statusTitle) {
-    statusTitle.textContent = failed
+    statusTitle.textContent = waiting ? "等待补充与确认" : failed
       ? "多智能体流程启动失败"
       : running
         ? "多智能体正在协作"
         : status === "canceled"
           ? "本次生成已停止"
-          : "等待启动多智能体流程";
+          : isCareerReportReadyStatus(status) ? "职业报告已生成" : "等待启动多智能体流程";
   }
   if (statusHint) {
-    statusHint.textContent = failed
+    statusHint.textContent = waiting ? "下方已保存职业决策，请确认目标和时间后继续。" : failed
       ? (state?.error_message || "请检查画像输入和模型配置后重试。")
       : running
         ? (state?.stage_detail || "正在生成职业报告…")
         : status === "canceled"
           ? "旧任务已停止，不会写入报告；可以重新启动一次新的多智能体生成。"
-        : missingCount
+        : isCareerReportReadyStatus(status) ? "报告已保存，可前往报告中心阅读或导出。" : missingCount
           ? `${focusText}；仍有 ${missingCount} 项画像信息可补充。`
-          : `${focusText}；路径规划师会把 ${gapCount} 个差距项转成阶段行动计划，完成后到个人中心阅读完整报告。`;
+          : "根据简历与目标方向生成职业决策，确认后生成行动计划；完成后到报告中心阅读。";
   }
   if (generatedTime) {
     generatedTime.textContent = state?.updated_at || state?.finished_at || state?.created_at || new Date().toLocaleString("zh-CN", { hour12: false });
@@ -9885,7 +9201,7 @@ function renderReportWorkspace(profile, roles) {
   if (launchBtn) {
     launchBtn.disabled = running;
     const isReady = isCareerReportReadyStatus(status);
-    launchBtn.textContent = running
+    launchBtn.textContent = waiting ? "重新开始" : running
       ? "生成中"
         : (isReady || hasReport)
           ? "重新生成"
@@ -9895,6 +9211,9 @@ function renderReportWorkspace(profile, roles) {
     cancelBtn.classList.toggle("hidden", !running);
     cancelBtn.disabled = !running;
   }
+  const inputForm = document.getElementById("reportWorkflowInput");
+  if (inputForm) inputForm.querySelectorAll("input, textarea, select").forEach((input) => { input.disabled = running; });
+  renderReportWorkflowReview(state);
   if (mapEl) {
     mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
     ensureReportAgentMapFitObserver();
@@ -9985,7 +9304,7 @@ function buildCareerReportGenerationPayload() {
       ? userWorkspaceState.scopedData.profile_snapshot.profile
       : null;
   const savedRoles = Array.isArray(userWorkspaceState.scopedData?.career_matching?.role_rankings)
-    ? userWorkspaceState.scopedData.career_matching.role_rankings
+    ? userWorkspaceState.scopedData.career_matching.role_rankings.filter((role) => role && role.matchSource !== "career_graph")
     : [];
   const profile = appState.derivedProfile && typeof appState.derivedProfile === "object"
     ? appState.derivedProfile
@@ -9994,18 +9313,26 @@ function buildCareerReportGenerationPayload() {
     ? appState.matchingRoles
     : (savedRoles.length ? savedRoles : computeRoleMatches(profile));
   if (!profile || typeof profile !== "object") return null;
-  if (!Array.isArray(roles) || !roles.length) return null;
   appState.derivedProfile = profile;
   appState.matchingRoles = roles;
   if (!roles.some((item) => item.id === appState.focusedRoleId)) {
-    appState.focusedRoleId = String(userWorkspaceState.scopedData?.career_matching?.focus_role_id || roles[0]?.id || "").trim();
+    const savedFocus = String(userWorkspaceState.scopedData?.career_matching?.focus_role_id || "").trim();
+    appState.focusedRoleId = roles.some((item) => item.id === savedFocus) ? savedFocus : (roles[0]?.id || "");
   }
   const focusId = String(appState.focusedRoleId || roles[0]?.id || "").trim();
   const role_rankings = buildReportRoleRankingsForPayload(roles, focusId);
   return {
     profile_snapshot: profile,
     role_rankings: role_rankings,
-    focus_role_id: focusId
+    focus_role_id: focusId,
+    workflow: {
+      targets: String(document.getElementById("reportWorkflowTargets")?.value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+      preferences: String(document.getElementById("reportWorkflowPreferences")?.value || "").trim(),
+      additional_evidence: String(document.getElementById("reportWorkflowEvidence")?.value || "").trim(),
+      recruitment: document.getElementById("reportWorkflowSearch")?.value.trim()
+        ? { request: document.getElementById("reportWorkflowSearch").value.trim(), channel: document.getElementById("reportWorkflowChannel")?.value || "web", limit: 5 }
+        : null
+    }
   };
 }
 
@@ -10064,6 +9391,7 @@ async function pollCareerReportJob(jobId) {
       stopCareerReportPolling();
       await loadCurrentCareerReportForMain();
       showToast("职业报告已生成", "可前往个人中心查看。", "success", 2200);
+      window.dispatchEvent(new CustomEvent("career-report:updated"));
       return state;
     }
     if (status === "failed") {
@@ -10146,6 +9474,10 @@ async function resumeCareerReportRuntime() {
 }
 
 async function startCareerReportGeneration() {
+  if (!document.getElementById("reportWorkflowInput")) {
+    window.location.href = "/#report";
+    return;
+  }
   if (!isAuthenticatedUser()) {
     showToast("请先登录", "请登录后生成职业报告。", "warning", 1800);
     return;
@@ -10153,7 +9485,7 @@ async function startCareerReportGeneration() {
   const payload = buildCareerReportGenerationPayload();
   if (!payload) {
     showSection("profile");
-    showToast("画像或岗位数据不足", "请先完成画像并生成岗位匹配结果，再启动职业报告。", "warning", 2400);
+    showToast("画像或岗位数据不足", "请先完成画像，再启动职业报告。", "warning", 2400);
     return;
   }
 
@@ -10163,68 +9495,111 @@ async function startCareerReportGeneration() {
     launchBtn.textContent = "启动中";
   }
 
-  // ========== 启动模拟动画（不调用后端）==========
-  const queuedState = {
-    ...(getCareerReportStateSafe() || {}),
-    status: "queued",
-    job_id: "sim_" + Date.now(),
-    report_id: "",
-    stage: "profile_fusion",
-    stage_label: "画像输入",
-    stage_detail: "任务已提交，模拟多智能体编排中...",
-    progress: [],
-    updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
-    focus_role_id: payload.focus_role_id
-  };
-  applyCareerReportRuntimeState(queuedState);
-  showToast("职业报告任务已启动", "模拟动画：每20秒一个节点变为完成状态，120秒后生成完毕。", "success", 2200);
-  
-  // 启动模拟
-  startReportSimulation();
+  try {
+    if (!payload.workflow.targets.length || payload.workflow.targets.length > 5) {
+      throw new Error("请填写 1 到 5 个目标岗位或方向，每行一个。");
+    }
+    await submitCareerReportWorkflow(payload);
+  } catch (error) {
+    showToast("启动失败", error.message || "请稍后重试。", "error", 3200);
+  } finally {
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  }
 }
+
+async function submitCareerReportWorkflow(payload) {
+  const result = await requestJson("/api/career-report/generate/start", { method: "POST", body: payload });
+  reportWorkflowSnapshot = null;
+  applyCareerReportRuntimeState({ status: "queued", job_id: result.job_id, report_id: result.report_id,
+    stage: "resume_analysis", stage_detail: "任务已提交，正在执行 Agent。", progress: [] });
+  void pollCareerReportJob(result.job_id);
+}
+
+let reportWorkflowSnapshot = null;
+let reportWorkflowLoading = "";
+
+function renderReportWorkflowReview(state) {
+  const container = document.getElementById("reportWorkflowReview");
+  if (!container) return;
+  const reportId = String(state?.report_id || "");
+  const visible = ["waiting_input", "failed"].includes(state?.status) && reportId;
+  container.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  if (reportWorkflowSnapshot?.reportId === reportId) return;
+  if (reportWorkflowLoading === reportId) return;
+  reportWorkflowLoading = reportId;
+  container.textContent = "正在读取已保存的分析结果…";
+  requestJson(`/api/career-report/workflow/${encodeURIComponent(reportId)}`).then((snapshot) => {
+    if (getCareerReportStateSafe()?.report_id !== reportId) return;
+    reportWorkflowSnapshot = { ...snapshot, reportId };
+    const review = snapshot.review;
+    if (!review) {
+      container.innerHTML = `<p>执行进度已保存，可重试失败步骤。</p><button type="button" class="report-launch-primary" onclick="continueCareerReportWorkflow()">${snapshot.complete ? "重试报告整理" : "从保存处重试"}</button>`;
+      return;
+    }
+    const decisions = { recommended: "建议优先考虑", conditional: "满足条件后考虑", not_recommended: "暂不建议", insufficient_information: "信息不足" };
+    const targets = review.targets.map((target) => {
+      const assessment = (review.assessments || []).find((item) => item.target_id === target.target_id);
+      return `<label class="report-workflow-target"><input type="radio" name="reportWorkflowTarget" value="${escHtml(target.target_id)}" ${review.targets.length === 1 ? "checked" : ""} required>
+        <span><strong>${escHtml(target.title)}</strong> · ${escHtml(decisions[assessment?.decision] || "信息不足")}<br>${escHtml(assessment?.conclusion || "")}</span></label>`;
+    }).join("");
+    let questionIndex = 0;
+    const questions = Object.entries(review.questions || {}).map(([agent, items]) => items.map((question) =>
+      `<label>${escHtml(question)}<textarea data-report-question="${questionIndex++}" rows="2" maxlength="10000" placeholder="选填；未回答的内容仍按未知处理"></textarea></label>`
+    ).join("")).join("");
+    const today = new Date().toLocaleDateString("en-CA");
+    container.innerHTML = `<form onsubmit="event.preventDefault(); continueCareerReportWorkflow();">
+      <h3>职业决策与行动安排</h3><p>${escHtml(review.summary || "请确认本次目标。")}</p>${targets}${questions}
+      <div class="report-workflow-constraints">
+        <label>每周可投入小时<input id="reportWorkflowHours" type="number" min="0.1" max="168" step="0.1" required></label>
+        <label>开始日期<input id="reportWorkflowStart" type="date" value="${escHtml(today)}" min="${escHtml(today)}" required></label>
+        <label>截止日期<input id="reportWorkflowDeadline" type="date" min="${escHtml(today)}" required></label>
+        <label>预算（元，选填）<input id="reportWorkflowBudget" type="number" min="0" step="0.01"></label>
+      </div>
+      <label>已完成的任务（每行一项，选填）<textarea id="reportWorkflowCompleted" rows="2" maxlength="10000"></textarea></label>
+      <button type="submit" class="report-launch-primary">确认并生成行动计划</button>
+    </form>`;
+  }).catch((error) => {
+    container.textContent = error.message || "读取失败，请刷新页面重试。";
+  }).finally(() => { reportWorkflowLoading = ""; });
+}
+
+async function continueCareerReportWorkflow() {
+  const snapshot = reportWorkflowSnapshot;
+  if (!snapshot) return;
+  const container = document.getElementById("reportWorkflowReview");
+  const form = container?.querySelector("form");
+  if (form && !form.reportValidity()) return;
+  let response = {};
+  if (snapshot.review) {
+    const answers = {};
+    let index = 0;
+    Object.entries(snapshot.review.questions || {}).forEach(([agent, questions]) => {
+      const items = questions.map((question) => ({ question, answer: String(container.querySelector(`[data-report-question="${index++}"]`)?.value || "").trim() })).filter((item) => item.answer);
+      if (items.length) answers[agent] = items;
+    });
+    const budget = document.getElementById("reportWorkflowBudget").value;
+    response = { target_id: container.querySelector('[name="reportWorkflowTarget"]:checked')?.value,
+      answers, constraints: { weekly_hours: Number(document.getElementById("reportWorkflowHours").value),
+        start_date: document.getElementById("reportWorkflowStart").value, deadline: document.getElementById("reportWorkflowDeadline").value,
+        budget: budget === "" ? null : Number(budget),
+        completed_tasks: document.getElementById("reportWorkflowCompleted").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) } };
+  }
+  const buttons = container.querySelectorAll("button");
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await submitCareerReportWorkflow({ continue_report_id: snapshot.reportId, checkpoint_id: snapshot.checkpoint_id, response });
+  } catch (error) {
+    showToast("继续失败", error.message || "请稍后重试。", "error", 3600);
+    if (String(error.message || "").includes("刷新")) reportWorkflowSnapshot = null;
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+window.continueCareerReportWorkflow = continueCareerReportWorkflow;
 
 let unifiedRefreshScheduled = false;
 let unifiedRefreshRunning = false;
-
-// ========== 报告生成模拟动画（前端控制，不依赖后端）==========
-let reportSimTimer = null;       // 模拟计时器
-let reportSimIndex = -1;         // 当前节点索引（-1表示未开始）
-let reportSimTotal = 9;          // 总节点数
-
-function startReportSimulation() {
-  stopReportSimulation();
-  reportSimIndex = 0;  // 从第0个节点开始（profile_fusion）
-  
-  // 立即更新一次
-  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-  
-  // 每40秒更新一次节点状态（变成已完成）
-  reportSimTimer = window.setInterval(() => {
-    reportSimIndex++;
-    if (reportSimIndex >= reportSimTotal) {
-      // 全部完成
-      stopReportSimulation();
-      // 模拟完成后按钮变成"重新生成"
-      appState.reportGenerated = true;
-    }
-    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-  }, 40000);
-  
-  // 120秒后按钮变成"重新生成"
-  window.setTimeout(() => {
-    appState.reportGenerated = true;
-    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-    showToast("报告生成完成", "职业发展报告已生成，可以查看或重新生成。", "success", 3000);
-  }, 120000);
-}
-
-function stopReportSimulation() {
-  if (reportSimTimer) {
-    window.clearInterval(reportSimTimer);
-    reportSimTimer = null;
-  }
-  reportSimIndex = -1;
-}
 let unifiedRefreshPending = false;
 
 function refreshUnifiedExperience() {
@@ -10264,11 +9639,8 @@ function buildProfileSnapshotScope(profile) {
 }
 
 function buildCareerMatchingScope(profile, roles) {
-  let role_rankings = Array.isArray(roles) ? roles : [];
+  const role_rankings = Array.isArray(roles) ? roles : [];
   const scoped = userWorkspaceState.scopedData?.career_matching;
-  if (!role_rankings.length && scoped?.graph_match_bundle?.results?.length && typeof graphMatchResultsToRoleRankings === "function") {
-    role_rankings = graphMatchResultsToRoleRankings(scoped.graph_match_bundle.results);
-  }
   const focusFallback = String(
     appState.focusedRoleId || role_rankings[0]?.id || scoped?.focus_role_id || ""
   ).trim();
@@ -10296,7 +9668,7 @@ async function persistUnifiedExperienceState(profile, roles) {
 
 function applyUnifiedExperienceState(profile, roles, options = {}) {
   const safeProfile = profile && typeof profile === "object" ? profile : deriveUnifiedProfile();
-  const safeRoles = Array.isArray(roles) ? roles : [];
+  const safeRoles = (Array.isArray(roles) ? roles : []).filter((role) => role && role.matchSource !== "career_graph");
   const requestedFocusRoleId = String(options.focusRoleId || "").trim();
 
   appState.derivedProfile = safeProfile;
@@ -10318,11 +9690,9 @@ function applyUnifiedExperienceState(profile, roles, options = {}) {
     && safeProfile.assessment?.holland?.completed
     && PROFILE_BASIC_FIELDS.every((key) => safeProfile.basics?.[key])
   );
-  appState.matchingComplete = safeRoles.length > 0 && Boolean(safeProfile.assessment?.mbti?.completed || safeProfile.assessment?.holland?.completed);
   appState.score = safeRoles[0]?.overallScore || safeRoles[0]?.trait?.score || appState.profileCompletion;
 
   renderProfileWorkspace(safeProfile, safeRoles);
-  renderMatchingWorkspace(safeProfile, safeRoles);
   renderReportWorkspace(safeProfile, safeRoles);
   updateDashboardMetrics();
 
@@ -10338,7 +9708,7 @@ function restoreUnifiedExperienceFromSavedScopes() {
     ? profileScope.profile
     : null;
   const roles = matchingScope && typeof matchingScope === "object" && Array.isArray(matchingScope.role_rankings)
-    ? matchingScope.role_rankings
+    ? matchingScope.role_rankings.filter((role) => role && role.matchSource !== "career_graph")
     : [];
   const focusRoleId = matchingScope && typeof matchingScope === "object"
     ? String(matchingScope.focus_role_id || "").trim()
@@ -10355,23 +9725,6 @@ function refreshUnifiedExperienceNow() {
   profile.nextSteps = uniqueValues([...profile.nextSteps, ...(roles[0]?.nextActions || [])], 6);
   profile.moduleStates = buildAgentModuleStates(profile, roles);
   applyUnifiedExperienceState(profile, roles, { persist: true });
-}
-
-function focusMatchingRole(roleId) {
-  appState.focusedRoleId = String(roleId || "");
-  renderMatchingWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-  renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-  if (isAuthenticatedUser()) {
-    void mergeScopedUserState("career_matching", {
-      focus_role_id: appState.focusedRoleId,
-      updated_at: new Date().toLocaleString("zh-CN", { hour12: false })
-    });
-  }
-}
-
-function openMatchingRoleReport(roleId) {
-  focusMatchingRole(roleId);
-  showSection("report");
 }
 
 function animateCounter(el, target, suffix = "", duration = 500) {
@@ -10501,8 +9854,43 @@ function initNavWorkspaceMenu() {
   });
 }
 
+function clearPrivateWorkspace() {
+  accountRequestEpoch += 1;
+  inFlightGetRequests.clear();
+  stopCareerReportPolling();
+  stopAnalyzeProgressTicker();
+  stopProfilePortraitLoading();
+  Object.keys(userWorkspaceState.scopedData).forEach(key => { userWorkspaceState.scopedData[key] = null; });
+  Object.keys(userWorkspaceState.scopedDataLoaded).forEach(key => { userWorkspaceState.scopedDataLoaded[key] = false; });
+  Object.keys(userWorkspaceState.llmConfigs).forEach(key => { userWorkspaceState.llmConfigs[key] = null; });
+  Object.assign(appState, { careerReport: null, careerReportState: null, careerReportTracker: null,
+    careerReportVersions: [], careerReportCanonicalId: "", careerReportViewingHistorical: false,
+    reportGenerated: false, reportReady: false, derivedProfile: null, matchingRoles: [], focusedRoleId: "",
+    selectedJobs: [], profileComplete: false, profileCompletion: 0, baseExploredJobs: 0, score: 0, notifications: 0, lastGreetingKey: "" });
+  Object.assign(resumeTaskState, { uploadInFlight: false, analyzeInFlight: false, forceInputView: false, deckIndices: {} });
+  reportWorkflowSnapshot = null;
+  resetCareerInterviewState({ preserveBasics: false });
+  Object.assign(communityForumState, { loading: false, loaded: false, posts: [], boards: [], hotTags: [],
+    stats: {}, board: "all", sort: "hot", query: "", selectedPostId: "", viewedIds: {}, view: "list" });
+  for (const id of ["forumPostTitle", "forumPostTags", "forumPostContent", "forumReplyInput", "forumSearchInput"]) {
+    const input = document.getElementById(id);
+    if (input) input.value = "";
+  }
+  const boardInput = document.getElementById("forumPostBoard");
+  if (boardInput) boardInput.selectedIndex = 0;
+  for (const id of ["forumListView", "forumDetailView", "forumComposeView"]) {
+    document.getElementById(id)?.classList.toggle("hidden", id !== "forumListView");
+  }
+  const detail = document.getElementById("forumThreadDetail");
+  if (detail) detail.innerHTML = "";
+  renderCommunityForum();
+  window.closeReportViewer?.();
+  window.renderCareerReportPanels?.();
+}
+
 function lockApp() {
   void window.CareerAuth.ensureReady();
+  clearPrivateWorkspace();
   userWorkspaceState.currentUser = null;
   userWorkspaceState.authReadyPromise = null;
   document.body.classList.remove("auth-checking");
@@ -10526,6 +9914,7 @@ function lockApp() {
 }
 
 function unlockAppForUser(user) {
+  if (userWorkspaceState.currentUser?.username !== user.username) clearPrivateWorkspace();
   userWorkspaceState.currentUser = user;
   const startup = document.getElementById("startupScreen");
   const label = document.getElementById("currentUserLabel");
@@ -10841,30 +10230,19 @@ function updateTaskPanels(explored) {
   const exploreStatusCard = document.getElementById("taskJobExploreStatusCard");
   const exploreTag = document.getElementById("taskJobExploreTag");
   const exploreTagCard = document.getElementById("taskJobExploreTagCard");
-  const matchingStatus = document.getElementById("taskMatchingStatus");
-  const matchingStatusCard = document.getElementById("taskMatchingStatusCard");
-  const matchingTag = document.getElementById("taskMatchingTag");
-  const matchingTagCard = document.getElementById("taskMatchingTagCard");
   const progressHint = document.getElementById("taskProgressHint");
   const progressHintDisplay = document.getElementById("taskProgressHintDisplay");
   const reportBtn = document.getElementById("generateReportBtn");
   const reportBtnCard = document.getElementById("generateReportBtnCard");
   const exploredDone = explored >= 3;
   const exploreText = `已形成 ${explored} 个初步岗位方向`;
-  const matchingText = appState.matchingRoles.length
-    ? `已生成 ${appState.matchingRoles.length} 个岗位匹配结果`
-    : "等待画像输入生成匹配";
   if (exploreStatus) exploreStatus.textContent = exploreText;
   if (exploreStatusCard) exploreStatusCard.textContent = exploreText;
   setTagState(exploreTag, exploredDone ? "done" : "processing");
   setTagState(exploreTagCard, exploredDone ? "done" : "processing");
-  if (matchingStatus) matchingStatus.textContent = matchingText;
-  if (matchingStatusCard) matchingStatusCard.textContent = matchingText;
-  setTagState(matchingTag, appState.matchingComplete ? "done" : "processing");
-  setTagState(matchingTagCard, appState.matchingComplete ? "done" : "processing");
-  const doneCount = [appState.profileComplete, exploredDone, appState.matchingComplete, appState.reportGenerated].filter(Boolean).length;
-  if (progressHint) progressHint.textContent = `已完成 ${doneCount}/4 个关键任务`;
-  if (progressHintDisplay) progressHintDisplay.textContent = `已完成 ${doneCount}/4 个关键任务`;
+  const doneCount = [appState.profileComplete, exploredDone, appState.reportGenerated].filter(Boolean).length;
+  if (progressHint) progressHint.textContent = `已完成 ${doneCount}/3 个关键任务`;
+  if (progressHintDisplay) progressHintDisplay.textContent = `已完成 ${doneCount}/3 个关键任务`;
   [reportBtn, reportBtnCard].forEach((button) => {
     if (!button) return;
     if (appState.reportGenerated) {
@@ -10922,8 +10300,9 @@ function markReportGenerated(source = "view") {
 }
 
 function showSection(sectionId) {
+  const sections = ["dashboard", "jobs", "profile", "report", "forum"];
+  if (!sections.includes(sectionId)) sectionId = "dashboard";
   if (sectionId === appState.currentSection) return;
-  const sections = ["dashboard", "jobs", "profile", "matching", "report", "forum"];
   sections.forEach((id) => {
     const section = document.getElementById(id);
     // 优先使用 data-section 选择导航按钮，避免依赖 onclick 选择器。
@@ -10944,7 +10323,6 @@ function showSection(sectionId) {
     btn.classList.toggle("is-active", Boolean(sid) && sid === sectionId);
   });
   appState.currentSection = sectionId;
-  document.body.classList.toggle("section-matching", sectionId === "matching");
   // 更新 URL hash，让 return-nav 能记录当前 section，返回时恢复正确页面
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
   if (sectionId === "report") renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
@@ -10957,22 +10335,8 @@ function showSection(sectionId) {
     void ensureCommunityForumLoaded();
   }
   if (sectionId === "profile") {
-    initProfileFlow();
+    window.AssessmentCenter?.refresh();
     void refreshResumeProfile(true);
-  }
-  if (sectionId === "matching") {
-    const profile = appState.derivedProfile || deriveUnifiedProfile();
-    const roles = Array.isArray(appState.matchingRoles) && appState.matchingRoles.length
-      ? appState.matchingRoles
-      : computeRoleMatches(profile);
-    renderMatchingWorkspace(profile, roles);
-  }
-  if (sectionId === "matching") {
-    void ensureCareerGraphMatchingAssets()
-      .then((api) => api?.onSectionVisible?.())
-      .catch((error) => {
-        showToast("职业图谱加载失败", error.message, "warning", 2200);
-      });
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -11051,29 +10415,6 @@ function switchGraphType(type) {
     btns[0].classList.remove("active", "bg-purple-100", "text-purple-600");
     btns[0].classList.add("bg-gray-100", "text-gray-600");
   }
-}
-
-function updateWeight(slider, dimension) {
-  const value = Number(slider.value);
-  appState.weights[dimension] = value;
-  const valueLabel = slider.closest(".matching-weight-card")?.querySelector(".matching-weight-value");
-  if (valueLabel) valueLabel.textContent = `${value}%`;
-  const sliders = Array.from(document.querySelectorAll("input[type='range'][onchange*='updateWeight']"));
-  const total = sliders.reduce((sum, item) => sum + Number(item.value || 0), 0);
-  const totalEl = document.getElementById("weightTotal");
-  if (totalEl) {
-    totalEl.textContent = `${total}%`;
-    totalEl.classList.toggle("text-orange-600", total !== 100);
-    totalEl.classList.toggle("text-sky-600", total === 100);
-  }
-}
-
-function recalculateMatching() {
-  const total = Object.values(appState.weights).reduce((sum, n) => sum + n, 0);
-  if (total !== 100) return showToast("权重总和不正确", "四个分项权重之和必须等于 100%。", "warning", 2200);
-  refreshUnifiedExperience();
-  addLiveActivity("Matching strategy refreshed with new weight settings");
-  showToast("匹配结果已刷新", "系统已按最新权重重新排序岗位结果。", "success", 1800);
 }
 
 function recalculateProfile() {
@@ -11603,7 +10944,7 @@ document.addEventListener("DOMContentLoaded", function () {
     void resumeCareerReportRuntime();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
-      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "matching", "report", "forum"];
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "report", "forum"];
       const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
       if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
         showSection(hashId);
@@ -11686,6 +11027,7 @@ function getCommunityForumFilteredPosts() {
       return text.includes(query);
     });
   }
+  if (sort === "unanswered") posts = posts.filter(post => !Number(post.reply_count || 0));
   posts.sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
@@ -11716,165 +11058,72 @@ function showForumView(view) {
 function renderCommunityForumBoardFilters() {
   const container = document.getElementById("forumBoardFilters");
   if (!container) return;
-  const boards = communityForumState.boards.length
-    ? communityForumState.boards
-    : [{ key: "all", label: "全部", count: 0 }].concat(
-        Object.keys(COMMUNITY_FORUM_BOARD_META)
-          .filter((key) => key !== "all")
-          .map((key) => ({ key, label: key, count: 0 }))
-      );
-  container.innerHTML = boards.map((item) => {
+  const boards = communityForumState.boards.length ? communityForumState.boards
+    : [{ key: "all", label: "全部讨论", count: 0 }, ...Object.keys(COMMUNITY_FORUM_BOARD_META).filter(key => key !== "all").map(key => ({ key, label: key, count: 0 }))];
+  container.innerHTML = boards.map(item => {
     const key = String(item.key || item.label || "all");
     const active = key === communityForumState.board;
-    const meta = getCommunityBoardMeta(key);
-    return `
-      <button
-        type="button"
-        onclick="setCommunityForumBoard('${key}')"
-        class="flex items-center gap-2.5 w-full rounded-xl px-3 py-2.5 text-sm font-medium transition-all text-left ${active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}"
-      >
-        <span class="flex-none inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs ${active ? "bg-white/20" : "bg-slate-100"}">${escHtml(meta.icon)}</span>
-        <span class="flex-1 truncate">${escHtml(String(item.label || key))}</span>
-        <span class="text-xs ${active ? "text-white/50" : "text-slate-400"}">${Number(item.count || 0)}</span>
-      </button>
-    `;
+    return `<button type="button" data-forum-action="board" data-forum-value="${escHtml(key)}" class="forum-board-button${active ? ' is-active' : ''}" aria-pressed="${active}"><span class="forum-board-icon" aria-hidden="true">${escHtml(getCommunityBoardMeta(key).icon)}</span><strong>${key === 'all' ? '全部讨论' : escHtml(item.label || key)}</strong><small>${Number(item.count || 0)}</small></button>`;
   }).join("");
+  const heading = document.getElementById("forumCurrentBoard");
+  if (heading) heading.textContent = communityForumState.board === "all" ? "全部讨论" : communityForumState.board;
 }
 
 function renderCommunityForumSortFilters() {
   const container = document.getElementById("forumSortFilters");
   if (!container) return;
-  const options = [
-    { key: "hot", label: "最热" },
-    { key: "latest", label: "最新" },
-    { key: "unanswered", label: "待回复" }
-  ];
-  container.innerHTML = options.map((item) => `
-    <button
-      type="button"
-      onclick="setCommunityForumSort('${item.key}')"
-      class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${communityForumState.sort === item.key ? "border-amber-400 bg-amber-400 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-700"}"
-    >
-      ${item.label}
-    </button>
-  `).join("");
+  container.innerHTML = [{ key: "hot", label: "热门讨论" }, { key: "latest", label: "最新发布" }, { key: "unanswered", label: "等待回复" }].map(item =>
+    `<button type="button" data-forum-action="sort" data-forum-value="${item.key}" class="forum-sort-button${communityForumState.sort === item.key ? ' is-active' : ''}" aria-pressed="${communityForumState.sort === item.key}">${item.label}</button>`
+  ).join("");
 }
 
 function renderCommunityForumHotTags() {
   const container = document.getElementById("forumHotTags");
   if (!container) return;
-  if (!communityForumState.hotTags.length) {
-    container.innerHTML = '<p class="text-xs text-slate-400">发帖后自动生成热议标签</p>';
-    return;
-  }
-  container.innerHTML = communityForumState.hotTags.map((item) => {
-    const tagText = String(item.tag || "");
-    const safeTag = JSON.stringify(tagText);
-    return `
-      <button
-        type="button"
-        onclick="applyCommunityForumTag(${safeTag})"
-        class="rounded-full bg-amber-50 border border-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition hover:bg-amber-100"
-      >
-        #${escHtml(tagText)}<span class="ml-1 text-amber-400">${Number(item.count || 0)}</span>
-      </button>
-    `;
-  }).join("");
+  container.innerHTML = communityForumState.hotTags.length ? communityForumState.hotTags.map(item =>
+    `<button type="button" class="forum-tag" data-forum-action="tag" data-forum-value="${escHtml(item.tag || '')}">#${escHtml(item.tag || '')}<small>${Number(item.count || 0)}</small></button>`
+  ).join("") : '<p class="forum-visibility-note">从你的第一条讨论开始。</p>';
+}
+
+function communityForumIcon(name) {
+  const paths = {
+    reply: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/>',
+    view: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+    like: '<path d="m20.8 4.6 0 0a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>'
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.reply}</svg>`;
+}
+
+function communityForumLikeButton(post) {
+  return `<button type="button" class="forum-like-button${post.liked ? ' is-liked' : ''}" data-forum-action="like" data-forum-value="${escHtml(post.id)}" aria-label="${post.liked ? '取消点赞' : '点赞'}" aria-pressed="${Boolean(post.liked)}">${communityForumIcon('like')}<span>${Number(post.likes || 0)}</span></button>`;
 }
 
 function renderCommunityForumList() {
-  const summaryEl = document.getElementById("forumListSummary");
-  const listEl = document.getElementById("forumThreadList");
-  if (!summaryEl || !listEl) return;
+  const summary = document.getElementById("forumListSummary");
+  const list = document.getElementById("forumThreadList");
+  if (!summary || !list) return;
   if (communityForumState.loading && !communityForumState.loaded) {
-    summaryEl.textContent = "正在加载讨论内容...";
-    listEl.innerHTML = [1, 2, 3].map(() => `
-      <div class="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
-        <div class="h-3 bg-slate-100 rounded w-1/4 mb-4"></div>
-        <div class="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
-        <div class="h-3 bg-slate-100 rounded w-full mb-1"></div>
-        <div class="h-3 bg-slate-100 rounded w-2/3"></div>
-      </div>
-    `).join("");
+    summary.textContent = "正在加载…";
+    list.innerHTML = '<div class="forum-empty" role="status">正在整理讨论内容…</div>';
     return;
   }
   const posts = getCommunityForumFilteredPosts();
-  const sortLabel = { hot: "最热", latest: "最新", unanswered: "待回复" }[communityForumState.sort] || "最热";
-  summaryEl.textContent = `${posts.length} 条讨论 · ${sortLabel}`;
+  summary.textContent = `${posts.length} 条讨论`;
   if (!posts.length) {
-    listEl.innerHTML = `
-      <div class="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
-        <p class="text-slate-400 text-sm">这个条件下还没有帖子</p>
-        <button type="button" onclick="showForumView('compose')" class="mt-3 text-sm text-amber-600 hover:underline">发起第一条讨论</button>
-      </div>
-    `;
+    list.innerHTML = '<div class="forum-empty"><p>还没有找到相关讨论</p><button type="button" class="forum-secondary-button" onclick="showForumView(\'compose\')">聊一个新话题</button></div>';
     return;
   }
-  listEl.innerHTML = posts.map((post) => {
-    const meta = getCommunityBoardMeta(post.board);
-    const excerpt = String(post.content || "").length > 100
-      ? `${String(post.content || "").slice(0, 100)}...`
-      : String(post.content || "");
-    const tags = (post.tags || []).slice(0, 3);
-    const isSystem = post.author?.username === "system";
-    const cardClass = isSystem
-      ? "block w-full rounded-2xl shadow-md p-5 text-left transition hover:shadow-lg group relative overflow-hidden"
-      : "block w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left transition hover:border-amber-200 hover:shadow-md group";
-    const cardStyle = isSystem
-      ? "background:#fffdf7; border:1.5px solid transparent; background-clip:padding-box; box-shadow:0 0 0 1.5px rgba(251,191,36,0.55), 0 4px 16px rgba(251,191,36,0.13);"
-      : "";
-    const authorHtml = isSystem
-      ? `<span class="inline-flex items-center gap-1 font-semibold" style="color:#b45309;">
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#d97706);flex-shrink:0;">
-             <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M5 1l1.12 2.27L9 3.635l-2 1.95.472 2.75L5 7.01 2.528 8.335 3 5.585 1 3.635l2.88-.365L5 1z" fill="#fff"/></svg>
-           </span>
-           官方发起
-         </span>`
-      : `<span class="font-medium text-slate-600">${escHtml(post.author?.display_name || "匿名同学")}</span>`;
-    return `
-      <button
-        type="button"
-        onclick="selectCommunityPost('${post.id}')"
-        class="${cardClass}"
-        ${cardStyle ? `style="${cardStyle}"` : ""}
-      >
-        ${isSystem ? `<div style="position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,#f59e0b,#fbbf24,#fde68a,#fbbf24,#f59e0b);opacity:0.9;"></div>` : ""}
-        <div class="flex items-start gap-3">
-          <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-1.5 mb-2">
-              <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.chip}">
-                <span class="text-[10px]">${escHtml(meta.icon)}</span>${escHtml(meta.label)}
-              </span>
-              ${post.pinned ? '<span class="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">置顶</span>' : ""}
-              ${Number(post.reply_count || 0) === 0 ? '<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">待回复</span>' : ""}
-            </div>
-            <h4 class="text-base font-bold text-slate-900 leading-snug group-hover:text-amber-700 transition-colors">${escHtml(post.title || "")}</h4>
-            <p class="mt-1.5 text-sm text-slate-500 leading-relaxed line-clamp-2">${escHtml(excerpt)}</p>
-            ${tags.length ? `<div class="mt-2 flex flex-wrap gap-1">${tags.map((tag) => `<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">#${escHtml(tag)}</span>`).join("")}</div>` : ""}
-          </div>
-          <div class="flex-none text-right space-y-1.5 text-xs text-slate-400 pl-2 min-w-[3rem]">
-            <div class="font-medium">${Number(post.reply_count || 0)}<span class="block text-[10px] font-normal">回复</span></div>
-            <div>${Number(post.likes || 0)}<span class="block text-[10px]">赞</span></div>
-          </div>
-        </div>
-        <div class="mt-3 flex items-center justify-between gap-2 text-xs text-slate-400 border-t ${isSystem ? "border-amber-100" : "border-slate-50"} pt-3">
-          <div class="flex items-center gap-2">
-            ${authorHtml}
-            <span>·</span>
-            <span>${formatRelativeTimeCN(post.updated_at || post.created_at)}</span>
-            <span>·</span>
-            <span>${Number(post.views || 0)} 浏览</span>
-          </div>
-          <button
-            type="button"
-            onclick="event.stopPropagation(); toggleCommunityPostLike('${post.id}')"
-            class="flex items-center gap-1 rounded-full px-2.5 py-1 border transition ${post.liked ? 'border-rose-200 bg-rose-50 text-rose-500' : 'border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-500'}"
-          >
-            ${post.liked ? "❤️" : "🤍"} <span>${Number(post.likes || 0)}</span>
-          </button>
-        </div>
-      </button>
-    `;
+  list.innerHTML = posts.map(post => {
+    const author = post.author?.display_name || "匿名同学";
+    const initial = Array.from(author)[0] || "同";
+    const excerpt = String(post.content || "").slice(0, 150);
+    return `<article class="forum-thread-card${post.pinned ? ' is-pinned' : ''}" data-board="${escHtml(post.board || '')}">
+      <div class="forum-thread-head"><span class="forum-avatar" aria-hidden="true">${escHtml(initial)}</span><div class="forum-thread-author"><strong>${escHtml(author)}${post.author?.is_system ? ' · 官方' : ''}</strong><span>${escHtml(formatRelativeTimeCN(post.created_at))}</span></div><span class="forum-board-badge">${escHtml(post.board || '讨论')}</span>${post.pinned ? '<span class="forum-pin">置顶</span>' : ''}</div>
+      <button type="button" class="forum-thread-title" data-forum-action="post" data-forum-value="${escHtml(post.id)}">${escHtml(post.title || '')}</button>
+      <p class="forum-thread-excerpt">${escHtml(excerpt)}</p>
+      <div class="forum-tags">${(post.tags || []).slice(0, 4).map(tag => `<button type="button" class="forum-tag" data-forum-action="tag" data-forum-value="${escHtml(tag)}">#${escHtml(tag)}</button>`).join('')}</div>
+      <div class="forum-thread-footer"><div class="forum-thread-metrics"><span>${communityForumIcon('reply')}${Number(post.reply_count || 0)} 回复</span><span>${communityForumIcon('view')}${Number(post.views || 0)} 浏览</span>${!Number(post.reply_count || 0) ? '<span class="forum-unanswered">等一个好建议</span>' : ''}</div>${communityForumLikeButton(post)}</div>
+    </article>`;
   }).join("");
 }
 
@@ -11883,79 +11132,17 @@ function renderCommunityForumDetail() {
   const badge = document.getElementById("forumDetailBadge");
   if (!container || !badge) return;
   const post = getCommunityForumPostById(communityForumState.selectedPostId);
-  if (!post) {
-    badge.textContent = "分区";
-    badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600";
-    container.innerHTML = "";
-    return;
-  }
-  const meta = getCommunityBoardMeta(post.board);
-  badge.textContent = meta.label;
-  badge.className = `text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.chip}`;
+  badge.className = "forum-board-badge";
+  badge.dataset.board = post?.board || "";
+  badge.textContent = post?.board || "讨论";
+  if (!post) { container.innerHTML = ""; return; }
   const replies = Array.isArray(post.replies) ? post.replies : [];
-  const replyHtml = replies.length
-    ? replies.map((item, idx) => `
-        <div class="flex gap-3">
-          <div class="flex-none w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">${idx + 1}</div>
-          <div class="flex-1 min-w-0 pb-4 ${idx < replies.length - 1 ? "border-b border-slate-100" : ""}">
-            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1.5">
-              <span class="font-semibold text-slate-700">${escHtml(item.author?.display_name || "匿名同学")}</span>
-              <span>·</span>
-              <span>${formatRelativeTimeCN(item.created_at)}</span>
-            </div>
-            <p class="text-sm text-slate-700 leading-relaxed">${escHtml(item.content || "")}</p>
-          </div>
-        </div>
-      `).join("")
-    : '<p class="text-sm text-slate-400 text-center py-8">还没有回复，来第一个发言吧</p>';
-  container.innerHTML = `
-    <div>
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <h4 class="text-xl font-bold text-slate-900 leading-snug flex-1">${escHtml(post.title || "")}</h4>
-        <button
-          type="button"
-          onclick="toggleCommunityPostLike('${post.id}')"
-          class="flex-none inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 border text-xs font-semibold transition ${post.liked ? "border-rose-200 bg-rose-50 text-rose-600" : "border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-600"}"
-        >
-          ${post.liked ? "❤️" : "🤍"} ${Number(post.likes || 0)}
-        </button>
-      </div>
-      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-4">
-        <span class="font-medium text-slate-700">${escHtml(post.author?.display_name || "匿名同学")}</span>
-        <span>·</span>
-        <span>${formatRelativeTimeCN(post.created_at)}</span>
-        <span>·</span>
-        <span>${Number(post.views || 0)} 浏览</span>
-        <span>·</span>
-        <span>${Number(post.reply_count || 0)} 回复</span>
-      </div>
-      ${(post.tags || []).length ? `
-        <div class="flex flex-wrap gap-1.5 mb-4">
-          ${(post.tags || []).map((tag) => {
-            const safeTag = JSON.stringify(String(tag || ""));
-            return `<button type="button" onclick="applyCommunityForumTag(${safeTag})" class="rounded-full bg-slate-100 hover:bg-amber-100 px-2.5 py-1 text-xs text-slate-500 hover:text-amber-700 transition">#${escHtml(tag)}</button>`;
-          }).join("")}
-        </div>` : ""}
-      <div class="bg-slate-50 rounded-xl border border-slate-100 px-5 py-4 text-sm leading-7 text-slate-700 whitespace-pre-line mb-6">${escHtml(post.content || "")}</div>
-      <div class="mb-4 flex items-center justify-between">
-        <h5 class="text-sm font-bold text-slate-700">回复 <span class="text-slate-400 font-normal ml-1">${replies.length}</span></h5>
-        <span class="text-xs text-slate-400">最近更新：${formatRelativeTimeCN(post.last_reply_at || post.updated_at || post.created_at)}</span>
-      </div>
-      <div class="space-y-1 mb-6">${replyHtml}</div>
-      <div class="border-t border-slate-100 pt-5">
-        <label for="forumReplyInput" class="block text-sm font-medium text-slate-700 mb-2">写回复</label>
-        <textarea id="forumReplyInput" rows="4" maxlength="1200"
-          placeholder="比如：你目前最缺的是哪一部分、已经投了哪些岗位、卡在什么反馈上？"
-          class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"></textarea>
-        <div class="mt-3 flex items-center justify-end">
-          <button type="button" onclick="submitCommunityReply('${post.id}')"
-            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
-            发送回复
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+  container.innerHTML = `<h3 class="forum-detail-title">${escHtml(post.title || '')}</h3><div class="forum-detail-meta">${escHtml(post.author?.display_name || '匿名同学')} · ${escHtml(formatRelativeTimeCN(post.created_at))} · ${Number(post.views || 0)} 浏览</div>
+    <div class="forum-tags">${(post.tags || []).map(tag => `<button type="button" class="forum-tag" data-forum-action="tag" data-forum-value="${escHtml(tag)}">#${escHtml(tag)}</button>`).join('')}</div>
+    <div class="forum-detail-content">${escHtml(post.content || '')}</div><div class="forum-thread-footer"><span class="forum-detail-meta">${replies.length} 条回复</span>${communityForumLikeButton(post)}</div>
+    <h4 class="forum-replies-title">一起聊聊</h4>
+    ${replies.length ? replies.map(reply => `<article class="forum-reply"><span class="forum-avatar" aria-hidden="true">${escHtml(Array.from(reply.author?.display_name || '同')[0])}</span><div class="forum-reply-body"><div class="forum-thread-author"><strong>${escHtml(reply.author?.display_name || '匿名同学')}</strong><span>${escHtml(formatRelativeTimeCN(reply.created_at))}</span></div><p>${escHtml(reply.content || '')}</p></div></article>`).join('') : '<p class="forum-reply-empty">还没有回复，你的经验可能正好能帮上忙。</p>'}
+    <form class="forum-reply-form" data-forum-reply-id="${escHtml(post.id)}"><label for="forumReplyInput">留下你的建议<textarea id="forumReplyInput" rows="4" maxlength="1200" minlength="4" required placeholder="分享一个思路，或者追问你想进一步了解的地方。"></textarea></label><button type="submit" class="forum-primary-button">发送回复</button></form>`;
 }
 
 function renderCommunityForum() {
@@ -11983,6 +11170,7 @@ async function ensureCommunityForumLoaded(force = false) {
     return;
   }
   communityForumState.loading = true;
+  const epoch = accountRequestEpoch;
   renderCommunityForum();
   try {
     const payload = await requestJson("/api/community-feed");
@@ -11990,10 +11178,13 @@ async function ensureCommunityForumLoaded(force = false) {
     communityForumState.loaded = true;
     renderCommunityForum();
   } catch (error) {
+    if (epoch !== accountRequestEpoch) return;
     showToast("论坛加载失败", error.message, "warning", 2200);
   } finally {
-    communityForumState.loading = false;
-    renderCommunityForum();
+    if (epoch === accountRequestEpoch) {
+      communityForumState.loading = false;
+      renderCommunityForum();
+    }
   }
 }
 
@@ -12132,6 +11323,26 @@ function scrollToForumComposer() {
 }
 
 function initCommunityForumEvents() {
+  const root = document.getElementById("forum");
+  if (root && !root.dataset.actionsBound) {
+    root.dataset.actionsBound = "true";
+    root.addEventListener("click", event => {
+      const button = event.target.closest("[data-forum-action]");
+      if (!button || !root.contains(button)) return;
+      const { forumAction: action, forumValue: value } = button.dataset;
+      if (action === "board") setCommunityForumBoard(value);
+      else if (action === "sort") setCommunityForumSort(value);
+      else if (action === "tag") applyCommunityForumTag(value);
+      else if (action === "post") void selectCommunityPost(value);
+      else if (action === "like") void toggleCommunityPostLike(value);
+    });
+    root.addEventListener("submit", event => {
+      const form = event.target.closest("[data-forum-reply-id]");
+      if (!form) return;
+      event.preventDefault();
+      void submitCommunityReply(form.dataset.forumReplyId);
+    });
+  }
   const searchInput = document.getElementById("forumSearchInput");
   if (searchInput && !searchInput.dataset.boundForumInput) {
     searchInput.addEventListener("input", (event) => {

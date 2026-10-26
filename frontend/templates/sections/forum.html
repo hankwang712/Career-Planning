@@ -1,192 +1,56 @@
 <section id="forum" class="hidden fade-in">
-  <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-6 py-6">
-
-    <!-- Hero Banner -->
-    <div class="mb-6 rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border border-amber-100 p-5 sm:p-6">
-      <div class="flex flex-col lg:flex-row lg:items-center gap-5">
-        <div class="flex-1">
-          <div class="flex flex-wrap items-center gap-2 mb-2">
-            <span class="text-xl">☕</span>
-            <span class="text-sm font-semibold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">Offer 茶水间</span>
-            <span class="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>正在热聊
-            </span>
-          </div>
-          <h2 class="text-2xl font-bold text-slate-900">聊面经、简历、选岗和上岸节奏</h2>
-          <p class="mt-1 text-sm text-slate-500 leading-relaxed">发布讨论、追问回复、围观热门帖子，在这里找到同路人。</p>
-        </div>
-        <div class="grid grid-cols-4 gap-2 lg:w-72 flex-shrink-0">
-          <div class="text-center bg-white/70 rounded-xl p-3 border border-white/80">
-            <p id="forumThreadCount" class="text-xl font-bold text-slate-900">0</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">讨论数</p>
-          </div>
-          <div class="text-center bg-white/70 rounded-xl p-3 border border-white/80">
-            <p id="forumTodayCount" class="text-xl font-bold text-slate-900">0</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">今日新帖</p>
-          </div>
-          <div class="text-center bg-white/70 rounded-xl p-3 border border-white/80">
-            <p id="forumActiveUsers" class="text-xl font-bold text-slate-900">0</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">参与者</p>
-          </div>
-          <div class="text-center bg-white/70 rounded-xl p-3 border border-white/80">
-            <p id="forumUnansweredCount" class="text-xl font-bold text-slate-900">0</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">待回复</p>
-          </div>
+  <div class="forum-shell">
+    <header class="forum-header">
+      <div class="forum-heading">
+        <p class="forum-eyebrow">THE CAREER COMMONS</p>
+        <h2>Offer 茶水间<span class="forum-heading-mark" aria-hidden="true">☕</span></h2>
+        <p class="forum-intro">面经、简历、选岗与职场日常。把问题说出来，也把经验留下来。</p>
+        <div class="forum-overview" aria-label="社区概览">
+          <span><strong id="forumThreadCount">0</strong> 个讨论</span>
+          <span><strong id="forumTodayCount">0</strong> 条新帖</span>
+          <span><strong id="forumActiveUsers">0</strong> 位参与者</span>
+          <span><strong id="forumUnansweredCount">0</strong> 个问题待回复</span>
         </div>
       </div>
-    </div>
+      <button type="button" class="forum-primary-button" onclick="showForumView('compose')"><span aria-hidden="true">＋</span> 发起讨论</button>
+    </header>
 
-    <!-- Main Layout: Sidebar + Content -->
-    <div class="flex gap-5 items-start">
-
-      <!-- Sidebar (desktop only) -->
-      <aside class="hidden lg:flex flex-col gap-4 w-56 flex-shrink-0 sticky top-20">
-
-        <!-- Board Filters -->
-        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-50 flex items-center justify-between">
-            <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">板块</h3>
-          </div>
-          <div id="forumBoardFilters" class="p-2 space-y-0.5"></div>
-        </div>
-
-        <!-- Hot Tags -->
-        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">热议标签</h3>
-            <button type="button" onclick="ensureCommunityForumLoaded(true)" class="text-[11px] text-slate-400 hover:text-amber-600 transition-colors">刷新</button>
-          </div>
-          <div id="forumHotTags" class="flex flex-wrap gap-1.5"></div>
-        </div>
-
+    <div class="forum-layout">
+      <aside class="forum-sidebar">
+        <div class="forum-sidebar-card"><h3>讨论板块</h3><nav id="forumBoardFilters" aria-label="讨论板块"></nav></div>
+        <div class="forum-sidebar-card"><div class="forum-sidebar-heading"><h3>大家在聊</h3><button type="button" class="forum-text-button" onclick="ensureCommunityForumLoaded(true)">刷新</button></div><div id="forumHotTags" class="forum-tags"></div></div>
+        <p class="forum-visibility-note">帖子对登录用户公开。<br>测评、简历和报告不会在这里公开。</p>
       </aside>
 
-      <!-- Main Content Panel -->
-      <div class="flex-1 min-w-0">
-
-        <!-- ── View: List ── -->
-        <div id="forumListView" class="space-y-3">
-
-          <!-- Action Bar -->
-          <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <div class="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-              <div class="relative flex-1 max-w-sm">
-                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
-                <input id="forumSearchInput" type="text" placeholder="搜索标题、正文或标签"
-                  class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition">
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <div id="forumSortFilters" class="flex gap-1.5"></div>
-                <button type="button" onclick="showForumView('compose')"
-                  class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap">
-                  ＋ 发起讨论
-                </button>
-              </div>
-            </div>
+      <main class="forum-main">
+        <div id="forumListView">
+          <div class="forum-toolbar">
+            <label class="forum-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="forumSearchInput" type="search" aria-label="搜索讨论" placeholder="搜一搜你关心的问题"></label>
+            <div id="forumSortFilters" class="forum-sort" role="group" aria-label="讨论排序"></div>
           </div>
-
-          <!-- Summary + List -->
-          <p id="forumListSummary" class="text-xs text-slate-400 px-1">加载中...</p>
-          <div id="forumThreadList" class="space-y-2.5"></div>
-
+          <div class="forum-feed-heading"><h3 id="forumCurrentBoard">全部讨论</h3><span id="forumListSummary">正在加载…</span></div>
+          <div id="forumThreadList" class="forum-thread-list"></div>
         </div>
 
-        <!-- ── View: Detail ── -->
-        <div id="forumDetailView" class="hidden space-y-4">
-
-          <button type="button" onclick="showForumView('list')"
-            class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors font-medium">
-            ← 返回帖子列表
-          </button>
-
-          <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <!-- Detail Header -->
-            <div class="px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-3">
-              <span id="forumDetailBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">分区</span>
-            </div>
-            <!-- Detail Body -->
-            <div class="p-6">
-              <div id="forumThreadDetail"></div>
-            </div>
-          </div>
-
+        <div id="forumDetailView" class="hidden">
+          <button type="button" class="forum-back-button" onclick="showForumView('list')">← 返回讨论</button>
+          <article class="forum-detail-surface"><span id="forumDetailBadge" class="forum-board-badge">分区</span><div id="forumThreadDetail"></div></article>
         </div>
 
-        <!-- ── View: Compose ── -->
-        <div id="forumComposeView" class="hidden space-y-4">
-
-          <button type="button" onclick="showForumView('list')"
-            class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors font-medium">
-            ← 返回帖子列表
-          </button>
-
-          <div id="forumComposerCard" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-lg flex-shrink-0">☕</div>
-              <div>
-                <h3 class="text-lg font-bold text-slate-900">发起一个讨论</h3>
-                <p class="text-xs text-slate-400 mt-0.5">把你的问题、经历或想法分享给大家</p>
-              </div>
+        <div id="forumComposeView" class="hidden">
+          <button type="button" class="forum-back-button" onclick="showForumView('list')">← 返回讨论</button>
+          <form id="forumComposerCard" class="forum-composer" onsubmit="event.preventDefault(); submitCommunityPost();">
+            <p class="forum-eyebrow">START A CONVERSATION</p><h3>有什么想聊的？</h3><p class="forum-composer-copy">一个具体的问题，一段真实的经历，都可以成为讨论的开始。</p>
+            <label for="forumPostTitle">讨论标题<input id="forumPostTitle" type="text" maxlength="80" minlength="4" required placeholder="比如：暑期实习，先补项目还是先刷题？"></label>
+            <div class="forum-composer-fields">
+              <label for="forumPostBoard">选择板块<select id="forumPostBoard"><option>面经互助</option><option>简历门诊</option><option>实习内推</option><option>选岗热议</option><option>职场日常</option></select></label>
+              <label for="forumPostTags">标签<span class="forum-field-optional">选填</span><input id="forumPostTags" type="text" maxlength="48" placeholder="用逗号分隔，例如：校招, 项目经历"></label>
             </div>
-
-            <div class="space-y-4">
-              <div>
-                <label for="forumPostTitle" class="block text-sm font-medium text-slate-700 mb-1.5">
-                  标题 <span class="text-rose-400">*</span>
-                </label>
-                <input id="forumPostTitle" type="text" maxlength="80"
-                  placeholder="比如：现在补项目还是先刷题，暑期实习还有机会吗？"
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition">
-              </div>
-
-              <div class="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="forumPostBoard" class="block text-sm font-medium text-slate-700 mb-1.5">板块</label>
-                  <select id="forumPostBoard"
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition">
-                    <option value="面经互助">面经互助</option>
-                    <option value="简历门诊">简历门诊</option>
-                    <option value="实习内推">实习内推</option>
-                    <option value="选岗热议">选岗热议</option>
-                    <option value="职场日常">职场日常</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="forumPostTags" class="block text-sm font-medium text-slate-700 mb-1.5">标签</label>
-                  <input id="forumPostTags" type="text" maxlength="48"
-                    placeholder="例如：暑期实习, 简历修改"
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition">
-                </div>
-              </div>
-
-              <div>
-                <label for="forumPostContent" class="block text-sm font-medium text-slate-700 mb-1.5">
-                  正文 <span class="text-rose-400">*</span>
-                </label>
-                <textarea id="forumPostContent" rows="7" maxlength="2400"
-                  placeholder="把背景、目标和你纠结的点写清楚，大家更容易给到有用建议。"
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition"></textarea>
-              </div>
-
-              <div class="flex items-center justify-between gap-3 pt-1">
-                <p class="text-xs text-slate-400">建议写清楚目标岗位、时间线和当前卡点</p>
-                <div class="flex gap-2 flex-shrink-0">
-                  <button type="button" onclick="showForumView('list')"
-                    class="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition">
-                    取消
-                  </button>
-                  <button type="button" onclick="submitCommunityPost()"
-                    class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
-                    发布
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
+            <label for="forumPostContent">展开聊聊<textarea id="forumPostContent" rows="8" maxlength="2400" minlength="10" required placeholder="介绍一下你的背景、目前的进展，以及最想听听大家建议的地方。"></textarea></label>
+            <div class="forum-composer-footer"><p>发布后所有登录用户可见，请勿填写私密信息。</p><div><button type="button" class="forum-secondary-button" onclick="showForumView('list')">取消</button><button type="submit" class="forum-primary-button">发布讨论</button></div></div>
+          </form>
         </div>
-
-      </div><!-- /Main Content Panel -->
-    </div><!-- /Main Layout -->
+      </main>
+    </div>
   </div>
 </section>

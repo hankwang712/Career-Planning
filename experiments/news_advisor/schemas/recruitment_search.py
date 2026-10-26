@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .followup import Clarification
+
 
 Text = Annotated[str, Field(min_length=1)]
 RecruitmentType = Literal["社招", "春招", "秋招", "实习", "校招"]
@@ -18,6 +20,7 @@ class RecruitmentSearchInput(SearchRecord):
     channel: Literal["wechat", "web", "all"] = "wechat"
     days: Annotated[int, Field(ge=1, le=365)] | None = None
     limit: int = Field(default=5, ge=1, le=10)
+    clarifications: list[Clarification] = Field(default_factory=list)
 
 
 class SearchIntent(SearchRecord):

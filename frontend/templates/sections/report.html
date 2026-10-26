@@ -12,6 +12,29 @@
             </div>
         </div>
 
+        <form id="reportWorkflowInput" class="report-workflow-form" onsubmit="event.preventDefault(); startCareerReportGeneration();">
+            <label>目标岗位或方向（每行一个，最多五个）
+                <textarea id="reportWorkflowTargets" rows="2" maxlength="1500" placeholder="例如：大模型应用开发工程师" required></textarea>
+            </label>
+            <label>求职偏好与限制
+                <textarea id="reportWorkflowPreferences" rows="2" maxlength="5000" placeholder="城市、到岗时间、求职期限等"></textarea>
+            </label>
+            <label>补充经历事实
+                <textarea id="reportWorkflowEvidence" rows="2" maxlength="20000" placeholder="简历未写明的真实经历，可留空"></textarea>
+            </label>
+            <label>招聘搜索需求（选填）
+                <input id="reportWorkflowSearch" maxlength="3000" placeholder="例如：查找上海的大模型应用开发实习机会">
+            </label>
+            <label>招聘搜索渠道
+                <select id="reportWorkflowChannel">
+                    <option value="web">网页</option>
+                    <option value="wechat">微信公众号</option>
+                    <option value="all">网页与微信公众号</option>
+                </select>
+            </label>
+            <p>使用已上传并解析的简历。职业决策完成后，请确认目标和每周可用时间，再生成行动计划。</p>
+        </form>
+
         <div id="reportStatus" class="report-launch-status">
             <div>
                 <p id="reportStatusTitle" class="report-launch-status-title">等待启动多智能体流程</p>
@@ -22,6 +45,8 @@
                 <strong id="reportGeneratedTime">--</strong>
             </div>
         </div>
+
+        <div id="reportWorkflowReview" class="report-workflow-form hidden" aria-live="polite"></div>
 
         <div class="report-workflow-section" aria-label="多智能体协作流">
             <div class="report-workflow-header">

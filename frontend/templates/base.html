@@ -33,7 +33,7 @@
         font-family: var(--app-font-stack);
       }
     </style>
-        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260418-nav-workspace-pill-light-v7">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20261026-map-zoom">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}?v=20260418-career-news-grid-margin-v16">
         <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}?v=20261016-cards-autoplay">
         <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
@@ -258,7 +258,7 @@
                     </div>
                     <div class="leading-tight">
                         <h1 class="text-base font-bold whitespace-nowrap">智航生涯</h1>
-                        <p class="text-xs text-purple-200 whitespace-nowrap">双图谱 · 大模型推理</p>
+                        <p class="text-xs text-purple-200 whitespace-nowrap">多智能体 · 大模型推理</p>
                     </div>
                 </div>
 
@@ -288,16 +288,7 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        能力画像
-                    </button>
-                    <button onclick="showSection('matching')" data-section="matching" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
-                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        人岗匹配
+                        测评中心
                     </button>
                     <button onclick="showSection('report')" data-section="report" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
                         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -376,7 +367,6 @@
         {% include "sections/dashboard.html" %}
         {% include "sections/jobs.html" %}
         {% include "sections/profile.html" %}
-        {% include "sections/matching.html" %}
         {% include "sections/report.html" %}
         {% include "sections/forum.html" %}
 
@@ -409,7 +399,6 @@
                     <ul class="space-y-2 text-sm text-gray-400">
                         <li><a href="#" onclick="showSection('jobs')" class="hover:text-white transition-all">岗位探索</a></li>
                         <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
-                        <li><a href="#" onclick="showSection('matching')" class="hover:text-white transition-all">人岗匹配</a></li>
                         <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
                         <li><a href="#" onclick="showSection('forum')" class="hover:text-white transition-all">Offer 茶水间</a></li>
                     </ul>
@@ -669,13 +658,15 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20261016-category-polish-v1" defer></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261016-clean-interface" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261016-assessment-v1">
-    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20261016-assessment-v1" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20261026-forum-colors" defer></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261026-langgraph-agents" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261026-assessment-center">
+    <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}?v=20261026-forum-blue">
+    <script src="{{ url_for('static', filename='assessment-center.js') }}?v=20261026-assessment-center" defer></script>
+    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20261026-assessment-center" defer></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260414-pet-size-v1" defer></script>
-    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20261016-clean-interface" defer></script>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20261026-assessment-center" defer></script>
     <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260419-analytics-salary-wan-v1" defer></script>
-    <script src="{{ url_for('static', filename='tour.js') }}?v=20261016-clean-interface" defer></script>
+    <script src="{{ url_for('static', filename='tour.js') }}?v=20261026-assessment-center" defer></script>
 </body>
 </html>

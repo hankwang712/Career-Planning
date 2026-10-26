@@ -55,7 +55,10 @@ class ResumeAnalysisAgent(BaseAgent):
     async def arun(self, payload: dict, config: RunnableConfig | None = None) -> dict:
         request = ResumeInput.model_validate(payload)
         if not request.file_path:
-            return await super().arun(request.model_dump(), config=config)
+            result = await super().arun(request.model_dump(), config=config)
+            if request.document:
+                result["document"] = request.document
+            return result
         if not self.use_tools:
             return self.document_error("已禁用工具，无法读取简历文件")
 
@@ -92,13 +95,17 @@ class ResumeAnalysisAgent(BaseAgent):
 
     def prepare(self, payload: dict) -> dict:
         inputs = dict(payload)
-        document = inputs.pop("_document", {})
+        document = inputs.pop("_document", inputs.get("document", {}))
         prepared = ResumeInput.model_validate(inputs).model_dump()
         role = prepared["target_role"] or explicit_resume_role(prepared["raw_resume"])
         if role.lower() in UNSPECIFIED:
             role = ""
         prepared["target_role"] = role
         prepared["document"] = document
+        prepared["additional_evidence"] = "\n".join(filter(None, [
+            prepared["additional_evidence"],
+            *(item["answer"] for item in prepared["clarifications"]),
+        ]))
         prepared["rubrics"] = {
             "resume": RESUME_WEIGHTS,
             "experiences": EXPERIENCE_WEIGHTS,

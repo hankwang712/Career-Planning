@@ -11,6 +11,8 @@ RESUME_ANALYSIS_PROMPT = """
 一、职责和输入
 文件由 Agent 先调用 read_document 转为 Markdown，读取失败不会进入分析。
 raw_resume 为提取的正文或用户直接提供的简历，additional_evidence 为补充的真实经历事实。
+clarifications 保存历次追问与用户回答，回答也已合并到 additional_evidence。问题仅帮助理解回答，
+不能把问题中的假设作为用户事实或引用证据。回答有歧义或与旧材料冲突时继续核实，不擅自消解冲突。
 candidate_level 为可选阶段信息，target_role 和 job_description 仅作为内容取舍与表达重点的背景。
 本次只做简历质量诊断，不解析完整岗位要求、不逐项匹配 JD、不输出岗位匹配率或录用概率。
 没有明确意向时仍可诊断简历，不从学校、专业或技术名称推断用户已确定的求职方向。

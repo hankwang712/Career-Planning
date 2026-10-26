@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import threading
 import time
 from urllib.parse import urlsplit
 
@@ -11,7 +12,7 @@ import httpx
 from .config import JobRAGConfig
 
 RESEARCH_DIR = Path(__file__).resolve().parents[2] / "artifacts/research"
-_start_lock = asyncio.Lock()
+_start_lock = threading.Lock()
 
 
 class LightRAGStartupError(RuntimeError):
@@ -59,7 +60,10 @@ async def ensure_lightrag(client: httpx.AsyncClient, settings: JobRAGConfig) -> 
 
     if await ready():
         return
-    async with _start_lock:
+    # 主系统的 Flask 任务在线程各自的事件循环中执行，锁不能绑定单一 asyncio loop。
+    while not _start_lock.acquire(blocking=False):
+        await asyncio.sleep(.1)
+    try:
         if await ready():
             return
         parsed = urlsplit(settings.base_url)
@@ -73,3 +77,5 @@ async def ensure_lightrag(client: httpx.AsyncClient, settings: JobRAGConfig) -> 
                 return
             await asyncio.sleep(.5)
         raise LightRAGStartupError("LightRAG 健康检查超时，请查看 artifacts/research/.job_graph/logs/webui.log")
+    finally:
+        _start_lock.release()

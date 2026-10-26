@@ -3,13 +3,13 @@
   const PLAN_STORAGE_PREFIX = "dp_overlay_plans_v1_";
   const PLAN_PROGRESS_PREFIX = "dp_plan_progress_v1_";
   const DEFAULT_STAGE_PROGRESS = [
-    { key: "profile_fusion", label: "画像融合", status: "pending" },
-    { key: "role_retrieval", label: "目标职业提取", status: "pending" },
-    { key: "trend_intelligence", label: "趋势情报提炼", status: "pending" },
-    { key: "gap_analysis", label: "差距分析", status: "pending" },
-    { key: "stage_planning", label: "阶段规划", status: "pending" },
-    { key: "report_writer", label: "报告撰写", status: "pending" },
-    { key: "critic", label: "一致性校验", status: "pending" }
+    { key: "resume_analysis", label: "简历分析", status: "pending" },
+    { key: "job_analysis", label: "岗位分析", status: "pending" },
+    { key: "recruitment_search", label: "招聘搜索", status: "pending" },
+    { key: "career_decision", label: "职业决策", status: "pending" },
+    { key: "review", label: "补充与确认", status: "pending" },
+    { key: "action_planning", label: "行动规划", status: "pending" },
+    { key: "report_writer", label: "报告合成", status: "pending" }
   ];
 
   const reportRuntime = {
@@ -893,6 +893,9 @@
     const run = () => {
       reportRuntime.renderQueued = false;
       renderCareerReportPanels();
+      if (typeof window.renderReportWorkspace === "function") {
+        window.renderReportWorkspace(window.appState?.derivedProfile, window.appState?.matchingRoles || []);
+      }
       if (withUserCenterRefresh && typeof window.renderUserCenterDashboard === "function") {
         window.renderUserCenterDashboard();
       }
@@ -1062,36 +1065,7 @@
   }
 
   async function pollCareerReportJob(jobId) {
-    stopCareerReportPolling();
-    if (!jobId) return;
-
-    try {
-      const payload = await syncCareerReportStatus(jobId);
-      const merged = mergeCareerReportStatusForApply(payload);
-      const followId = String(merged.job_id || payload.job?.job_id || jobId || "").trim();
-      const status = String(merged.status || payload.job?.status || "").trim().toLowerCase();
-      if (status === "queued" || status === "running") {
-        reportRuntime.pollTimer = setTimeout(() => {
-          void pollCareerReportJob(followId || jobId);
-        }, REPORT_POLL_INTERVAL_MS);
-        return;
-      }
-      if (status === "ready" || status === "completed") {
-        await loadCurrentCareerReport({ userCenterRefresh: true });
-        toast("职业报告已完成", "新的报告版本已经生成并同步到报告中心。", "success", 2200);
-        // Notify learning plan to auto-refresh from new tracker data
-        window.dispatchEvent(new CustomEvent("career-report:updated"));
-        return;
-      }
-      if (status === "failed") {
-        toast("职业报告生成失败", merged.error_message || "请稍后重试。", "error", 2600);
-      }
-    } catch (error) {
-      reportRuntime.pollTimer = setTimeout(() => {
-        void pollCareerReportJob(jobId);
-      }, REPORT_POLL_INTERVAL_MS * 2);
-      console.warn("career report status poll failed", error);
-    }
+    return window.pollCareerReportJob?.(jobId);
   }
 
   function getCareerReportVersionList() {
@@ -2102,7 +2076,7 @@
 
     const allowedKeys = groupConfig ? new Set(groupConfig.sectionKeys || []) : null;
     const availableModules = navOrder
-      .map((key, idx) => ({ key, idx, meta: navMeta[key], section: sections[key] }))
+      .map((key, idx) => ({ key, idx, meta: { ...navMeta[key], label: sections[key]?.label || navMeta[key].label }, section: sections[key] }))
       .filter((item) => Boolean(item.section) && (!allowedKeys || allowedKeys.has(item.key)));
 
     const groupHeroHtml = groupConfig ? `
@@ -3063,6 +3037,15 @@
     const bundle = window.appState?.careerReport || null;
     const historical = Boolean(window.appState?.careerReportViewingHistorical);
     const status = String(state?.status || "").trim().toLowerCase();
+
+    if (status === "waiting_input") {
+      host.innerHTML = `<div class="career-report-banner-main"><div>
+        <h3 class="career-report-banner-title">等待补充与确认</h3>
+        <p class="career-report-banner-copy">职业决策已保存，请返回生成台确认目标与可投入时间。</p>
+        <a href="/#report" class="career-report-secondary-btn">继续生成报告</a>
+      </div></div>`;
+      return;
+    }
 
     if (status === "queued" || status === "running") {
       host.innerHTML = `
@@ -5437,78 +5420,6 @@
     toast("已切换主岗位", `下次生成职业报告时将优先使用 ${roleName}。`, "success", 1800);
   }
 
-  function buildCareerReportPayload() {
-    ensureAppState();
-    const profile = window.appState?.derivedProfile && typeof window.appState.derivedProfile === "object"
-      ? window.appState.derivedProfile
-      : null;
-    const roles = Array.isArray(window.appState?.matchingRoles) ? window.appState.matchingRoles : [];
-    if (!profile || !roles.length) return null;
-    const focusId = String(window.appState?.focusedRoleId || roles[0]?.id || "").trim();
-    let role_rankings;
-    if (typeof window.buildReportRoleRankingsForPayload === "function") {
-      role_rankings = window.buildReportRoleRankingsForPayload(roles, focusId);
-    } else {
-      const focus = roles.find((r) => r && String(r.id) === focusId) || roles[0];
-      const rest = roles.filter((r) => r && String(r.id) !== String(focus.id));
-      role_rankings = rest.length ? [focus, rest[0]] : [focus];
-    }
-    return {
-      profile_snapshot: profile,
-      role_rankings: role_rankings,
-      focus_role_id: focusId
-    };
-  }
-
-  async function startCareerReportGeneration() {
-    if (!isAuthenticated()) {
-      toast("请先登录", "登录后才能生成职业报告。", "warning", 1800);
-      return;
-    }
-
-    const payload = buildCareerReportPayload();
-    if (!payload) {
-      if (typeof window.showSection === "function") {
-        window.showSection("profile");
-      }
-      toast("画像还不完整", "请先完成测评、基础信息或岗位匹配，再生成职业报告。", "warning", 2200);
-      return;
-    }
-
-    try {
-      const response = await requestJsonSafe("/api/career-report/generate/start", {
-        method: "POST",
-        body: payload
-      });
-      applyCareerReportState(undefined, getCareerReportTracker(), {
-        ...(getCareerReportStateSafe() || {}),
-        job_id: response.job_id,
-        report_id: response.report_id,
-        status: "queued",
-        stage: "profile_fusion",
-        stage_label: "画像融合",
-        stage_detail: "任务已创建，等待后台编排"
-      }, {
-        keepBundle: true,
-        historical: false,
-        userCenterRefresh: true
-      });
-      toast("职业报告任务已启动", "系统正在后台生成新的职业报告版本。", "success", 2200);
-      await pollCareerReportJob(response.job_id);
-    } catch (error) {
-      if (error.status === 409) {
-        toast("已有报告任务在运行", "正在同步当前生成进度。", "warning", 1800);
-        const statusPayload = await syncCareerReportStatus();
-        const jobId = statusPayload?.state?.job_id || statusPayload?.job?.job_id || "";
-        if (jobId) {
-          await pollCareerReportJob(jobId);
-        }
-        return;
-      }
-      toast("职业报告启动失败", error.message || "请稍后重试。", "error", 2600);
-    }
-  }
-
   function saveReport() {
     if (!window.appState?.careerReport?.report_document) {
       toast("暂无可保存报告", "请先生成完整职业报告。", "warning", 1800);
@@ -6587,7 +6498,9 @@
             </div>
           </div>
           <div class="crdoc-reader-aside">
-            ${renderReportReaderHeroOrb(fitScore, fitBandLabel)}
+            ${String(meta.pipeline_version || "").startsWith("experiments-langgraph")
+              ? `<span class="crdoc-reader-highlight">${esc(fitBandLabel)}</span>`
+              : renderReportReaderHeroOrb(fitScore, fitBandLabel)}
           </div>
         </div>
         <div class="crdoc-reader-statbar">
@@ -6622,6 +6535,9 @@
   }
 
   function renderReportDashboardV2(bundle, tracker) {
+    if (String(bundle?.meta?.pipeline_version || "").startsWith("experiments-langgraph")) {
+      return renderReportSections(bundle);
+    }
     const data = buildReportDashboardUiData(bundle, tracker);
     return `
       <div class="crdoc-page">
@@ -6761,7 +6677,6 @@
   window.fetchCareerReportVersion = fetchCareerReportVersion;
   window.restoreLatestCareerReportView = restoreLatestCareerReportView;
   window.loadCurrentCareerReport = loadCurrentCareerReport;
-  window.startCareerReportGeneration = startCareerReportGeneration;
   window.renderCareerReportPanels = renderCareerReportPanels;
   window.openReportViewer = openReportViewer;
   window.closeReportViewer = closeReportViewer;

@@ -14,6 +14,7 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 import gzip
+import hashlib
 import io
 import json
 import logging
@@ -29,7 +30,6 @@ import urllib.request
 import urllib.error
 import uuid
 import webbrowser
-from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
 import random
@@ -54,7 +54,10 @@ from services.report import (
     empty_report_state,
     generate_career_report_bundle,
 )
-from services.report.orchestrator import (
+from services.report.workflow import (
+    ReportNeedsInput, read_report_workflow, validate_report_request, validate_report_continuation,
+)
+from services.report.legacy_report import (
     _build_dashboard_summary,
     _build_role_cards,
     _build_role_rankings,
@@ -154,16 +157,6 @@ CAREER_REPORT_LLM_TIMEOUT_SECONDS = max(
     30,
     int(os.environ.get("CAREER_REPORT_LLM_TIMEOUT_SECONDS", "180")),
 )
-CAREER_GRAPH_FILE = os.path.join(DATA_DIR, "career_graph.json")
-CAREER_GRAPH_LOCK = threading.Lock()
-CAREER_GRAPH_CACHE = {
-    "mtime": None,
-    "graph": None,
-    "node_map": None,
-    "cluster_map": None,
-    "adjacency": None,
-    "bootstrap": None,
-}
 JOB_DETAIL_ONLY_FIELDS = {
     "岗位描述",
     "公司简介",
@@ -211,6 +204,17 @@ app = Flask(
 
 @app.endpoint("static")
 def static_asset(filename):
+    normalized = os.path.normpath(filename).replace("\\", "/")
+    if normalized.lower().startswith("img/report/"):
+        user = _current_user()
+        if not user:
+            return jsonify({"message": "文件不存在"}), 404
+        name = os.path.basename(normalized)
+        report_ids = [str(item.get("report_id") or "") for item in _list_career_report_version_summaries(user["username"])]
+        prefixes = ["".join(ch for ch in report_id if ch.isalnum() or ch in "-_")[:24] + "_"
+                    for report_id in report_ids if report_id]
+        if not any(name.startswith(prefix) for prefix in prefixes):
+            return jsonify({"message": "文件不存在"}), 404
     if os.path.isfile(os.path.join(PUBLIC_DATA_DIR, filename)):
         return send_from_directory(PUBLIC_DATA_DIR, filename, conditional=True)
     return app.send_static_file(filename)
@@ -259,6 +263,31 @@ VITE_MANIFEST_CACHE = {"mtime": None, "payload": None}
 def _handle_api_preflight():
     if request.method == "OPTIONS" and request.path.startswith("/api/"):
         return ("", 204)
+    return None
+
+
+def _checked_report_identifier(value, *, allow_empty=False):
+    if value is None or value == "":
+        if allow_empty:
+            return ""
+        raise ValueError("缺少报告或快照编号")
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value):
+        raise ValueError("报告或快照编号格式不正确")
+    return value
+
+
+@app.before_request
+def _validate_private_report_identifiers():
+    if not request.path.startswith("/api/career-report/") or not _current_user():
+        return None
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
+    try:
+        for key in ("report_id", "snapshot_id", "continue_report_id"):
+            for value in [request.args.get(key), body.get(key)]:
+                _checked_report_identifier(value, allow_empty=True)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
     return None
 
 
@@ -324,7 +353,7 @@ def _inject_api_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = allow_origin
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token"
-    response.headers["Vary"] = "Origin"
+    response.vary.add("Origin")
     if allow_origin != "*":
         response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
@@ -341,7 +370,10 @@ def _static_headers_and_gzip(response):
     path = request.path
 
     # ── 静态文件长效缓存 ──────────────────────────────
-    if path.startswith("/static/"):
+    if os.path.normpath(path).replace("\\", "/").lower().startswith("/static/img/report/"):
+        response.headers["Cache-Control"] = "no-store"
+        response.vary.add("Cookie")
+    elif path.startswith("/static/"):
         ext = os.path.splitext(path)[1].lower()
         if ext in _STATIC_EXTS_LONG:
             # 版本号通过 ?v=xxx 实现，可以安全地设置 1 年
@@ -854,7 +886,54 @@ def _user_state_path(username):
 
 
 def _user_storage_key(username):
+    value = str(username or "").strip()
+    return "u_" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _legacy_storage_key(username):
     return re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
+
+
+def _admin_storage_key(value):
+    raw = str(value or "").strip()
+    for user in _load_users():
+        if raw in {user.get("username"), _user_storage_key(user.get("username"))}:
+            return _user_storage_key(user.get("username"))
+        if raw == _legacy_storage_key(user.get("username")) and _unique_legacy_owner(user.get("username")):
+            return _user_storage_key(user.get("username"))
+    return _legacy_storage_key(raw)
+
+
+def _unique_legacy_owner(username):
+    legacy = _legacy_storage_key(username)
+    owners = [str(user.get("username") or "") for user in _load_users()
+              if _legacy_storage_key(user.get("username")) == legacy]
+    return owners == [str(username)]
+
+
+def _private_account_directory(base_dir, username):
+    # 管理端可按未绑定账号的目录编号读取清单；真实账号名称始终单独计算哈希。
+    if re.fullmatch(r"u_[a-f0-9]{64}", str(username or "")) and not any(user.get("username") == username for user in _load_users()):
+        return os.path.join(base_dir, username)
+    target = os.path.join(base_dir, _user_storage_key(username))
+    legacy = os.path.join(base_dir, _legacy_storage_key(username))
+    # 已有目录仅在旧名称唯一归属当前账号时沿用；冲突目录不猜测归属。
+    if not os.path.exists(target) and os.path.isdir(legacy) and _unique_legacy_owner(username):
+        return legacy
+    return target
+
+
+def _owned_resume_storage_path(username, path):
+    if not path:
+        return ""
+    root = os.path.realpath(_user_upload_dir(username))
+    resolved = os.path.realpath(path)
+    try:
+        if os.path.commonpath([root, resolved]) == root:
+            return resolved
+    except ValueError:
+        pass
+    return ""
 
 
 def _load_user_state(username):
@@ -869,12 +948,14 @@ def _save_user_state(username, payload):
 
 
 def _account_storage_paths(storage_key):
-    safe_key = _user_storage_key(storage_key)
+    safe_key = _admin_storage_key(storage_key)
+    owner = next((item.get("username") for item in _load_users()
+                  if _user_storage_key(item.get("username")) == safe_key), None)
     return {
         "storage_key": safe_key,
         "state": os.path.join(USER_STATE_DIR, f"{safe_key}.json"),
-        "reports": os.path.join(CAREER_REPORT_DIR, safe_key),
-        "uploads": os.path.join(RESUME_UPLOAD_DIR, safe_key),
+        "reports": _private_account_directory(CAREER_REPORT_DIR, owner) if owner else os.path.join(CAREER_REPORT_DIR, safe_key),
+        "uploads": _private_account_directory(RESUME_UPLOAD_DIR, owner) if owner else os.path.join(RESUME_UPLOAD_DIR, safe_key),
     }
 
 
@@ -887,7 +968,7 @@ def _iter_known_account_storage_keys():
         for name in os.listdir(USER_STATE_DIR):
             if not name.lower().endswith(".json"):
                 continue
-            keys.add(os.path.splitext(name)[0])
+            keys.add(_admin_storage_key(os.path.splitext(name)[0]))
 
     for base_dir in (CAREER_REPORT_DIR, RESUME_UPLOAD_DIR):
         if not os.path.isdir(base_dir):
@@ -897,7 +978,7 @@ def _iter_known_account_storage_keys():
                 continue
             full_path = os.path.join(base_dir, name)
             if os.path.isdir(full_path):
-                keys.add(name)
+                keys.add(_admin_storage_key(name))
 
     return sorted(key for key in keys if key)
 
@@ -926,7 +1007,7 @@ def _max_timestamp_label(*values):
 
 def _build_admin_account_completion(user=None, storage_key=""):
     registered_user = user if isinstance(user, dict) else None
-    safe_storage_key = _user_storage_key(storage_key or (registered_user or {}).get("username"))
+    safe_storage_key = _admin_storage_key(storage_key or (registered_user or {}).get("username"))
     lookup_name = (registered_user or {}).get("username") or safe_storage_key
 
     state = _load_user_state(lookup_name)
@@ -948,12 +1029,8 @@ def _build_admin_account_completion(user=None, storage_key=""):
     resume_ready = resume_status in {"analyzed", "ready", "completed"}
 
     matching_scope = state.get("career_matching") if isinstance(state.get("career_matching"), dict) else {}
-    matching_roles = matching_scope.get("role_rankings") if isinstance(matching_scope.get("role_rankings"), list) else []
-    matching_ready = bool(
-        matching_roles
-        or str(matching_scope.get("focus_role_id") or "").strip()
-        or (matching_scope.get("graph_match_bundle") if isinstance(matching_scope.get("graph_match_bundle"), dict) else {})
-    )
+    matching_roles = _saved_matching_role_payload(matching_scope)
+    matching_ready = bool(matching_roles or bundle.get("match_output"))
 
     report_meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
     report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
@@ -1110,7 +1187,7 @@ def _remove_account_runtime_jobs(lookup_name):
 
 
 def _delete_admin_account(account_key, acting_username=""):
-    safe_key = _user_storage_key(account_key)
+    safe_key = _admin_storage_key(account_key)
     if not safe_key:
         raise ValueError("缺少账号标识")
 
@@ -1147,7 +1224,7 @@ def _saved_profile_snapshot_payload(raw_scope):
 def _saved_matching_role_payload(raw_scope):
     scope = raw_scope if isinstance(raw_scope, dict) else {}
     items = scope.get("role_rankings") if isinstance(scope.get("role_rankings"), list) else []
-    return items
+    return [item for item in items if isinstance(item, dict) and item.get("matchSource") != "career_graph"]
 
 
 def _build_career_report_agent_memory(state, profile_payload=None, role_payload=None):
@@ -1166,7 +1243,6 @@ def _build_career_report_agent_memory(state, profile_payload=None, role_payload=
         "career_matching": {
             "focus_role_id": str(matching_scope.get("focus_role_id") or "").strip(),
             "role_rankings": effective_roles,
-            "graph_match_bundle": matching_scope.get("graph_match_bundle") if isinstance(matching_scope.get("graph_match_bundle"), dict) else {},
             "updated_at": str(matching_scope.get("updated_at") or "").strip(),
         },
         "resume_memory": {
@@ -1194,6 +1270,27 @@ def _forum_clean_text(value, limit=800):
     return re.sub(r"\s+", " ", str(value or "").strip())[:limit]
 
 
+def _forum_clean_content(value, limit):
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(value or "").replace("\r\n", "\n").replace("\r", "\n")).strip()[:limit]
+
+
+def _forum_transaction(view_func):
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        with COMMUNITY_FORUM_LOCK:
+            return view_func(*args, **kwargs)
+    return wrapped
+
+
+def _public_forum_author(author):
+    author = author if isinstance(author, dict) else {}
+    display = str(author.get("display_name") or "匿名同学")
+    if "@" in display and display == author.get("username"):
+        display = "同学"
+    return {"display_name": display,
+            "is_system": author.get("username") == "system"}
+
+
 def _forum_slug(seed):
     safe = re.sub(r"[^0-9A-Za-z_-]", "", str(seed or "").lower())
     return safe[:24] or uuid.uuid4().hex[:10]
@@ -1214,7 +1311,7 @@ def _forum_normalize_tags(raw_tags, limit=4):
 
 def _forum_normalize_author(raw_author, fallback_username="", fallback_display="匿名同学"):
     author = raw_author if isinstance(raw_author, dict) else {}
-    username = _forum_clean_text(author.get("username") or fallback_username, 32) or "guest"
+    username = _forum_clean_text(author.get("username") or fallback_username, 256) or "guest"
     display_name = _forum_clean_text(author.get("display_name") or author.get("displayName") or fallback_display, 32) or "匿名同学"
     return {
         "username": username,
@@ -1224,7 +1321,7 @@ def _forum_normalize_author(raw_author, fallback_username="", fallback_display="
 
 def _forum_normalize_reply(raw_reply):
     reply = raw_reply if isinstance(raw_reply, dict) else {}
-    content = _forum_clean_text(reply.get("content"), 1200)
+    content = _forum_clean_content(reply.get("content"), 1200)
     if not content:
         return None
     created_at = int(reply.get("created_at") or time.time())
@@ -1239,7 +1336,7 @@ def _forum_normalize_reply(raw_reply):
 def _forum_normalize_post(raw_post):
     post = raw_post if isinstance(raw_post, dict) else {}
     title = _forum_clean_text(post.get("title"), 80)
-    content = _forum_clean_text(post.get("content"), 2400)
+    content = _forum_clean_content(post.get("content"), 2400)
     if not title or not content:
         return None
     board = _forum_clean_text(post.get("board"), 16)
@@ -1253,7 +1350,7 @@ def _forum_normalize_post(raw_post):
     replies.sort(key=lambda item: int(item.get("created_at") or 0))
     liked_by = []
     for value in post.get("liked_by") or []:
-        username = _forum_clean_text(value, 32)
+        username = _forum_clean_text(value, 256)
         if username and username not in liked_by:
             liked_by.append(username)
     created_at = int(post.get("created_at") or time.time())
@@ -1401,7 +1498,7 @@ def _public_community_forum_reply(raw_reply):
         "id": str(reply.get("id") or ""),
         "content": str(reply.get("content") or ""),
         "created_at": int(reply.get("created_at") or 0),
-        "author": reply.get("author") or {"username": "", "display_name": "匿名同学"},
+        "author": _public_forum_author(reply.get("author")),
     }
 
 
@@ -1416,7 +1513,7 @@ def _public_community_forum_post(raw_post, user=None):
         "content": str(post.get("content") or ""),
         "board": str(post.get("board") or ""),
         "tags": post.get("tags") or [],
-        "author": post.get("author") or {"username": "", "display_name": "匿名同学"},
+        "author": _public_forum_author(post.get("author")),
         "created_at": int(post.get("created_at") or 0),
         "updated_at": int(post.get("updated_at") or 0),
         "pinned": bool(post.get("pinned")),
@@ -1426,7 +1523,7 @@ def _public_community_forum_post(raw_post, user=None):
         "reply_count": len(replies),
         "replies": replies,
         "last_reply_at": int(post.get("last_reply_at") or post.get("updated_at") or 0),
-        "last_reply_user": str(post.get("last_reply_user") or ""),
+        "last_reply_user": replies[-1]["author"]["display_name"] if replies else "",
     }
 
 
@@ -1450,7 +1547,9 @@ def _community_forum_payload(user=None):
     stats = {
         "threads": len(posts),
         "today_posts": sum(1 for item in posts if now - int(item.get("created_at") or 0) <= 24 * 3600),
-        "active_users": len({str((item.get("author") or {}).get("username") or "") for item in posts if (item.get("author") or {}).get("username")}),
+        "active_users": len({str(item["author"]["username"]) for post in store.get("posts", [])
+                             for item in [post, *(post.get("replies") or [])]
+                             if (item.get("author") or {}).get("username")}),
         "unanswered": sum(1 for item in posts if not int(item.get("reply_count") or 0)),
     }
     boards = [{"key": "all", "label": "全部", "count": board_counts.get("all", 0)}]
@@ -2481,8 +2580,7 @@ def _generate_profile_portrait_image(base_url, api_key, model, prompt):
 
 
 def _career_report_user_dir(username):
-    safe_name = re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
-    return os.path.join(CAREER_REPORT_DIR, safe_name)
+    return _private_account_directory(CAREER_REPORT_DIR, username)
 
 
 CAREER_REPORT_EXPORT_FORMATS = ["pdf", "docx", "md", "html"]
@@ -2571,7 +2669,7 @@ def _read_career_report_bundle(username):
 
 
 def _read_career_report_bundle_by_id(username, report_id=""):
-    safe_report_id = str(report_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
     paths = _career_report_file_paths(username)
     with APP_DATA_LOCK:
         if not safe_report_id:
@@ -2824,7 +2922,7 @@ def _remove_current_career_report_files(paths):
 
 
 def _delete_career_report_version(username, report_id):
-    safe_report_id = str(report_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
     if not safe_report_id:
         raise ValueError("缺少 report_id")
 
@@ -3020,12 +3118,12 @@ def _public_career_report_snapshot(raw_snapshot, include_content=False):
 
 
 def _career_report_snapshot_dir(paths, report_id):
-    safe_report_id = re.sub(r"[^0-9A-Za-z_.-]", "_", str(report_id or "").strip())
+    safe_report_id = _checked_report_identifier(report_id)
     return os.path.join(paths["drafts_dir"], safe_report_id)
 
 
 def _list_career_report_snapshots(username, report_id):
-    safe_report_id = str(report_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
     if not safe_report_id:
         return []
     paths = _career_report_file_paths(username)
@@ -3046,8 +3144,8 @@ def _list_career_report_snapshots(username, report_id):
 
 
 def _read_career_report_snapshot(username, report_id, snapshot_id):
-    safe_report_id = str(report_id or "").strip()
-    safe_snapshot_id = str(snapshot_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
+    safe_snapshot_id = _checked_report_identifier(snapshot_id, allow_empty=True)
     if not safe_snapshot_id:
         return None
     paths = _career_report_file_paths(username)
@@ -3071,7 +3169,7 @@ def _read_career_report_snapshot(username, report_id, snapshot_id):
 
 def _commit_career_report_markdown_to_store(username, report_id, markdown_text):
     """将润色后的 Markdown 写回已存储的职业报告正文（阅览室与后续加载同源）。"""
-    safe_report_id = str(report_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
     md = normalize_br_tags_in_markdown(str(markdown_text or "").strip())
     if not safe_report_id or not md:
         return False
@@ -3097,7 +3195,7 @@ def _commit_career_report_markdown_to_store(username, report_id, markdown_text):
 
 
 def _save_career_report_snapshot(username, report_id, snapshot):
-    safe_report_id = str(report_id or "").strip()
+    safe_report_id = _checked_report_identifier(report_id, allow_empty=True)
     if not safe_report_id:
         raise ValueError("缺少 report_id")
     paths = _career_report_file_paths(username)
@@ -3345,7 +3443,7 @@ def _public_career_report_state(raw_state):
 def _sanitize_transient_career_report_state(username, raw_state, current_bundle=None):
     state = raw_state if isinstance(raw_state, dict) else {}
     status = str(state.get("status") or "").strip().lower()
-    if status not in {"canceled", "cancelled", "failed"}:
+    if status not in {"canceled", "cancelled"}:
         return state, False
 
     bundle = current_bundle if isinstance(current_bundle, dict) else _read_career_report_bundle(username)
@@ -3756,7 +3854,7 @@ def _sync_career_report_tracker_state(username, bundle, current_capabilities=Non
         tracker["versions"] = _list_career_report_version_summaries(username)[:6]
     meta = bundle.get("meta") if isinstance(bundle, dict) and isinstance(bundle.get("meta"), dict) else {}
 
-    if meta and str(report_state.get("status") or "") not in {"running", "queued"}:
+    if meta and str(report_state.get("status") or "") not in {"running", "queued", "waiting_input", "failed"}:
         report_state.update(
             {
                 "status": "ready",
@@ -3777,28 +3875,6 @@ def _sync_career_report_tracker_state(username, bundle, current_capabilities=Non
     return state, report_state, tracker
 
 
-def _merge_stage_progress(job_id, new_stage_key):
-    """Build progress that marks new_stage_key as active but preserves other active stages.
-
-    Prevents parallel agents from overwriting each other's 'active' status with 'done'.
-    """
-    new_progress = build_stage_progress(new_stage_key)
-    with CAREER_REPORT_LOCK:
-        job = CAREER_REPORT_JOBS.get(job_id)
-        existing = list(job.get("progress") or []) if isinstance(job, dict) else []
-    existing_map = {str(item.get("key") or ""): str(item.get("status") or "") for item in existing}
-    merged = []
-    for item in new_progress:
-        key = str(item.get("key") or "")
-        new_status = str(item.get("status") or "")
-        existing_status = existing_map.get(key, "")
-        # Don't downgrade an active parallel stage to done; it will become done
-        # naturally once the next serial stage notifies.
-        if new_status == "done" and existing_status == "active":
-            merged.append({**item, "status": "active"})
-        else:
-            merged.append(item)
-    return merged
 
 
 def _update_career_report_job(job_id, **fields):
@@ -3856,27 +3932,10 @@ def _save_career_report_progress(username, job_id, stage, stage_label, detail, *
     _save_user_state(username, state)
 
 
-def _build_report_markdown_writer(base_url, api_key, model):
-    if not (base_url and api_key and model):
-        return None
-
-    def _writer(payload, system_prompt):
-        message = [{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
-        return _call_markdown_chat(
-            base_url,
-            api_key,
-            model,
-            message,
-            system_prompt=system_prompt,
-            max_tokens=2200,
-        )
-
-    return _writer
 
 
 def _user_upload_dir(username):
-    safe_name = re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
-    return os.path.join(RESUME_UPLOAD_DIR, safe_name)
+    return _private_account_directory(RESUME_UPLOAD_DIR, username)
 
 
 def _allowed_pdf(file_storage):
@@ -4699,6 +4758,9 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_de
         _save_resume_job_progress(username, job_id, stage, detail)
 
     try:
+        storage_path = _owned_resume_storage_path(username, storage_path)
+        if not storage_path:
+            raise ValueError("简历文件不属于当前账号")
         matcher_state, analysis_meta = _analyze_resume_matcher(
             storage_path,
             job_description,
@@ -5769,8 +5831,9 @@ def app_data_asset(filename):
     if not safe_name:
         return jsonify({"message": "文件不存在"}), 404
     normalized = os.path.normpath(safe_name).replace("\\", "/")
-    storage_key = _user_storage_key(_current_user()["username"])
-    allowed_prefixes = (f"user_uploads/{storage_key}/", f"career_reports/{storage_key}/")
+    username = _current_user()["username"]
+    allowed_prefixes = (f"user_uploads/{os.path.basename(_user_upload_dir(username))}/",
+                        f"career_reports/{os.path.basename(_career_report_user_dir(username))}/")
     if not normalized.startswith(allowed_prefixes):
         return jsonify({"message": "文件不存在"}), 404
     if normalized.startswith("../") or "/../" in normalized:
@@ -5844,868 +5907,6 @@ def sbti_page():
     if not _current_user():
         return redirect(url_for("index"))
     return render_template("sbti.html")
-
-
-def _career_graph_safe_float(value, default=0.0):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return float(default)
-
-
-def _career_graph_edge_confidence(source_id: str, target_id: str, raw_value: float) -> float:
-    """
-    返回边的置信度，范围 [0.40, 0.95]，服从正态分布 N(0.67, 0.11)。
-    - 若原始数据已有有效置信度（>0）：直接裁剪到 [0.40, 0.95]。
-    - 若原始数据缺失或为 0：基于 source+target 生成确定性伪随机正态值，
-      同一条边每次调用结果一致，不依赖随机种子。
-    """
-    import hashlib
-    import math
-    import struct
-
-    if raw_value > 0:
-        return round(max(0.40, min(0.95, raw_value)), 3)
-
-    # Box-Muller 变换：用边端点的 SHA-256 哈希生成两个均匀分布随机数
-    seed = hashlib.sha256(f"{source_id}|{target_id}".encode()).digest()
-    u1_raw, u2_raw = struct.unpack(">II", seed[:8])
-    u1 = (u1_raw + 1) / (2 ** 32 + 1)   # (0, 1) 开区间，避免 log(0)
-    u2 = (u2_raw + 1) / (2 ** 32 + 1)
-    z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
-    # N(0.67, 0.11)：均值 0.67 对应区间中点，std=0.11 使 95% 值落在 [0.45, 0.89]
-    value = 0.67 + 0.11 * z
-    return round(max(0.40, min(0.95, value)), 3)
-
-
-def _career_graph_level_number(level):
-    match = re.search(r"(\d+)", str(level or ""))
-    return int(match.group(1)) if match else 1
-
-
-def _career_graph_unique_values(items, limit=None):
-    values = []
-    for item in items or []:
-        text = str(item or "").strip()
-        if not text or text in values:
-            continue
-        values.append(text)
-        if limit and len(values) >= limit:
-            break
-    return values
-
-
-def _career_graph_city_preferences(*values, limit=8):
-    cities = []
-    for raw in values:
-        if raw is None:
-            continue
-        if isinstance(raw, (list, tuple, set)):
-            cities.extend(_career_graph_city_preferences(*raw, limit=limit))
-            continue
-        text = str(raw or "").strip()
-        if not text:
-            continue
-        cities.extend(part.strip() for part in re.split(r"[,，、;；/|｜\s]+", text) if part and part.strip())
-    return _career_graph_unique_values(cities, limit=limit)
-
-
-def _career_graph_iter_values(value):
-    if isinstance(value, dict):
-        for item in value.values():
-            yield from _career_graph_iter_values(item)
-        return
-    if isinstance(value, (list, tuple, set)):
-        for item in value:
-            yield from _career_graph_iter_values(item)
-        return
-    text = str(value or "").strip()
-    if text:
-        yield text
-
-
-def _career_graph_blob(*values):
-    return " ".join(
-        part.lower()
-        for value in values
-        for part in _career_graph_iter_values(value)
-    )
-
-
-def _career_graph_tokens(*values):
-    tokens = []
-    for value in values:
-        for text in _career_graph_iter_values(value):
-            normalized = (
-                str(text)
-                .replace("_", " ")
-                .replace("/", " ")
-                .replace("-", " ")
-                .strip()
-            )
-            for token in re.findall(r"[A-Za-z0-9#+.]+|[\u4e00-\u9fff]{2,}", normalized.lower()):
-                if token and token not in tokens:
-                    tokens.append(token)
-    return tokens
-
-
-def _career_graph_overlap(terms, *text_values):
-    blob = _career_graph_blob(*text_values)
-    tokens = set(_career_graph_tokens(*text_values))
-    matches = []
-    for raw_term in terms or []:
-        term = str(raw_term or "").strip().lower()
-        if not term:
-            continue
-        term_tokens = _career_graph_tokens(term)
-        matched = False
-        if term in blob:
-            matched = True
-        elif term_tokens and all(token in tokens or token in blob for token in term_tokens):
-            matched = True
-        elif len(term) >= 2 and any(part in blob for part in term.split()):
-            matched = True
-        if matched and raw_term not in matches:
-            matches.append(str(raw_term).strip())
-    return matches
-
-
-def _career_graph_major_fit(major, node):
-    major_text = str(major or "").strip()
-    if not major_text:
-        return 60
-
-    family_blob = _career_graph_blob(
-        node.get("title"),
-        node.get("cluster_name"),
-        node.get("career_family"),
-        node.get("sub_domain"),
-    )
-    tech_terms = ["计算机", "软件", "智能", "数据", "数学", "电子", "信息", "自动化", "网络"]
-    design_terms = ["设计", "美术", "数字媒体", "交互"]
-    product_terms = ["管理", "工业工程", "经济", "统计", "市场", "金融"]
-    people_terms = ["人力", "心理", "社会", "法学", "工商"]
-
-    def has_any(source, keywords):
-        return any(keyword in source for keyword in keywords)
-
-    if has_any(family_blob, ["后端", "前端", "测试", "算法", "运维", "移动"]):
-        if has_any(major_text, tech_terms):
-            return 95
-        if has_any(major_text, ["统计", "数学", "物理"]):
-            return 84
-        return 58
-    if has_any(family_blob, ["产品"]):
-        if has_any(major_text, product_terms + tech_terms):
-            return 88
-        return 68
-    if has_any(family_blob, ["设计"]):
-        if has_any(major_text, design_terms):
-            return 94
-        if has_any(major_text, tech_terms):
-            return 76
-        return 60
-    if has_any(family_blob, ["销售", "HR", "人力"]):
-        if has_any(major_text, people_terms + product_terms):
-            return 88
-        return 70
-    return 72
-
-
-def _career_graph_estimate_requirements(node):
-    level_num = _career_graph_level_number(node.get("level"))
-    requirements = {
-        "professional": 34 + level_num * 11,
-        "learning": 48 + level_num * 6,
-        "communication": 36 + level_num * 7,
-        "innovation": 28 + level_num * 6,
-        "stress_tolerance": 34 + level_num * 6,
-        "internship": 30 + level_num * 6,
-        "execution": 40 + level_num * 7,
-    }
-
-    work_scope = str(node.get("work_scope") or "")
-    decision_scope = str(node.get("decision_scope") or "")
-    collaboration_scope = str(node.get("collaboration_scope") or "")
-    people_scope = str(node.get("people_scope") or "")
-
-    if "项目" in work_scope:
-        requirements["professional"] += 6
-        requirements["execution"] += 5
-    if "方向" in work_scope or "模块" in work_scope:
-        requirements["innovation"] += 5
-        requirements["learning"] += 3
-    if decision_scope == "中":
-        requirements["innovation"] += 6
-        requirements["communication"] += 4
-    elif decision_scope == "高":
-        requirements["innovation"] += 10
-        requirements["communication"] += 8
-        requirements["stress_tolerance"] += 6
-    if collaboration_scope and collaboration_scope not in {"组内", "无"}:
-        requirements["communication"] += 8
-    if people_scope and people_scope not in {"无", "0", "零"}:
-        requirements["communication"] += 6
-        requirements["stress_tolerance"] += 5
-        requirements["execution"] += 4
-
-    return {
-        key: max(32, min(95, int(value)))
-        for key, value in requirements.items()
-    }
-
-
-def _career_graph_capability_fit(capabilities, requirements):
-    used = 0
-    weighted = 0.0
-    gaps = []
-    weights = {
-        "professional": 0.24,
-        "learning": 0.15,
-        "communication": 0.17,
-        "innovation": 0.12,
-        "stress_tolerance": 0.12,
-        "internship": 0.08,
-        "execution": 0.12,
-    }
-    labels = {
-        "professional": "专业技能",
-        "learning": "学习能力",
-        "communication": "沟通能力",
-        "innovation": "创新能力",
-        "stress_tolerance": "抗压能力",
-        "internship": "实践能力",
-        "execution": "执行能力",
-    }
-    for key, weight in weights.items():
-        score = capabilities.get(key)
-        need = requirements.get(key)
-        if score is None or need is None:
-            continue
-        used += 1
-        fit = min(112.0, max(28.0, (float(score) / max(float(need), 1.0)) * 100.0))
-        weighted += fit * weight
-        if float(score) + 8 < float(need):
-            gaps.append(f"{labels[key]} {int(score)}/{int(need)}")
-    if not used:
-        return 58, []
-    return int(round(weighted)), gaps[:4]
-
-
-def _career_graph_collect_profile_inputs(profile_payload, city_preferences=None):
-    payload = profile_payload if isinstance(profile_payload, dict) else {}
-    basics = payload.get("basics") if isinstance(payload.get("basics"), dict) else {}
-    assessment = payload.get("assessment") if isinstance(payload.get("assessment"), dict) else {}
-    interview = payload.get("interview") if isinstance(payload.get("interview"), dict) else {}
-    interview_profile = interview.get("profile") if isinstance(interview.get("profile"), dict) else {}
-    resume_state = payload.get("resume") if isinstance(payload.get("resume"), dict) else {}
-    resume_public = resume_state.get("profile") if isinstance(resume_state.get("profile"), dict) else {}
-    resume_profile = resume_public.get("profile") if isinstance(resume_public.get("profile"), dict) else {}
-    resume_matcher = resume_public.get("matcher") if isinstance(resume_public.get("matcher"), dict) else {}
-    if not resume_matcher:
-        resume_matcher = resume_state.get("matcher") if isinstance(resume_state.get("matcher"), dict) else {}
-    structured_resume = resume_public.get("structured_resume") if isinstance(resume_public.get("structured_resume"), dict) else {}
-    if not structured_resume:
-        structured_resume = (
-            resume_state.get("structured_resume") if isinstance(resume_state.get("structured_resume"), dict) else {}
-        )
-
-    capabilities = {}
-    for key in ["professional", "learning", "communication", "innovation", "stress_tolerance", "internship", "execution"]:
-        item = payload.get("capabilities", {}).get(key) if isinstance(payload.get("capabilities"), dict) else None
-        if isinstance(item, dict) and item.get("score") is not None:
-            capabilities[key] = int(_career_graph_safe_float(item.get("score")))
-        else:
-            capabilities[key] = None
-
-    structured_skills = []
-    for item in structured_resume.get("skills") or []:
-        if isinstance(item, dict):
-            structured_skills.append(item.get("skill_name") or item.get("skillName") or "")
-        else:
-            structured_skills.append(item)
-
-    experience_titles = []
-    for item in structured_resume.get("experiences") or []:
-        if isinstance(item, dict):
-            experience_titles.append(item.get("job_title") or item.get("jobTitle") or "")
-            experience_titles.extend(item.get("technologies_used") or item.get("technologiesUsed") or [])
-
-    project_terms = []
-    for item in structured_resume.get("projects") or []:
-        if isinstance(item, dict):
-            project_terms.append(item.get("project_name") or item.get("projectName") or "")
-            project_terms.extend(item.get("technologies_used") or item.get("technologiesUsed") or [])
-
-    roles_detected = [
-        item.get("role") or item.get("job_title") or ""
-        for item in (resume_profile.get("roles_detected") or [])
-        if isinstance(item, dict)
-    ]
-
-    direction_terms = _career_graph_unique_values(
-        [
-            basics.get("target_direction"),
-            *(payload.get("recommendedRoles") or []),
-            *(interview_profile.get("recommended_roles") or []),
-            *(resume_matcher.get("recommended_directions") or []),
-            *roles_detected,
-        ],
-        limit=18,
-    )
-
-    skill_terms = _career_graph_unique_values(
-        [
-            *(resume_matcher.get("resume_keywords") or []),
-            *structured_skills,
-            *experience_titles,
-            *project_terms,
-        ],
-        limit=36,
-    )
-
-    mbti = ""
-    holland_codes = []
-    mbti_state = assessment.get("mbti") if isinstance(assessment.get("mbti"), dict) else {}
-    holland_state = assessment.get("holland") if isinstance(assessment.get("holland"), dict) else {}
-    if mbti_state.get("completed"):
-        mbti = str(
-            mbti_state.get("final_type")
-            or mbti_state.get("display_type")
-            or mbti_state.get("raw_type")
-            or ""
-        ).strip()
-    if holland_state.get("completed"):
-        holland_codes = _career_graph_unique_values(
-            holland_state.get("top_codes") or holland_state.get("code") or [],
-            limit=3,
-        )
-
-    target_cities = _career_graph_city_preferences(
-        city_preferences,
-        basics.get("target_city"),
-        basics.get("targetCity"),
-    )
-
-    return {
-        "summary": str(payload.get("summary") or "").strip(),
-        "major": str(basics.get("major") or "").strip(),
-        "grade": str(basics.get("grade") or basics.get("education_level") or "").strip(),
-        "target_city": target_cities[0] if target_cities else "",
-        "target_cities": target_cities,
-        "direction_terms": direction_terms,
-        "skill_terms": skill_terms,
-        "work_values": _career_graph_unique_values(
-            [
-                *(payload.get("workValues") or []),
-                *(interview_profile.get("work_values") or []),
-            ],
-            limit=8,
-        ),
-        "mbti": mbti,
-        "holland_codes": holland_codes,
-        "capabilities": capabilities,
-        "missing_items": _career_graph_unique_values(payload.get("missingItems") or [], limit=6),
-    }
-
-
-def _career_graph_compact_node(node, degree=0):
-    salary = node.get("salary_range") if isinstance(node.get("salary_range"), dict) else {}
-    return {
-        "id": str(node.get("node_id") or "").strip(),
-        "title": str(node.get("title") or "").strip(),
-        "clusterId": str(node.get("cluster_id") or "").strip(),
-        "cluster": str(node.get("cluster_name") or "").strip(),
-        "family": str(node.get("career_family") or "").strip(),
-        "subDomain": str(node.get("sub_domain") or "").strip(),
-        "level": str(node.get("level") or "").strip(),
-        "skills": _career_graph_unique_values(node.get("skills") or [], limit=12),
-        "city": str(node.get("city") or "").strip(),
-        "industry": str(node.get("company_industry") or "").strip(),
-        "track": str(node.get("track") or "").strip(),
-        "years": _career_graph_safe_float(node.get("years_required"), 0),
-        "salaryMin": _career_graph_safe_float(salary.get("min"), 0),
-        "salaryMax": _career_graph_safe_float(salary.get("max"), 0),
-        "workScope": str(node.get("work_scope") or "").strip(),
-        "decisionScope": str(node.get("decision_scope") or "").strip(),
-        "collaborationScope": str(node.get("collaboration_scope") or "").strip(),
-        "peopleScope": str(node.get("people_scope") or "").strip(),
-        "nodeType": str(node.get("node_type") or "").strip(),
-        "degree": int(degree or 0),
-    }
-
-
-def _load_career_graph_index():
-    try:
-        mtime = os.path.getmtime(CAREER_GRAPH_FILE)
-    except OSError as exc:
-        raise FileNotFoundError(CAREER_GRAPH_FILE) from exc
-
-    with CAREER_GRAPH_LOCK:
-        if CAREER_GRAPH_CACHE["mtime"] == mtime and CAREER_GRAPH_CACHE["graph"] is not None:
-            return CAREER_GRAPH_CACHE
-
-        with open(CAREER_GRAPH_FILE, "r", encoding="utf-8") as fp:
-            graph = json.load(fp)
-
-        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
-        edges = graph.get("edges") if isinstance(graph.get("edges"), list) else []
-        clusters = graph.get("clusters") if isinstance(graph.get("clusters"), list) else []
-
-        node_map = {}
-        cluster_map = {}
-        adjacency = defaultdict(lambda: {"promotion_out": [], "promotion_in": [], "substitution": []})
-        degree_map = defaultdict(int)
-
-        for node in nodes:
-            node_id = str(node.get("node_id") or "").strip()
-            if node_id:
-                node_map[node_id] = node
-
-        for cluster in clusters:
-            cluster_id = str(cluster.get("cluster_id") or "").strip()
-            if cluster_id:
-                cluster_map[cluster_id] = cluster
-
-        compact_edges = []
-        for edge in edges:
-            source = str(edge.get("source") or "").strip()
-            target = str(edge.get("target") or "").strip()
-            relation = str(edge.get("relation") or "related").strip() or "related"
-            if not source or not target or source not in node_map or target not in node_map:
-                continue
-            normalized_edge = {
-                "source": source,
-                "target": target,
-                "relation": relation,
-                "confidence": _career_graph_edge_confidence(
-                    source, target, _career_graph_safe_float(edge.get("confidence"), 0)
-                ),
-                "continuity_score": round(_career_graph_safe_float(edge.get("continuity_score"), 0), 3),
-                "uplift_score": round(_career_graph_safe_float(edge.get("uplift_score"), 0), 3),
-                "reason": _career_graph_unique_values(edge.get("reason") or [], limit=4),
-            }
-            compact_edges.append(normalized_edge)
-            degree_map[source] += 1
-            degree_map[target] += 1
-            if relation == "promotion":
-                adjacency[source]["promotion_out"].append(normalized_edge)
-                adjacency[target]["promotion_in"].append(normalized_edge)
-            else:
-                adjacency[source]["substitution"].append(normalized_edge)
-                adjacency[target]["substitution"].append(normalized_edge)
-
-        cluster_summary = [
-            {
-                "clusterId": str(item.get("cluster_id") or "").strip(),
-                "cluster": str(item.get("cluster_name") or "").strip(),
-                "count": int(item.get("count") or len(item.get("member_ids") or [])),
-            }
-            for item in clusters
-        ]
-        cluster_summary.sort(key=lambda item: (-item["count"], item["cluster"]))
-
-        bootstrap = {
-            "metadata": graph.get("metadata") if isinstance(graph.get("metadata"), dict) else {},
-            "filters": {
-                "careerFamilies": sorted(
-                    {
-                        str(node.get("career_family") or "").strip()
-                        for node in nodes
-                        if str(node.get("career_family") or "").strip()
-                    }
-                ),
-                "levels": sorted(
-                    {
-                        str(node.get("level") or "").strip()
-                        for node in nodes
-                        if str(node.get("level") or "").strip()
-                    }
-                ),
-                "clusters": cluster_summary,
-            },
-            "nodes": [
-                _career_graph_compact_node(node, degree_map.get(str(node.get("node_id") or "").strip(), 0))
-                for node in nodes
-                if str(node.get("node_id") or "").strip()
-            ],
-            "edges": compact_edges,
-        }
-
-        CAREER_GRAPH_CACHE.update(
-            {
-                "mtime": mtime,
-                "graph": graph,
-                "node_map": node_map,
-                "cluster_map": cluster_map,
-                "adjacency": adjacency,
-                "bootstrap": bootstrap,
-            }
-        )
-        return CAREER_GRAPH_CACHE
-
-
-def _career_graph_path_summary(node_id, node_map, adjacency, max_hops=3):
-    titles = []
-    current_id = str(node_id or "").strip()
-    hops = 0
-    visited = set()
-    while current_id and current_id not in visited and hops < max_hops:
-        visited.add(current_id)
-        current_node = node_map.get(current_id) or {}
-        title = str(current_node.get("title") or "").strip()
-        if title:
-            titles.append(title)
-        promotion_edges = adjacency.get(current_id, {}).get("promotion_out") or []
-        current_level = _career_graph_level_number(current_node.get("level"))
-        promotion_edges = [
-            item for item in promotion_edges
-            if _career_graph_level_number((node_map.get(str(item.get("target") or "").strip()) or {}).get("level")) >= current_level
-        ] or promotion_edges
-        if not promotion_edges:
-            break
-        next_edge = sorted(
-            promotion_edges,
-            key=lambda item: (
-                -_career_graph_safe_float(item.get("confidence"), 0),
-                -_career_graph_safe_float(item.get("uplift_score"), 0),
-            ),
-        )[0]
-        current_id = str(next_edge.get("target") or "").strip()
-        hops += 1
-    return " → ".join(titles)
-
-
-def _career_graph_match_path_options(node_id, node_map, adjacency):
-    current_id = str(node_id or "").strip()
-    if not current_id or current_id not in node_map:
-        return []
-
-    current_title = str((node_map.get(current_id) or {}).get("title") or "").strip()
-    options = []
-
-    promotion_path = _career_graph_path_summary(current_id, node_map, adjacency, max_hops=4)
-    if promotion_path and promotion_path != current_title:
-        options.append({"label": "晋升路径", "text": promotion_path})
-
-    substitution_edges = sorted(
-        adjacency.get(current_id, {}).get("substitution") or [],
-        key=lambda item: (
-            -_career_graph_safe_float(item.get("confidence"), 0),
-            -_career_graph_safe_float(item.get("continuity_score"), 0),
-        ),
-    )
-    for edge in substitution_edges[:3]:
-        source_id = str(edge.get("source") or "").strip()
-        other_id = str(edge.get("target") if source_id == current_id else edge.get("source") or "").strip()
-        other_node = node_map.get(other_id) or {}
-        other_title = str(other_node.get("title") or "").strip()
-        if other_title:
-            options.append({"label": "换岗路径", "text": f"{current_title} → {other_title}" if current_title else other_title})
-
-    if not options and current_title:
-        options.append({"label": "验证路径", "text": f"围绕 {current_title} 补齐作品、项目与面试证据"})
-
-    seen = set()
-    deduped = []
-    for item in options:
-        key = str(item.get("label") or "") + "\n" + str(item.get("text") or "")
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped[:4]
-
-
-def _career_graph_score_candidate(node, profile_inputs, node_map, adjacency):
-    node_blob = _career_graph_blob(
-        node.get("title"),
-        node.get("cluster_name"),
-        node.get("career_family"),
-        node.get("sub_domain"),
-        node.get("skills"),
-        node.get("company_industry"),
-    )
-    node_skill_blob = _career_graph_blob(node.get("skills"))
-
-    direction_hits = _career_graph_overlap(profile_inputs.get("direction_terms"), node_blob)
-    skill_hits = _career_graph_overlap(profile_inputs.get("skill_terms"), node_skill_blob)
-    target_cities = _career_graph_city_preferences(
-        profile_inputs.get("target_cities") or [],
-        profile_inputs.get("target_city") or "",
-    )
-    target_city = target_cities[0] if target_cities else ""
-    city = str(node.get("city") or "").strip()
-
-    direction_score = 58 if not profile_inputs.get("direction_terms") else min(100, 44 + len(direction_hits) * 18)
-    if profile_inputs.get("direction_terms") and not direction_hits:
-        direction_score = 38
-
-    node_skills = _career_graph_unique_values(node.get("skills") or [], limit=12)
-    if node_skills:
-        skill_score = 34 + int(round(min(1.0, len(skill_hits) / max(len(node_skills), 1)) * 66))
-    else:
-        skill_score = 56
-
-    major_score = _career_graph_major_fit(profile_inputs.get("major"), node)
-
-    estimated_years = 0.0
-    if "硕" in str(profile_inputs.get("grade") or ""):
-        estimated_years = 0.5
-    elif "博" in str(profile_inputs.get("grade") or ""):
-        estimated_years = 1.0
-    target_years = _career_graph_safe_float(node.get("years_required"), 0)
-    experience_score = max(40, 100 - int(abs(target_years - estimated_years) * 26))
-    if target_years <= 1.0 and _career_graph_level_number(node.get("level")) <= 2:
-        experience_score = min(100, experience_score + 8)
-
-    city_score = 62
-    if target_cities and city:
-        city_score = 100 if city in target_cities else 42
-    elif city:
-        city_score = 66
-
-    requirements = _career_graph_estimate_requirements(node)
-    capability_score, capability_gaps = _career_graph_capability_fit(profile_inputs.get("capabilities") or {}, requirements)
-
-    overall_score = int(round(
-        direction_score * 0.30
-        + skill_score * 0.26
-        + capability_score * 0.17
-        + experience_score * 0.10
-        + major_score * 0.07
-        + city_score * 0.10
-    ))
-
-    missing_skills = [skill for skill in node_skills if skill not in skill_hits][:4]
-    reason_lines = []
-    if direction_hits:
-        reason_lines.append(f"方向信号命中：{'、'.join(direction_hits[:3])}")
-    if skill_hits:
-        reason_lines.append(f"技能重合：{'、'.join(skill_hits[:4])}")
-    if target_cities and city and city in target_cities:
-        reason_lines.append(f"目标城市匹配：{city}")
-    if not reason_lines:
-        reason_lines.append("当前画像信号有限，本次推荐更依赖岗位图谱结构与基础门槛。")
-    if capability_gaps:
-        reason_lines.append(f"关键能力缺口：{'、'.join(capability_gaps[:2])}")
-
-    path_summary = _career_graph_path_summary(node.get("node_id"), node_map, adjacency, max_hops=3)
-    path_options = _career_graph_match_path_options(node.get("node_id"), node_map, adjacency)
-    confidence_inputs = 0
-    confidence_inputs += 1 if profile_inputs.get("direction_terms") else 0
-    confidence_inputs += 1 if profile_inputs.get("skill_terms") else 0
-    confidence_inputs += 1 if any(value is not None for value in (profile_inputs.get("capabilities") or {}).values()) else 0
-    confidence_inputs += 1 if profile_inputs.get("major") else 0
-    confidence_inputs += 1 if target_city else 0
-    confidence_ratio = confidence_inputs / 5.0
-    confidence_text = "高" if confidence_ratio >= 0.8 else "中" if confidence_ratio >= 0.5 else "低"
-
-    next_actions = _career_graph_unique_values(
-        [
-            *(f"补足 {skill} 相关证据或项目" for skill in missing_skills[:2]),
-            *(f"提升 {gap}" for gap in capability_gaps[:2]),
-            f"优先验证 {node.get('title') or '目标岗位'} 的真实职责与面试要求",
-        ],
-        limit=4,
-    )
-
-    compact_node = _career_graph_compact_node(node)
-    compact_node.update(
-        {
-            "overallScore": max(0, min(100, overall_score)),
-            "directionScore": max(0, min(100, direction_score)),
-            "skillScore": max(0, min(100, skill_score)),
-            "capabilityScore": max(0, min(100, capability_score)),
-            "experienceScore": max(0, min(100, experience_score)),
-            "majorScore": max(0, min(100, major_score)),
-            "cityScore": max(0, min(100, city_score)),
-            "confidence": confidence_text,
-            "reasonLines": reason_lines[:4],
-            "skillHits": skill_hits[:6],
-            "missingSkills": missing_skills,
-            "capabilityGaps": capability_gaps,
-            "path": path_summary or compact_node.get("title") or "",
-            "pathOptions": path_options,
-            "directionLabel": compact_node.get("cluster") or compact_node.get("family") or "",
-            "nextActions": next_actions,
-        }
-    )
-    return compact_node
-
-
-def _career_graph_pick_diverse(candidates, limit):
-    selected = []
-    selected_ids = set()
-    used_clusters = set()
-
-    for item in candidates:
-        cluster = str(item.get("cluster") or "").strip()
-        node_id = str(item.get("id") or "").strip()
-        if not node_id or node_id in selected_ids:
-            continue
-        if cluster and cluster in used_clusters:
-            continue
-        selected.append(item)
-        selected_ids.add(node_id)
-        if cluster:
-            used_clusters.add(cluster)
-        if len(selected) >= limit:
-            return selected
-
-    for item in candidates:
-        node_id = str(item.get("id") or "").strip()
-        if not node_id or node_id in selected_ids:
-            continue
-        selected.append(item)
-        selected_ids.add(node_id)
-        if len(selected) >= limit:
-            break
-    return selected
-
-
-def _career_graph_llm_rerank(profile_inputs, candidates, limit=5):
-    base_url, api_key, model = _get_active_provider_and_model()
-    if not base_url or not api_key or not candidates:
-        return None
-
-    shortlist = []
-    for item in candidates[:12]:
-        shortlist.append(
-            {
-                "node_id": item.get("id"),
-                "title": item.get("title"),
-                "cluster": item.get("cluster"),
-                "level": item.get("level"),
-                "city": item.get("city"),
-                "years_required": item.get("years"),
-                "skills": item.get("skills"),
-                "score": item.get("overallScore"),
-                "reason_lines": item.get("reasonLines"),
-                "missing_skills": item.get("missingSkills"),
-                "path": item.get("path"),
-                "path_options": item.get("pathOptions") or [],
-            }
-        )
-
-    system_prompt = (
-        "你是职业匹配顾问。请根据用户画像，从候选岗位中挑选最适合的 5 条不同职业方向。"
-        "必须兼顾匹配度与方向差异，不要返回 5 个几乎相同的岗位。"
-        "只输出 JSON："
-        '{"recommendations":[{"node_id":"岗位ID","fit_reason":"不超过60字","direction_label":"方向标签","next_step":"一个具体下一步"}]}'
-    )
-    user_payload = {
-        "profile": {
-            "summary": profile_inputs.get("summary"),
-            "major": profile_inputs.get("major"),
-            "grade": profile_inputs.get("grade"),
-            "target_city": profile_inputs.get("target_city"),
-            "target_cities": profile_inputs.get("target_cities") or [],
-            "direction_terms": profile_inputs.get("direction_terms"),
-            "skill_terms": profile_inputs.get("skill_terms"),
-            "work_values": profile_inputs.get("work_values"),
-            "mbti": profile_inputs.get("mbti"),
-            "holland_codes": profile_inputs.get("holland_codes"),
-            "missing_items": profile_inputs.get("missing_items"),
-        },
-        "candidates": shortlist,
-    }
-
-    try:
-        parsed = _call_structured_chat(
-            base_url,
-            api_key,
-            model,
-            [{"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}],
-            system_prompt=system_prompt,
-            max_tokens=1000,
-        )
-    except Exception:
-        app.logger.exception("career graph llm rerank failed")
-        return None
-
-    recommendations = parsed.get("recommendations") if isinstance(parsed, dict) else []
-    if not isinstance(recommendations, list):
-        return None
-
-    candidate_map = {
-        str(item.get("id") or "").strip(): dict(item)
-        for item in candidates
-        if str(item.get("id") or "").strip()
-    }
-    selected = []
-    selected_ids = set()
-    used_clusters = set()
-    for item in recommendations:
-        if not isinstance(item, dict):
-            continue
-        node_id = str(item.get("node_id") or "").strip()
-        if not node_id or node_id not in candidate_map or node_id in selected_ids:
-            continue
-        candidate = candidate_map[node_id]
-        cluster = str(candidate.get("cluster") or "").strip()
-        if cluster and cluster in used_clusters:
-            continue
-        candidate["fitReason"] = str(item.get("fit_reason") or "").strip() or "模型认为该岗位与当前画像较匹配。"
-        candidate["directionLabel"] = str(item.get("direction_label") or "").strip() or candidate.get("directionLabel") or ""
-        llm_next = str(item.get("next_step") or "").strip()
-        if llm_next:
-            candidate["nextActions"] = _career_graph_unique_values([llm_next, *(candidate.get("nextActions") or [])], limit=4)
-        selected.append(candidate)
-        selected_ids.add(node_id)
-        if cluster:
-            used_clusters.add(cluster)
-        if len(selected) >= limit:
-            break
-
-    if not selected:
-        return None
-
-    return {
-        "mode": "llm_reranked",
-        "model": model,
-        "recommendations": selected,
-    }
-
-
-def _career_graph_node_detail_payload(node_id):
-    graph_cache = _load_career_graph_index()
-    node_map = graph_cache.get("node_map") or {}
-    adjacency = graph_cache.get("adjacency") or {}
-    node = node_map.get(str(node_id or "").strip())
-    if not node:
-        return None
-
-    compact_node = _career_graph_compact_node(node)
-    relation_payload = {}
-    for bucket_name in ["promotion_out", "promotion_in", "substitution"]:
-        items = []
-        for edge in sorted(
-            adjacency.get(compact_node["id"], {}).get(bucket_name) or [],
-            key=lambda item: (-_career_graph_safe_float(item.get("confidence"), 0), item.get("target") or ""),
-        )[:10]:
-            related_id = edge.get("target") if bucket_name != "promotion_in" else edge.get("source")
-            if bucket_name == "substitution":
-                related_id = edge.get("target") if edge.get("source") == compact_node["id"] else edge.get("source")
-            related_node = node_map.get(str(related_id or "").strip())
-            if not related_node:
-                continue
-            items.append(
-                {
-                    "edge": edge,
-                    "node": _career_graph_compact_node(related_node),
-                }
-            )
-        relation_payload[bucket_name] = items
-
-    detail = dict(node)
-    detail["node_id"] = compact_node["id"]
-    return {
-        "node": detail,
-        "summary": compact_node,
-        "relations": relation_payload,
-        "path": _career_graph_path_summary(compact_node["id"], node_map, adjacency, max_hops=4),
-    }
 
 
 @app.route("/api/auth/status")
@@ -6899,17 +6100,19 @@ def api_user_state(scope):
 
 @app.route("/api/community-feed", methods=["GET"])
 @_login_required
+@_forum_transaction
 def api_community_feed():
     return jsonify(_community_forum_payload(_current_user()))
 
 
 @app.route("/api/community-feed/posts", methods=["POST"])
 @_login_required
+@_forum_transaction
 def api_community_feed_create_post():
     user = _current_user()
     payload = request.get_json(silent=True) or {}
     title = _forum_clean_text(payload.get("title"), 80)
-    content = _forum_clean_text(payload.get("content"), 2400)
+    content = _forum_clean_content(payload.get("content"), 2400)
     board = _forum_clean_text(payload.get("board"), 16)
     tags = _forum_normalize_tags(payload.get("tags") or [])
     if len(title) < 4:
@@ -6947,10 +6150,11 @@ def api_community_feed_create_post():
 
 @app.route("/api/community-feed/posts/<post_id>/reply", methods=["POST"])
 @_login_required
+@_forum_transaction
 def api_community_feed_reply(post_id):
     user = _current_user()
     payload = request.get_json(silent=True) or {}
-    content = _forum_clean_text(payload.get("content"), 1200)
+    content = _forum_clean_content(payload.get("content"), 1200)
     if len(content) < 4:
         return jsonify({"message": "回复内容至少需要 4 个字。"}), 400
 
@@ -6979,6 +6183,7 @@ def api_community_feed_reply(post_id):
 
 @app.route("/api/community-feed/posts/<post_id>/like", methods=["POST"])
 @_login_required
+@_forum_transaction
 def api_community_feed_like(post_id):
     user = _current_user()
     store = _load_community_forum_store()
@@ -7005,6 +6210,7 @@ def api_community_feed_like(post_id):
 
 @app.route("/api/community-feed/posts/<post_id>/view", methods=["POST"])
 @_login_required
+@_forum_transaction
 def api_community_feed_view(post_id):
     user = _current_user()
     store = _load_community_forum_store()
@@ -7381,7 +6587,7 @@ def api_resume_upload():
 
     state = _load_user_state(user["username"])
     prev = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
-    old_path = str(prev.get("storage_path") or "").strip()
+    old_path = _owned_resume_storage_path(user["username"], str(prev.get("storage_path") or "").strip())
     if old_path and old_path != saved_path and os.path.exists(old_path):
         try:
             os.remove(old_path)
@@ -7420,7 +6626,7 @@ def api_resume_analyze():
     payload = request.get_json(silent=True) or {}
     state = _load_user_state(user["username"])
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
-    storage_path = str(resume_state.get("storage_path") or "").strip()
+    storage_path = _owned_resume_storage_path(user["username"], str(resume_state.get("storage_path") or "").strip())
     if "job_description" in payload:
         job_description = str(payload.get("job_description") or "").strip()
     else:
@@ -7477,7 +6683,7 @@ def api_resume_analyze_start():
     payload = request.get_json(silent=True) or {}
     state = _load_user_state(username)
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
-    storage_path = str(resume_state.get("storage_path") or "").strip()
+    storage_path = _owned_resume_storage_path(user["username"], str(resume_state.get("storage_path") or "").strip())
     if "job_description" in payload:
         job_description = str(payload.get("job_description") or "").strip()
     else:
@@ -7590,7 +6796,7 @@ def api_resume_profile():
     if request.method == "GET":
         return jsonify({"data": _public_resume_state(resume_state)})
 
-    storage_path = str(resume_state.get("storage_path") or "").strip()
+    storage_path = _owned_resume_storage_path(user["username"], str(resume_state.get("storage_path") or "").strip())
     if storage_path and os.path.exists(storage_path):
         try:
             os.remove(storage_path)
@@ -7611,43 +6817,6 @@ def _career_report_console_log(job_id, message, **fields):
     print(f"[career-report][{job_id[:8]}] {datetime.now().strftime('%H:%M:%S')} {message}{suffix}", flush=True)
 
 
-def _build_llm_caller_for_report(base_url, api_key, model, log=None, cancel_checker=None):
-    """Build an LLMCaller for the career report agents."""
-    if not (base_url and api_key and model):
-        return None
-
-    def _caller(messages, system_prompt, max_tokens=3500):
-        if callable(cancel_checker) and cancel_checker():
-            raise CareerReportCanceled("职业报告生成已被用户取消。")
-        started = time.perf_counter()
-        if callable(log):
-            log(
-                "LLM 调用开始",
-                model=model,
-                max_tokens=max_tokens,
-                messages=len(messages or []),
-                system_chars=len(system_prompt or ""),
-            )
-        try:
-            result = _call_markdown_chat(
-                base_url,
-                api_key,
-                model,
-                messages,
-                system_prompt=system_prompt,
-                max_tokens=max_tokens,
-            )
-        except Exception as exc:
-            if callable(log):
-                log("LLM 调用失败", elapsed=f"{time.perf_counter() - started:.1f}s", error=str(exc)[:160])
-            raise
-        if callable(cancel_checker) and cancel_checker():
-            raise CareerReportCanceled("职业报告生成已被用户取消。")
-        if callable(log):
-            log("LLM 调用完成", elapsed=f"{time.perf_counter() - started:.1f}s", output_chars=len(result or ""))
-        return result
-
-    return _caller
 
 
 def _run_career_report_job(username, job_id, report_id, profile_payload, role_payload, focus_role_id, runtime_llm):
@@ -7655,84 +6824,36 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
     runtime_llm_payload = dict(runtime_llm or {}) if isinstance(runtime_llm, dict) else {}
     model_name = str(runtime_llm_payload.get("model") or "").strip()
     job_started = time.perf_counter()
-    generation_mode = "fallback"
+    generation_mode = "langgraph"
 
     def _log(message, **fields):
         _career_report_console_log(job_id, message, **fields)
 
-    # Build LLM caller for agents from the request-time snapshot.
-    base_url = str(runtime_llm_payload.get("base_url") or "").strip()
-    api_key = str(runtime_llm_payload.get("api_key") or "").strip()
-    selection_snapshot = runtime_llm_payload.get("selection") if isinstance(runtime_llm_payload.get("selection"), dict) else None
-    _model = model_name
-    llm_caller = None
-    provider_host = urllib.parse.urlparse(base_url).netloc if base_url else ""
-    try:
-        if not (base_url and api_key and _model):
-            fallback_base_url, fallback_api_key, fallback_model = _get_active_provider_and_model(selection_snapshot)
-            base_url = base_url or str(fallback_base_url or "").strip()
-            api_key = api_key or str(fallback_api_key or "").strip()
-            _model = _model or str(fallback_model or "").strip()
-            provider_host = urllib.parse.urlparse(base_url).netloc if base_url else ""
-        model_name = _model
-        llm_caller = _build_llm_caller_for_report(
-            base_url,
-            api_key,
-            model_name,
-            log=_log,
-            cancel_checker=lambda: _is_career_report_job_cancelled(job_id),
-        )
-    except Exception as exc:
-        app.logger.exception("career report llm init failed")
-        _log("LLM init failed, continuing with fallback", error=str(exc)[:220])
-    generation_mode = "llm" if (llm_caller or callable(runtime_llm_payload.get("writer"))) else "fallback"
-    _log(
-        "后台任务开始",
-        user=username,
-        report_id=report_id,
-        mode=generation_mode,
-        model=model_name or _model or "none",
-        provider=provider_host or "none",
-        roles=len(role_payload or []),
-        focus_role=focus_role_id or "auto",
-    )
+    generation_mode = "langgraph"
+    model_name = str(runtime_llm_payload.get("model") or model_name)
+    _log("后台任务开始", user=username, report_id=report_id, mode=generation_mode, model=model_name)
 
     def _ensure_not_cancelled():
         if _is_career_report_job_cancelled(job_id):
             raise CareerReportCanceled("职业报告生成已被用户取消。")
 
-    # Attach caller to runtime_llm
     runtime_llm_with_caller = dict(runtime_llm_payload)
-    runtime_llm_with_caller["caller"] = llm_caller
-    runtime_llm_with_caller["logger"] = _log
-    # 注入图片生成配置，供 orchestrator 使用
-    try:
-        tti_base, tti_key, tti_model = _get_text_to_image_runtime()
-        if tti_key:
-            runtime_llm_with_caller["text_to_image"] = {
-                "base_url": tti_base,
-                "api_key": tti_key,
-                "model": tti_model,
-            }
-    except Exception:
-        pass
-
     _ensure_not_cancelled()
     _update_career_report_job(
         job_id,
         status="running",
         started_at=int(time.time()),
-        stage="industry_analysis",
-        stage_label=stage_defs.get("industry_analysis", "行业分析"),
-        stage_detail="正在分析行业趋势与劳动力市场动态",
-        progress=build_stage_progress("industry_analysis"),
+        stage="resume_analysis",
+        stage_label=stage_defs.get("resume_analysis", "简历分析"),
+        stage_detail="正在恢复工作流或分析简历证据",
+        progress=build_stage_progress("resume_analysis"),
     )
     _save_career_report_progress(
         username,
         job_id,
-        "industry_analysis",
-        stage_defs.get("industry_analysis", "行业分析"),
-        "正在分析行业趋势与劳动力市场动态",
+        "resume_analysis",
+        stage_defs.get("resume_analysis", "简历分析"),
+        "正在恢复工作流或分析简历证据",
         model=model_name,
         generation_mode=generation_mode,
         report_id=report_id,
@@ -7749,7 +6870,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             stage_label=stage_label,
             stage_detail=detail,
             message=detail,
-            progress=_merge_stage_progress(job_id, stage_key),
+            progress=build_stage_progress(stage_key),
         )
         _save_career_report_progress(
             username,
@@ -7770,7 +6891,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             report_id=report_id,
             profile_payload=profile_payload,
             role_payload=role_payload,
-            news_payload=get_career_news_payload(),
+            news_payload=None,
             focus_role_id=focus_role_id,
             stage_callback=_stage_callback,
             runtime_llm=runtime_llm_with_caller,
@@ -7814,6 +6935,14 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             report_id=str(meta.get("report_id") or report_id),
             mode=generation_mode,
         )
+    except ReportNeedsInput as exc:
+        if _is_career_report_job_cancelled(job_id):
+            return
+        _update_career_report_job(job_id, status="waiting_input", finished_at=int(time.time()),
+                                  stage="review", stage_label="补充与确认", stage_detail=str(exc), message=str(exc))
+        _save_career_report_progress(username, job_id, "review", "补充与确认", str(exc),
+                                    status="waiting_input", model=model_name, generation_mode=generation_mode,
+                                    report_id=report_id)
     except CareerReportCanceled as exc:
         _log("后台任务已取消", elapsed=f"{time.perf_counter() - job_started:.1f}s")
         _update_career_report_job(
@@ -7847,8 +6976,8 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
         _save_career_report_progress(
             username,
             job_id,
-            "path_planning",
-            stage_defs.get("path_planning", "路径规划"),
+            str((CAREER_REPORT_JOBS.get(job_id) or {}).get("stage") or "resume_analysis"),
+            str((CAREER_REPORT_JOBS.get(job_id) or {}).get("stage_label") or "工作流执行"),
             "报告生成失败",
             status="failed",
             error_message=str(exc),
@@ -7873,17 +7002,19 @@ def api_career_report_generate_start():
 
     payload = request.get_json(silent=True) or {}
     profile_payload = payload.get("profile_snapshot") if isinstance(payload.get("profile_snapshot"), dict) else {}
-    role_payload = payload.get("role_rankings") if isinstance(payload.get("role_rankings"), list) else []
+    role_payload = _saved_matching_role_payload({"role_rankings": payload.get("role_rankings")})
     focus_role_id = str(payload.get("focus_role_id") or "").strip()
     state = _load_user_state(username)
     if not profile_payload:
         profile_payload = _saved_profile_snapshot_payload(state.get("profile_snapshot"))
     if not role_payload:
         role_payload = _saved_matching_role_payload(state.get("career_matching"))
-    if not focus_role_id and isinstance(state.get("career_matching"), dict):
+    if not focus_role_id and role_payload and isinstance(state.get("career_matching"), dict):
         focus_role_id = str((state.get("career_matching") or {}).get("focus_role_id") or "").strip()
+    if not any(str(role.get("id") or "") == focus_role_id for role in role_payload):
+        focus_role_id = ""
     if not profile_payload:
-        return jsonify({"message": "请先完成画像步骤后再生成职业规划报告。"}), 400
+        profile_payload = {}
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
     profile_portrait = state.get("profile_portrait") if isinstance(state.get("profile_portrait"), dict) else {}
     profile_payload = dict(profile_payload)
@@ -7894,30 +7025,42 @@ def api_career_report_generate_start():
     ).strip()
     profile_payload["agent_memory"] = _build_career_report_agent_memory(state, profile_payload, role_payload)
 
+    continuation = None
+    report_id = str(payload.get("continue_report_id") or "").strip()
+    try:
+        if report_id:
+            snapshot = read_report_workflow(username, report_id)
+            checkpoint_id = str(payload.get("checkpoint_id") or "")
+            if not checkpoint_id or checkpoint_id != snapshot["checkpoint_id"]:
+                return jsonify({"message": "工作流已有更新，请刷新后继续。"}), 409
+            response = payload.get("response") or {}
+            validate_report_continuation(response, snapshot)
+            continuation = {"checkpoint_id": checkpoint_id, "response": response}
+        else:
+            report_id = f"report-{uuid.uuid4().hex[:12]}"
+            raw_resume = str((state.get("resume_profile") or {}).get("resume_source_text") or "").strip()
+            if not raw_resume:
+                return jsonify({"message": "请先上传并解析简历，再运行多智能体报告。"}), 400
+            profile_payload["agent_workflow"] = validate_report_request(payload.get("workflow") or {}, raw_resume)
+    except (ValueError, TypeError, KeyError) as exc:
+        return jsonify({"message": str(exc)}), 400
+    except ImportError:
+        return jsonify({"message": "请先安装 backend/requirements.txt 中的 Agent 依赖。"}), 503
+
     selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
     base_url, api_key, model = _get_active_provider_and_model(selection_snapshot)
-    runtime_llm = {
-        "writer": _build_report_markdown_writer(base_url, api_key, model),
-        "model": model or "",
-        "base_url": str(base_url or ""),
-        "api_key": str(api_key or ""),
-        "selection": dict(selection_snapshot),
-    } if (base_url and api_key and model) else {
-        "writer": None,
-        "model": str(model or ""),
-        "base_url": str(base_url or ""),
-        "api_key": str(api_key or ""),
-        "selection": dict(selection_snapshot),
-    }
+    if not (base_url and api_key and model):
+        return jsonify({"message": "请先配置主系统的对话模型，再启动 Agent。"}), 400
+    runtime_llm = {"model": model, "base_url": base_url, "api_key": api_key,
+                   "selection": dict(selection_snapshot), "continuation": continuation}
 
     job_id = uuid.uuid4().hex
-    report_id = f"report-{uuid.uuid4().hex[:12]}"
-    stage_label = next((item["label"] for item in CAREER_REPORT_STAGE_DEFS if item["key"] == "industry_analysis"), "行业分析")
+    stage_label = next((item["label"] for item in CAREER_REPORT_STAGE_DEFS if item["key"] == "resume_analysis"), "简历分析")
     job = {
         "job_id": job_id,
         "username": username,
         "status": "queued",
-        "stage": "industry_analysis",
+        "stage": "resume_analysis",
         "stage_label": stage_label,
         "stage_detail": "任务已创建，等待后台编排",
         "message": "",
@@ -7925,12 +7068,17 @@ def api_career_report_generate_start():
         "started_at": 0,
         "finished_at": 0,
         "report_id": report_id,
-        "progress": build_stage_progress("industry_analysis"),
+        "progress": build_stage_progress("resume_analysis"),
         "model": str(runtime_llm.get("model") or ""),
-        "generation_mode": "llm" if runtime_llm.get("writer") else "fallback",
+        "generation_mode": "langgraph",
         "cancel_requested": False,
     }
     with CAREER_REPORT_LOCK:
+        running = next((item for item in CAREER_REPORT_JOBS.values()
+                        if item.get("username") == username and item.get("status") in {"queued", "running"}), None)
+        if running:
+            return jsonify({"message": "已有职业规划报告任务在运行中。",
+                            "job_id": running["job_id"], "already_running": True}), 409
         CAREER_REPORT_JOBS[job_id] = job
 
     _career_report_console_log(
@@ -7939,7 +7087,7 @@ def api_career_report_generate_start():
         user=username,
         report_id=report_id,
         model=str(runtime_llm.get("model") or "none"),
-        mode="llm" if runtime_llm.get("writer") else "fallback",
+        mode="langgraph",
         roles=len(role_payload or []),
         focus_role=focus_role_id or "auto",
     )
@@ -7947,13 +7095,13 @@ def api_career_report_generate_start():
     _save_career_report_progress(
         username,
         job_id,
-        "industry_analysis",
+        "resume_analysis",
         stage_label,
         "任务已创建，等待后台编排",
         status="queued",
         report_id=report_id,
         model=str(runtime_llm.get("model") or ""),
-        generation_mode="llm" if runtime_llm.get("writer") else "fallback",
+        generation_mode="langgraph",
         focus_role_id=focus_role_id,
     )
 
@@ -7971,6 +7119,20 @@ def api_career_report_generate_start():
         "report_id": report_id,
         "already_running": False,
     })
+
+
+@app.route("/api/career-report/workflow/<report_id>", methods=["GET"])
+@_login_required
+def api_career_report_workflow(report_id):
+    try:
+        snapshot = read_report_workflow(_current_user()["username"], report_id)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except ImportError:
+        return jsonify({"message": "请安装 Agent 运行依赖。"}), 503
+    if not snapshot["checkpoint_id"]:
+        return jsonify({"message": "没有找到此账户的报告工作流。"}), 404
+    return jsonify(snapshot)
 
 
 @app.route("/api/career-report/generate/cancel", methods=["POST"])
@@ -8090,8 +7252,8 @@ def api_career_report_generate_status():
     current_bundle = _read_career_report_bundle(username)
     if not selected and report_status in {"queued", "running"}:
         report_state.update({
-            "status": "canceled",
-            "stage_detail": "上一次生成任务已不在后台运行，可能是服务重启或任务被中断；请重新启动生成。",
+            "status": "failed",
+            "stage_detail": "后台执行已中断，可从已保存的检查点继续。",
             "error_message": "",
         })
         state["career_report"] = report_state
@@ -8666,103 +7828,6 @@ def api_career_report_export():
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         as_attachment=True,
         download_name=f"{filename_stem}.docx",
-    )
-
-
-@app.route("/api/career-graph/bootstrap")
-@_login_required
-def api_career_graph_bootstrap():
-    try:
-        payload = _load_career_graph_index().get("bootstrap") or {}
-    except FileNotFoundError:
-        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
-    except Exception:
-        app.logger.exception("career graph bootstrap failed")
-        return jsonify({"message": "职业图谱加载失败。"}), 500
-    return _cache_json_response(payload, max_age=600)
-
-
-@app.route("/api/career-graph/node/<node_id>")
-@_login_required
-def api_career_graph_node_detail(node_id):
-    try:
-        payload = _career_graph_node_detail_payload(node_id)
-    except FileNotFoundError:
-        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
-    except Exception:
-        app.logger.exception("career graph node detail failed")
-        return jsonify({"message": "岗位详情加载失败。"}), 500
-    if not payload:
-        return jsonify({"message": "未找到对应岗位节点。"}), 404
-    return _cache_json_response(payload, max_age=600)
-
-
-@app.route("/api/career-graph/match", methods=["POST"])
-@_login_required
-def api_career_graph_match():
-    payload = request.get_json(silent=True) or {}
-    profile_payload = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
-    city_preferences = payload.get("cityPreferences") if isinstance(payload.get("cityPreferences"), list) else payload.get("city_preferences")
-    limit = max(1, min(int(payload.get("limit") or 5), 8))
-
-    try:
-        graph_cache = _load_career_graph_index()
-    except FileNotFoundError:
-        return jsonify({"message": "职业图谱数据文件不存在。"}), 404
-    except Exception:
-        app.logger.exception("career graph match bootstrap failed")
-        return jsonify({"message": "职业图谱加载失败。"}), 500
-
-    profile_inputs = _career_graph_collect_profile_inputs(profile_payload, city_preferences=city_preferences)
-    node_map = graph_cache.get("node_map") or {}
-    adjacency = graph_cache.get("adjacency") or {}
-
-    candidates = [
-        _career_graph_score_candidate(node, profile_inputs, node_map, adjacency)
-        for node in node_map.values()
-    ]
-    candidates.sort(
-        key=lambda item: (
-            -int(item.get("overallScore") or 0),
-            -int(item.get("directionScore") or 0),
-            -int(item.get("skillScore") or 0),
-            str(item.get("title") or ""),
-        )
-    )
-
-    target_city_set = set(profile_inputs.get("target_cities") or [])
-    if target_city_set:
-        in_city = [item for item in candidates if item.get("city") in target_city_set]
-        out_city = [item for item in candidates if item.get("city") not in target_city_set]
-        selection_candidates = in_city + out_city if len(in_city) < limit else in_city
-    else:
-        selection_candidates = candidates
-
-    deterministic_pool = _career_graph_pick_diverse(selection_candidates, max(limit * 3, 12))
-    llm_result = _career_graph_llm_rerank(profile_inputs, deterministic_pool, limit=limit)
-    recommendations = llm_result.get("recommendations") if llm_result else deterministic_pool[:limit]
-    if not llm_result:
-        recommendations = _career_graph_pick_diverse(selection_candidates, limit)
-
-    return jsonify(
-        {
-            "mode": llm_result.get("mode") if llm_result else "deterministic",
-            "model": llm_result.get("model") if llm_result else "",
-            "recommendations": recommendations,
-            "profileEcho": {
-                "targetCity": profile_inputs.get("target_city") or "",
-                "targetCities": profile_inputs.get("target_cities") or [],
-                "targetDirection": (profile_inputs.get("direction_terms") or [""])[0],
-                "major": profile_inputs.get("major") or "",
-                "missingItems": profile_inputs.get("missing_items") or [],
-            },
-            "diagnostics": {
-                "candidateCount": len(candidates),
-                "cityCandidateCount": len([item for item in candidates if item.get("city") in target_city_set]) if target_city_set else len(candidates),
-                "directionSignals": len(profile_inputs.get("direction_terms") or []),
-                "skillSignals": len(profile_inputs.get("skill_terms") or []),
-            },
-        }
     )
 
 

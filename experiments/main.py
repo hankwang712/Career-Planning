@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from .news_advisor.agents.base import BaseAgent
 from .news_advisor.config import get_ai_config
+from .news_advisor.api.advisor import create_advisor_router
 
 
 @lru_cache(maxsize=1)
@@ -35,6 +36,7 @@ def get_model() -> ChatOpenAI:
 
 
 app = FastAPI(title="FastAPI + LangGraph 最小测试")
+app.include_router(create_advisor_router(get_model))
 
 
 @app.get("/", include_in_schema=False)

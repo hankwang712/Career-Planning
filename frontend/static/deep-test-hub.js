@@ -387,12 +387,15 @@
 
   function getSbtiProfile() {
     try {
-      const currentRaw = localStorage.getItem(SBTI_PROFILE_KEY);
+      const currentRaw = localStorage.getItem(`${SBTI_PROFILE_KEY}_${resolveCurrentUsername()}`)
+        || (resolveCurrentUsername() === "guest" ? localStorage.getItem(SBTI_PROFILE_KEY) : null);
       if (currentRaw) {
         const currentParsed = JSON.parse(currentRaw);
         if (currentParsed && typeof currentParsed === "object") return currentParsed;
       }
     } catch (_) {}
+    // 未标明所属账户的旧缓存只在访客空间读取，避免混入其他用户的历史。
+    if (resolveCurrentUsername() !== "guest") return null;
     try {
       const legacyRaw = localStorage.getItem(SBTI_LEGACY_PROFILE_KEY);
       if (!legacyRaw) return null;
@@ -560,6 +563,7 @@
       },
     };
     persistStoredResults();
+    window.AssessmentCenter?.recordExtended("friends", st.store.friends);
   }
 
   function saveInsideOutStore(result, completedAt) {
@@ -580,6 +584,7 @@
       },
     };
     persistStoredResults();
+    window.AssessmentCenter?.recordExtended("insideout", st.store.insideout);
   }
 
   function saveDeepStore(result, completedAt) {
@@ -591,6 +596,7 @@
       aiText: st.deep.aiText ? String(st.deep.aiText) : "",
     };
     persistStoredResults();
+    window.AssessmentCenter?.recordExtended("deep", st.store.deep);
   }
 
   function saveSbtiStore(result, completedAt) {
@@ -599,10 +605,10 @@
     st.store.sbti = normalized;
     st.sbti.result = { ...normalized };
     try {
-      localStorage.setItem(SBTI_PROFILE_KEY, JSON.stringify(normalized));
-      localStorage.removeItem(SBTI_LEGACY_PROFILE_KEY);
+      localStorage.setItem(`${SBTI_PROFILE_KEY}_${resolveCurrentUsername()}`, JSON.stringify(normalized));
     } catch (_) {}
     persistStoredResults();
+    window.AssessmentCenter?.recordExtended("sbti", st.store.sbti);
   }
 
   function loadStoredResults() {

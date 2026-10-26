@@ -316,9 +316,17 @@ def init_app(app):
 
     @app.after_request
     def protect_auth_responses(response):
-        if request.path.startswith("/api/auth/"):
+        private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/",
+                            "/api/profile-portrait", "/api/account", "/api/community-feed", "/app_data/")
+        if request.path.startswith(private_prefixes):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"
+            response.vary.add("Cookie")
+            user = current_user()
+            if user:
+                from urllib.parse import quote
+                response.headers["X-Workspace-Owner"] = quote(user["username"], safe="")
+                response.headers["Access-Control-Expose-Headers"] = "X-Workspace-Owner"
         return response
 
     @app.errorhandler(AuthError)

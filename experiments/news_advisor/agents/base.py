@@ -106,7 +106,7 @@ class BaseAgent(ABC):
         return {
             "agent": self.name,
             "status": status,
-            "data": draft.model_dump() if draft is not None else {},
+            "data": draft.model_dump(mode="json") if draft is not None else {},
             "error": message
         }
 

@@ -49,42 +49,9 @@
   let persistSaving = false;
   let persistDirty = false;
   let workspaceSyncChain = Promise.resolve();
-  const selectedModules = new Set(["mbti", "holland"]);
-  let planActive = false;
   let autoAdvance = true;
   let choiceTimer = null;
   let modalReturnFocus = null;
-  const MODULES = {
-    mbti: { name: "MBTI 性格倾向", copy: "了解你的思维方式、决策偏好与相处风格。", minutes: 12, total: 93, icon: "◈", tone: "blue" },
-    holland: { name: "霍兰德职业兴趣", copy: "探索你偏好的工作活动，发现适合的职业方向。", minutes: 10, total: 90, icon: "⬡", tone: "orange" }
-  };
-
-  function renderSelection() {
-    const root = document.getElementById("assessmentSelection");
-    if (!root) return;
-    let remaining = 0;
-    const selected = [...selectedModules];
-    const cards = Object.entries(MODULES).map(([key, meta]) => {
-      const total = (key === "mbti" ? mbtiQuestions() : hollandQuestions()).length || meta.total;
-      const answered = Math.min(activeAnsweredCount(key), total);
-      const completed = Boolean(state[key].result?.completed);
-      if (selectedModules.has(key)) remaining += completed ? 0 : meta.minutes * (1 - answered / total);
-      return `<article class="ax-module ax-${meta.tone}${selectedModules.has(key) ? " is-selected" : ""}"><label><input type="checkbox" aria-label="选择${meta.name}" ${selectedModules.has(key) ? "checked" : ""} onchange="toggleAssessmentSelection('${key}',this.checked)"><span class="ax-module-icon" aria-hidden="true">${meta.icon}</span><span class="ax-module-copy"><strong>${meta.name}</strong><span>${meta.copy}</span></span></label><div class="ax-module-meta"><span>${total} 题</span><span>预计 ${meta.minutes} 分钟</span><span>${completed ? "已完成" : answered ? `已答 ${answered} 题` : "未开始"}</span></div>${answered ? `<div class="ax-module-progress"><i style="width:${Math.round(answered / total * 100)}%"></i></div>` : ""}<button type="button" class="ax-module-resume" onclick="openAssessmentModal('${key}')">${completed ? "查看结果" : answered ? "继续作答" : "单独开始"} →</button></article>`;
-    }).join("");
-    root.innerHTML = `<section class="ax-module-board"><div class="ax-board-head"><h3>选择测评模块</h3><span>按自己的节奏开始</span></div><div class="ax-module-grid">${cards}</div></section><aside class="ax-plan"><p class="ax-plan-kicker">YOUR ASSESSMENT PLAN</p><h3>你的测评计划</h3><p class="ax-plan-count">已选择 ${selected.length} 个基础模块</p><div class="ax-plan-list">${selected.map(key => `<div><span class="ax-plan-dot ax-${MODULES[key].tone}" aria-hidden="true">${MODULES[key].icon}</span><strong>${MODULES[key].name}</strong><span>${state[key].result?.completed ? "已完成" : `约 ${MODULES[key].minutes} 分钟`}</span></div>`).join("") || '<p>选择一个模块开始探索</p>'}</div><div class="ax-plan-time"><span>预计剩余用时</span><strong>${Math.ceil(remaining)}<small> 分钟</small></strong></div><button type="button" class="ax-start" onclick="startAssessmentPlan()" ${selected.length ? "" : "disabled"}>${remaining ? selected.some(key => activeAnsweredCount(key)) ? "继续测评" : "开始测评" : "查看测评结果"}<span aria-hidden="true">→</span></button><p class="ax-plan-foot">支持中途退出，下次继续</p></aside>`;
-  }
-
-  function startAssessmentPlan() {
-    if (!selectedModules.size) return;
-    planActive = true;
-    const next = [...selectedModules].find(key => !state[key].result?.completed);
-    if (next) openAssessmentModal(next);
-    else {
-      const fold = document.getElementById("assessmentResultsFold");
-      if (fold) { fold.open = true; fold.scrollIntoView({ behavior: "smooth", block: "start" }); }
-    }
-  }
-
   function questionProgress(test, index, total) {
     const count = activeAnsweredCount(test);
     const percent = Math.round(count / total * 100);
@@ -753,6 +720,7 @@
     const holland = state.holland.result;
     return {
       generated_at: new Date().toISOString(),
+      owner: getProgressStorageKey().slice(LOCAL_PROGRESS_PREFIX.length),
       knowledge_version: state.data.knowledge_version || "",
       mbti: mbti?.completed ? {
         completed: true,
@@ -1081,7 +1049,6 @@
   }
 
   function renderAll() {
-    renderSelection();
     updateConfigStatus();
     updateMbtiCard();
     updateHollandCard();
@@ -1377,7 +1344,6 @@
             : "主测已完成，可查看原始分布与 AI 最终判定。";
         setModalHeader("MBTI 性格倾向测评", subtitle, "结果已生成", `${result.answeredCount} / ${result.totalQuestions}`);
         content.innerHTML = renderMbtiResult();
-        appendPlanAction(content);
         return;
       }
       state.mbti.currentIndex = Math.max(0, Math.min(state.mbti.currentIndex, mbtiQuestions().length - 1));
@@ -1388,7 +1354,6 @@
     if (state.holland.result?.completed) {
       setModalHeader("霍兰德职业兴趣测评", "职业兴趣主测已完成，可查看结果与职业线索。", "结果已生成", `${state.holland.result.answeredCount} / ${state.holland.result.totalQuestions}`);
       content.innerHTML = renderHollandResult();
-      appendPlanAction(content);
       return;
     }
     state.holland.currentIndex = Math.max(0, Math.min(state.holland.currentIndex, hollandQuestions().length - 1));
@@ -1428,7 +1393,7 @@
     document.getElementById("assessmentModal")?.classList.add("hidden");
     document.body.style.overflow = "";
     if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
-    else document.querySelector(".ax-start")?.focus();
+    else document.querySelector(`[data-assessment-test="${state.activeTest || 'mbti'}"]`)?.focus();
   }
 
   function handleAssessmentOverlayClick(event) {
@@ -1503,12 +1468,6 @@
     document.querySelector("#assessmentModal .assessment-question-title")?.scrollIntoView({ block: "nearest" });
   }
 
-  function appendPlanAction(content) {
-    if (!planActive) return;
-    const next = [...selectedModules].find(key => !state[key].result?.completed);
-    content.insertAdjacentHTML("beforeend", `<div class="ax-plan-continue"><span>${next ? "这一项已完成，继续你的测评计划" : "已完成所选基础测评"}</span><button type="button" class="assessment-nav-btn primary" onclick="${next ? `openAssessmentModal('${next}')` : "finishAssessmentPlan()"}">${next ? `继续${MODULES[next].name}` : "返回能力画像"} →</button></div>`);
-  }
-
   function goToPreviousQuestion(test) {
     clearTimeout(choiceTimer);
     choiceTimer = null;
@@ -1525,10 +1484,8 @@
   }
 
   function showAssessmentHome() {
-    clearTimeout(choiceTimer);
-    choiceTimer = null;
-    state.activeTest = null;
-    renderModal();
+    closeAssessmentModal();
+    document.getElementById("assessmentTestGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function buildAnswerHighlights() {
@@ -1647,7 +1604,6 @@
   function resetWorkspaceState() {
     clearTimeout(choiceTimer);
     choiceTimer = null;
-    planActive = false;
     state.activeTest = null;
     closeAssessmentHistoryCompare();
     state.configOpen = false;
@@ -1723,24 +1679,11 @@
   }
 
   window.openAssessmentModal = openAssessmentModal;
-  window.toggleAssessmentSelection = (key, checked) => {
-    if (!MODULES[key]) return;
-    if (checked) selectedModules.add(key); else selectedModules.delete(key);
-    renderSelection();
-    document.querySelector(`.ax-module input[aria-label="选择${MODULES[key].name}"]`)?.focus();
-  };
-  window.startAssessmentPlan = startAssessmentPlan;
   window.goToNextAssessmentQuestion = goToNextAssessmentQuestion;
   window.setAssessmentAutoAdvance = value => {
     autoAdvance = Boolean(value);
     clearTimeout(choiceTimer);
     choiceTimer = null;
-  };
-  window.finishAssessmentPlan = () => {
-    closeAssessmentModal();
-    planActive = false;
-    const fold = document.getElementById("assessmentResultsFold");
-    if (fold) { fold.open = true; fold.scrollIntoView({ behavior: "smooth", block: "start" }); }
   };
   window.closeAssessmentModal = closeAssessmentModal;
   window.handleAssessmentOverlayClick = handleAssessmentOverlayClick;

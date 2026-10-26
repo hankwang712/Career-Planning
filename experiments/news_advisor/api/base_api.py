@@ -10,6 +10,24 @@ from ..agents.base import BaseAgent
 logger = logging.getLogger(__name__)
 
 
+def ensure_agent_result(result: dict) -> dict:
+    """统一 HTTP 状态映射；不向客户端透出底层异常详情。"""
+    if not isinstance(result, dict):
+        raise HTTPException(status_code=500, detail="Agent 返回格式错误")
+    status = result.get("status")
+    if status in ("ok", "insufficient_evidence"):
+        return result
+    errors = {
+        "execution_limit": (503, "达到执行次数上限"),
+        "model_error": (502, "模型执行失败"),
+        "validation_failed": (502, "模型输出校验失败"),
+    }
+    if not isinstance(status, str) or not status.strip():
+        raise HTTPException(status_code=500, detail="Agent 返回状态错误")
+    status_code, message = errors.get(status, (502, "Agent 执行失败"))
+    raise HTTPException(status_code=status_code, detail={"status": status, "message": message})
+
+
 class AgentResponse(BaseModel):
     """与 BaseAgent.format_result() 对应的通用响应。"""
 
@@ -40,24 +58,4 @@ class BaseAgentAPI(ABC):
             logger.exception("Agent 执行异常")
             raise HTTPException(status_code=500, detail="Agent 服务内部错误") from exc
 
-        if not isinstance(result, dict):
-            logger.error("Agent 返回值不是字典")
-            raise HTTPException(status_code=500, detail="Agent 返回格式错误")
-
-        status = result.get("status")
-        if status in ("ok", "insufficient_evidence"):
-            return result
-
-        errors = {
-            "execution_limit": (503, "达到执行次数上限"),
-            "model_error": (502, "模型执行失败"),
-            "validation_failed": (502, "模型输出校验失败"),
-        }
-        # 业务错误不在公共层逐项登记；响应不包含底层异常详情。
-        if not isinstance(status, str) or not status.strip():
-            raise HTTPException(status_code=500, detail="Agent 返回状态错误")
-        status_code, message = errors.get(status, (502, "Agent 执行失败"))
-        raise HTTPException(
-            status_code=status_code,
-            detail={"status": status, "message": message},
-        )
+        return ensure_agent_result(result)

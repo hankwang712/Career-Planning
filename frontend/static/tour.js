@@ -8,7 +8,7 @@
   var STEPS = [
     {
       title: '欢迎使用职业规划智能体',
-      content: '推荐流程：<br><span class="tg-flow"><span class="tg-step-tag">1</span>仪表盘<span class="tg-arrow">→</span><span class="tg-step-tag">2</span>能力画像<span class="tg-arrow">→</span><span class="tg-step-tag">3</span>岗位探索<span class="tg-arrow">→</span><span class="tg-step-tag">4</span>人岗匹配<span class="tg-arrow">→</span><span class="tg-step-tag">5</span>规划报告</span>',
+      content: '推荐流程：<br><span class="tg-flow"><span class="tg-step-tag">1</span>仪表盘<span class="tg-arrow">→</span><span class="tg-step-tag">2</span>测评中心<span class="tg-arrow">→</span><span class="tg-step-tag">3</span>岗位探索<span class="tg-arrow">→</span><span class="tg-step-tag">4</span>规划报告</span>',
       target: null,
     },
     {
@@ -18,8 +18,8 @@
       section: 'dashboard',
     },
     {
-      title: '② 能力画像 — 生成用户画像',
-      content: '这里完成 MBTI、霍兰德、基础信息、简历和访谈输入。系统会把这些内容汇总成后续匹配使用的用户画像。',
+      title: '② 测评中心 — 了解自己',
+      content: '这里直接选择六项测评，右侧查看完成时间与简要结果。',
       target: '[data-section="profile"]',
       section: 'profile',
     },
@@ -30,25 +30,19 @@
       section: 'jobs',
     },
     {
-      title: '④ 人岗匹配 — 查看关系与差距',
-      content: '这里使用岗位知识图谱呈现晋升、换岗关系。点击具体岗位后，只聚焦当前岗位相关节点，并显示用户画像与岗位画像差距。',
-      target: '[data-section="matching"]',
-      section: 'matching',
-    },
-    {
-      title: '⑤ 规划报告 — 观察智能体流程',
+      title: '④ 规划报告 — 观察智能体流程',
       content: '生成职业报告，并在个人中心查看。',
       target: '[data-section="report"]',
       section: 'report',
     },
     {
-      title: '⑥ Offer 茶水间 — 复盘与交流',
+      title: '⑤ Offer 茶水间 — 复盘与交流',
       content: '分享求职复盘、面试经验，与同伴交流。',
       target: '[data-section="forum"]',
       section: 'forum',
     },
     {
-      title: '⑦ 行业快报 — 回到主页末尾',
+      title: '⑥ 行业快报 — 回到主页末尾',
       content: '主页末尾展示行业与职业快报，可按分类浏览资讯、阅读摘要，或加载更多新闻。',
       target: '#careerNewsBoard',
       section: 'dashboard',

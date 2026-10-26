@@ -8,6 +8,8 @@ RECRUITMENT_SEARCH_PROMPT = """
 
 【输入与职责】
 request 包含用户的原始需求、channel、可选 days 和结果数量 limit；analysis_date 是时间参照。
+request.clarifications 是历次问题与用户回答；仅回答能补充用户条件，问题中的假设不是用户意愿。
+结合原始需求和补充回答重新搜索；明确纠正以新回答为准，存在歧义或冲突则核实，不重复询问已回答的问题。
 channel=wechat 仅使用微信工具，web 仅使用网页工具，all 可按需求结合使用。
 显式 days 优先于默认值；未提供时，从原始需求理解“近一周/一个月”等时间。
 用户只说“近期”而未指定范围时，用最近30天并在 summary 说明；不把默认值说成用户要求。

@@ -7,6 +7,7 @@ from pydantic import (
 )
 
 from ..resume_rubric import RESUME_WEIGHTS, experience_weights
+from .followup import Clarification
 
 Text = Annotated[str, Field(min_length=1)]
 
@@ -26,6 +27,8 @@ class ResumeInput(Record):
     candidate_level: str = ""
     education_context: str = ""
     additional_evidence: str = ""
+    clarifications: list[Clarification] = Field(default_factory=list)
+    document: dict = Field(default_factory=dict, description="文档读取状态与警告，不属于经历事实")
 
     @model_validator(mode="after")
     def require_single_source(self):
