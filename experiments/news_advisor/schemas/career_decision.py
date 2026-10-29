@@ -25,6 +25,7 @@ class CareerDecisionInput(DecisionRecord):
     preferences: str = ""
     question: str = ""
     resume_analysis: dict[str, Any] = Field(default_factory=dict)
+    recruitment_search: dict[str, Any] = Field(default_factory=dict, description="招聘搜索的完整结果，仅作为待核实机会背景")
     clarifications: list[Clarification] = Field(default_factory=list)
     targets: list[CareerTarget] = Field(min_length=1, max_length=5)
 

@@ -9,7 +9,10 @@ from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededE
 from langchain.agents.structured_output import StructuredOutputError
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import merge_configs
 from langgraph.errors import GraphRecursionError
+
+from ..telemetry import AgentMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -126,18 +129,23 @@ class BaseAgent(ABC):
 
     async def _arun_prepared(self, prepared: dict, config: RunnableConfig | None = None) -> dict:
         """执行已整理的输入，供需要基于同一份材料校验结果的子类复用。"""
+        metrics = AgentMetrics()
         if not self.should_run(prepared):
-            return self.format_result()
-
-        graph = self.build_graph(prepared)
+            return {**self.format_result(), "execution": metrics.summary()}
 
         try:
+            graph = self.build_graph(prepared)
             state = await graph.ainvoke(
                 self.make_inputs(prepared),
-                config=config
+                config=merge_configs(config, {"callbacks": [metrics]})
             )
             draft = state.get("structured_response")
-            return self.format_result(draft)
+            result = self.format_result(draft)
         except Exception as error:
             logger.exception("Agent 执行失败：%s", self.name)
-            return self.format_result(error=error)
+            result = self.format_result(error=error)
+        result["execution"] = metrics.summary()
+        model = getattr(self.model, "model_name", None) or getattr(self.model, "model", None)
+        if isinstance(model, str):
+            result["execution"]["model"] = model
+        return result

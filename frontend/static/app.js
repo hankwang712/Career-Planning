@@ -527,7 +527,7 @@ async function requestJson(url, options = {}) {
     Object.assign(headers, await window.CareerAuth.headers());
   }
   let body = options.body;
-  if (body && typeof body !== "string") {
+  if (body && typeof body !== "string" && !(body instanceof FormData)) {
     headers["Content-Type"] = headers["Content-Type"] || "application/json";
     body = JSON.stringify(body);
   }
@@ -698,6 +698,10 @@ const resumeTaskState = {
   reportObserver: null
 };
 
+const reportResumeUiState = { pending: false, phase: "", error: "" };
+let reportGenerationStarting = false;
+let reportGenerationError = "";
+
 const profilePortraitTaskState = {
   loading: false,
   stageIndex: 0,
@@ -801,6 +805,7 @@ function updateResumeActionButtons() {
   if (uploadBtn) uploadBtn.disabled = busy;
   if (analyzeBtn) analyzeBtn.disabled = busy;
   if (deleteBtn) deleteBtn.disabled = busy;
+  renderReportResumePanel();
 }
 
 function syncResumeJobInputFrame() {
@@ -4197,6 +4202,7 @@ function resumeAnalysisDashboardHtml(state, profile, matcher, analysisMode, reco
 
 function renderResumeProfileSection(data) {
   const state = data || emptyResumeProfile();
+  renderReportResumePanel(state);
   const uploadStatus = document.getElementById("resumeUploadStatus");
   const uploadMeta = document.getElementById("resumeUploadMeta");
   const analyzeStatus = document.getElementById("resumeAnalyzeStatus");
@@ -9213,6 +9219,7 @@ function renderReportWorkspace(profile, roles) {
   }
   const inputForm = document.getElementById("reportWorkflowInput");
   if (inputForm) inputForm.querySelectorAll("input, textarea, select").forEach((input) => { input.disabled = running; });
+  renderReportResumePanel();
   renderReportWorkflowReview(state);
   if (mapEl) {
     mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
@@ -9325,6 +9332,10 @@ function buildCareerReportGenerationPayload() {
     profile_snapshot: profile,
     role_rankings: role_rankings,
     focus_role_id: focusId,
+    availability: {
+      arrival: document.getElementById("reportWorkflowArrival")?.value || "undecided",
+      days_per_week: Number(document.getElementById("reportWorkflowDays")?.value || 0)
+    },
     workflow: {
       targets: String(document.getElementById("reportWorkflowTargets")?.value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
       preferences: String(document.getElementById("reportWorkflowPreferences")?.value || "").trim(),
@@ -9473,6 +9484,132 @@ async function resumeCareerReportRuntime() {
   }
 }
 
+function renderReportResumePanel(data = getResumeProfileFromCache()) {
+  const panel = document.getElementById("reportResumePanel");
+  if (!panel) return;
+  const hasFile = Boolean(data?.file_name);
+  const ready = hasFile;
+  const running = isCareerReportRunningStatus(getCareerReportStateSafe()?.status);
+  const busy = reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight;
+  const locked = running || busy || reportGenerationStarting;
+  const title = document.getElementById("reportResumeFileName");
+  const meta = document.getElementById("reportResumeFileMeta");
+  const badge = document.getElementById("reportResumeStatus");
+  const hint = document.getElementById("reportResumeHint");
+  const select = document.getElementById("reportResumeSelectBtn");
+  const input = document.getElementById("reportResumeFileInput");
+  panel.dataset.state = reportResumeUiState.error ? "error" : busy ? "busy" : ready ? "ready" : "empty";
+  panel.setAttribute("aria-busy", String(busy));
+  if (title) title.textContent = hasFile ? (data.original_file_name || data.file_name) : "选择简历文件，或拖拽到这里";
+  if (meta) meta.textContent = hasFile
+    ? `${String(data.file_type || "文件").toUpperCase()} · ${(Number(data.file_size || 0) / 1024).toFixed(0)} KB`
+    : "支持 PDF、DOCX，单个文件不超过 12 MB。";
+  if (badge) badge.textContent = busy ? (reportResumeUiState.phase || "正在处理") : ready ? "已上传" : "未上传";
+  if (hint) hint.textContent = reportResumeUiState.error || (busy
+    ? "当前任务正在处理，请稍候。"
+    : ready ? "简历已上传。填写下方目标岗位，点击“启动生成”，分析流程会自动读取这份简历。"
+    : "先上传简历，再填写目标岗位，点击“启动生成”开始多智能体分析。");
+  if (select) { select.disabled = locked; select.textContent = hasFile ? "更换简历" : "上传简历"; }
+  if (input) input.disabled = locked;
+  document.getElementById("reportWorkflowInput")?.querySelectorAll("input, textarea, select").forEach((field) => {
+    field.disabled = running || reportGenerationStarting;
+  });
+  const launch = document.getElementById("reportLaunchBtn");
+  if (launch) {
+    launch.disabled = locked || !hasFile;
+    launch.title = !hasFile ? "请先在下方上传简历" : busy ? "当前任务正在处理，请稍候" : "使用当前简历启动多智能体分析";
+    if (reportGenerationStarting) launch.textContent = "正在启动";
+  }
+  const feedback = document.getElementById("reportLaunchFeedback");
+  if (feedback) {
+    feedback.hidden = !reportGenerationStarting && !reportGenerationError;
+    feedback.dataset.state = reportGenerationError ? "error" : "starting";
+    feedback.textContent = reportGenerationError
+      ? `启动失败：${reportGenerationError}`
+      : "正在提交简历和分析目标，等待创建任务…";
+  }
+  if (reportGenerationStarting || reportGenerationError) {
+    const statusTitle = document.getElementById("reportStatusTitle");
+    const statusHint = document.getElementById("reportStatusHint");
+    if (statusTitle) statusTitle.textContent = reportGenerationError ? "多智能体流程未启动" : "正在启动多智能体流程";
+    if (statusHint) statusHint.textContent = reportGenerationError || "正在提交简历和分析目标，任务创建后将在下方显示执行进度。";
+  }
+}
+
+async function refreshReportResumePanel(force = true) {
+  if (reportResumeUiState.pending) return;
+  try {
+    const data = await loadResumeProfile(force);
+    if (data.file_name) reportResumeUiState.error = "";
+    renderReportResumePanel(data);
+  } catch (error) {
+    if (error.code === "ACCOUNT_CHANGED") return;
+    reportResumeUiState.error = error.message || "简历状态加载失败，请刷新页面重试。";
+    renderReportResumePanel();
+  }
+}
+
+function pickReportResumeFile() {
+  if (!isAuthenticatedUser()) return showToast("请先登录", "请登录后上传简历。", "warning", 2000);
+  if (!reportResumeUiState.pending && !resumeTaskState.uploadInFlight && !resumeTaskState.analyzeInFlight && !reportGenerationStarting && !isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
+    document.getElementById("reportResumeFileInput")?.click();
+  }
+}
+
+async function uploadReportResumeFile(file) {
+  if (!file) return;
+  if (!isAuthenticatedUser()) return showToast("请先登录", "请登录后上传简历。", "warning", 2000);
+  if (reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight || reportGenerationStarting || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
+    return showToast("请稍候", "当前有上传或分析任务正在进行，请完成后再更换简历。", "warning", 2500);
+  }
+  if (!/\.(pdf|docx)$/i.test(file.name) || file.size <= 0 || file.size > 12 * 1024 * 1024) {
+    reportResumeUiState.error = "请选择不超过 12 MB 的非空 PDF 或 DOCX 简历文件。";
+    renderReportResumePanel();
+    return;
+  }
+  const epoch = accountRequestEpoch;
+  reportResumeUiState.pending = true;
+  reportResumeUiState.error = "";
+  reportResumeUiState.phase = "上传中";
+  resumeTaskState.uploadInFlight = true;
+  updateResumeActionButtons();
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const payload = await requestJson("/api/resume/upload", { method: "POST", body });
+    const uploaded = payload.data || emptyResumeProfile();
+    userWorkspaceState.scopedData.resume_profile = uploaded;
+    userWorkspaceState.scopedDataLoaded.resume_profile = true;
+    renderResumeProfileSection(uploaded);
+    showToast("上传成功", "文件已保存。点击“启动生成”，由现有分析流程读取并分析简历。", "success", 2800);
+    refreshUnifiedExperience();
+  } catch (error) {
+    if (error.code !== "ACCOUNT_CHANGED" && epoch === accountRequestEpoch) {
+      reportResumeUiState.error = error.message || "简历上传失败，请重试。";
+      showToast("简历上传失败", reportResumeUiState.error, "error", 3200);
+    }
+  } finally {
+    if (epoch === accountRequestEpoch) {
+      reportResumeUiState.pending = false;
+      reportResumeUiState.phase = "";
+      resumeTaskState.uploadInFlight = false;
+      updateResumeActionButtons();
+    }
+  }
+}
+
+async function onReportResumeSelected(event) {
+  try { await uploadReportResumeFile(event?.target?.files?.[0]); }
+  finally { if (event?.target) event.target.value = ""; }
+}
+
+function onReportResumeDrop(event) {
+  event.preventDefault();
+  event.currentTarget?.classList.remove("is-dragging");
+  if (event.dataTransfer?.files?.length !== 1) return showToast("请选择一个文件", "一次上传一份用于当前分析的简历。", "warning", 2000);
+  void uploadReportResumeFile(event.dataTransfer.files[0]);
+}
+
 async function startCareerReportGeneration() {
   if (!document.getElementById("reportWorkflowInput")) {
     window.location.href = "/#report";
@@ -9482,6 +9619,10 @@ async function startCareerReportGeneration() {
     showToast("请先登录", "请登录后生成职业报告。", "warning", 1800);
     return;
   }
+  if (reportGenerationStarting || reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
+    return showToast("请稍候", "简历或报告任务正在执行中。", "warning", 2000);
+  }
+  if (document.getElementById("reportWorkflowInput")?.reportValidity?.() === false) return;
   const payload = buildCareerReportGenerationPayload();
   if (!payload) {
     showSection("profile");
@@ -9489,26 +9630,43 @@ async function startCareerReportGeneration() {
     return;
   }
 
+  const epoch = accountRequestEpoch;
+  reportGenerationError = "";
+  reportGenerationStarting = true;
   const launchBtn = document.getElementById("reportLaunchBtn");
   if (launchBtn) {
     launchBtn.disabled = true;
     launchBtn.textContent = "启动中";
   }
+  renderReportResumePanel();
 
   try {
     if (!payload.workflow.targets.length || payload.workflow.targets.length > 5) {
       throw new Error("请填写 1 到 5 个目标岗位或方向，每行一个。");
     }
+    const resume = await loadResumeProfile(true);
+    if (!resume.file_name) {
+      document.getElementById("reportResumePanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      throw new Error("请先在上方上传 PDF 或 DOCX 简历。");
+    }
     await submitCareerReportWorkflow(payload);
   } catch (error) {
-    showToast("启动失败", error.message || "请稍后重试。", "error", 3200);
+    if (error.code !== "ACCOUNT_CHANGED" && epoch === accountRequestEpoch) {
+      reportGenerationError = error.message || "请稍后重试。";
+      showToast("启动失败", reportGenerationError, "error", 3200);
+    }
   } finally {
-    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+    if (epoch === accountRequestEpoch) {
+      reportGenerationStarting = false;
+      renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+    }
   }
 }
 
 async function submitCareerReportWorkflow(payload) {
   const result = await requestJson("/api/career-report/generate/start", { method: "POST", body: payload });
+  reportGenerationError = "";
+  window.ReportReview?.reset();
   reportWorkflowSnapshot = null;
   applyCareerReportRuntimeState({ status: "queued", job_id: result.job_id, report_id: result.report_id,
     stage: "resume_analysis", stage_detail: "任务已提交，正在执行 Agent。", progress: [] });
@@ -9524,74 +9682,50 @@ function renderReportWorkflowReview(state) {
   const reportId = String(state?.report_id || "");
   const visible = ["waiting_input", "failed"].includes(state?.status) && reportId;
   container.classList.toggle("hidden", !visible);
-  if (!visible) return;
-  if (reportWorkflowSnapshot?.reportId === reportId) return;
+  if (!visible) { window.ReportReview?.close(); return; }
+  const active = !document.getElementById("report")?.classList.contains("hidden");
+  if (reportWorkflowSnapshot?.reportId === reportId) {
+    window.ReportReview?.autoOpen(active && state.status === "waiting_input");
+    return;
+  }
   if (reportWorkflowLoading === reportId) return;
   reportWorkflowLoading = reportId;
+  const epoch = accountRequestEpoch;
   container.textContent = "正在读取已保存的分析结果…";
   requestJson(`/api/career-report/workflow/${encodeURIComponent(reportId)}`).then((snapshot) => {
-    if (getCareerReportStateSafe()?.report_id !== reportId) return;
+    if (epoch !== accountRequestEpoch || getCareerReportStateSafe()?.report_id !== reportId) return;
     reportWorkflowSnapshot = { ...snapshot, reportId };
     const review = snapshot.review;
     if (!review) {
       container.innerHTML = `<p>执行进度已保存，可重试失败步骤。</p><button type="button" class="report-launch-primary" onclick="continueCareerReportWorkflow()">${snapshot.complete ? "重试报告整理" : "从保存处重试"}</button>`;
       return;
     }
-    const decisions = { recommended: "建议优先考虑", conditional: "满足条件后考虑", not_recommended: "暂不建议", insufficient_information: "信息不足" };
-    const targets = review.targets.map((target) => {
-      const assessment = (review.assessments || []).find((item) => item.target_id === target.target_id);
-      return `<label class="report-workflow-target"><input type="radio" name="reportWorkflowTarget" value="${escHtml(target.target_id)}" ${review.targets.length === 1 ? "checked" : ""} required>
-        <span><strong>${escHtml(target.title)}</strong> · ${escHtml(decisions[assessment?.decision] || "信息不足")}<br>${escHtml(assessment?.conclusion || "")}</span></label>`;
-    }).join("");
-    let questionIndex = 0;
-    const questions = Object.entries(review.questions || {}).map(([agent, items]) => items.map((question) =>
-      `<label>${escHtml(question)}<textarea data-report-question="${questionIndex++}" rows="2" maxlength="10000" placeholder="选填；未回答的内容仍按未知处理"></textarea></label>`
-    ).join("")).join("");
-    const today = new Date().toLocaleDateString("en-CA");
-    container.innerHTML = `<form onsubmit="event.preventDefault(); continueCareerReportWorkflow();">
-      <h3>职业决策与行动安排</h3><p>${escHtml(review.summary || "请确认本次目标。")}</p>${targets}${questions}
-      <div class="report-workflow-constraints">
-        <label>每周可投入小时<input id="reportWorkflowHours" type="number" min="0.1" max="168" step="0.1" required></label>
-        <label>开始日期<input id="reportWorkflowStart" type="date" value="${escHtml(today)}" min="${escHtml(today)}" required></label>
-        <label>截止日期<input id="reportWorkflowDeadline" type="date" min="${escHtml(today)}" required></label>
-        <label>预算（元，选填）<input id="reportWorkflowBudget" type="number" min="0" step="0.01"></label>
-      </div>
-      <label>已完成的任务（每行一项，选填）<textarea id="reportWorkflowCompleted" rows="2" maxlength="10000"></textarea></label>
-      <button type="submit" class="report-launch-primary">确认并生成行动计划</button>
-    </form>`;
+    window.ReportReview.mount(container, reportWorkflowSnapshot, {
+      onSubmit: continueCareerReportWorkflow,
+      active: !document.getElementById("report")?.classList.contains("hidden") && getCareerReportStateSafe()?.status === "waiting_input"
+    });
   }).catch((error) => {
-    container.textContent = error.message || "读取失败，请刷新页面重试。";
-  }).finally(() => { reportWorkflowLoading = ""; });
+    if (epoch === accountRequestEpoch) container.textContent = error.message || "读取失败，请刷新页面重试。";
+  }).finally(() => { if (epoch === accountRequestEpoch) reportWorkflowLoading = ""; });
 }
 
-async function continueCareerReportWorkflow() {
+async function continueCareerReportWorkflow(response = {}) {
   const snapshot = reportWorkflowSnapshot;
-  if (!snapshot) return;
+  if (!snapshot) return false;
   const container = document.getElementById("reportWorkflowReview");
-  const form = container?.querySelector("form");
-  if (form && !form.reportValidity()) return;
-  let response = {};
-  if (snapshot.review) {
-    const answers = {};
-    let index = 0;
-    Object.entries(snapshot.review.questions || {}).forEach(([agent, questions]) => {
-      const items = questions.map((question) => ({ question, answer: String(container.querySelector(`[data-report-question="${index++}"]`)?.value || "").trim() })).filter((item) => item.answer);
-      if (items.length) answers[agent] = items;
-    });
-    const budget = document.getElementById("reportWorkflowBudget").value;
-    response = { target_id: container.querySelector('[name="reportWorkflowTarget"]:checked')?.value,
-      answers, constraints: { weekly_hours: Number(document.getElementById("reportWorkflowHours").value),
-        start_date: document.getElementById("reportWorkflowStart").value, deadline: document.getElementById("reportWorkflowDeadline").value,
-        budget: budget === "" ? null : Number(budget),
-        completed_tasks: document.getElementById("reportWorkflowCompleted").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) } };
-  }
+  const epoch = accountRequestEpoch;
   const buttons = container.querySelectorAll("button");
   buttons.forEach((button) => { button.disabled = true; });
   try {
     await submitCareerReportWorkflow({ continue_report_id: snapshot.reportId, checkpoint_id: snapshot.checkpoint_id, response });
+    return true;
   } catch (error) {
-    showToast("继续失败", error.message || "请稍后重试。", "error", 3600);
+    if (error.code === "ACCOUNT_CHANGED" || epoch !== accountRequestEpoch) return false;
+    const message = error.message || "请稍后重试。";
+    showToast("继续失败", message, "error", 3600);
+    window.ReportReview?.showError(message);
     if (String(error.message || "").includes("刷新")) reportWorkflowSnapshot = null;
+    return false;
   } finally {
     buttons.forEach((button) => { button.disabled = false; });
   }
@@ -9856,6 +9990,10 @@ function initNavWorkspaceMenu() {
 
 function clearPrivateWorkspace() {
   accountRequestEpoch += 1;
+  window.ReportReview?.reset();
+  Object.assign(reportResumeUiState, { pending: false, phase: "", error: "" });
+  reportGenerationStarting = false;
+  reportGenerationError = "";
   inFlightGetRequests.clear();
   stopCareerReportPolling();
   stopAnalyzeProgressTicker();
@@ -10325,7 +10463,10 @@ function showSection(sectionId) {
   appState.currentSection = sectionId;
   // 更新 URL hash，让 return-nav 能记录当前 section，返回时恢复正确页面
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
-  if (sectionId === "report") renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+  if (sectionId === "report") {
+    renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
+    void refreshReportResumePanel(true);
+  }
   if (sectionId === "jobs") {
     void openDatasetBrowser();
   } else {

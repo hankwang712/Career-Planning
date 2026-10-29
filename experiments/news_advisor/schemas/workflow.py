@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .followup import Clarification
 
 
-AgentName = Literal["resume_analysis", "recruitment_search", "career_decision", "action_planning"]
+AgentName = Literal["resume_analysis", "job_analysis", "recruitment_search", "career_decision", "action_planning"]
 
 
 class ThreadCheckpoint(BaseModel):
@@ -16,6 +16,7 @@ class ThreadCheckpoint(BaseModel):
 
 class AgentRequest(ThreadCheckpoint):
     agent: AgentName
+    message: str = Field(default="", max_length=12000, description="可选的用户本轮陈述，分层记忆入口从中提取事实与偏好")
     input: dict[str, Any] = Field(default_factory=dict, description="首次提供完整输入，后续只传需要更新的字段")
     answers: list[Clarification] = Field(default_factory=list, description="回答本线程中该 Agent 实际提出的问题")
 

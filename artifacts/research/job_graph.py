@@ -672,7 +672,7 @@ def dump_json(path: Path, value) -> None:
 
 def docker(args, *parts) -> bytes:
     cmd = ["docker", "compose", "--env-file", str(args.env_file.resolve()),
-           "-f", str(ROOT / "compose.postgres.yml"), *parts]
+           "-f", str(ROOT.parents[1] / "compose.yml"), *parts]
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True)
     if result.returncode:
         # 不打印命令中的环境文件内容；只返回 Docker/数据库的错误。

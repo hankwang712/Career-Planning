@@ -1,0 +1,246 @@
+#report .report-resume-panel {
+    margin: 20px 0;
+    padding: 25px 28px 20px;
+    border: 1px solid #dce5ed;
+    border-radius: 18px;
+    background: #fff;
+}
+
+.report-resume-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+#report .report-input-step {
+    display: block;
+    margin-bottom: 7px;
+    color: #647b91;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .07em;
+}
+
+#report .report-resume-heading h3,
+#report .report-input-heading h3 {
+    margin: 0;
+    color: #213c55;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.report-input-heading {
+    margin-bottom: 22px;
+}
+
+.report-resume-status {
+    padding: 5px 10px;
+    border: 1px solid #dfe7ee;
+    border-radius: 6px;
+    background: #f5f8fb;
+    color: #708397;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.report-resume-dropzone {
+    display: flex;
+    align-items: center;
+    gap: 17px;
+    padding: 22px;
+    border: 1px dashed #bfcfdd;
+    border-radius: 10px;
+    background: #f7fafc;
+    transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.report-resume-dropzone.is-dragging {
+    border-color: #3273ad;
+    background: #eef6fc;
+}
+
+.report-resume-document-icon {
+    display: grid;
+    width: 48px;
+    height: 52px;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid #dee7ef;
+    border-radius: 9px;
+    background: #fff;
+    color: #567d9d;
+}
+
+.report-resume-document-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.report-resume-file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.report-resume-file-info strong {
+    display: block;
+    color: #29445e;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+#report .report-resume-file-info p {
+    margin: 5px 0 0;
+    color: #75879a;
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.report-resume-file-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#report #reportResumeFileInput[hidden] {
+    display: none !important;
+}
+
+#report .report-resume-file-actions button {
+    min-height: 40px;
+    padding: 9px 17px;
+    font-size: 13px;
+}
+
+#report .report-resume-file-actions button:disabled,
+#report #reportLaunchBtn:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+#report .report-resume-hint {
+    margin: 13px 0 0;
+    color: #75869a;
+    font-size: 12px;
+    line-height: 1.8;
+}
+
+.report-resume-panel[data-state="ready"] .report-resume-status {
+    border-color: #cde3da;
+    background: #f0f8f3;
+    color: #447663;
+}
+
+.report-resume-panel[data-state="ready"] .report-resume-dropzone {
+    border-style: solid;
+    border-color: #d7e6df;
+}
+
+.report-resume-panel[data-state="error"] .report-resume-hint {
+    color: #ac5147;
+}
+
+.report-resume-panel[data-state="busy"] .report-resume-status {
+    color: #2e6d9e;
+    background: #edf5fc;
+}
+
+.report-launch-feedback {
+    margin: 18px 0;
+    padding: 14px 18px;
+    border: 1px solid #c9ddec;
+    border-radius: 10px;
+    background: #eff6fc;
+    color: #2e6d9e;
+    overflow-wrap: anywhere;
+}
+
+.report-launch-feedback[data-state="error"] {
+    border-color: #ebc9c4;
+    background: #fff5f3;
+    color: #a34036;
+}
+
+.report-availability-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.report-extra-options { margin-top: 6px; border-top: 1px solid #e4ebf1; padding-top: 14px; }
+.report-extra-options summary, .report-review-analysis summary { color: #56738d; cursor: pointer; font-size: 13px; }
+.report-extra-options[open] summary { margin-bottom: 18px; }
+.report-extra-options > label { margin-top: 14px; }
+.report-review-overview { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.report-review-panel { margin: 20px 0; padding: 24px; border: 1px solid #dfe4ef; border-radius: 18px; background: #fff; }
+.report-review-overview h3 { margin: 4px 0 8px; font-size: 20px; color: #213c55; }
+.report-review-overview p { margin: 0; color: #718397; font-size: 14px; }
+.report-review-analysis { margin-top: 18px; border-top: 1px solid #e4ebf1; padding-top: 14px; }
+.report-review-analysis p { font-size: 13px; line-height: 1.9; color: #6b7e92; white-space: pre-line; }
+
+.report-review-dialog {
+    width: min(540px, calc(100vw - 32px));
+    max-height: calc(100dvh - 48px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid #dbe4ed;
+    border-radius: 20px;
+    color: #233c52;
+    background: #fff;
+    box-shadow: 0 28px 90px #142b4540;
+    overflow: auto;
+}
+.report-review-dialog::backdrop { background: #132d4a70; backdrop-filter: blur(4px); }
+.report-review-card { padding: 28px; }
+.report-review-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #7c8c9b; font-size: 12px; }
+.report-review-close { width: 30px; height: 30px; border: 0; background: #f0f4f7; border-radius: 50%; color: #6a8094; font-size: 23px; cursor: pointer; }
+.report-review-card progress { width: 100%; height: 4px; margin: 16px 0 22px; border: 0; accent-color: #356b99; border-radius: 4px; }
+.report-review-card progress::-webkit-progress-bar { background: #e5edf3; border-radius: 4px; }
+.report-review-card progress::-webkit-progress-value { background: #356b99; border-radius: 4px; }
+.report-review-card progress::-moz-progress-bar { background: #356b99; border-radius: 4px; }
+.report-review-card h3 { margin: 0 0 20px; font-size: 21px; font-weight: 650; line-height: 1.65; overflow-wrap: anywhere; outline: none; }
+.report-review-note { margin: 0 0 18px; color: #7a8b9c; font-size: 13px; line-height: 1.8; }
+.report-review-choice { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; margin: 10px 0; border: 1px solid #dce5ed; border-radius: 12px; color: #455f76; font-size: 14px; line-height: 1.6; cursor: pointer; }
+.report-review-choice:has(input:checked) { border-color: #3a759f; background: #f1f7fb; }
+.report-review-choice input { margin-top: 4px; accent-color: #356b99; }
+.report-review-field { display: block; margin-top: 18px; color: #536b80; font-size: 14px; }
+.report-review-dialog select, .report-review-dialog textarea { display: block; width: 100%; margin-top: 8px; padding: 12px; border: 1px solid #d7e2eb; border-radius: 10px; background: #fff; color: #2c465c; font: inherit; }
+.report-review-dialog :is(select, textarea, button, input):focus-visible { outline: 2px solid #3677ab; outline-offset: 3px; }
+.report-review-recorded { padding: 14px 16px; margin-bottom: 18px; border-radius: 10px; background: #f3f7fa; font-size: 14px; }
+.report-review-recorded p { margin: 6px 0 0; font-size: 12px; line-height: 1.7; color: #6a8194; }
+.report-review-footer { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #e6edf3; }
+.report-review-footer button { min-height: 40px; padding: 10px 16px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+.report-review-footer .report-launch-primary, .report-review-overview .report-launch-primary { background: #32668e; border: 1px solid #32668e; color: #fff; }
+.report-review-footer .report-launch-secondary { border: 1px solid #d5e0ea; color: #526d84; background: #fff; }
+.report-review-skip { color: #748a9c; background: transparent; border: 0; }
+.report-review-dialog button:disabled { cursor: wait; opacity: .6; }
+.report-review-error { color: #a34036; font-size: 13px; line-height: 1.7; }
+
+@media (max-width: 680px) {
+    .report-availability-fields { grid-template-columns: 1fr; gap: 10px; }
+    .report-review-overview { align-items: flex-start; flex-direction: column; gap: 16px; }
+    .report-review-card { padding: 22px 18px; }
+    .report-review-card h3 { font-size: 19px; }
+    #report .report-resume-panel {
+        padding: 21px 18px;
+    }
+
+    .report-resume-heading {
+        gap: 12px;
+    }
+
+    .report-resume-dropzone {
+        flex-wrap: wrap;
+        gap: 13px;
+        padding: 18px;
+    }
+
+    .report-resume-file-info {
+        flex-basis: calc(100% - 65px);
+    }
+
+    .report-resume-file-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

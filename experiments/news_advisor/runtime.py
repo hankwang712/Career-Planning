@@ -24,13 +24,13 @@ def _start_local(settings: JobRAGConfig, port: int) -> None:
     print("[岗位图谱] 正在启动数据库容器和 LightRAG…", file=sys.stderr, flush=True)
     commands = [
         ["docker.exe" if os.name == "nt" else "docker", "compose", "--env-file", str(RESEARCH_DIR / ".env"),
-         "-f", str(RESEARCH_DIR / "compose.postgres.yml"), "up", "-d", "--wait", "--wait-timeout", "60", "postgres"],
+         "-f", str(RESEARCH_DIR.parents[1] / "compose.yml"), "up", "-d", "--wait", "--wait-timeout", "60", "postgres"],
         [sys.executable, "-X", "utf8", str(RESEARCH_DIR / "job_graph.py"), "serve", "--background",
          "--workspace", settings.workspace, "--env-file", str(RESEARCH_DIR / ".env"), "--webui-port", str(port)],
     ]
     for index, command in enumerate(commands):
         message = (
-            "数据库启动失败，请先打开 Docker Desktop，并确认 research/.env 和 compose.postgres.yml 配置正确"
+            "数据库启动失败，请先打开 Docker Desktop，并确认 research/.env 和根目录 compose.yml 配置正确"
             if index == 0 else
             "LightRAG 启动失败，请使用 yolov11 环境，并查看 artifacts/research/.job_graph/logs/webui.log"
         )

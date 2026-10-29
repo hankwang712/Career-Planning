@@ -35,6 +35,8 @@
     </style>
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20261026-map-zoom">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}?v=20260418-career-news-grid-margin-v16">
+        <link rel="stylesheet" href="{{ url_for('static', filename='career-process.css') }}?v=20261029-product-preview-v2">
+        <link rel="stylesheet" href="{{ url_for('static', filename='report-resume.css') }}?v=20261029-review-cards">
         <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}?v=20261016-cards-autoplay">
         <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
         <link rel="stylesheet" href="{{ url_for('static', filename='auth-security.css') }}">
@@ -313,6 +315,10 @@
 
                 <!-- 右侧操作区：时钟 + 深色工作区胶囊（参考 Notion/Linear 工作区切换器） -->
                 <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
+                    <a href="/assistant.html" class="assistant-nav-entry" title="打开 AI 生涯助手" aria-label="打开 AI 生涯助手" style="display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border:1px solid rgba(159,220,211,.25);border-radius:12px;background:rgba(159,220,211,.08);color:#bce7dd;font-size:12px;white-space:nowrap;text-decoration:none;">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></svg>
+                        <span class="hidden xl:inline">AI 助手</span>
+                    </a>
                     <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
                     <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
                         <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区与账号菜单">
@@ -658,7 +664,8 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20261026-forum-colors" defer></script>
+    <script src="{{ url_for('static', filename='report-review.js') }}?v=20261029-cards" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20261029-report-review-cards" defer></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261026-langgraph-agents" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261026-assessment-center">
     <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}?v=20261026-forum-blue">

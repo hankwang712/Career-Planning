@@ -1,0 +1,7 @@
+name: career
+
+include:
+  - path: ./artifacts/research/compose.postgres.yml
+    env_file: ./artifacts/research/.env
+  - path: ./experiments/compose.memory.yml
+    env_file: ./experiments/.env

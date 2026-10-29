@@ -9,6 +9,8 @@ import threading
 from weakref import WeakValueDictionary
 
 from ..paths import APP_DATA_DIR, PROJECT_ROOT
+from .provenance import capture_provenance, freeze_profile
+from .review import REVIEW_POLICY, build_review_ui
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -39,8 +41,12 @@ def _lock_for(thread_id):
 
 @asynccontextmanager
 async def _graph(runtime=None, stage_callback=None):
+    from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     from experiments.news_advisor.report_workflow import build_report_graph
+    from experiments.news_advisor.agents import CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
+    from experiments.news_advisor.agents.job import JobAnalysisAgent
+    from .planning import ReportActionPlanningAgent
 
     def model_provider():
         from langchain_openai import ChatOpenAI
@@ -52,11 +58,28 @@ async def _graph(runtime=None, stage_callback=None):
         if (urlsplit(config["base_url"]).hostname or "").endswith(".deepseek.com") or urlsplit(config["base_url"]).hostname == "deepseek.com":
             options["extra_body"] = {"thinking": {"type": "disabled"}}
         return ChatOpenAI(base_url=config["base_url"], api_key=config["api_key"], model=config["model"],
-                          timeout=180, max_retries=1, **options)
+                          timeout=180, max_retries=1, http_client=sync_client,
+                          # Own clients preserve the SDK's default system/environment proxy handling.
+                          http_async_client=async_client, http_socket_options=(), **options)
+
+    classes = {"resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
+               "recruitment_search": RecruitmentSearchAgent, "career_decision": CareerDecisionAgent}
+
+    def agent_factory(name):
+        if name == "action_planning":
+            return ReportActionPlanningAgent(model_provider(), stage_callback=stage_callback)
+        agent = classes[name](model_provider())
+        if name == "career_decision":
+            agent.system_prompt += "\n" + REVIEW_POLICY
+        return agent
 
     APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    async with AsyncSqliteSaver.from_conn_string(str(APP_DATA_DIR / "agent_checkpoints.sqlite3")) as saver:
-        yield build_report_graph(model_provider, checkpointer=saver, stage_callback=stage_callback)
+    # Flask 每次恢复都有独立的 asyncio.run；连接不得从已关闭的 loop 缓存中复用。
+    with DefaultHttpxClient() as sync_client:
+        async with DefaultAsyncHttpxClient() as async_client:
+            async with AsyncSqliteSaver.from_conn_string(str(APP_DATA_DIR / "agent_checkpoints.sqlite3")) as saver:
+                yield build_report_graph(model_provider, checkpointer=saver, stage_callback=stage_callback,
+                                         agent_factory=agent_factory)
 
 
 def _snapshot(snapshot):
@@ -67,6 +90,9 @@ def _snapshot(snapshot):
         "results": snapshot.values.get("results", {}),
         "errors": [str(task.error) for task in snapshot.tasks if task.error],
         "complete": bool(snapshot.values) and not snapshot.next,
+        "provenance": snapshot.values.get("provenance", {}),
+        "review_ui": build_review_ui(pending[0] if pending else None, snapshot.values.get("input"),
+                                    snapshot.values.get("profile_snapshot")),
     }
 
 
@@ -79,12 +105,19 @@ def read_report_workflow(username, report_id):
     return asyncio.run(_read(username, report_id))
 
 
-def validate_report_request(payload, raw_resume):
+def validate_report_request(payload, raw_resume="", *, file_path=""):
     from experiments.news_advisor.report_workflow import ReportInput
     supplied = dict(payload)
-    # 简历原文只从当前账户已保存的简历中读取。
-    supplied["raw_resume"] = raw_resume
-    return ReportInput.model_validate(supplied).model_dump(mode="json")
+    # Only the server selects the account's uploaded file; the browser cannot supply paths or resume text.
+    supplied["raw_resume"] = "" if file_path else raw_resume
+    schema = ReportInput
+    if file_path:
+        from pydantic import create_model
+        schema = create_model("UploadedReportInput", __base__=ReportInput, raw_resume=(str, ""))
+    validated = schema.model_validate(supplied).model_dump(mode="json")
+    if file_path:
+        validated["file_path"] = str(file_path)
+    return validated
 
 
 def validate_report_continuation(payload, snapshot):
@@ -102,8 +135,25 @@ def validate_report_continuation(payload, snapshot):
     return None
 
 
-async def _execute(username, report_id, inputs, runtime, callback):
+async def _execute(username, report_id, inputs, runtime, callback, profile=None):
     from langgraph.types import Command
+
+    document_metadata = None
+    if runtime.get("continuation") is None and inputs.get("file_path"):
+        from experiments.news_advisor.tools.document import read_document
+        if callback:
+            callback("resume_analysis", "简历分析", "正在使用文档工具读取上传的简历")
+        supplied = dict(inputs)
+        file_path = supplied.pop("file_path")
+        if runtime.get("document_cache") is not None:
+            document = await asyncio.to_thread(runtime["document_cache"].read, username, {"path": file_path})
+        else:
+            document = await read_document.ainvoke({"file_path": file_path, "max_pages": 20})
+        markdown = str(document.get("markdown") or "").strip()
+        if document.get("status") not in {"ok", "partial"} or not markdown:
+            raise ValueError(document.get("error") or "简历文档读取失败，请检查上传文件后重试")
+        inputs = validate_report_request(supplied, markdown)
+        document_metadata = {key: document[key] for key in ("status", "warnings", "processed_pages", "total_pages") if key in document}
 
     config = {"configurable": {"thread_id": _thread_id(username, report_id)}, "recursion_limit": 100}
     async with _graph(runtime, callback) as graph:
@@ -117,7 +167,13 @@ async def _execute(username, report_id, inputs, runtime, callback):
                 return (await graph.aget_state(config)).values
             value = Command(resume=response) if current["review"] else None
         else:
-            value = {"input": inputs}
+            frozen = freeze_profile(profile)
+            value = {"input": inputs, "profile_snapshot": frozen,
+                     "provenance": capture_provenance(inputs, frozen, runtime.get("model", ""))}
+            value["provenance"]["review_policy_revision"] = sha256(REVIEW_POLICY.encode("utf-8")).hexdigest()
+            value["provenance"]["action_planning_output_mode"] = "validated_json_v1"
+            if document_metadata is not None:
+                value["provenance"]["resume_document"] = document_metadata
         await graph.ainvoke(value, config, durability="sync")
         state = await graph.aget_state(config)
         if _snapshot(state)["review"]:
@@ -133,10 +189,11 @@ def generate_career_report_bundle(*, username, report_id, profile_payload, runti
     if not lock.acquire(blocking=False):
         raise ValueError("此报告正在执行，请等待当前任务完成")
     try:
-        state = asyncio.run(_execute(username, report_id, profile_payload.get("agent_workflow"), runtime_llm, stage_callback))
+        state = asyncio.run(_execute(username, report_id, profile_payload.get("agent_workflow"), runtime_llm,
+                                     stage_callback, profile_payload))
         if stage_callback:
             stage_callback("report_writer", "报告合成", "正在将已校验的 Agent 结果整理为报告")
         from .workflow_report import build_report_bundle
-        return build_report_bundle(username, report_id, profile_payload, state, model_name)
+        return build_report_bundle(username, report_id, state.get("profile_snapshot", {}), state, model_name)
     finally:
         lock.release()

@@ -57,6 +57,7 @@ from services.report import (
 from services.report.workflow import (
     ReportNeedsInput, read_report_workflow, validate_report_request, validate_report_continuation,
 )
+from services.report.review import apply_availability
 from services.report.legacy_report import (
     _build_dashboard_summary,
     _build_role_cards,
@@ -103,6 +104,8 @@ from services.tools import generate_text_to_image, get_text_to_image_runtime
 from services import db as _app_db
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
+from services.chat import create_blueprint as create_chat_blueprint
+from services.chat.profile import build_background as build_chat_background
 from services.paths import (
     APP_DATA_DIR,
     DATA_DIR,
@@ -672,6 +675,14 @@ def _get_active_provider_and_model(selection=None):
     return base_url, api_key, model
 
 
+def _get_chat_runtime(selection=None):
+    runtime = _get_active_provider_and_model(selection)
+    if all(runtime):
+        return runtime
+    from services.chat.config import fallback_chat_runtime
+    return fallback_chat_runtime()
+
+
 def _get_profile_portrait_runtime():
     providers = _load_providers()
     provider = next(
@@ -934,6 +945,17 @@ def _owned_resume_storage_path(username, path):
     except ValueError:
         pass
     return ""
+
+
+def _chat_resume_source(username):
+    state = _load_user_state(username)
+    resume = state.get("resume_profile") or {}
+    path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
+    if not path or not os.path.isfile(path):
+        return {}
+    return {"path": path, "document_id": str(resume.get("document_id") or ""),
+            "name": str(resume.get("original_file_name") or resume.get("file_name") or "简历"),
+            "text": str(resume.get("resume_source_text") or "")}
 
 
 def _load_user_state(username):
@@ -1201,6 +1223,10 @@ def _delete_admin_account(account_key, acting_username=""):
         raise PermissionError("不能删除当前登录账号")
 
     if registered_user:
+        chat_service = app.extensions.get("chat_service")
+        if chat_service:
+            chat_service.vector.delete_owner(registered_username)
+            chat_service.store.delete_owner(registered_username)
         _app_db.delete_user(registered_username)
 
     lookup_name = registered_username or safe_key
@@ -3988,7 +4014,7 @@ def _save_resume_upload(file_storage, username):
         raise ValueError("仅支持 PDF 或 DOCX 简历文件上传。")
     if not safe.lower().endswith(suffix):
         safe += suffix
-    saved_name = f"{int(time.time())}_{safe}"
+    saved_name = f"{int(time.time())}_{uuid.uuid4().hex[:8]}_{safe}"
     target_path = os.path.join(target_dir, saved_name)
     file_storage.save(target_path)
     return target_path, saved_name, size, suffix.lstrip(".")
@@ -4666,6 +4692,8 @@ def _public_resume_state(raw_state):
     state = raw_state if isinstance(raw_state, dict) else {}
     return {
         "file_name": state.get("file_name") or "",
+        "original_file_name": state.get("original_file_name") or state.get("file_name") or "",
+        "document_id": state.get("document_id") or "",
         "file_size": state.get("file_size") or 0,
         "file_type": state.get("file_type") or "",
         "uploaded_at": state.get("uploaded_at"),
@@ -6576,6 +6604,8 @@ def api_resume_llm_models():
 @_login_required
 def api_resume_upload():
     user = _current_user()
+    if _find_running_resume_job(user["username"]) or _find_running_career_report_job(user["username"]):
+        return jsonify({"message": "正在分析简历或生成报告，请等待任务结束后再更换简历。"}), 409
     file_storage = request.files.get("file")
     if file_storage is None:
         return jsonify({"message": "请上传 PDF 或 DOCX 简历文件（file 字段）。"}), 400
@@ -6596,6 +6626,8 @@ def api_resume_upload():
 
     state["resume_profile"] = {
         "file_name": saved_name,
+        "original_file_name": str(file_storage.filename or "resume").replace("\\", "/").rsplit("/", 1)[-1],
+        "document_id": uuid.uuid4().hex,
         "file_size": file_size,
         "file_type": file_type,
         "storage_path": saved_path,
@@ -6804,6 +6836,7 @@ def api_resume_profile():
             pass
     state.pop("resume_profile", None)
     _save_user_state(user["username"], state)
+    app.extensions["chat_service"].store.forget_documents(user["username"])
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
@@ -6838,6 +6871,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             raise CareerReportCanceled("职业报告生成已被用户取消。")
 
     runtime_llm_with_caller = dict(runtime_llm_payload)
+    runtime_llm_with_caller["document_cache"] = app.extensions["chat_service"].documents
     _ensure_not_cancelled()
     _update_career_report_job(
         job_id,
@@ -7000,7 +7034,9 @@ def api_career_report_generate_start():
             "already_running": True,
         }), 409
 
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"message": "请求必须是有效的 JSON 对象。"}), 400
     profile_payload = payload.get("profile_snapshot") if isinstance(payload.get("profile_snapshot"), dict) else {}
     role_payload = _saved_matching_role_payload({"role_rankings": payload.get("role_rankings")})
     focus_role_id = str(payload.get("focus_role_id") or "").strip()
@@ -7038,19 +7074,42 @@ def api_career_report_generate_start():
             continuation = {"checkpoint_id": checkpoint_id, "response": response}
         else:
             report_id = f"report-{uuid.uuid4().hex[:12]}"
-            raw_resume = str((state.get("resume_profile") or {}).get("resume_source_text") or "").strip()
-            if not raw_resume:
-                return jsonify({"message": "请先上传并解析简历，再运行多智能体报告。"}), 400
-            profile_payload["agent_workflow"] = validate_report_request(payload.get("workflow") or {}, raw_resume)
+            resume_scope = state.get("resume_profile") or {}
+            resume_path = _owned_resume_storage_path(username, str(resume_scope.get("storage_path") or ""))
+            resume_path = resume_path if resume_path and os.path.isfile(resume_path) else ""
+            raw_resume = str(resume_scope.get("resume_source_text") or "").strip()
+            if not resume_path and not raw_resume:
+                return jsonify({"message": "请先上传简历，再启动多智能体报告。"}), 400
+            workflow_request = dict(payload.get("workflow") or {})
+            profile_payload["report_user_inputs"] = {key: workflow_request.get(key, "")
+                for key in ("preferences", "additional_evidence")}
+            shared_memory = app.extensions["chat_service"].career_context(username)
+            if not workflow_request.get("preferences") and shared_memory["preferences"]:
+                workflow_request["preferences"] = shared_memory["preferences"]
+            availability, preferences = apply_availability(payload.get("availability"), workflow_request.get("preferences", ""))
+            if availability:
+                profile_payload["report_availability"] = availability
+                workflow_request["preferences"] = preferences
+            historical_context = "\n".join(filter(None, [shared_memory["evidence"],
+                "历史偏好（当前用户输入优先）：" + shared_memory["preferences"] if shared_memory["preferences"] else ""]))
+            if historical_context:
+                evidence = str(workflow_request.get("additional_evidence") or "")
+                prefix = "\n历史用户原文（当前简历和当前输入优先）：\n"
+                remaining = 20000 - len(evidence) - len(prefix)
+                if remaining > 0:
+                    workflow_request["additional_evidence"] = evidence + prefix + historical_context[:remaining]
+            profile_payload["agent_workflow"] = validate_report_request(workflow_request, raw_resume, file_path=resume_path)
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify({"message": str(exc)}), 400
     except ImportError:
         return jsonify({"message": "请先安装 backend/requirements.txt 中的 Agent 依赖。"}), 503
 
     selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
-    base_url, api_key, model = _get_active_provider_and_model(selection_snapshot)
+    # The report and assistant both reuse experiments/.env when no UI provider is configured.
+    base_url, api_key, model = _get_chat_runtime(selection_snapshot)
     if not (base_url and api_key and model):
-        return jsonify({"message": "请先配置主系统的对话模型，再启动 Agent。"}), 400
+        _career_report_console_log(report_id, "启动请求被拒绝", reason="model_not_configured")
+        return jsonify({"message": "未找到可用的对话模型，请在主系统配置模型，或补全 experiments/.env 中的 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL。"}), 400
     runtime_llm = {"model": model, "base_url": base_url, "api_key": api_key,
                    "selection": dict(selection_snapshot), "continuation": continuation}
 
@@ -8147,6 +8206,16 @@ _ensure_app_storage()
 _app_db.init_db()
 _auth.init_app(app)
 app.register_blueprint(create_datasets_blueprint(_login_required))
+_chat_blueprint = create_chat_blueprint(
+    directory=APP_DATA_DIR / "assistant",
+    current_user=_current_user,
+    login_required=_login_required,
+    runtime_provider=_get_chat_runtime,
+    profile_provider=lambda username: build_chat_background(_load_user_state(username), _read_career_report_bundle(username)),
+    resume_provider=_chat_resume_source,
+)
+app.register_blueprint(_chat_blueprint)
+app.extensions["chat_service"] = _chat_blueprint.chat_service
 _load_users()
 _prewarm_caches()
 if __name__ == "__main__":

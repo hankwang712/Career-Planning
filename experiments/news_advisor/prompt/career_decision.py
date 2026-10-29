@@ -28,6 +28,11 @@ CAREER_DECISION_PROMPT = """
   补充回答来源可能带 question，仅帮助理解回答；可引用的用户事实只在 content 中，不能引用问题中的假设。
   新回答与旧材料冲突时标为待核实；明确说明是对旧信息的纠正时，说明更新依据后采用新信息。
 - resume_analysis 只包含上游执行状态和文档读取元数据，质量诊断意见不参与本次事实判断。
+- recruitment_context 是本次招聘搜索的辅助背景，只包含已读取来源中可核对的引文与待核实条件。
+  可用它提出核实招聘状态、到岗安排等后续问题；不得将其解释为仍在招聘、用户满足资格或整个行业趋势。
+  search: 开头的 reference 不属于 sources，不能写入 checks 的 job_evidence 或 candidate_evidence。
+  不新增 targets，不将不同招聘线索的条件合并到已有目标；needs_confirmation 必须保留待核实性质。
+  搜索不可用、没有结果或没有搜索时，不据此否定目标方向；学生能力仍仅由学生材料判断。
 - targets 含 target_id、title、target_type、job_analysis、source_ids。
   job 表示单条具体岗位，direction 表示方向检索样本。上游概括要回到原文核对。
   上游 findings、summary、limitations 都是待复核的分析；与原文冲突时以原文为准。

@@ -129,55 +129,71 @@
                 </div>
             </section>
 
-            <section class="cs-product-section cs-kimi-journey" aria-labelledby="kimiJourneyCtaTitle">
-                <header class="cs-kimi-journey-hero-head">
-                    <h2 class="cs-kimi-journey-hero-title" id="kimiJourneyCtaTitle">准备好改变你的职业了吗？</h2>
-                </header>
-                <div class="cs-kimi-journey-shell">
-                    <article class="cs-kimi-step-card cs-kimi-step-card--assess">
-                        <span class="cs-kimi-step-num">1</span>
-                        <div class="cs-kimi-step-visual" aria-hidden="true">
-                            <img src="{{ url_for('static', filename='assets/illustrations/undraw-career-development-hero.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
-                        </div>
-                        <span class="cs-kimi-step-tag">Assess</span>
-                        <h4>能力盘点</h4>
-                        <p>先确认你的技能结构、兴趣重心和优势证据，避免一开始就在岗位列表里盲选。</p>
-                        <button type="button" class="cs-kimi-step-link" onclick="showSection('profile')">进入能力画像</button>
-                    </article>
-                    <article class="cs-kimi-step-card cs-kimi-step-card--explore">
-                        <span class="cs-kimi-step-num">2</span>
-                        <div class="cs-kimi-step-visual" aria-hidden="true">
-                            <img src="{{ url_for('static', filename='assets/illustrations/undraw-resume-folder-explore.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
-                        </div>
-                        <span class="cs-kimi-step-tag">Explore</span>
-                        <h4>机会筛选</h4>
-                        <p>结合城市、行业和招聘热度，过滤掉不适合的岗位池，把注意力放到最现实的机会窗口。</p>
-                        <button type="button" class="cs-kimi-step-link" onclick="showSection('jobs')">查看市场热度</button>
-                    </article>
-                    <article class="cs-kimi-step-card cs-kimi-step-card--execute">
-                        <span class="cs-kimi-step-num">3</span>
-                        <div class="cs-kimi-step-visual" aria-hidden="true">
-                            <img src="{{ url_for('static', filename='assets/illustrations/undraw-progress-overview-execute.svg') }}" alt="" width="200" height="140" loading="lazy" decoding="async" />
-                        </div>
-                        <span class="cs-kimi-step-tag">Execute</span>
-                        <h4>行动落地</h4>
-                        <p>把岗位方向转成简历优化、项目补强和投递节奏，形成真正可执行的下一步计划。</p>
-                        <button type="button" class="cs-kimi-step-link" onclick="showSection('report')">生成行动报告</button>
-                    </article>
-                </div>
-                <div class="cs-kimi-bottom-cta cs-kimi-journey-bottom-cta">
-                    <div class="cs-kimi-bottom-cta-inner">
-                        <p>立即开始你的旅程，发现更多可能。让 AI 协助你完成评估、匹配与规划。</p>
-                        <div class="cs-kimi-bottom-cta-actions">
-                            <button type="button" class="cs-kimi-bottom-cta-primary" onclick="showSection('profile')">开始探索</button>
-                        </div>
-                        <ul class="cs-kimi-bottom-cta-trust">
-                            <li>免费使用核心功能</li>
-                            <li>数据仅服务于你的账号</li>
-                            <li>随时调整职业路径</li>
-                        </ul>
+            <section class="cs-career-process" aria-labelledby="careerProcessTitle">
+                <header class="cs-career-process-head">
+                    <div class="cs-career-process-intro">
+                        <p class="cs-career-process-eyebrow">职业发展路径</p>
+                        <h2 id="careerProcessTitle">从了解自己，到<span>明确下一步。</span></h2>
+                        <p class="cs-career-process-description">把能力、岗位与行动连接起来，逐步建立适合你的职业路径。</p>
                     </div>
-                </div>
+                    <div class="cs-career-process-start">
+                        <button type="button" class="cs-career-process-primary" onclick="showSection('profile')">
+                            开始能力评估
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
+                        </button>
+                        <span>建议从第一步开始</span>
+                    </div>
+                </header>
+
+                <ol class="cs-career-process-steps">
+                    <li class="cs-career-process-step cs-career-process-step--profile">
+                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">01</span><span>了解自己</span></div>
+                        <div class="cs-process-preview cs-process-preview--profile" aria-hidden="true">
+                            <div class="cs-process-preview-heading"><span>能力结构</span><small>功能示意</small></div>
+                            <div class="cs-process-profile-chart">
+                                <svg viewBox="0 0 210 140" class="cs-process-radar">
+                                    <g class="cs-process-radar-grid"><path d="m105 12 64 42-24 67H65L41 54Z"/><path d="m105 33 43 28-16 44H78L62 61Z"/><path d="m105 54 22 14-8 22H91L83 68Z"/><path d="M105 77V12m0 65 64-23m-64 23 40 44m-40-44-40 44m40-44L41 54"/></g>
+                                    <path class="cs-process-radar-area" d="m105 24 49 35-30 39-48 12-22-52Z"/>
+                                    <g class="cs-process-radar-points"><circle cx="105" cy="24" r="3"/><circle cx="154" cy="59" r="3"/><circle cx="124" cy="98" r="3"/><circle cx="76" cy="110" r="3"/><circle cx="54" cy="58" r="3"/></g>
+                                </svg>
+                                <div class="cs-process-profile-legend"><span><i></i>技能基础</span><span><i></i>兴趣方向</span><span><i></i>实践经历</span></div>
+                            </div>
+                        </div>
+                        <h3>看清自己的能力与优势</h3>
+                        <p class="cs-career-process-step-description">梳理技能、兴趣与已有经历，找到能够支撑职业选择的优势，也明确接下来需要补充的部分。</p>
+                        <button type="button" class="cs-career-process-link" onclick="showSection('profile')">建立能力画像<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
+                    </li>
+                    <li class="cs-career-process-step cs-career-process-step--jobs">
+                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">02</span><span>探索机会</span></div>
+                        <div class="cs-process-preview cs-process-preview--jobs" aria-hidden="true">
+                            <div class="cs-process-preview-heading"><span>机会筛选</span><small>功能示意</small></div>
+                            <div class="cs-process-filter-row"><span>目标城市 <b>⌄</b></span><span>岗位方向 <b>⌄</b></span></div>
+                            <div class="cs-process-job-sample"><span class="cs-process-job-mark">A</span><div><strong>与能力相符的方向</strong><span class="cs-process-skeleton"></span></div><span class="cs-process-job-status">优先了解</span></div>
+                            <div class="cs-process-job-sample"><span class="cs-process-job-mark">B</span><div><strong>值得探索的机会</strong><span class="cs-process-skeleton"></span></div><span class="cs-process-job-status cs-process-job-status--muted">进一步评估</span></div>
+                        </div>
+                        <h3>筛选适合自己的岗位</h3>
+                        <p class="cs-career-process-step-description">结合目标城市、岗位要求与个人背景，缩小选择范围，把精力放在值得进一步了解的机会。</p>
+                        <button type="button" class="cs-career-process-link" onclick="showSection('jobs')">查看匹配岗位<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
+                    </li>
+                    <li class="cs-career-process-step cs-career-process-step--plan">
+                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">03</span><span>推进计划</span></div>
+                        <div class="cs-process-preview cs-process-preview--plan" aria-hidden="true">
+                            <div class="cs-process-preview-heading"><span>下一步行动</span><small>功能示意</small></div>
+                            <div class="cs-process-task"><span class="cs-process-task-check cs-process-task-check--done">✓</span><span>梳理项目经历</span><small>了解优势</small></div>
+                            <div class="cs-process-task"><span class="cs-process-task-check"></span><span>优化岗位简历</span><small>完善表达</small></div>
+                            <div class="cs-process-task"><span class="cs-process-task-check"></span><span>制定投递安排</span><small>推进目标</small></div>
+                            <div class="cs-process-plan-track"><span></span><span></span><span></span><span></span><span></span></div>
+                        </div>
+                        <h3>把职业目标拆成行动</h3>
+                        <p class="cs-career-process-step-description">围绕选定方向，明确技能提升、项目实践与求职安排，让每一个阶段都有具体的目标与下一步。</p>
+                        <button type="button" class="cs-career-process-link" onclick="showSection('report')">查看规划报告<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
+                    </li>
+                </ol>
+
+                <footer class="cs-career-process-footer">
+                    <p>职业方向可以逐步明确。你可以随时补充信息，调整自己的选择。</p>
+                    <a class="cs-career-process-assistant" href="/assistant.html">还没想好？和生涯助手聊聊<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>
+                </footer>
             </section>
 
             <!-- 职业发展路径 -->

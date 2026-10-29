@@ -16,3 +16,11 @@ lxml>=4.9.0
 
 # Reuse the experimental Agent runtime in the main application.
 -r ../experiments/requirements-resume.txt
+
+# Main-site assistant working context and semantic memory index.
+redis>=6.4,<7
+chromadb>=1.5,<2
+# Windows uses Chroma's SegmentAPI to avoid native Rust binding crashes.
+chroma-hnswlib>=0.7.6,<0.8; sys_platform == "win32"
+protobuf>=5.29,<7
+packaging>=23.2,<26

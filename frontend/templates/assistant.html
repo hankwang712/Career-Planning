@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>AI 生涯助手 · 智航生涯</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}?v=20261029-memory-v3">
+    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='assistant.js') }}?v=20261029-memory-v3" defer></script>
+</head>
+<body>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/><path d="m20 2 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+        <symbol id="i-back" viewBox="0 0 24 24"><path d="m10 6-6 6 6 6M4 12h16"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1V11.5a9 9 0 0 1 18 0Z"/><path d="M8 10h8M8 14h5"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15l-1 5Z"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
+        <symbol id="i-memory" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-5 3 4 4 0 0 0-1 7 4 4 0 0 0 6 5 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3Zm6 0a3 3 0 0 1 5 3 4 4 0 0 1 1 7 4 4 0 0 1-6 5 3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Z"/><path d="M5 10h3m8 0h3M7 16h2m6 0h2"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></symbol>
+    </svg>
+    <button class="sidebar-scrim" id="sidebarScrim" aria-label="关闭会话列表" hidden></button>
+    <aside class="chat-sidebar" id="chatSidebar" aria-label="聊天会话">
+        <a class="chat-brand" href="/main.html"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="34" height="34"><span>智航生涯<span class="brand-caption">你的职业探索伙伴</span></span></a>
+        <button class="new-chat" id="newChat"><svg><use href="#i-plus"/></svg>开启新对话<span>＋</span></button>
+        <label class="session-search"><svg><use href="#i-chat"/></svg><input id="sessionSearch" type="search" placeholder="搜索对话" aria-label="搜索对话标题" autocomplete="off"></label>
+        <div class="sidebar-section-label">最近对话 <span id="sessionCount">0</span></div>
+        <nav class="session-list" id="sessionList" aria-label="历史对话"><p class="sidebar-empty">正在加载对话…</p></nav>
+        <div class="sidebar-bottom">
+            <button class="sidebar-memory" id="openMemory"><svg><use href="#i-memory"/></svg><span>记忆与资料<small>查看简历、记忆和本轮上下文</small></span><span class="memory-count" id="memoryCount">0</span></button>
+            <a class="workspace-return" href="/main.html"><svg><use href="#i-back"/></svg>返回工作台</a>
+            <div class="sidebar-user"><span class="user-avatar" id="userAvatar">我</span><span id="userName">我的工作区</span><span class="private-label">私人对话</span></div>
+        </div>
+    </aside>
+    <main class="chat-main">
+        <header class="chat-header">
+            <button class="icon-button mobile-menu" id="toggleSidebar" aria-label="打开会话列表" aria-expanded="false"><svg><use href="#i-menu"/></svg></button>
+            <div class="header-identity"><span class="assistant-status"></span><span>AI 生涯助手</span><span class="header-divider">/</span><span class="model-name" id="modelName">正在连接</span></div>
+            <button class="header-memory" id="headerMemory"><svg><use href="#i-memory"/></svg><span id="headerMemoryLabel">查看记忆状态</span></button>
+        </header>
+        <div class="configuration-note" id="configurationNote" hidden>还没有可用的对话模型。<a href="/main.html">返回工作台配置模型</a>后，即可开始聊天。</div>
+        <div class="conversation-scroll" id="conversationScroll">
+            <div class="welcome" id="welcome">
+                <div class="welcome-symbol"><svg><use href="#i-spark"/></svg></div>
+                <p class="welcome-eyebrow">每一个下一步，都可以聊一聊</p>
+                <h1>接下来，你想探索什么？</h1>
+                <p class="welcome-description">从职业选择到眼前的小困惑。<br>结合你已有的职业画像，一起把思路变清晰。</p>
+                <div class="suggestion-grid">
+                    <button data-prompt="结合你了解的我的职业背景，帮我梳理下一步适合探索的方向。"><span class="suggestion-number">01</span><strong>找到适合我的方向</strong><span>从兴趣、能力和期待开始</span><span class="suggestion-arrow">↗</span></button>
+                    <button data-prompt="我想让简历更有说服力，你能结合我已有的简历信息，帮我看看应该先改哪里吗？"><span class="suggestion-number">02</span><strong>让简历更有说服力</strong><span>一起找出值得被看见的经历</span><span class="suggestion-arrow">↗</span></button>
+                    <button data-prompt="我想准备一次面试，请先了解我的目标岗位，再帮我制定练习安排。"><span class="suggestion-number">03</span><strong>为下一场面试做准备</strong><span>把经历转化成清晰的表达</span><span class="suggestion-arrow">↗</span></button>
+                    <button data-prompt="我最近对职业发展有些迷茫，想和你聊聊，请先问我一个容易回答的问题。"><span class="suggestion-number">04</span><strong>聊聊最近的职业困惑</strong><span>不用准备好答案，慢慢说就好</span><span class="suggestion-arrow">↗</span></button>
+                </div>
+                <p class="welcome-memory"><svg><use href="#i-memory"/></svg>有价值的偏好会被记住，你随时可以查看和移除。</p>
+            </div>
+            <section class="conversation" id="conversation" aria-label="当前对话" hidden>
+                <button class="load-earlier" id="loadEarlier" hidden>加载更早的消息</button>
+                <div id="messageList" role="log" aria-label="聊天消息"></div>
+            </section>
+        </div>
+        <div class="composer-region">
+            <div class="conversation-notice" id="conversationNotice" role="status" hidden></div>
+            <button class="retry-button" id="retryMessage" hidden>重试上一条消息</button>
+            <form class="composer" id="chatForm">
+                <label class="sr-only" for="chatInput">发送消息给 AI 生涯助手</label>
+                <textarea id="chatInput" rows="1" maxlength="12000" placeholder="说说你在想什么…" autocomplete="off"></textarea>
+                <div class="composer-tools"><span><svg><use href="#i-spark"/></svg>从你的背景出发</span><div><span class="input-shortcut">Enter 发送 · Shift + Enter 换行</span><button class="stop-button" id="stopReply" type="button" hidden>停止</button><button class="send-button" id="sendMessage" type="submit" aria-label="发送消息" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+            </form>
+            <button type="button" class="context-status" id="contextStatus">查看助手当前了解的资料与记忆</button>
+            <p class="composer-caption">每个对话独立展开，长期偏好在你的对话间共享。AI 的建议供你参考。</p>
+        </div>
+    </main>
+    <dialog class="memory-dialog" id="memoryDialog" aria-labelledby="memoryTitle">
+        <div class="memory-header"><div><p class="welcome-eyebrow">知道什么，来源在哪里，都看得见</p><h2 id="memoryTitle">记忆与资料</h2></div><button class="icon-button" id="closeMemory" aria-label="关闭记忆面板"><svg><use href="#i-close"/></svg></button></div>
+        <p class="memory-description">上传的简历、工作台分析和聊天偏好分别展示，可核对原文、移除单条记忆。移除记忆不会删除原对话或上传文件。</p>
+        <div class="memory-metrics" id="memoryMetrics"></div>
+        <div class="memory-index-state" id="memoryIndexStatus" role="status"></div>
+        <nav class="memory-tabs" aria-label="记忆内容" role="tablist">
+            <button type="button" id="memorySourcesTab" role="tab" aria-controls="memorySourcesPanel" aria-selected="true" data-memory-tab="sources">资料来源</button>
+            <button type="button" id="memorySavedTab" role="tab" aria-controls="memorySavedPanel" aria-selected="false" data-memory-tab="memories">长期记忆</button>
+            <button type="button" id="memoryContextTab" role="tab" aria-controls="memoryContextPanel" aria-selected="false" data-memory-tab="context">本轮上下文</button>
+        </nav>
+        <section id="memorySourcesPanel" role="tabpanel" aria-labelledby="memorySourcesTab">
+            <div class="memory-resume-state"><div><strong id="memoryResumeTitle">当前简历</strong><p id="memoryResumeStatus"></p></div><button type="button" id="syncResumeMemory">读取当前简历</button></div>
+            <div id="memorySources" class="memory-source-list"></div>
+        </section>
+        <section id="memorySavedPanel" role="tabpanel" aria-labelledby="memorySavedTab" hidden>
+        <p class="memory-job-status" id="memoryJobStatus" role="status"></p>
+        <div class="memory-list" id="memoryList"></div>
+        <button class="consolidate-button" id="consolidateMemory">整理当前对话的记忆</button>
+        </section>
+        <section id="memoryContextPanel" role="tabpanel" aria-labelledby="memoryContextTab" hidden><div id="memoryContext"></div></section>
+    </dialog>
+    <dialog class="action-dialog" id="actionDialog" aria-labelledby="actionTitle">
+        <form id="actionForm"><h2 id="actionTitle"></h2><p id="actionDescription"></p><input id="actionInput" maxlength="80" autocomplete="off" aria-label="对话标题"><div class="action-buttons"><button id="cancelAction" type="button">取消</button><button id="confirmAction" type="submit">确定</button></div></form>
+    </dialog>
+    <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

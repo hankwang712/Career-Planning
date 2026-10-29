@@ -1074,6 +1074,7 @@
         }
       }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='user-center-report.css') }}?v=20261029-report-layout-v2">
 </head>
 <body class="user-center-page" data-page="user-center">
     {% include "partials/page_loader.html" %}
@@ -1089,34 +1090,30 @@
                 </div>
                 <div class="uc-brand-copy">
                     <strong>智航生涯</strong>
-                    <span>个人工作台与成长中心</span>
+                    <span>职业发展工作台</span>
                 </div>
             </a>
 
             <nav class="uc-nav" aria-label="个人中心导航">
                 <div class="uc-nav-group">
                     <button type="button" class="uc-nav-link active" data-target="report-workspace" data-nav-group="report">
-                        <span class="uc-nav-icon">📄</span>
+                        <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg></span>
                         <span>职业报告</span>
                     </button>
                 </div>
                 <button type="button" class="uc-nav-link" data-target="plan-workspace">
-                    <span class="uc-nav-icon">🧭</span>
+                    <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5h6a2 2 0 0 1 2 2v12a3 3 0 0 0-3-2H5zM13 7a2 2 0 0 1 2-2h4v12h-3a3 3 0 0 0-3 2"/></svg></span>
                     <span>学习路径</span>
                 </button>
                 <button type="button" class="uc-nav-link" data-target="account-center">
-                    <span class="uc-nav-icon">👤</span>
+                    <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v2"/></svg></span>
                     <span>账户中心</span>
                 </button>
                 <button type="button" class="uc-nav-link hidden" id="userCenterAdminNavBtn" data-target="account-admin">
-                    <span class="uc-nav-icon">🛠️</span>
+                    <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6zM9 12l2 2 4-4"/></svg></span>
                     <span>账号管理</span>
                 </button>
             </nav>
-
-            <div class="uc-sidebar-note">
-                <h2>个人中心说明</h2>
-            </div>
 
             <div class="uc-sidebar-footer">
                 <a class="uc-footer-link" href="/" onclick="event.preventDefault();ucGoBack()">← 返回上一界面</a>
@@ -1128,8 +1125,8 @@
                 <div class="uc-topbar-left">
                     <a class="uc-back-link" href="/" onclick="event.preventDefault();ucGoBack()">← 返回上一界面</a>
                     <div>
-                        <p class="uc-topbar-kicker">User Center</p>
-                        <h1>个人中心与工作台</h1>
+                        <p class="uc-topbar-kicker">个人工作台</p>
+                        <h1>我的职业发展</h1>
                     </div>
                 </div>
                 <div class="uc-topbar-actions">
@@ -1151,8 +1148,8 @@
                         <section class="uc-surface uc-report-hero-surface">
                             <div class="uc-section-head">
                                 <div>
-                                    <p class="uc-section-kicker">Career Report</p>
-                                    <h2 class="uc-section-title">职业报告中心</h2>
+                                    <p class="uc-section-kicker">了解自己 · 明确方向 · 采取行动</p>
+                                    <h2 class="uc-section-title">职业报告</h2>
                                     <p id="userCenterReportSubline" class="uc-section-subline">先选择一份正式报告。</p>
                                 </div>
                                 <div class="uc-hero-actions">
@@ -1165,9 +1162,8 @@
                             <section class="uc-surface uc-report-library-surface">
                                 <div class="uc-block-head">
                                     <div>
-                                        <p class="uc-section-kicker">Formal Reports</p>
-                                        <h3 class="uc-block-title">正式职业报告</h3>
-                                        <p class="uc-block-copy">按岗位方向和生成时间查看正式报告。</p>
+                                        <h3 class="uc-block-title">我的报告 <span id="userCenterReportCount" class="uc-report-count">0 份报告</span></h3>
+                                        <p class="uc-block-copy">查看分析与建议，或打开历史版本对照。</p>
                                     </div>
                                 </div>
                                 <div id="userCenterReportLibrary" class="uc-report-library-grid" aria-live="polite"></div>
@@ -1179,10 +1175,9 @@
                                 <div class="uc-block-head uc-report-workbench-head">
                                     <div>
                                         <div class="uc-report-detail-backline">
-                                            <button type="button" class="uc-back-mini-btn" onclick="window.openUserCenterReportLibrary?.()">← 返回报告卡片库</button>
+                                            <button type="button" class="uc-back-mini-btn" onclick="window.openUserCenterReportLibrary?.()">← 全部报告</button>
                                         </div>
-                                        <p class="uc-section-kicker">Career Report Reader</p>
-                                        <h3 class="uc-block-title">职业报告阅览室</h3>
+                                        <h3 class="uc-block-title">报告详情</h3>
                                     </div>
                                     <div class="uc-report-toolbar">
                                         <button id="userCenterExportPdfBtn" type="button" class="career-report-secondary-btn uc-report-toolbar-btn uc-report-toolbar-btn--pdf" onclick="exportReport('pdf')">
@@ -1727,8 +1722,8 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}?v=20261026-forum-colors"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20261026-langgraph-agents"></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261026-langgraph-agents"></script>
-    <script src="{{ url_for('static', filename='user-center.js') }}?v=20261016-clean-interface"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261029-report-layout-v2"></script>
+    <script src="{{ url_for('static', filename='user-center.js') }}?v=20261029-cleanup-v1"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20260402-learning-path-fusion-v1"></script>
     <style>
       /* ── 报告中心主区域按钮样式 ── */

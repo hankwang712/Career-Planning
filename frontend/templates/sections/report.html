@@ -12,27 +12,53 @@
             </div>
         </div>
 
+        <p id="reportLaunchFeedback" class="report-launch-feedback" role="status" aria-live="polite" hidden></p>
+
+        <section id="reportResumePanel" class="report-resume-panel" aria-labelledby="reportResumeTitle">
+            <div class="report-resume-heading"><div><span class="report-input-step">01 · 简历材料</span><h3 id="reportResumeTitle">上传用于分析的简历</h3></div><span id="reportResumeStatus" class="report-resume-status" role="status">未上传</span></div>
+            <div id="reportResumeDropzone" class="report-resume-dropzone" ondragover="event.preventDefault(); this.classList.add('is-dragging');" ondragleave="this.classList.remove('is-dragging');" ondrop="onReportResumeDrop(event)">
+                <div class="report-resume-document-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div>
+                <div class="report-resume-file-info"><strong id="reportResumeFileName">选择简历文件，或拖拽到这里</strong><p id="reportResumeFileMeta">支持 PDF、DOCX，单个文件不超过 12 MB。</p></div>
+                <div class="report-resume-file-actions"><button id="reportResumeSelectBtn" type="button" class="report-launch-primary" onclick="pickReportResumeFile()">上传简历</button></div>
+                <input id="reportResumeFileInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="onReportResumeSelected(event)" hidden>
+            </div>
+            <p id="reportResumeHint" class="report-resume-hint" role="status" aria-live="polite">先上传简历，再填写目标岗位，点击“启动生成”开始多智能体分析。</p>
+        </section>
+
         <form id="reportWorkflowInput" class="report-workflow-form" onsubmit="event.preventDefault(); startCareerReportGeneration();">
+            <div class="report-input-heading"><span class="report-input-step">02 · 分析目标</span><h3>填写目标与偏好</h3></div>
             <label>目标岗位或方向（每行一个，最多五个）
                 <textarea id="reportWorkflowTargets" rows="2" maxlength="1500" placeholder="例如：大模型应用开发工程师" required></textarea>
             </label>
             <label>求职偏好与限制
-                <textarea id="reportWorkflowPreferences" rows="2" maxlength="5000" placeholder="城市、到岗时间、求职期限等"></textarea>
+                <textarea id="reportWorkflowPreferences" rows="2" maxlength="4500" placeholder="例如：希望在杭州或上海工作，其他限制可留空"></textarea>
             </label>
-            <label>补充经历事实
-                <textarea id="reportWorkflowEvidence" rows="2" maxlength="20000" placeholder="简历未写明的真实经历，可留空"></textarea>
-            </label>
-            <label>招聘搜索需求（选填）
-                <input id="reportWorkflowSearch" maxlength="3000" placeholder="例如：查找上海的大模型应用开发实习机会">
-            </label>
-            <label>招聘搜索渠道
-                <select id="reportWorkflowChannel">
-                    <option value="web">网页</option>
-                    <option value="wechat">微信公众号</option>
-                    <option value="all">网页与微信公众号</option>
-                </select>
-            </label>
-            <p>使用已上传并解析的简历。职业决策完成后，请确认目标和每周可用时间，再生成行动计划。</p>
+            <div class="report-availability-fields">
+                <label>什么时候可以开始实习？
+                    <select id="reportWorkflowArrival" required>
+                        <option value="" disabled selected>选择到岗时间</option>
+                        <option value="now">随时到岗</option><option value="one_week">一周内</option>
+                        <option value="two_weeks">两周内</option><option value="one_month">一个月内</option>
+                        <option value="winter">寒假开始</option><option value="summer">暑假开始</option>
+                        <option value="undecided">尚未确定</option>
+                    </select>
+                </label>
+                <label>每周可以实习几天？
+                    <select id="reportWorkflowDays" required>
+                        <option value="" disabled selected>选择每周天数</option>
+                        <option value="1">1 天</option><option value="2">2 天</option><option value="3">3 天</option>
+                        <option value="4">4 天</option><option value="5">5 天</option><option value="6">6 天</option>
+                        <option value="7">7 天</option><option value="0">尚未确定</option>
+                    </select>
+                </label>
+            </div>
+            <details class="report-extra-options">
+                <summary>更多选项（选填）</summary>
+                <label>简历之外的补充经历<textarea id="reportWorkflowEvidence" rows="2" maxlength="20000" placeholder="没有需要补充的内容可留空"></textarea></label>
+                <label>招聘搜索需求<input id="reportWorkflowSearch" maxlength="3000" placeholder="需要实时搜索时填写"></label>
+                <label>招聘搜索渠道<select id="reportWorkflowChannel"><option value="web">网页</option><option value="wechat">微信公众号</option><option value="all">网页与微信公众号</option></select></label>
+            </details>
+            <p>简历分析后，只需确认少量尚未说明的信息，即可生成行动计划。</p>
         </form>
 
         <div id="reportStatus" class="report-launch-status">
@@ -46,7 +72,7 @@
             </div>
         </div>
 
-        <div id="reportWorkflowReview" class="report-workflow-form hidden" aria-live="polite"></div>
+        <div id="reportWorkflowReview" class="report-review-panel hidden" aria-live="polite"></div>
 
         <div class="report-workflow-section" aria-label="多智能体协作流">
             <div class="report-workflow-header">

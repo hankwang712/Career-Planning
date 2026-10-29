@@ -194,8 +194,10 @@ function applyUserCenterReportWorkspaceMode() {
   const libraryShell = document.getElementById("userCenterReportLibraryShell");
   const detailShell = document.getElementById("userCenterReportDetailShell");
   const showDetail = mode === "detail";
+  const workspace = document.getElementById("report-workspace");
+  if (workspace) workspace.dataset.mode = mode;
   if (libraryShell) {
-    libraryShell.classList.remove("hidden");
+    libraryShell.classList.toggle("hidden", showDetail);
     libraryShell.classList.toggle("uc-report-library-shell--with-detail", showDetail);
   }
   if (detailShell) {
@@ -786,8 +788,6 @@ function renderUserCenterReportStat(label, value, iconType, tone = "") {
 function renderUserCenterReportLibrary() {
   const host = document.getElementById("userCenterReportLibrary");
   if (!host) return;
-  {
-
   const pack = typeof window.getCareerReportVersionList === "function"
     ? window.getCareerReportVersionList()
     : { versions: [], reportState: null, canonicalReportId: "" };
@@ -840,7 +840,9 @@ function renderUserCenterReportLibrary() {
     const specialty = getUserCenterReportSpecialty(titleRaw, focusRoleRaw);
     const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展正式报告";
     const summary = buildUserCenterReportSummary(item, focusRoleRaw, specialty);
-    const fitScore = Number(item?.fit_score);
+    const rawFitScore = item?.fit_score;
+    const fitScore = rawFitScore === null || rawFitScore === undefined || String(rawFitScore).trim() === ""
+      ? NaN : Number(rawFitScore);
     const fitLabel = Number.isFinite(fitScore)
       ? `${Math.round(fitScore)}%`
       : (String(item?.fit_band_label || "").trim() || "待评估");
@@ -849,17 +851,15 @@ function renderUserCenterReportLibrary() {
       : "neutral";
     const gapCount = Math.max(0, Number(item?.gap_count || 0));
     const actionCount = Math.max(0, Number(item?.action_count || 0));
-    const sectionCount = Math.max(0, Number(item?.section_count || 0));
     const strengthCount = Math.max(0, Number(item?.strength_count || 0));
     const latestBadgeLabel = isLatest ? "最新版本" : "历史版本";
     const latestBadgeIcon = isLatest ? "latest" : "history";
     const summaryBody = clipUserCenterText(summary, 168);
-    const statActionValue = actionCount > 0 ? actionCount : sectionCount;
 
     return `
       <article class="uc-report-library-card tone-${escHtml(tone)}${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
         <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
-          ${reportLibraryCardSparkles()}
+          <div class="uc-report-library-copy">
           <div class="uc-report-library-card-top">
             <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
               ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
@@ -873,15 +873,13 @@ function renderUserCenterReportLibrary() {
               <p class="uc-report-library-title">${escHtml(subtitle)}</p>
             </div>
           </div>
-          <div class="uc-report-library-outline">
-            <span class="uc-report-library-outline-item">${renderUserCenterMetaIcon("role")}${escHtml(focusRoleRaw)}</span>
-            ${specialty ? `<span class="uc-report-library-outline-item">${renderUserCenterMetaIcon("major")}${escHtml(specialty)}</span>` : ""}
-          </div>
+          ${specialty && specialty !== focusRoleRaw ? `<div class="uc-report-library-outline"><span class="uc-report-library-outline-item">${escHtml(specialty)}</span></div>` : ""}
           <p class="uc-report-library-summary">${escHtml(summaryBody)}</p>
+          </div>
           <div class="uc-report-library-stats">
-            ${renderUserCenterReportStat("契合度", fitLabel, "fit", fitTone)}
+            ${renderUserCenterReportStat(Number.isFinite(fitScore) ? "契合度" : "决策建议", fitLabel, "fit", fitTone)}
             ${renderUserCenterReportStat("待补强", `${gapCount}`, "gap", gapCount > 0 ? "warn" : "high")}
-            ${renderUserCenterReportStat("行动项", `${statActionValue}`, actionCount > 0 ? "action" : "section", actionCount > 0 ? "accent" : "neutral")}
+            ${renderUserCenterReportStat("行动项", `${actionCount}`, actionCount > 0 ? "action" : "section", actionCount > 0 ? "accent" : "neutral")}
           </div>
         </button>
         <div class="uc-report-library-foot">
@@ -890,108 +888,9 @@ function renderUserCenterReportLibrary() {
             <span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("section")}优势 ${escHtml(String(strengthCount))}</span>
           </div>` : ""}
           <div class="uc-report-library-foot-actions">
+            <button type="button" class="uc-report-read-btn" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>阅读报告 <span aria-hidden="true">→</span></button>
             <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" aria-label="删除这份报告卡片" ${!rid || isDeleting ? "disabled" : ""}>
               ${renderUserCenterMetaIcon("delete")}${isDeleting ? "删除中..." : "删除"}
-            </button>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join("");
-
-  host.querySelectorAll("[data-report-library-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      void openUserCenterReportDetail(button.dataset.reportLibraryId || "");
-    });
-  });
-
-  host.querySelectorAll("[data-report-delete-id]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void deleteUserCenterReport(button.dataset.reportDeleteId || "");
-    });
-  });
-  return;
-  }
-
-  const pack = typeof window.getCareerReportVersionList === "function"
-    ? window.getCareerReportVersionList()
-    : { versions: [], reportState: null, canonicalReportId: "" };
-  const { versions, reportState, canonicalReportId } = pack;
-  const cards = Array.isArray(versions) ? versions : [];
-  const deletingId = String(userCenterState.deletingReportId || "").trim();
-  const detailMode = normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode) === "detail";
-  const selectedId = detailMode ? String(appState?.careerReport?.meta?.report_id || "").trim() : "";
-
-  const pendingCard = reportState?.status === "running" || reportState?.status === "queued"
-    ? `
-      <article class="uc-report-library-card uc-report-library-card--pending">
-        ${reportLibraryCardSparkles()}
-        <div class="uc-report-library-card-top">
-          <div class="uc-report-library-card-mark tone-general">
-            ${renderUserCenterReportIcon("")}
-          </div>
-          <div class="uc-report-library-card-head">
-            <div class="uc-report-library-meta">
-              <span class="uc-report-library-badge">生成中</span>
-              <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${escHtml(reportState.stage_label || "任务编排中")}</span>
-            </div>
-            <h4>新的正式职业报告正在生成</h4>
-          </div>
-        </div>
-        <p class="uc-report-library-title">${escHtml(reportState.stage_detail || "系统正在串联多智能体分析与报告写作。")}</p>
-      </article>
-    `
-    : "";
-
-  if (!cards.length && !pendingCard) {
-    host.innerHTML = `
-      <article class="uc-report-library-empty">
-        <p>当前还没有正式职业报告。先生成一份正式报告，卡片库会按岗位方向和生成时间保存历史版本。</p>
-      </article>
-    `;
-    return;
-  }
-
-  host.innerHTML = pendingCard + cards.map((item) => {
-    const rid = String(item?.report_id || "").trim();
-    const isLatest = Boolean(canonicalReportId && rid === canonicalReportId);
-    const isActive = Boolean(selectedId && rid === selectedId);
-    const isDeleting = Boolean(deletingId && rid === deletingId);
-    const focusRoleRaw = String(item?.focus_role_name || "").trim() || "待识别方向";
-    const titleRaw = String(item?.title || "").trim();
-    const generatedAt = escHtml(item?.generated_at || "--");
-    const tone = getUserCenterReportTone(item?.focus_role_name || item?.title || "");
-    const specialty = titleRaw ? String(titleRaw.split("·")[0] || "").trim() : "";
-    const subtitle = specialty && specialty !== focusRoleRaw ? specialty : "职业发展报告";
-    const summaryExtra = titleRaw && titleRaw !== subtitle
-      ? clipUserCenterText(titleRaw, 120)
-      : "";
-
-    return `
-      <article class="uc-report-library-card${isLatest ? " latest" : ""}${isActive ? " active" : ""}${isDeleting ? " is-deleting" : ""}">
-        <button type="button" class="uc-report-library-card-main" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
-          ${reportLibraryCardSparkles()}
-          <div class="uc-report-library-card-top">
-            <div class="uc-report-library-card-mark tone-${escHtml(tone)}">
-              ${renderUserCenterReportIcon(item?.focus_role_name || item?.title || "")}
-            </div>
-            <div class="uc-report-library-card-head">
-              <div class="uc-report-library-meta">
-                <span class="uc-report-library-badge${isLatest ? "" : " muted"}">${isLatest ? "最新" : "历史"}</span>
-                <span class="uc-report-library-meta-item">${renderUserCenterMetaIcon("time")}${generatedAt}</span>
-              </div>
-              <h4>${escHtml(focusRoleRaw)}</h4>
-            </div>
-          </div>
-          <p class="uc-report-library-title">${escHtml(subtitle)}</p>
-          ${summaryExtra ? `<p class="uc-report-library-summary">${escHtml(summaryExtra)}</p>` : ""}
-        </button>
-        <div class="uc-report-library-foot">
-          <div class="uc-report-library-foot-actions">
-            <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>
-              ${isDeleting ? "删除中..." : "删除卡片"}
             </button>
           </div>
         </div>
@@ -1166,6 +1065,10 @@ function renderUserCenterReportOverview() {
   const viewerBtn = document.getElementById("userCenterOpenReportBtn");
   const generateBtn = document.getElementById("userCenterGenerateReportBtn");
   const heroSublineEl = document.getElementById("userCenterReportSubline");
+  const countEl = document.getElementById("userCenterReportCount");
+  const libraryPack = typeof window.getCareerReportVersionList === "function" ? window.getCareerReportVersionList() : {};
+  const libraryCount = Array.isArray(libraryPack.versions) ? libraryPack.versions.length : 0;
+  if (countEl) countEl.textContent = `${libraryCount} 份报告`;
   const versionCount = Number(versions.length || (reportData?.report_document ? 1 : 0));
   // 检查是否有正式报告：versions数量、careerReport对象存在、或有report_document
   const hasFormalReport = versionCount > 0 || careerReportToolbarActionsAvailable() || Boolean(reportData?.report_document);
@@ -1178,7 +1081,7 @@ function renderUserCenterReportOverview() {
   if (versionEl) versionEl.textContent = String(versionCount);
   if (viewerBtn) {
     viewerBtn.disabled = !careerReportToolbarActionsAvailable();
-    viewerBtn.classList.toggle("hidden", viewMode !== "report");
+    viewerBtn.classList.toggle("hidden", workspaceMode !== "detail" || viewMode !== "report");
   }
   if (generateBtn) {
     generateBtn.disabled = Boolean(reportState?.status === "running" || reportState?.status === "queued");
@@ -1192,10 +1095,14 @@ function renderUserCenterReportOverview() {
       : "当前已进入报告详情页，可在概览与完整报告之间切换，并使用编辑与导出。";
   }
 
-  if (sublineEl) {
+  if (sublineEl && workspaceMode === "detail") {
     const title = reportData?.meta?.title || displayTracker?.report_title || "职业规划报告";
     const statusTag = appState?.careerReportViewingHistorical ? "历史只读" : viewMode === "report" ? "完整报告" : "概览视图";
     sublineEl.textContent = `${title} · ${statusTag} · 生成时间 ${updatedAt}`;
+  } else if (sublineEl) {
+    sublineEl.textContent = libraryCount
+      ? `已保存 ${libraryCount} 份职业分析，查看判断依据，找到下一步的行动方向。`
+      : "从一份简历开始，梳理你的优势、职业方向与下一步行动。";
   }
 
   if (historyEl) {

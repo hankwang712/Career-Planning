@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-REPORT_VERSION = "2026.10-langgraph-v1"
+REPORT_VERSION = "2026.10-langgraph-v2"
 
 CAREER_REPORT_STAGE_DEFS = [
     {"key": "resume_analysis", "label": "简历分析", "agent": "ResumeAnalysisAgent"},

@@ -49,6 +49,11 @@ def export_once() -> None:
             html = render_template("base.html")
     (out_dir / "index.html").write_text(html, encoding="utf-8")
 
+    # The assistant has its own document, while authenticated chat APIs stay on Flask.
+    with server.app.test_request_context("/assistant.html"):
+        assistant_html = render_template("assistant.html")
+    (out_dir / "assistant.html").write_text(assistant_html, encoding="utf-8")
+
     # 2) 复制 static 目录
     if static_src.exists():
         shutil.copytree(static_src, out_dir / "static")

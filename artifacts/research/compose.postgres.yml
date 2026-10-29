@@ -1,3 +1,5 @@
+name: career
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -29,3 +31,5 @@ services:
 
 volumes:
   career_pgdata:
+    external: true
+    name: research_career_pgdata

@@ -2,16 +2,18 @@
 
 from copy import deepcopy
 import json
+from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from .agents import ActionPlanningAgent, CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
+from .agents import ActionPlanningAgent, CareerDecisionAgent, JobAnalysisAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
 from .schemas.action_planning import ActionPlanningInput
 from .schemas.career_decision import CareerDecisionInput
 from .schemas.followup import Clarification
+from .schemas.job import JobAnalysisInput
 from .schemas.recruitment_search import RecruitmentSearchInput
 from .schemas.resume import ResumeInput
 from .schemas.workflow import AgentRequest
@@ -19,6 +21,7 @@ from .schemas.workflow import AgentRequest
 
 AGENTS = {
     "resume_analysis": (ResumeInput, ResumeAnalysisAgent),
+    "job_analysis": (JobAnalysisInput, JobAnalysisAgent),
     "recruitment_search": (RecruitmentSearchInput, RecruitmentSearchAgent),
     "career_decision": (CareerDecisionInput, CareerDecisionAgent),
     "action_planning": (ActionPlanningInput, ActionPlanningAgent),
@@ -29,7 +32,11 @@ class AdvisorState(MessagesState, total=False):
     request: dict
     candidate: dict
     inputs: dict[str, dict]
+    executed_inputs: dict[str, dict]
     results: dict[str, dict]
+    memory_context: dict
+    memory_event_id: str
+    memory_text: str
 
 
 class AgentExecutionError(RuntimeError):
@@ -50,7 +57,7 @@ def followup_questions(result: dict) -> list[str]:
     return list(dict.fromkeys(question for question in questions if question.strip()))
 
 
-def build_advisor_graph(model_provider, *, checkpointer: BaseCheckpointSaver):
+def build_advisor_graph(model_provider, *, checkpointer: BaseCheckpointSaver, memory=None):
     async def prepare(state: AdvisorState):
         request = AgentRequest.model_validate(state["request"])
         name = request.agent
@@ -122,34 +129,75 @@ def build_advisor_graph(model_provider, *, checkpointer: BaseCheckpointSaver):
             decision = results.get("career_decision", {})
             if decision.get("status") != "ok":
                 raise ValueError("请先在本线程完成或更新职业决策，再生成行动计划")
-            payload.update(decision_input=inputs["career_decision"], decision_result=decision)
+            payload.update(decision_input=state.get("executed_inputs", {}).get("career_decision", inputs["career_decision"]),
+                           decision_result=decision)
 
         schema = AGENTS[name][0]
         payload = schema.model_validate(payload).model_dump(mode="json")
         # 条件更新后不继续展示依赖旧材料的决策与计划。
         invalidated = {name}
-        if name == "resume_analysis":
+        if name in {"resume_analysis", "job_analysis"}:
             invalidated.update(("career_decision", "action_planning"))
         elif name == "career_decision":
             invalidated.add("action_planning")
         for key in invalidated:
             results.pop(key, None)
         inputs[name] = payload
-        return {"candidate": candidate, "inputs": inputs, "results": results, "messages": [HumanMessage(
+        return {"candidate": candidate, "inputs": inputs, "results": results,
+                "memory_context": {}, "memory_event_id": str(uuid4()), "messages": [HumanMessage(
             content=json.dumps(request.model_dump(exclude={"checkpoint_id"}), ensure_ascii=False),
         )]}
+
+    async def recall_memory(state: AdvisorState, config: RunnableConfig):
+        from .memory.service import user_material
+
+        identity = config["configurable"]
+        request = state["request"]
+        inputs = state["inputs"][request["agent"]]
+        text = user_material(request, resolved_resume=(inputs.get("raw_resume", "")
+                                                      if request.get("input", {}).get("file_path") else ""))
+        query = "\n".join(str(value) for value in [request.get("message", ""), inputs.get("question", ""),
+                          inputs.get("target_role", ""), inputs.get("request", "")] if value) or text[:6000]
+        context = await memory.prepare(identity["user_id"], identity["session_id"], text, query,
+                                       state["memory_event_id"])
+        context["current_message"] = request.get("message", "")
+        return {"memory_context": context, "memory_text": text}
+
+    async def remember_turn(state: AdvisorState, config: RunnableConfig):
+        identity = config["configurable"]
+        result = state["results"][state["request"]["agent"]]
+        assistant = result.get("data", {}).get("summary") or result["status"]
+        await memory.finish(identity["user_id"], identity["session_id"], state["memory_event_id"],
+                            state["memory_text"], assistant)
+        return {}
 
     def execution_node(name):
         async def execute(state: AdvisorState, config: RunnableConfig):
             agent = AGENTS[name][1](model_provider())
-            result = await agent.arun(deepcopy(state["inputs"][name]), config=config)
+            payload = deepcopy(state["inputs"][name])
+            if memory is not None:
+                context = state.get("memory_context", {})
+                agent.system_prompt += memory.prompt(context)
+                # 复用已有事实证据通道，不修改 Agent 输出及原文校验逻辑。
+                if name in {"resume_analysis", "career_decision"}:
+                    facts = [row["evidence"] for row in context.get("recalled", []) if row["kind"] == "fact"]
+                    evidence = [payload.get("additional_evidence", "")]
+                    if context.get("current_message"):
+                        evidence.append("当前用户陈述：" + context["current_message"])
+                    if facts:
+                        evidence.extend(["历史用户原文（当前陈述优先）：", *dict.fromkeys(facts)])
+                    payload["additional_evidence"] = "\n".join(filter(None, evidence))
+                if name == "career_decision" and not payload.get("preferences"):
+                    payload["preferences"] = "；".join(row["value"] for row in context.get("preferences", []))
+            result = await agent.arun(payload, config=config)
             if result["status"] not in {"ok", "insufficient_evidence"}:
                 # 保留原生失败检查点；ainvoke(None, config) 可从该节点重试。
                 raise AgentExecutionError(result)
             summary = result.get("data", {}).get("summary") or result["status"]
             # 当前状态仅保留最近 20 条消息；历史检查点仍由 checkpointer 管理。
             messages = [RemoveMessage(id=message.id) for message in state.get("messages", [])[:-19] if message.id]
-            return {"results": {**state.get("results", {}), name: result},
+            return {"executed_inputs": {**state.get("executed_inputs", {}), name: payload},
+                    "results": {**state.get("results", {}), name: result},
                     "messages": messages + [AIMessage(content=summary)]}
 
         return execute
@@ -157,8 +205,15 @@ def build_advisor_graph(model_provider, *, checkpointer: BaseCheckpointSaver):
     graph = StateGraph(AdvisorState)
     graph.add_node("prepare", prepare)
     graph.add_edge(START, "prepare")
+    route_from = "prepare"
+    if memory is not None:
+        graph.add_node("recall_memory", recall_memory)
+        graph.add_node("remember_turn", remember_turn)
+        graph.add_edge("prepare", "recall_memory")
+        graph.add_edge("remember_turn", END)
+        route_from = "recall_memory"
     for name in AGENTS:
         graph.add_node(name, execution_node(name))
-        graph.add_edge(name, END)
-    graph.add_conditional_edges("prepare", lambda state: state["request"]["agent"], {name: name for name in AGENTS})
+        graph.add_edge(name, "remember_turn" if memory is not None else END)
+    graph.add_conditional_edges(route_from, lambda state: state["request"]["agent"], {name: name for name in AGENTS})
     return graph.compile(checkpointer=checkpointer, name="career_advisor")

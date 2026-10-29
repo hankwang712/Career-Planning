@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .schemas import REPORT_VERSION
+from .provenance import report_provenance
 
 
 DECISIONS = {"recommended": "建议优先考虑", "conditional": "满足条件后考虑",
@@ -17,6 +18,8 @@ def _bullets(items):
 
 
 def build_report_bundle(username, report_id, profile, state, model_name):
+    from experiments.news_advisor.telemetry import summarize_executions
+
     results = state["results"]
     resume = results["resume_analysis"].get("data", {})
     decision = results["career_decision"].get("data", {})
@@ -56,7 +59,10 @@ def build_report_bundle(username, report_id, profile, state, model_name):
     section("target_job_analysis", "目标岗位要求与来源", "\n\n".join(job_parts))
     recruitment = results.get("recruitment_search", {})
     search = recruitment.get("data", {})
-    search_text = search.get("summary") or "本次未请求招聘搜索。"
+    search_text = search.get("summary") or (
+        "本次未请求招聘搜索。" if recruitment.get("status", "skipped") == "skipped"
+        else "本次招聘搜索未获得可核实结果，请核实后再使用。"
+    )
     for finding in search.get("findings", []):
         search_text += f"\n\n- {finding['summary']} [{finding['source_id']}]\n" + _bullets(finding.get("evidence_quotes", []))
         search_text += "\n" + _bullets(finding.get("unverified_conditions", []))
@@ -109,6 +115,8 @@ def build_report_bundle(username, report_id, profile, state, model_name):
         source_parts.append(f"- 决策来源 [{source['source_id']}]：{origin}" +
                             (f"；对应岗位片段 {source['chunk_id']}" if source.get("chunk_id") else ""))
     source_parts += [f"- 用户补充问题：{item['question']}\n  - 回答：{item['answer']}" for item in clarifications]
+    source_parts += [f"- 招聘搜索补充问题：{item['question']}\n  - 回答：{item['answer']}"
+                     for item in review.get("answers", {}).get("recruitment_search", [])]
     section("appendix", "证据来源与补充记录", "\n\n".join(source_parts))
     order = ["executive_summary", "personal_traits", "target_job_analysis", "macro_environment",
              "matching_decision", "gap_action_plan", "risk_backup", "appendix"]
@@ -117,7 +125,8 @@ def build_report_bundle(username, report_id, profile, state, model_name):
     selected_assessment = next((item for item in decision.get("assessments", []) if item["target_id"] == selected["target_id"]), {})
     summary = decision.get("summary", "")
     meta = {"report_id": report_id, "username": username, "generated_at": generated_at, "status": "ready",
-            "version": REPORT_VERSION, "pipeline_version": "experiments-langgraph-v1", "model": model_name,
+            "version": REPORT_VERSION, "pipeline_version": "experiments-langgraph-v2", "model": model_name,
+            "provenance": report_provenance(state), "execution": summarize_executions(results),
             "generation_mode": "langgraph", "focus_role_id": selected["target_id"], "focus_role_name": selected["title"],
             "title": title, "summary": summary}
     # 沿用主系统展示协议；数值匹配率没有可靠来源，保持为空。

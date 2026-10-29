@@ -248,7 +248,7 @@
     }
     const rows = branches.map((br) => {
       const hasSubs = Array.isArray(br.subs) && br.subs.length > 0;
-      const startExpanded = true;
+      const startExpanded = variant !== "aside";
       const h2Btn = `<button type="button" class="cr-md-toc-h2${hasSubs ? " has-children" : ""}" data-report-scroll-target="${esc(br.id)}">${esc(br.title)}</button>`;
       const toggle = hasSubs
         ? `<button type="button" class="cr-md-toc-toggle${startExpanded ? " is-open" : ""}" aria-expanded="${startExpanded ? "true" : "false"}" aria-label="展开或收起子章节"></button>`
@@ -334,7 +334,7 @@
         if (!targetId) return;
         const target =
           main?.querySelector?.(`#${escapeSelectorId(targetId)}`) || document.getElementById(targetId);
-        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+        target?.scrollIntoView({ behavior: "auto", block: "start" });
       });
     });
   }
@@ -603,9 +603,10 @@
       if (!sec || typeof sec !== "object") continue;
       const md = String(sec.markdown || "").trim();
       if (!md) continue;
-      parts.push(md);
+      const label = String(sec.label || SECTION_NAV.find((item) => item.key === key)?.label || key).trim();
+      parts.push(/^##\s/m.test(md) ? md : `## ${label}\n\n${md}`);
     }
-    return parts.join("\n\n---\n\n").trim();
+    return parts.join("\n\n").trim();
   }
 
   function computeGenerationPercent(progress) {
@@ -6485,7 +6486,7 @@
             <div class="crdoc-reader-copy">
               <p class="ucrd-kicker">Formal Career Report</p>
               <h2 class="ucrd-full-head-title">${esc(meta.title || "\u804c\u4e1a\u751f\u6daf\u53d1\u5c55\u62a5\u544a")}</h2>
-              ${summaryRaw ? `<p class="ucrd-full-head-summary">${esc(summaryRaw)}</p>` : ""}
+              ${summaryRaw ? `<details class="uc-report-summary-details"><summary>查看分析摘要</summary><p class="ucrd-full-head-summary">${esc(summaryRaw)}</p></details>` : ""}
               <div class="crdoc-reader-meta">
                 <span>\u4e3b\u7ebf\u5c97\u4f4d\u00a0\u00b7\u00a0${esc(focusRole)}</span>
                 <span>\u751f\u6210\u65f6\u95f4\u00a0\u00b7\u00a0${esc(meta.generated_at || "--")}</span>
@@ -6504,7 +6505,7 @@
           </div>
         </div>
         <div class="crdoc-reader-statbar">
-          ${renderReportMetricCard("\u76ee\u6807\u5c97\u4f4d", focusRole, "\u5f53\u524d\u62a5\u544a\u4e3b\u7ebf")}
+          ${renderReportMetricCard("决策建议", fitBandLabel, "基于本次材料与岗位样本")}
           ${renderReportMetricCard("\u8bc1\u636e\u7247\u6bb5", String(evidenceCount), evidenceCount ? "\u652f\u6491\u5173\u952e\u5224\u65ad" : "\u7b49\u5f85\u66f4\u591a\u8bc1\u636e", evidenceCount ? "success" : "warn")}
           ${renderReportMetricCard("\u884c\u52a8\u5efa\u8bae", String(actionItems.length || sectionCount), actionItems.length ? "\u5df2\u53ef\u7ee7\u7eed\u6267\u884c" : "\u7ed3\u6784\u5316\u9605\u8bfb", actionItems.length ? "success" : "")}
         </div>

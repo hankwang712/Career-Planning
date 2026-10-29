@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import datetime
+from time import perf_counter
 from typing import Annotated, Literal, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -56,6 +57,8 @@ class ReportState(TypedDict, total=False):
     results: dict
     decision_input: dict
     review: dict
+    profile_snapshot: dict
+    provenance: dict
 
 
 def review_request(state: ReportState) -> dict:
@@ -95,8 +98,10 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
 
     async def run(name, payload, config):
         notify(name, f"正在执行{labels[name]}")
+        started = perf_counter()
         agent = agent_factory(name) if agent_factory else classes[name](model_provider())
         result = await agent.arun(deepcopy(payload), config=config)
+        result.setdefault("execution", {})["stage_elapsed_seconds"] = round(perf_counter() - started, 3)
         allowed = {"ok", "insufficient_evidence"} if name == "recruitment_search" else {"ok"}
         if result["status"] not in allowed:
             raise AgentExecutionError(result)
@@ -132,6 +137,7 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         inputs = state["input"]
         payload = {"raw_resume": inputs["raw_resume"], "additional_evidence": inputs.get("additional_evidence", ""),
                    "preferences": inputs.get("preferences", ""), "resume_analysis": state["results"]["resume_analysis"],
+                   "recruitment_search": state["results"].get("recruitment_search", {}),
                    "targets": state["results"]["job_analysis"]["data"]["targets"]}
         result = await run("career_decision", payload, config)
         return {"decision_input": payload, "results": {**state["results"], "career_decision": result}}
@@ -157,9 +163,10 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
             search = deepcopy(state["input"]["recruitment"])
             search.setdefault("clarifications", []).extend(answers["recruitment_search"])
             results["recruitment_search"] = await run("recruitment_search", search, config)
+            payload["recruitment_search"] = results["recruitment_search"]
         # 简历追问的回答也属于候选人事实；问题文本不会作为事实证据。
         payload["clarifications"] = answers.get("resume_analysis", []) + answers.get("career_decision", [])
-        if payload["clarifications"]:
+        if payload["clarifications"] or answers.get("recruitment_search"):
             results["career_decision"] = await run("career_decision", payload, config)
         return {"results": results, "decision_input": payload}
 

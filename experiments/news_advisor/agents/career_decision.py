@@ -13,6 +13,42 @@ from ..utils.dates import resume_date_context
 from .base import BaseAgent
 
 
+def recruitment_context(result: dict) -> dict:
+    """只传递已读取来源中的真实引文，不将招聘线索混入岗位/学生事实。"""
+    status = result.get("status", "skipped")
+    data = result.get("data") or {}
+    context = {"status": status, "outcome": data.get("outcome"), "findings": [], "limitations": []}
+    if status == "skipped":
+        return context
+    context["limitations"].append("招聘搜索仅提供核实线索，不证明岗位仍开放或用户符合任职条件。")
+    if status != "ok":
+        context["limitations"].append("招聘搜索未提供可用结果，不能据此判断没有招聘机会。")
+        return context
+    sources = {source["source_id"]: source for source in result.get("sources", [])
+               if source.get("source_id") and source.get("read_state") == "read"}
+    omitted = False
+    for finding in data.get("findings", []):
+        source = sources.get(finding.get("source_id"))
+        if source is None:
+            omitted = True
+            continue
+        original = str(source.get("title", "")) + "\n" + str(source.get("content", ""))
+        quotes = [copy_source_quote(quote, original) for quote in finding.get("evidence_quotes", [])]
+        if not quotes or any(quote is None for quote in quotes):
+            omitted = True
+            continue
+        context["findings"].append({
+            "reference": "search:" + source["source_id"], "title": source.get("title", ""),
+            "url": source.get("url", ""), "published_at": source.get("published_at"),
+            "match_status": finding.get("match_status", "needs_confirmation"),
+            "evidence_quotes": quotes, "unverified_conditions": finding.get("unverified_conditions", []),
+        })
+    if omitted:
+        context["limitations"].append("部分招聘线索只有摘要、图片或引文无法核对，未作为决策材料。")
+    context["limitations"].extend(data.get("limitations", []))
+    return context
+
+
 def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]:
     """复用上游数据结构，隔离各目标的来源编号；不重复验证上游分析引文。"""
     result = target.job_analysis
@@ -121,6 +157,8 @@ class CareerDecisionAgent(BaseAgent):
         limitations.extend(document.get("warnings") or [])
         if request.resume_analysis and request.resume_analysis.get("status") != "ok":
             limitations.append("简历 Agent 未成功完成诊断，当前仅依据提供的学生原文判断。")
+        recruitment = recruitment_context(request.recruitment_search)
+        limitations.extend(recruitment["limitations"])
 
         for index, target in enumerate(request.targets, 1):
             result = target.job_analysis
@@ -141,6 +179,7 @@ class CareerDecisionAgent(BaseAgent):
         return {
             "analysis_date": analysis_date.isoformat(), "date_context": resume_date_context(request.raw_resume, analysis_date),
             "question": request.question, "sources": sources, "targets": targets,
+            "recruitment_context": recruitment,
             # 简历质量诊断不是能力事实来源；隔离其未经验证的推断，避免错误意见被下游复述。
             "resume_analysis": {"status": request.resume_analysis.get("status"), "document": document},
             "input_limitations": list(dict.fromkeys(limitations)),

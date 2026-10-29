@@ -5,6 +5,9 @@
   "scripts": {
     "start": "node backend/scripts/start-server.mjs",
     "start:check": "node backend/scripts/start-server.mjs --check",
+    "check:report": "python backend/scripts/check_report_workflow.py",
+    "check:chat": "python backend/scripts/check_chat.py",
+    "check:report-upload": "python -B backend/scripts/check_report_upload.py && node frontend/scripts/check-report-upload.mjs",
     "dev": "npm run dev --workspace frontend",
     "build": "npm run build --workspace frontend",
     "sync:vendors": "npm run sync:vendors --workspace frontend",
