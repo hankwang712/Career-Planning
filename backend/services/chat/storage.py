@@ -52,6 +52,11 @@ class ChatStore(MemoryControls):
                     UNIQUE(session_id, request_id, role)
                 );
                 CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, seq);
+                CREATE TABLE IF NOT EXISTS chat_images (
+                    id TEXT PRIMARY KEY, message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                    position INTEGER NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL,
+                    width INTEGER NOT NULL, height INTEGER NOT NULL, digest TEXT NOT NULL,
+                    UNIQUE(message_id,position));
                 CREATE TABLE IF NOT EXISTS memory_jobs (
                     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                     kind TEXT NOT NULL, priority INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT 'idle',
@@ -194,9 +199,35 @@ class ChatStore(MemoryControls):
             self.owned(conn, owner, session_id)
             rows = conn.execute("""SELECT * FROM messages WHERE session_id=? AND seq<?
                 ORDER BY seq DESC LIMIT ?""", (session_id, before or 2**63-1, limit + 1)).fetchall()
-            return {"items": [dict(row) for row in reversed(rows[:limit])], "has_more": len(rows) > limit}
+            items = [dict(row) for row in reversed(rows[:limit])]
+            images = {}
+            if items:
+                marks = ",".join("?" for _ in items)
+                for image in conn.execute(f"SELECT message_id,id,name,mime,width,height FROM chat_images WHERE message_id IN ({marks}) ORDER BY position",
+                                          [item["id"] for item in items]):
+                    metadata = {key: image[key] for key in ("id", "name", "mime", "width", "height")}
+                    images.setdefault(image["message_id"], []).append({**metadata, "url": "/api/chat/images/" + image["id"]})
+            for item in items:
+                item["images"] = images.get(item["id"], [])
+            return {"items": items, "has_more": len(rows) > limit}
 
-    def begin_turn(self, owner, session_id, request_id, content, selection):
+    def image(self, owner, identifier, *, session_id=None):
+        with self.connect() as conn:
+            row = conn.execute("""SELECT i.* FROM chat_images i JOIN messages m ON m.id=i.message_id
+                JOIN sessions s ON s.id=m.session_id WHERE i.id=? AND s.owner=?""", (identifier, owner)).fetchone()
+            if not row:
+                raise ChatError("图片不存在或已删除。", 404)
+            if session_id and not conn.execute("SELECT 1 FROM messages WHERE id=? AND session_id=?", (row["message_id"], session_id)).fetchone():
+                raise ChatError("图片不属于当前会话。", 404)
+            return dict(row)
+
+    def turn_image_count(self, owner, session_id, request_id):
+        with self.connect() as conn:
+            self.owned(conn, owner, session_id)
+            return conn.execute("""SELECT COUNT(*) FROM chat_images i JOIN messages m ON m.id=i.message_id
+                WHERE m.session_id=? AND m.request_id=? AND m.role='user'""", (session_id, request_id)).fetchone()[0]
+
+    def begin_turn(self, owner, session_id, request_id, content, selection, *, images=None):
         now = time.time()
         with self.connect(write=True) as conn:
             session = self.owned(conn, owner, session_id)
@@ -206,9 +237,13 @@ class ChatStore(MemoryControls):
                                     (session_id, request_id)).fetchone()
             if previous and previous["content"] != content:
                 raise ChatError("同一消息编号不能用于不同内容。", 409)
+            if previous and previous["seq"] <= session["context_cutoff_seq"]:
+                raise ChatError("该历史请求已失效，请用新的消息编号重新发送。", 409)
+            if previous and images is not None:
+                old = [row[0] for row in conn.execute("SELECT digest FROM chat_images WHERE message_id=? ORDER BY position", (previous["id"],))]
+                if old != [hashlib.sha256(image["data"]).hexdigest() for image in images]:
+                    raise ChatError("同一消息编号不能用于不同图片。", 409)
             if completed:
-                if previous and previous["seq"] <= session["context_cutoff_seq"]:
-                    raise ChatError("该历史请求已失效，请用新的消息编号重新发送。", 409)
                 return {"replay": dict(completed), "privacy_epoch": session["privacy_epoch"]}
             if session["sending_until"] > now:
                 raise ChatError("当前对话正在回复，请稍后再发送。", 409)
@@ -220,8 +255,13 @@ class ChatStore(MemoryControls):
                     raise ChatError("此消息之后已有新对话，请重新发送。", 409)
                 conn.execute("UPDATE messages SET status='complete' WHERE seq=?", (previous["seq"],))
             else:
+                message_id = uuid4().hex
                 conn.execute("INSERT INTO messages(id,session_id,request_id,role,content,status,created_at) VALUES(?,?,?,'user',?,'complete',?)",
-                             (uuid4().hex, session_id, request_id, content, now))
+                             (message_id, session_id, request_id, content, now))
+                for position, image in enumerate(images or []):
+                    conn.execute("INSERT INTO chat_images VALUES(?,?,?,?,?,?,?,?,?)",
+                        (uuid4().hex, message_id, position, image["name"], image["mime"], image["data"],
+                         image["width"], image["height"], hashlib.sha256(image["data"]).hexdigest()))
             token = uuid4().hex
             title = content.replace("\n", " ")[:24] if session["title"] == "新对话" else session["title"]
             conn.execute("UPDATE sessions SET sending_token=?,sending_until=?,selection=?,title=?,updated_at=?,sending_epoch=? WHERE id=?",

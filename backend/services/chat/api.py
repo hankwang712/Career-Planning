@@ -13,17 +13,18 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from flask import session
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.middleware.wsgi import WSGIMiddleware
 
 from .storage import ChatError
+from .images import MAX_DATA_URL_LENGTH, MAX_IMAGES, MAX_MESSAGE_BODY, image_capability, prepare_images
 from .privacy import SCOPE as CLEANUP_SCOPE
 
 
 Title = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=80)]
-Content = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=12000)]
+Content = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, max_length=12000)]
 
 
 class NewSession(BaseModel):
@@ -34,9 +35,21 @@ class RenameSession(BaseModel):
     title: Title
 
 
+class ImageInput(BaseModel):
+    name: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=120)] = "图片"
+    data_url: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=MAX_DATA_URL_LENGTH)]
+
+
 class NewMessage(BaseModel):
-    content: Content
+    content: Content = ""
+    images: list[ImageInput] = Field(default_factory=list, max_length=MAX_IMAGES)
     request_id: UUID = Field(description="同一条消息重试时复用此 UUID，避免重复生成。")
+
+    @model_validator(mode="after")
+    def require_message(self):
+        if not self.content and not self.images:
+            raise ValueError("A message needs text or an image")
+        return self
 
 
 class MemoryCorrection(BaseModel):
@@ -88,13 +101,15 @@ class ChatTransport:
             return await Response(status_code=204)(scope, receive, private_send)
 
         if scope["method"] in {"POST", "PUT", "PATCH", "DELETE"}:
+            message_upload = scope["method"] == "POST" and path.startswith("/api/chat/sessions/") and path.endswith("/messages")
+            body_limit = MAX_MESSAGE_BODY if message_upload else 65536
             body = bytearray()
             while True:
                 message = await receive()
                 if message["type"] == "http.disconnect":
                     return
                 body.extend(message.get("body", b""))
-                if len(body) > 65536:
+                if len(body) > body_limit:
                     return await JSONResponse({"message": "提交内容过大。"}, status_code=413)(scope, receive, private_send)
                 if not message.get("more_body", False):
                     break
@@ -181,7 +196,7 @@ def create_app(flask_app, *, service, current_user):
         service.prepare_resume(user.owner)
         runtime = service.runtime_provider(user.selection)
         return {"items": service.store.list_sessions(user.owner), "model": runtime[2] or "尚未配置模型",
-                "configured": all(runtime), "display_name": user.display_name}
+                "configured": all(runtime), "display_name": user.display_name, "image_input": image_capability(runtime)}
 
     @api.post("/api/chat/sessions", status_code=201)
     def create_session(data: NewSession, user: User):
@@ -207,12 +222,22 @@ def create_app(flask_app, *, service, current_user):
         row = service.store.session(user.owner, session_id)
         return {**result, "title": row["title"], "generating": row["sending_until"] > time.time()}
 
+    @api.get("/api/chat/images/{image_id}")
+    def chat_image(image_id: str, user: User):
+        image = service.store.image(user.owner, image_id)
+        return Response(image["data"], media_type=image["mime"], headers={"Content-Disposition": "inline"})
+
     @api.post("/api/chat/sessions/{session_id}/messages", response_class=StreamingResponse,
               responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}})
     def send_message(session_id: str, data: NewMessage, user: User):
         request_id = str(data.request_id)
         runtime = service.runtime(user.selection)
-        turn = service.store.begin_turn(user.owner, session_id, request_id, data.content, user.selection)
+        service.store.session(user.owner, session_id)
+        if (data.images or service.store.turn_image_count(user.owner, session_id, request_id)) and image_capability(runtime) is False:
+            raise ChatError("当前模型不支持图片输入，请选择 deepseek-flash 或其他视觉模型。")
+        images = prepare_images([image.model_dump() for image in data.images]) if data.images else None
+        content = data.content or "请分析上传的图片。"
+        turn = service.store.begin_turn(user.owner, session_id, request_id, content, user.selection, images=images)
 
         def encoded():
             if "replay" in turn:
@@ -222,7 +247,7 @@ def create_app(flask_app, *, service, current_user):
                 events = iter([{"type": "delta", "text": turn["replay"]["content"]},
                                {"type": "done", "session_id": session_id, "request_id": request_id}])
             else:
-                events = service.stream(user.owner, session_id, request_id, turn["token"], data.content, runtime)
+                events = service.stream(user.owner, session_id, request_id, turn["token"], content, runtime)
             try:
                 for event in events:
                     yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"

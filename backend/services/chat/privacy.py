@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS artifact_leases (
 """
 
 SCOPE = {
-    "managed": ["SQLite聊天记录及衍生数据", "Redis聊天缓存", "Chroma记忆索引"],
+    "managed": ["SQLite聊天记录、图片附件及衍生数据", "Redis聊天缓存", "Chroma记忆索引"],
     "excluded": ["独立简历文件与解析资料", "已有规划报告", "外部日志和备份", "模型服务商已接收的数据"],
     "retained_metadata": "仅保留任务回执、删除保护槽位与游标，不保留已忘记的值或原文证据。",
     "restore_rule": "已忘记的属性只接受删除之后新的明确“请重新记住”授权；旧消息不能恢复记忆。",

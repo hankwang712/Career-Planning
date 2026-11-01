@@ -103,7 +103,7 @@ class MemoryManager:
                 continue
             if size + len(row["content"]) > self.RECENT_CHARACTERS:
                 break
-            recent.append({"role": row["role"], "content": row["content"]})
+            recent.append({"role": row["role"], "content": row["content"], **({"images": row["images"]} if row.get("images") else {})})
             size += len(row["content"])
         return list(reversed(recent))
 

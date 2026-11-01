@@ -2,7 +2,8 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   const state = { sessions: [], active: null, messages: [], hasMore: false, configured: false,
-    pending: new Map(), retries: new Map(), view: 0, remoteBusy: false, creating: false, memoryTab: "sources" };
+    pending: new Map(), retries: new Map(), view: 0, remoteBusy: false, creating: false, memoryTab: "sources",
+    draftImages: [], readingImages: false, imageEpoch: 0, imageInput: null };
   let csrfPromise, memoryTimer, toastTimer, streamFrame;
   const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -48,11 +49,72 @@
 
   function updateComposer() {
     const busy = state.pending.has(state.active) || state.remoteBusy || state.creating;
-    $("sendMessage").disabled = busy || !state.configured || !$("chatInput").value.trim();
+    $("sendMessage").disabled = busy || state.readingImages || !state.configured ||
+      (!$("chatInput").value.trim() && !state.draftImages.length) || (state.draftImages.length > 0 && state.imageInput === false);
+    $("attachImage").disabled = busy || state.readingImages || !state.configured || state.imageInput === false;
+    $("attachImage").title = state.imageInput === false ? "当前模型不支持图片，请切换视觉模型" : "上传图片（最多 3 张，每张不超过 5 MB）";
+    $("imagePreviews").querySelectorAll("button").forEach((button) => { button.disabled = busy || state.readingImages; });
     $("stopReply").hidden = !state.pending.has(state.active);
     $("retryMessage").hidden = busy || !state.retries.has(state.active);
     $("chatInput").disabled = !state.configured;
-    $("chatInput").placeholder = state.configured ? "说说你在想什么…" : "配置对话模型后，即可开始聊天";
+    $("chatInput").placeholder = state.configured ? "发送消息，或添加图片…" : "配置对话模型后，即可开始聊天";
+  }
+
+  function renderImagePreviews() {
+    $("imagePreviews").replaceChildren();
+    $("imagePreviews").hidden = !state.draftImages.length;
+    state.draftImages.forEach((image, index) => {
+      const item = document.createElement("div");
+      item.className = "image-preview";
+      const preview = document.createElement("img");
+      preview.src = image.data_url;
+      preview.alt = image.name;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.innerHTML = icon("close");
+      remove.setAttribute("aria-label", `移除图片：${image.name}`);
+      remove.addEventListener("click", () => { state.draftImages.splice(index, 1); renderImagePreviews(); updateComposer(); });
+      item.append(preview, remove);
+      $("imagePreviews").append(item);
+    });
+  }
+
+  function clearDraftImages() {
+    state.imageEpoch++;
+    state.readingImages = false;
+    state.draftImages = [];
+    $("imageInput").value = "";
+    renderImagePreviews();
+    updateComposer();
+  }
+
+  async function addImages(files) {
+    if (state.readingImages || state.creating || state.remoteBusy || state.pending.has(state.active) || !state.configured) return;
+    if (state.imageInput === false) return toast("当前模型不支持图片，请先切换视觉模型。");
+    const selected = [...files];
+    if (selected.length + state.draftImages.length > 3) return toast("每条消息最多添加 3 张图片。");
+    const epoch = state.imageEpoch;
+    state.readingImages = true;
+    updateComposer();
+    try {
+      for (const file of selected) {
+        if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) { toast("请选择 JPG、PNG、WebP 或 GIF 图片。"); continue; }
+        if (file.size > 5 * 1024 * 1024) { toast("每张图片不能超过 5 MB。"); continue; }
+        if (file.type === "image/gif") toast("GIF 将以首帧静态图片发送。");
+        const data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("图片读取失败，请重新选择。"));
+          reader.readAsDataURL(file);
+        });
+        if (state.imageEpoch !== epoch) return;
+        state.draftImages.push({ name: file.name.slice(0, 120) || "图片", data_url: data });
+        renderImagePreviews();
+      }
+    } catch (error) { toast(error.message); }
+    finally {
+      if (state.imageEpoch === epoch) { state.readingImages = false; $("imageInput").value = ""; updateComposer(); }
+    }
   }
 
   function renderSessions() {
@@ -94,6 +156,7 @@
     const data = await api("/api/chat/sessions");
     state.sessions = data.items;
     state.configured = data.configured;
+    state.imageInput = data.image_input ?? null;
     $("modelName").textContent = data.model;
     $("modelName").title = data.model;
     $("configurationNote").hidden = data.configured;
@@ -110,7 +173,16 @@
     node.className = `message ${row.role}${streaming ? " streaming" : ""}${row.status === "failed" ? " failed" : ""}`;
     const avatar = document.createElement("span");
     avatar.className = "message-avatar";
-    avatar.innerHTML = icon("spark");
+    avatar.setAttribute("aria-hidden", "true");
+    const brand = document.querySelector(".chat-brand img");
+    if (row.role === "assistant" && brand) {
+      const image = document.createElement("img");
+      image.src = brand.src;
+      image.alt = "";
+      image.width = image.height = 32;
+      image.addEventListener("error", () => { avatar.innerHTML = icon("spark"); }, { once: true });
+      avatar.append(image);
+    } else avatar.innerHTML = icon("spark");
     const body = document.createElement("div");
     body.className = "message-body";
     const author = document.createElement("div");
@@ -120,6 +192,26 @@
     content.className = "message-content";
     if (row.role === "user") content.textContent = row.content;
     else content.innerHTML = markdown(row.content);
+    if (row.role === "user" && row.images?.length) {
+      const images = document.createElement("div");
+      images.className = "message-images";
+      row.images.forEach((image) => {
+        const preview = document.createElement("img");
+        preview.src = image.data_url || apiUrl(`/api/chat/images/${encodeURIComponent(image.id)}`);
+        preview.alt = image.name || "聊天图片";
+        preview.loading = "lazy";
+        if (image.id) {
+          const link = document.createElement("a");
+          link.href = preview.src;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.title = "查看原图";
+          link.append(preview);
+          images.append(link);
+        } else images.append(preview);
+      });
+      content.append(images);
+    }
     body.append(author, content);
     if (row.status === "failed") {
       const failed = document.createElement("span");
@@ -147,14 +239,42 @@
 
   function renderStream() {
     if (streamFrame) return;
-    streamFrame = requestAnimationFrame(() => {
+    streamFrame = requestAnimationFrame((now) => {
       streamFrame = null;
       const pending = state.pending.get(state.active);
       const target = $("messageList").querySelector(".message.streaming .message-content");
-      if (!pending || !target) return;
+      if (!pending || !target || pending.controller.signal.aborted) return;
       const shouldScroll = nearBottom();
-      target.innerHTML = markdown(pending.answer);
+      const visible = pending.reveal.advance(pending.answer, now, document.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches);
+      const tables = [...target.querySelectorAll(".message-table")].map((table) => table.scrollLeft);
+      target.innerHTML = markdown(visible);
+      target.querySelectorAll(".message-table").forEach((table, index) => { table.scrollLeft = tables[index] || 0; });
       if (shouldScroll) scrollBottom();
+      if (!pending.reveal.complete(pending.answer)) renderStream();
+      else pending.onRevealDone?.();
+    });
+  }
+
+  function drainReply(id, pending) {
+    const now = performance.now();
+    if (state.active !== id || document.hidden || pending.controller.signal.aborted || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      pending.reveal.advance(pending.answer, now, true);
+      return Promise.resolve();
+    }
+    pending.reveal.finish(now);
+    return new Promise((resolve) => {
+      const settle = () => {
+        clearTimeout(timer);
+        pending.controller.signal.removeEventListener("abort", flush);
+        pending.flushReveal = pending.onRevealDone = null;
+        resolve();
+      };
+      const flush = () => { pending.reveal.advance(pending.answer, performance.now(), true); settle(); };
+      const timer = setTimeout(flush, 700);
+      pending.flushReveal = flush;
+      pending.onRevealDone = settle;
+      pending.controller.signal.addEventListener("abort", flush, { once: true });
+      renderStream();
     });
   }
 
@@ -167,9 +287,10 @@
     $("loadEarlier").hidden = !state.hasMore;
     if (pending) {
       if (!state.messages.some((row) => row.request_id === pending.requestId && row.role === "user")) {
-        $("messageList").append(messageElement({ role: "user", content: pending.content }));
+        $("messageList").append(messageElement({ role: "user", content: pending.content, images: pending.images }));
       }
-      $("messageList").append(messageElement({ role: "assistant", content: pending.answer }, true));
+      $("messageList").append(messageElement({ role: "assistant", content: pending.reveal.current(pending.answer) }, true));
+      if (!pending.reveal.complete(pending.answer)) renderStream();
     }
   }
 
@@ -181,7 +302,7 @@
     state.hasMore = data.has_more;
     state.remoteBusy = data.generating && !state.pending.has(sessionId);
     const last = data.items.filter((row) => row.role === "user").at(-1);
-    if (last?.status === "failed") state.retries.set(sessionId, { content: last.content, requestId: last.request_id });
+    if (last?.status === "failed") state.retries.set(sessionId, { content: last.content, requestId: last.request_id, images: last.images || [] });
     else if (!state.pending.has(sessionId)) state.retries.delete(sessionId);
     renderMessages();
     updateComposer();
@@ -196,6 +317,8 @@
   }
 
   async function openSession(id) {
+    if (state.active !== id) clearDraftImages();
+    if (state.active !== id) state.pending.get(state.active)?.flushReveal?.();
     if (state.active !== id) finishSession(state.active);
     state.active = id;
     state.view += 1;
@@ -214,6 +337,8 @@
   }
 
   function newConversation() {
+    clearDraftImages();
+    state.pending.get(state.active)?.flushReveal?.();
     finishSession(state.active);
     state.active = null;
     state.view += 1;
@@ -233,13 +358,17 @@
   }
 
   async function send(retry = null) {
-    const content = retry?.content || $("chatInput").value.trim();
-    if (!content || !state.configured || state.pending.has(state.active) || state.remoteBusy || state.creating) return;
+    const images = retry?.images || [...state.draftImages];
+    const entered = retry?.content || $("chatInput").value.trim();
+    if ((!entered && !images.length) || state.readingImages || !state.configured || state.pending.has(state.active) || state.remoteBusy || state.creating) return;
+    if (images.length && state.imageInput === false) return toast("当前模型不支持图片，请切换视觉模型。");
+    const content = entered || "请分析上传的图片。";
     let id = state.active;
     $("sendMessage").disabled = true;
     try {
       if (!id) {
         state.creating = true;
+        updateComposer();
         const row = await api("/api/chat/sessions", { method: "POST", body: "{}" });
         id = row.id;
         state.active = id;
@@ -248,8 +377,9 @@
       }
     } catch (error) { notice(error.message); state.creating = false; updateComposer(); return; }
     state.creating = false;
-    const pending = { content, requestId: retry?.requestId || crypto.randomUUID(), answer: "", controller: new AbortController() };
+    const pending = { content, images, requestId: retry?.requestId || crypto.randomUUID(), answer: "", controller: new AbortController(), reveal: new window.CareerTyping.TextReveal() };
     state.pending.set(id, pending);
+    clearDraftImages();
     state.retries.delete(id);
     $("chatInput").value = "";
     $("chatInput").style.height = "auto";
@@ -260,7 +390,8 @@
     let done = false;
     try {
       const response = await api(`/api/chat/sessions/${id}/messages`, { method: "POST", stream: true,
-        signal: pending.controller.signal, body: JSON.stringify({ content, request_id: pending.requestId }) });
+        signal: pending.controller.signal, body: JSON.stringify({ content, request_id: pending.requestId,
+          images: images.filter((image) => image.data_url).map(({ name, data_url }) => ({ name, data_url })) }) });
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -298,10 +429,12 @@
         }
       } finally { await reader.cancel().catch(() => {}); }
       if (!done) throw new Error("连接中断，请重试上一条消息。");
+      await drainReply(id, pending);
     } catch (error) {
-      state.retries.set(id, { content, requestId: pending.requestId });
+      state.retries.set(id, { content, requestId: pending.requestId, images });
       if (state.active === id) notice(error.name === "AbortError" ? "已停止回复，可以重试或发送新消息。" : error.message);
     } finally {
+      pending.flushReveal?.();
       state.pending.delete(id);
       if (state.active === id) {
         try { await refreshMessages(id, true); } catch (_) { renderMessages(); }
@@ -546,6 +679,16 @@
   $("newChat").addEventListener("click", newConversation);
   $("sessionSearch").addEventListener("input", renderSessions);
   $("stopReply").addEventListener("click", () => state.pending.get(state.active)?.controller.abort());
+  $("attachImage").addEventListener("click", () => $("imageInput").click());
+  $("imageInput").addEventListener("change", (event) => void addImages(event.target.files));
+  $("chatInput").addEventListener("paste", (event) => {
+    const files = [...(event.clipboardData?.files || [])].filter((file) => file.type.startsWith("image/"));
+    if (files.length) { event.preventDefault(); void addImages(files); }
+  });
+  $("chatForm").addEventListener("dragover", (event) => { if ([...(event.dataTransfer?.types || [])].includes("Files")) event.preventDefault(); });
+  $("chatForm").addEventListener("drop", (event) => {
+    if (event.dataTransfer?.files.length) { event.preventDefault(); void addImages(event.dataTransfer.files); }
+  });
   $("retryMessage").addEventListener("click", () => void send(state.retries.get(state.active)));
   $("toggleSidebar").addEventListener("click", () => sidebar(!$("chatSidebar").classList.contains("open")));
   $("sidebarScrim").addEventListener("click", () => sidebar(false));
@@ -610,6 +753,11 @@
   document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => { $("chatInput").value = button.dataset.prompt; $("chatInput").dispatchEvent(new Event("input")); $("chatInput").focus(); }));
   window.addEventListener("pagehide", () => { finishSession(state.active, true); for (const pending of state.pending.values()) pending.controller.abort(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") sidebar(false); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      for (const pending of state.pending.values()) pending.flushReveal?.();
+    } else renderStream();
+  });
   setInterval(() => { if (state.active && state.remoteBusy && !document.hidden) void refreshMessages(state.active, nearBottom()).catch(() => {}); }, 3000);
 
   async function init() {
