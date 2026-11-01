@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const state = { sessions: [], active: null, messages: [], hasMore: false, configured: false,
     pending: new Map(), retries: new Map(), view: 0, remoteBusy: false, creating: false, memoryTab: "sources" };
-  let csrfPromise, memoryTimer, toastTimer;
+  let csrfPromise, memoryTimer, toastTimer, streamFrame;
   const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const apiUrl = (path) => `${String(window.__API_BASE__ || "").replace(/\/+$/, "")}${path}`;
@@ -103,28 +103,7 @@
     updateComposer();
   }
 
-  // Escape all source first. Only this small, explicit Markdown subset produces HTML.
-  function inlineMarkdown(value) {
-    return escape(value).replace(/`([^`\n]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
-  }
-
-  function markdown(value) {
-    const chunks = String(value).split(/```[^\n]*\n([\s\S]*?)```/g);
-    return chunks.map((chunk, index) => {
-      if (index % 2) return `<pre><code>${escape(chunk)}</code></pre>`;
-      const blocks = chunk.split(/\n\s*\n/);
-      return blocks.filter(Boolean).map((block) => {
-        const lines = block.trim().split("\n");
-        if (lines.every((line) => /^\s*[-*] /.test(line))) return `<ul>${lines.map((line) => `<li>${inlineMarkdown(line.replace(/^\s*[-*] /, ""))}</li>`).join("")}</ul>`;
-        if (lines.every((line) => /^\s*\d+[.)、] /.test(line))) return `<ol>${lines.map((line) => `<li>${inlineMarkdown(line.replace(/^\s*\d+[.)、] /, ""))}</li>`).join("")}</ol>`;
-        return lines.map((line) => {
-          const heading = /^(#{1,4})\s+(.+)$/.exec(line);
-          return heading ? `<h3>${inlineMarkdown(heading[2])}</h3>` : `<p>${inlineMarkdown(line)}</p>`;
-        }).join("");
-      }).join("");
-    }).join("");
-  }
+  const markdown = (value) => window.CareerMarkdown.render(value);
 
   function messageElement(row, streaming = false) {
     const node = document.createElement("article");
@@ -139,7 +118,7 @@
     author.textContent = "智航生涯";
     const content = document.createElement("div");
     content.className = "message-content";
-    if (row.role === "user" || streaming) content.textContent = row.content;
+    if (row.role === "user") content.textContent = row.content;
     else content.innerHTML = markdown(row.content);
     body.append(author, content);
     if (row.status === "failed") {
@@ -165,6 +144,19 @@
 
   function scrollBottom() { $("conversationScroll").scrollTop = $("conversationScroll").scrollHeight; }
   function nearBottom() { const element = $("conversationScroll"); return element.scrollHeight - element.scrollTop - element.clientHeight < 120; }
+
+  function renderStream() {
+    if (streamFrame) return;
+    streamFrame = requestAnimationFrame(() => {
+      streamFrame = null;
+      const pending = state.pending.get(state.active);
+      const target = $("messageList").querySelector(".message.streaming .message-content");
+      if (!pending || !target) return;
+      const shouldScroll = nearBottom();
+      target.innerHTML = markdown(pending.answer);
+      if (shouldScroll) scrollBottom();
+    });
+  }
 
   function renderMessages() {
     const pending = state.pending.get(state.active);
@@ -279,7 +271,7 @@
         if (event.type === "start") void refreshSessions().catch(() => {});
         if (event.type === "status" && state.active === id) notice(event.message);
         if (event.type === "context" && state.active === id) {
-          notice();
+          notice("正在等待模型回复…");
           $("contextStatus").textContent = `本轮已提供 ${event.source_count} 项资料、${event.memory_count} 条记忆 · 查看详情`;
         }
         if (event.type === "error") throw new Error(event.message);
@@ -287,10 +279,8 @@
         if (event.type === "delta") {
           pending.answer += event.text;
           if (state.active === id) {
-            const shouldScroll = nearBottom();
-            const target = $("messageList").querySelector(".message.streaming .message-content");
-            if (target) target.textContent = pending.answer;
-            if (shouldScroll) scrollBottom();
+            notice();
+            renderStream();
           }
         }
       }
@@ -433,6 +423,13 @@
     info.className = "memory-context-note";
     info.textContent = `${trace.retrieval === "vector" ? "本轮有语义检索命中" : "本轮直接选取已保存记忆"} · 提供 ${trace.recent_messages} 条近期消息${trace.has_conversation_summary ? "和一份会话摘要" : ""}`;
     $("memoryContext").append(sources, info);
+    if (trace.timings) {
+      const timing = document.createElement("p");
+      timing.className = "memory-context-note";
+      const seconds = (ms) => `${(ms / 1000).toFixed(2)} 秒`;
+      timing.textContent = `上下文准备 ${seconds(trace.timings.context_ms || 0)}${trace.timings.first_token_ms == null ? "" : ` · 模型首字 ${seconds(trace.timings.first_token_ms)}`}${trace.timings.total_ms == null ? "" : ` · 本轮总计 ${seconds(trace.timings.total_ms)}`}`;
+      $("memoryContext").append(timing);
+    }
     if (trace.resume_source?.file_name) {
       const resume = document.createElement("p");
       resume.className = "memory-context-note";

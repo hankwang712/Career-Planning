@@ -6,9 +6,10 @@
     <meta name="color-scheme" content="dark">
     <title>AI 生涯助手 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png">
-    <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}?v=20261101-controls-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}?v=20261101-layout-v4">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='assistant.js') }}?v=20261101-controls-v1" defer></script>
+    <script src="{{ url_for('static', filename='chat-markdown.js') }}?v=20261101-layout-v4" defer></script>
+    <script src="{{ url_for('static', filename='assistant.js') }}?v=20261101-layout-v4" defer></script>
 </head>
 <body>
     <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -46,15 +47,14 @@
         <div class="configuration-note" id="configurationNote" hidden>还没有可用的对话模型。<a href="/main.html">返回工作台配置模型</a>后，即可开始聊天。</div>
         <div class="conversation-scroll" id="conversationScroll">
             <div class="welcome" id="welcome">
-                <div class="welcome-symbol"><svg><use href="#i-spark"/></svg></div>
-                <p class="welcome-eyebrow">每一个下一步，都可以聊一聊</p>
-                <h1>接下来，你想探索什么？</h1>
-                <p class="welcome-description">从职业选择到眼前的小困惑。<br>结合你已有的职业画像，一起把思路变清晰。</p>
+                <div class="welcome-symbol" aria-hidden="true"><svg><use href="#i-spark"/></svg></div>
+                <h1>今天想聊些什么？</h1>
+                <p class="welcome-description">聊聊职业方向、简历、面试，或你正在考虑的问题。</p>
                 <div class="suggestion-grid">
-                    <button data-prompt="结合你了解的我的职业背景，帮我梳理下一步适合探索的方向。"><span class="suggestion-number">01</span><strong>找到适合我的方向</strong><span>从兴趣、能力和期待开始</span><span class="suggestion-arrow">↗</span></button>
-                    <button data-prompt="我想让简历更有说服力，你能结合我已有的简历信息，帮我看看应该先改哪里吗？"><span class="suggestion-number">02</span><strong>让简历更有说服力</strong><span>一起找出值得被看见的经历</span><span class="suggestion-arrow">↗</span></button>
-                    <button data-prompt="我想准备一次面试，请先了解我的目标岗位，再帮我制定练习安排。"><span class="suggestion-number">03</span><strong>为下一场面试做准备</strong><span>把经历转化成清晰的表达</span><span class="suggestion-arrow">↗</span></button>
-                    <button data-prompt="我最近对职业发展有些迷茫，想和你聊聊，请先问我一个容易回答的问题。"><span class="suggestion-number">04</span><strong>聊聊最近的职业困惑</strong><span>不用准备好答案，慢慢说就好</span><span class="suggestion-arrow">↗</span></button>
+                    <button data-prompt="结合你了解的我的职业背景，帮我梳理下一步适合探索的方向。"><strong>探索职业方向</strong><span>结合兴趣、能力和已有经历</span></button>
+                    <button data-prompt="我想让简历更有说服力，你能结合我已有的简历信息，帮我看看应该先改哪里吗？"><strong>看看简历怎么改</strong><span>梳理项目亮点与表达</span></button>
+                    <button data-prompt="我想准备一次面试，请先了解我的目标岗位，再帮我制定练习安排。"><strong>准备下一场面试</strong><span>围绕目标岗位练习</span></button>
+                    <button data-prompt="我最近对职业发展有些迷茫，想和你聊聊，请先问我一个容易回答的问题。"><strong>聊聊最近的困惑</strong><span>先整理想法，再讨论下一步</span></button>
                 </div>
                 <p class="welcome-memory"><svg><use href="#i-memory"/></svg>有价值的偏好会被记住，你随时可以查看和移除。</p>
             </div>
@@ -69,15 +69,14 @@
             <form class="composer" id="chatForm">
                 <label class="sr-only" for="chatInput">发送消息给 AI 生涯助手</label>
                 <textarea id="chatInput" rows="1" maxlength="12000" placeholder="说说你在想什么…" autocomplete="off"></textarea>
-                <div class="composer-tools"><span><svg><use href="#i-spark"/></svg>从你的背景出发</span><div><span class="input-shortcut">Enter 发送 · Shift + Enter 换行</span><button class="stop-button" id="stopReply" type="button" hidden>停止</button><button class="send-button" id="sendMessage" type="submit" aria-label="发送消息" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+                <div class="composer-tools"><div><span class="input-shortcut">Enter 发送 · Shift + Enter 换行</span><button class="stop-button" id="stopReply" type="button" hidden>停止</button><button class="send-button" id="sendMessage" type="submit" aria-label="发送消息" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
             </form>
             <button type="button" class="context-status" id="contextStatus">查看助手当前了解的资料与记忆</button>
-            <p class="composer-caption">每个对话独立展开，长期偏好在你的对话间共享。AI 的建议供你参考。</p>
         </div>
     </main>
     <dialog class="memory-dialog" id="memoryDialog" aria-labelledby="memoryTitle">
         <div class="memory-header"><div><p class="welcome-eyebrow">知道什么，来源在哪里，都看得见</p><h2 id="memoryTitle">记忆与资料</h2></div><button class="icon-button" id="closeMemory" aria-label="关闭记忆面板"><svg><use href="#i-close"/></svg></button></div>
-        <p class="memory-description">删除对话会保留长期记忆。“忘记”清除记忆值和证据，原聊天仍可查看；“彻底删除”还会清理已记录的证据消息、对应回复及衍生记忆。删除后暂停旧资料引用，可在资料来源中主动重新开启。</p>
+        <p class="memory-description">会话记录彼此独立，长期记忆在当前账号的会话之间共享。删除对话会保留长期记忆。“忘记”清除记忆值和证据，原聊天仍可查看；“彻底删除”还会清理已记录的证据消息、对应回复及衍生记忆。删除后暂停旧资料引用，可在资料来源中主动重新开启。</p>
         <div class="memory-metrics" id="memoryMetrics"></div>
         <div class="memory-index-state" id="memoryIndexStatus" role="status"></div>
         <nav class="memory-tabs" aria-label="记忆内容" role="tablist">

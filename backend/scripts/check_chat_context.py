@@ -5,9 +5,10 @@ import asyncio
 from contextlib import asynccontextmanager
 import json
 import sys
+import threading
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_chat import ChatChecks
@@ -29,6 +30,121 @@ class ContextChecks(unittest.TestCase):
             self.reads.append(path)
             return {"status": "ok", "markdown": "姓名：林禾\n学校：示例大学\n专业：计算机科学\n项目：RAG 助手\n电话：13912345678\n邮箱：sample@example.invalid"}
         self.service.documents.reader = read
+
+    def finish_document_tasks(self):
+        with self.service.documents.guard:
+            tasks = list(self.service.documents.tasks.values())
+        for task in tasks:
+            task.join(timeout=3)
+
+    def test_general_first_question_does_not_wait_for_a_slow_resume_reader(self):
+        started, release, answered = threading.Event(), threading.Event(), threading.Event()
+        reader = self.service.documents.reader
+
+        def slow_reader(path):
+            started.set()
+            release.wait(5)
+            return reader(path)
+
+        self.service.documents.reader = slow_reader
+        sid = self.case.create()
+        errors = []
+
+        def send():
+            try:
+                self.case.send(sid, "AI岗位有哪些类别？")
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                answered.set()
+
+        request = threading.Thread(target=send)
+        request.start()
+        try:
+            self.assertTrue(started.wait(2))
+            self.assertTrue(answered.wait(2), "The answer waited for document parsing")
+            self.assertFalse(release.is_set())
+            self.assertFalse(errors)
+        finally:
+            release.set()
+            request.join(timeout=3)
+            self.finish_document_tasks()
+
+    def test_ready_resume_text_does_not_wait_for_structured_profile_model(self):
+        started, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+        def slow_profile(*args):
+            started.set()
+            release.wait(5)
+            finished.set()
+            return []
+
+        self.service.documents.profile_extractor = slow_profile
+        try:
+            self.service.documents.start("alice", self.sources["alice"])
+            self.service.prepare_resume("alice", wait_seconds=1)
+            self.assertTrue(started.wait(2))
+            sid = self.case.create()
+            self.case.send(sid, "我的专业是什么？")
+            self.assertFalse(finished.is_set(), "The answer waited for the profile model")
+            prompt = next(call for call in reversed(self.case.calls) if call.get("stream"))["messages"][0]["content"]
+            self.assertIn("林禾", prompt)
+            self.assertIn("计算机科学", prompt)
+        finally:
+            release.set()
+            self.finish_document_tasks()
+
+    def test_first_answer_has_priority_over_resume_profile_model(self):
+        from check_chat import FakeClient
+        order = []
+
+        class Client(FakeClient):
+            def create(inner, **kwargs):
+                if kwargs.get("stream"):
+                    order.append("answer")
+                return super().create(**kwargs)
+
+        self.service.client_factory = lambda runtime: Client(self.case.calls)
+        self.service.documents.profile_extractor = lambda *args: order.append("profile") or []
+        self.case.send(self.case.create(), "AI岗位有哪些类别？")
+        self.finish_document_tasks()
+        self.assertEqual(order, ["answer", "profile"])
+
+    def test_stalled_semantic_recall_falls_back_without_queuing_more_calls(self):
+        sid = self.case.create()
+        self.case.send(sid)
+        job, messages, result = self.case.batch(sid)
+        self.service.memory.commit_candidates(job, messages, result["memories"], 0)
+        identifier = self.service.store.memory_snapshot("alice")[1][0]["id"]
+        started, release = threading.Event(), threading.Event()
+
+        def stalled(*args, **kwargs):
+            started.set()
+            release.wait(5)
+            return [identifier]
+
+        memory = self.service.memory
+        memory.VECTOR_WAIT_SECONDS = .01
+        memory.vector.search = MagicMock(side_effect=stalled)
+        try:
+            for _ in range(3):
+                context, trace = self.service.context("alice", sid, "推荐一个城市", with_trace=True, read_resume=False)
+                self.assertIn("杭州", context[0]["content"])
+                self.assertEqual(trace["retrieval"], "saved_memory")
+            self.assertTrue(started.is_set())
+            self.assertEqual(memory.vector.search.call_count, 2)
+        finally:
+            release.set()
+
+    def test_reply_trace_reports_context_and_model_latency_separately(self):
+        sid = self.case.create()
+        self.case.send(sid, "你好")
+        trace = self.service.store.context_trace("alice", sid)
+        self.assertEqual(trace["status"], "complete")
+        for key in ("context_ms", "model_connect_ms", "first_token_ms", "total_ms"):
+            self.assertGreaterEqual(trace["timings"][key], 0)
+        self.assertGreaterEqual(trace["timings"]["total_ms"], trace["timings"]["context_ms"])
+        self.finish_document_tasks()
 
     def test_uploaded_resume_is_in_chat_context_as_user_source_and_read_once(self):
         sid = self.case.create()
@@ -120,6 +236,20 @@ class ContextChecks(unittest.TestCase):
         self.service.memory.vector.retry_at = 0
         self.assertEqual(self.service.memory.vector.status()["state"], "degraded")
 
+    def test_index_degradation_identifies_the_incompatible_hnswlib_variant(self):
+        class OrdinaryIndex:
+            pass
+
+        try:
+            OrdinaryIndex.file_handle_count
+        except AttributeError as error:
+            self.service.memory.vector.unavailable(error)
+        data = self.case.client.get("/api/chat/memories").json()
+        self.assertEqual(data["index"]["state"], "degraded")
+        self.assertEqual(data["index"]["error_code"], "incompatible_hnswlib")
+        self.assertIn("chroma-hnswlib", data["index"]["message"])
+        self.assertIn("重启", data["index"]["message"])
+
     def test_replacing_resume_does_not_reuse_previous_file_content(self):
         self.service.context("alice", self.case.create(), "我是谁")
         self.file.write_bytes(b"offline resume version two")
@@ -168,10 +298,11 @@ class ContextChecks(unittest.TestCase):
         self.case.login("alice")
         self.assertEqual(self.case.client.post("/api/chat/sources/resume/sync").status_code, 403)
         seen = []
-        self.service.documents.start = lambda owner, source: seen.append((owner, source))
+        self.service.documents.start = lambda owner, source, **options: seen.append((owner, source, options))
         result = self.case.api("POST", "/api/chat/sources/resume/sync", {"path": "/other/account/private"})
         self.assertEqual(result.status_code, 202)
         self.assertEqual(seen[0][1]["path"], str(self.file))
+        self.assertTrue(seen[0][2]["retry"])
 
 
 if __name__ == "__main__":

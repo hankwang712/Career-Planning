@@ -24,12 +24,24 @@ class ResumeDocuments:
         self.guard = threading.Lock()
         self.locks = {}
         self.tasks = {}
+        self.read_ready = {}
+        self.profile_locks = {}
         self.current_source = current_source
 
     def forget(self, owner):
         self.repository.delete_owner(owner)
 
     def _profile(self, owner, fingerprint, source, text):
+        with self.guard:
+            lock = self.profile_locks.setdefault((owner, fingerprint), threading.Lock())
+        if not lock.acquire(blocking=False):
+            return
+        try:
+            self._build_profile(owner, fingerprint, source, text)
+        finally:
+            lock.release()
+
+    def _build_profile(self, owner, fingerprint, source, text):
         row = self.repository.get(owner, fingerprint)
         if not row:
             return
@@ -100,7 +112,20 @@ class ResumeDocuments:
                 "profile_error": row["profile_error"] if row else "",
                 "warnings": metadata.get("warnings", [])}
 
-    def read(self, owner, source):
+    def read(self, owner, source, *, extract_profile=True):
+        fingerprint = self.fingerprint(source)
+        with self.guard:
+            ready = self.read_ready.setdefault((owner, fingerprint), threading.Event())
+        try:
+            document = self._read_text(owner, source)
+        finally:
+            # Text becomes usable before the separate profile model call finishes.
+            ready.set()
+        if extract_profile:
+            self._profile(owner, fingerprint, source, document["markdown"])
+        return document
+
+    def _read_text(self, owner, source):
         fingerprint = self.fingerprint(source)
         if not fingerprint:
             raise ValueError("当前简历文件不存在，请重新上传。")
@@ -112,7 +137,6 @@ class ResumeDocuments:
                 raise ValueError("简历已更换或移除，请使用当前简历重试。")
             row = self.repository.get(owner, fingerprint)
             if row and row["status"] == "ready":
-                self._profile(owner, fingerprint, source, row["content"])
                 return {**json.loads(row["metadata"]), "markdown": row["content"]}
             self.repository.save(owner, fingerprint, status="reading", source=source)
             try:
@@ -126,27 +150,31 @@ class ResumeDocuments:
                 if not self.is_current(owner, fingerprint):
                     raise ValueError("简历已更换或移除，请使用当前简历重试。")
                 self.repository.save(owner, fingerprint, status="ready", content=text, metadata=metadata, source=source)
-                self._profile(owner, fingerprint, source, text)
                 return {**metadata, "markdown": text}
             except Exception:
                 if self.is_current(owner, fingerprint):
                     self.repository.save(owner, fingerprint, status="failed", error="简历读取未完成，请检查文件或 OCR 配置后重试。")
                 raise
 
-    def start(self, owner, source):
+    def start(self, owner, source, *, retry=False, extract_profile=True):
         fingerprint = self.fingerprint(source)
         if not fingerprint:
             raise ValueError("请先在工作台上传简历。")
-        key = owner, fingerprint
+        key = owner, fingerprint, extract_profile
+        read_key = owner, fingerprint
         with self.guard:
             if key in self.tasks and self.tasks[key].is_alive():
                 return
             row = self.repository.get(owner, fingerprint)
-            if row and row["profile_status"] == "failed":
+            if row and not retry and (row["status"] == "failed" or
+                    row["status"] == "ready" and (not extract_profile or row["profile_status"] in {"ready", "failed"})):
+                return
+            if row and retry and row["profile_status"] == "failed":
                 self.repository.save_profile(owner, fingerprint, status="pending")
+            self.read_ready.setdefault(read_key, threading.Event()).clear()
             def work():
                 try:
-                    self.read(owner, source)
+                    self.read(owner, source, extract_profile=extract_profile)
                 except Exception:
                     pass  # The source status exposes a sanitized failure message.
                 finally:
@@ -155,3 +183,12 @@ class ResumeDocuments:
             task = threading.Thread(target=work, name="assistant-resume", daemon=True)
             self.tasks[key] = task
             task.start()
+
+    def prepare(self, owner, source, *, wait_seconds=0, extract_profile=False):
+        """Warm the source; optionally wait for text, never for profile extraction."""
+        self.start(owner, source, extract_profile=extract_profile)
+        key = owner, self.fingerprint(source)
+        with self.guard:
+            ready = self.read_ready.get(key)
+        if ready and wait_seconds > 0:
+            ready.wait(wait_seconds)

@@ -44,6 +44,9 @@ class VectorMemory:
         if isinstance(error, ModuleNotFoundError) and error.name == "hnswlib":
             self.error_code = "missing_hnswlib"
             self.last_error = "当前运行环境缺少 hnswlib，本地 Chroma 索引未启动。"
+        elif isinstance(error, AttributeError) and getattr(error, "name", None) == "file_handle_count":
+            self.error_code = "incompatible_hnswlib"
+            self.last_error = "当前 hnswlib 与本地 Chroma 不兼容，请在后端运行的 Python 环境中安装 chroma-hnswlib，并重启后端。"
         elif error is None:
             self.last_error = "尚未配置完整的向量模型连接。"
         elif phase == "embedding":

@@ -37,6 +37,7 @@ class MemoryContext:
 class MemoryManager:
     RECENT_LIMIT = 40
     RECENT_CHARACTERS = 32000
+    VECTOR_WAIT_SECONDS = 0.75
 
     def __init__(self, store, directory, *, runtime, client_factory, cache=None, vector=None):
         self.store = store
@@ -50,6 +51,27 @@ class MemoryManager:
         self._wakeup = threading.Event()
         self._stopping = threading.Event()
         self._resources_closed = False
+        self._recall_slots = threading.BoundedSemaphore(2)
+
+    def _semantic_matches(self, owner, query, epoch):
+        # A slow embedding provider must not hold up the main reply. Do not queue
+        # requests behind stalled calls, and discard late results rather than
+        # caching queries or recalled personal data after a privacy change.
+        if self._stopping.is_set() or not self._recall_slots.acquire(blocking=False):
+            return []
+        finished, result = threading.Event(), []
+
+        def search():
+            try:
+                result.extend(self.vector.search(owner, query, epoch=epoch))
+            except Exception:
+                pass  # Confirmed SQLite memories remain available below.
+            finally:
+                self._recall_slots.release()
+                finished.set()
+
+        threading.Thread(target=search, name="assistant-recall", daemon=True).start()
+        return result if finished.wait(self.VECTOR_WAIT_SECONDS) else []
 
     def _recent(self, owner, session):
         epoch = session["privacy_epoch"]
@@ -97,7 +119,7 @@ class MemoryManager:
         _, memories = self.store.memory_snapshot(owner)
         active = self.confirmed(memories)
         identity_query = bool(re.search(r"我是谁|我的(?:背景|学校|学历|专业|毕业|情况|简历)|了解我", query))
-        ids = self.vector.search(owner, query, epoch=session["privacy_epoch"]) if active and not identity_query and not self.store.cleanup_pending(owner) else []
+        ids = self._semantic_matches(owner, query, session["privacy_epoch"]) if active and not identity_query and not self.store.cleanup_pending(owner) else []
         ranks = {memory_id: rank for rank, memory_id in enumerate(ids)}
         core = [row for row in active if row["kind"] in {"preference", "communication"}][:20]
         core_ids = {row["id"] for row in core}

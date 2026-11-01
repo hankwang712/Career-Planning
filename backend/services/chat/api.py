@@ -178,6 +178,7 @@ def create_app(flask_app, *, service, current_user):
 
     @api.get("/api/chat/sessions")
     def list_sessions(user: User):
+        service.prepare_resume(user.owner)
         runtime = service.runtime_provider(user.selection)
         return {"items": service.store.list_sessions(user.owner), "model": runtime[2] or "尚未配置模型",
                 "configured": all(runtime), "display_name": user.display_name}
@@ -259,7 +260,7 @@ def create_app(flask_app, *, service, current_user):
         if not service.store.privacy(user.owner)["resume_enabled"]:
             raise ChatError("请先启用聊天中的简历资料来源。", 409)
         try:
-            service.documents.start(user.owner, service.resume_provider(user.owner))
+            service.documents.start(user.owner, service.resume_provider(user.owner), retry=True)
         except ValueError as error:
             raise ChatError(str(error), 400) from None
         return {"ok": True, "message": "已安排读取当前简历，可在资料来源中查看进度。"}

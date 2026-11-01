@@ -372,6 +372,11 @@ class PipelineChecks(unittest.TestCase):
             {"key": "graduation", "subject": "profile", "value": "2027", "evidence": {"quote": "2027年毕业"}},
             {"key": "skill", "subject": "Python", "value": "Python", "evidence": {"quote": "Python"}}])
         self.service.background("alice", read_resume=True)
+        # Chat consumes the text immediately; structured extraction is background work.
+        with self.service.documents.guard:
+            tasks = list(self.service.documents.tasks.values())
+        for task in tasks:
+            task.join(timeout=3)
         restarted = ChatService(Path(self.case.temp.name), lambda selection: self.case.runtime,
                                 lambda owner: {}, resume_provider=self.service.resume_provider)
         restarted.memory.cache.retry_at = restarted.memory.vector.retry_at = float("inf")

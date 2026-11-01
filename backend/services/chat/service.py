@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import time
 
 from openai import OpenAI
@@ -26,10 +27,12 @@ SYSTEM_PROMPT = """你是智航生涯的 AI 生涯助手，可以与用户自由
 只知道提供的背景，不声称访问了其他会话全文，不声称联网搜索或执行了未提供的工具。
 不要编造岗位、薪资、用户经历或已经执行的操作。没有实时来源时说明信息边界。
 适当使用 Markdown。用户可以在“记忆与资料”查看来源和移除记忆。后台只筛选明确且有长期价值的信息，不承诺每句话都被记住。
+表格使用标准 Markdown：表头下一行紧接分隔线，每条记录占一行，表格行之间不插入空行；长单元格保持简洁。
 """
 
 
 class ChatService:
+    RESUME_WAIT_SECONDS = 1.0
     def __init__(self, directory, runtime_provider, profile_provider, *, client_factory=None, resume_provider=None):
         self.store = ChatStore(directory / "conversations.sqlite3")
         self.runtime_provider, self.profile_provider = runtime_provider, profile_provider
@@ -65,7 +68,8 @@ class ChatService:
         recently_failed = resume["status"] == "failed" and time.time() - (resume.get("updated_at") or 0) < 60
         if read_resume and source.get("path") and not recently_failed:
             try:
-                self.documents.read(owner, source)
+                self.documents.read(owner, source, extract_profile=False)
+                self.documents.start(owner, source)
             except Exception as error:
                 logger.warning("聊天简历接入未完成：%s", type(error).__name__)
             # Reading can overlap a replacement or deletion; refresh the authoritative source.
@@ -83,6 +87,16 @@ class ChatService:
         elif resume["status"] != "missing":
             background["当前简历读取状态"] = {"状态": resume["status"], "说明": resume["message"]}
         return background, resume
+
+    def prepare_resume(self, owner, *, wait_seconds=0, extract_profile=False):
+        if not self.store.privacy(owner)["resume_enabled"]:
+            return
+        source = self.resume_provider(owner) or {}
+        if source.get("path"):
+            try:
+                self.documents.prepare(owner, source, wait_seconds=wait_seconds, extract_profile=extract_profile)
+            except ValueError:
+                pass  # A removed or replaced source is reflected by the next snapshot.
 
     def memory_overview(self, owner, session_id=None):
         overview = self.memory.overview(owner, session_id)
@@ -102,9 +116,9 @@ class ChatService:
         disputed = {(row["key"], normalized(row["subject"])) for row in view["conflicts"]}
         return self.memory.career_context(owner, disputed=disputed)
 
-    def context(self, owner, session_id, query, *, with_trace=False):
+    def context(self, owner, session_id, query, *, with_trace=False, read_resume=True):
         context = self.memory.context(owner, session_id, query)
-        background, resume = self.background(owner, read_resume=True)
+        background, resume = self.background(owner, read_resume=read_resume)
         view = unified_facts(resume, self.store.memory_snapshot(owner)[1])
         disputed = {(row["key"], normalized(row["subject"])) for row in view["conflicts"]}
         context.memories = [row for row in context.memories if (row["key"], normalized(row["subject"])) not in disputed]
@@ -126,17 +140,24 @@ class ChatService:
 
     def stream(self, owner, session_id, request_id, token, content, runtime):
         completed = False
+        started = time.perf_counter()
         client, response = None, None
         try:
             epoch = self.store.check_turn(owner, session_id, token)
             yield {"type": "start", "session_id": session_id, "request_id": request_id, "model": runtime[2]}
             if self.store.privacy(owner)["resume_enabled"] and (self.resume_provider(owner) or {}).get("path"):
-                yield {"type": "status", "message": "正在载入当前简历与已保存记忆；首次读取简历可能需要稍候。"}
-            messages, trace = self.context(owner, session_id, content, with_trace=True)
+                yield {"type": "status", "message": "正在准备资料与已保存记忆…"}
+            needs_resume = bool(re.search(r"简历|我是谁|了解我|我的(?:背景|学校|学历|专业|毕业|经历|技能)", content))
+            self.prepare_resume(owner, wait_seconds=self.RESUME_WAIT_SECONDS if needs_resume else 0)
+            messages, trace = self.context(owner, session_id, content, with_trace=True, read_resume=False)
+            trace["timings"] = {"context_ms": round((time.perf_counter() - started) * 1000)}
             self.store.check_turn(owner, session_id, token)
             self.store.save_context_trace(owner, session_id, request_id, trace, epoch=epoch)
+            yield {"type": "status", "message": "正在等待模型回复…"}
             client = self.client_factory(runtime)
+            model_started = time.perf_counter()
             response = client.chat.completions.create(model=runtime[2], messages=messages, stream=True, max_tokens=5000)
+            trace["timings"]["model_connect_ms"] = round((time.perf_counter() - model_started) * 1000)
             trace["status"] = "sent"
             self.store.save_context_trace(owner, session_id, request_id, trace, epoch=epoch)
             yield {"type": "context", "memory_count": len(trace["memories"]), "source_count": len(trace["source_titles"]), "resume_status": trace["resume_status"]}
@@ -148,6 +169,8 @@ class ChatService:
                 delta = chunk.choices[0].delta.content
                 if not isinstance(delta, str) or not delta:
                     continue
+                if not parts:
+                    trace["timings"]["first_token_ms"] = round((time.perf_counter() - model_started) * 1000)
                 parts.append(delta)
                 size += len(delta)
                 if size > 24000:
@@ -158,10 +181,14 @@ class ChatService:
                 raise ValueError("Empty model response")
             self.store.finish_turn(owner, session_id, request_id, token, answer)
             completed = True
+            trace["timings"]["total_ms"] = round((time.perf_counter() - started) * 1000)
             self.store.save_context_trace(owner, session_id, request_id, {**trace, "status": "complete"}, epoch=epoch)
             self.memory.invalidate(owner, session_id)
             self.memory.queue(owner, session_id)
-            yield {"type": "done", "session_id": session_id, "request_id": request_id}
+            self.prepare_resume(owner, extract_profile=True)
+            logger.info("聊天耗时：上下文 %d ms，模型首字 %d ms，总计 %d ms", trace["timings"]["context_ms"],
+                        trace["timings"]["first_token_ms"], trace["timings"]["total_ms"])
+            yield {"type": "done", "session_id": session_id, "request_id": request_id, "timings": trace["timings"]}
         except GeneratorExit:
             raise
         except Exception:
