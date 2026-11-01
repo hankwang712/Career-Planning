@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-职业规划智能体 Flask 服务。
+职业规划智能体 FastAPI + Flask 服务。
 运行方式：python backend/server.py
 访问地址：http://localhost:8080
 """
@@ -105,6 +105,7 @@ from services import db as _app_db
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
 from services.chat import create_blueprint as create_chat_blueprint
+from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
 from services.paths import (
     APP_DATA_DIR,
@@ -953,7 +954,8 @@ def _chat_resume_source(username):
     path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
     if not path or not os.path.isfile(path):
         return {}
-    return {"path": path, "document_id": str(resume.get("document_id") or ""),
+    return {"structured_profile": resume.get("structured_resume") or {}, "selection": state.get("llm_selection") or {},
+            "path": path, "document_id": str(resume.get("document_id") or ""),
             "name": str(resume.get("original_file_name") or resume.get("file_name") or "简历"),
             "text": str(resume.get("resume_source_text") or "")}
 
@@ -1225,8 +1227,8 @@ def _delete_admin_account(account_key, acting_username=""):
     if registered_user:
         chat_service = app.extensions.get("chat_service")
         if chat_service:
-            chat_service.vector.delete_owner(registered_username)
-            chat_service.store.delete_owner(registered_username)
+            chat_service.memory.delete_owner(registered_username)
+            chat_service.documents.forget(registered_username)
         _app_db.delete_user(registered_username)
 
     lookup_name = registered_username or safe_key
@@ -6617,12 +6619,10 @@ def api_resume_upload():
 
     state = _load_user_state(user["username"])
     prev = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
-    old_path = _owned_resume_storage_path(user["username"], str(prev.get("storage_path") or "").strip())
-    if old_path and old_path != saved_path and os.path.exists(old_path):
-        try:
-            os.remove(old_path)
-        except OSError:
-            pass
+    versions = state.get("resume_versions") if isinstance(state.get("resume_versions"), list) else []
+    if prev.get("document_id") and not any(isinstance(item, dict) and item.get("document_id") == prev["document_id"] for item in versions):
+        versions.append({key: prev.get(key) for key in ("document_id", "storage_path", "file_name", "original_file_name", "uploaded_at")})
+    state["resume_versions"] = versions
 
     state["resume_profile"] = {
         "file_name": saved_name,
@@ -6828,15 +6828,20 @@ def api_resume_profile():
     if request.method == "GET":
         return jsonify({"data": _public_resume_state(resume_state)})
 
-    storage_path = _owned_resume_storage_path(user["username"], str(resume_state.get("storage_path") or "").strip())
-    if storage_path and os.path.exists(storage_path):
-        try:
-            os.remove(storage_path)
-        except OSError:
-            pass
+    versions = state.get("resume_versions") if isinstance(state.get("resume_versions"), list) else []
+    for version in [resume_state, *versions]:
+        if not isinstance(version, dict):
+            continue
+        storage_path = _owned_resume_storage_path(user["username"], str(version.get("storage_path") or "").strip())
+        if storage_path and os.path.exists(storage_path):
+            try:
+                os.remove(storage_path)
+            except OSError:
+                pass
     state.pop("resume_profile", None)
+    state.pop("resume_versions", None)
     _save_user_state(user["username"], state)
-    app.extensions["chat_service"].store.forget_documents(user["username"])
+    app.extensions["chat_service"].documents.forget(user["username"])
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
@@ -8209,7 +8214,6 @@ app.register_blueprint(create_datasets_blueprint(_login_required))
 _chat_blueprint = create_chat_blueprint(
     directory=APP_DATA_DIR / "assistant",
     current_user=_current_user,
-    login_required=_login_required,
     runtime_provider=_get_chat_runtime,
     profile_provider=lambda username: build_chat_background(_load_user_state(username), _read_career_report_bundle(username)),
     resume_provider=_chat_resume_source,
@@ -8218,12 +8222,18 @@ app.register_blueprint(_chat_blueprint)
 app.extensions["chat_service"] = _chat_blueprint.chat_service
 _load_users()
 _prewarm_caches()
+
+# Uvicorn serves chat with FastAPI; the rest of the site remains in Flask.
+app.config.update(FRONTEND_ORIGIN=FRONTEND_ORIGIN, VITE_DEV_SERVER_URL=VITE_DEV_SERVER_URL)
+asgi_app = create_chat_app(app, service=_chat_blueprint.chat_service, current_user=_current_user)
+
 if __name__ == "__main__":
+    import uvicorn
     host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
     port = int(os.environ.get("PORT", "8080"))
     auto_open_browser = os.environ.get("AUTO_OPEN_BROWSER", "").lower() in {"1", "true", "yes"}
     print("=" * 50)
-    print("  职业规划智能体 · Flask 服务")
+    print("  职业规划智能体 · FastAPI + Flask 服务")
     print(f"  访问地址：http://{host}:{port}")
     print("  数据目录：", BOSS_INFO_DIR)
     print("  用户数据目录：", APP_DATA_DIR)
@@ -8233,4 +8243,4 @@ if __name__ == "__main__":
     if auto_open_browser:
         threading.Thread(target=open_browser, daemon=True).start()
 
-    app.run(host=host, port=port, debug=False, threaded=True)
+    uvicorn.run(asgi_app, host=host, port=port)

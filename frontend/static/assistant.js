@@ -322,15 +322,17 @@
     }
   }
 
-  function askAction({ title, description, initial, danger = false }) {
+  function askAction({ title, description, initial, danger = false, maxLength = 80, confirmLabel }) {
     return new Promise((resolve) => {
       $("actionTitle").textContent = title;
       $("actionDescription").textContent = description || "";
       $("actionInput").hidden = initial === undefined;
       $("actionInput").value = initial || "";
+      $("actionInput").maxLength = maxLength;
+      $("actionInput").setAttribute("aria-label", title);
       $("actionInput").required = initial !== undefined;
       $("confirmAction").classList.toggle("danger", danger);
-      $("confirmAction").textContent = danger ? "删除" : "保存";
+      $("confirmAction").textContent = confirmLabel || (danger ? "删除" : "保存");
       $("actionDialog").returnValue = "";
       $("actionForm").onsubmit = (event) => {
         event.preventDefault();
@@ -354,11 +356,11 @@
     if (!await askAction({ title: "删除这个对话？", description: "聊天记录将被删除。已提取的长期记忆可在“我的记忆”中单独移除。", danger: true })) return;
     try {
       state.pending.get(row.id)?.controller.abort();
-      await api(`/api/chat/sessions/${row.id}`, { method: "DELETE" });
+      const result = await api(`/api/chat/sessions/${row.id}`, { method: "DELETE" });
       state.retries.delete(row.id);
       if (state.active === row.id) { state.active = null; newConversation(); }
       await refreshSessions();
-      toast("对话已删除");
+      toast(result.task.status === "completed" ? "对话及缓存清理完成，长期记忆保留" : "对话已移除，缓存清理已受理；长期记忆保留");
     } catch (error) { toast(error.message); }
   }
 
@@ -388,11 +390,11 @@
   function renderMemorySources(data, expanded) {
     const resume = data.resume || {};
     $("memoryResumeTitle").textContent = resume.file_name || "当前简历";
-    $("memoryResumeStatus").textContent = resume.message || "请重启更新后的后端服务，再刷新资料状态。";
+    $("memoryResumeStatus").textContent = [resume.message, resume.profile_error].filter(Boolean).join(" ") || "请重启更新后的后端服务，再刷新资料状态。";
     const sync = $("syncResumeMemory");
-    sync.hidden = !resume.status || ["missing", "ready"].includes(resume.status);
+    sync.hidden = !resume.status || resume.status === "missing" || (resume.status === "ready" && resume.profile_status !== "failed");
     sync.disabled = resume.status === "reading";
-    sync.textContent = resume.status === "reading" ? "正在读取…" : resume.status === "failed" ? "重试读取" : "读取当前简历";
+    sync.textContent = resume.status === "reading" ? "正在读取…" : resume.profile_status === "failed" ? "重试资料提取" : resume.status === "failed" ? "重试读取" : "读取当前简历";
     $("memorySources").replaceChildren();
     for (const source of data.sources || []) {
       const card = document.createElement("article");
@@ -403,7 +405,7 @@
       title.textContent = source.title;
       const badge = document.createElement("span");
       badge.className = ["user_upload", "user_statement"].includes(source.kind) ? "memory-source-badge original" : "memory-source-badge";
-      badge.textContent = source.kind === "user_upload" ? "用户上传原文" : source.kind === "user_statement" ? "用户填写 / 选择" : "历史分析 / 工作台资料";
+      badge.textContent = source.kind === "user_upload" ? "用户上传原文" : source.kind === "user_statement" ? "用户填写 / 选择" : source.kind === "profile" ? "用户资料 · 可核对来源" : "历史分析 / 工作台资料";
       heading.append(title, badge);
       card.append(heading, memoryDetails(`source:${source.title}`, "查看实际载入的内容", source.preview, expanded));
       $("memorySources").append(card);
@@ -460,11 +462,21 @@
     $("memoryIndexStatus").dataset.state = index.state;
     $("memoryIndexStatus").textContent = `${index.state === "ready" ? "语义检索正常" : index.state === "degraded" ? "语义检索已降级" : "语义检索待就绪"} · ${index.message} ${index.state === "ready" ? `已同步 ${index.indexed}/${index.total} 条记忆。` : "当前简历与已保存记忆仍可直接使用。"}`;
     renderMemorySources(data, expanded);
+    $("resumeSourceEnabled").checked = Boolean(data.controls?.resume_enabled ?? true);
+    $("workspaceSourceEnabled").checked = Boolean(data.controls?.workspace_enabled ?? true);
+    const cleanup = data.cleanup || [];
+    const pendingCleanup = cleanup.filter((task) => task.status !== "completed");
+    $("memoryCleanupStatus").textContent = pendingCleanup.length
+      ? `有 ${data.cleanup_pending_count ?? pendingCleanup.length} 项清理尚未完成，相关记忆已停止使用。${pendingCleanup.some((task) => task.error_code === "LegacyCachePending") ? "部分旧缓存等待原有效期结束，后台会继续核对。" : pendingCleanup.some((task) => task.status === "retrying") ? "部分存储暂不可用，后台会继续重试。" : "后台正在处理。"}`
+      : cleanup.length ? "当前应用内的清理任务已完成。外部备份、日志和独立资料不在清理范围内。" : "";
     renderMemoryContext(data.context, expanded);
     memoryTab(state.memoryTab);
     const labels = { fact: "职业事实", preference: "职业偏好", communication: "交流偏好" };
-    const keys = { education: "教育背景", graduation: "毕业时间", experience: "经历", skill: "技能", target_city: "目标城市", target_role: "目标方向", salary: "薪资期待", work_style: "工作方式", industry: "行业", availability: "到岗安排", constraint: "个人限制", answer_length: "回答长度", answer_structure: "回答结构", language: "语言", tone: "语气", explanation_style: "解释方式" };
-    $("memoryJobStatus").textContent = data.jobs.running ? "正在整理对话中的有效信息…" : data.jobs.error ? "部分对话尚未整理成功，可以点击下方按钮重试。" : data.jobs.queued ? "有对话待整理，后台会自动筛选值得保留的信息。" : "已保存的记忆会用于后续对话。";
+    const keys = { education: "教育背景", graduation: "毕业时间", major: "专业", experience: "经历", skill: "技能", target_city: "目标城市", target_role: "目标方向", salary: "薪资期待", work_style: "工作方式", industry: "行业", availability: "到岗安排", constraint: "个人限制", answer_length: "回答长度", answer_structure: "回答结构", language: "语言", tone: "语气", explanation_style: "解释方式" };
+    const jobLabel = (jobs = {}) => jobs.running ? "正在整理" : jobs.error ? "整理失败，可以重试" : jobs.queued ? "等待整理" : jobs.done ? "已完成" : "暂无待处理内容";
+    $("memoryJobStatus").textContent = data.jobs.memory || data.jobs.summary
+      ? `长期记忆：${jobLabel(data.jobs.memory)}；会话摘要：${jobLabel(data.jobs.summary)}。`
+      : jobLabel(data.jobs);
     $("memoryList").replaceChildren();
     for (const row of data.items) {
       const item = document.createElement("article");
@@ -481,15 +493,7 @@
       source.textContent = `来源：${row.source_title || "用户对话"} · ${memoryTime(row.updated_at)}${provided ? " · 已列入本轮上下文" : ""}`;
       body.append(source);
       if (row.evidence?.length) body.append(memoryDetails(`memory:${row.id}`, "核对用户原话", row.evidence.map((item) => item.quote).join("\n\n"), expanded));
-      const remove = document.createElement("button");
-      remove.textContent = "移除";
-      remove.setAttribute("aria-label", `移除记忆：${row.value}`);
-      remove.addEventListener("click", async () => {
-        remove.disabled = true;
-        try { await api(`/api/chat/memories/${encodeURIComponent(row.id)}`, { method: "DELETE" }); await refreshMemories(); toast("已移除这条记忆"); }
-        catch (error) { toast(error.message); remove.disabled = false; }
-      });
-      item.append(body, remove);
+      item.append(body, memoryActions(row));
       $("memoryList").append(item);
     }
     if (!data.items.length) {
@@ -499,6 +503,37 @@
       $("memoryList").append(empty);
     }
     $("consolidateMemory").disabled = !state.active || state.pending.has(state.active);
+  }
+
+  function memoryActions(row) {
+    const actions = document.createElement("div");
+    actions.className = "memory-actions";
+    for (const [mode, label] of [["edit", "纠正"], ["forget", "忘记"], ["purge", "彻底删除"]]) {
+      if (mode === "edit" && !["active", "conflict"].includes(row.status)) continue;
+      const button = document.createElement("button");
+      button.textContent = label;
+      button.setAttribute("aria-label", `${label}记忆：${row.value}`);
+      button.addEventListener("click", async () => {
+        const description = mode === "edit" ? "新内容会成为当前值，旧聊天上下文将失效。"
+          : mode === "forget" ? "清除这条聊天记忆的值、证据和旧上下文，原聊天记录保留。旧资料引用会暂停。若要恢复记忆，请明确说“请重新记住……”。"
+          : "还将删除已记录的证据消息、对应回复和由这些消息提取的其他记忆，无法恢复。独立简历和已有报告保留。";
+        const result = await askAction({ title: `${label}这条记忆？`, description, confirmLabel: label,
+          ...(mode === "edit" ? { initial: row.value, maxLength: 1000 } : { danger: true }) });
+        if (!result) return;
+        button.disabled = true;
+        try {
+          for (const pending of state.pending.values()) pending.controller.abort();
+          await api(`/api/chat/memories/${encodeURIComponent(row.id)}${mode === "edit" ? "" : `?mode=${mode}`}`, {
+            method: mode === "edit" ? "PATCH" : "DELETE", ...(mode === "edit" ? { body: JSON.stringify({ value: result }) } : {}) });
+          state.retries.clear();
+          await refreshMemories();
+          if (mode === "purge") { await refreshSessions(); if (state.active) await refreshMessages(state.active, false); }
+          toast(mode === "edit" ? "记忆已纠正，缓存与索引更新已受理" : "相关记忆已停止使用，清理已受理，可在此查看进度");
+        } catch (error) { toast(error.message); button.disabled = false; }
+      });
+      actions.append(button);
+    }
+    return actions;
   }
 
   function openMemories() {
@@ -528,6 +563,30 @@
   });
   $("closeMemory").addEventListener("click", () => $("memoryDialog").close());
   $("memoryDialog").addEventListener("close", () => clearInterval(memoryTimer));
+  $("clearChatData").addEventListener("click", async () => {
+    if (!await askAction({ title: "清除全部 Chat 数据？", description: "删除当前账号的聊天、摘要、记忆与快照，并后台清理缓存和向量。独立简历及已有报告保留，旧资料引用会暂停。", danger: true })) return;
+    try {
+      for (const pending of state.pending.values()) pending.controller.abort();
+      await api("/api/chat/chat-data", { method: "DELETE" });
+      state.active = null;
+      state.sessions = [];
+      state.retries.clear();
+      newConversation();
+      await refreshSessions();
+      await refreshMemories();
+      toast("Chat 数据已停止使用，全部清理请求已受理");
+    } catch (error) { toast(error.message); }
+  });
+  for (const id of ["resumeSourceEnabled", "workspaceSourceEnabled"]) {
+    $(id).addEventListener("change", async () => {
+      const desired = { resume_enabled: $("resumeSourceEnabled").checked, workspace_enabled: $("workspaceSourceEnabled").checked };
+      if ($(id).checked && !await askAction({ title: "重新引用独立资料？", description: "这些资料可能仍包含你已从聊天记忆中删除的信息。启用后，助手可以再次使用这些独立来源。" })) { $(id).checked = false; return; }
+      try {
+        await api("/api/chat/source-settings", { method: "PATCH", body: JSON.stringify(desired) });
+        await refreshMemories();
+      } catch (error) { toast(error.message); await refreshMemories(); }
+    });
+  }
   $("cancelAction").addEventListener("click", () => $("actionDialog").close("cancel"));
   $("consolidateMemory").addEventListener("click", async () => {
     if (!state.active) return;

@@ -1306,3 +1306,9 @@ dialog::backdrop {
         transition:none!important;
     }
 }
+
+.memory-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-content:flex-start; }
+.memory-item>.memory-actions { flex:0 0 150px; }
+.memory-source-controls { display:flex; flex-direction:column; gap:12px; padding:12px 0 18px; font-size:13px; }
+.memory-source-controls label { display:flex; align-items:center; gap:8px; }
+.consolidate-button.danger { color:#f2aaa4; margin-top:12px; }

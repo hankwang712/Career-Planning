@@ -103,6 +103,22 @@ class ReportUploadChecks(unittest.TestCase):
         second = self.upload()
         self.assertNotEqual(first["document_id"], second["document_id"])
         self.assertNotEqual(first_path, self.states[self.owner]["resume_profile"]["storage_path"])
+        self.assertTrue(Path(first_path).is_file())
+        self.assertEqual(self.states[self.owner]["resume_versions"][0]["document_id"], first["document_id"])
+
+    def test_deleting_resume_removes_owned_versions_and_parsed_artifacts(self):
+        self.upload()
+        first = self.states[self.owner]["resume_profile"]["storage_path"]
+        self.upload()
+        second = self.states[self.owner]["resume_profile"]["storage_path"]
+        with patch.object(server.app.extensions["chat_service"].documents, "forget") as forget:
+            response = self.client.delete("/api/resume/profile")
+        self.assertEqual(response.status_code, 200)
+        forget.assert_called_once_with(self.owner)
+        self.assertFalse(Path(first).exists())
+        self.assertFalse(Path(second).exists())
+        self.assertNotIn("resume_profile", self.states[self.owner])
+        self.assertNotIn("resume_versions", self.states[self.owner])
 
     def test_running_report_blocks_replacement(self):
         document = self.upload()

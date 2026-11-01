@@ -1,6 +1,39 @@
-"""Bounded, read-only context from the user's existing main-site analysis."""
+"""Bounded profile views with explicit resume/chat provenance."""
+
+import json
 
 from .documents import redact_contacts
+from .storage import normalized
+
+
+def unified_facts(resume, memories):
+    """Merge sources as a view; chat never silently mutates resume facts."""
+    facts = []
+    for item in resume.get("facts", []):
+        facts.append({"key": item["key"], "subject": item["subject"], "value": item["value"],
+                      "sources": [{"type": "resume", "fingerprint": resume.get("fingerprint"),
+                                   "document_id": resume.get("document_id"), "evidence": item.get("evidence", {})}],
+                      "status": "confirmed"})
+    for item in memories:
+        if item["kind"] != "fact" or item["status"] not in {"active", "conflict"}:
+            continue
+        same = [fact for fact in facts if fact["key"] == item["key"] and normalized(fact["subject"]) == normalized(item["subject"])]
+        matching = next((fact for fact in same if normalized(fact["value"]) == normalized(item["value"])), None)
+        source = {"type": "chat", "memory_id": item["id"], "source_session": item["source_session"],
+                  "evidence": json.loads(item["evidence"])}
+        status = "conflict" if item["status"] == "conflict" or any(fact["status"] == "conflict" for fact in same) or (
+            same and not matching and item["key"] in {"education", "graduation", "major"}) else "confirmed"
+        if matching:
+            matching["sources"].append(source)
+            if status == "conflict":
+                matching["status"] = status
+        else:
+            facts.append({"key": item["key"], "subject": item["subject"], "value": item["value"],
+                          "sources": [source], "status": status})
+        if status == "conflict":
+            for fact in same:
+                fact["status"] = "conflict"
+    return {"facts": facts, "conflicts": [fact for fact in facts if fact["status"] == "conflict"]}
 
 
 def compact(value, depth=0):

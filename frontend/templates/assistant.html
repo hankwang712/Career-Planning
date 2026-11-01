@@ -6,9 +6,9 @@
     <meta name="color-scheme" content="dark">
     <title>AI 生涯助手 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png">
-    <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}?v=20261029-memory-v3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}?v=20261101-controls-v1">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='assistant.js') }}?v=20261029-memory-v3" defer></script>
+    <script src="{{ url_for('static', filename='assistant.js') }}?v=20261101-controls-v1" defer></script>
 </head>
 <body>
     <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -77,7 +77,7 @@
     </main>
     <dialog class="memory-dialog" id="memoryDialog" aria-labelledby="memoryTitle">
         <div class="memory-header"><div><p class="welcome-eyebrow">知道什么，来源在哪里，都看得见</p><h2 id="memoryTitle">记忆与资料</h2></div><button class="icon-button" id="closeMemory" aria-label="关闭记忆面板"><svg><use href="#i-close"/></svg></button></div>
-        <p class="memory-description">上传的简历、工作台分析和聊天偏好分别展示，可核对原文、移除单条记忆。移除记忆不会删除原对话或上传文件。</p>
+        <p class="memory-description">删除对话会保留长期记忆。“忘记”清除记忆值和证据，原聊天仍可查看；“彻底删除”还会清理已记录的证据消息、对应回复及衍生记忆。删除后暂停旧资料引用，可在资料来源中主动重新开启。</p>
         <div class="memory-metrics" id="memoryMetrics"></div>
         <div class="memory-index-state" id="memoryIndexStatus" role="status"></div>
         <nav class="memory-tabs" aria-label="记忆内容" role="tablist">
@@ -86,13 +86,17 @@
             <button type="button" id="memoryContextTab" role="tab" aria-controls="memoryContextPanel" aria-selected="false" data-memory-tab="context">本轮上下文</button>
         </nav>
         <section id="memorySourcesPanel" role="tabpanel" aria-labelledby="memorySourcesTab">
+            <div class="memory-source-controls"><label><input type="checkbox" id="resumeSourceEnabled"> 在聊天中使用独立简历资料</label><label><input type="checkbox" id="workspaceSourceEnabled"> 在聊天中使用历史工作台资料</label></div>
             <div class="memory-resume-state"><div><strong id="memoryResumeTitle">当前简历</strong><p id="memoryResumeStatus"></p></div><button type="button" id="syncResumeMemory">读取当前简历</button></div>
             <div id="memorySources" class="memory-source-list"></div>
         </section>
         <section id="memorySavedPanel" role="tabpanel" aria-labelledby="memorySavedTab" hidden>
         <p class="memory-job-status" id="memoryJobStatus" role="status"></p>
+        <p class="memory-job-status" id="memoryCleanupStatus" role="status"></p>
         <div class="memory-list" id="memoryList"></div>
         <button class="consolidate-button" id="consolidateMemory">整理当前对话的记忆</button>
+        <button class="consolidate-button danger" id="clearChatData" type="button">清除全部 Chat 数据</button>
+        <p class="memory-description">清空 Chat 不删除独立简历和已有报告。清理仅覆盖当前应用管理的数据，外部日志、备份及模型服务商已接收的数据不在此范围。</p>
         </section>
         <section id="memoryContextPanel" role="tabpanel" aria-labelledby="memoryContextTab" hidden><div id="memoryContext"></div></section>
     </dialog>

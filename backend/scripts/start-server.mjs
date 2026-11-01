@@ -49,7 +49,7 @@ function runCheck(command, args) {
 function ensureAvailable() {
   const pythonCheck = runCheck(pythonCmd, ["--version"]);
   if (pythonCheck.error || pythonCheck.status !== 0) {
-    fail("Python 不可用，无法启动 Flask 服务。");
+    fail("Python 不可用，无法启动 FastAPI + Flask 服务。");
   }
   if (useViteDevServer) {
     const viteCheck = runCheck(process.execPath, [viteBin, "--version"]);
@@ -102,7 +102,7 @@ if (isWin) {
   } catch (_) { /* ignore */ }
 }
 
-log(`Starting Flask on http://${host}:${port}`);
+log(`Starting FastAPI + Flask on http://${host}:${port}`);
 if (useViteDevServer) {
   log(`Starting Vite on ${viteOrigin}`);
 } else {
@@ -112,7 +112,7 @@ if (useViteDevServer) {
 const pythonProc = spawnTagged(
   pythonCmd,
   ["backend/server.py"],
-  "flask",
+  "backend",
   {
     HOST: host,
     PORT: port,
@@ -144,7 +144,7 @@ function shutdown(reasonCode = 0) {
 
 pythonProc.on("exit", (code) => {
   if (!shuttingDown) {
-    process.stderr.write(`[flask] exited with code ${code ?? 0}\n`);
+    process.stderr.write(`[backend] exited with code ${code ?? 0}\n`);
     shutdown(code ?? 0);
   }
 });
