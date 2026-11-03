@@ -1,5 +1,3 @@
-"""生成有失败分母、配对差值和评测口径说明的本地 HTML/JSON/CSV 报告。"""
-
 from __future__ import annotations
 
 from collections import Counter, defaultdict

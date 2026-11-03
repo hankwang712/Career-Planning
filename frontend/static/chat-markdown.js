@@ -1,4 +1,3 @@
-/* Chat Markdown: all source text is escaped; generated tags are explicit. */
 ((root, factory) => {
   const renderer = factory();
   if (typeof module === "object" && module.exports) module.exports = renderer;

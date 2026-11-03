@@ -1,10 +1,3 @@
-"""真实执行五类 Agent 的完整报告流程；人工复核阶段支持跨进程恢复。
-
-python -m experiments.run_full_report --resume-file "简历.pdf" --preferences "大模型算法工作" --output-dir experiments/output/full_report/case
-python -m experiments.run_full_report --output-dir experiments/output/full_report/case --review-file review.json
-python -m experiments.run_full_report --output-dir experiments/output/full_report/case --render-only
-"""
-
 import argparse
 import asyncio
 from datetime import datetime

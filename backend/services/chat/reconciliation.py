@@ -1,5 +1,3 @@
-"""Stage B: compare candidates with owned slots and validate executable decisions."""
-
 import re
 
 from .storage import normalized

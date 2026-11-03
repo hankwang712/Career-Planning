@@ -1,10 +1,3 @@
-"""User controls and durable cleanup outbox, sharing ChatStore transactions.
-
-Receipts and suppressions keep identifiers/cursors only, never forgotten values.
-Cleanup completion covers managed application stores, not external logs/backups
-or data already sent to a model provider. Resume files and reports are separate.
-"""
-
 import json
 import time
 from uuid import uuid4

@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-将 other_city.json 清洗并映射为与 boss_info/*.json 单条记录尽量一致的字段结构。
-
-规则摘要：
-- 城市：地址优先按 "_" 取首段；若无 "_" 则按 "-" 取首段（如 东莞-虎门镇 -> 东莞）。
-- 删除：岗位编码、更新日期 等无对应目标字段的键。
-- 输出：默认写入 data/cleaned/other_city_boss_format.json
-"""
-
 from __future__ import annotations
 
 import argparse

@@ -1,5 +1,3 @@
-"""仅兼容历史报告字段，不执行 Agent 或生成新的职业判断。"""
-
 from __future__ import annotations
 
 import re

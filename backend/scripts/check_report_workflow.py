@@ -1,8 +1,3 @@
-"""离线回归检查：使用临时 SQLite 与确定性替身，不调用模型、网页或业务数据库。
-
-运行：python backend/scripts/check_report_workflow.py
-"""
-
 import asyncio
 from contextlib import asynccontextmanager
 from copy import deepcopy

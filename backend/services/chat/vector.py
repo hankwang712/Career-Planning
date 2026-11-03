@@ -1,5 +1,3 @@
-"""Rebuildable Chroma index for semantic retrieval of saved memories."""
-
 import hashlib
 import logging
 import os

@@ -1,5 +1,3 @@
-"""Configurable triggers and local conservative token estimates (not a tokenizer)."""
-
 from dataclasses import dataclass
 import math
 import os

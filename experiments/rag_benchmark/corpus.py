@@ -1,5 +1,3 @@
-"""冻结真实入库语料与图谱指纹，并从岗位原文准备待审核题目。"""
-
 from __future__ import annotations
 
 from collections import Counter, defaultdict

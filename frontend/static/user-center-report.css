@@ -1,4 +1,3 @@
-/* Report workspace: a compact library and a readable document with chapter navigation. */
 body.user-center-page:has(#report-workspace.active) {
     background: #f5f7fa;
     color: #26394b;

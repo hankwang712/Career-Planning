@@ -1,8 +1,3 @@
-"""Offline checks for the report upload and the existing Agent file handoff.
-
-Run: python -B backend/scripts/check_report_upload.py
-"""
-
 from copy import deepcopy
 import contextlib
 import io

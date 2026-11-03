@@ -1,5 +1,3 @@
-"""可被主系统和实验入口复用的报告工作流，状态由 LangGraph 保存。"""
-
 from copy import deepcopy
 from datetime import datetime
 from time import perf_counter

@@ -1,9 +1,3 @@
-"""用简历和职业取向验证决策 Agent，保存真实输入、证据和待人工复核结果。
-
-python -m experiments.run_career_decision "简历.pdf" --preferences "AI Agent 应用开发实习"
-python -m experiments.run_career_decision --replay-input "结果目录/decision_input.json"
-"""
-
 import argparse
 import asyncio
 import hashlib

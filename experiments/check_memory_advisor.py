@@ -1,9 +1,3 @@
-"""真实 Redis + Chroma 的本地回归检查，不调用收费模型。
-
-先在项目根目录运行 docker compose up -d redis，再运行 python -m experiments.check_memory_advisor。
-仅删除本次检查专用的 Redis 前缀；Chroma 检查数据位于 experiments/output/memory_checks。
-"""
-
 import asyncio
 from contextlib import asynccontextmanager
 import json

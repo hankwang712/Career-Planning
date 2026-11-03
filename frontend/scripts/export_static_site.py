@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-导出静态站点产物，供 Nginx 直接从磁盘提供 HTML/CSS/JS。
-
-用法：
-  python frontend/scripts/export_static_site.py
-  python frontend/scripts/export_static_site.py --watch
-
-说明：
-  - 测评进度（MBTI/霍兰德）在浏览器端会写入 localStorage 备份，并在登录时与服务端
-    /api/user-state/assessment_hub 合并，避免切换导航或同步竞态导致「做完又变未做」。
-  - 静态部署仍需可访问同源或配置好的 API（见 FRONTEND_ORIGIN / __API_BASE__），否则服务端备份不可用，
-    但本地备份仍可保留访客进度。
-"""
-
 import argparse
 import hashlib
 import shutil

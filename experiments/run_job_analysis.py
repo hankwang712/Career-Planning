@@ -1,5 +1,3 @@
-"""在项目根目录运行：python -m experiments.run_job_analysis --target-role "AI Agent 开发工程师"。"""
-
 import argparse
 import asyncio
 import json

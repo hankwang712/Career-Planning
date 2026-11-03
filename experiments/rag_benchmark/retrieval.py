@@ -1,5 +1,3 @@
-"""LightRAG HTTP 检索与显式 embedding 的 Chroma 对照组。"""
-
 from __future__ import annotations
 
 import importlib.metadata

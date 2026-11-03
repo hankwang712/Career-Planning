@@ -1,5 +1,3 @@
-"""单次 Agent 调用的计量；不保存提示词、简历、工具参数或凭证。"""
-
 from time import perf_counter
 
 from langchain_core.callbacks import AsyncCallbackHandler

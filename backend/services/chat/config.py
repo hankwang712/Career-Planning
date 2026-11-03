@@ -1,5 +1,3 @@
-"""Read existing model settings without importing or modifying experimental code."""
-
 import os
 
 from ..paths import PROJECT_ROOT

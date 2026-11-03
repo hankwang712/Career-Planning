@@ -1,8 +1,3 @@
-"""Offline assistant regression checks using temporary databases and a fake model.
-
-Run: python backend/scripts/check_chat.py
-"""
-
 from copy import deepcopy
 import asyncio
 import json

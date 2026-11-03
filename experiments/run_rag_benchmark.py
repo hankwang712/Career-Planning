@@ -1,24 +1,3 @@
-"""同一岗位语料上的 LightRAG / Chroma RAG 对照实验。
-
-在项目根目录运行 python -m experiments.run_rag_benchmark --help。
-draft/prepare/check 不调用模型；index 会计算 Chroma 向量；run 会检索，
---answers 额外调用统一回答模型；score 调用 RAGAS 评审模型。
-
-推荐步骤（导入与图谱优化结束后再 prepare）：
-  python -m experiments.run_rag_benchmark draft --records 300 --questions 40
-  python -m experiments.run_rag_benchmark prepare --expected-records 300
-  python -m experiments.run_rag_benchmark index
-  python -m experiments.run_rag_benchmark run --answers --allow-draft --limit 5
-  python -m experiments.run_rag_benchmark score --allow-draft --limit 5
-  python -m experiments.run_rag_benchmark report
-
-人工审核：编辑 dataset.draft.json，修订参考答案/全部相关岗位/证据，
-把每题 reviewed 设为 true，另存 dataset.reviewed.json。
-使用 run --dataset ... --run-name reviewed --answers，不加 --allow-draft。
-通过 --strategies lightrag_mix chroma_fixed lightrag_naive chroma_record 加入消融组。
-各阶段自动续跑同配置的已有结果；--retry-errors 显式重试失败题。
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -33,7 +12,7 @@ from experiments.rag_benchmark.common import DEFAULT_OUTPUT, RESEARCH, ROOT, Tok
 
 
 def parser():
-    root = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    root = argparse.ArgumentParser(description='Compare LightRAG and Chroma retrieval on the same job corpus.', formatter_class=argparse.RawDescriptionHelpFormatter)
     shared = argparse.ArgumentParser(add_help=False)
     shared.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="实验数据目录；扩充/优化后请使用新目录保存新基线")
     shared.add_argument("--env-file", type=Path, default=RESEARCH / ".env")

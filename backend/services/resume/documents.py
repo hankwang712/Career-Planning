@@ -1,5 +1,3 @@
-"""Cache the existing document reader's result per account and file content."""
-
 from hashlib import sha256
 import json
 from pathlib import Path

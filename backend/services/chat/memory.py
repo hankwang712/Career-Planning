@@ -1,9 +1,3 @@
-"""Application entry point for LLM memory: recall, extraction and background work.
-
-SQLite owns durable records. Redis and Chroma are replaceable acceleration layers.
-This module has no dependency on FastAPI, Flask or the chat response format.
-"""
-
 from dataclasses import dataclass
 import json
 import logging

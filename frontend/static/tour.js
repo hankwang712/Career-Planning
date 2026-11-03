@@ -1,7 +1,3 @@
-/**
- * TourGuide — 职业规划智能体使用引导
- * Spotlight 引导，localStorage 记录完成状态
- */
 (function () {
   'use strict';
 

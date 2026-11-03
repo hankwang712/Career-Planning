@@ -1,5 +1,3 @@
-"""Flask-rendered assistant page; chat APIs are served by FastAPI."""
-
 from pathlib import Path
 
 from flask import Blueprint, redirect, render_template

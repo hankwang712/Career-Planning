@@ -1,4 +1,3 @@
-/* Report confirmation cards. No model calls or new persistence in the browser. */
 (() => {
   "use strict";
   const HOURS = [2, 4, 6, 8, 10, 15, 20];

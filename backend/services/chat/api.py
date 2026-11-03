@@ -1,5 +1,3 @@
-"""FastAPI chat routes, sharing the main site's signed cookie and auth checks."""
-
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 import hmac

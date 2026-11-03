@@ -1,5 +1,3 @@
-"""把实际 Agent 结果映射为主系统现有的报告、导出和任务跟踪结构。"""
-
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 

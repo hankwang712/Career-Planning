@@ -1,5 +1,3 @@
-"""运行需求驱动的招聘信息搜索 Agent。"""
-
 import argparse
 import asyncio
 import json

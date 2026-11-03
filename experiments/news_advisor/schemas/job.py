@@ -1,5 +1,3 @@
-"""岗位分析的请求、检索证据和结构化结果。"""
-
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator

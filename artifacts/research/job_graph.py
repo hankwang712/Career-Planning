@@ -1,8 +1,3 @@
-"""岗位图谱入口：职业能力建图、证据查询、旧图清理与网页服务。
-
-直接运行默认执行 optimize，更新现有 career_jd 图谱；--dry-run 只检查不调用模型或修改数据库。
-运行状态、复核缓存和别名词典统一保存在 .job_graph 中，数据库备份保存在 backups 中。
-"""
 from __future__ import annotations
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
@@ -445,6 +440,7 @@ def preview(args) -> None:
         "mode": "preview_only",
         "schema": args.schema,
         "workspace": args.workspace,
+        "merge_mode": args.merge_mode,
         "input": str(args.input.resolve()),
         "records": count,
         "start_record": args.start,
@@ -475,6 +471,9 @@ def create_rag(args):
     token_limit = int(os.getenv("EMBEDDING_TOKEN_LIMIT", "8192"))
     if dimension <= 0 or token_limit <= 0:
         raise ValueError("EMBEDDING_DIM 和 EMBEDDING_TOKEN_LIMIT 必须为正数")
+    request_timeout = float(os.getenv("JOB_GRAPH_REQUEST_TIMEOUT", "120"))
+    if not 0 < request_timeout < float("inf"):
+        raise ValueError("JOB_GRAPH_REQUEST_TIMEOUT must be a positive finite number")
 
     checkout = RESEARCH_DIR / "LightRAG"
     if not (checkout / "lightrag/lightrag.py").is_file():
@@ -482,9 +481,20 @@ def create_rag(args):
     sys.path.insert(0, str(checkout))
     from lightrag import LightRAG
     from lightrag.llm.openai import openai_complete_if_cache, openai_embed
-    from lightrag.utils import EmbeddingFunc
+    from lightrag.utils import EmbeddingFunc, TokenTracker
+    from embedding_cache import EmbeddingCache
+
+    llm_usage, embedding_usage = TokenTracker(), TokenTracker()
+    embedding_cache = None if getattr(args, "no_embedding_cache", False) else EmbeddingCache(
+        STATE_DIR / "embedding_cache.sqlite3",
+        endpoint=os.environ["EMBEDDING_BINDING_HOST"],
+        model=os.environ["EMBEDDING_MODEL"], dimension=dimension,
+        version=os.getenv("EMBEDDING_CACHE_VERSION", "1"),
+    )
 
     async def complete(prompt, system_prompt=None, history_messages=None, **kwargs):
+        kwargs.setdefault("token_tracker", llm_usage)
+        kwargs.setdefault("timeout", request_timeout)
         return await openai_complete_if_cache(
             os.environ["LLM_MODEL"], prompt,
             system_prompt=system_prompt,
@@ -494,19 +504,20 @@ def create_rag(args):
             **kwargs,
         )
 
-    async def embed(texts):
-        return await openai_embed.func(
-            texts,
-            model=os.environ["EMBEDDING_MODEL"],
-            base_url=os.environ["EMBEDDING_BINDING_HOST"],
-            api_key=os.environ["EMBEDDING_BINDING_API_KEY"],
-            # 分块回调先检查输入上限，超长岗位记为失败，保留原文供后续处理。
-            # 关闭接口适配器的二次截断，避免文本被静默裁剪。
-            max_token_size=0,
-        )
+    async def embed(texts, context="document"):
+        async def fetch(values):
+            return await openai_embed.func(
+                values, model=os.environ["EMBEDDING_MODEL"],
+                base_url=os.environ["EMBEDDING_BINDING_HOST"],
+                api_key=os.environ["EMBEDDING_BINDING_API_KEY"],
+                max_token_size=0, context=context, token_tracker=embedding_usage,
+            )
+        if embedding_cache is None:
+            return await fetch(texts)
+        return await embedding_cache.embed(texts, fetch, context=context)
 
     # 四类存储共用 PostgreSQL；图使用普通表，向量部分使用 pgvector 扩展。
-    return LightRAG(
+    rag = LightRAG(
         working_dir=str(args.working_dir),
         workspace=args.workspace,
         llm_model_func=complete,
@@ -538,6 +549,12 @@ def create_rag(args):
         chunk_token_size=token_limit,
         chunk_overlap_token_size=0,
     )
+    rag.career_token_usage = lambda: {
+        "llm": llm_usage.get_usage(), "embedding": embedding_usage.get_usage(),
+        "embedding_cache": embedding_cache.usage() if embedding_cache else {"disabled": True},
+        "note": "API-reported usage only; missing provider usage is not an estimated zero cost",
+    }
+    return rag
 
 
 async def import_documents(args) -> None:
@@ -635,6 +652,17 @@ async def import_documents(args) -> None:
             raise RuntimeError(f"有 {failed_count} 条岗位未成功处理，详情：{failure_path}")
     finally:
         await rag.finalize_storages()
+        print_token_usage(rag, args)
+
+
+def print_token_usage(rag, args):
+    usage = rag.career_token_usage()
+    usage.update(workspace=args.workspace, recorded_at=datetime.now().astimezone().isoformat())
+    print("本次模型用量：" + json.dumps(usage, ensure_ascii=False))
+    log_dir = STATE_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with (log_dir / "token_usage.jsonl").open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(usage, ensure_ascii=False) + "\n")
 
 
 def career_components(args):
@@ -680,6 +708,7 @@ async def import_career_documents(args):
             result = await CareerService(store, catalog, rag).ingest(
                 career_job_records(args), retry_failed=args.retry_failed,
                 publish=not args.extract_only, progress=update, merge_mode=args.merge_mode,
+                extract_workers=args.extract_workers,
                 merge_options={"max_pairs": args.merge_max_pairs, "min_similarity": args.merge_min_similarity,
                                "min_confidence": args.merge_min_confidence})
         if args.export and not args.extract_only:
@@ -694,6 +723,7 @@ async def import_career_documents(args):
         try:
             if rag is not None:
                 await rag.finalize_storages()
+                print_token_usage(rag, args)
         finally:
             store.close()
             if paused:
@@ -708,6 +738,21 @@ def query_career(args):
         filters = {"city": args.city, "education": args.education}
         if args.action == "status":
             result = store.summary()
+            from lightrag.career.registry import EntityRegistry
+            report = EntityRegistry(store).latest_run()
+            if report and report.get("mode") == "semantic":
+                valid = len(report.get("reviews", []))
+                failed = sum(len(item.get("pair_ids", [])) for item in report.get("errors", []))
+                total = report.get("selected_count", 0)
+                result["merge_progress"] = {
+                    "status": report.get("status"),
+                    "processed_pairs": valid + failed,
+                    "total_pairs": total,
+                    "valid_pairs": valid,
+                    "failed_pairs": failed,
+                    "failed_batches": len(report.get("errors", [])),
+                    "remaining_pairs": max(0, total - valid - failed),
+                }
         elif args.action == "roles":
             result = service.roles(**filters)
         elif args.action == "profile":
@@ -775,6 +820,7 @@ def query_career(args):
                     try:
                         if rag is not None:
                             await rag.finalize_storages()
+                            print_token_usage(rag, args)
                     finally:
                         if paused:
                             start_webui(args)
@@ -930,6 +976,7 @@ async def apply_plan(args, snapshot, plan):
         raise
     finally:
         await rag.finalize_storages()
+        print_token_usage(rag, args)
 
 
 def append_action(path: Path, value):
@@ -1568,7 +1615,7 @@ def optimize(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Career graph import, evidence queries, maintenance and WebUI.')
     commands = parser.add_subparsers(dest="command")
     importing = commands.add_parser("import", help="按岗位分块导入 TXT，支持 start/limit 和进度条")
     optimizing = commands.add_parser("optimize", help="自动复核、合并和剪枝，直接更新原工作空间")
@@ -1581,6 +1628,7 @@ def main():
         child.add_argument("--env-file", type=Path, default=ROOT / ".env")
         child.add_argument("--working-dir", type=Path, default=ROOT / "jd_rag_storage")
         child.add_argument("--webui-port", type=int)
+        child.add_argument("--no-embedding-cache", action="store_true", help="禁用本地向量缓存，直接请求embedding接口")
     for child in (importing, serving, career):
         child.add_argument("--schema", choices=["career", "legacy"], default="legacy" if child is serving else "career")
         child.add_argument("--career-db", type=Path, default=STATE_DIR / "career.sqlite3")
@@ -1590,13 +1638,16 @@ def main():
     importing.add_argument("--start", type=int, default=1)
     importing.add_argument("--limit", type=int, default=0)
     importing.add_argument("--batch-size", type=int, default=10)
+    importing.add_argument("--extract-workers", type=int, choices=[1, 2], default=2,
+                           help="职业事实抽取的并发请求数，默认2；服务繁忙时可改为1")
     importing.add_argument("--preview", action="store_true", help="只解析本地文件")
     importing.add_argument("--export", type=Path)
     importing.add_argument("--retry-failed", action="store_true", help="显式重试事实库中抽取失败的JD")
     importing.add_argument("--extract-only", action="store_true", help="只抽取并保存事实，暂不发布LightRAG图谱")
     for child in (importing, career):
-        child.add_argument("--merge-mode", choices=["off", "rules", "semantic"], default="semantic",
-                           help="建图末尾自动合并：默认规则归一+向量召回+证据复核；extract-only仅执行规则")
+        child.add_argument("--merge-mode", choices=["off", "rules", "semantic"],
+                           default="rules" if child is importing else "semantic",
+                           help="import默认仅规则归一以减少模型消耗；semantic额外执行向量召回和模型复核；extract-only仅执行规则")
         child.add_argument("--merge-max-pairs", type=int, default=0, help="每轮最多复核对数；默认0复核全部，未处理项保留在报告")
         child.add_argument("--merge-min-similarity", type=float, default=.9)
         child.add_argument("--merge-min-confidence", type=float, default=.95, help="模型自评分数阈值；不能替代双侧证据校验")

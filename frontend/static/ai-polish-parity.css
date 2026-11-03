@@ -1,8 +1,3 @@
-/**
- * 与仓库根目录 ai润色.html 对齐的润色全屏视觉层
- * 依赖：#reportEditorOverlay.ai-polish-parity-overlay + .ai-polish-shell
- * 字体：模板中需引入 Noto Serif SC（与 ai润色.html 一致）
- */
 #reportEditorOverlay.ai-polish-parity-overlay {
   --ap-bg-main: #e8f0ec;
   --ap-bg-panel: rgba(252, 253, 252, 0.5);

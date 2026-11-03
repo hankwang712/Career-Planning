@@ -1,5 +1,3 @@
-"""Flask 报告任务与实验 Agent 的边界：模型配置、原生检查点和报告适配。"""
-
 import asyncio
 from contextlib import asynccontextmanager
 from hashlib import sha256

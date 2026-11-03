@@ -1,5 +1,3 @@
-"""按原始岗位去重计算排序指标；证据覆盖使用实际送入生成器的文本。"""
-
 from __future__ import annotations
 
 import math

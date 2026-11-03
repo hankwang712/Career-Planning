@@ -1,5 +1,3 @@
-"""Deletion controls, suppression, durable cleanup and in-flight work fences."""
-
 import fnmatch
 import json
 from pathlib import Path

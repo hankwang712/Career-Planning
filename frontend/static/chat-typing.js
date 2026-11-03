@@ -1,4 +1,3 @@
-/* Presentation pacing only; the server still streams and stores the full reply. */
 ((root, factory) => {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;

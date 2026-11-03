@@ -1,7 +1,3 @@
-/**
- * 与根目录 6.html 一致的简历深度审计组件样式。
- * 仅作用于 .resume-6html-scope，避免污染主站其它区域。
- */
 .resume-6html-scope {
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-border: rgba(0, 0, 0, 0.06);

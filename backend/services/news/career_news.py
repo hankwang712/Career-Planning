@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Lightweight career news bridge for the Flask dashboard.
-
-This keeps only the "daily snapshot + multi-source aggregation" approach from
-the previous standalone news module and exposes a Python-first payload that
-can be rendered directly by the existing web app without importing another
-frontend structure.
-"""
-
 from __future__ import annotations
 
 import json

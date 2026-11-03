@@ -1,5 +1,3 @@
-"""Optional Redis cache for recent messages; SQLite remains authoritative."""
-
 import hashlib
 import json
 import os

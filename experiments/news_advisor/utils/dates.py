@@ -1,5 +1,3 @@
-"""年月区间比较的纯函数，不推断缺失年份。"""
-
 import re
 from datetime import date
 

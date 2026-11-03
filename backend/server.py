@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-职业规划智能体 FastAPI + Flask 服务。
-运行方式：python backend/server.py
-访问地址：http://localhost:8080
-"""
-
 import sys
 
 # Windows 控制台默认 GBK，强制 stdout/stderr 使用 UTF-8，避免中文日志乱码

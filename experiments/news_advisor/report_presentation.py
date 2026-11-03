@@ -1,5 +1,3 @@
-"""将报告状态整理为面向求职者的阅读稿；原始执行状态和证据保持独立。"""
-
 from collections import defaultdict
 from datetime import date
 from html import escape

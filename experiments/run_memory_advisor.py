@@ -1,5 +1,3 @@
-"""项目根目录运行：python -m experiments.run_memory_advisor --start-redis。"""
-
 import argparse
 import os
 from pathlib import Path

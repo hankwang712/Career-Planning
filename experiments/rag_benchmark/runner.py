@@ -1,5 +1,3 @@
-"""分阶段运行检索、统一生成和 RAGAS 评分；每题结果落盘以便续跑。"""
-
 from __future__ import annotations
 
 from collections import Counter

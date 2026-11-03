@@ -1,5 +1,3 @@
-"""Validated private chat images; bytes live in SQLite and follow message deletion."""
-
 import base64
 import binascii
 from io import BytesIO

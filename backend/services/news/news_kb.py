@@ -1,21 +1,3 @@
-"""
-News Storage & RAG Module
-
-存储层：所有新闻条目存入单个 JSON 文件（news_store.json），
-        每条记录仅保存 title / content / published_at / source / url / summary。
-        存储时 **不做 embedding**。
-
-行业/趋势总览：职业报告中的行业分析使用 **近期新闻摘要归纳**（get_recent_news_context），
-        按时间选取条目并做正文节选与 Markdown 拼装，**不走向量 RAG**。
-
-RAG 层（按需）：当用户画像查询与新闻块在向量上足够接近时再检索——见
-        get_profile_aligned_news_rag_context() 与 search_news_for_agent()：
-        1. 读取 news_store.json
-        2. 将每篇文章拼合后按 500 token / overlap=50 分块
-        3. 对每个 chunk 做 embedding（结果缓存到 news_chunks_cache.json）
-        4. 对 query 做 embedding，余弦相似度排序
-        5. 返回达到 score 阈值的 top_k 相关 chunk
-"""
 from __future__ import annotations
 
 import hashlib

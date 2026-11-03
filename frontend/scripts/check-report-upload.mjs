@@ -1,5 +1,3 @@
-// Run with: node frontend/scripts/check-report-upload.mjs
-// Exercise the real report-upload functions without a browser or network/model calls.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";

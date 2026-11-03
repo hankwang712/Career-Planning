@@ -1,5 +1,3 @@
-"""Shared constraints for model output and optional provider JSON schemas."""
-
 import os
 from typing import Annotated, Literal
 

@@ -1,5 +1,3 @@
-"""Memory extraction instructions and evidence validation for LLM output."""
-
 from .storage import normalized
 from .schemas import Candidate
 import re

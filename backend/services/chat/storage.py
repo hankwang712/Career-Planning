@@ -1,5 +1,3 @@
-"""Durable chat records and a leased, retryable memory-analysis queue."""
-
 from contextlib import contextmanager
 import hashlib
 import json

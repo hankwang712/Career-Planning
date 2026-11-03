@@ -1,5 +1,3 @@
-"""Offline checks of resume provenance, job isolation and memory reconciliation."""
-
 import json
 from pathlib import Path
 import sys

@@ -1,5 +1,3 @@
-"""指标、语料一致性、API适配和本地Chroma的确定性回归，不调用付费服务。"""
-
 from __future__ import annotations
 
 import argparse

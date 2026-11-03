@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-简历深度诊断「6.html 五步」结构化 UI 数据。
-由 LLM 从 analysis_markdown 抽取，供前端按固定版式渲染。
-"""
 import json
 from datetime import datetime
 

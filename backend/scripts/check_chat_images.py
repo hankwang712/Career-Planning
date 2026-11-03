@@ -1,5 +1,3 @@
-"""Offline chat-image checks: real SQLite/Pillow and a fake multimodal model."""
-
 import base64
 from io import BytesIO
 import json

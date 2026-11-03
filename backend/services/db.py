@@ -1,5 +1,3 @@
-"""SQLite persistence layer for app data (users, user_state, configs, forum)."""
-
 import json
 import os
 import sqlite3

@@ -1,5 +1,3 @@
-"""Offline checks for direct JSON planning; no API requests or business data writes."""
-
 import asyncio
 from copy import deepcopy
 from datetime import datetime, timedelta

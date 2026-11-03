@@ -1,5 +1,3 @@
-"""基准实验共享的数据、token 和模型访问约定。"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

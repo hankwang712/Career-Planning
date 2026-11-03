@@ -1,12 +1,3 @@
-"""
-网页正文提取（由 web-content-extractor 思路迁移：Mozilla Readability + 纯文本）。
-
-原 Next.js 实现：fetch → JSDOM → @mozilla/readability → article.textContent → 空白折叠。
-Python 使用 readability-lxml（同源算法族）得到摘要 HTML，再用 lxml 取 text_content，
-仅返回纯文本字符串；失败时可回退 trafilatura.extract（仍为纯文本）。
-
-不依赖 Node；不返回 HTML 片段以外的结构化字段写入 news_store。
-"""
 from __future__ import annotations
 
 import re

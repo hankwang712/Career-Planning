@@ -1,8 +1,3 @@
-"""分层记忆实验入口：python -m experiments.run_memory_advisor --start-redis。
-
-仅供本机实验。接入主站时 user_id 必须取自服务端已验证的登录态。
-"""
-
 import asyncio
 from contextlib import asynccontextmanager
 from functools import lru_cache

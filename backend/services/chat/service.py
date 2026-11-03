@@ -1,5 +1,3 @@
-"""Main-site assistant. No experimental runtime or database is mutated."""
-
 import json
 import logging
 import re

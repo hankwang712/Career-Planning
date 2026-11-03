@@ -1,5 +1,3 @@
-"""读取 DOCX、PDF 或图片并转换为 Markdown；OCR 配置读取 experiments/.env。"""
-
 import argparse
 import base64
 import mimetypes

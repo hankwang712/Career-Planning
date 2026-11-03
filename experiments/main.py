@@ -1,5 +1,3 @@
-"""在项目根目录运行：uvicorn experiments.main:app --port 8001 --reload。"""
-
 import argparse
 import asyncio
 import json

@@ -1,10 +1,3 @@
-"""Versioned resume parsing artifacts, independent of conversation memory.
-
-Original files and the current document pointer belong to the existing upload
-module. This repository owns parsed text and facts, keyed by account and digest.
-The existing SQLite file/table is reused so saved parsing results survive upgrades.
-"""
-
 from contextlib import contextmanager
 import json
 from pathlib import Path

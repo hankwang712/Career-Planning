@@ -1,5 +1,3 @@
-"""网页搜索、新闻搜索及正文提取；上游许可见 LICENSE.search-engine-tool。"""
-
 import base64
 import logging
 import os

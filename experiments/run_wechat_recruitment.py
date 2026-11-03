@@ -1,5 +1,3 @@
-"""运行微信公众号招聘文章搜索或读取工具，不调用 LLM。"""
-
 import argparse
 import json
 import sys

@@ -1,8 +1,3 @@
-/**
- * assessment-pet.js
- * 卡通助手嵌入 Modal 左侧"当前状态"卡片底部（#assessmentPetSlot）
- * 不修改 assessment-hub.js，通过包装 window 函数 + 监听事件实现联动
- */
 (function () {
   const GIF_BASE = "/static/pet/";
   const GIFS = {

@@ -1,5 +1,3 @@
-"""招聘信息搜索 Agent 的请求、需求与结果。"""
-
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator

@@ -1,5 +1,3 @@
-"""固定报告的输入与代码版本；元数据只记录内容摘要，不记录模型凭证。"""
-
 from copy import deepcopy
 from datetime import datetime
 from hashlib import sha256

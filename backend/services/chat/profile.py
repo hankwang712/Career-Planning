@@ -1,5 +1,3 @@
-"""Bounded profile views with explicit resume/chat provenance."""
-
 import json
 
 from .documents import redact_contacts

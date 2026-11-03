@@ -1,15 +1,3 @@
-/**
- * 城市招聘全景分析仪表盘
- * 依赖：Chart.js（已在 base.html 引入）
- * 入口：window.initJobsAnalytics(jobs, options?)
- * options.boss_cities：仅用于本面板的 boss_info 城市顺序（与岗位探索全量城市解耦）
- * options.city_supplement_extra_count：各 boss 城市合并的补充样本条数，用于「热门」标注
- *
- * 关键设计原则：
- *   1. 先销毁所有 Chart.js 实例，再替换 innerHTML——避免 canvas context 泄漏导致白屏
- *   2. S.ready 标志防止重复初始化（loadJobs 只触发一次，但做防御）
- *   3. Tab 点击通过 HTML onclick 属性绑定，彻底避免 addEventListener 累积
- */
 (function () {
   "use strict";
 

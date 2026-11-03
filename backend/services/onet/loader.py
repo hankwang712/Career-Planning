@@ -1,7 +1,3 @@
-"""
-O*NET 30.2 Database Loader — career report enrichment.
-Provides lazy-loaded, cached access to O*NET occupational data.
-"""
 from __future__ import annotations
 
 import os

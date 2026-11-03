@@ -1,5 +1,3 @@
-"""Offline regression checks; no model requests, servers or business data writes."""
-
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path

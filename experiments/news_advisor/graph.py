@@ -1,5 +1,3 @@
-"""用 LangGraph State 和 Checkpointer 保存各 Agent 的输入、结果与补充回答。"""
-
 from copy import deepcopy
 import json
 from uuid import uuid4

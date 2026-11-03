@@ -1,5 +1,3 @@
-"""简历分析的输入和输出结构；内容判断由 Agent 完成。"""
-
 from typing import Annotated, Literal
 
 from pydantic import (

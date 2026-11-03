@@ -1,5 +1,3 @@
-"""主站行动规划：直接生成 JSON，沿用实验 Agent 的输入与业务约束校验。"""
-
 import json
 import logging
 import re

@@ -1,5 +1,3 @@
-"""在项目根目录运行：python -m experiments.run_resume_analysis "简历.pdf"。"""
-
 import argparse
 import asyncio
 import json

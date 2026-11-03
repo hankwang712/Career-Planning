@@ -1,5 +1,3 @@
-"""从冻结的300条JD准备40题分层挑战集；不读取任一检索器输出。"""
-
 from __future__ import annotations
 
 import argparse
@@ -244,7 +242,7 @@ def build(output=DEFAULT_OUTPUT):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Prepare the job retrieval challenge dataset.')
     parser.add_argument("--output", type=type(DEFAULT_OUTPUT), default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     print(build(args.output))

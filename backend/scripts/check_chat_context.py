@@ -1,5 +1,3 @@
-"""Offline regression checks for resume context and memory visibility. No model/OCR calls."""
-
 from pathlib import Path
 import asyncio
 from contextlib import asynccontextmanager
