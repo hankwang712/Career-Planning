@@ -63,6 +63,20 @@ def verify_action_plan(plan: ActionPlan, prepared: dict) -> list[str]:
     for week, total in reduced_hours.items():
         if week in weeks and total > reduced.weekly_hours * weeks[week]["days"] / 7 + 1e-6:
             errors.append(f"缩减方案第 {week} 周工时超出可用时间")
+    if plan.development_roadmap:
+        if [item.horizon for item in plan.development_roadmap] != ["short", "mid", "long"]:
+            errors.append("成长路线必须按 short、mid、long 顺序各提供一个阶段")
+        for milestone in plan.development_roadmap:
+            for action in milestone.actions:
+                check = checks.get(action.check_id)
+                if check is None:
+                    errors.append("成长路线引用了无效 check_id")
+                elif check["kind"] == "hard_condition" and action.kind == "practice":
+                    errors.append("成长路线不能用能力练习解决硬条件")
+                if blocked_job and action.kind in {"practice", "apply"}:
+                    errors.append("具体岗位存在硬条件冲突，成长路线应先核实或重新选择目标")
+                if action.kind == "apply" and prepared["assessment"]["decision"] != "recommended":
+                    errors.append("当前决策不支持成长路线中的投递任务")
     return list(dict.fromkeys(errors))
 
 

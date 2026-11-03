@@ -1722,9 +1722,9 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}?v=20261026-forum-colors"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20261026-langgraph-agents"></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261029-report-layout-v2"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261103-career-development-v3.1"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}?v=20261029-cleanup-v1"></script>
-    <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20260402-learning-path-fusion-v1"></script>
+    <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20261103-career-development-v3.1"></script>
     <style>
       /* ── 报告中心主区域按钮样式 ── */
       #report-workspace .uc-section-head {
@@ -2872,6 +2872,15 @@
         color: var(--lp-muted);
       }
 
+      #plan-workspace .lp-stage-task-note {
+        display: block;
+        margin-top: 8px;
+        white-space: pre-line;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #526579;
+      }
+
       #plan-workspace .lp-level-tag {
         background: linear-gradient(135deg, #9b8cff 0%, #6c7fff 100%);
         color: #fff;
@@ -3051,6 +3060,7 @@
         position: relative;
         display: flex;
         padding: 20px 24px;
+        overflow-x: auto;
       }
 
       #plan-workspace .lp-stage-timeline::before {
@@ -3065,6 +3075,7 @@
 
       #plan-workspace .lp-stage-milestone {
         flex: 1;
+        min-width: 140px;
         text-align: center;
         position: relative;
         z-index: 1;

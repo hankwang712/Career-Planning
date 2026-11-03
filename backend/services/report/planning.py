@@ -4,7 +4,7 @@ import re
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables.config import merge_configs
-from pydantic import ValidationError
+from pydantic import ValidationError, model_validator
 
 from experiments.news_advisor.agents.action_planning import ActionPlanningAgent
 from experiments.news_advisor.telemetry import AgentMetrics
@@ -25,6 +25,18 @@ class ReportActionPlanningAgent(ActionPlanningAgent):
     def __init__(self, model, *, stage_callback=None, **kwargs):
         super().__init__(model, **kwargs)
         self.stage_callback = stage_callback
+
+    def get_output_schema(self, prepared):
+        parent = super().get_output_schema(prepared)
+
+        class CareerDevelopmentPlan(parent):
+            @model_validator(mode="after")
+            def require_roadmap(self):
+                if len(self.development_roadmap) != 3:
+                    raise ValueError("请提供 short、mid、long 三阶段成长路线，每阶段包含具体准备事项、交付物、验收标准和调整条件")
+                return self
+
+        return CareerDevelopmentPlan
 
     def notify(self, message):
         if self.stage_callback:

@@ -3036,7 +3036,7 @@ def _build_career_report_section_map(bundle, markdown_text=""):
     sections = report_document.get("sections")
     result = []
     if isinstance(sections, dict):
-        ordered_keys = [
+        ordered_keys = report_document.get("section_order") or [
             "industry_analysis",
             "career_positioning",
             "resume_evidence",
@@ -3296,9 +3296,13 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
         "role_match": "目标岗位对比",
         "path_plan": "职业路径",
     }
+    if report_document.get("section_order"):
+        required_sections = {"personal_traits": "个人画像", "target_job_analysis": "职业目标", "macro_environment": "就业市场",
+                             "matching_decision": "岗位适配", "ability_gaps": "能力差距", "development_path": "成长路径",
+                             "gap_action_plan": "行动计划", "risk_backup": "动态评估", "appendix": "参考依据"}
     section_keys = {str(item.get("key") or "").strip() for item in section_map if isinstance(item, dict)}
     for key, label in required_sections.items():
-        if key not in section_keys:
+        if key not in section_keys or not any(item.get("key") == key and item.get("markdown") for item in section_map):
             issues.append({"level": "warning", "type": "missing_section", "message": f"缺少“{label}”章节。"})
 
     markdown_value = str(markdown_text or report_document.get("markdown") or "").strip()
@@ -3622,6 +3626,8 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
         return None
 
     existing = existing_tracker if isinstance(existing_tracker, dict) else {}
+    if str(existing.get("report_id") or "") != report_id:
+        existing = {}
     phase_plan = bundle.get("phase_plan") if isinstance(bundle.get("phase_plan"), dict) else {}
     profile_snapshot = bundle.get("profile_snapshot") if isinstance(bundle.get("profile_snapshot"), dict) else {}
     gap_map = bundle.get("gap_map") if isinstance(bundle.get("gap_map"), dict) else {}
@@ -3648,9 +3654,8 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
 
     plan_items = []
     raw_plan_items = []
-    raw_plan_items.extend(phase_plan.get("short_term") or [])
-    raw_plan_items.extend(phase_plan.get("mid_term") or [])
-    raw_plan_items.extend(phase_plan.get("long_term") or [])
+    for bucket, phase_key in (("short_term", "short"), ("mid_term", "mid"), ("long_term", "long")):
+        raw_plan_items.extend({**item, "phase_key": phase_key} for item in (phase_plan.get(bucket) or []) if isinstance(item, dict))
     for index, item in enumerate(raw_plan_items):
         if not isinstance(item, dict):
             continue
@@ -3677,6 +3682,16 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
                 "note": str(previous.get("note") or ""),
                 "updated_at": str(previous.get("updated_at") or ""),
                 "is_phase": True,
+                "phase_key": item.get("phase_key", "short"),
+                "is_action": bool(item.get("is_action") or (item.get("task_id") and item.get("deliverable"))),
+                "is_roadmap": bool(item.get("is_roadmap")),
+                "deliverable": str(item.get("deliverable") or ""),
+                "acceptance_criteria": str(item.get("acceptance_criteria") or ""),
+                "deadline": str(item.get("due_date") or ""),
+                "hours": item.get("hours"), "cost": item.get("cost"),
+                "depends_on": item.get("depends_on") or [],
+                "week": item.get("week"), "requirement": item.get("requirement") or "",
+                "entry_conditions": item.get("entry_conditions") or "",
             }
         )
         # Also expand nested task items into top-level plan items
@@ -3705,6 +3720,11 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
                     "note": str(prev_task.get("note") or ""),
                     "updated_at": str(prev_task.get("updated_at") or ""),
                     "is_task": True,
+                    "phase_key": item.get("phase_key", "short"),
+                    "deliverable": str(task.get("deliverable") or ""),
+                    "acceptance_criteria": str(task.get("acceptance_criteria") or ""),
+                    "requirement": task.get("requirement") or "",
+                    "conditional": bool(task.get("conditional")),
                 }
             )
 
@@ -3722,6 +3742,7 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
                 "id": checkpoint_id,
                 "label": label,
                 "summary": str(item.get("summary") or ""),
+                "due_date": str(item.get("due_date") or ""),
                 "status": status,
                 "completed_at": completed_at,
                 "note": str(previous.get("note") or ""),
@@ -3785,9 +3806,9 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
         )
 
     # Use task items for progress calculation (more granular); fall back to phase items
-    task_items = [item for item in plan_items if item.get("is_task")]
-    phase_items = [item for item in plan_items if item.get("is_phase")]
-    trackable = task_items if task_items else phase_items
+    parents_with_tasks = {item.get("parent_phase") for item in plan_items if item.get("is_task")}
+    trackable = [item for item in plan_items if item.get("is_task") or item.get("is_action")
+                 or (item.get("is_phase") and item["id"] not in parents_with_tasks and not item.get("is_roadmap"))]
     done_count = sum(1 for item in trackable if item.get("status") == "done") + sum(1 for item in checkpoints if item.get("status") == "done")
     doing_count = sum(1 for item in trackable if item.get("status") == "doing")
     total_count = len(trackable) + len(checkpoints)
@@ -3838,7 +3859,7 @@ def _build_career_report_tracker(bundle, existing_tracker=None, current_capabili
         )
     versions = versions[:6]
 
-    next_focus = next((item.get("title") for item in plan_items if item.get("status") != "done"), "")
+    next_focus = next((item.get("title") for item in trackable if item.get("status") != "done"), "")
     if not next_focus:
         next_focus = next((item.get("label") for item in checkpoints if item.get("status") != "done"), "")
 

@@ -28,6 +28,9 @@ assert.equal(response.constraints.weekly_hours, 6);
 assert.equal(response.constraints.deadline, "2026-11-25");
 assert.equal(response.constraints.budget, null);
 assert.equal(Object.keys(response.constraints).includes("days_per_week"), false);
+assert.equal(response.constraints.student_stage, "unspecified");
+assert.equal(responseFor(snapshot, { ...values, student_stage: "exploration" }).constraints.student_stage, "exploration");
+assert.equal(responseFor(snapshot, { ...values, student_stage: "employment" }).constraints.student_stage, "employment");
 
 const skip = responseFor(snapshot, { hours: "2", weeks: "2", answers: {} }, "2026-12-28");
 assert.equal(Object.keys(skip.answers).length, 0);

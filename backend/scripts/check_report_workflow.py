@@ -74,6 +74,11 @@ def action_result(payload):
         "deliverable": "项目贡献清单", "acceptance_criteria": "列出个人完成的 API 和验证方式"}],
         "reduced_plan": {"weekly_hours": 2, "keep_task_ids": ["A1"], "reason": "保留核实任务"},
         "deferred_actions": [], "limitations": []}
+    plan["development_roadmap"] = [{"horizon": horizon, "objective": "验证并完善 Python 项目成果",
+        "entry_conditions": "确认个人项目贡献后推进", "review_trigger": "用代码与测试记录复核，无法独立演示时先缩小范围",
+        "actions": [{"check_id": "C1", "kind": "practice", "title": "完善 API 项目的测试和演示记录",
+                     "deliverable": "代码、测试结果与演示说明", "acceptance_criteria": "能够独立运行并解释关键接口"}]}
+        for horizon in ("short", "mid", "long")]
     assert not verify_action_plan(ActionPlan.model_validate(plan), prepared)
     return {"agent": "action_planning", "status": "ok", "data": plan}
 
@@ -150,8 +155,10 @@ class WorkflowChecks(unittest.TestCase):
         self.assertEqual(decisions[-1]["recruitment_search"]["sources"][0]["source_id"], "S1")
         self.assertEqual([name for name, _ in self.calls].count("resume_analysis"), 1)
         self.assertNotIn("待核实：" + QUESTION, bundle["report_document"]["sections"]["risk_backup"]["markdown"])
-        self.assertEqual(len(bundle["report_document"]["sections"]), 8)
-        self.assertEqual(len(bundle["phase_plan"]["short_term"]), 1)
+        self.assertEqual(len(bundle["report_document"]["sections"]), 10)
+        self.assertEqual(len(bundle["phase_plan"]["short_term"]), 2)
+        self.assertEqual(len(bundle["phase_plan"]["mid_term"]), 1)
+        self.assertEqual(len(bundle["phase_plan"]["long_term"]), 1)
         self.assertIn("offline.txt#record=1", bundle["report_document"]["markdown"])
         self.assertEqual(len(bundle["meta"]["provenance"]["job_source_revisions"]), 2)
         self.assertTrue(workflow.read_report_workflow("offline-user", self.report_id)["complete"])

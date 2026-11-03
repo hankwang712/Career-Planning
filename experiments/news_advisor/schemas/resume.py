@@ -76,6 +76,13 @@ class ExperienceReview(Record):
         return calculate_score(self.dimensions, experience_weights(self.experience_type))
 
 
+class CareerProfileFact(Record):
+    field: Literal["education", "major", "graduation_year", "current_city", "interests", "skills", "strengths", "development_needs"]
+    value: Text
+    source: Literal["raw_resume", "additional_evidence", "education_context"]
+    quote: Text = Field(description="支持该画像事实的连续原文；不推断未说明的毕业年份、兴趣或能力水平")
+
+
 class ResumeAnalysis(Record):
     summary: Text
     dimensions: list[Dimension]
@@ -83,6 +90,7 @@ class ResumeAnalysis(Record):
     issues: list[Issue]
     recommendations: list[Text]
     missing_information: list[Text]
+    career_profile: list[CareerProfileFact] = Field(default_factory=list, max_length=16, description="可追溯的职业画像；只提取材料明确说明的信息，缺失项不填")
 
     @computed_field
     @property

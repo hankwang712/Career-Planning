@@ -4,9 +4,9 @@
   const LEGACY_PROGRESS_STORAGE_PREFIX = "dp_plan_progress_v1_";
   const PHASE_ORDER = ["short", "mid", "long"];
   const PHASE_META = {
-    short: { label: "短期", title: "短期推进阶段", empty: "先把最近一轮可执行动作压缩到 2-4 周。", milestonePrefix: "Week", accent: "short" },
-    mid: { label: "中期", title: "中期进阶阶段", empty: "这里适合放持续 1-3 个月的能力进阶计划。", milestonePrefix: "Month", accent: "mid" },
-    long: { label: "长期", title: "长期路径阶段", empty: "长期阶段用于放求职冲刺、路径验证和周期性复盘。", milestonePrefix: "Phase", accent: "long" }
+    short: { label: "短期", title: "短期 · 1—3个月", empty: "尚未生成短期任务，请生成报告或添加自己的计划。", accent: "short" },
+    mid: { label: "中期", title: "中期 · 3—12个月", empty: "这份报告尚无中期成长路线，可重新生成报告补充。", accent: "mid" },
+    long: { label: "长期", title: "长期 · 1—3年", empty: "这份报告尚无长期成长路线，可重新生成报告补充。", accent: "long" }
   };
   const BADGE_META = {
     start: { icon: "🚀", title: "开始行动", desc: "完成第一项任务" },
@@ -189,53 +189,13 @@
   }
 
   function defaultManualPlans() {
-    const role = focusRoleName();
-    return [
-      normalizePlan({
-        id: uid("manual"),
-        title: `${role} 短期推进`,
-        summary: "用 2-4 周先建立一轮能被验证的岗位证据。",
-        phase_key: "short",
-        source: "manual",
-        role,
-        timeline: "第 1 阶段 · 起步期",
-        items: [
-          { id: uid("task"), title: "整理 10 条目标岗位样本", tag: "技能", xp: 20 },
-          { id: uid("task"), title: "补一段能证明能力的项目案例", tag: "证据", xp: 30 }
-        ]
-      }),
-      normalizePlan({
-        id: uid("manual"),
-        title: `${role} 中期进阶`,
-        summary: "把方向判断逐步变成稳定输出和可复用能力。",
-        phase_key: "mid",
-        source: "manual",
-        role,
-        timeline: "第 2 阶段 · 进阶期",
-        items: [
-          { id: uid("task"), title: "围绕目标岗位补一轮作品集", tag: "实践", xp: 40 },
-          { id: uid("task"), title: "完成一次周复盘并更新路径判断", tag: "复查", xp: 20 }
-        ]
-      }),
-      normalizePlan({
-        id: uid("manual"),
-        title: `${role} 长期路径验证`,
-        summary: "把求职推进、路径验证和后续复盘放在同一条长期线上。",
-        phase_key: "long",
-        source: "manual",
-        role,
-        timeline: "第 3 阶段 · 长期阶段",
-        items: [
-          { id: uid("task"), title: "建立季度复盘节奏", tag: "复查", xp: 30 }
-        ]
-      })
-    ];
+    return [];
   }
 
   function normalizeStore(rawStore) {
     const raw = rawStore && typeof rawStore === "object" ? rawStore : {};
     const progressRaw = raw.progress && typeof raw.progress === "object" ? raw.progress : {};
-    const plans = Array.isArray(raw.plans) ? raw.plans.map(normalizePlan) : [];
+    const plans = Array.isArray(raw.plans) ? raw.plans.map(normalizePlan).filter((plan) => !isUntouchedExamplePlan(plan)) : [];
     return {
       version: 3,
       plans: plans.length ? plans : defaultManualPlans(),
@@ -248,6 +208,17 @@
       },
       updated_at: String(raw.updated_at || raw.updatedAt || "").trim() || nowStamp()
     };
+  }
+
+  function isUntouchedExamplePlan(plan) {
+    if (plan.source === "report" || plan.items.some((item) => item.done || item.note || item.deadline)) return false;
+    const templates = [
+      ["短期推进", "用 2-4 周先建立一轮能被验证的岗位证据。", ["整理 10 条目标岗位样本", "补一段能证明能力的项目案例"]],
+      ["中期进阶", "把方向判断逐步变成稳定输出和可复用能力。", ["围绕目标岗位补一轮作品集", "完成一次周复盘并更新路径判断"]],
+      ["长期路径验证", "把求职推进、路径验证和后续复盘放在同一条长期线上。", ["建立季度复盘节奏"]]
+    ];
+    return templates.some(([suffix, summary, titles]) => plan.title.endsWith(` ${suffix}`) && plan.summary === summary
+      && JSON.stringify(plan.items.map((item) => item.title)) === JSON.stringify(titles));
   }
 
   function legacyStore() {
@@ -337,12 +308,24 @@
     phaseItems.forEach((item, index) => {
       const phase = String(item?.phase || "").trim();
       // 根据 phase 文本推断 short/mid/long，不再依赖硬编码的索引
-      const phaseKey = inferPhaseKey(phase, index === 0 ? "short" : "long");
+      const phaseKey = inferPhaseKey(item?.phase_key || phase, "short");
       const summary = String(item?.objective || "").trim();
       const tasks = [];
+      const actualAction = item.is_action || Boolean(item.deliverable && !item.is_roadmap);
+      const taskNote = (task) => [
+        task.requirement ? `对应要求：${task.requirement}` : "",
+        task.deliverable ? `交付物：${task.deliverable}` : "",
+        task.acceptance_criteria ? `验收：${task.acceptance_criteria}` : "",
+        task.hours ? `预计 ${task.hours} 小时` : "",
+        task.depends_on?.length ? `前置任务：${task.depends_on.join("、")}` : "",
+        task.conditional ? `进入条件：${item.entry_conditions || "阶段复核后确认"}` : ""
+      ].filter(Boolean).join("\n");
+
+      if (actualAction) tasks.push({ id: item.id, title: item.title, note: taskNote(item),
+        deadline: item.deadline, tag: "行动", xp: 20, done: item.status === "done" });
 
       // 1. Phase objective as an overview task
-      if (summary) {
+      if (summary && !actualAction && !item.is_roadmap && !(tasksByPhase[String(item?.id || "")] || []).length) {
         tasks.push({
           id: `${item.id || index}_objective`,
           title: summary,
@@ -359,19 +342,21 @@
           id: String(task.id || ""),
           title: String(task.title || task.objective || "").trim(),
           tag: "实践",
+          note: taskNote(task),
+          deadline: task.deadline || "",
           xp: 20,
           done: String(task?.status || "").trim().toLowerCase() === "done"
         });
       });
 
       // 3. Focus points as skill tasks (fallback when no nested task items exist)
-      if (childTasks.length === 0) {
+      if (childTasks.length === 0 && !actualAction && !item.is_roadmap && !summary) {
         (Array.isArray(item?.focus_points) ? item.focus_points : []).forEach((point, pointIndex) => {
           const text = String(point || "").trim();
-          if (!text) return;
+          if (!text || /^C\d+$/i.test(text)) return;
           tasks.push({
             id: `${item.id || index}_focus_${pointIndex}`,
-            title: `推进 ${text}`,
+            title: text,
             tag: "技能",
             xp: 20
           });
@@ -379,7 +364,7 @@
       }
 
       // 4. Success signals as validation tasks
-      (Array.isArray(item?.signals) ? item.signals : []).forEach((signal, signalIndex) => {
+      (Array.isArray(item?.signals) && !actualAction && !item.is_roadmap && !summary && !childTasks.length ? item.signals : []).forEach((signal, signalIndex) => {
         const text = String(signal || "").trim();
         if (!text) return;
         tasks.push({
@@ -397,36 +382,39 @@
         phase_key: phaseKey,
         source: "report",
         role,
-        timeline: phase || `阶段 ${index + 1}`,
+        timeline: item.deadline || phase || `阶段 ${index + 1}`,
         report_id: reportId,
         updated_at: item?.updated_at || tracker.last_synced_at || tracker.generated_at,
         items: tasks
       }));
     });
 
-    // Checkpoints → long-term review plan
+    // 复核节点保留真实阶段和日期。
     const checkpoints = Array.isArray(tracker.checkpoints) ? tracker.checkpoints : [];
-    if (checkpoints.length) {
+    PHASE_ORDER.forEach((phaseKey) => {
+      const phaseChecks = checkpoints.filter((item) => inferPhaseKey(item.label, "short") === phaseKey);
+      if (!phaseChecks.length) return;
       plans.push(normalizePlan({
-        id: `report_review_${reportId || "current"}`,
-        title: "路径复查与动态回看",
-        summary: "把需要周期性回看的复查节点统一放到长期阶段里。",
-        phase_key: "long",
+        id: `report_review_${phaseKey}_${reportId || "current"}`,
+        title: `${phaseLabel(phaseKey)}阶段评估`,
+        summary: "根据交付成果判断是否继续、延长练习或调整职业目标。",
+        phase_key: phaseKey,
         source: "report",
         role,
-        timeline: "长期阶段 · 复查节点",
+        timeline: phaseChecks[0].due_date || `${phaseLabel(phaseKey)} · 阶段复核`,
         report_id: reportId,
         updated_at: tracker.last_synced_at || tracker.generated_at,
-        items: checkpoints.map((checkpoint, checkIndex) => ({
-          id: `checkpoint_${checkIndex}_${String(checkpoint?.label || "item").trim()}`,
+        items: phaseChecks.map((checkpoint, checkIndex) => ({
+          id: `checkpoint_${checkpoint.id || checkIndex}`,
           title: String(checkpoint?.label || `复查 ${checkIndex + 1}`).trim(),
           note: String(checkpoint?.summary || "").trim(),
+          deadline: checkpoint.due_date || "",
           tag: "复查",
           xp: 18,
           done: String(checkpoint?.status || "").trim().toLowerCase() === "done"
         }))
       }));
-    }
+    });
 
     return plans;
   }
@@ -437,13 +425,13 @@
     const previousReportPlans = new Map(next.plans.filter((plan) => plan.source === "report").map((plan) => [plan.id, plan]));
     const reportPlans = buildTrackerPlans(tracker).map((plan) => {
       const previous = previousReportPlans.get(plan.id);
-      if (!previous) return plan;
+      if (!previous || previous.report_id !== plan.report_id) return plan;
       const itemMap = new Map(previous.items.map((item) => [item.id, item]));
       return {
         ...plan,
         items: plan.items.map((item) => ({
           ...item,
-          done: itemMap.get(item.id)?.done ?? item.done
+          done: itemMap.get(item.id)?.done ?? itemMap.get(`${item.id}_objective`)?.done ?? item.done
         }))
       };
     });
@@ -519,24 +507,16 @@
   }
 
   function milestoneNodes(phaseKey, plans) {
-    const meta = PHASE_META[phaseKey];
-    const sourceItems = plans.length
-      ? plans
-      : [{ title: meta.title }, { title: "推进动作" }, { title: "结果验证" }, { title: "阶段回看" }];
-    const nodes = sourceItems.slice(0, 4).map((plan, index) => ({
-      label: `${meta.milestonePrefix} ${index + 1}`,
-      title: String(plan.timeline || plan.title || "").trim() || `${meta.label}阶段 ${index + 1}`
-    }));
-    while (nodes.length < 4) {
-      nodes.push({
-        label: `${meta.milestonePrefix} ${nodes.length + 1}`,
-        title: `${meta.label}阶段 ${nodes.length + 1}`
-      });
-    }
-    const progressCount = plans.length ? plans.filter((plan) => planStats(plan).pct === 100).length : 0;
-    return nodes.map((node, index) => ({
-      ...node,
-      state: index < progressCount ? "completed" : index === progressCount ? "current" : "pending"
+    const grouped = new Map();
+    plans.forEach((plan) => {
+      const label = plan.timeline || plan.title;
+      if (!grouped.has(label)) grouped.set(label, []);
+      grouped.get(label).push(plan);
+    });
+    return [...grouped].map(([label, items]) => ({
+      label,
+      title: items.length > 1 ? `${items.length} 项准备任务` : items[0].title,
+      state: items.every((plan) => planStats(plan).pct === 100) ? "completed" : "pending"
     }));
   }
 
@@ -665,7 +645,7 @@
     }
     setText("lpFusionCheckinHint", checkedToday
       ? `已完成今日打卡，当前连续 ${progress.streak} 天。`
-      : "每天打卡会累积连续记录，并自动推进当前阶段的下一项任务。");
+      : "每天打卡记录学习节奏；任务完成后请核对交付物和验收标准，再手动勾选。");
 
     renderWeekStrip();
     renderHeatmap();
@@ -682,7 +662,7 @@
           <span class="lp-stage-task-meta">
             <span class="lp-stage-task-tag ${esc(taskTagClass(task.tag))}">${esc(task.tag || "技能")}</span>
             <span class="lp-stage-task-source">${esc(sourceLabel(task.source))}</span>
-            ${task.planTitle ? `<span class="lp-stage-task-plan">${esc(task.planTitle)}</span>` : ""}
+            ${task.planTitle && task.planTitle !== task.title ? `<span class="lp-stage-task-plan">${esc(task.planTitle)}</span>` : ""}
             ${task.deadline ? `<span class="lp-stage-task-deadline">截止 ${esc(task.deadline)}</span>` : ""}
           </span>
           ${task.note ? `<span class="lp-stage-task-note">${esc(task.note)}</span>` : ""}
@@ -696,7 +676,7 @@
     const meta = PHASE_META[phaseKey];
     const aggregate = phaseAggregate(plans);
     const milestones = milestoneNodes(phaseKey, plans);
-    const title = plans[0]?.title || meta.title;
+    const title = meta.title;
     const reportPlan = plans.find((p) => p.source === "report");
     const roleHint = reportPlan?.role ? ` · ${reportPlan.role}` : "";
     const subtitle = plans.length
@@ -719,7 +699,7 @@
             </div>
           </div>
         </div>
-        <div class="lp-stage-timeline">
+        ${milestones.length ? `<div class="lp-stage-timeline">
           ${milestones.map((node) => `
             <div class="lp-stage-milestone ${esc(node.state)}">
               <div class="lp-stage-milestone-dot"></div>
@@ -727,7 +707,7 @@
               <div class="lp-stage-milestone-date">${esc(node.title)}</div>
             </div>
           `).join("")}
-        </div>
+        </div>` : ""}
         <div class="lp-stage-task-list">
           ${aggregate.tasks.length
             ? aggregate.tasks.map((task) => renderTaskRow(task)).join("")
@@ -893,7 +873,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           item_type: isCheckpoint ? "checkpoint" : "plan",
-          item_id: taskId,
+          item_id: isCheckpoint ? taskId.slice("checkpoint_".length) : taskId,
           status
         })
       });
@@ -938,14 +918,6 @@
     progress.xp += progress.streak % 7 === 0 ? 50 : 10;
     progress.last_checkin = today;
     progress.active_days[today] = true;
-    const plan = activePhasePlan();
-    if (plan) {
-      const nextTask = plan.items.find((item) => !item.done);
-      if (nextTask) {
-        nextTask.done = true;
-        progress.xp += Math.max(0, Number(nextTask.xp || 0));
-      }
-    }
     await saveStore();
     renderAll();
     showAchievement("打卡完成", `连续 ${progress.streak} 天，成长值已更新。`);

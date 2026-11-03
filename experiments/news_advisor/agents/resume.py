@@ -3,6 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from langchain_core.runnables import RunnableConfig
+from pydantic import model_validator
 
 from ..prompt.resume_analysis import RESUME_ANALYSIS_PROMPT
 from ..resume_rubric import DEFAULT_EXPERIENCE_WEIGHTS, EXPERIENCE_WEIGHTS, RESUME_WEIGHTS
@@ -121,5 +122,15 @@ class ResumeAnalysisAgent(BaseAgent):
         return bool(prepared["raw_resume"])
 
     def get_output_schema(self, prepared: dict):
-        return ResumeAnalysis
+        class EvidencedResumeAnalysis(ResumeAnalysis):
+            @model_validator(mode="after")
+            def verify_profile_quotes(self):
+                for fact in self.career_profile:
+                    quote = re.sub(r"\s+", "", fact.quote)
+                    source = re.sub(r"\s+", "", prepared.get(fact.source, ""))
+                    if not quote or quote not in source:
+                        raise ValueError("职业画像必须引用对应用户材料中的连续原文")
+                return self
+
+        return EvidencedResumeAnalysis
 

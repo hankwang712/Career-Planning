@@ -586,7 +586,7 @@
   function stitchModularMarkdownFromBundle(bundle) {
     const sections = bundle?.report_document?.sections;
     if (!sections || typeof sections !== "object" || Array.isArray(sections)) return "";
-    const navOrder = [
+    const navOrder = bundle?.report_document?.section_order || [
       "executive_summary",
       "macro_environment",
       "personal_traits",
@@ -1282,7 +1282,7 @@
   function renderReportSections4(bundle, sections, options = {}) {
     const requestedGroup = String(options.group || "").trim().toLowerCase();
     const groupConfig = REPORT_WORKSPACE_GROUPS[requestedGroup] || null;
-    const navOrder = [
+    const navOrder = bundle?.report_document?.section_order || [
       "executive_summary",
       "macro_environment",
       "personal_traits",
@@ -1298,6 +1298,8 @@
       "personal_traits":      { label: "个人特质与潜力",     icon: "03", anchor: "cr-sec-traits",       kicker: "Personal Profile",             accentClass: "cr-module-amber" },
       "target_job_analysis":  { label: "目标企业与岗位分析", icon: "04", anchor: "cr-sec-target",       kicker: "Target Job Analysis",          accentClass: "cr-module-green" },
       "matching_decision":    { label: "人岗匹配与决策建议", icon: "05", anchor: "cr-sec-match",        kicker: "Role Match Officer",           accentClass: "cr-module-indigo" },
+      "ability_gaps":         { label: "职业能力差距", icon: "06", anchor: "cr-sec-ability-gaps", kicker: "Capability Gaps", accentClass: "cr-module-indigo" },
+      "development_path":     { label: "职业发展与成长路径", icon: "07", anchor: "cr-sec-development", kicker: "Development Roadmap", accentClass: "cr-module-teal" },
       "gap_action_plan":      { label: "差距分析与行动计划", icon: "06", anchor: "cr-sec-gap",          kicker: "Gap & Action Plan",            accentClass: "cr-module-teal" },
       "risk_backup":          { label: "风险管理与备选方案", icon: "07", anchor: "cr-sec-risk",         kicker: "Risk & Backup",                accentClass: "cr-module-rose" },
       "appendix":             { label: "附录",               icon: "08", anchor: "cr-sec-appendix",     kicker: "Appendix",                     accentClass: "cr-module-slate" },
@@ -2077,7 +2079,8 @@
 
     const allowedKeys = groupConfig ? new Set(groupConfig.sectionKeys || []) : null;
     const availableModules = navOrder
-      .map((key, idx) => ({ key, idx, meta: { ...navMeta[key], label: sections[key]?.label || navMeta[key].label }, section: sections[key] }))
+      .filter((key) => navMeta[key])
+      .map((key, idx) => ({ key, idx, meta: { ...navMeta[key], icon: String(idx + 1).padStart(2, "0"), label: sections[key]?.label || navMeta[key].label }, section: sections[key] }))
       .filter((item) => Boolean(item.section) && (!allowedKeys || allowedKeys.has(item.key)));
 
     const groupHeroHtml = groupConfig ? `
@@ -3271,6 +3274,8 @@
     { key: "personal_traits",      label: "个人特质与潜力",     icon: "03", anchor: "cr-sec-traits" },
     { key: "target_job_analysis",  label: "目标企业与岗位分析", icon: "04", anchor: "cr-sec-target" },
     { key: "matching_decision",    label: "人岗匹配与决策建议", icon: "05", anchor: "cr-sec-match" },
+    { key: "ability_gaps",         label: "职业能力差距", icon: "06", anchor: "cr-sec-ability-gaps" },
+    { key: "development_path",     label: "职业发展与成长路径", icon: "07", anchor: "cr-sec-development" },
     { key: "gap_action_plan",      label: "差距分析与行动计划", icon: "06", anchor: "cr-sec-gap" },
     { key: "risk_backup",          label: "风险管理与备选方案", icon: "07", anchor: "cr-sec-risk" },
     { key: "appendix",             label: "附录",               icon: "08", anchor: "cr-sec-appendix" },
@@ -3293,7 +3298,7 @@
       label: "\u89c4\u5212\u8def\u5f84",
       title: "\u5206\u9636\u6bb5\u8865\u9f50\u80fd\u529b\u5e76\u5f62\u6210\u6267\u884c\u8def\u7ebf",
       summary: "\u628a\u957f\u671f\u76ee\u6807\u62c6\u6210\u8fd1\u671f\u52a8\u4f5c\u3001\u9636\u6bb5\u76ee\u6807\u548c\u91cc\u7a0b\u7891\uff0c\u4fbf\u4e8e\u540e\u7eed\u7ee7\u7eed\u7f16\u8f91\u3001\u68c0\u67e5\u548c\u5bfc\u51fa\u3002",
-      sectionKeys: ["gap_action_plan", "risk_backup", "appendix"]
+      sectionKeys: ["ability_gaps", "development_path", "gap_action_plan", "risk_backup", "appendix"]
     }
   };
   window.CAREER_REPORT_WORKSPACE_GROUPS = REPORT_WORKSPACE_GROUPS;
@@ -3539,7 +3544,9 @@
 
   function renderReportViewerTasks(tracker) {
     const items = [];
-    const planItems = Array.isArray(tracker?.plan_items) ? tracker.plan_items : [];
+    const rawItems = Array.isArray(tracker?.plan_items) ? tracker.plan_items : [];
+    const parentIds = new Set(rawItems.filter((item) => item.is_task).map((item) => item.parent_phase));
+    const planItems = rawItems.filter((item) => item.is_task || item.is_action || (!item.is_roadmap && !parentIds.has(item.id)));
     const checkpoints = Array.isArray(tracker?.checkpoints) ? tracker.checkpoints : [];
 
     if (planItems.length) {

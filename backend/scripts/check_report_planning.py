@@ -120,6 +120,29 @@ class PlanningChecks(unittest.TestCase):
             asyncio.run(agent.arun(self.payload))
         self.assertFalse(model.seen)
 
+    def test_missing_or_misordered_roadmap_is_repaired(self):
+        invalid = deepcopy(self.valid)
+        invalid["development_roadmap"] = []
+        result, model, _ = self.run_agent([invalid, self.valid])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(model.seen), 2)
+        invalid["development_roadmap"] = list(reversed(self.valid["development_roadmap"]))
+        result, _, _ = self.run_agent([invalid])
+        self.assertEqual(result["status"], "validation_failed")
+
+    def test_roadmap_cannot_invent_checks_or_bypass_apply_gate(self):
+        for change in ({"check_id": "invented"}, {"kind": "apply"}):
+            invalid = deepcopy(self.valid)
+            invalid["development_roadmap"][1]["actions"][0].update(change)
+            result, _, _ = self.run_agent([invalid])
+            self.assertEqual(result["status"], "validation_failed")
+
+    def test_student_stage_reaches_model_without_guessing(self):
+        self.payload["constraints"]["student_stage"] = "exploration"
+        result, model, _ = self.run_agent([self.valid])
+        self.assertEqual(result["constraints"]["student_stage"], "exploration")
+        self.assertIn('"student_stage": "exploration"', model.seen[0][-1].content)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

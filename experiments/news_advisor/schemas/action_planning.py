@@ -11,6 +11,8 @@ class PlanRecord(BaseModel):
 
 
 class PlanningConstraints(PlanRecord):
+    student_stage: Literal["exploration", "employment", "unspecified"] = Field(
+        default="unspecified", description="用户选择：大一大二职业探索 / 大三大四及研究生就业准备 / 尚未说明；不得从学历推断年级")
     weekly_hours: float = Field(gt=0, le=168)
     deadline: date
     start_date: date | None = None
@@ -45,9 +47,28 @@ class ReducedPlan(PlanRecord):
     reason: str = Field(min_length=1, description="保留什么、删减什么，以及暂缓的影响")
 
 
+class DevelopmentAction(PlanRecord):
+    check_id: str = Field(min_length=1)
+    kind: Literal["clarify", "document", "practice", "apply"]
+    title: str = Field(min_length=1, description="具体要准备或完成的事情，不能只写提升能力")
+    deliverable: str = Field(min_length=1)
+    acceptance_criteria: str = Field(min_length=1)
+
+
+class DevelopmentMilestone(PlanRecord):
+    horizon: Literal["short", "mid", "long"]
+    objective: str = Field(min_length=1)
+    actions: list[DevelopmentAction] = Field(min_length=1, max_length=4)
+    entry_conditions: str = Field(min_length=1, description="进入阶段所需条件；未知资格核实后再推进，不默认满足")
+    review_trigger: str = Field(min_length=1, description="何时复核、看哪些成果、什么情况下调整方向")
+
+
 class ActionPlan(PlanRecord):
     summary: str = Field(min_length=1)
     tasks: list[PlanTask] = Field(min_length=1, max_length=30, description="按依赖执行顺序排列")
     reduced_plan: ReducedPlan
     deferred_actions: list[str] = Field(default_factory=list, description="期限或预算内未安排的行动及原因")
     limitations: list[str] = Field(default_factory=list)
+    development_roadmap: list[DevelopmentMilestone] = Field(
+        default_factory=list, max_length=3,
+        description="短期1—3个月、中期3—12个月、长期1—3年的条件性成长路线；与已排工时的本阶段任务分开")

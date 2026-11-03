@@ -6,6 +6,7 @@
     "start": "node backend/scripts/start-server.mjs",
     "start:check": "node backend/scripts/start-server.mjs --check",
     "check:report": "python backend/scripts/check_report_workflow.py",
+    "check:report-development": "python -B backend/scripts/check_report_development.py && python -B backend/scripts/check_report_planning.py && node frontend/scripts/check-learning-path.mjs && node frontend/scripts/check-report-review.mjs",
     "check:chat": "python backend/scripts/check_chat.py && python backend/scripts/check_chat_context.py ContextChecks && python backend/scripts/check_chat_pipeline.py PipelineChecks PolicyChecks && python backend/scripts/check_chat_privacy.py PrivacyChecks && python backend/scripts/check_chat_images.py ImageChecks && node frontend/scripts/check-chat-markdown.mjs && node frontend/scripts/check-chat-typing.mjs",
     "check:report-upload": "python -B backend/scripts/check_report_upload.py && node frontend/scripts/check-report-upload.mjs",
     "dev": "npm run dev --workspace frontend",

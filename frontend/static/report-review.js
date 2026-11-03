@@ -45,7 +45,8 @@
     const deadline = new Date(`${today}T00:00:00Z`);
     deadline.setUTCDate(deadline.getUTCDate() + weeks * 7 - 1);
     return { target_id: target, answers, constraints: { weekly_hours: hours, start_date: today,
-      deadline: deadline.toISOString().slice(0, 10), budget: null, completed_tasks: [] } };
+      deadline: deadline.toISOString().slice(0, 10), budget: null, completed_tasks: [],
+      student_stage: ["exploration", "employment"].includes(values.student_stage) ? values.student_stage : "unspecified" } };
   }
 
   function close() {
@@ -85,6 +86,7 @@
     if (step.kind === "planning") {
       current.values.hours = values.get("hours");
       current.values.weeks = values.get("weeks");
+      current.values.student_stage = values.get("student_stage");
     }
   }
 
@@ -114,8 +116,9 @@
       const target = snapshot.review.targets.find((item) => item.target_id === values.target) || snapshot.review.targets[0];
       body = `<div class="report-review-recorded"><strong>${esc(target.title)}</strong><p>${esc(snapshot.review_ui?.availability_summary || "实习安排尚未确定，将按未知信息保留。")}</p></div>
         <p class="report-review-note">下面选择用于学习、完善简历和求职的时间，与每周实习天数分开计算。</p>
+        <label class="report-review-field">当前学习阶段<select name="student_stage"><option value="unspecified">暂不说明</option><option value="exploration" ${values.student_stage === "exploration" ? "selected" : ""}>大一、大二 · 职业探索</option><option value="employment" ${values.student_stage === "employment" ? "selected" : ""}>大三、大四及研究生 · 就业准备</option></select></label>
         <label class="report-review-field">每周可用于准备的时间<select name="hours" required><option value="">请选择</option>${HOURS.map((hours) => `<option value="${hours}" ${Number(values.hours) === hours ? "selected" : ""}>${hours} 小时 / 周</option>`).join("")}</select></label>
-        <label class="report-review-field">从今天开始，计划覆盖多久？<select name="weeks" required><option value="">请选择</option>${WEEKS.map((weeks) => `<option value="${weeks}" ${Number(values.weeks) === weeks ? "selected" : ""}>${weeks} 周</option>`).join("")}</select></label>`;
+        <label class="report-review-field">近期任务安排多久？<select name="weeks" required><option value="">请选择</option>${WEEKS.map((weeks) => `<option value="${weeks}" ${Number(values.weeks) === weeks ? "selected" : ""}>${weeks} 周</option>`).join("")}</select></label><p class="report-review-note">另外生成1—3个月、3—12个月和1—3年的成长路线，后续按阶段复核调整。</p>`;
     }
     dialog.innerHTML = `<form class="report-review-card">
       <div class="report-review-top"><span>确认 ${index + 1} / ${steps.length}</span><button type="button" class="report-review-close" data-action="close" aria-label="关闭，稍后继续">×</button></div>
