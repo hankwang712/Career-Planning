@@ -10,6 +10,8 @@ import logging
 import re
 import threading
 
+from pydantic import ValidationError
+
 from .cache import RecentCache
 from .extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, validate_candidates
 from .policy import estimate_tokens, message_windows
@@ -19,6 +21,31 @@ from .storage import normalized
 from .vector import VectorMemory
 
 logger = logging.getLogger(__name__)
+
+
+def analysis_error_detail(error):
+    """Useful diagnostics without provider bodies, API keys or private excerpts."""
+    if isinstance(error, ValidationError):
+        fields = {"summary", "memories", "kind", "key", "subject", "value", "operation", "evidence",
+                  "message_id", "quote", "confidence", "scope", "reason", "target_id", "requires_confirmation"}
+        details = []
+        for item in error.errors(include_input=False, include_context=False, include_url=False)[:3]:
+            location = ".".join(str(part) if isinstance(part, int) or part in fields else "*" for part in item["loc"])
+            code = item["type"] if re.fullmatch(r"[a-z_]{1,60}", item["type"]) else "invalid"
+            details.append(location + ":" + code)
+        return "输出字段校验失败[" + ", ".join(details) + "]"
+    if isinstance(error, json.JSONDecodeError):
+        return f"JSON解析失败[行{error.lineno},列{error.colno}]"
+    status = getattr(error, "status_code", None)
+    if type(status) is int:
+        return f"模型接口HTTP状态码={status}"
+    return {
+        "Incomplete or refused memory output": "模型输出被截断、过滤或拒绝",
+        "Extraction request exceeds the configured input token budget": "输入超过记忆分析Token预算",
+        "Invalid conversation summary": "摘要格式无效或超过2500字",
+        "Model must return a JSON object": "模型输出不是JSON对象",
+        "Evidence must be verbatim user text": "候选证据不属于本批用户原文",
+    }.get(str(error), "未记录原始异常文本，以免泄露聊天内容或密钥")
 
 
 class CleanupBusy(Exception):
@@ -273,8 +300,11 @@ class MemoryManager:
             return False
         try:
             self.analyze(job)
-        except Exception:
-            logger.warning("助手记忆分析失败，任务将按策略重试", exc_info=False)
+        except Exception as error:
+            action = "已达上限，停止自动重试" if job["attempts"] >= 3 else f"约{60 * job['attempts']}秒后重试"
+            logger.warning("助手%s失败：%s；异常=%s；尝试=%d/3；%s",
+                           "会话摘要" if job["kind"] == "summary" else "长期记忆提取",
+                           analysis_error_detail(error), type(error).__name__, job["attempts"], action)
             self.store.fail_job(job)
         return True
 

@@ -41,7 +41,7 @@ NEWS_STORE_LOCK = threading.RLock()  # load 时可能就地修复并回写，需
 
 EMBEDDING_MODEL = "baai/bge-m3"
 EMBEDDING_BASE_URL = "https://openrouter.ai/api/v1"
-EMBEDDING_API_KEY = "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"
+EMBEDDING_API_KEY = os.getenv("NEWS_EMBEDDING_API_KEY", "").strip()
 
 NEWS_MAX_ENTRIES = 500     # 最多保留条数
 NEWS_MAX_AGE_DAYS = 45     # 超过此天数的条目会被裁剪
@@ -576,7 +576,7 @@ def _chunk_text(
 
 def _get_embedding(text: str) -> list[float] | None:
     """调用 OpenRouter baai/bge-m3 接口，返回 embedding 向量。"""
-    if not text or not text.strip():
+    if not text or not text.strip() or not EMBEDDING_API_KEY:
         return None
     try:
         payload = json.dumps({

@@ -1,4 +1,4 @@
-"""岗位图谱单一入口：TXT 导入、规则清理、AI 复核、自动合并与剪枝、网页服务。
+"""岗位图谱入口：职业能力建图、证据查询、旧图清理与网页服务。
 
 直接运行默认执行 optimize，更新现有 career_jd 图谱；--dry-run 只检查不调用模型或修改数据库。
 运行状态、复核缓存和别名词典统一保存在 .job_graph 中，数据库备份保存在 backups 中。
@@ -443,6 +443,8 @@ def preview(args) -> None:
         raise ValueError("未找到岗位记录")
     print(json.dumps({
         "mode": "preview_only",
+        "schema": args.schema,
+        "workspace": args.workspace,
         "input": str(args.input.resolve()),
         "records": count,
         "start_record": args.start,
@@ -633,6 +635,156 @@ async def import_documents(args) -> None:
             raise RuntimeError(f"有 {failed_count} 条岗位未成功处理，详情：{failure_path}")
     finally:
         await rag.finalize_storages()
+
+
+def career_components(args):
+    """新图使用独立事实库；目录变更需使用新 workspace。"""
+    sys.path.insert(0, str(RESEARCH_DIR / "LightRAG"))
+    from lightrag.career import CareerCatalog, CareerStore
+    catalog = CareerCatalog.load(args.catalog)
+    store = CareerStore(args.career_db, args.workspace, catalog.fingerprint)
+    return catalog, store
+
+
+def career_job_records(args):
+    from lightrag.career import JobRecord
+    for document in selected_documents(args):
+        header = document.text.split(DESCRIPTION_LABEL, 1)[0].splitlines()
+        values = [line.split("：", 1)[1] for line in header[:4]]
+        yield JobRecord(jd_id=document.document_id, record=document.index, text=document.text,
+                        file_path=f"{args.input.resolve().as_posix()}#record={document.index}",
+                        title=values[0], company=values[1], city=values[2], education=values[3])
+
+
+async def import_career_documents(args):
+    from tqdm import tqdm
+    catalog, store = career_components(args)
+    from lightrag.career import CareerService
+    rag = None
+    paused = False
+    try:
+        paused = stop_webui(args)
+        rag = create_rag(args)
+        await rag.initialize_storages()
+        # Keep readers away from a partially refreshed aggregate graph.
+        with socket.socket() as probe:
+            if probe.connect_ex(("127.0.0.1", args.webui_port)) == 0:
+                raise RuntimeError("请先停止该端口的网页服务再建图；完成后可重新 serve")
+        total = sum(1 for _ in selected_documents(args))
+        if not total:
+            raise ValueError("未找到岗位记录")
+        with tqdm(total=total, desc="职业能力抽取", unit="条", dynamic_ncols=True) as progress:
+            def update(counts):
+                progress.update(1)
+                progress.set_postfix(counts)
+            result = await CareerService(store, catalog, rag).ingest(
+                career_job_records(args), retry_failed=args.retry_failed,
+                publish=not args.extract_only, progress=update, merge_mode=args.merge_mode,
+                merge_options={"max_pairs": args.merge_max_pairs, "min_similarity": args.merge_min_similarity,
+                               "min_confidence": args.merge_min_confidence})
+        if args.export and not args.extract_only:
+            args.export.parent.mkdir(parents=True, exist_ok=True)
+            await rag.aexport_data(str(args.export), file_format="txt")
+        print(json.dumps({"workspace": args.workspace, **result, "state": store.summary()}, ensure_ascii=False, indent=2))
+        if result["failed"] or result["skipped_failed"]:
+            raise RuntimeError("存在抽取失败的JD；career status查看状态，import --retry-failed显式重试")
+        if result.get("merge", {}).get("errors"):
+            raise RuntimeError("部分同义复核失败；已保存模型响应及报告，请用career merges检查后重试")
+    finally:
+        try:
+            if rag is not None:
+                await rag.finalize_storages()
+        finally:
+            store.close()
+            if paused:
+                start_webui(args)
+
+
+def query_career(args):
+    catalog, store = career_components(args)
+    from lightrag.career import CareerService
+    try:
+        service = CareerService(store, catalog)
+        filters = {"city": args.city, "education": args.education}
+        if args.action == "status":
+            result = store.summary()
+        elif args.action == "roles":
+            result = service.roles(**filters)
+        elif args.action == "profile":
+            if not args.role:
+                raise ValueError("profile需要--role，先用career roles查看Role ID")
+            result = service.profile(args.role, **filters)
+        elif args.action == "skill":
+            if not args.skill:
+                raise ValueError("skill需要--skill")
+            result = service.roles_for_skill(args.skill, **filters)
+        elif args.action == "similar":
+            if not args.role:
+                raise ValueError("similar需要--role")
+            result = service.similar(args.role, limit=args.top_k, **filters)
+        elif args.action == "catalog":
+            result = {"roles": catalog.roles, "aliases": catalog.aliases}
+        elif args.action == "compare":
+            if not args.source_role or not args.target_role:
+                raise ValueError("compare需要--source-role和--target-role")
+            result = service.compare(args.source_role, args.target_role, owned=args.owned_skills, **filters)
+        elif args.action == "entities":
+            from lightrag.career.merging import inventory
+            result = list(inventory(store).values())
+        elif args.action == "merges":
+            from lightrag.career.registry import EntityRegistry
+            registry = EntityRegistry(store)
+            result = {"history": registry.history(), "last_run": registry.latest_run()}
+        elif args.action == "merge-review":
+            if not args.cache_key:
+                raise ValueError("merge-review需要--cache-key，可从合并报告中获取")
+            row = store.db.execute("SELECT * FROM career_merge_reviews WHERE workspace=? AND cache_key=?",
+                                   (args.workspace, args.cache_key)).fetchone()
+            if row is None:
+                raise ValueError("未找到该复核响应")
+            result = dict(row)
+        elif args.action == "merge" and args.dry_run:
+            result = asyncio.run(service.merge(mode=args.merge_mode, dry_run=True, publish=False,
+                max_pairs=args.merge_max_pairs, min_similarity=args.merge_min_similarity,
+                min_confidence=args.merge_min_confidence))
+        elif args.action in {"publish", "merge", "merge-apply", "merge-undo"}:
+            if args.action == "merge-apply" and (not args.target_id or not args.source_ids or not args.reason):
+                raise ValueError("merge-apply需要--target-id、--source-ids和--reason")
+            if args.action == "merge-undo" and not args.merge_id:
+                raise ValueError("merge-undo需要--merge-id；仅可从最近一次有效合并开始撤销")
+            async def maintain():
+                paused = stop_webui(args)
+                rag = None
+                try:
+                    rag = create_rag(args)
+                    await rag.initialize_storages()
+                    with socket.socket() as probe:
+                        if probe.connect_ex(("127.0.0.1", args.webui_port)) == 0:
+                            raise RuntimeError("请先停止该端口的网页服务再发布图谱")
+                    writer = CareerService(store, catalog, rag)
+                    if args.action == "merge":
+                        return await writer.merge(mode=args.merge_mode, max_pairs=args.merge_max_pairs,
+                            min_similarity=args.merge_min_similarity, min_confidence=args.merge_min_confidence)
+                    if args.action == "merge-apply":
+                        return await writer.apply_merge(args.target_id, args.source_ids, reason=args.reason,
+                                                         expected_revision=args.expected_revision)
+                    if args.action == "merge-undo":
+                        return await writer.undo_merge(args.merge_id)
+                    return await writer.publish()
+                finally:
+                    try:
+                        if rag is not None:
+                            await rag.finalize_storages()
+                    finally:
+                        if paused:
+                            start_webui(args)
+            with workspace_lock(args.workspace):
+                result = asyncio.run(maintain())
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if args.action == "merge" and result.get("errors"):
+            raise RuntimeError("合并复核有失败项，已保存完整响应；career merges可检查")
+    finally:
+        store.close()
 
 
 
@@ -1249,11 +1401,16 @@ def start_webui(args):
     log_dir.mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
     environment["PYTHONIOENCODING"] = "utf-8"
+    schema_options = ["--schema", getattr(args, "schema", "legacy")]
+    if getattr(args, "schema", "legacy") == "career":
+        schema_options.extend(["--career-db", str(args.career_db.resolve())])
+        if args.catalog:
+            schema_options.extend(["--catalog", str(args.catalog.resolve())])
     with (log_dir / "webui.log").open("ab") as stream:
         process = subprocess.Popen(
             [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "serve",
              "--workspace", args.workspace, "--env-file", str(args.env_file.resolve()),
-             "--working-dir", str(args.working_dir.resolve()), "--webui-port", str(args.webui_port)],
+             "--working-dir", str(args.working_dir.resolve()), "--webui-port", str(args.webui_port), *schema_options],
             cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             start_new_session=os.name != "nt",
@@ -1277,6 +1434,21 @@ def serve(args):
     import runpy
     os.chdir(ROOT)
     load_dotenv(args.env_file, override=False)
+    if getattr(args, "schema", "legacy") == "career":
+        if os.getenv("PG_WORKSPACE") and os.environ["PG_WORKSPACE"] != args.workspace:
+            raise ValueError("PG_WORKSPACE与职业图谱workspace不一致，拒绝启动")
+        os.environ.update({
+            "LIGHTRAG_KV_STORAGE": "PGKVStorage", "LIGHTRAG_VECTOR_STORAGE": "PGVectorStorage",
+            "LIGHTRAG_GRAPH_STORAGE": "PGTableGraphStorage", "LIGHTRAG_DOC_STATUS_STORAGE": "PGDocStatusStorage",
+        })
+        os.environ["CAREER_FACTS_DB"] = str(args.career_db.resolve())
+        if args.catalog:
+            os.environ["CAREER_CATALOG"] = str(args.catalog.resolve())
+        else:
+            os.environ.pop("CAREER_CATALOG", None)
+    else:
+        os.environ.pop("CAREER_FACTS_DB", None)
+        os.environ.pop("CAREER_CATALOG", None)
     if os.getenv("POSTGRES_HOST", "").lower() == "localhost":
         os.environ["POSTGRES_HOST"] = "127.0.0.1"
     logs = STATE_DIR / "logs"
@@ -1345,6 +1517,8 @@ def optimize(args):
     paused = False
     try:
         snapshot = read_snapshot(args)
+        if any(n["properties"].get("schema_version") == "career-v1" for n in snapshot["nodes"]):
+            raise RuntimeError("职业能力图谱由事实库聚合，不能用旧版optimize修改；请使用career publish重放")
         if any(d["status"] not in {"processed", "failed"} for d in snapshot["docs"]):
             raise RuntimeError("存在进行中的导入任务，请等待结束后再优化")
         plan = build_plan(snapshot, args.workspace)
@@ -1399,11 +1573,18 @@ def main():
     importing = commands.add_parser("import", help="按岗位分块导入 TXT，支持 start/limit 和进度条")
     optimizing = commands.add_parser("optimize", help="自动复核、合并和剪枝，直接更新原工作空间")
     serving = commands.add_parser("serve", help="启动或停止可视化网页")
-    for child in (importing, optimizing, serving):
-        child.add_argument("--workspace", default="career_jd")
+    career = commands.add_parser("career", help="职业画像、技能反查、岗位比较及事实重放（默认不调用模型）")
+    career.add_argument("action", choices=["roles", "profile", "skill", "similar", "compare", "status", "catalog", "publish",
+                                           "merge", "merge-apply", "merge-undo", "merge-review", "merges", "entities"])
+    for child in (importing, optimizing, serving, career):
+        child.add_argument("--workspace")
         child.add_argument("--env-file", type=Path, default=ROOT / ".env")
         child.add_argument("--working-dir", type=Path, default=ROOT / "jd_rag_storage")
-        child.add_argument("--webui-port", type=int, default=9621)
+        child.add_argument("--webui-port", type=int)
+    for child in (importing, serving, career):
+        child.add_argument("--schema", choices=["career", "legacy"], default="legacy" if child is serving else "career")
+        child.add_argument("--career-db", type=Path, default=STATE_DIR / "career.sqlite3")
+        child.add_argument("--catalog", type=Path, help="包含roles与类型限定aliases的JSON目录")
     for child in (importing, optimizing):
         child.add_argument("--input", type=Path, default=PROJECT_ROOT / "job_descriptions.txt")
     importing.add_argument("--start", type=int, default=1)
@@ -1411,6 +1592,29 @@ def main():
     importing.add_argument("--batch-size", type=int, default=10)
     importing.add_argument("--preview", action="store_true", help="只解析本地文件")
     importing.add_argument("--export", type=Path)
+    importing.add_argument("--retry-failed", action="store_true", help="显式重试事实库中抽取失败的JD")
+    importing.add_argument("--extract-only", action="store_true", help="只抽取并保存事实，暂不发布LightRAG图谱")
+    for child in (importing, career):
+        child.add_argument("--merge-mode", choices=["off", "rules", "semantic"], default="semantic",
+                           help="建图末尾自动合并：默认规则归一+向量召回+证据复核；extract-only仅执行规则")
+        child.add_argument("--merge-max-pairs", type=int, default=0, help="每轮最多复核对数；默认0复核全部，未处理项保留在报告")
+        child.add_argument("--merge-min-similarity", type=float, default=.9)
+        child.add_argument("--merge-min-confidence", type=float, default=.95, help="模型自评分数阈值；不能替代双侧证据校验")
+    career.add_argument("--dry-run", action="store_true", help="仅预览规则及文本候选，不调用模型或修改映射；不包含向量召回")
+    career.add_argument("--target-id", help="人工确认的规范实体ID")
+    career.add_argument("--source-ids", nargs="+", help="需要合并到规范实体的源ID")
+    career.add_argument("--reason", help="人工确认合并的理由")
+    career.add_argument("--expected-revision", type=int, help="可选指定审核时的事实库版本，拒绝过期操作")
+    career.add_argument("--merge-id", help="要撤销的最近一次有效合并ID")
+    career.add_argument("--cache-key", help="需要查看原始模型响应的合并复核缓存键")
+    career.add_argument("--role")
+    career.add_argument("--skill")
+    career.add_argument("--source-role")
+    career.add_argument("--target-role")
+    career.add_argument("--owned-skills", nargs="*", help="用户明确提供的技能；不从岗位推断个人能力")
+    career.add_argument("--city", help="按JD城市精确筛选并重新计算分母")
+    career.add_argument("--education", help="按JD学历字段精确筛选，不推断学历等价性")
+    career.add_argument("--top-k", type=int, default=10, help="相似岗位返回数量，1～100")
     optimizing.add_argument("--limit", type=int, default=40, help="本轮 AI 判断对数，默认40；0表示全部候选")
     optimizing.add_argument("--batch-size", type=int, default=2)
     optimizing.add_argument("--entity-types", default="skill,capability,requirement,task")
@@ -1428,6 +1632,13 @@ def main():
     if args.command is None:
         parser.print_help()
         return
+    schema = getattr(args, "schema", "legacy")
+    args.workspace = args.workspace or ("career_v1" if schema == "career" else "career_jd")
+    args.webui_port = args.webui_port or (9622 if schema == "career" else 9621)
+    if args.command == "career" and args.dry_run and args.action != "merge":
+        parser.error("--dry-run只支持career merge，其他维护操作不会在此参数下执行")
+    if hasattr(args, "merge_max_pairs") and (args.merge_max_pairs < 0 or not 0 <= args.merge_min_similarity <= 1 or not 0 <= args.merge_min_confidence <= 1):
+        parser.error("merge-max-pairs不能为负，合并相似度和自评分数阈值必须为0～1")
     migrate_state()
     if args.command == "import":
         if args.start < 1 or args.limit < 0 or args.batch_size < 1:
@@ -1436,7 +1647,10 @@ def main():
             preview(args)
         else:
             with workspace_lock(args.workspace):
-                asyncio.run(import_documents(args))
+                if args.schema == "career":
+                    asyncio.run(import_career_documents(args))
+                else:
+                    asyncio.run(import_documents(args))
     elif args.command == "optimize":
         args.entity_types = set(args.entity_types.split(","))
         if args.limit < 0 or not 1 <= args.batch_size <= 10 or not 0 <= args.min_similarity <= 1:
@@ -1450,6 +1664,10 @@ def main():
         else:
             with workspace_lock(args.workspace):
                 optimize(args)
+    elif args.command == "career":
+        if args.schema != "career":
+            parser.error("career查询只支持职业能力schema")
+        query_career(args)
     elif args.stop:
         stop_webui(args)
     elif args.background:

@@ -31,3 +31,36 @@ node_modules/
 
 # 7. 当前项目的临时文件目录
 /tmp/
+
+# Environment secrets (keep shareable configuration templates)
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!.env.sample
+!*.env.example
+!*.env.sample
+
+# Python virtual environments, bytecode and tooling caches
+.venv/
+venv/
+env/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local logs, editor state and OS files
+*.log
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Generated research graph preview
+/artifacts/research/career_graph_current.png

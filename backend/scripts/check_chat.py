@@ -28,7 +28,7 @@ from services.chat import create_blueprint
 from services.chat.api import create_app
 from services.chat.extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, validate_analysis
 from services.chat.cache import RecentCache
-from services.chat.memory import MemoryManager
+from services.chat.memory import MemoryManager, analysis_error_detail
 from services.chat.reconciliation import RELATION_PROMPT, REPLACEMENT_CUE
 from services.resume.facts import PROFILE_PROMPT
 from services.chat.storage import ChatError, ChatStore
@@ -463,6 +463,34 @@ class MemoryChecks(unittest.TestCase):
         self.assertEqual(len(self.store.messages("alice", self.sid)["items"]), 2)
         self.assertEqual(self.store.memory_status("alice")["memory"]["queued"], 1)
         self.client.close.assert_called_once()
+
+    def test_failure_logs_are_specific_without_private_model_content(self):
+        from services.chat.schemas import SummaryOutput
+        private = "private-chat-and-api-key"
+        try:
+            SummaryOutput.model_validate({"summary": private * 200})
+        except ValueError as error:
+            validation = error
+        self.turn()
+        self.store.enqueue("alice", self.sid, immediate=True)
+        with self.store.connect(write=True) as conn:
+            conn.execute("UPDATE memory_jobs SET attempts=2 WHERE session_id=? AND kind='summary'", (self.sid,))
+        job = self.store.claim_job(kind="summary")
+        with patch.object(self.store, "claim_job", return_value=job), patch.object(self.memory, "analyze", side_effect=validation):
+            with self.assertLogs("services.chat.memory", level="WARNING") as captured:
+                self.memory.run_once()
+        message = " ".join(captured.output)
+        self.assertIn("会话摘要", message)
+        self.assertIn("summary:string_too_long", message)
+        self.assertIn("ValidationError", message)
+        self.assertIn("3/3", message)
+        self.assertIn("停止自动重试", message)
+        self.assertNotIn(private, message)
+        self.assertEqual(self.store.memory_status("alice")["summary"]["error"], 1)
+        self.assertNotIn(private, analysis_error_detail(RuntimeError(private)))
+        with self.assertRaises(ValueError) as malformed:
+            SummaryOutput.model_validate({"summary": "", private: "secret"})
+        self.assertNotIn(private, analysis_error_detail(malformed.exception))
 
     def test_worker_shutdown_releases_clients_once(self):
         entered = threading.Event()
