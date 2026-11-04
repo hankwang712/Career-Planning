@@ -64,3 +64,6 @@ Thumbs.db
 
 # Generated research graph preview
 /artifacts/research/career_graph_current.png
+
+# Local GitHub Actions workflows
+/.github/workflows/
