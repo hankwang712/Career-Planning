@@ -1,66 +1,125 @@
-# 智航生涯 · Career Planning
+﻿<div align="center">
 
-一个围绕职业探索、简历分析和求职规划开发的 Web 项目。
+# 🧭 智航生涯 · Career Planning
 
-项目把测评、岗位数据、个人经历和 AI 分析放在同一个工作台里。用户可以先了解自己的兴趣与偏好，再查岗位、整理简历、比较职业方向，最后把选定的方向拆成具体的学习和求职安排。报告、测评记录和对话会保留下来，方便后续回看和调整。
+**从认识自己，到选择方向，再到落实下一步行动。**
 
-[![智航生涯工作台](asserts/workspace.png)](asserts/workspace.png)
+职业测评 · 岗位探索 · 简历分析 · AI 规划报告 · 生涯对话
 
-## 目前可以做什么
+[功能一览](#features) · [快速启动](#quickstart) · [系统架构](#architecture) · [配置服务](#configuration) · [项目目录](#development)
 
-| 功能 | 具体内容 |
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](backend/requirements.txt)
+[![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](package.json)
+[![Flask](https://img.shields.io/badge/Flask-3.1-181717?style=for-the-badge&logo=flask&logoColor=white)](backend/requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](backend/services/chat/api.py)
+
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](frontend/vite.config.mjs)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langgraph&logoColor=white)](experiments/news_advisor/report_workflow.py)
+[![GitHub Stars](https://img.shields.io/github/stars/hankwang712/Career-Planning?style=for-the-badge&logo=github&logoColor=white&color=E3B341)](https://github.com/hankwang712/Career-Planning/stargazers)
+
+</div>
+
+![智航生涯工作台](asserts/workspace.png)
+
+智航生涯是一个面向职业探索与求职准备的 Web 工作台，将个人经历、测评结果、岗位数据和 AI 分析放在同一条使用流程中。用户可以比较职业方向、生成规划报告，并将选定方向拆解为学习与求职任务。
+
+<a id="features"></a>
+
+## ✨ 功能一览
+
+| 模块 | 可以做什么 |
 | --- | --- |
-| 测评中心 | 提供 MBTI、霍兰德职业兴趣、深层 MBTI、老友记角色、情绪主导和 SBTI 六项测评，支持进度保存和历史结果查看；基础测评可对比最近两次结果。 |
-| 岗位探索 | 按城市和条件浏览岗位，查看岗位详情、薪资分布和地域分布，也可以浏览项目收录的数据集。 |
-| 简历分析 | 上传简历并提取文本，分析经历、技能与岗位要求之间的匹配情况，整理已有证据和需要补充的材料。支持 PDF、DOCX 等文档处理，并保留 OCR 识别能力。 |
-| 职业规划报告 | 结合简历、目标方向和个人偏好生成报告，支持中途补充信息、确认方向、编辑润色、版本查看，以及 Word / PDF 导出。 |
-| 行动与学习计划 | 根据学习阶段、目标方向和可投入时间安排近期任务，补充 1—3 个月、3—12 个月、1—3 年的成长路线；每项准备事项都有交付成果与验收标准。 |
-| AI 生涯助手 | 围绕职业选择、简历、面试准备和学习计划进行对话，可结合当前工作台资料、已上传简历和历史记忆回答问题，也支持在聊天中提交图片。 |
-| 资讯与社区 | 查看职业资讯和相关新闻，在社区发布求职经验、岗位讨论及回复。 |
-| 个人中心与管理 | 管理测评记录、个人资料和报告；管理员可以管理账户及模型接口配置。另有职业画像海报生成功能。 |
+| 🧩 测评中心 | MBTI、霍兰德、深层 MBTI、老友记角色、情绪主导、SBTI 六项测评；保存答题进度、查看历史结果，基础测评支持最近两次结果对比。 |
+| 🔎 岗位探索 | 按城市和条件浏览岗位、查看岗位详情、薪资与地域分布，并浏览收录的数据集。 |
+| 📄 简历分析 | 上传 PDF、DOCX 等简历，提取经历与技能，分析岗位匹配情况、证据和待补材料；可按需启用 OCR。 |
+| 🗺️ 职业规划报告 | 结合简历、目标和偏好分阶段生成报告，支持补充信息、确认方向、编辑润色、版本查看与 Word / PDF 导出。 |
+| ✅ 行动与学习计划 | 根据阶段、目标和可投入时间安排近期任务，延伸到中长期成长路线；为准备事项提供交付成果与验收标准。 |
+| 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话，结合工作台资料、简历与已保存记忆回答，支持图片输入。 |
+| 📰 资讯与社区 | 查看职业资讯、相关新闻，发布求职经验、岗位讨论及回复。 |
+| 👤 个人与管理中心 | 查看个人资料、测评和报告记录；管理员管理账户及模型接口，另有职业画像海报生成功能。 |
 
-测评结果用于提供探索线索；报告会结合简历和岗位材料继续分析，不会只凭一个性格类型决定职业方向。
+```mermaid
+flowchart LR
+    A[了解自己<br/>测评与个人经历] --> B[探索方向<br/>岗位与简历分析]
+    B --> C[比较并确认目标<br/>职业规划报告]
+    C --> D[付诸行动<br/>学习与求职计划]
+    D --> E[回顾与调整<br/>报告记录与生涯对话]
+    E --> B
+```
 
-| 岗位探索：浏览招聘样本与岗位要求 | 测评中心：选择测评并查看历史记录 |
+测评用于提供探索线索，职业建议还需要结合简历与岗位证据。报告中的招聘样本用于说明检索到的岗位要求，不代表全市场招聘规模或薪资趋势。
+
+<details>
+<summary>🖼️ 查看岗位探索与测评中心截图</summary>
+
+| 岗位探索 | 测评中心 |
 | :---: | :---: |
-| [![岗位探索页面](asserts/jobs.png)](asserts/jobs.png) | [![测评中心页面](asserts/assessments.png)](asserts/assessments.png) |
+| [![岗位探索](asserts/jobs.png)](asserts/jobs.png) | [![测评中心](asserts/assessments.png)](asserts/assessments.png) |
 
-点击图片可查看原图。
+</details>
 
-## 报告是怎样生成的
+<details>
+<summary>🕸️ 查看 LightRAG 岗位知识图谱</summary>
 
-报告生成使用 LangGraph 组织工作流，主要包括简历分析、岗位分析、招聘检索、职业决策和行动规划几个阶段。
+项目将岗位材料中的角色、技能、任务和能力要求组织成可检索图谱，结合原始 JD 证据进行职业画像、技能反查和岗位比较。下图为本项目已保存的 LightRAG 界面截图。
 
-系统先整理已有材料，分析候选方向；遇到需要补充的信息或需要用户做选择的地方，会暂停等待确认。用户确认目标和时间约束后，再继续生成行动计划。工作流状态保存在 SQLite 中，支持在确认后恢复执行。
+[![LightRAG 岗位知识图谱](asserts/lightrag-career-graph.png)](asserts/lightrag-career-graph.png)
 
-正文包括个人画像、目标定位、就业市场、岗位适配、能力差距、成长路径、行动计划、动态评估和参考依据九个部分，另附执行摘要。低年级侧重方向探索和基础实践，高年级及研究生侧重项目、实习与求职准备。招聘样本只用于说明检索到的要求，不据此推算全市场招聘规模或薪资趋势；没有证据的结论会保留为未知。学习打卡记录节奏，任务需按实际成果单独确认完成。
+图谱演示使用独立的 JD 样本集；当前职业事实库包含 **200 条已抽取 JD**，与下方完整岗位数据集的统计范围不同。
 
-报告也保存生成时使用的资料快照和版本，便于核对某个结论来自哪次输入。这里的 `experiments/news_advisor/` 已有部分代码被主站直接复用，并非完全独立的演示目录。
+</details>
 
-[![职业规划报告的多智能体协作流](asserts/agent-workflow.png)](asserts/agent-workflow.png)
+<details>
+<summary>🗃️ 查看最终数据集：页面、规模与记录示例</summary>
 
-## 技术栈
+[![数据集分类与岗位浏览](asserts/datasets.png)](asserts/datasets.png)
 
-| 部分 | 使用的技术 |
-| --- | --- |
-| Web 后端 | Python、Flask、FastAPI、Uvicorn；Flask 负责主站页面和业务接口，FastAPI 提供聊天接口。 |
-| 前端 | 原生 JavaScript、Jinja2 模板、Vite、Tailwind CSS、PostCSS；采用多个页面入口组织登录、工作台、个人中心和测评页面。 |
-| AI 与工作流 | OpenAI Python SDK、兼容 OpenAI 的模型接口、LangChain、LangGraph、Pydantic。 |
-| 主站存储 | SQLite，用于账户、用户状态、报告、对话和工作流检查点。 |
-| 对话记忆 | Redis 缓存、Chroma 向量索引及独立的 embedding 模型配置。 |
-| 岗位图谱 | LightRAG、PostgreSQL、pgvector，以及岗位事实库和证据校验逻辑，位于独立的研究模块中。 |
-| 图表与交互 | ECharts、Chart.js、Fuse.js、GSAP。 |
-| 文档处理 | PyMuPDF、pypdf、pdfplumber、python-docx、docx2pdf、Pillow、pytesseract。 |
-| 资讯处理 | feedparser、trafilatura、readability-lxml、lxml。 |
-| 工程与部署 | npm workspaces、GitHub Actions、Docker Compose、Nginx 配置及静态站点导出脚本。 |
+数据经清洗、去重与统一字段处理后，形成 **81,296 条岗位记录 + 3,600 条分类知识**。以下数量对应当前仓库数据快照：
 
-## 本地运行
+| 数据分类 | 最终记录数 |
+| --- | ---: |
+| 城市招聘样本 | 4,037 |
+| 补充城市岗位 | 2,685 |
+| 公开招聘快照 | 74,574 |
+| 职业分类知识 | 1,827 |
+| 行业分类知识 | 1,773 |
 
-建议使用 **Python 3.12** 和 **Node.js 22**，与仓库的 CI 检查环境保持一致。以下命令都在项目根目录执行。
+岗位以 `jobs.jsonl.gz` 保存，分类知识以 `knowledge.jsonl` 保存，`summary.json` 记录合并统计。文件位于 `data/cleaned/merged/`，由主站数据集浏览器按需读取。招聘快照不代表岗位仍在招聘，缺失字段不补写为已知事实。
+
+下面截取一条实际岗位记录的部分字段；`sources` 保留来源文件与记录位置：
+
+```json
+{
+  "id": "job_ecf03b34992e5a868decf640",
+  "title": "python开发实习生",
+  "company": "若轻信息",
+  "locations": ["上海"],
+  "salary": "3-8K",
+  "education": "本科",
+  "experience": "在校/应届",
+  "skills": ["Nginx", "Docker", "MySQL", "Linux开发/部署经验", "Python"],
+  "sources": [
+    {
+      "dataset": "city_jobs",
+      "file": "data/jobs/上海.json",
+      "row": 1,
+      "record_id": "2"
+    }
+  ]
+}
+```
+
+</details>
+
+<a id="quickstart"></a>
+
+## 🚀 快速启动
+
+推荐 **Python 3.12 + Node.js 22**，与仓库 CI 环境一致。以下命令均在项目根目录执行。
 
 ### 1. 安装依赖
 
-建议先建立虚拟环境。以 Windows PowerShell 为例：
+**Windows PowerShell**
 
 ```powershell
 python -m venv .venv
@@ -69,130 +128,220 @@ python -m pip install -r backend/requirements.txt
 npm ci
 ```
 
-macOS / Linux 使用 `python3 -m venv .venv` 创建环境，再执行 `source .venv/bin/activate`，其余安装命令相同。
+<details>
+<summary>macOS / Linux 命令</summary>
 
-`backend/requirements.txt` 会引用报告工作流所需的实验模块依赖，安装时请保留完整的项目目录。
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r backend/requirements.txt
+npm ci
+```
 
-### 2. 构建前端并启动
+</details>
+
+`backend/requirements.txt` 会引用 `experiments/requirements-resume.txt`，请保留完整仓库目录。
+
+### 2. 构建并启动
 
 ```bash
 npm run build
 npm start
 ```
 
-启动后访问 <http://localhost:8080>。
+打开 **<http://localhost:8080>**。终端保持运行，按 `Ctrl+C` 停止服务。
 
-`npm start` 默认运行后端并使用 `frontend/static/dist/` 中的构建资源。前端代码修改后，需要重新构建，或使用下面的热更新方式。
+`npm start` 默认启动后端并使用 `frontend/static/dist/` 中的构建资源。基础页面与普通测评可先体验；AI 对话、简历分析和报告生成需要配置可用模型。
 
-### 3. 前端热更新开发
+### 3. 配置 AI 模型
 
-在 PowerShell 中执行：
+```bash
+python backend/scripts/create_admin.py
+```
+
+按提示设置管理员邮箱和密码，登录后在工作台模型设置中填写 **接口地址、API Key、模型名称**，再选择模型。普通账户使用管理员提供的配置。
+
+该脚本也会更新同邮箱的已有账户密码和管理员角色，并撤销其旧登录会话。
+
+### 4. 修改前端时启用开发模式
+
+**PowerShell**
 
 ```powershell
 $env:USE_VITE_DEV_SERVER = "true"
 npm start
 ```
 
-此时会同时启动后端和 Vite，仍从 `http://localhost:8080` 进入主站。Vite 默认使用 `5173` 端口。
-
-如果只需要运行后端，也可以执行：
+**macOS / Linux**
 
 ```bash
-python backend/server.py
+USE_VITE_DEV_SERVER=true npm start
 ```
 
-`npm run dev` 只启动 Vite，不会启动后端。
+开发模式同时启动后端和 Vite，仍从 **8080** 进入系统；Vite 默认使用 **5173**。Vite 管理的资源支持热更新，模板及直接加载的静态脚本修改后按需刷新页面。
 
-## 模型和服务配置
+| 启动方式 | 用途 |
+| --- | --- |
+| `npm start` | 启动完整 Web 服务，默认使用已构建前端。 |
+| `python backend/server.py` | 直接启动后端入口，提供 FastAPI 聊天接口和 Flask 主站。 |
+| `npm run dev` | 仅启动 Vite，业务功能仍需要后端。 |
 
-### 对话模型与管理员
+<a id="architecture"></a>
 
-页面浏览、普通测评等功能可以先使用；AI 对话、简历分析和报告生成需要配置可用的模型接口。
+## 🏗️ 系统架构与技术组成
 
-首次配置模型前，可以创建管理员账户：
-
-```bash
-python backend/scripts/create_admin.py
+```mermaid
+flowchart TB
+    UI[浏览器工作台<br/>Jinja2 · JavaScript · Vite]
+    WEB[统一 Web 服务 · 默认 8080<br/>Uvicorn]
+    FLASK[Flask<br/>页面 · 账户 · 岗位 · 简历 · 报告]
+    CHAT[FastAPI<br/>聊天接口与上下文管理]
+    GRAPH[LangGraph 报告工作流]
+    LLM[OpenAI 兼容模型接口]
+    DB[(SQLite<br/>账户 · 报告 · 对话 · 检查点)]
+    MEMORY[聊天记忆管理器]
+    CACHE[(Redis<br/>近期消息缓存)]
+    VECTOR[(Chroma<br/>记忆语义索引)]
+    RAG[岗位图谱研究模块<br/>LightRAG · PostgreSQL / pgvector]
+    UI --> WEB
+    WEB --> FLASK
+    WEB --> CHAT
+    FLASK --> GRAPH
+    GRAPH --> LLM
+    GRAPH --> RAG
+    GRAPH --> DB
+    FLASK --> DB
+    CHAT --> LLM
+    CHAT --> MEMORY
+    MEMORY --> DB
+    MEMORY -. 按需启用 .-> CACHE
+    MEMORY -. 需要 embedding 配置 .-> VECTOR
 ```
 
-脚本会交互式询问邮箱和密码。登录后，在工作台的模型设置中配置接口地址、API Key 和模型名称，再选择要使用的模型。普通账户使用管理员提供的配置。
+| 层次 | 使用内容 | 主要位置 |
+| --- | --- | --- |
+| 前端 | 原生 JavaScript、Jinja2、Vite、Tailwind CSS、PostCSS | `frontend/templates/`、`frontend/static/`、`frontend/src/` |
+| 后端 | Flask、FastAPI、Uvicorn、Pydantic | `backend/server.py`、`backend/services/` |
+| AI 与工作流 | OpenAI SDK、LangChain、LangGraph、SQLite 检查点 | `backend/services/report/`、`experiments/news_advisor/` |
+| 聊天记忆 | SQLite 持久化、Redis 缓存、Chroma 语义索引 | `backend/services/chat/` |
+| 岗位数据与图谱 | 城市岗位数据、职业知识、LightRAG、PostgreSQL / pgvector | `data/`、`artifacts/research/` |
+| 文档处理 | PyMuPDF、pypdf、pdfplumber、python-docx、docx2pdf、Tesseract OCR | `backend/services/resume/`、`backend/services/report/exporters.py` |
+| 图表与交互 | ECharts、Chart.js、Fuse.js、GSAP | `frontend/static/` |
+| 资讯处理 | feedparser、trafilatura、readability-lxml、lxml | `backend/services/news/` |
+| 构建与部署 | npm workspaces、GitHub Actions、Docker Compose、Nginx | `package.json`、`.github/workflows/`、`deploy/` |
 
-聊天助手也支持环境变量作为备用配置，格式见 [backend/chat.env.example](backend/chat.env.example)。工作台已选择的模型优先于备用配置。
+### 🗺️ 报告如何生成
 
-### 常用环境变量
+```mermaid
+flowchart LR
+    A[简历分析] --> B[岗位分析]
+    B --> C[招聘检索<br/>未请求时跳过]
+    C --> D[职业决策]
+    D --> E[暂停等待用户<br/>补充信息 · 确认方向与时间]
+    E --> F[根据补充信息修订]
+    F --> G[行动规划]
+    G --> H[报告展示与导出]
+```
+
+工作流通过 SQLite 检查点保存状态，在用户确认后恢复执行。报告包含个人画像、目标定位、就业市场、岗位适配、能力差距、成长路径、行动计划、动态评估、参考依据，并附执行摘要。生成时保留资料快照和报告版本，便于核对结论来源。
+
+### 🧠 聊天记忆目前支持什么
+
+| 已有能力 | 当前边界 |
+| --- | --- |
+| 聊天历史、近期上下文、增量会话摘要 | 摘要主要维持当前会话连续性。 |
+| 跨会话的用户事实、职业偏好、交流偏好 | 以用户明确陈述和原话证据为基础，不把助手建议直接记成用户事实。 |
+| 新增、去重、补充、替换、冲突处理和变更记录 | 暂无完整的记忆自动过期与定期归档机制。 |
+| 用户查看、纠正、遗忘和删除；缓存与索引清理重试 | 外部服务不可用时，可能显示清理待完成状态。 |
+| 已保存记忆的语义召回及无向量服务时的回退 | 尚未形成独立的跨会话情景记忆、决策记录与结构化任务进度系统。 |
+
+主站聊天记忆位于 `backend/services/chat/`。`experiments/news_advisor/memory/` 是另一套实验模块，调整主站聊天时应先从主站实现入手。
+
+<a id="configuration"></a>
+
+## ⚙️ 模型与可选服务配置
+
+### 模型配置入口
+
+| 配置 | 何时需要 | 配置方式 |
+| --- | --- | --- |
+| 主站对话模型 | AI 分析、对话与报告 | 管理员工作台模型设置。 |
+| 聊天备用模型 | 没有主站模型配置时供聊天使用 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
+| 聊天 embedding 模型 | 启用记忆语义检索 | `AI_EMBEDDING_BASE_URL`、`AI_EMBEDDING_API_KEY`、`AI_EMBEDDING_MODEL`。 |
+| 文生图模型 | 职业画像海报 | `TEXT_TO_IMAGE_API_KEY`、`TEXT_TO_IMAGE_BASE_URL`、`TEXT_TO_IMAGE_MODEL`；可用 `PROFILE_PORTRAIT_MODEL` 单独指定画像模型。 |
+| 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](backend/news.env.example)。 |
+
+聊天配置格式见 [backend/chat.env.example](backend/chat.env.example)。主站选定的模型优先于聊天备用配置。聊天与 embedding 配置也读取 `experiments/.env`，进程环境变量优先；示例文件不会自动加载。
+
+<details>
+<summary>🔧 常用运行环境变量</summary>
 
 | 变量 | 用途 |
 | --- | --- |
-| `HOST` / `PORT` | 后端监听地址和端口，默认 `0.0.0.0:8080`。 |
-| `APP_SECRET_KEY` / `SECRET_KEY` | 会话签名密钥。未设置时使用数据库中保存的密钥；部署时可显式指定。 |
-| `USE_VITE_DEV_SERVER` | 设为 `true` 时，由启动脚本同时运行 Vite。 |
-| `VITE_DEV_SERVER_URL` | 自定义 Vite 地址，设置后也会启用前端开发模式。 |
+| `HOST` / `PORT` | 后端地址和端口，默认 `0.0.0.0:8080`。 |
+| `APP_SECRET_KEY` / `SECRET_KEY` | 会话签名密钥；未设置时使用数据库中保存的密钥。 |
+| `USE_VITE_DEV_SERVER` | 设为 `true`，启动脚本同时运行 Vite。 |
+| `VITE_DEV_SERVER_URL` | 自定义 Vite 地址，同时启用前端开发模式。 |
 | `FRONTEND_ORIGIN` | 前后端分离部署时允许的前端来源。 |
-| `SESSION_COOKIE_SECURE` | 在 HTTPS 部署中启用 Secure Cookie。 |
-| `AI_CHAT_BASE_URL` / `AI_CHAT_API_KEY` / `AI_CHAT_MODEL` | 聊天助手的备用模型配置。 |
-| `AI_EMBEDDING_BASE_URL` / `AI_EMBEDDING_API_KEY` / `AI_EMBEDDING_MODEL` | 对话记忆的向量检索模型。 |
-| `CHAT_REDIS_URL` | 聊天缓存地址，默认 `redis://127.0.0.1:6380/0`。 |
-| `TEXT_TO_IMAGE_API_KEY` / `TEXT_TO_IMAGE_BASE_URL` / `TEXT_TO_IMAGE_MODEL` | 文生图接口配置。`PROFILE_PORTRAIT_MODEL` 可单独指定职业画像模型。 |
-| `NEWS_EMBEDDING_API_KEY` | 新闻语义检索使用的 embedding 接口密钥，见 [backend/news.env.example](backend/news.env.example)。 |
-| `TESSERACT_CMD` | Tesseract 可执行文件路径，启用 OCR 时使用。 |
+| `SESSION_COOKIE_SECURE` | HTTPS 部署时启用 Secure Cookie。 |
+| `CHAT_REDIS_URL` | 聊天缓存，默认 `redis://127.0.0.1:6380/0`。 |
+| `TESSERACT_CMD` | Tesseract 程序路径，OCR 使用。 |
 
-上表变量可设置在启动进程的环境中。`.env.example` 文件仅提供格式参考，不会自动加载。聊天模型和 embedding 配置还会读取 `experiments/.env`，进程环境变量优先。
+</details>
 
-### 按需启用的服务
+### 按需启用服务
 
-- **Redis**：用于近期对话缓存。可以通过 `experiments/compose.memory.yml` 单独启动；缓存不可用时，聊天记录仍由 SQLite 保存。
-- **对话语义记忆**：配置 embedding 模型后使用 Chroma 建立本地索引。未配置时，助手仍可使用已保存的记忆和工作台资料。
-- **岗位图谱与检索**：需要本地 LightRAG 代码、PostgreSQL / pgvector 及 `artifacts/research/.env` 配置。LightRAG 目录、数据库和本地 JD 文本不随主仓库提交，克隆后需要另行准备。
-- **OCR**：除 Python 依赖外，还需要安装 Tesseract 程序。
-- **PDF 导出**：当前通过 `docx2pdf` 将 Word 文档转成 PDF；Windows 环境需要安装 Microsoft Word。DOCX 导出由 `python-docx` 生成。
+| 服务 | 启用条件 | 说明 |
+| --- | --- | --- |
+| Redis | 安装 Docker，启动下方 Compose 服务 | 用于近期消息缓存；不可用时，聊天记录仍由 SQLite 保存。 |
+| Chroma 记忆索引 | 配置 embedding 接口 | 在后端进程中使用本地持久化索引，无需另启 Chroma 服务；未就绪时回退到已保存记忆和资料。 |
+| 岗位图谱 | 本地 LightRAG、PostgreSQL / pgvector、研究配置和岗位材料 | 入口见 `artifacts/research/job_graph.py`；LightRAG 检出目录为 `artifacts/research/LightRAG/`，不随主仓库提供。 |
+| OCR | 安装 Tesseract 程序及所需语言数据 | 仅安装 Python 的 `pytesseract` 包不够。 |
+| PDF 导出 | `docx2pdf` 转换环境 | 当前通过 DOCX 转 PDF；Windows 需要 Microsoft Word，DOCX 本身由 `python-docx` 生成。 |
 
-根目录 `compose.yml` 组合了图谱数据库与 Redis 配置，启动前需要准备它引用的环境文件和已有数据卷。它不负责构建或启动主站应用。
+**单独启动 Redis**：当前 Compose 使用外部数据卷，首次运行需先创建。
 
-## 项目目录
+```bash
+docker volume create career-agent-memory_memory-redis
+docker compose -f experiments/compose.memory.yml up -d redis
+```
+
+根目录 `compose.yml` 组合了图谱数据库和 Redis，依赖它引用的环境文件及数据卷，**不会构建或启动主站应用**。先跑通主站，再按需配置图谱服务。
+
+<a id="development"></a>
+
+## 📁 项目目录
 
 ```text
 career-agent/
 ├── backend/
-│   ├── server.py                 # Web 服务入口
-│   ├── requirements.txt          # 主站依赖
-│   ├── services/                 # 账户、聊天、简历、报告、资讯等服务
-│   └── scripts/                  # 管理员创建、数据处理与功能检查
+│   ├── server.py                 # 主站入口、页面路由与业务接口
+│   ├── services/
+│   │   ├── chat/                 # 聊天、资料上下文、记忆与隐私
+│   │   ├── resume/               # 简历解析、事实与匹配
+│   │   ├── report/               # 报告接入、规划、审阅、导出
+│   │   └── news/                 # 资讯采集与知识检索
+│   └── scripts/                  # 启动、管理员、数据构建与检查
 ├── frontend/
-│   ├── src/                      # Vite 页面入口和样式
-│   ├── templates/                # Jinja2 页面模板
-│   ├── static/                   # 脚本、图片、图标及构建资源
-│   └── scripts/                  # 资源同步、前端检查与静态导出
+│   ├── templates/                # 页面与可复用 Jinja2 片段
+│   ├── static/                   # 业务脚本、样式、媒体与构建资源
+│   ├── src/entries/              # Vite 多页面入口
+│   └── src/styles/               # 页面样式入口及静态样式导入
 ├── experiments/
-│   ├── news_advisor/             # 主站复用的 Agent 与报告工作流
+│   ├── news_advisor/             # 主站复用的 Agent、Prompt 和报告图
 │   └── rag_benchmark/            # 检索评估实验
-├── artifacts/research/           # 岗位图谱导入、查询与维护工具
+├── artifacts/research/           # 岗位图谱导入、查询与维护
 ├── data/
 │   ├── jobs/                     # 城市岗位数据
 │   ├── raw/                      # 原始数据及来源说明
-│   ├── cleaned/                  # 清洗后的岗位与知识数据
-│   ├── knowledge/                # 职业、行业分类资料
+│   ├── cleaned/                  # 清洗后的数据
+│   ├── knowledge/                # 职业与行业分类资料
 │   ├── onet/                     # O*NET 职业资料
-│   ├── public/                   # 测评题库等前端可用数据
-│   └── app_data/                 # 本地数据库、上传文件、报告和对话记录
-├── deploy/                       # Nginx 配置与静态导出目录
-├── .github/workflows/            # 自动检查
-├── compose.yml                   # 图谱数据库与 Redis 的组合配置
-├── package.json                  # 项目脚本和 npm workspace 配置
-└── README.md
+│   ├── public/                   # 测评题库等公开资源
+│   └── app_data/                 # 数据库、上传文件、报告及对话
+├── asserts/                      # README 页面截图
+├── deploy/                       # Nginx 示例与静态导出目录
+└── .github/workflows/            # CI 检查
 ```
 
-`data/app_data/`、环境配置、依赖目录和构建产物均由 `.gitignore` 排除。迁移运行环境时，需要单独备份数据库、用户上传文件和报告。
-
-## 常用命令
-
-| 命令 | 作用 |
-| --- | --- |
-| `npm run start:check` | 检查 Python 是否可用及后端语法。 |
-| `npm run build` | 同步前端依赖资源并构建页面入口。 |
-| `npm run check:report` | 检查报告工作流。 |
-| `npm run check:report-development` | 检查成长路线、任务约束和学习计划转换。 |
-| `npm run check:report-upload` | 检查报告上传相关逻辑。 |
-| `npm run check:chat` | 检查聊天上下文、隐私、图片及前端消息渲染。 |
-| `npm run export:static` | 将页面和静态资源导出到 `deploy/static-site/`。 |
-
-静态导出后，登录、AI 对话和报告等功能仍需连接后端 API。仓库提供了 [Nginx 配置示例](deploy/nginx.static-api.conf)，可按实际域名和服务端口调整。
+`experiments/news_advisor/` 已有代码被主站直接导入，不能作为纯演示目录随意移除。`data/app_data/`、环境配置、依赖目录和构建产物由 `.gitignore` 排除；迁移环境时需单独备份运行数据及配置。
