@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 from services.chat import create_blueprint
 from services.chat.api import create_app
-from services.chat.extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, validate_analysis
+from services.chat.extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, SUMMARY_TEXT_PROMPT, validate_analysis
 from services.chat.cache import RecentCache
 from services.chat.memory import MemoryManager, analysis_error_detail
 from services.chat.reconciliation import RELATION_PROMPT, REPLACEMENT_CUE
@@ -421,6 +421,81 @@ class MemoryChecks(unittest.TestCase):
         request_id = str(uuid4())
         turn = self.store.begin_turn("alice", self.sid, request_id, "记住这个问题", {})
         self.store.finish_turn("alice", self.sid, request_id, turn["token"], "收到")
+
+    @staticmethod
+    def model_response(content, finish_reason="stop", refusal=None):
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=finish_reason,
+            message=SimpleNamespace(content=content, refusal=refusal))])
+
+    def test_invalid_summary_json_regenerates_text_from_original_messages(self):
+        self.turn()
+        self.store.enqueue("alice", self.sid, immediate=True)
+        job = self.store.claim_job(kind="summary")
+        summary = '用户说：“保留引号和路径 C:\\work”。\n助手建议稍后核实。'
+        with patch.object(self.client, "create", side_effect=[
+                self.model_response('{"summary":"未转义的"引号"}'), self.model_response(summary)]) as create:
+            self.assertTrue(self.memory.analyze(job))
+        self.assertEqual(self.store.session("alice", self.sid)["summary"], summary)
+        self.assertGreater(self.store.session("alice", self.sid)["analyzed_seq"], 0)
+        first, fallback = [call.kwargs for call in create.call_args_list]
+        self.assertEqual(first["messages"][1], fallback["messages"][1])
+        self.assertEqual(fallback["messages"][0]["content"], SUMMARY_TEXT_PROMPT)
+        self.assertNotIn("response_format", fallback)
+        self.assertEqual(self.client.close.call_count, 2)
+
+    def test_invalid_text_fallback_preserves_summary_cursor_and_history(self):
+        self.turn()
+        self.store.enqueue("alice", self.sid, immediate=True)
+        job = self.store.claim_job(kind="summary")
+        for response in (self.model_response(""), self.model_response(" " * 10),
+                         self.model_response("摘" * 2501), self.model_response('{"summary":"broken'),
+                         self.model_response("```text\n摘要\n```"),
+                         self.model_response("不完整摘要", "length"),
+                         self.model_response(None, "stop", "declined")):
+            with self.subTest(response=response), patch.object(self.client, "create", side_effect=[
+                    self.model_response('{"summary":"broken'), response]):
+                with self.assertRaises(ValueError):
+                    self.memory.analyze(job)
+                session = self.store.session("alice", self.sid)
+                self.assertEqual((session["summary"], session["analyzed_seq"]), ("", 0))
+                self.assertEqual(len(self.store.messages("alice", self.sid)["items"]), 2)
+
+    def test_long_summary_keeps_every_window_and_previous_summary_on_fallback(self):
+        from dataclasses import replace
+        self.memory.policy = replace(self.memory.policy, batch_tokens=1000)
+        text = "长期会话中的用户背景与未决事项。" * 100
+        request_id = str(uuid4())
+        turn = self.store.begin_turn("alice", self.sid, request_id, text, {})
+        self.store.finish_turn("alice", self.sid, request_id, turn["token"], "收到")
+        self.store.enqueue("alice", self.sid, immediate=True)
+        job = self.store.claim_job(kind="summary")
+        windows = []
+
+        def generate(**kwargs):
+            if kwargs["messages"][0]["content"] == SUMMARY_PROMPT:
+                return self.model_response('{"summary":"bad"quote"}')
+            payload = json.loads(kwargs["messages"][1]["content"])
+            self.assertEqual(payload["previous_summary"], "" if not windows else f"累计摘要{len(windows)}")
+            windows.append(payload["messages"])
+            return self.model_response(f"累计摘要{len(windows)}")
+
+        with patch.object(self.client, "create", side_effect=generate):
+            self.assertTrue(self.memory.analyze(job))
+        self.assertGreater(len(windows), 1)
+        self.assertEqual("".join(row["content"] for window in windows for row in window if row["role"] == "user"), text)
+        session = self.store.session("alice", self.sid)
+        self.assertEqual(session["summary"], f"累计摘要{len(windows)}")
+        self.assertEqual(session["analyzed_seq"], 2)
+
+    def test_invalid_memory_json_does_not_use_summary_fallback(self):
+        self.turn()
+        self.store.enqueue("alice", self.sid, immediate=True)
+        job = self.store.claim_job(kind="memory")
+        with patch.object(self.client, "create", return_value=self.model_response('{"memories":[')) as create:
+            with self.assertRaises(json.JSONDecodeError):
+                self.memory.analyze(job)
+        create.assert_called_once()
+        self.assertEqual(self.store.session("alice", self.sid)["memory_seq"], 0)
 
     def test_corrupt_or_stale_cache_falls_back_to_durable_messages(self):
         self.turn()

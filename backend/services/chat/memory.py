@@ -7,7 +7,7 @@ import threading
 from pydantic import ValidationError
 
 from .cache import RecentCache
-from .extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, validate_candidates
+from .extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, SUMMARY_TEXT_PROMPT, validate_candidates
 from .policy import estimate_tokens, message_windows
 from .reconciliation import RELATION_PROMPT, automatic_decision, validate_decision
 from .schemas import DecisionOutput, ExtractionOutput, SummaryOutput, response_format
@@ -208,9 +208,9 @@ class MemoryManager:
         if job["kind"] == "summary":
             summary = job["summary"]
             for window in message_windows(messages, self.policy.batch_tokens):
-                result = self._request_json(SUMMARY_PROMPT, {"previous_summary": summary, "messages": window}, job)
+                result = self._request_summary({"previous_summary": summary, "messages": window}, job)
                 summary = result.get("summary")
-                if not isinstance(summary, str) or len(summary) > 2500:
+                if not isinstance(summary, str) or not summary.strip() or len(summary) > 2500:
                     raise ValueError("Invalid conversation summary")
             return self.store.apply_summary(job, messages, summary)
         collected = {}
@@ -230,6 +230,34 @@ class MemoryManager:
         candidates = validate_candidates({"memories": list(collected.values())}, messages)
         return self.commit_candidates(job, messages, candidates)
 
+    def _request_summary(self, payload, job):
+        try:
+            return self._request_json(SUMMARY_PROMPT, payload, job)
+        except json.JSONDecodeError:
+            # Some compatible providers ignore JSON mode or fail to escape prose.
+            # Generate afresh from the original input; never repair partial JSON
+            # into a potentially incomplete summary or apply this to user facts.
+            logger.info("助手会话摘要JSON格式无效，立即尝试纯文本摘要")
+        content = json.dumps(payload, ensure_ascii=False)
+        if estimate_tokens(SUMMARY_TEXT_PROMPT) + estimate_tokens(content) > self.policy.input_tokens:
+            raise ValueError("Extraction request exceeds the configured input token budget")
+        self.store.renew_job(job)
+        runtime = self.runtime(json.loads(job["selection"]))
+        client = self.client_factory(runtime)
+        try:
+            response = client.chat.completions.create(model=runtime[2],
+                messages=[{"role": "system", "content": SUMMARY_TEXT_PROMPT},
+                          {"role": "user", "content": content}], max_tokens=6000)
+            choice = response.choices[0]
+            if getattr(choice, "finish_reason", None) in {"length", "content_filter"} or getattr(choice.message, "refusal", None):
+                raise ValueError("Incomplete or refused memory output")
+            summary = choice.message.content
+            if not isinstance(summary, str) or not summary.strip() or summary.lstrip().startswith(("{", "[", "```")):
+                raise ValueError("Invalid conversation summary")
+            return SummaryOutput.model_validate({"summary": summary.strip()}).model_dump()
+        finally:
+            client.close()
+
     def _request_json(self, prompt, payload, job):
         content = json.dumps(payload, ensure_ascii=False)
         output_model = {EXTRACTION_PROMPT: ExtractionOutput, SUMMARY_PROMPT: SummaryOutput,
@@ -243,7 +271,8 @@ class MemoryManager:
         client = self.client_factory(runtime)
         try:
             response = client.chat.completions.create(model=runtime[2], response_format=output_format,
-                messages=[{"role": "system", "content": prompt}, {"role": "user", "content": content}], max_tokens=4500)
+                messages=[{"role": "system", "content": prompt}, {"role": "user", "content": content}],
+                max_tokens=6000 if prompt == SUMMARY_PROMPT else 4500)
             choice = response.choices[0]
             if getattr(choice, "finish_reason", None) in {"length", "content_filter"} or getattr(choice.message, "refusal", None):
                 raise ValueError("Incomplete or refused memory output")
