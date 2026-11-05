@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <script src="https://cdn.tailwindcss.com" defer></script>
+    {{ vite_asset_tags('src/entries/workspace.js') }}
     <style>
       :root {
         --app-font-stack: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -61,15 +61,15 @@
         outline-offset: 3px;
       }
     </style>
-        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20261026-map-zoom">
-        <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}?v=20260418-career-news-grid-margin-v16">
-        <link rel="stylesheet" href="{{ url_for('static', filename='career-process.css') }}?v=20261029-product-preview-v2">
-        <link rel="stylesheet" href="{{ url_for('static', filename='report-resume.css') }}?v=20261029-review-cards">
-        <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}?v=20261016-cards-autoplay">
-        <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}?v=20260412-resume-6html-v1">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='career-process.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='report-resume.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='auth-security.css') }}">
 </head>
-<body class="bg-gray-50 scroll-smooth auth-checking">
+<body class="bg-gray-50 scroll-smooth auth-checking" data-legacy-features="eager">
     {% include "partials/page_loader.html" %}
     <div class="ambient-orb a"></div>
     <div class="ambient-orb b"></div>
@@ -685,23 +685,23 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260414-auth-checking-nav-v1" defer></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}" defer></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='report-review.js') }}?v=20261103-career-development-v3.1" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20261029-report-review-cards" defer></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261103-career-development-v3.1" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261026-assessment-center">
-    <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}?v=20261026-forum-blue">
-    <script src="{{ url_for('static', filename='assessment-center.js') }}?v=20261026-assessment-center" defer></script>
-    <script src="{{ url_for('static', filename='assessment-hub.js') }}?v=20261026-assessment-center" defer></script>
-    <script src="{{ url_for('static', filename='assessment-pet.js') }}?v=20260414-pet-size-v1" defer></script>
-    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20261026-assessment-center" defer></script>
-    <script src="{{ url_for('static', filename='jobs-analytics.js') }}?v=20260419-analytics-salary-wan-v1" defer></script>
-    <script src="{{ url_for('static', filename='tour.js') }}?v=20261026-assessment-center" defer></script>
+    <script src="{{ url_for('static', filename='report-review.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}">
+    <script src="{{ url_for('static', filename='assessment-center.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='assessment-hub.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='assessment-pet.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='jobs-analytics.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='tour.js') }}" defer></script>
 </body>
 </html>

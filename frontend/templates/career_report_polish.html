@@ -10,12 +10,12 @@
       window.__CAREER_REPORT_POLISH_PAGE__ = true;
       window.__CAREER_REPORT_POLISH_RETURN__ = "{{ url_for('user_center_page') }}#report-workspace";
     </script>
-    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260412-return-nav-skip-test-v1" defer></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}?v=20260418-editor-save-baseline-v1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}?v=20260421-no-ai-intent-card-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}">
 </head>
 <body>
     {% include "partials/page_loader.html" %}
@@ -24,8 +24,8 @@
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20261016-clean-interface" defer></script>
-    <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20261016-clean-interface" defer></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261016-clean-interface" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='app-hotfix.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}" defer></script>
 </body>
 </html>

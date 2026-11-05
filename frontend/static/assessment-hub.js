@@ -1,5 +1,5 @@
 (function () {
-  const DATA_URL = "/static/assessment-data.json?v=20260321-route-align-v2";
+  const DATA_URL = "/static/assessment-data.json";
   /** 浏览器本地备份（登录用户按用户名分桶，未登录为 guest），避免仅内存态在同步/刷新后丢失 */
   const LOCAL_PROGRESS_PREFIX = "ms_assessment_hub_progress_v2_";
   const MBTI_SCALE = [

@@ -198,6 +198,7 @@ app = Flask(
     template_folder=str(TEMPLATE_DIR),
     static_folder=str(STATIC_DIR),
 )
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 
 @app.endpoint("static")
@@ -367,15 +368,22 @@ _GZIP_MIN_SIZE = 1400  # bytes
 def _static_headers_and_gzip(response):
     path = request.path
 
-    # ── 静态文件长效缓存 ──────────────────────────────
+    if response.mimetype == "text/html":
+        response.headers.setdefault("Cache-Control", "no-cache")
+
+    # 带内容指纹的构建产物长期缓存，原始脚本和样式使用条件请求更新。
     if os.path.normpath(path).replace("\\", "/").lower().startswith("/static/img/report/"):
         response.headers["Cache-Control"] = "no-store"
         response.vary.add("Cookie")
     elif path.startswith("/static/"):
         ext = os.path.splitext(path)[1].lower()
         if ext in _STATIC_EXTS_LONG:
-            # 版本号通过 ?v=xxx 实现，可以安全地设置 1 年
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            if path.startswith("/static/dist/assets/"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            elif ext in {".js", ".css", ".json"}:
+                response.headers["Cache-Control"] = "no-cache"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
     # ── gzip 压缩 ──────────────────────────────────────
     accept_enc = request.headers.get("Accept-Encoding", "")

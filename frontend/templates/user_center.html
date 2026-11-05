@@ -8,13 +8,13 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260412-return-nav-skip-test-v1"></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}"></script>
     {{ vite_asset_tags('src/entries/user-center.js') }}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}?v=20260418-editor-save-baseline-v1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}?v=20260421-no-ai-intent-card-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}">
     <style>
       .career-report-shell {
         display: grid;
@@ -1074,7 +1074,7 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="{{ url_for('static', filename='user-center-report.css') }}?v=20261029-report-layout-v2">
+    <link rel="stylesheet" href="{{ url_for('static', filename='user-center-report.css') }}">
 </head>
 <body class="user-center-page" data-page="user-center">
     {% include "partials/page_loader.html" %}
@@ -1720,11 +1720,11 @@
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20261026-forum-colors"></script>
-    <script src="{{ url_for('static', filename='app-hotfix.js') }}?v=20261026-langgraph-agents"></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}?v=20261103-career-development-v3.1"></script>
-    <script src="{{ url_for('static', filename='user-center.js') }}?v=20261029-cleanup-v1"></script>
-    <script src="{{ url_for('static', filename='user-center-learning-path.js') }}?v=20261103-career-development-v3.1"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script src="{{ url_for('static', filename='app-hotfix.js') }}"></script>
+    <script src="{{ url_for('static', filename='workspace-restoration.js') }}"></script>
+    <script src="{{ url_for('static', filename='user-center.js') }}"></script>
+    <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>
     <style>
       /* ── 报告中心主区域按钮样式 ── */
       #report-workspace .uc-section-head {

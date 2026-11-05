@@ -470,9 +470,9 @@ async function ensureJobsGeoAssets() {
   if (window.echarts && typeof window.initializeJobGeoInsights === "function") return;
   if (!jobsGeoAssetsPromise) {
     jobsGeoAssetsPromise = (async () => {
-      await loadScriptOnce("/static/vendor/echarts.min.js?v=20260319-lazy-geo", "echarts");
-      await loadScriptOnce("/static/vendor/china.js?v=20260318-geo", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js?v=20261026-map-zoom", "jobs-geo");
+      await loadScriptOnce("/static/vendor/echarts.min.js", "echarts");
+      await loadScriptOnce("/static/vendor/china.js", "china-map");
+      await loadScriptOnce("/static/jobs-geo.js", "jobs-geo");
     })().catch((error) => {
       jobsGeoAssetsPromise = null;
       throw error;
@@ -10603,7 +10603,7 @@ function showNodeDetail(nodeName) { showToast("Node details", `${nodeName} detai
 // --------------------------------------------------
 async function openDatasetBrowser(options = {}) {
   try {
-    await loadScriptOnce("/static/dataset-browser.js?v=20261016-category-polish-v1", "dataset-browser");
+    await loadScriptOnce("/static/dataset-browser.js", "dataset-browser");
     if (appState.currentSection !== "jobs") return;
     await window.DatasetBrowser?.open(options);
   } catch (error) {

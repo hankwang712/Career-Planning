@@ -3,11 +3,11 @@
   if (!root) return;
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = "/static/dataset-browser.css?v=20261016-category-polish-v1";
+  stylesheet.href = "/static/dataset-browser.css";
   document.head.appendChild(stylesheet);
   const detailStylesheet = document.createElement("link");
   detailStylesheet.rel = "stylesheet";
-  detailStylesheet.href = root.dataset.detailStyleUrl || "/static/job-detail.css?v=20261016-readable-v2";
+  detailStylesheet.href = root.dataset.detailStyleUrl || "/static/job-detail.css";
   document.head.appendChild(detailStylesheet);
 
   const categories = document.getElementById("datasetCategories");

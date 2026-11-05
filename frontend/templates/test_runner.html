@@ -8,9 +8,9 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
-    <script src="{{ url_for('static', filename='return-nav.js') }}?v=20260412-return-nav-skip-test-v1"></script>
+    <script src="{{ url_for('static', filename='return-nav.js') }}"></script>
     {{ vite_asset_tags('src/entries/test-runner.js') }}
-    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}?v=20261016-assessment-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}">
 </head>
 <body class="tr-page" data-page="test-runner">
     {% include "partials/page_loader.html" %}
@@ -115,8 +115,8 @@
             </main>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='assessment-center.js') }}?v=20261026-assessment-center"></script>
-    <script src="{{ url_for('static', filename='deep-test-hub.js') }}?v=20261026-assessment-center"></script>
-    <script src="{{ url_for('static', filename='test-runner.js') }}?v=20261016-assessment-v1"></script>
+    <script src="{{ url_for('static', filename='assessment-center.js') }}"></script>
+    <script src="{{ url_for('static', filename='deep-test-hub.js') }}"></script>
+    <script src="{{ url_for('static', filename='test-runner.js') }}"></script>
 </body>
 </html>

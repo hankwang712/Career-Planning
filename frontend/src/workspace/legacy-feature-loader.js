@@ -5,12 +5,12 @@ const SECTION_BUNDLES = {
 
 const LEGACY_BUNDLES = {
   jobs: [
-    { key: "jobs-analytics", src: "/static/jobs-analytics.js?v=20260321-analytics-v1" }
+    { key: "jobs-analytics", src: "/static/jobs-analytics.js" }
   ],
   profile: [
-    { key: "assessment-hub", src: "/static/assessment-hub.js?v=20260322-top-model-status-v1" },
-    { key: "assessment-pet", src: "/static/assessment-pet.js?v=20260330-pet-v1" },
-    { key: "deep-test-hub", src: "/static/deep-test-hub.js?v=20261016-clean-interface" }
+    { key: "assessment-hub", src: "/static/assessment-hub.js" },
+    { key: "assessment-pet", src: "/static/assessment-pet.js" },
+    { key: "deep-test-hub", src: "/static/deep-test-hub.js" }
   ]
 };
 

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SBTI 完整版测试 | 智航生涯</title>
     {% include "partials/head_fonts.html" %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260410-sbti-v1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sbti-lite.css') }}?v=20260410-sbti-v1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sbti-lite.css') }}">
 </head>
 <body class="sbti-page">
     {% include "partials/page_loader.html" %}
@@ -53,6 +53,6 @@
             </div>
         </section>
     </main>
-    <script src="{{ url_for('static', filename='sbti-lite.js') }}?v=20261016-clean-interface"></script>
+    <script src="{{ url_for('static', filename='sbti-lite.js') }}"></script>
 </body>
 </html>
