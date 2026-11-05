@@ -1,5 +1,5 @@
-const USER_CENTER_DEFAULT_SECTION = "report-workspace";
-const USER_CENTER_SECTIONS = ["report-workspace", "plan-workspace", "account-center", "account-admin"];
+const USER_CENTER_DEFAULT_SECTION = "career-profile";
+const USER_CENTER_SECTIONS = ["career-profile", "report-workspace", "plan-workspace", "account-center", "account-admin"];
 const USER_CENTER_ROLE_FILTERS = {
   all: "全部",
   employed: "在职",
@@ -175,6 +175,10 @@ function switchUserCenterSection(sectionId, options = {}) {
 
   if (nextSection === "account-center") {
     renderUserCenterIdentity();
+  }
+
+  if (nextSection === "career-profile") {
+    void window.loadCareerProfile?.();
   }
 
   if (nextSection === "account-admin") {
@@ -1294,6 +1298,7 @@ function renderUserCenterIdentity() {
   const isAdmin = Boolean(user && user.role === "super_admin");
   if (adminNavBtn) adminNavBtn.classList.toggle("hidden", !isAdmin);
   if (adminSection) adminSection.classList.toggle("hidden", !isAdmin);
+  document.getElementById("ucApiAdminCard")?.classList.toggle("hidden", !isAdmin);
   if (!user) return;
 
   const displayName = user.display_name || user.displayName || user.username || "用户";

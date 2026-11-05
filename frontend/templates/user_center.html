@@ -1095,10 +1095,14 @@
             </a>
 
             <nav class="uc-nav" aria-label="个人中心导航">
+                <button type="button" class="uc-nav-link active" data-target="career-profile">
+                    <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="9" r="2.5"/><path d="M8 17c0-4 8-4 8 0"/></svg></span>
+                    <span>职业档案</span>
+                </button>
                 <div class="uc-nav-group">
-                    <button type="button" class="uc-nav-link active" data-target="report-workspace" data-nav-group="report">
+                    <button type="button" class="uc-nav-link" data-target="report-workspace" data-nav-group="report">
                         <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg></span>
-                        <span>职业报告</span>
+                        <span>规划报告</span>
                     </button>
                 </div>
                 <button type="button" class="uc-nav-link" data-target="plan-workspace">
@@ -1107,7 +1111,7 @@
                 </button>
                 <button type="button" class="uc-nav-link" data-target="account-center">
                     <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v2"/></svg></span>
-                    <span>账户中心</span>
+                    <span>账户设置</span>
                 </button>
                 <button type="button" class="uc-nav-link hidden" id="userCenterAdminNavBtn" data-target="account-admin">
                     <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6zM9 12l2 2 4-4"/></svg></span>
@@ -1131,19 +1135,16 @@
                 </div>
                 <div class="uc-topbar-actions">
                     <span id="currentUserLabel" class="topbar-pill">未登录</span>
-                    <button id="notificationBtn" type="button" class="topbar-icon-btn tooltip" data-tooltip="系统通知" aria-label="系统通知">
-                        <span>通知</span>
-                        <span id="notificationCount" class="topbar-count">3</span>
-                    </button>
                     <button id="logoutBtn" type="button" onclick="logout()" class="topbar-text-btn">退出</button>
-                    <button type="button" class="topbar-avatar-btn" onclick="window.openUserCenterReportLibrary?.()" title="职业报告" aria-label="打开职业报告">
+                    <button type="button" class="topbar-avatar-btn" onclick="switchUserCenterSection('career-profile')" title="职业档案" aria-label="打开职业档案">
                         <span id="currentUserAvatar">人</span>
                     </button>
                 </div>
             </header>
 
             <main class="uc-content">
-                <section id="report-workspace" class="uc-section active">
+                {% include "partials/career_profile.html" %}
+                <section id="report-workspace" class="uc-section">
                     <div class="uc-section-shell">
                         <section class="uc-surface uc-report-hero-surface">
                             <div class="uc-section-head">
@@ -1395,105 +1396,6 @@
                                 </section>
                             </div>
                         </div>
-                        <div class="lp-legacy-shell" aria-hidden="true">
-                        <section class="uc-surface">
-                            <div class="uc-section-head">
-                                <div>
-                                    <p class="uc-section-kicker">Learning Path</p>
-                                    <h2 class="uc-section-title">学习路径</h2>
-                                    <p class="uc-section-copy">这里保留你的打卡、经验值、任务清单和计划详情。之前新增的学习路径和成长记录能力会继续在这里维护。</p>
-                                </div>
-                                <div class="uc-stat-strip">
-                                    <article>
-                                        <span>连续打卡</span>
-                                        <strong id="upStatStreak">0 天</strong>
-                                    </article>
-                                    <article>
-                                        <span>累计经验值</span>
-                                        <strong id="upStatXP">0 XP</strong>
-                                    </article>
-                                    <article>
-                                        <span>完成任务</span>
-                                        <strong id="upStatDone">0</strong>
-                                    </article>
-                                    <article>
-                                        <span>解锁徽章</span>
-                                        <strong id="upStatBadges">0</strong>
-                                    </article>
-                                </div>
-                            </div>
-                        </section>
-
-                        <div class="lp-grid">
-                            <aside class="uc-surface lp-left-panel">
-                                <div class="lp-streak-hero">
-                                    <div class="lp-streak-flame" id="lpStreakIcon">🔥</div>
-                                    <div class="lp-streak-num" id="lpStreakCount">0</div>
-                                    <div class="lp-streak-label">连续打卡天数</div>
-                                    <div class="lp-streak-best">历史最佳 <strong id="lpStreakBest">0</strong> 天</div>
-                                </div>
-
-                                <div class="lp-level-row">
-                                    <span class="lp-level-tag" id="lpLevel">Lv.1</span>
-                                    <div class="lp-xp-bar">
-                                        <div class="lp-xp-numbers"><span id="lpXP">0</span> / <span id="lpXPNext">100</span> XP</div>
-                                        <div class="lp-xp-track"><div class="lp-xp-fill" id="lpXPFill" style="width:0%"></div></div>
-                                    </div>
-                                </div>
-
-                                <button id="lpCheckinBtn" class="lp-checkin-btn" type="button" onclick="doCheckin()">
-                                    今日打卡 +10 XP
-                                </button>
-                                <p class="lp-checkin-sub" id="lpCheckinHint">每天打卡会累积连续天数，完成学习任务还可获得额外经验值。</p>
-
-                                <div class="lp-week-grid" id="lpWeekStrip"></div>
-
-                                <div class="lp-heatmap-wrap">
-                                    <p class="lp-section-label">最近 4 周活跃度</p>
-                                    <div class="lp-heatmap" id="lpHeatmap"></div>
-                                </div>
-
-                                <div class="lp-badges-wrap">
-                                    <p class="lp-section-label">成长徽章</p>
-                                    <div class="lp-badge-grid" id="lpBadgeGrid"></div>
-                                </div>
-                            </aside>
-
-                            <section class="uc-surface lp-plan-board">
-                                <div id="upPlanListView">
-                                    <div class="up-section-hd">
-                                        <h3 class="up-section-title">学习计划列表</h3>
-                                        <button class="up-new-btn" type="button" onclick="createNewPlan()">
-                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                            新建计划
-                                        </button>
-                                    </div>
-                                    <div id="upPlanList" class="up-plan-list"></div>
-                                </div>
-
-                                <div id="upPlanDetailView" class="hidden">
-                                    <div class="up-detail-hd">
-                                        <button class="up-back-btn" type="button" onclick="showPlanList()">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                        </button>
-                                        <h4 class="up-detail-title" id="upDetailTitle">计划详情</h4>
-                                        <span class="up-detail-pct" id="upDetailPct">0%</span>
-                                    </div>
-                                    <div class="up-detail-prog-row">
-                                        <div class="up-detail-prog-track">
-                                            <div class="up-detail-prog-fill" id="upDetailProgFill" style="width:0%"></div>
-                                        </div>
-                                        <span class="up-detail-prog-txt" id="upDetailProgTxt">0 / 0 项完成</span>
-                                    </div>
-                                    <div id="upDetailItems" class="up-items-list"></div>
-                                    <div class="up-add-row">
-                                        <input id="upNewItemInput" class="up-add-input" type="text" placeholder="添加一条新的学习任务..." onkeydown="if(event.key==='Enter') addPlanItem()">
-                                        <button class="up-add-btn" type="button" onclick="addPlanItem()">添加</button>
-                                    </div>
-                                </div>
-                            </section>
-                        </div>
-                        </div>
                     </div>
                 </section>
 
@@ -1503,8 +1405,8 @@
                             <div class="uc-section-head">
                                 <div>
                                     <p class="uc-section-kicker">Account Center</p>
-                                    <h2 class="uc-section-title">账户中心</h2>
-                                    <p class="uc-section-copy">这里可以维护头像、密码和账户信息。管理员也可以从这里直接进入系统 API 配置面板。</p>
+                                    <h2 class="uc-section-title">账户设置</h2>
+                                    <p class="uc-section-copy">维护登录密码与头像，职业资料统一保存在职业档案中。</p>
                                 </div>
                             </div>
                         </section>
@@ -1547,7 +1449,7 @@
                             </section>
                         </div>
 
-                        <section class="uc-surface uc-account-card uc-admin-card">
+                        <section id="ucApiAdminCard" class="uc-surface uc-account-card uc-admin-card hidden">
                             <div class="uc-account-card-head">
                                 <div>
                                     <h3>系统 API 配置</h3>
@@ -1723,6 +1625,7 @@
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}"></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}"></script>
+    <script src="{{ url_for('static', filename='career-profile.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>
     <style>

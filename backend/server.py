@@ -98,6 +98,7 @@ from services.tools import generate_text_to_image, get_text_to_image_runtime
 from services import db as _app_db
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
+from services.career import create_blueprint as create_career_blueprint, snapshot as career_snapshot, sync_sources as sync_career_sources
 from services.chat import create_blueprint as create_chat_blueprint
 from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
@@ -6865,6 +6866,7 @@ def api_resume_profile():
     state.pop("resume_versions", None)
     _save_user_state(user["username"], state)
     app.extensions["chat_service"].documents.forget(user["username"])
+    sync_career_sources(user["username"], state)
     return jsonify({"message": "简历与匹配分析结果已删除。"})
 
 
@@ -8243,6 +8245,29 @@ _chat_blueprint = create_chat_blueprint(
 )
 app.register_blueprint(_chat_blueprint)
 app.extensions["chat_service"] = _chat_blueprint.chat_service
+
+
+def _career_memory_records(username):
+    records = _chat_blueprint.chat_service.store.memory_snapshot(username)[1]
+    return [{key: item[key] for key in ("id", "key", "subject", "value", "status", "source_session", "updated_at")}
+            for item in records if item["kind"] == "fact" and item["status"] in {"active", "conflict"}]
+
+
+def _career_chat_background(username):
+    background = build_chat_background(_load_user_state(username), _read_career_report_bundle(username))
+    data = career_snapshot(username)
+    resume_enabled = _chat_blueprint.chat_service.store.privacy(username)["resume_enabled"]
+    background["用户维护的职业档案（自述与证据分级）"] = {
+        "profile": {key: value for key, value in (data["profile"] or {}).items() if key != "owner"},
+        **{key: [{field: value[:1200] if isinstance(value, str) else value for field, value in row.items()
+                  if field not in {"owner", "created_at"}} for row in data[key]
+                 if resume_enabled or row["source_type"] != "resume"][:30]
+           for key in ("entries", "skills", "evidence", "goals")}}
+    return background
+
+
+_chat_blueprint.chat_service.profile_provider = _career_chat_background
+app.register_blueprint(create_career_blueprint(_login_required, _current_user, _load_user_state, _career_memory_records))
 _load_users()
 _prewarm_caches()
 

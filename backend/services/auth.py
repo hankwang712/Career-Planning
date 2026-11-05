@@ -306,8 +306,9 @@ def init_app(app):
 
     @app.before_request
     def protect_auth_requests():
-        if request.path.startswith("/api/auth/") and request.method in {"POST", "PUT", "DELETE", "PATCH"}:
-            if request.content_length and request.content_length > 16384:
+        if request.path.startswith(("/api/auth/", "/api/career-profile")) and request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+            limit = 65536 if request.path.startswith("/api/career-profile") else 16384
+            if request.content_length and request.content_length > limit:
                 raise AuthError("提交的内容过大。", 413)
             expected = session.get("csrf_token")
             supplied = request.headers.get("X-CSRF-Token", "")
@@ -316,7 +317,7 @@ def init_app(app):
 
     @app.after_request
     def protect_auth_responses(response):
-        private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/",
+        private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/", "/api/career-profile",
                             "/api/profile-portrait", "/api/account", "/api/community-feed", "/app_data/")
         if request.path.startswith(private_prefixes):
             response.headers["Cache-Control"] = "no-store"

@@ -125,6 +125,8 @@ def init_db():
             attempts INTEGER NOT NULL
         );
     """)
+    from .career import init_schema
+    init_schema(conn)
     migrated = cur.execute("SELECT 1 FROM auth_settings WHERE name = 'legacy_json_imported'").fetchone()
     conn.commit()
     conn.close()

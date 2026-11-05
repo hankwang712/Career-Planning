@@ -1,0 +1,32 @@
+<section id="career-profile" class="uc-section active" aria-labelledby="cpTitle">
+    <div class="uc-section-shell cp-shell">
+        <section class="uc-surface cp-hero">
+            <div class="cp-hero-copy">
+                <p class="uc-section-kicker">USER CAREER PROFILE</p>
+                <h2 id="cpTitle" class="uc-section-title">我的职业档案</h2>
+                <p class="uc-section-copy">把经历、技能与目标连在一起，让每一步职业选择都有据可循。</p>
+                <p id="cpUpdated" class="cp-meta">正在读取档案…</p>
+            </div>
+            <button type="button" class="career-report-primary-btn" data-cp-action="edit-profile">编辑基础资料 <span aria-hidden="true">↗</span></button>
+        </section>
+        <div id="cpStatus" class="cp-status" role="status" aria-live="polite"></div>
+        <nav class="cp-tabs" aria-label="职业档案分类">
+            <button type="button" data-cp-tab="overview" aria-pressed="true" class="active">档案概览</button>
+            <button type="button" data-cp-tab="skills" aria-pressed="false">技能与证据 <span id="cpSkillCount">0</span></button>
+            <button type="button" data-cp-tab="goals" aria-pressed="false">职业目标</button>
+            <button type="button" data-cp-tab="records" aria-pressed="false">测评与简历</button>
+        </nav>
+        <div id="cpOverview" class="cp-view" data-cp-view="overview"></div>
+        <div id="cpSkills" class="cp-view" data-cp-view="skills" hidden></div>
+        <div id="cpGoals" class="cp-view" data-cp-view="goals" hidden></div>
+        <div id="cpRecords" class="cp-view" data-cp-view="records" hidden></div>
+    </div>
+</section>
+<dialog id="cpEditor" class="cp-dialog" aria-labelledby="cpEditorTitle">
+    <form id="cpEditorForm">
+        <div class="cp-dialog-head"><div><p class="uc-section-kicker">维护职业档案</p><h3 id="cpEditorTitle">编辑资料</h3></div><button type="button" data-cp-action="close-editor" aria-label="关闭编辑">×</button></div>
+        <div id="cpEditorFields" class="cp-fields"></div>
+        <p id="cpEditorMessage" class="cp-form-message" role="status" aria-live="polite"></p>
+        <div class="cp-dialog-footer"><button type="button" class="career-report-secondary-btn" data-cp-action="close-editor">取消</button><button id="cpSave" type="submit" class="career-report-primary-btn">保存记录</button></div>
+    </form>
+</dialog>

@@ -623,7 +623,7 @@
       window.openSettingsPanel();
       return;
     }
-    window.openUserCenterPage?.("report-workspace");
+    window.openUserCenterPage?.("career-profile");
   }
 
   function showPlanList() {

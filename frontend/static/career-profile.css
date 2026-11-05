@@ -1,0 +1,66 @@
+.cp-shell { --cp-ink: #153141; --cp-muted: #6a7e8c; --cp-line: #e1e9ed; }
+.cp-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 32px; background: linear-gradient(115deg, #f2f9f8, #fff 75%); border-top: 3px solid #277c77; }
+.cp-hero .uc-section-kicker { color: #277c77; letter-spacing: .15em; font-size: 11px; }
+.cp-meta { color: var(--cp-muted); font-size: 12px; margin: 14px 0 0; line-height: 1.7; }
+.cp-status:empty { display: none; }
+.cp-status { padding: 12px 16px; background: #edf7f5; border-radius: 10px; color: #22615b; font-size: 13px; }
+.cp-status.is-error, .cp-form-message { color: #b34339; }
+.cp-status.is-error { background: #fff3f0; }
+.cp-tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--cp-line); overflow-x: auto; }
+.cp-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; white-space: nowrap; padding: 15px 2px; color: var(--cp-muted); cursor: pointer; font-size: 14px; }
+.cp-tabs button.active { border-bottom-color: #277c77; color: #22615b; font-weight: 700; }
+.cp-tabs button span { font-size: 11px; background: #e8f0ef; border-radius: 5px; padding: 2px 6px; margin-left: 5px; }
+.cp-view[hidden] { display: none !important; }
+#ucApiAdminCard.hidden { display: none !important; }
+.user-center-page .uc-nav-link.hidden { display: none !important; }
+.cp-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+.cp-stack { display: grid; gap: 20px; min-width: 0; }
+.cp-card { padding: 24px; min-width: 0; }
+.cp-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.cp-card h3 { margin: 0; font-size: 16px; color: var(--cp-ink); font-weight: 700; }
+.cp-card p { font-size: 13px; line-height: 1.8; color: #5a6e7a; overflow-wrap: anywhere; }
+.cp-card-head button, .cp-text-btn { border: 0; background: none; color: #277c77; font-size: 12px; cursor: pointer; padding: 4px 0; }
+.cp-name { font-size: 24px !important; margin: 4px 0 7px !important; }
+.cp-headline { margin: 0 0 16px; }
+.cp-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.cp-tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 6px; color: #506674; background: #f1f5f7; font-size: 11px; }
+.cp-tag.is-supported { background: #e9f5f1; color: #28735c; }
+.cp-tag.is-warning { background: #fff5df; color: #8a641d; }
+.cp-empty { border: 1px dashed #dbe5e7; padding: 25px 18px; border-radius: 12px; text-align: center; }
+.cp-empty strong { color: #435d6b; font-size: 13px; font-weight: 600; }
+.cp-empty p { margin: 5px 0 0; font-size: 12px; }
+.cp-row { padding: 16px 0; border-top: 1px solid #edf1f3; }
+.cp-row:first-child { border-top: 0; padding-top: 0; }
+.cp-row:last-child { padding-bottom: 0; }
+.cp-row h4 { font-size: 14px; color: var(--cp-ink); margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.cp-row p { margin: 7px 0; white-space: pre-wrap; }
+.cp-row-top, .cp-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cp-actions { justify-content: flex-start; gap: 16px; flex-wrap: wrap; }
+.cp-row .cp-meta { font-size: 11px; color: #7c8d98; }
+.cp-note { padding: 15px 18px; border-left: 3px solid #64a49b; background: #f2f8f7; border-radius: 0 8px 8px 0; color: #4d706c; font-size: 12px; line-height: 1.8; margin-bottom: 20px; }
+.cp-levels { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 20px; }
+.cp-level { padding: 15px; border: 1px solid var(--cp-line); background: #fff; border-radius: 10px; }
+.cp-level span { font-size: 11px; color: #8a9aa4; }
+.cp-level strong { display: block; font-size: 13px; color: #34535e; margin: 6px 0; }
+.cp-level p { font-size: 11px; color: var(--cp-muted); line-height: 1.7; margin: 0; }
+.cp-skill-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.cp-evidence { padding: 12px 14px; background: #f7f9fa; border-radius: 9px; margin-top: 12px; }
+.cp-evidence p { margin: 6px 0; font-size: 12px; }
+.cp-evidence a { color: #277c77; font-size: 12px; text-decoration: underline; }
+.cp-goal-date { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--cp-muted); }
+.cp-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; border: 1px solid #e0e8ed; border-radius: 18px; padding: 26px; color: #203b49; box-shadow: 0 24px 80px #19334626; }
+.cp-dialog::backdrop { background: #142b4280; backdrop-filter: blur(3px); }
+.cp-dialog-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.cp-dialog-head h3 { font-size: 20px; font-weight: 700; margin: 6px 0 0; }
+.cp-dialog-head > button { background: #f3f6f7; border: 0; border-radius: 50%; width: 32px; height: 32px; font-size: 22px; cursor: pointer; }
+.cp-fields { display: grid; gap: 16px; }
+.cp-fields label { display: grid; gap: 8px; font-size: 13px; font-weight: 600; }
+.cp-fields input, .cp-fields select, .cp-fields textarea { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid #dce5e9; border-radius: 8px; background: #fff; font: inherit; font-size: 13px; color: #234152; }
+.cp-fields textarea { resize: vertical; min-height: 100px; }
+.cp-fields input:focus, .cp-fields textarea:focus, .cp-fields select:focus { outline: 2px solid #78b3a9; outline-offset: 2px; }
+.cp-form-message { font-size: 12px; line-height: 1.7; min-height: 20px; }
+.cp-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.cp-history { display: grid; gap: 10px; }
+.cp-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; background: #f5f8f9; border-radius: 8px; padding: 12px; }
+@media(max-width: 1000px) { .cp-grid { grid-template-columns: 1fr; } }
+@media(max-width: 640px) { .cp-hero { padding: 22px; align-items: flex-start; flex-direction: column; } .cp-card { padding: 20px; } .cp-tabs { gap: 20px; } .cp-levels { grid-template-columns: repeat(2,minmax(0,1fr)); } .cp-skill-grid { grid-template-columns: 1fr; } .cp-row-top { flex-wrap: wrap; } }
