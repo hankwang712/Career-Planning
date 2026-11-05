@@ -1,0 +1,115 @@
+/* Shared workspace palette. Loaded after page styles so navigation and surfaces agree. */
+:root {
+  --product-accent: #246bfe;
+  --product-accent-hover: #1553db;
+  --product-bg: #f5f8fd;
+  --product-card: #ffffff;
+  --product-text: #20304a;
+  --product-muted: #7b8ba3;
+  --product-border: #e7edf6;
+  --cs-primary: #246bfe;
+  --cs-primary-light: #508afa;
+  --cs-primary-soft: #edf4ff;
+  --cs-bg: #f5f8fd;
+  --cs-bg-alt: #eff5ff;
+  --cs-surface: #ffffffed;
+  --cs-surface-strong: #fff;
+  --cs-surface-muted: #f7faff;
+  --cs-border: #e1eaf7;
+  --cs-border-light: #eaf0f8;
+  --cs-text: #20304a;
+  --cs-secondary: #647792;
+  --cs-muted: #7b8ba3;
+  --home-bg: #f5f8fd;
+  --home-surface-soft: #eff5ff;
+  --home-text: #20304a;
+  --home-muted: #75859c;
+  --home-border: #e7edf6;
+  --home-accent: #246bfe;
+  --home-accent-hover: #1553db;
+  --home-accent-soft: #edf3ff;
+  --home-shadow: 0 12px 40px #31568709;
+  --home-shadow-soft: 0 4px 20px #31568706;
+  --uc-bg: #f5f8fd;
+  --uc-copy: #20304a;
+  --uc-muted: #7b8ba3;
+  --uc-line: #e7edf6;
+  --uc-accent: #246bfe;
+  --uc-accent-strong: #1553db;
+  --uc-accent-soft: #edf3ff;
+  --uc-shadow: 0 6px 24px #31568706;
+}
+body.bg-gray-50, body.user-center-page {
+  color: var(--product-text);
+  background: radial-gradient(ellipse 80% 430px at 85% 0, #dfeeff 0, transparent 80%), linear-gradient(180deg, #f3f8ff, #f8fafd 650px, #f5f8fd) !important;
+}
+body.bg-gray-50 .ambient-orb { display: none; }
+nav.gradient-bg {
+  background: #ffffffed !important;
+  border-bottom: 1px solid #e5edf9;
+  box-shadow: 0 2px 14px #284d7e04 !important;
+  color: var(--product-text);
+}
+nav.gradient-bg .nav-brand-mark { background: #edf4ff; box-shadow: none; }
+nav.gradient-bg h1 { color: #246bfe !important; }
+nav.gradient-bg .leading-tight > p { color: #8a9bb3; font-size: 10px; }
+nav.gradient-bg .nav-tab-strip { gap: 6px; }
+nav.gradient-bg .nav-item {
+  min-height: 38px;
+  padding: 8px 14px !important;
+  border: 1px solid transparent;
+  border-radius: 9px !important;
+  color: #52647f !important;
+  font-size: 13px;
+  box-shadow: none;
+}
+nav.gradient-bg .nav-item:hover { background: #f4f7ff !important; color: #246bfe !important; }
+nav.gradient-bg .nav-item.active { background: #eaf2ff !important; border-color: #e1ecff; color: #246bfe !important; box-shadow: none; }
+nav.gradient-bg .nav-item .tab-icon { width: 16px; height: 16px; }
+nav.gradient-bg .nav-workspace-pill { background: #f0f5fc !important; color: #496180; border-color: #e2eaf6; box-shadow: none !important; }
+nav.gradient-bg #liveClock { color: #8293aa !important; background: transparent !important; border: 0; font-size: 12px; }
+body.bg-gray-50 .glass-surface { border-color: #e4ecf7; box-shadow: 0 6px 25px #31568706; }
+#dashboard.cs-home-concierge::before { background: radial-gradient(ellipse at top right, #d9eaff66, transparent 65%); }
+#dashboard.cs-home-concierge::after { background: none; }
+.cs-home-concierge .cs-hero-product {
+  background: radial-gradient(ellipse at 92% 5%, #d7eaff88, transparent 45%), linear-gradient(120deg, #fff, #f1f7ff);
+  border-color: #e3ecf9;
+  box-shadow: var(--home-shadow);
+}
+.cs-home-concierge .cs-hero-product::before { opacity: .06; background-image: linear-gradient(#527fbc 1px, transparent 1px), linear-gradient(90deg, #527fbc 1px, transparent 1px); }
+.cs-home-concierge .cs-hero-concierge-nav button.is-active { color: #246bfe; background: #edf4ff; box-shadow: inset 0 0 0 1px #e2ecff; }
+#productHero .cs-hero-product-badge { color: #246bfe; border-color: #dce9ff; box-shadow: none; }
+.cs-home-concierge .cs-hero-kimi-em { background-image: linear-gradient(120deg, #246bfe, #18adc4); }
+.cs-home-concierge .cs-btn-product-primary, .cs-home-concierge .cs-kimi-bottom-cta-primary { background: #246bfe; color: #fff; box-shadow: 0 6px 18px #246bfe22; }
+.cs-home-concierge :is(.cs-product-card, .cs-product-feature-card, .cs-kimi-step-card) { border-color: #e4ecf7; box-shadow: var(--home-shadow-soft); }
+.cs-home-concierge .cs-kimi-bottom-cta { background: linear-gradient(120deg, #e8f2ff, #f0f9fc); border-color: #dfeafa; }
+body #profile .assessment-center-heading h2, #report .report-launch-title { color: #20304a; }
+body #profile .assessment-center-eyebrow, #report .report-launch-kicker { color: #246bfe; }
+body #profile :is(.assessment-center-card, .assessment-center-history) { border-color: #e4ecf7; box-shadow: 0 5px 20px #31568705; border-radius: 14px; }
+body #profile .assessment-center-card:hover { box-shadow: 0 10px 30px #3156870c; border-color: #cbdfff; }
+#report .report-launch-primary { background: #246bfe; border-color: #246bfe; }
+/* Career profile uses the same light navigation and blue emphasis. */
+.user-center-page .uc-sidebar { background: #ffffffed; border-color: #e7edf6; color: #344966; }
+.user-center-page .uc-brand-copy strong { color: #246bfe; }
+.user-center-page .uc-brand-copy span, .user-center-page .uc-footer-link { color: #7b8ba3; }
+.user-center-page .uc-brand-mark { box-shadow: none; }
+.user-center-page .uc-nav-link { color: #62758f; background: transparent; border-radius: 10px; }
+.user-center-page .uc-nav-link:hover, .user-center-page .uc-nav-link.active { color: #246bfe; background: #edf4ff; border-color: #e0ecff; transform: none; }
+.user-center-page .uc-nav-icon { background: #f2f6fc; color: #6a8cbd; border-radius: 8px; }
+.user-center-page .uc-sidebar-note { background: linear-gradient(120deg, #eef5ff, #f4fafc); border-color: #e3ecf8; border-radius: 14px; }
+.user-center-page .uc-sidebar-note h2 { color: #344966; }
+.user-center-page .uc-sidebar-note p { color: #7b8ba3; }
+.user-center-page .uc-topbar { border-radius: 14px; border-color: #e7edf6; box-shadow: none; }
+.user-center-page .uc-surface { border-color: #e4ecf7; border-radius: 14px; box-shadow: var(--uc-shadow); }
+.user-center-page .cp-hero { border-top: 1px solid #dce9ff; background: radial-gradient(ellipse at top right, #e5f0ff, transparent 70%), #fff; }
+.user-center-page .cp-hero .uc-section-kicker { color: #246bfe; }
+.user-center-page .cp-tabs button.active { color: #246bfe; border-color: #246bfe; }
+.user-center-page .cp-card-head button, .user-center-page .cp-text-btn { color: #246bfe; }
+.user-center-page .cp-shell .career-report-primary-btn { background: #246bfe; box-shadow: 0 5px 16px #246bfe20; border-color: #246bfe; }
+.user-center-page .cp-shell .career-report-primary-btn:hover { background: #1553db; box-shadow: 0 6px 18px #246bfe26; }
+@media (max-width: 640px) {
+  nav.gradient-bg > div > .flex { gap: 12px; }
+  nav.gradient-bg .leading-tight { display: none; }
+  nav.gradient-bg > div > .flex > .w-px { display: none; }
+  nav.gradient-bg .nav-item { padding-inline: 11px !important; font-size: 12px; }
+}
