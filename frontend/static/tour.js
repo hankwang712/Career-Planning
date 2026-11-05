@@ -148,34 +148,6 @@
       '}',
       '.tg-btn-skip:hover { color:#9ca3af; }',
 
-      /* 悬浮引导入口按钮 */
-      '#tg-fab {',
-      '  position:fixed; bottom:28px; right:24px;',
-      '  z-index:9100;',
-      '  width:46px; height:46px; border-radius:50%;',
-      '  background:linear-gradient(135deg,#2b6cb0,#1a365d);',
-      '  color:#fff; border:none; cursor:pointer;',
-      '  font-size:18px; font-weight:700;',
-      '  box-shadow:0 10px 28px rgba(26,54,93,0.35);',
-      '  display:flex; align-items:center; justify-content:center;',
-      '  transition:transform 0.2s,box-shadow 0.2s;',
-      '  outline:none;',
-      '}',
-      '#tg-fab:hover {',
-      '  transform:scale(1.1);',
-      '  box-shadow:0 14px 32px rgba(26,54,93,0.42);',
-      '}',
-      '#tg-fab-tip {',
-      '  position:fixed; bottom:82px; right:24px;',
-      '  z-index:9100;',
-      '  background:#1f2937; color:#fff;',
-      '  font-size:12px; padding:6px 12px;',
-      '  border-radius:8px; white-space:nowrap;',
-      '  opacity:0; pointer-events:none;',
-      '  transition:opacity 0.2s;',
-      '}',
-      '#tg-fab:hover + #tg-fab-tip,',
-      '#tg-fab-tip:hover { opacity:1; }',
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -206,19 +178,6 @@
       '</div>',
     ].join('');
     document.body.appendChild(wrap);
-
-    // 悬浮按钮
-    var fab = document.createElement('button');
-    fab.id = 'tg-fab';
-    fab.title = '使用引导';
-    fab.innerHTML = '?';
-    fab.addEventListener('click', function () { TourGuide.start(); });
-    document.body.appendChild(fab);
-
-    var fabTip = document.createElement('div');
-    fabTip.id = 'tg-fab-tip';
-    fabTip.textContent = '重新引导';
-    document.body.appendChild(fabTip);
 
     // 事件绑定
     document.getElementById('tg-next').addEventListener('click', function () { TourGuide.next(); });

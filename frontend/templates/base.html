@@ -33,33 +33,6 @@
         font-family: var(--app-font-stack);
       }
 
-      .assistant-nav-entry {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 9px 13px;
-        border: 1px solid #c4d5e6;
-        border-radius: 12px;
-        background: #edf4fb;
-        color: #355b82;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 19px;
-        white-space: nowrap;
-        text-decoration: none;
-        transition: background-color .15s, border-color .15s, color .15s;
-      }
-
-      .assistant-nav-entry:hover {
-        background: #e1edf8;
-        border-color: #9db8d2;
-        color: #274766;
-      }
-
-      .assistant-nav-entry:focus-visible {
-        outline: 2px solid #355b82;
-        outline-offset: 3px;
-      }
     </style>
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}">
@@ -343,10 +316,6 @@
 
                 <!-- 右侧操作区：时钟 + 深色工作区胶囊（参考 Notion/Linear 工作区切换器） -->
                 <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
-                    <a href="/assistant.html" class="assistant-nav-entry" title="打开 AI 生涯助手" aria-label="打开 AI 生涯助手">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></svg>
-                        <span class="hidden xl:inline">AI 助手</span>
-                    </a>
                     <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
                     <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
                         <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区与账号菜单">
@@ -681,6 +650,11 @@
         </div>
     </div>
 
+    <a id="careerAssistantMascot" class="assistant-mascot" href="{{ url_for('assistant.page') }}" aria-label="打开职小航 AI 生涯助手">
+        <img class="assistant-mascot-idle" src="{{ url_for('static', filename='assets/mascot/zhixiaohang-idle.png') }}" width="421" height="415" alt="职小航" decoding="async" draggable="false">
+        <img class="assistant-mascot-wave" src="{{ url_for('static', filename='assets/mascot/zhixiaohang-wave.gif') }}" width="421" height="415" alt="" aria-hidden="true" decoding="async" draggable="false">
+        <span class="assistant-mascot-hint" aria-hidden="true">和职小航聊聊</span>
+    </a>
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
