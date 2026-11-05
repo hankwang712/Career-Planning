@@ -1,0 +1,48 @@
+<div id="liveJobMarket" class="lm-panel" aria-labelledby="lmTitle">
+    <header class="lm-hero">
+        <div id="lmScheduleLine" class="lm-schedule">正在读取更新计划…</div>
+        <div class="lm-hero-actions"><button type="button" class="lm-btn lm-btn-primary" data-lm-action="refresh">刷新岗位 <span aria-hidden="true">↻</span></button><a id="lmExport" class="lm-btn" href="/api/job-market/export">导出 Excel ↗</a><button type="button" class="lm-btn lm-admin-only" data-lm-action="settings" hidden>采集管理</button></div>
+    </header>
+    <p id="lmFeedback" class="lm-feedback" role="status" aria-live="polite"></p>
+    <button id="lmSourceToggle" type="button" class="lm-source-tab" data-lm-action="toggle-sources" aria-label="打开数据更新" aria-expanded="false" aria-controls="lmSourceDrawer" title="数据更新"><svg viewBox="0 0 26 68" aria-hidden="true"><path class="lm-source-tab-shape" d="M26 1 2 34l24 33Z"/><path class="lm-source-tab-chevron" d="m20 27-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <dialog id="lmSourceDrawer" class="lm-source-drawer" aria-labelledby="lmSourceTitle">
+        <div class="lm-source-drawer-head"><div><h4 id="lmSourceTitle"><span class="lm-live-dot" aria-hidden="true"></span>数据更新</h4><p id="lmSourceSummary">正在同步</p></div><button type="button" class="lm-source-close" data-lm-action="close-sources" aria-label="收起数据更新">×</button></div>
+        <div id="lmSourceStatus"></div>
+        <div class="lm-admin-actions lm-admin-only" hidden><button type="button" class="lm-btn lm-btn-primary" data-lm-action="collect">立即采集</button><button type="button" class="lm-btn" data-lm-action="cancel">停止任务</button></div>
+    </dialog>
+    <div class="lm-content-grid"><div class="lm-main-column">
+    <div id="lmStats" class="lm-stats" aria-live="polite"></div>
+    <div class="lm-workspace">
+        <div class="lm-list-pane">
+            <form id="lmSearchForm" class="lm-search" role="search">
+                <label class="lm-search-main"><span class="sr-only">搜索岗位、公司或技能</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input name="q" type="search" maxlength="120" placeholder="搜索岗位、公司或技能，例如 Python 实习"><button type="submit" class="lm-btn lm-btn-primary">搜索</button></label>
+                <div class="lm-filter-row">
+                    <label>地点<input name="location" maxlength="100" placeholder="全部城市"></label>
+                    <label>岗位类型<select name="job_type"><option value="">全部类型</option><option value="intern">实习</option><option value="graduate">校招 / 应届</option><option value="experienced">社会招聘</option></select></label>
+                    <label>数据来源<select name="source"><option value="">全部来源</option><option value="ncss">国家就业平台</option><option value="api">企业招聘 API</option><option value="shixiseng">实习僧</option><option value="website">企业官网</option></select></label>
+                    <label>采集范围<select name="days"><option value="7">最近 7 天</option><option value="30" selected>最近 30 天</option><option value="90">最近 90 天</option><option value="0">全部记录</option></select></label>
+                    <label>排序<select name="sort"><option value="recent">最近采集</option><option value="newest">首次发现</option><option value="salary">薪资从高到低</option></select></label>
+                </div>
+                <details class="lm-advanced"><summary>更多筛选 <span>公司、行业、学历、薪资与发布日期</span></summary><div class="lm-filter-row">
+                    <label>公司<input name="company_name" maxlength="100" placeholder="公司名称"></label><label>行业<input name="industry" maxlength="100" placeholder="行业关键词"></label><label>学历<input name="education" maxlength="100" placeholder="例如：本科"></label><label>公司性质<input name="company_nature" maxlength="100" placeholder="例如：国有企业"></label>
+                    <label>计薪周期<select name="salary_unit"><option value="">全部周期</option><option value="month">月薪（元 / 月）</option><option value="day">日薪（元 / 天）</option><option value="year">年薪（元 / 年）</option><option value="hour">时薪（元 / 小时）</option></select></label><label>最低薪资<input name="salary_min" type="number" min="0" max="10000000" step="1" placeholder="按所选周期，单位元"></label><label>最高薪资<input name="salary_max" type="number" min="0" max="10000000" step="1" placeholder="按所选周期，单位元"></label><label>发布于此日期后<input name="date_from" type="date"></label><label>发布于此日期前<input name="date_to" type="date"></label>
+                </div><div class="lm-filter-actions"><button type="reset" class="lm-btn">重置</button><button type="submit" class="lm-btn lm-btn-primary">应用筛选</button></div></details>
+            </form>
+            <div class="lm-results-heading"><h4>最新岗位 <span id="lmResultCount">—</span></h4><span>招聘要求以原站为准</span></div>
+            <div id="lmResults" class="lm-results" aria-live="polite"></div>
+            <nav id="lmPagination" class="lm-pagination" aria-label="最新岗位分页" hidden><button type="button" class="lm-btn" data-lm-action="previous">上一页</button><span id="lmPageInfo"></span><button type="button" class="lm-btn" data-lm-action="next">下一页</button></nav>
+        </div>
+    </div>
+    </div><aside class="lm-sidebar" aria-label="岗位市场概览">
+        <section class="lm-side-card lm-market-trend"><div class="lm-side-heading"><h4>岗位发现趋势</h4><span>近 7 天</span></div><p class="lm-side-caption">每天首次收录的岗位样本</p><div id="lmTrend"></div><p class="lm-chart-note">基于本站采集记录，非全市场招聘增量。</p></section>
+        <nav class="lm-side-card lm-quick-nav" aria-label="探索快捷导航"><h4>继续探索</h4><div class="lm-quick-grid">
+            <button type="button" data-lm-action="cities"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V7l7-3v17M10 10l10-4v15M1 21h22M6 10v2m0 3v2m8-5v2m3-3v2m-3 3v2m3-3v2"/></svg><strong>城市分析</strong><small>看看不同城市的机会</small></button>
+            <button type="button" data-lm-action="archives"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg><strong>岗位档案</strong><small>查看岗位画像与要求</small></button>
+            <a href="/user-center#career-profile"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 18v-1a4 4 0 0 1 8 0v1"/></svg><strong>职业档案</strong><small>整理经历与技能证据</small></a>
+            <button type="button" onclick="showSection('profile')"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg><strong>了解自己</strong><small>发现兴趣与职业倾向</small></button>
+        </div></nav>
+        <details class="lm-insights lm-side-card"><summary>样本分布 <span>城市与技能关键词</span></summary><div id="lmInsights" class="lm-insights-grid"></div></details>
+    </aside></div>
+</div>
+<dialog id="lmDetailDialog" class="lm-dialog" aria-labelledby="lmDetailTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-detail" aria-label="关闭岗位详情">×</button><div id="lmDetailContent"></div></dialog>
+<dialog id="lmSettingsDialog" class="lm-dialog lm-settings-dialog" aria-labelledby="lmSettingsTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-settings" aria-label="关闭采集管理">×</button><p class="lm-eyebrow">COLLECTION SETTINGS</p><h3 id="lmSettingsTitle">岗位采集计划</h3><p class="lm-muted">计划供全站共用，修改后按新间隔安排下一次采集。</p><form id="lmSettingsForm"><div id="lmSettingsFields"></div><p id="lmSettingsFeedback" role="status"></p><button type="submit" class="lm-btn lm-btn-primary">保存采集计划</button></form></dialog>

@@ -1,14 +1,16 @@
         <section id="jobs" class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
             <div class="jobs-explore-heading">
                 <span class="jobs-explore-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V4h8v3M3 12c6 4 12 4 18 0M12 12v4"/></svg></span>
-                <div><span class="jobs-explore-kicker">CAREER EXPLORER</span><h2>岗位探索中心</h2></div>
+                <div><h2 id="lmTitle">岗位探索中心</h2><p class="jobs-explore-description">从真实招聘信息出发，发现适合你的实习与就业机会。</p></div>
             </div>
 
 
             <nav class="jobs-view-switch" aria-label="探索视图">
-                <button type="button" data-jobs-view="list" aria-pressed="true" aria-controls="datasetBrowser">岗位列表</button>
+                <button type="button" data-jobs-view="live" aria-pressed="true" aria-controls="liveJobMarket">最新岗位</button>
+                <button type="button" data-jobs-view="list" aria-pressed="false" aria-controls="datasetBrowser">岗位档案</button>
                 <button type="button" data-jobs-view="cities" aria-pressed="false" aria-controls="legacyJobsExplorer">城市分析</button>
             </nav>
+            {% include "sections/job_market.html" %}
             {% include "sections/dataset_browser.html" %}
             <div id="legacyJobsExplorer" hidden>
             <div id="jobsLoading" class="py-16 text-center text-gray-400">

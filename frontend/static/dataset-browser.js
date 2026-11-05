@@ -34,6 +34,7 @@
   let needsReload = false;
   let analyticsPromise = null;
   let detailRecord = null;
+  let currentView = document.getElementById("liveJobMarket") ? "live" : "list";
   const categoryState = new Map();
   const categoryViews = {
     city_jobs: { title: "城市岗位", label: "寻找适合你的岗位", placeholder: "搜索岗位、技能、公司或城市", tag: "招聘样本", picks: ["前端", "Python", "产品经理", "实习"] },
@@ -392,13 +393,18 @@
     }
   });
   function selectView(view) {
+    currentView = view;
     const cities = view === "cities";
-    root.hidden = cities;
+    root.hidden = view !== "list";
+    const live = document.getElementById("liveJobMarket");
+    if (live) live.hidden = view !== "live";
     document.getElementById("legacyJobsExplorer").hidden = !cities;
     document.querySelectorAll("[data-jobs-view]").forEach(button => {
       button.setAttribute("aria-pressed", String(button.dataset.jobsView === view));
     });
     dialog.close();
+    window.dispatchEvent(new CustomEvent("jobs:view-changed", { detail: { view } }));
+    if (view === "list") void loadCatalog();
     if (cities && !analyticsPromise) {
       const panel = document.getElementById("legacyJobsExplorer");
       const loading = document.getElementById("jobsLoading");
@@ -448,11 +454,14 @@
         needsReload = Boolean(selected);
         page = 1;
       }
+      selectView(currentView);
+      if (currentView !== "list") return;
       await loadCatalog();
       if (needsReload) void loadPage(page);
       if (!document.getElementById("legacyJobsExplorer").hidden) requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
     },
     pause() {
+      window.JobMarket?.pause();
       if (pending) {
         needsReload = true;
         listController?.abort();

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" fill="none">
+  <defs><linearGradient id="glass" x1="70" y1="20" x2="240" y2="180" gradientUnits="userSpaceOnUse"><stop stop-color="#7fb5ff" stop-opacity=".14"/><stop offset="1" stop-color="#7fb5ff" stop-opacity="0"/></linearGradient></defs>
+  <g stroke="#7caeff" stroke-opacity=".38" stroke-linejoin="round">
+    <path d="m106 58 75-43 75 43v87l-75 43-75-43Z" fill="url(#glass)"/>
+    <path d="m106 58 75 43 75-43M181 15v86m0 0v87M121 49l75 43v87M136 41l75 42v87M151 32l75 43v87M166 24l75 42v87M106 76l75 43 75-43M106 94l75 43 75-43M106 112l75 43 75-43M106 130l75 43 75-43"/>
+    <path d="m42 114 40-23 40 23v47l-40 23-40-23Z" fill="url(#glass)"/>
+    <path d="m42 114 40 23 40-23M82 91v93M56 106l40 23v47M69 99l40 23v47M42 130l40 23 40-23M42 146l40 23 40-23M20 173l69-40M224 164l55-32"/>
+  </g>
+</svg>
