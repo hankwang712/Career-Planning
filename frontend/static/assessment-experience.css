@@ -67,7 +67,9 @@
 #assessmentModal .assessment-side-state { color: #4f6f99; font-size: 14px; }
 #assessmentModal .assessment-side-progress { color: #3d6ed4; font-size: 25px; }
 #assessmentModal .assessment-toolbar-btn { padding: 9px 12px; border: 1px solid #dfe7f1; border-radius: 9px; background: #fff; color: #7d90a9; font-size: 12px; }
-#assessmentModal .assessment-question-card { padding: 0; border: 0; box-shadow: none; background: transparent; }
+#assessmentModal .assessment-question-card { padding: 0; border: 0; box-shadow: none; background: transparent; animation: none; }
+/* Answer updates and question navigation recreate these cards; keep them visible. */
+#assessmentModal .assessment-ai-card:has(.assessment-option-grid) { animation: none; }
 .ax-question-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 #assessmentModal .assessment-question-index { color: #3768cb; font-size: 22px; font-weight: 700; background: transparent; padding: 0; }
 .assessment-question-index small { color: #9ba9bb; font-size: 13px; font-weight: 400; }
@@ -96,16 +98,53 @@
 #assessmentModal .assessment-home-card { padding: 25px; border: 1px solid #dfe8f7; border-radius: 16px; background: linear-gradient(135deg, #fff, #f3f7ff); }
 #assessmentModal .assessment-home-card h4 { color: #385477; font-size: 21px; }
 #assessmentModal .assessment-home-card p { color: #8295af; font-size: 14px; line-height: 1.9; }
-body[data-page="test-runner"] .tr-content { max-width: 1100px; margin: 0 auto; }
-body[data-page="test-runner"] .ts-hero { padding: 20px; border: 1px solid #e1e9f6; border-radius: 16px; background: linear-gradient(110deg, #f2f7ff, #fff); }
-body[data-page="test-runner"] .ts-hero img { max-width: 100px; max-height: 90px; object-fit: contain; }
-body[data-page="test-runner"] .ts-progress-wrap { position: relative; padding-top: 28px; }
-body[data-page="test-runner"] .ts-progress-wrap > .ax-auto-label { position: absolute; right: 0; top: 0; }
-body[data-page="test-runner"] .ts-question-card { padding: 32px; border-color: #dfe8f5; border-radius: 18px; background: #fff; }
-body[data-page="test-runner"] .ts-question-text { font-size: 25px; line-height: 1.8; color: #314c70; }
-body[data-page="test-runner"] .ts-option { min-height: 78px; padding: 18px; border: 1px solid #dce6f5; border-radius: 12px; background: #fff; color: #607d9f; font-size: 16px; line-height: 1.8; }
-body[data-page="test-runner"] .ts-option.selected { background: #edf4ff; color: #3f6ece; border-color: #6e97ed; box-shadow: inset 0 0 0 1px #6e97ed; }
-body[data-page="test-runner"] .ts-nav-row { position: sticky; bottom: 12px; z-index: 3; padding: 15px; border: 1px solid #e0e8f4; border-radius: 14px; background: #ffffffed; backdrop-filter: blur(12px); }
+body[data-page="test-runner"] { background: #f3f6fa; }
+body[data-page="test-runner"] .tr-layout { grid-template-columns: 228px minmax(0, 1fr); }
+body[data-page="test-runner"] .tr-topbar { padding: 18px 32px; background: #fff; }
+body[data-page="test-runner"] .tr-topbar h1 { font-size: 20px; line-height: 1.5; font-weight: 650; color: #2b4261; }
+body[data-page="test-runner"] .tr-topbar-kicker { font-size: 10px; color: #8a9bb0; }
+body[data-page="test-runner"] .tr-content { box-sizing: border-box; width: 100%; max-width: 1040px; padding: 32px; margin: 0 auto; }
+body[data-page="test-runner"] .ts-workspace { padding: 28px 36px 22px; border: 1px solid #e0e8f2; border-radius: 22px; box-shadow: 0 12px 40px -24px #29476b30; }
+body[data-page="test-runner"] .ts-quiz-shell { gap: 0; }
+body[data-page="test-runner"] .ts-hero { display: flex; gap: 18px; align-items: center; padding: 0 0 24px; border: 0; border-bottom: 1px solid #e9eef5; border-radius: 0; background: transparent; }
+body[data-page="test-runner"] .ts-hero img { flex: 0 0 64px; width: 64px; height: 64px; min-height: 0; max-height: none; border: 0; border-radius: 14px; object-fit: cover; }
+body[data-page="test-runner"] .ts-hero-copy { flex: 1; min-width: 0; gap: 5px; padding: 0; border: 0; background: transparent; }
+body[data-page="test-runner"] .ts-hero-copy h3 { font-size: 18px; color: #2b4261; font-weight: 650; }
+body[data-page="test-runner"] .ts-hero-copy p { font-size: 12px; color: #8191a6; }
+body[data-page="test-runner"] .ts-hero-copy .ts-meta-line { font-size: 11px; color: #97a5b6; }
+body[data-page="test-runner"] .ts-tools { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+body[data-page="test-runner"] .tr-btn { border-radius: 10px; padding: 11px 17px; font-size: 13px; box-shadow: none; }
+body[data-page="test-runner"] .tr-btn.ghost { background: #fff; color: #7387a2; border-color: #dce5f1; }
+body[data-page="test-runner"] .tr-btn.primary { background: #4779e3; border-color: #4779e3; }
+body[data-page="test-runner"] .ts-tools .tr-btn { padding: 8px 11px; font-size: 12px; }
+body[data-page="test-runner"] .ts-progress-wrap { gap: 11px; padding: 24px 0 0; border: 0; border-radius: 0; background: transparent; }
+body[data-page="test-runner"] .ts-progress-head strong { color: #4472c7; font-size: 14px; font-weight: 600; }
+body[data-page="test-runner"] .ts-progress-caption { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #97a5b7; }
+body[data-page="test-runner"] .ts-progress-track { height: 5px; background: #ecf1f8; }
+body[data-page="test-runner"] .ts-progress-fill { background: #6089e6; }
+body[data-page="test-runner"] .ts-question-card { min-height: 0; gap: 0; padding: 30px 0; border: 0; border-radius: 0; background: transparent; }
+body[data-page="test-runner"] .ts-question-no { margin-bottom: 12px; font-size: 11px; color: #92a2b8; }
+body[data-page="test-runner"] .ts-question-text { margin-bottom: 25px; font-size: 24px; line-height: 1.7; color: #2c4262; font-weight: 650; overflow-wrap: anywhere; }
+body[data-page="test-runner"] .ts-options { gap: 12px; }
+body[data-page="test-runner"] .ts-option { display: flex; align-items: center; gap: 13px; min-width: 0; min-height: 76px; padding: 16px 18px; border: 1px solid #dfe7f2; border-radius: 12px; background: #fff; color: #5d7391; font-size: 14px; line-height: 1.7; font-weight: 500; transition: border-color .15s, background .15s, color .15s; overflow-wrap: anywhere; }
+body[data-page="test-runner"] .ts-option:hover { transform: none; background: #f7faff; border-color: #a4bdec; }
+body[data-page="test-runner"] .ts-option-marker { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: 8px; background: #f0f4fa; color: #8b9eb8; font-size: 12px; font-weight: 650; }
+body[data-page="test-runner"] .ts-option.selected { background: #eff5ff; color: #3769cb; border-color: #7096e6; box-shadow: inset 0 0 0 1px #7096e6; }
+body[data-page="test-runner"] .ts-option.selected .ts-option-marker { background: #4779e3; color: #fff; }
+body[data-page="test-runner"] .ts-options-likert .ts-option { flex-direction: column; justify-content: center; text-align: center; padding: 18px 8px; }
+body[data-page="test-runner"] .ts-options-likert .ts-option-marker { flex-basis: auto; width: 28px; }
+body[data-page="test-runner"] .ts-nav-row { position: static; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 0; border: 0; border-top: 1px solid #e9eef5; border-radius: 0; background: transparent; }
+body[data-page="test-runner"] .ts-nav-forward { display: flex; gap: 10px; }
+body[data-page="test-runner"] .ts-hint-line { margin-top: 16px; color: #97a5b6; font-size: 11px; line-height: 1.7; text-align: center; }
+body[data-page="test-runner"] button:focus-visible { outline: 3px solid #aac5ff; outline-offset: 3px; }
+body[data-page="test-runner"] [hidden] { display: none !important; }
+@media (max-width: 1080px) {
+  body[data-page="test-runner"] .tr-layout { grid-template-columns: 1fr; }
+  body[data-page="test-runner"] .tr-sidebar { padding: 14px 20px; gap: 14px; }
+  body[data-page="test-runner"] .tr-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body[data-page="test-runner"] .tr-nav-link { padding: 10px; font-size: 12px; text-align: center; }
+  body[data-page="test-runner"] .tr-sidebar-footer { display: none; }
+}
 @media (max-width: 1050px) {
   .ax-selection { grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; }
   .ax-module-grid { grid-template-columns: minmax(0, 1fr); }
@@ -140,10 +179,21 @@ body[data-page="test-runner"] .ts-nav-row { position: sticky; bottom: 12px; z-in
   #assessmentModal .assessment-option-card { min-height: 88px; }
   #assessmentModal .assessment-question-actions { position: sticky; bottom: -22px; z-index: 2; padding: 16px 0; background: #fffffff2; }
   #assessmentModal .assessment-home-grid { grid-template-columns: minmax(0, 1fr); }
-  body[data-page="test-runner"] .ts-question-card { padding: 22px 17px; }
-  body[data-page="test-runner"] .ts-question-text { font-size: 21px; }
-  body[data-page="test-runner"] .ts-option { font-size: 14px; }
+  body[data-page="test-runner"] .tr-content { padding: 16px 12px; }
+  body[data-page="test-runner"] .tr-topbar { position: static; padding: 15px; flex-wrap: wrap; }
+  body[data-page="test-runner"] .tr-topbar h1 { font-size: 16px; }
+  body[data-page="test-runner"] .tr-topbar-left { gap: 10px; }
+  body[data-page="test-runner"] .tr-topbar-actions { margin-left: auto; }
+  body[data-page="test-runner"] .ts-workspace { padding: 22px 18px; border-radius: 16px; }
+  body[data-page="test-runner"] .ts-hero { flex-wrap: wrap; gap: 12px; padding-bottom: 20px; }
+  body[data-page="test-runner"] .ts-hero img { flex-basis: 50px; width: 50px; height: 50px; }
+  body[data-page="test-runner"] .ts-tools { width: 100%; justify-content: flex-end; }
+  body[data-page="test-runner"] .ts-question-card { padding: 26px 0; }
+  body[data-page="test-runner"] .ts-question-text { font-size: 21px; margin-bottom: 20px; }
+  body[data-page="test-runner"] .ts-option { min-height: 68px; padding: 14px; }
+  body[data-page="test-runner"] .ts-options-likert .ts-option { flex-direction: row; justify-content: flex-start; text-align: left; padding: 14px; }
 }
+@media (prefers-reduced-motion: reduce) { body[data-page="test-runner"] .ts-option, body[data-page="test-runner"] .ts-progress-fill { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .ax-module, .ax-answer-progress i, #assessmentModal .assessment-option-card { transition: none; } }
 #profile .assessment-center-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0 28px; color: #213c5d; }
 #profile .assessment-center-eyebrow { margin: 0 0 9px; color: #6e89a5; font-size: 10px; font-weight: 750; letter-spacing: .18em; }

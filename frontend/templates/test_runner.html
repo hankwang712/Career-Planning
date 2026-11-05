@@ -33,10 +33,6 @@
                 <button type="button" class="tr-nav-link" data-test="sbti">SBTI 人格扩展</button>
             </nav>
 
-            <div class="tr-sidebar-note">
-                <h2>完整测试流程</h2>
-            </div>
-
             <div class="tr-sidebar-footer">
                 <a class="tr-footer-link" href="/main.html#profile">返回主界面</a>
             </div>
@@ -61,22 +57,7 @@
             </header>
 
             <main class="tr-content">
-                <section class="tr-surface">
-                    <div class="tr-head-row">
-                        <div>
-                            <p class="tr-kicker">扩展测试流程</p>
-                            <h2 id="tsSectionTitle">深层 MBTI 测试</h2>
-                            <p id="tsSectionHint" class="tr-hint">完成全部题目后，会进入完整结果页，展示分布、角色解析和后续扩展内容。</p>
-                        </div>
-                        <div class="tr-head-actions">
-                            <button id="tsViewResultBtn" type="button" class="tr-btn ghost">查看完整结果</button>
-                            <button id="tsRestartBtn" type="button" class="tr-btn ghost">重新开始</button>
-                            <button id="tsBackBtn" type="button" class="tr-btn primary">返回主界面</button>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="tr-surface">
+                <section class="tr-surface ts-workspace" aria-label="测评作答">
                     <div class="ts-quiz-shell">
                         <div class="ts-hero">
                             <img id="tsCoverImage" src="{{ url_for('static', filename='trueyouteller/brand/trueyouteller.png') }}" alt="测试封面图">
@@ -85,16 +66,23 @@
                                 <p id="tsHeroDesc">点击选项后会自动记录答案，并在完成后跳转到对应的完整结果页。</p>
                                 <p id="tsMetaLine" class="ts-meta-line"></p>
                             </div>
+                            <div class="ts-tools">
+                                <button id="tsViewResultBtn" type="button" class="tr-btn ghost">查看上次结果</button>
+                                <button id="tsRestartBtn" type="button" class="tr-btn ghost">重新开始</button>
+                            </div>
                         </div>
 
                         <div class="ts-progress-wrap">
-                            <label class="ax-auto-label"><input type="checkbox" id="tsAutoAdvance" checked>自动下一题</label>
                             <div class="ts-progress-head">
                                 <strong id="tsProgressText">进度 0 / 0</strong>
-                                <span id="tsAnsweredText">已作答 0 / 0</span>
+                                <label class="ax-auto-label"><input type="checkbox" id="tsAutoAdvance" checked>自动下一题</label>
                             </div>
-                            <div class="ts-progress-track">
+                            <div class="ts-progress-track" role="progressbar" aria-label="作答进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                                 <div id="tsProgressFill" class="ts-progress-fill"></div>
+                            </div>
+                            <div class="ts-progress-caption">
+                                <span id="tsAnsweredText">已作答 0 / 0</span>
+                                <span>按日常感受选择即可</span>
                             </div>
                         </div>
 
@@ -105,9 +93,11 @@
                         </article>
 
                         <div class="ts-nav-row">
-                            <button id="tsPrevBtn" type="button" class="tr-btn ghost">上一题</button>
-                            <button id="tsNextBtn" type="button" class="tr-btn ghost">下一题</button>
-                            <button id="tsSubmitBtn" type="button" class="tr-btn primary">完成并查看完整结果</button>
+                            <button id="tsPrevBtn" type="button" class="tr-btn ghost">← 上一题</button>
+                            <div class="ts-nav-forward">
+                                <button id="tsNextBtn" type="button" class="tr-btn primary">下一题 →</button>
+                                <button id="tsSubmitBtn" type="button" class="tr-btn primary" hidden>查看测评结果 →</button>
+                            </div>
                         </div>
                         <p id="tsHintLine" class="ts-hint-line"></p>
                     </div>

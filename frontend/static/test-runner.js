@@ -179,8 +179,7 @@
     if (heroDescEl) heroDescEl.textContent = meta.heroDesc;
     if (coverEl) coverEl.src = coverForType(state.testType);
     if (metaLineEl) {
-      const sourceText = state.testType === "sbti" ? "SBTI 完整题库与匹配逻辑" : "trueyouteller 题库与素材";
-      metaLineEl.textContent = `总题数：${total} 题 ｜ 来源：${sourceText}`;
+      metaLineEl.textContent = `${total} 道题 · 进度自动保存`;
     }
 
     document.title = `${meta.pageTitle} | 职业规划智能体`;
@@ -199,6 +198,7 @@
     if (progressTextEl) progressTextEl.textContent = `进度 ${idx} / ${total}`;
     if (answeredTextEl) answeredTextEl.textContent = `已作答 ${answered} / ${total}`;
     if (fillEl) fillEl.style.width = `${progress}%`;
+    fillEl?.parentElement?.setAttribute("aria-valuenow", String(progress));
   }
 
   function renderOptions(question) {
@@ -227,7 +227,13 @@
       btn.type = "button";
       btn.className = "ts-option";
       if (String(selectedValue) === String(value)) btn.classList.add("selected");
-      btn.textContent = label;
+      const marker = document.createElement("span");
+      marker.className = "ts-option-marker";
+      marker.textContent = isDeep ? String(idx + 1) : String.fromCharCode(65 + idx);
+      marker.setAttribute("aria-hidden", "true");
+      const copy = document.createElement("span");
+      copy.textContent = label;
+      btn.append(marker, copy);
       btn.setAttribute("aria-pressed", String(String(selectedValue) === String(value)));
       btn.addEventListener("click", () => {
         if (advanceTimer || state.submitting) return;
@@ -294,13 +300,18 @@
     const questionKey = state.testType === "sbti" ? String(q.id || "") : Number(q.id);
     const answeredCurrent = state.answers[questionKey] !== undefined;
     if (prevBtn) prevBtn.disabled = state.idx <= 0 || state.submitting;
-    if (nextBtn) nextBtn.disabled = state.idx >= total - 1 || !answeredCurrent || state.submitting;
+    if (nextBtn) {
+      nextBtn.disabled = state.idx >= total - 1 || !answeredCurrent || state.submitting;
+      nextBtn.hidden = answered >= total;
+    }
     if (submitBtn) {
+      submitBtn.hidden = answered < total;
       submitBtn.disabled = answered < total || state.submitting;
-      submitBtn.textContent = state.submitting ? "正在生成结果..." : "完成并查看完整结果";
+      submitBtn.textContent = state.submitting ? "正在生成结果..." : "查看测评结果 →";
     }
     if (viewResultBtn) {
       viewResultBtn.disabled = !state.hasResult;
+      viewResultBtn.hidden = !state.hasResult;
     }
 
     updateProgress();
