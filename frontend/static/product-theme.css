@@ -68,6 +68,59 @@ nav.gradient-bg .nav-item.active { background: #eaf2ff !important; border-color:
 nav.gradient-bg .nav-item .tab-icon { width: 16px; height: 16px; }
 nav.gradient-bg .nav-workspace-pill { background: #f0f5fc !important; color: #496180; border-color: #e2eaf6; box-shadow: none !important; }
 nav.gradient-bg #liveClock { color: #8293aa !important; background: transparent !important; border: 0; font-size: 12px; }
+/* Main navigation: keep the primary destinations together and account actions separate. */
+nav.app-topbar { --topbar-height:76px; top:0; left:0; }
+nav.app-topbar .topbar-container { max-width:1680px; margin-inline:auto; padding-inline:28px; }
+nav.app-topbar .topbar-row { display:grid; grid-template-columns:minmax(170px,1fr) auto minmax(170px,1fr); gap:24px; min-height:76px; padding-block:12px; }
+nav.app-topbar .topbar-brand { width:fit-content; gap:10px; color:inherit; text-decoration:none; }
+nav.app-topbar .nav-brand-mark { width:38px; height:38px; border-radius:11px; box-shadow:0 3px 9px #1c3d7010; }
+nav.app-topbar .topbar-brand h1 { font-size:17px; letter-spacing:.02em; color:#203b63 !important; }
+nav.app-topbar .topbar-brand .leading-tight > p { margin-top:4px; color:#94a2b7 !important; font-size:10px; letter-spacing:.05em; }
+nav.app-topbar .nav-tab-strip { display:flex; justify-content:center; gap:4px; min-height:0; padding:5px; background:#f5f8fd; border:1px solid #edf1f8; border-radius:13px; max-width:100%; }
+nav.app-topbar .nav-item { display:inline-flex; align-items:center; gap:7px; min-height:36px; padding:8px 13px !important; font-size:12px !important; font-weight:550; line-height:1.4; border-radius:9px !important; color:#6b7e99 !important; transition:background-color .16s,color .16s,box-shadow .16s; }
+nav.app-topbar .nav-item .tab-icon { display:block; width:16px; height:16px; stroke-width:1.7; transform:none; opacity:.8; }
+nav.app-topbar .nav-item:hover { background:#eaf1fc !important; color:#246bfe !important; }
+nav.app-topbar .nav-item.active { color:#fff !important; background:#246bfe !important; box-shadow:0 3px 9px #246bfe24 !important; font-weight:650; }
+nav.app-topbar .nav-item.active .tab-icon { color:inherit; opacity:1; transform:none; }
+nav.app-topbar .nav-item.active::after { display:none; }
+nav.app-topbar .nav-item:focus-visible, nav.app-topbar .topbar-brand:focus-visible { outline:2px solid #84afff; outline-offset:3px; }
+nav.app-topbar .nav-action-strip { justify-self:end; gap:14px; }
+nav.app-topbar #liveClock { padding:0; font-size:11px; letter-spacing:.04em; font-variant-numeric:tabular-nums; box-shadow:none !important; }
+nav.app-topbar .nav-workspace-pill { min-height:39px; gap:8px; padding:4px 10px 4px 5px; border-radius:11px; background:white !important; border-color:#e7edf6; box-shadow:0 2px 8px #284d7e04 !important; }
+nav.app-topbar .nav-workspace-pill:hover { background:#f7faff !important; border-color:#c9dcfb; }
+nav.app-topbar .nav-workspace-avatar-wrap { width:29px; height:29px; border-radius:8px; background:linear-gradient(140deg,#548dff,#246bfe); }
+nav.app-topbar .nav-workspace-title { font-size:12px; font-weight:550; color:#526984 !important; }
+nav.app-topbar .nav-workspace-chevron { width:13px; height:13px; color:#9aabc0; }
+body.bg-gray-50 .app-topbar + main { padding-top:94px; }
+@media(max-width:1150px) {
+  nav.app-topbar .topbar-container { padding-inline:20px; }
+  nav.app-topbar .topbar-row { grid-template-columns:auto minmax(0,1fr) auto; gap:16px; }
+  nav.app-topbar .nav-tab-strip { justify-content:flex-start; }
+  nav.app-topbar #liveClock { display:none; }
+  nav.app-topbar .nav-item { padding-inline:11px !important; }
+}
+@media(max-width:760px) {
+  nav.app-topbar .topbar-container { padding-inline:16px; }
+  nav.app-topbar .topbar-row { grid-template-columns:minmax(0,1fr) auto; gap:10px; min-height:112px; padding-block:10px 8px; }
+  nav.app-topbar .topbar-brand { grid-column:1; grid-row:1; }
+  nav.app-topbar .topbar-brand .leading-tight { display:block; }
+  nav.app-topbar .topbar-brand h1 { font-size:15px; }
+  nav.app-topbar .nav-brand-mark { width:32px; height:32px; border-radius:9px; }
+  nav.app-topbar .topbar-brand .leading-tight > p { margin-top:3px; font-size:9px; }
+  nav.app-topbar .nav-action-strip { grid-column:2; grid-row:1; }
+  nav.app-topbar #navWorkspaceTitle { display:inline; }
+  nav.app-topbar .nav-workspace-pill { min-height:34px; gap:7px; padding:3px 7px 3px 4px; }
+  nav.app-topbar .nav-workspace-avatar-wrap { width:25px; height:25px; }
+  nav.app-topbar .nav-workspace-title { font-size:11px; }
+  nav.app-topbar .nav-tab-strip { grid-column:1/-1; grid-row:2; padding:4px; gap:3px; border-radius:10px; scroll-padding:4px; }
+  nav.app-topbar .nav-item { justify-content:center; flex:1 0 auto; gap:5px; padding:8px 9px !important; min-height:34px; font-size:11px !important; border-radius:7px !important; }
+  nav.app-topbar .nav-item .tab-icon { width:14px; height:14px; }
+  body.bg-gray-50 .app-topbar + main { padding-top:132px; }
+  html:has(.app-topbar) { scroll-padding-top:128px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  nav.app-topbar .nav-item { transition:none; }
+}
 body.bg-gray-50 .glass-surface { border-color: #e4ecf7; box-shadow: 0 6px 25px #31568706; }
 #dashboard.cs-home-concierge::before { background: radial-gradient(ellipse at top right, #d9eaff66, transparent 65%); }
 #dashboard.cs-home-concierge::after { background: none; }

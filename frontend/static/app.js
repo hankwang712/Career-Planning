@@ -10449,11 +10449,21 @@ function showSection(sectionId) {
     if (id === sectionId) {
       section.classList.remove("hidden");
       section.classList.add("fade-in");
-      if (navItem) navItem.classList.add("active");
+      if (navItem) {
+        navItem.classList.add("active");
+        navItem.setAttribute("aria-current", "page");
+        const strip = navItem.closest(".nav-tab-strip");
+        if (strip && strip.scrollWidth > strip.clientWidth) {
+          strip.scrollTo({ left: navItem.offsetLeft - strip.offsetLeft - (strip.clientWidth - navItem.offsetWidth) / 2, behavior: "auto" });
+        }
+      }
     } else {
       section.classList.add("hidden");
       section.classList.remove("fade-in");
-      if (navItem) navItem.classList.remove("active");
+      if (navItem) {
+        navItem.classList.remove("active");
+        navItem.removeAttribute("aria-current");
+      }
     }
   });
   document.querySelectorAll(".cs-hero-concierge-nav button[data-section]").forEach((btn) => {

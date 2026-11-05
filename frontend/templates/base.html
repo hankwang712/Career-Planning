@@ -252,33 +252,30 @@
     </div>
     
     <!-- 顶部导航 -->
-    <nav class="gradient-bg text-white shadow-lg fixed w-full z-50">
-        <div class="w-full px-4 lg:px-8">
-            <div class="flex items-center min-h-[4.55rem] gap-5 py-2">
+    <nav class="app-topbar gradient-bg text-white shadow-lg fixed w-full z-50" aria-label="主导航">
+        <div class="topbar-container w-full px-4 lg:px-8">
+            <div class="topbar-row flex items-center min-h-[4.55rem] gap-5 py-2">
                 <!-- 品牌区 -->
-                <div class="flex items-center gap-3 flex-shrink-0">
+                <a class="topbar-brand flex items-center gap-3 flex-shrink-0" href="/main.html#dashboard" aria-label="智航生涯首页">
                     <div class="app-brand-mark nav-brand-mark app-brand-mark--img" aria-hidden="true">
                         <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="40" height="40" decoding="async">
                     </div>
                     <div class="leading-tight">
                         <h1 class="text-base font-bold whitespace-nowrap">智航生涯</h1>
-                        <p class="text-xs text-purple-200 whitespace-nowrap">多智能体 · 大模型推理</p>
+                        <p class="text-xs text-purple-200 whitespace-nowrap">探索方向 · 规划未来</p>
                     </div>
-                </div>
-
-                <!-- 分隔线 -->
-                <div class="w-px h-8 bg-white/25 flex-shrink-0"></div>
+                </a>
 
                 <!-- 导航标签区：flex-1 自适应宽度，单行不换行 -->
                 <div class="nav-tab-strip flex items-center gap-2 flex-1 overflow-x-auto scrollbar-none">
-                    <button onclick="showSection('dashboard')" data-section="dashboard" class="nav-item active px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <button type="button" onclick="showSection('dashboard')" data-section="dashboard" aria-current="page" class="nav-item active px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
                         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="7" height="7" rx="1"></rect>
                             <rect x="14" y="3" width="7" height="7" rx="1"></rect>
                             <rect x="3" y="14" width="7" height="7" rx="1"></rect>
                             <rect x="14" y="14" width="7" height="7" rx="1"></rect>
                         </svg>
-                        智能仪表盘
+                        首页
                     </button>
                     <button onclick="showSection('jobs')" data-section="jobs" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
                         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -315,7 +312,7 @@
                     </button>
                 </div>
 
-                <!-- 右侧操作区：时钟 + 深色工作区胶囊（参考 Notion/Linear 工作区切换器） -->
+                <!-- 账号与工作区菜单 -->
                 <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
                     <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
                     <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
@@ -323,7 +320,7 @@
                             <span class="nav-workspace-avatar-wrap">
                                 <span id="currentUserAvatar" class="nav-workspace-avatar-inner">人</span>
                             </span>
-                            <span id="navWorkspaceTitle" class="nav-workspace-title">Personal</span>
+                            <span id="navWorkspaceTitle" class="nav-workspace-title">个人空间</span>
                             <svg class="nav-workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path d="M6 9l6 6 6-6"></path>
                             </svg>
