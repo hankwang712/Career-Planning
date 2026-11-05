@@ -99,6 +99,8 @@ from services import db as _app_db
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
 from services.career import create_blueprint as create_career_blueprint, snapshot as career_snapshot, sync_sources as sync_career_sources
+from services.job_market.api import create_blueprint as create_job_market_blueprint
+from services.job_market.collector import Collector as JobMarketCollector
 from services.chat import create_blueprint as create_chat_blueprint
 from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
@@ -8268,6 +8270,11 @@ def _career_chat_background(username):
 
 _chat_blueprint.chat_service.profile_provider = _career_chat_background
 app.register_blueprint(create_career_blueprint(_login_required, _current_user, _load_user_state, _career_memory_records))
+_job_market_collector = JobMarketCollector()
+app.extensions["job_market"] = _job_market_collector
+app.register_blueprint(create_job_market_blueprint(_job_market_collector, _login_required, _super_admin_required, _current_user))
+if os.environ.get("JOB_MARKET_SCHEDULER", "1").lower() not in {"0", "false", "no"}:
+    _job_market_collector.start_scheduler()
 _load_users()
 _prewarm_caches()
 

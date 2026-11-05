@@ -1,0 +1,6 @@
+# JobHunter collectors run in an isolated process; the host Flask version is unchanged.
+playwright>=1.58,<2
+playwright-stealth>=2.0,<3
+fonttools>=4.50,<5
+brotli>=1.0,<2
+openpyxl>=3.1,<4
