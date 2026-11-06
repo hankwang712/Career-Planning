@@ -31,7 +31,7 @@
 | --- | --- |
 | 🧩 测评中心 | MBTI、霍兰德、深层 MBTI、老友记角色、情绪主导、SBTI 六项测评；保存答题进度、查看历史结果，基础测评支持最近两次结果对比。 |
 | 🔎 岗位探索 | 定时获取公开招聘岗位，查看最新机会、样本行情、技能要求与来源时间，支持多维筛选和 Excel 导出；保留历史岗位档案与城市分析。详见[最新岗位与行情观察](docs/job-market.md)。 |
-| 📄 简历分析 | 上传 PDF、DOCX 等简历，提取经历与技能，分析岗位匹配情况、证据和待补材料；可按需启用 OCR。 |
+| 📄 简历分析 | 上传 PDF、DOCX 等简历，诊断经历深度、表达问题与证据缺口，给出有原文依据的修改建议；扫描文档可通过 OCR 读取。 |
 | 🗺️ 职业规划报告 | 结合简历、目标和偏好分阶段生成报告，支持补充信息、确认方向、编辑润色、版本查看与 Word / PDF 导出。 |
 | ✅ 行动与学习计划 | 根据阶段、目标和可投入时间安排近期任务，延伸到中长期成长路线；为准备事项提供交付成果与验收标准。 |
 | 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话，结合工作台资料、简历与已保存记忆回答，支持图片输入。 |
@@ -49,19 +49,47 @@ flowchart LR
 
 测评用于提供探索线索，职业建议还需要结合简历与岗位证据。报告中的招聘样本用于说明检索到的岗位要求，不代表全市场招聘规模或薪资趋势。
 
-<details>
-<summary>🖼️ 查看岗位探索与测评中心截图</summary>
+## 🖼️ 主要功能界面
 
-| 岗位探索 | 测评中心 |
+以下截图更新于 **2026-11-06**。职业档案、规划报告与对话使用匿名演示资料，岗位和资讯展示截图时的数据快照。点击图片可查看大图。
+
+| 实时岗位与行情 | 城市招聘分析 |
 | :---: | :---: |
-| [![岗位探索](asserts/jobs.png)](asserts/jobs.png) | [![测评中心](asserts/assessments.png)](asserts/assessments.png) |
+| [![实时岗位与行情：来源、采集时间、薪资与筛选](asserts/jobs.png)](asserts/jobs.png) | [![城市招聘分析：全国地图与城市岗位画像](asserts/city-analysis.png)](asserts/city-analysis.png) |
+
+| 统一职业档案 | 技能与证据 |
+| :---: | :---: |
+| [![职业档案：教育、经历、目标与资料来源](asserts/career-profile.png)](asserts/career-profile.png) | [![技能证据：自述、经历支持、成果验证与实际评估](asserts/skill-evidence.png)](asserts/skill-evidence.png) |
+
+| 六项职业与人格测评 | 简历材料与报告生成台 |
+| :---: | :---: |
+| [![测评中心：六项测评与完成记录](asserts/assessments.png)](asserts/assessments.png) | [![报告生成台：简历上传、目标方向与求职偏好](asserts/resume-analysis.png)](asserts/resume-analysis.png) |
+
+| 职业规划报告 | 学习路径与任务板 |
+| :---: | :---: |
+| [![职业规划报告：原文依据、能力差距、行动建议与导出](asserts/career-report.png)](asserts/career-report.png) | [![学习路径：阶段任务、交付物、验收标准与学习打卡](asserts/learning.png)](asserts/learning.png) |
+
+| AI 生涯助手 | Offer 茶水间 |
+| :---: | :---: |
+| [![浅色版生涯助手：连续对话、Markdown 表格与资料入口](asserts/assistant.png)](asserts/assistant.png) | [![Offer 茶水间：面经互助、简历讨论与岗位交流](asserts/community.png)](asserts/community.png) |
+
+<details>
+<summary>📰 查看行业资讯与多智能体协作流程</summary>
+
+**职业与行业快报**：按主题浏览技术、就业与职业成长资讯，保留来源和发布时间。
+
+[![职业规划与计算机行业快报](asserts/career-news.png)](asserts/career-news.png)
+
+**报告协作流程**：从简历分析、岗位证据到目标确认、行动规划与报告合成，页面展示各阶段的执行状态。
+
+[![多智能体报告协作流程](asserts/agent-workflow.png)](asserts/agent-workflow.png)
 
 </details>
 
 <details>
 <summary>🕸️ 查看 LightRAG 岗位知识图谱</summary>
 
-项目将岗位材料中的角色、技能、任务和能力要求组织成可检索图谱，结合原始 JD 证据进行职业画像、技能反查和岗位比较。下图为本项目已保存的 LightRAG 界面截图。
+项目将岗位材料中的角色、技能、任务和能力要求组织成可检索图谱，结合原始 JD 证据进行职业画像、技能反查和岗位比较。下图为当前 `career_jd` 知识库的 LightRAG 实际界面。
 
 [![LightRAG 岗位知识图谱](asserts/lightrag-career-graph.png)](asserts/lightrag-career-graph.png)
 
