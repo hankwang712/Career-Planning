@@ -17,13 +17,24 @@ from ..telemetry import AgentMetrics
 logger = logging.getLogger(__name__)
 
 
+class ModelOutputTruncatedError(ValueError):
+    """模型达到输出上限，不能将可能不完整的结构化结果交给后续节点。"""
+
+
 @after_model(can_jump_to=["model"])
 def check_model_output(state, runtime):
-    message = state["messages"][-1]
-    if not isinstance(message, AIMessage):
+    # 结构化输出解析器可能已在本次响应后追加 ToolMessage，仍需检查模型原始响应。
+    message = next((item for item in reversed(state["messages"]) if isinstance(item, AIMessage)), None)
+    if message is None:
         return
     if message.response_metadata.get("finish_reason") == "length":
-        raise ValueError("模型输出达到长度上限，结构化结果可能被截断。请精简输出或检查模型接口的输出 token 限制")
+        usage = message.usage_metadata or message.response_metadata.get("token_usage") or {}
+        tokens = usage.get("output_tokens", usage.get("completion_tokens"))
+        detail = f"，本次输出 {tokens} token" if isinstance(tokens, int) and not isinstance(tokens, bool) else ""
+        raise ModelOutputTruncatedError(
+            f"模型输出达到长度上限（finish_reason=length{detail}），结构化结果可能被截断。"
+            "请精简输出或检查模型接口的输出 token 限制"
+        )
     if message.invalid_tool_calls:
         # 替换损坏的工具调用，避免下一次请求包含未配对的 tool_call；原始响应由调用方诊断记录保存。
         if not message.id:
@@ -79,6 +90,9 @@ class BaseAgent(ABC):
             tools=tools,
             system_prompt=self.system_prompt,
             response_format=self.get_output_schema(prepared),
+            # 外层报告图按完整 Agent 步骤持久化。内部图不继承检查点，否则外层
+            # 重试会恢复到旧的 after_model 节点，永远不会重新请求模型。
+            checkpointer=False,
             middleware=[
                 check_model_output,
                 ModelCallLimitMiddleware(
@@ -99,6 +113,9 @@ class BaseAgent(ABC):
         elif isinstance(error, (ModelCallLimitExceededError, GraphRecursionError)):
             status = "execution_limit"
             message = "达到执行次数上限"
+        elif isinstance(error, ModelOutputTruncatedError):
+            status = "model_error"
+            message = str(error)
         elif isinstance(error, (StructuredOutputError, ValidationError)):
             status = "validation_failed"
             message = str(error)
@@ -137,12 +154,20 @@ class BaseAgent(ABC):
             graph = self.build_graph(prepared)
             state = await graph.ainvoke(
                 self.make_inputs(prepared),
-                config=merge_configs(config, {"callbacks": [metrics]})
+                config=merge_configs(config, {"callbacks": [metrics]}),
+                # 不继承外层 durability="sync"：本图没有检查点，部分 LangGraph
+                # 版本仍会等待不存在的 checkpoint future。外层继续同步保存步骤。
+                durability="exit",
             )
             draft = state.get("structured_response")
             result = self.format_result(draft)
         except Exception as error:
-            logger.exception("Agent 执行失败：%s", self.name)
+            # 仅记录用量和额度，不记录简历正文、模型输出或密钥。
+            budget = (getattr(self.model, "extra_body", None) or {}).get("max_tokens")
+            if budget is None:
+                budget = getattr(self.model, "max_tokens", None)
+            logger.exception("Agent 执行失败：%s | max_output_tokens=%s execution=%s",
+                             self.name, budget, metrics.summary())
             result = self.format_result(error=error)
         result["execution"] = metrics.summary()
         model = getattr(self.model, "model_name", None) or getattr(self.model, "model", None)

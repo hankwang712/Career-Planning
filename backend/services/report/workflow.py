@@ -54,9 +54,11 @@ async def _graph(runtime=None, stage_callback=None):
         from urllib.parse import urlsplit
         options = {}
         if (urlsplit(config["base_url"]).hostname or "").endswith(".deepseek.com") or urlsplit(config["base_url"]).hostname == "deepseek.com":
-            options["extra_body"] = {"thinking": {"type": "disabled"}}
+            # 与独立报告脚本保持一致；兼容接口需要原始 max_tokens 字段，
+            # 顶层参数会被 ChatOpenAI 改写为 max_completion_tokens。
+            options["extra_body"] = {"thinking": {"type": "disabled"}, "max_tokens": 16384}
         return ChatOpenAI(base_url=config["base_url"], api_key=config["api_key"], model=config["model"],
-                          timeout=180, max_retries=1, http_client=sync_client,
+                          temperature=0, timeout=180, max_retries=1, http_client=sync_client,
                           # Own clients preserve the SDK's default system/environment proxy handling.
                           http_async_client=async_client, http_socket_options=(), **options)
 

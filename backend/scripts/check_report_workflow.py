@@ -17,6 +17,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult, LLMResult
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
 from backend.services.report import workflow
@@ -90,6 +91,7 @@ class WorkflowChecks(unittest.TestCase):
         database = str(Path(self.directory.name) / "checkpoints.sqlite3")
         self.calls = []
         self.fail_plan = False
+        self.fail_resume = False
         owner = self
 
         def factory(name):
@@ -97,6 +99,10 @@ class WorkflowChecks(unittest.TestCase):
                 async def arun(self, payload, config=None):
                     owner.calls.append((name, deepcopy(payload)))
                     if name == "resume_analysis":
+                        if owner.fail_resume:
+                            owner.fail_resume = False
+                            return {"agent": name, "status": "model_error", "data": {},
+                                    "error": "模型输出达到长度上限"}
                         return {"agent": name, "status": "ok", "data": {"summary": "简历原文已提供"}}
                     if name == "job_analysis":
                         return job_result()
@@ -163,6 +169,19 @@ class WorkflowChecks(unittest.TestCase):
         self.assertEqual(len(bundle["meta"]["provenance"]["job_source_revisions"]), 2)
         self.assertTrue(workflow.read_report_workflow("offline-user", self.report_id)["complete"])
         self.assertFalse(workflow.read_report_workflow("another-user", self.report_id)["checkpoint_id"])
+
+    def test_failed_resume_is_executed_again_from_checkpoint(self):
+        self.fail_resume = True
+        with self.assertRaisesRegex(Exception, "模型输出达到长度上限"):
+            self.generate()
+        failed = workflow.read_report_workflow("offline-user", self.report_id)
+        self.assertEqual(failed["next"], ["resume_analysis"])
+        self.assertFalse(failed["complete"])
+        self.assertEqual([name for name, _ in self.calls], ["resume_analysis"])
+        with self.assertRaises(workflow.ReportNeedsInput):
+            self.generate({"checkpoint_id": failed["checkpoint_id"], "response": {}})
+        self.assertEqual([name for name, _ in self.calls].count("resume_analysis"), 2)
+        self.assertEqual(workflow.read_report_workflow("offline-user", self.report_id)["next"], ["review"])
 
     def test_failed_planning_resumes_without_repeating_upstream(self):
         snapshot = self.begin()
@@ -274,6 +293,136 @@ class EvidenceChecks(unittest.TestCase):
 
 
 class MetricsChecks(unittest.TestCase):
+    def test_nested_agent_retry_requests_new_output_instead_of_replaying_truncation(self):
+        from langchain.agents import create_agent
+
+        def legacy_agent(**kwargs):
+            # 首次失败使用修复前的持久化方式，确保已有失败报告也能恢复。
+            kwargs.pop("checkpointer", None)
+
+            class LegacyGraph:
+                def __init__(self):
+                    self.graph = create_agent(**kwargs)
+
+                def with_config(self, **config):
+                    self.graph = self.graph.with_config(**config)
+                    return self
+
+                async def ainvoke(self, *args, **config):
+                    config["durability"] = "sync"
+                    return await self.graph.ainvoke(*args, **config)
+
+            return LegacyGraph()
+
+        class CheckOutput(BaseModel):
+            summary: str
+
+        calls = []
+
+        class RecoveringModel(BaseChatModel):
+            @property
+            def _llm_type(self):
+                return "offline-recovering-model"
+
+            def bind_tools(self, tools, **kwargs):
+                return self
+
+            def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+                calls.append(True)
+                if len(calls) == 1:
+                    message = AIMessage(content="", response_metadata={"finish_reason": "length"},
+                        invalid_tool_calls=[{"name": "CheckOutput", "args": '{"summary":',
+                                             "id": "cut", "error": "incomplete JSON"}])
+                else:
+                    message = AIMessage(content="", response_metadata={"finish_reason": "stop"},
+                        tool_calls=[{"name": "CheckOutput", "args": {"summary": "recovered"}, "id": "complete"}])
+                return ChatResult(generations=[ChatGeneration(message=message)])
+
+        class CheckAgent(BaseAgent):
+            def prepare(self, payload):
+                return payload
+
+            def get_output_schema(self, prepared):
+                return CheckOutput
+
+        async def check():
+            async def resume(state, config):
+                result = await CheckAgent(RecoveringModel()).arun({}, config=config)
+                if result["status"] != "ok":
+                    raise RuntimeError(result["error"])
+                return result
+
+            with tempfile.TemporaryDirectory() as directory:
+                database = str(Path(directory) / "nested.sqlite3")
+                config = {"configurable": {"thread_id": "retry-truncated-resume"}}
+
+                def build(saver):
+                    builder = StateGraph(dict)
+                    builder.add_node("resume", resume)
+                    builder.add_edge(START, "resume")
+                    builder.add_edge("resume", END)
+                    return builder.compile(checkpointer=saver)
+
+                async with AsyncSqliteSaver.from_conn_string(database) as saver:
+                    with self.assertLogs("experiments.news_advisor.agents.base", level="ERROR"), patch(
+                            "experiments.news_advisor.agents.base.create_agent", side_effect=legacy_agent):
+                        with self.assertRaisesRegex(RuntimeError, "模型输出达到长度上限"):
+                            await build(saver).ainvoke({}, config, durability="sync")
+                    self.assertEqual(len(calls), 1)
+                # 与网页重试一致：关闭并重新创建图和数据库连接，保留失败报告的 thread_id。
+                async with AsyncSqliteSaver.from_conn_string(database) as saver:
+                    result = await build(saver).ainvoke(None, config, durability="sync")
+                    self.assertEqual(result["data"], {"summary": "recovered"})
+                    self.assertEqual(result["execution"]["model_calls"], 1)
+                    self.assertEqual(len(calls), 2)
+                    # 新建报告同样走网页的同步持久化入口，不能只验证历史报告恢复。
+                    fresh = await build(saver).ainvoke({},
+                        {"configurable": {"thread_id": "fresh-resume"}}, durability="sync")
+                    self.assertEqual(fresh["status"], "ok")
+                    self.assertEqual(fresh["execution"]["model_calls"], 1)
+                    self.assertEqual(len(calls), 3)
+
+        asyncio.run(check())
+
+    def test_truncated_output_is_rejected_even_when_json_is_parseable(self):
+        class CheckOutput(BaseModel):
+            summary: str
+
+        class TruncatedModel(BaseChatModel):
+            malformed: bool = False
+
+            @property
+            def _llm_type(self):
+                return "offline-truncated-model"
+
+            def bind_tools(self, tools, **kwargs):
+                return self
+
+            def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+                calls = {"invalid_tool_calls": [{"name": "CheckOutput", "args": '{"summary":',
+                         "id": "cut", "error": "incomplete JSON"}]} if self.malformed else {
+                    "tool_calls": [{"name": "CheckOutput", "args": {"summary": "partial"}, "id": "cut"}]}
+                return ChatResult(generations=[ChatGeneration(message=AIMessage(
+                    content="", response_metadata={"finish_reason": "length"},
+                    usage_metadata={"input_tokens": 20, "output_tokens": 8192, "total_tokens": 8212}, **calls))])
+
+        class CheckAgent(BaseAgent):
+            def prepare(self, payload):
+                return payload
+
+            def get_output_schema(self, prepared):
+                return CheckOutput
+
+        for malformed in (False, True):
+            with self.subTest(malformed=malformed), self.assertLogs(
+                    "experiments.news_advisor.agents.base", level="ERROR"):
+                result = asyncio.run(CheckAgent(TruncatedModel(malformed=malformed)).arun({}))
+                self.assertEqual(result["status"], "model_error")
+                self.assertEqual(result["data"], {})
+                self.assertIn("模型输出达到长度上限", result["error"])
+                self.assertIn("本次输出 8192 token", result["error"])
+                self.assertEqual(result["execution"]["output_tokens"], 8192)
+
     def test_real_agent_graph_propagates_usage_callbacks(self):
         class CheckOutput(BaseModel):
             summary: str

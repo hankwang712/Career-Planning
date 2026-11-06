@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 import sys
@@ -83,6 +84,11 @@ class ClientLifecycleChecks(unittest.TestCase):
 
         def client_factory():
             def respond(request):
+                body = json.loads(request.content)
+                self.assertEqual(body["max_tokens"], 16384)
+                self.assertEqual(body["temperature"], 0)
+                self.assertEqual(body["thinking"], {"type": "disabled"})
+                self.assertNotIn("max_completion_tokens", body)
                 return sdk_httpx.Response(200, json={"id": "offline", "object": "chat.completion", "created": 0,
                     "model": "offline", "choices": [{"index": 0, "finish_reason": "stop",
                     "message": {"role": "assistant", "content": "offline response"}}],
@@ -92,7 +98,7 @@ class ClientLifecycleChecks(unittest.TestCase):
             return client
 
         async def invoke():
-            async with workflow._graph({"base_url": "https://offline.invalid/v1", "api_key": "offline", "model": "offline"}) as model:
+            async with workflow._graph({"base_url": "https://api.deepseek.com", "api_key": "offline", "model": "offline"}) as model:
                 self.assertEqual((await model.ainvoke("offline check")).content, "offline response")
 
         with tempfile.TemporaryDirectory() as directory, patch.object(workflow, "APP_DATA_DIR", Path(directory)), \
