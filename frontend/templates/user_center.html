@@ -1316,22 +1316,22 @@
                                     </section>
                                 </aside>
 
+                                <div class="lp-board-head">
+                                    <div>
+                                        <p class="uc-section-kicker">Plan Workspace</p>
+                                        <h3 class="up-section-title">学习计划任务板</h3>
+                                    </div>
+                                    <div class="lp-board-actions">
+                                        <div id="lpFusionFilterBar" class="lp-plan-filter-bar"></div>
+                                        <button class="up-new-btn" type="button" onclick="createNewPlan()">
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                            新建计划
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <section class="uc-surface lp-plan-board lp-plan-board--fusion">
                                     <div id="lpFusionListView">
-                                        <div class="lp-board-head">
-                                            <div>
-                                                <p class="uc-section-kicker">Plan Workspace</p>
-                                                <h3 class="up-section-title">学习计划任务板</h3>
-                                            </div>
-                                            <div class="lp-board-actions">
-                                                <div id="lpFusionFilterBar" class="lp-plan-filter-bar"></div>
-                                                <button class="up-new-btn" type="button" onclick="createNewPlan()">
-                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                                    新建计划
-                                                </button>
-                                            </div>
-                                        </div>
-
                                         <div id="lpFusionComposer" class="lp-plan-composer hidden">
                                             <div class="lp-plan-composer-grid">
                                                 <label>
@@ -2671,6 +2671,11 @@
         gap: 18px;
       }
 
+      #plan-workspace #lpFusionRoot {
+        display: grid;
+        gap: 18px;
+      }
+
       #plan-workspace .lp-overview-surface {
         padding: 0;
         background: transparent;
@@ -2717,7 +2722,16 @@
 
       #plan-workspace .lp-grid--fusion {
         grid-template-columns: 240px minmax(0, 1fr);
+        grid-template-areas: ". heading" "sidebar board";
         gap: 16px;
+      }
+
+      #plan-workspace .lp-left-panel--fusion {
+        grid-area: sidebar;
+      }
+
+      #plan-workspace .lp-plan-board--fusion {
+        grid-area: board;
       }
 
       #plan-workspace .lp-left-panel--fusion,
@@ -2741,6 +2755,36 @@
         background: var(--lp-surface-hero);
         border-color: rgba(121, 154, 214, 0.22);
         box-shadow: 0 22px 44px rgba(37, 55, 95, 0.22);
+        gap: 10px;
+        align-content: start;
+      }
+
+      #plan-workspace .lp-level-card-top {
+        align-items: center;
+      }
+
+      #plan-workspace .lp-level-card-badge {
+        flex-shrink: 0;
+      }
+
+      #plan-workspace .lp-level-card-kicker,
+      #plan-workspace .lp-streak-best {
+        margin: 0;
+      }
+
+      #plan-workspace .lp-level-row {
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+      }
+
+      #plan-workspace .lp-growth-copy {
+        gap: 2px;
+      }
+
+      #plan-workspace .lp-checkin-sub {
+        margin: 0;
+        line-height: 1.6;
       }
 
       #plan-workspace .lp-level-card-badge {
@@ -2798,6 +2842,13 @@
       }
 
       #plan-workspace .lp-checkin-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 8px 14px;
+        line-height: 24px;
         background: linear-gradient(135deg, #1fbf8f 0%, #12a06d 100%);
         box-shadow: 0 16px 28px rgba(18, 160, 109, 0.22);
       }
@@ -2858,8 +2909,20 @@
       }
 
       #plan-workspace .lp-board-head {
+        grid-area: heading;
         align-items: center;
-        margin-bottom: 6px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 0;
+      }
+
+      #plan-workspace .lp-board-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        margin-left: auto;
       }
 
       #plan-workspace .lp-board-head .uc-section-kicker {
@@ -2875,11 +2938,25 @@
       }
 
       #plan-workspace .up-new-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-shrink: 0;
+        min-width: 112px;
+        min-height: 40px;
+        white-space: nowrap;
+        line-height: 20px;
         border: none;
         background: linear-gradient(135deg, #4f7df6 0%, #6366f1 100%);
         color: #fff;
         border-radius: 12px;
         padding: 10px 14px;
+      }
+
+      #plan-workspace .up-new-btn svg {
+        display: block;
+        flex-shrink: 0;
       }
 
       #plan-workspace .lp-plan-composer-grid input,
@@ -3178,6 +3255,10 @@
         #plan-workspace .lp-overview-stats,
         #plan-workspace .lp-grid--fusion {
           grid-template-columns: 1fr;
+        }
+
+        #plan-workspace .lp-grid--fusion {
+          grid-template-areas: "sidebar" "heading" "board";
         }
       }
     </style>
