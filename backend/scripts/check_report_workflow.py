@@ -293,6 +293,23 @@ class EvidenceChecks(unittest.TestCase):
 
 
 class MetricsChecks(unittest.TestCase):
+    def test_resume_quotes_allow_ocr_math_formatting_but_reject_changed_facts(self):
+        from experiments.news_advisor.agents.resume import ResumeAnalysisAgent
+        agent = ResumeAnalysisAgent(None)
+        schema = agent.get_output_schema(agent.prepare({"raw_resume": r"专业排名：前 \(3\%\)，参与课程项目。"}))
+        draft = {"summary": "材料诊断", "dimensions": [], "experiences": [], "issues": [],
+                 "recommendations": [], "missing_information": []}
+        for quote, valid in [("专业排名：前3%", True), (r"专业排名：前 \(3\%\)", True),
+                             ("专业排名：前2%", False), ("前3%，独立完成课程项目", False)]:
+            with self.subTest(quote=quote):
+                payload = {**draft, "career_profile": [{"field": "strengths", "value": "学业表现",
+                           "source": "raw_resume", "quote": quote}]}
+                if valid:
+                    self.assertEqual(schema.model_validate(payload).career_profile[0].quote, quote)
+                else:
+                    with self.assertRaises(ValueError):
+                        schema.model_validate(payload)
+
     def test_nested_agent_retry_requests_new_output_instead_of_replaying_truncation(self):
         from langchain.agents import create_agent
 

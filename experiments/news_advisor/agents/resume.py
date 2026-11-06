@@ -122,12 +122,17 @@ class ResumeAnalysisAgent(BaseAgent):
         return bool(prepared["raw_resume"])
 
     def get_output_schema(self, prepared: dict):
+        def normalize_quote(text):
+            # OCR 会把百分数写为 \(3\%\)；仅去除数学定界符和字符转义，保留事实。
+            text = re.sub(r"\\[()\[\]]|\\(?=[%_#&{}$])", "", text)
+            return re.sub(r"\s+", "", text)
+
         class EvidencedResumeAnalysis(ResumeAnalysis):
             @model_validator(mode="after")
             def verify_profile_quotes(self):
                 for fact in self.career_profile:
-                    quote = re.sub(r"\s+", "", fact.quote)
-                    source = re.sub(r"\s+", "", prepared.get(fact.source, ""))
+                    quote = normalize_quote(fact.quote)
+                    source = normalize_quote(prepared.get(fact.source, ""))
                     if not quote or quote not in source:
                         raise ValueError("职业画像必须引用对应用户材料中的连续原文")
                 return self
