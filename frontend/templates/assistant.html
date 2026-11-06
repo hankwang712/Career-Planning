@@ -11,6 +11,7 @@
     <script src="{{ url_for('static', filename='chat-markdown.js') }}" defer></script>
     <script src="{{ url_for('static', filename='chat-typing.js') }}" defer></script>
     <script src="{{ url_for('static', filename='assistant.js') }}" defer></script>
+    {% include "partials/app_cursor.html" %}
 </head>
 <body>
     <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

@@ -15,6 +15,7 @@
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
     {{ vite_asset_tags('src/entries/login.js') }}
+    {% include "partials/app_cursor.html" %}
 </head>
 <body class="shell-body auth-locked page-login">
     {% include "partials/page_loader.html" %}

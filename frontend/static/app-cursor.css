@@ -1,0 +1,33 @@
+/* Shared native cursor. The hotspot is the glove's raised fingertip. */
+@media (any-hover:hover) and (any-pointer:fine) {
+    :root {
+        --app-cursor:url("assets/cursors/white-glove.png") 6 3;
+    }
+
+    html,html * {
+        cursor:var(--app-cursor),auto!important;
+    }
+
+    textarea,
+    input:not([type="button"],[type="submit"],[type="reset"],[type="checkbox"],[type="radio"],[type="range"],[type="color"],[type="file"]),
+    [contenteditable="true"],[contenteditable="true"] * {
+        cursor:text!important;
+    }
+
+    :disabled,[aria-disabled="true"] {
+        cursor:not-allowed!important;
+    }
+
+    .uc-cropper-frame,.uc-cropper-frame * {
+        cursor:grab!important;
+    }
+
+    .uc-cropper-frame.dragging,.uc-cropper-frame.dragging * {
+        cursor:grabbing!important;
+    }
+
+    .report-editor-col-resizer,
+    body[style*="col-resize"],body[style*="col-resize"] * {
+        cursor:col-resize!important;
+    }
+}

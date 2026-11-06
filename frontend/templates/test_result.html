@@ -10,6 +10,7 @@
     </script>
     <script src="{{ url_for('static', filename='return-nav.js') }}"></script>
     {{ vite_asset_tags('src/entries/test-result.js') }}
+    {% include "partials/app_cursor.html" %}
 </head>
 <body class="tr-page" data-page="test-result">
     {% include "partials/page_loader.html" %}

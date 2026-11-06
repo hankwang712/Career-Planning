@@ -11,6 +11,7 @@
     <script src="{{ url_for('static', filename='return-nav.js') }}"></script>
     {{ vite_asset_tags('src/entries/test-runner.js') }}
     <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}">
+    {% include "partials/app_cursor.html" %}
 </head>
 <body class="tr-page" data-page="test-runner">
     {% include "partials/page_loader.html" %}
