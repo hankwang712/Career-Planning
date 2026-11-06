@@ -62,7 +62,10 @@ def verify_action_plan(plan: ActionPlan, prepared: dict) -> list[str]:
         reduced_hours[task.week] = reduced_hours.get(task.week, 0) + task.hours
     for week, total in reduced_hours.items():
         if week in weeks and total > reduced.weekly_hours * weeks[week]["days"] / 7 + 1e-6:
-            errors.append(f"缩减方案第 {week} 周工时超出可用时间")
+            capacity = reduced.weekly_hours * weeks[week]["days"] / 7
+            errors.append(f"缩减方案第 {week} 周工时超出可用时间：保留任务合计 {total:g} 小时，"
+                          f"上限 {capacity:g} 小时（每周 {reduced.weekly_hours:g} 小时 × {weeks[week]['days']}/7）；"
+                          "请删减 keep_task_ids 并保留依赖，或在小于原每周时间的范围内调整 weekly_hours")
     if plan.development_roadmap:
         if [item.horizon for item in plan.development_roadmap] != ["short", "mid", "long"]:
             errors.append("成长路线必须按 short、mid、long 顺序各提供一个阶段")

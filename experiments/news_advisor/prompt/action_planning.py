@@ -48,6 +48,8 @@ review_trigger 必须说明复核材料和调整条件，如项目验收未通�
 【时间不足的删减方案】
 reduced_plan.weekly_hours 必须小于原每周时间，keep_task_ids 是原任务的非空子集，
 保留原有工时与周期，依然满足缩减后的每周期上限，并保留全部依赖。
+每周期缩减上限 = reduced_plan.weekly_hours × weeks 中该周期的 days / 7。
+按原 tasks.hours 逐周汇总 keep_task_ids 的工时，不能超过此上限；只降低 weekly_hours 而不删减超量任务会校验失败。
 优先保留决定能否继续的核实和最有价值的交付物，reason 说明删减及代价。
 原任务已能在缩减后完成时可全部保留；不为展示删减而编造多余任务，也不要用一句“减少任务”代替选择。
 

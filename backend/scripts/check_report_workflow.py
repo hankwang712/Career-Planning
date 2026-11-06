@@ -290,6 +290,10 @@ class EvidenceChecks(unittest.TestCase):
             invalid = deepcopy(valid)
             invalid["tasks"][0].update(change)
             self.assertTrue(verify_action_plan(ActionPlan.model_validate(invalid), prepared))
+        invalid = deepcopy(valid)
+        invalid["reduced_plan"]["weekly_hours"] = 0.5
+        errors = verify_action_plan(ActionPlan.model_validate(invalid), prepared)
+        self.assertTrue(any("合计 1 小时" in error and "上限 0.5 小时" in error for error in errors))
 
 
 class MetricsChecks(unittest.TestCase):
