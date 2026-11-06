@@ -314,48 +314,8 @@
 
                 <!-- 账号与工作区菜单 -->
                 <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
-                    <span id="liveClock" class="hidden xl:inline-flex text-sm bg-white/15 px-3 py-1.5 rounded-full tracking-wide whitespace-nowrap">--:--:--</span>
-                    <div id="navWorkspaceShell" class="nav-workspace-shell relative hidden">
-                        <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区与账号菜单">
-                            <span class="nav-workspace-avatar-wrap">
-                                <span id="currentUserAvatar" class="nav-workspace-avatar-inner">人</span>
-                            </span>
-                            <span id="navWorkspaceTitle" class="nav-workspace-title">个人空间</span>
-                            <svg class="nav-workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M6 9l6 6 6-6"></path>
-                            </svg>
-                        </button>
-                        <div id="navWorkspaceMenu" class="nav-workspace-menu hidden" role="menu" aria-labelledby="navWorkspaceToggle">
-                            <div class="nav-workspace-menu-header">
-                                <span id="currentUserLabel" class="nav-workspace-menu-label">未登录</span>
-                            </div>
-                            <div class="nav-workspace-menu-divider" role="presentation"></div>
-                            <button type="button" id="notificationBtn" class="nav-workspace-menu-row" role="menuitem" data-tooltip="系统通知">
-                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                                </svg>
-                                <span class="nav-workspace-menu-row-text">系统通知</span>
-                                <span id="notificationCount" class="nav-workspace-menu-badge">3</span>
-                            </button>
-                            <a href="/user-center.html#career-profile" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" title="个人中心">
-                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                                <span class="nav-workspace-menu-row-text">个人中心</span>
-                            </a>
-                            <button type="button" class="nav-workspace-menu-row" role="menuitem" onclick="closeNavWorkspaceMenu(); toggleSettingsPanel(event);" title="模型设置">
-                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 0 1 7.04 4.3l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.49 1 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
-                                </svg>
-                                <span class="nav-workspace-menu-row-text">模型设置</span>
-                            </button>
-                            <div class="nav-workspace-menu-divider" role="presentation"></div>
-                            <button type="button" id="logoutBtn" onclick="logout()" class="nav-workspace-menu-row nav-workspace-menu-danger" role="menuitem">退出登录</button>
-                        </div>
-                    </div>
+                    <span id="liveClock" class="topbar-clock" title="当前本地时间">--:--:--</span>
+                    {% include "partials/account_menu.html" %}
                 </div>
             </div>
         </div>

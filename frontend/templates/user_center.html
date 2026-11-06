@@ -1135,11 +1135,9 @@
                     </div>
                 </div>
                 <div class="uc-topbar-actions">
-                    <span id="currentUserLabel" class="topbar-pill">未登录</span>
-                    <button id="logoutBtn" type="button" onclick="logout()" class="topbar-text-btn">退出</button>
-                    <button type="button" class="topbar-avatar-btn" onclick="switchUserCenterSection('career-profile')" title="职业档案" aria-label="打开职业档案">
-                        <span id="currentUserAvatar">人</span>
-                    </button>
+                    {% with account_menu_in_center = true %}
+                    {% include "partials/account_menu.html" %}
+                    {% endwith %}
                 </div>
             </header>
 

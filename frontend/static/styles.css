@@ -14260,11 +14260,11 @@ nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
 }
 
 /* 顶栏右侧：浅色 Personal 工作区胶囊 + 白底下拉（覆盖上方通用 nav 按钮 token） */
-nav.gradient-bg .nav-workspace-shell {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-shell {
     flex-shrink: 0;
 }
 
-nav.gradient-bg .nav-workspace-pill {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -14279,17 +14279,17 @@ nav.gradient-bg .nav-workspace-pill {
     transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-nav.gradient-bg .nav-workspace-pill:hover {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-pill:hover {
     border-color: rgba(15, 23, 42, 0.14);
     background: #f8fafc !important;
 }
 
-nav.gradient-bg .nav-workspace-pill:focus-visible {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-pill:focus-visible {
     outline: 2px solid rgba(99, 179, 237, 0.85);
     outline-offset: 2px;
 }
 
-nav.gradient-bg .nav-workspace-avatar-wrap {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-avatar-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -14302,7 +14302,7 @@ nav.gradient-bg .nav-workspace-avatar-wrap {
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 
-nav.gradient-bg .nav-workspace-title {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-title {
     font-size: 0.875rem;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -14310,7 +14310,7 @@ nav.gradient-bg .nav-workspace-title {
     text-shadow: none;
 }
 
-nav.gradient-bg .nav-workspace-chevron {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-chevron {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
@@ -14319,16 +14319,16 @@ nav.gradient-bg .nav-workspace-chevron {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    nav.gradient-bg .nav-workspace-chevron {
+    :is(nav.gradient-bg, .uc-topbar) .nav-workspace-chevron {
         transition: none;
     }
 }
 
-nav.gradient-bg .nav-workspace-menu-open .nav-workspace-chevron {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-open .nav-workspace-chevron {
     transform: rotate(180deg);
 }
 
-nav.gradient-bg .nav-workspace-menu {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu {
     position: absolute;
     right: 0;
     top: calc(100% + 0.45rem);
@@ -14341,11 +14341,11 @@ nav.gradient-bg .nav-workspace-menu {
     box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }
 
-nav.gradient-bg .nav-workspace-menu-header {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-header {
     padding: 0.55rem 0.65rem 0.35rem;
 }
 
-nav.gradient-bg .nav-workspace-menu-label {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-label {
     display: block;
     font-size: 0.75rem;
     line-height: 1.35;
@@ -14356,14 +14356,14 @@ nav.gradient-bg .nav-workspace-menu-label {
     max-width: 16rem;
 }
 
-nav.gradient-bg .nav-workspace-menu-divider {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-divider {
     height: 1px;
     margin: 0.2rem 0.35rem;
     background: rgba(15, 23, 42, 0.08);
 }
 
-nav.gradient-bg .nav-workspace-menu-row,
-nav.gradient-bg .nav-workspace-menu-link {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row,
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-link {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -14382,29 +14382,29 @@ nav.gradient-bg .nav-workspace-menu-link {
     transition: background-color 0.15s ease;
 }
 
-nav.gradient-bg .nav-workspace-menu-row:hover,
-nav.gradient-bg .nav-workspace-menu-link:hover {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row:hover,
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-link:hover {
     background: rgba(15, 23, 42, 0.06) !important;
 }
 
-nav.gradient-bg .nav-workspace-menu-row:focus-visible,
-nav.gradient-bg .nav-workspace-menu-link:focus-visible {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row:focus-visible,
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-link:focus-visible {
     outline: 2px solid rgba(99, 179, 237, 0.75);
     outline-offset: 0;
 }
 
-nav.gradient-bg .nav-workspace-menu-row .action-icon {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row .action-icon {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
     opacity: 0.9;
 }
 
-nav.gradient-bg .nav-workspace-menu-row-text {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row-text {
     flex: 1 1 auto;
 }
 
-nav.gradient-bg .nav-workspace-menu-badge {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-badge {
     margin-left: auto;
     min-width: 1.35rem;
     padding: 0.1rem 0.4rem;
@@ -14416,15 +14416,15 @@ nav.gradient-bg .nav-workspace-menu-badge {
     color: #fff !important;
 }
 
-nav.gradient-bg .nav-workspace-menu-danger {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-danger {
     color: #dc2626 !important;
 }
 
-nav.gradient-bg .nav-workspace-menu-danger:hover {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-danger:hover {
     background: rgba(254, 226, 226, 0.85) !important;
 }
 
-nav.gradient-bg .nav-workspace-shell #currentUserAvatar {
+:is(nav.gradient-bg, .uc-topbar) .nav-workspace-shell #currentUserAvatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
