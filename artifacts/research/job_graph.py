@@ -1684,7 +1684,7 @@ def main():
         parser.print_help()
         return
     schema = getattr(args, "schema", "legacy")
-    args.workspace = args.workspace or ("career_v1" if schema == "career" else "career_jd")
+    args.workspace = args.workspace or "career_jd"
     args.webui_port = args.webui_port or (9622 if schema == "career" else 9621)
     if args.command == "career" and args.dry_run and args.action != "merge":
         parser.error("--dry-run只支持career merge，其他维护操作不会在此参数下执行")
