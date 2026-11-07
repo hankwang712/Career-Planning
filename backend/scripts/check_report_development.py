@@ -29,9 +29,9 @@ class DevelopmentChecks(unittest.TestCase):
 
     def test_sections_evidence_and_real_dates(self):
         bundle = self.bundle()
-        self.assertEqual(len(bundle["report_document"]["section_order"]), 10)
-        self.assertIn("职业探索", bundle["report_document"]["sections"]["personal_traits"]["markdown"])
-        self.assertIn("不是全市场招聘统计", bundle["report_document"]["sections"]["macro_environment"]["markdown"])
+        self.assertEqual(len(bundle["report_document"]["section_order"]), 6)
+        self.assertEqual(bundle["report_document"]["student_stage"], "exploration")
+        self.assertIn("不是全市场招聘统计", bundle["report_document"]["sections"]["appendix"]["markdown"])
         self.assertIsNone(bundle["report_document"]["dashboard_summary"]["fit_score"])
         self.assertEqual(len(bundle["phase_plan"]["checkpoints"]), 3)
         action = next(item for item in bundle["phase_plan"]["short_term"] if item.get("is_action"))
@@ -53,7 +53,7 @@ class DevelopmentChecks(unittest.TestCase):
         self.state["results"]["action_planning"]["data"].pop("development_roadmap")
         bundle = self.bundle()
         self.assertFalse(bundle["phase_plan"]["mid_term"])
-        self.assertIn("历史报告", bundle["report_document"]["sections"]["development_path"]["markdown"])
+        self.assertNotIn("未来一至三个月", bundle["report_document"]["sections"]["development_path"]["markdown"])
 
     def test_profile_quotes_must_exist_in_candidate_source(self):
         agent = ResumeAnalysisAgent(None)

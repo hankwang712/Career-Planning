@@ -3307,7 +3307,11 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
         "role_match": "目标岗位对比",
         "path_plan": "职业路径",
     }
-    if report_document.get("section_order"):
+    if report_document.get("reading_layout") == "narrative-v1":
+        required_sections = {"executive_summary": "核心结论", "personal_traits": "个人经历",
+                             "matching_decision": "岗位适配", "gap_action_plan": "近期行动",
+                             "development_path": "成长与调整", "appendix": "参考依据"}
+    elif report_document.get("section_order"):
         required_sections = {"personal_traits": "个人画像", "target_job_analysis": "职业目标", "macro_environment": "就业市场",
                              "matching_decision": "岗位适配", "ability_gaps": "能力差距", "development_path": "成长路径",
                              "gap_action_plan": "行动计划", "risk_backup": "动态评估", "appendix": "参考依据"}
@@ -3317,8 +3321,8 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
             issues.append({"level": "warning", "type": "missing_section", "message": f"缺少“{label}”章节。"})
 
     markdown_value = str(markdown_text or report_document.get("markdown") or "").strip()
-    if len(markdown_value) < 600:
-        issues.append({"level": "warning", "type": "content_length", "message": "完整报告正文偏短，建议补充行业、差距和行动计划说明。"})
+    if report_document.get("reading_layout") != "narrative-v1" and len(markdown_value) < 600:
+        issues.append({"level": "warning", "type": "content_length", "message": "报告正文偏短，请检查关键判断、依据和行动安排是否完整。"})
 
     explainability_summary = report_document.get("explainability_summary") if isinstance(report_document.get("explainability_summary"), dict) else {}
     because_items = explainability_summary.get("headline_because") if isinstance(explainability_summary.get("headline_because"), list) else []
