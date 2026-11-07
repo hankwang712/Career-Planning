@@ -8,6 +8,7 @@ from pydantic import ValidationError, model_validator
 
 from experiments.news_advisor.agents.action_planning import ActionPlanningAgent
 from experiments.news_advisor.telemetry import AgentMetrics
+from experiments.news_advisor.utils.dates import verify_education_timeline_claims
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,10 @@ class ReportActionPlanningAgent(ActionPlanningAgent):
         class CareerDevelopmentPlan(parent):
             @model_validator(mode="after")
             def require_roadmap(self):
+                errors = verify_education_timeline_claims(self.model_dump(), "\n".join(
+                    source["content"] for source in prepared.get("sources", []) if source["kind"] == "resume"))
+                if errors:
+                    raise ValueError("；".join(errors))
                 if len(self.development_roadmap) != 3:
                     raise ValueError("请提供 short、mid、long 三阶段成长路线，每阶段包含具体准备事项、交付物、验收标准和调整条件")
                 return self

@@ -124,6 +124,7 @@ class ActionPlanningAgent(BaseAgent):
             "sources": [source for source in upstream["sources"]
                         if source["kind"] != "job" or source.get("target_id") == request.target_id],
             "constraints": constraints, "weeks": weeks,
+            "education_timeline": upstream["education_timeline"],
             "input_limitations": list(dict.fromkeys(
                 upstream["input_limitations"] + decision["limitations"]
             )),

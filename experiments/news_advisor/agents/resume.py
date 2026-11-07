@@ -9,7 +9,7 @@ from ..prompt.resume_analysis import RESUME_ANALYSIS_PROMPT
 from ..resume_rubric import DEFAULT_EXPERIENCE_WEIGHTS, EXPERIENCE_WEIGHTS, RESUME_WEIGHTS
 from ..schemas.resume import ResumeAnalysis, ResumeInput
 from ..tools.document import read_document
-from ..utils.dates import resume_date_context
+from ..utils.dates import education_timeline_context, resume_date_context, verify_education_timeline_claims
 from .base import BaseAgent
 
 
@@ -115,6 +115,7 @@ class ResumeAnalysisAgent(BaseAgent):
         analysis_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
         prepared["analysis_date"] = analysis_date.isoformat()
         prepared["date_context"] = resume_date_context(prepared["raw_resume"], analysis_date)
+        prepared["education_timeline"] = education_timeline_context(prepared["raw_resume"])
         return prepared
 
     def should_run(self, prepared: dict) -> bool:
@@ -130,6 +131,9 @@ class ResumeAnalysisAgent(BaseAgent):
         class EvidencedResumeAnalysis(ResumeAnalysis):
             @model_validator(mode="after")
             def verify_profile_quotes(self):
+                errors = verify_education_timeline_claims(self.model_dump(), prepared.get("raw_resume", ""))
+                if errors:
+                    raise ValueError("；".join(errors))
                 for fact in self.career_profile:
                     quote = normalize_quote(fact.quote)
                     source = normalize_quote(prepared.get(fact.source, ""))

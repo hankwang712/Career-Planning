@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .agents import ActionPlanningAgent, CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
 from .agents.job import JobAnalysisAgent
 from .graph import AgentExecutionError, followup_questions
+from .report_collaboration import MAX_EVIDENCE_ROUNDS, merge_job_evidence, pending_evidence_requests
 from .schemas.action_planning import PlanningConstraints
 from .schemas.followup import Clarification
 from .schemas.recruitment_search import RecruitmentSearchInput
@@ -57,6 +58,8 @@ class ReportState(TypedDict, total=False):
     review: dict
     profile_snapshot: dict
     provenance: dict
+    evidence_rounds: int
+    evidence_attempts: list[dict]
 
 
 def review_request(state: ReportState) -> dict:
@@ -94,8 +97,8 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         if stage_callback:
             stage_callback(name, labels[name], detail)
 
-    async def run(name, payload, config):
-        notify(name, f"正在执行{labels[name]}")
+    async def run(name, payload, config, *, detail=None):
+        notify(name, detail or f"正在执行{labels[name]}")
         started = perf_counter()
         agent = agent_factory(name) if agent_factory else classes[name](model_provider())
         result = await agent.arun(deepcopy(payload), config=config)
@@ -128,8 +131,34 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
             notify("recruitment_search", "未请求招聘搜索，跳过此步骤")
             result = {"agent": "recruitment_search", "status": "skipped", "data": {}}
         else:
-            result = await run("recruitment_search", payload, config)
+            result = await search_with_fallback(payload, config)
         return {"results": {**state["results"], "recruitment_search": result}}
+
+    async def search_with_fallback(payload, config):
+        try:
+            return await run("recruitment_search", payload, config)
+        except AgentExecutionError as error:
+            notify("recruitment_search", "招聘搜索暂不可用，将保留限制说明并继续已有材料分析")
+            return {**error.result, "error": "招聘搜索暂不可用，请稍后重试。", "sources": [], "data": {
+                "outcome": "unavailable", "summary": "本次招聘搜索暂不可用，继续依据简历与岗位知识库分析。",
+                "findings": [], "followup_questions": [],
+                "limitations": ["未获取可核实的招聘线索，不代表没有招聘机会，招聘状态需另行核实。"],
+            }}
+
+    async def evaluate(payload, state, config, *, detail=None):
+        payload = deepcopy(payload)
+        payload["evidence_rounds_remaining"] = MAX_EVIDENCE_ROUNDS - state.get("evidence_rounds", 0)
+        payload["evidence_feedback"] = [
+            {"target_id": item["request"]["target_id"], "question": item["request"]["question"], "outcome": item["outcome"]}
+            for item in state.get("evidence_attempts", [])
+        ]
+        result = await run("career_decision", payload, config, detail=detail)
+        # 即使模型仍然请求补查，也由编排器强制停止重复查询或超额循环。
+        updated = {**state, "results": {**state["results"], "career_decision": result}}
+        if result.get("data", {}).get("evidence_requests") and not pending_evidence_requests(updated):
+            limitations = result["data"].setdefault("limitations", [])
+            limitations.append("岗位证据补查已达轮次上限或问题已查过，尚未核实的条件继续保留为未知。")
+        return {"decision_input": payload, "results": {**state["results"], "career_decision": result}}
 
     async def decision(state, config: RunnableConfig):
         inputs = state["input"]
@@ -137,8 +166,36 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
                    "preferences": inputs.get("preferences", ""), "resume_analysis": state["results"]["resume_analysis"],
                    "recruitment_search": state["results"].get("recruitment_search", {}),
                    "targets": state["results"]["job_analysis"]["data"]["targets"]}
-        result = await run("career_decision", payload, config)
-        return {"decision_input": payload, "results": {**state["results"], "career_decision": result}}
+        return await evaluate(payload, state, config)
+
+    async def supplement_evidence(state, config: RunnableConfig):
+        results = deepcopy(state["results"])
+        targets = {target["target_id"]: target for target in results["job_analysis"]["data"]["targets"]}
+        attempts = deepcopy(state.get("evidence_attempts", []))
+        round_number = state.get("evidence_rounds", 0) + 1
+        for request in pending_evidence_requests(state):
+            target = targets[request["target_id"]]
+            try:
+                result = await run("job_analysis", {"target_role": target["title"], "question": request["question"]}, config,
+                    detail=f"正在为{target['title']}补查影响决策的岗位要求（第 {round_number}/{MAX_EVIDENCE_ROUNDS} 轮）")
+            except AgentExecutionError as error:
+                result = error.result
+            target["job_analysis"], outcome = merge_job_evidence(target["job_analysis"], result)
+            attempts.append({"round": round_number, "request": request, "outcome": outcome,
+                             "execution": result.get("execution", {})})
+            if outcome != "added":
+                notify("job_analysis", "本次补查未取得可合并的新证据，保留已有材料和未知条件")
+        return {"results": results, "evidence_rounds": round_number, "evidence_attempts": attempts}
+
+    async def reconsider(state, config: RunnableConfig):
+        payload = deepcopy(state["decision_input"])
+        payload["targets"] = state["results"]["job_analysis"]["data"]["targets"]
+        return await evaluate(payload, state, config, detail="正在结合岗位补查结果重新核对职业建议")
+
+    def route_after_decision(state):
+        if pending_evidence_requests(state):
+            return "supplement_evidence"
+        return "action_planning" if state.get("review") else "review"
 
     def review(state):
         notify("review", "请补充信息、选择目标并确认可投入时间")
@@ -160,12 +217,12 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         if answers.get("recruitment_search"):
             search = deepcopy(state["input"]["recruitment"])
             search.setdefault("clarifications", []).extend(answers["recruitment_search"])
-            results["recruitment_search"] = await run("recruitment_search", search, config)
+            results["recruitment_search"] = await search_with_fallback(search, config)
             payload["recruitment_search"] = results["recruitment_search"]
         # 简历追问的回答也属于候选人事实；问题文本不会作为事实证据。
         payload["clarifications"] = answers.get("resume_analysis", []) + answers.get("career_decision", [])
         if payload["clarifications"] or answers.get("recruitment_search"):
-            results["career_decision"] = await run("career_decision", payload, config)
+            return await evaluate(payload, {**state, "results": results}, config)
         return {"results": results, "decision_input": payload}
 
     async def planning(state, config: RunnableConfig):
@@ -176,9 +233,16 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
 
     graph = StateGraph(ReportState)
     for name, node in [("resume_analysis", resume), ("job_analysis", jobs), ("recruitment_search", recruitment),
-                       ("career_decision", decision), ("review", review), ("revise", revise), ("action_planning", planning)]:
+                       ("career_decision", decision), ("review", review), ("revise", revise), ("action_planning", planning),
+                       ("supplement_evidence", supplement_evidence), ("reconsider", reconsider)]:
         graph.add_node(name, node)
-    sequence = [START, "resume_analysis", "job_analysis", "recruitment_search", "career_decision", "review", "revise", "action_planning", END]
+    sequence = [START, "resume_analysis", "job_analysis", "recruitment_search", "career_decision"]
     for before, after in zip(sequence, sequence[1:]):
         graph.add_edge(before, after)
+    for name in ("career_decision", "reconsider", "revise"):
+        graph.add_conditional_edges(name, route_after_decision,
+            ["supplement_evidence", "review", "action_planning"])
+    graph.add_edge("supplement_evidence", "reconsider")
+    graph.add_edge("review", "revise")
+    graph.add_edge("action_planning", END)
     return graph.compile(checkpointer=checkpointer, name="career_report")

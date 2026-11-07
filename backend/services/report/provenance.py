@@ -39,11 +39,14 @@ def capture_provenance(inputs, profile, model_name):
 
 
 def report_provenance(state):
+    from experiments.news_advisor.report_collaboration import collaboration_summary
+
     result = deepcopy(state.get("provenance", {}))
     result["snapshot_status"] = "frozen" if "profile_snapshot" in state else "legacy_unavailable"
     # 原始输入和最终补充回答分开记版本，便于复现修订前后的判断。
     result["decision_revision"] = content_revision(state.get("decision_input", {}))
     result["review_revision"] = content_revision(state.get("review", {}))
+    result["collaboration"] = collaboration_summary(state)
     result["job_source_revisions"] = [
         {"target_id": target["target_id"], "revision": content_revision(target["job_analysis"].get("sources", []))}
         for target in state.get("results", {}).get("job_analysis", {}).get("data", {}).get("targets", [])

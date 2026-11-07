@@ -19,6 +19,18 @@ class CareerTarget(DecisionRecord):
     job_analysis: dict[str, Any] = Field(description="岗位 Agent 完整返回值，包含 status、data、sources、scope")
 
 
+class JobEvidenceRequest(DecisionRecord):
+    target_id: Text
+    question: str = Field(min_length=1, max_length=1000, description="交给岗位 Agent 补查的公开岗位要求，不含用户经历或个人资料")
+    reason: str = Field(min_length=1, max_length=500, description="缺少哪项岗位证据，以及它如何影响当前判断")
+
+
+class JobEvidenceFeedback(DecisionRecord):
+    target_id: Text
+    question: str = Field(min_length=1, max_length=1000)
+    outcome: Literal["added", "no_new_evidence", "unavailable"]
+
+
 class CareerDecisionInput(DecisionRecord):
     raw_resume: str = ""
     additional_evidence: str = ""
@@ -28,6 +40,8 @@ class CareerDecisionInput(DecisionRecord):
     recruitment_search: dict[str, Any] = Field(default_factory=dict, description="招聘搜索的完整结果，仅作为待核实机会背景")
     clarifications: list[Clarification] = Field(default_factory=list)
     targets: list[CareerTarget] = Field(min_length=1, max_length=5)
+    evidence_rounds_remaining: int = Field(default=0, ge=0, le=2)
+    evidence_feedback: list[JobEvidenceFeedback] = Field(default_factory=list, max_length=6)
 
     @model_validator(mode="after")
     def unique_targets(self):
@@ -86,3 +100,5 @@ class CareerDecision(DecisionRecord):
     next_actions: list[DecisionAction] = Field(default_factory=list, max_length=3)
     followup_questions: list[Text] = Field(default_factory=list, max_length=3)
     limitations: list[Text] = Field(default_factory=list)
+    evidence_requests: list[JobEvidenceRequest] = Field(default_factory=list, max_length=3,
+        description="需要岗位 Agent 定向补查的证据缺口；用户经历、意愿等问题仍放入 followup_questions")

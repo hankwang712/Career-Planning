@@ -9,7 +9,7 @@ from ..prompt.career_decision import CAREER_DECISION_PROMPT
 from ..schemas.career_decision import CareerDecision, CareerDecisionInput, CareerTarget
 from ..schemas.job import JobAnalysis, JobSource
 from ..utils.evidence import copy_source_quote
-from ..utils.dates import resume_date_context
+from ..utils.dates import education_timeline_context, resume_date_context, verify_education_timeline_claims
 from .base import BaseAgent
 
 
@@ -79,7 +79,8 @@ def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]
 def verify_career_decision(data: dict, prepared: dict) -> list[str]:
     """只检查引用、关联和具体岗位的硬条件；不替模型决定能力取舍。"""
     analysis = CareerDecision.model_validate(data)
-    errors = []
+    errors = verify_education_timeline_claims(data, "\n".join(
+        source["content"] for source in prepared["sources"] if source["kind"] == "resume"))
     sources = {source["source_id"]: source for source in prepared["sources"]}
     originals = {key: re.sub(r"\s+", " ", source["content"]).strip() for key, source in sources.items()}
     targets = {target["target_id"]: target for target in prepared["targets"]}
@@ -125,6 +126,9 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
             errors.append(f"行动未关联同一目标下的有效 check：{action.check_id}")
         elif action.kind == "apply" and decisions[action.target_id] in {"not_recommended", "insufficient_information"}:
             errors.append(f"目标 {action.target_id} 当前结论不支持投递行动")
+    for request in analysis.evidence_requests:
+        if request.target_id not in targets:
+            errors.append(f"补查请求引用了不可用的 target_id：{request.target_id}")
     return list(dict.fromkeys(errors))
 
 
@@ -159,6 +163,10 @@ class CareerDecisionAgent(BaseAgent):
             limitations.append("简历 Agent 未成功完成诊断，当前仅依据提供的学生原文判断。")
         recruitment = recruitment_context(request.recruitment_search)
         limitations.extend(recruitment["limitations"])
+        for feedback in request.evidence_feedback:
+            if feedback.outcome != "added":
+                outcome = "未取得新证据" if feedback.outcome == "no_new_evidence" else "暂不可用"
+                limitations.append(f"目标 {feedback.target_id} 的岗位补查{outcome}，相关条件仍需核实：{feedback.question}")
 
         for index, target in enumerate(request.targets, 1):
             result = target.job_analysis
@@ -178,8 +186,11 @@ class CareerDecisionAgent(BaseAgent):
             limitations.extend(f"目标 {target.target_id}：{detail}" for detail in details)
         return {
             "analysis_date": analysis_date.isoformat(), "date_context": resume_date_context(request.raw_resume, analysis_date),
+            "education_timeline": education_timeline_context(request.raw_resume),
             "question": request.question, "sources": sources, "targets": targets,
             "recruitment_context": recruitment,
+            "evidence_rounds_remaining": request.evidence_rounds_remaining,
+            "evidence_feedback": [item.model_dump() for item in request.evidence_feedback],
             # 简历质量诊断不是能力事实来源；隔离其未经验证的推断，避免错误意见被下游复述。
             "resume_analysis": {"status": request.resume_analysis.get("status"), "document": document},
             "input_limitations": list(dict.fromkeys(limitations)),

@@ -27,6 +27,7 @@ from experiments.news_advisor.agents.base import BaseAgent
 from experiments.news_advisor.agents.career_decision import CareerDecisionAgent, recruitment_context, verify_career_decision
 from experiments.news_advisor.agents.job import verify_job_evidence
 from experiments.news_advisor.report_workflow import build_report_graph
+from experiments.news_advisor.report_collaboration import merge_job_evidence
 from experiments.news_advisor.schemas.action_planning import ActionPlan
 from experiments.news_advisor.telemetry import AgentMetrics, summarize_executions
 
@@ -68,6 +69,20 @@ def decision_result(payload):
     return {"agent": "career_decision", "status": "ok", "data": data, "sources": prepared["sources"]}
 
 
+def evidence_request(question="Docker 是必需还是优先条件？"):
+    return {"target_id": "T1", "question": question, "reason": "需要核实样本的岗位要求，避免扩大资格门槛"}
+
+
+def supplementary_job_result():
+    result = job_result()
+    result["sources"] = [{"chunk_id": "chunk-2", "file_path": "offline.txt#record=2",
+                          "content": "岗位要求：熟悉 Python，Docker 优先。"}]
+    result["data"]["findings"] = [{"category": "skill", "statement": "Docker 优先", "requirement": "preferred",
+                                   "evidence": [{"chunk_id": "chunk-2", "quote": "Docker 优先"}]}]
+    result["data"]["summary"] = "补查样本将 Docker 列为优先条件"
+    return result
+
+
 def action_result(payload):
     prepared = ActionPlanningAgent(None).prepare(payload)
     plan = {"summary": "先确认项目贡献", "tasks": [{"task_id": "A1", "check_id": "C1", "stage": "核实",
@@ -92,12 +107,15 @@ class WorkflowChecks(unittest.TestCase):
         self.calls = []
         self.fail_plan = False
         self.fail_resume = False
+        self.overrides = {}
         owner = self
 
         def factory(name):
             class OfflineAgent:
                 async def arun(self, payload, config=None):
                     owner.calls.append((name, deepcopy(payload)))
+                    if name in owner.overrides:
+                        return owner.overrides[name](payload)
                     if name == "resume_analysis":
                         if owner.fail_resume:
                             owner.fail_resume = False
@@ -160,12 +178,13 @@ class WorkflowChecks(unittest.TestCase):
         self.assertEqual(len(decisions), 2)
         self.assertEqual(decisions[-1]["recruitment_search"]["sources"][0]["source_id"], "S1")
         self.assertEqual([name for name, _ in self.calls].count("resume_analysis"), 1)
-        self.assertNotIn("待核实：" + QUESTION, bundle["report_document"]["sections"]["risk_backup"]["markdown"])
-        self.assertEqual(len(bundle["report_document"]["sections"]), 10)
+        self.assertNotIn("待核实：" + QUESTION, bundle["report_document"]["sections"]["development_path"]["markdown"])
+        self.assertEqual(len(bundle["report_document"]["sections"]), 6)
         self.assertEqual(len(bundle["phase_plan"]["short_term"]), 2)
         self.assertEqual(len(bundle["phase_plan"]["mid_term"]), 1)
         self.assertEqual(len(bundle["phase_plan"]["long_term"]), 1)
-        self.assertIn("offline.txt#record=1", bundle["report_document"]["markdown"])
+        self.assertNotIn("offline.txt#record=1", bundle["report_document"]["markdown"])
+        self.assertEqual(bundle["agent_results"]["job_analysis"]["data"]["targets"][0]["job_analysis"]["sources"][0]["file_path"], "offline.txt#record=1")
         self.assertEqual(len(bundle["meta"]["provenance"]["job_source_revisions"]), 2)
         self.assertTrue(workflow.read_report_workflow("offline-user", self.report_id)["complete"])
         self.assertFalse(workflow.read_report_workflow("another-user", self.report_id)["checkpoint_id"])
@@ -220,6 +239,166 @@ class WorkflowChecks(unittest.TestCase):
         bundle = self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})
         self.assertEqual(bundle["agent_results"]["recruitment_search"]["status"], "skipped")
         self.assertNotIn("recruitment_search", [name for name, _ in self.calls])
+
+    def test_decision_delegates_only_requested_target_and_reuses_all_evidence(self):
+        def decide(payload):
+            result = decision_result(payload)
+            if not payload.get("evidence_feedback"):
+                result["data"]["evidence_requests"] = [evidence_request()]
+            else:
+                result["data"]["assessments"][0]["checks"].append({
+                    "check_id": "C-Docker", "requirement": "Docker", "kind": "capability", "importance": "preferred",
+                    "status": "evidence_missing", "reasoning": "补查样本为优先条件，用户材料未说明相关经历",
+                    "job_evidence": [{"source_id": "T1JD2", "quote": "Docker 优先"}], "candidate_evidence": []})
+                self.assertFalse(verify_career_decision(result["data"], CareerDecisionAgent.prepare(payload)))
+            return result
+
+        self.overrides["career_decision"] = decide
+        self.overrides["job_analysis"] = lambda payload: supplementary_job_result() if payload.get("question") else job_result()
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 1)
+        self.assertEqual(snapshot["collaboration"]["attempts"][0]["outcome"], "added")
+        jobs = [payload for name, payload in self.calls if name == "job_analysis"]
+        self.assertEqual(len(jobs), 3)
+        self.assertEqual(jobs[-1], {"target_role": "后端实习", "question": evidence_request()["question"]})
+        self.assertEqual([name for name, _ in self.calls].count("resume_analysis"), 1)
+        self.review["answers"] = {}
+        bundle = self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})
+        target = bundle["agent_results"]["job_analysis"]["data"]["targets"][0]
+        self.assertEqual([source["chunk_id"] for source in target["job_analysis"]["sources"]], ["chunk-1", "chunk-2"])
+        self.assertEqual(len(target["job_analysis"]["data"]["findings"]), 2)
+        self.assertIn("Docker 优先", bundle["report_document"]["sections"]["appendix"]["markdown"])
+        self.assertIn("Docker", bundle["report_document"]["sections"]["matching_decision"]["markdown"])
+        self.assertNotIn("已补充岗位证据", bundle["report_document"]["sections"]["appendix"]["markdown"])
+        self.assertEqual(bundle["meta"]["provenance"]["collaboration"]["attempts"][0]["outcome"], "added")
+        self.assertEqual(bundle["meta"]["provenance"]["collaboration"]["rounds_used"], 1)
+
+    def test_repeated_evidence_request_stops_after_no_new_evidence(self):
+        def decide(payload):
+            result = decision_result(payload)
+            # 空白变化不能绕过重复问题检测。
+            question = " Docker要求 " if payload.get("evidence_feedback") else "Docker 要求"
+            result["data"]["evidence_requests"] = [evidence_request(question)]
+            return result
+        self.overrides["career_decision"] = decide
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 1)
+        self.assertEqual(snapshot["collaboration"]["attempts"][0]["outcome"], "no_new_evidence")
+        self.assertEqual([name for name, _ in self.calls].count("career_decision"), 2)
+        self.assertIn("问题已查过", " ".join(snapshot["results"]["career_decision"]["data"]["limitations"]))
+
+    def test_new_questions_obey_global_round_limit_including_user_revision(self):
+        def decide(payload):
+            result = decision_result(payload)
+            count = len([name for name, _ in self.calls if name == "career_decision"])
+            result["data"]["evidence_requests"] = [evidence_request(f"第 {count} 项岗位要求是什么？")]
+            return result
+        self.overrides["career_decision"] = decide
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 2)
+        bundle = self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})
+        self.assertEqual(len([payload for name, payload in self.calls if name == "job_analysis" and payload.get("question")]), 2)
+        final = workflow.read_report_workflow("offline-user", self.report_id)
+        self.assertTrue(final["complete"])
+        self.assertEqual(final["collaboration"]["rounds_used"], 2)
+        self.assertEqual([payload for name, payload in self.calls if name == "career_decision"][-1]["evidence_rounds_remaining"], 0)
+        self.assertIn("轮次上限", " ".join(bundle["agent_results"]["career_decision"]["data"]["limitations"]))
+
+    def test_failed_supplement_keeps_original_job_evidence(self):
+        def decide(payload):
+            result = decision_result(payload)
+            if not payload.get("evidence_feedback"):
+                result["data"]["evidence_requests"] = [evidence_request()]
+            return result
+        self.overrides["career_decision"] = decide
+        self.overrides["job_analysis"] = lambda payload: ({"agent": "job_analysis", "status": "retrieval_error", "data": {},
+                                                         "error": "offline unavailable"} if payload.get("question") else job_result())
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["attempts"][0]["outcome"], "unavailable")
+        original = snapshot["results"]["job_analysis"]["data"]["targets"][0]["job_analysis"]
+        self.assertEqual(original["sources"], job_result()["sources"])
+        self.assertIn("相关条件仍需核实", " ".join(snapshot["results"]["career_decision"]["data"]["limitations"]))
+        self.review["answers"] = {}
+        self.assertEqual(self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})["meta"]["status"], "ready")
+
+    def test_full_request_batches_stay_within_six_supplement_calls(self):
+        def decide(payload):
+            result = decision_result(payload)
+            batch = len(payload.get("evidence_feedback", [])) // 3
+            result["data"]["evidence_requests"] = [evidence_request(f"第 {batch} 轮的岗位要求 {index} 是什么？")
+                                                     for index in range(3)]
+            return result
+        self.overrides["career_decision"] = decide
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 2)
+        self.assertEqual(len(snapshot["collaboration"]["attempts"]), 6)
+        supplements = [payload for name, payload in self.calls if name == "job_analysis" and payload.get("question")]
+        self.assertEqual(len(supplements), 6)
+        self.assertTrue(all(payload["target_role"] == "后端实习" for payload in supplements))
+        final_decision = [payload for name, payload in self.calls if name == "career_decision"][-1]
+        self.assertEqual(len(final_decision["evidence_feedback"]), 6)
+        self.assertEqual(final_decision["evidence_rounds_remaining"], 0)
+
+    def test_reconsider_failure_resumes_after_saved_supplement(self):
+        failed = False
+        def decide(payload):
+            nonlocal failed
+            if payload.get("evidence_feedback") and not failed:
+                failed = True
+                return {"agent": "career_decision", "status": "model_error", "data": {}, "error": "offline reconsider failure"}
+            result = decision_result(payload)
+            if not payload.get("evidence_feedback"):
+                result["data"]["evidence_requests"] = [evidence_request()]
+            return result
+        self.overrides["career_decision"] = decide
+        self.overrides["job_analysis"] = lambda payload: supplementary_job_result() if payload.get("question") else job_result()
+        with self.assertRaisesRegex(Exception, "offline reconsider failure"):
+            self.generate()
+        snapshot = workflow.read_report_workflow("offline-user", self.report_id)
+        self.assertEqual(snapshot["next"], ["reconsider"])
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 1)
+        previous = len(self.calls)
+        with self.assertRaises(workflow.ReportNeedsInput):
+            self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": {}})
+        self.assertEqual([name for name, _ in self.calls[previous:]], ["career_decision"])
+        resumed = workflow.read_report_workflow("offline-user", self.report_id)
+        self.assertEqual(resumed["collaboration"], snapshot["collaboration"])
+
+    def test_user_answer_can_trigger_supplement_then_finish_without_second_review(self):
+        question = "项目中是否使用过 Docker？"
+        def decide(payload):
+            result = decision_result(payload)
+            if not payload.get("clarifications"):
+                result["data"]["followup_questions"] = [question]
+            elif not payload.get("evidence_feedback"):
+                result["data"]["evidence_requests"] = [evidence_request()]
+            return result
+        self.overrides["career_decision"] = decide
+        self.overrides["job_analysis"] = lambda payload: supplementary_job_result() if payload.get("question") else job_result()
+        snapshot = self.begin()
+        self.assertEqual(snapshot["collaboration"]["rounds_used"], 0)
+        self.review["answers"] = {"career_decision": [{"question": question, "answer": "没有使用过 Docker"}]}
+        bundle = self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})
+        self.assertEqual(bundle["meta"]["status"], "ready")
+        self.assertEqual(bundle["meta"]["provenance"]["collaboration"]["rounds_used"], 1)
+        final_payload = [payload for name, payload in self.calls if name == "career_decision"][-1]
+        self.assertEqual(final_payload["clarifications"][0]["answer"], "没有使用过 Docker")
+
+    def test_optional_search_failure_continues_without_fabricated_findings(self):
+        self.overrides["recruitment_search"] = lambda payload: {"agent": "recruitment_search", "status": "model_error",
+            "data": {"findings": [{"summary": "unverified draft"}]}, "error": "offline unavailable",
+            "sources": [{"source_id": "unverified"}]}
+        snapshot = self.begin()
+        search = snapshot["results"]["recruitment_search"]
+        self.assertEqual(search["status"], "model_error")
+        self.assertEqual(search["data"]["outcome"], "unavailable")
+        self.assertEqual(search["data"]["findings"], [])
+        self.assertEqual(search["sources"], [])
+        self.assertIn("不能据此判断没有招聘机会", " ".join(snapshot["results"]["career_decision"]["data"]["limitations"]))
+        self.review["answers"] = {}
+        bundle = self.generate({"checkpoint_id": snapshot["checkpoint_id"], "response": self.review})
+        self.assertIn("暂不可用", bundle["report_document"]["sections"]["appendix"]["markdown"])
+        self.assertNotIn("unverified draft", bundle["report_document"]["markdown"])
 
     def test_uploaded_file_uses_existing_document_tool_once(self):
         supplied = {key: value for key, value in self.input.items() if key != "raw_resume"}
@@ -278,6 +457,26 @@ class EvidenceChecks(unittest.TestCase):
         result["data"]["assessments"][0]["checks"][0]["candidate_evidence"][0] = {
             "source_id": "T1JD1", "quote": "熟悉 Python"}
         self.assertTrue(verify_career_decision(result["data"], CareerDecisionAgent.prepare(payload)))
+
+    def test_unknown_target_cannot_be_delegated_for_job_evidence(self):
+        payload = {"raw_resume": RESUME, "targets": [{"target_id": "T1", "title": "后端实习", "job_analysis": job_result()}]}
+        result = decision_result(payload)
+        result["data"]["evidence_requests"] = [{**evidence_request(), "target_id": "T99"}]
+        self.assertIn("不可用的 target_id", " ".join(verify_career_decision(result["data"], CareerDecisionAgent.prepare(payload))))
+
+    def test_conflicting_source_version_is_not_merged(self):
+        current = job_result()
+        supplement = job_result()
+        supplement["sources"][0]["content"] = "岗位要求已经发生变化。"
+        merged, outcome = merge_job_evidence(current, supplement)
+        self.assertEqual(outcome, "unavailable")
+        self.assertEqual(merged, job_result())
+
+    def test_empty_supplement_preserves_original_evidence(self):
+        current = job_result()
+        merged, outcome = merge_job_evidence(current, {"status": "insufficient_evidence", "data": {}, "sources": []})
+        self.assertEqual(outcome, "no_new_evidence")
+        self.assertEqual(merged, job_result())
 
     def test_action_budget_and_dependencies_are_checked(self):
         payload = {"raw_resume": RESUME, "targets": [{"target_id": "T1", "title": "后端实习", "job_analysis": job_result()}]}

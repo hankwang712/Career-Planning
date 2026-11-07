@@ -83,6 +83,8 @@ async def _graph(runtime=None, stage_callback=None):
 
 
 def _snapshot(snapshot):
+    from experiments.news_advisor.report_collaboration import collaboration_summary
+
     pending = [item.value for task in snapshot.tasks for item in task.interrupts]
     return {
         "checkpoint_id": (snapshot.config or {}).get("configurable", {}).get("checkpoint_id", ""),
@@ -91,6 +93,7 @@ def _snapshot(snapshot):
         "errors": [str(task.error) for task in snapshot.tasks if task.error],
         "complete": bool(snapshot.values) and not snapshot.next,
         "provenance": snapshot.values.get("provenance", {}),
+        "collaboration": collaboration_summary(snapshot.values),
         "review_ui": build_review_ui(pending[0] if pending else None, snapshot.values.get("input"),
                                     snapshot.values.get("profile_snapshot")),
     }
