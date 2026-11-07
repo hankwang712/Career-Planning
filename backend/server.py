@@ -62,7 +62,7 @@ from services.report.legacy_report import (
 )
 from services.report.exporters import (
     export_markdown_to_docx_bytes,
-    export_markdown_to_pdf_via_docx_bytes,
+    export_markdown_to_pdf_bytes,
     normalize_br_tags_in_markdown,
     render_markdown_export_html,
     render_report_html,
@@ -7901,16 +7901,18 @@ def api_career_report_export():
 
     if export_format == "pdf":
         try:
-            pdf_bytes = export_markdown_to_pdf_via_docx_bytes(markdown_text, title=source_label)
+            pdf_bytes = export_markdown_to_pdf_bytes(markdown_text, title=source_label)
         except Exception as exc:
             app.logger.exception("career report pdf export failed")
             return jsonify({"message": str(exc)[:500] or "PDF 导出失败。"}), 500
-        return send_file(
+        response = send_file(
             io.BytesIO(pdf_bytes),
             mimetype="application/pdf",
             as_attachment=True,
             download_name=f"{filename_stem}.pdf",
         )
+        response.headers["X-Report-PDF-Engine"] = "pymupdf"
+        return response
 
     try:
         docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=source_label)
@@ -8296,6 +8298,7 @@ if __name__ == "__main__":
     print(f"  访问地址：http://{host}:{port}")
     print("  数据目录：", BOSS_INFO_DIR)
     print("  用户数据目录：", APP_DATA_DIR)
+    print("  PDF 导出引擎：", f"PyMuPDF {fitz.VersionBind}" if fitz is not None else "PyMuPDF 未安装，请安装 backend/requirements.txt")
     print("  按 Ctrl+C 停止")
     print("=" * 50)
 

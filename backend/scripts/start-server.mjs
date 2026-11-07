@@ -117,7 +117,8 @@ const pythonProc = spawnTagged(
     HOST: host,
     PORT: port,
     VITE_DEV_SERVER_URL: useViteDevServer ? viteOrigin : "",
-    PYTHONIOENCODING: "utf-8"
+    PYTHONIOENCODING: "utf-8",
+    PYTHONUTF8: "1"
   }
 );
 

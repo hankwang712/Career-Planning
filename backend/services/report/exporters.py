@@ -169,7 +169,6 @@ def docx_prepare_markdown(text: str) -> str:
 
 DOCX_MCP_CONDA_ENV = os.environ.get("CAREER_REPORT_DOCX_CONDA_ENV", "yolov11").strip() or "yolov11"
 DOCX_MCP_PYTHON = os.environ.get("CAREER_REPORT_DOCX_PYTHON", "").strip()
-PDF_EXPORT_CONDA_ENV = os.environ.get("CAREER_REPORT_PDF_CONDA_ENV", DOCX_MCP_CONDA_ENV).strip() or DOCX_MCP_CONDA_ENV
 
 
 def _resolve_docx_python(conda_env: str) -> str:
@@ -277,48 +276,24 @@ def render_report_markdown(report: dict[str, Any]) -> str:
 
 
 def _render_markdown_html(markdown_text: str) -> str:
-    lines = str(markdown_text or "").splitlines()
-    html: list[str] = []
-    in_list = False
-    for raw_line in lines:
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        if not stripped:
-            if in_list:
-                html.append("</ul>")
-                in_list = False
-            continue
-        if stripped.startswith("# "):
-            if in_list:
-                html.append("</ul>")
-                in_list = False
-            html.append(f"<h1>{escape(stripped[2:].strip())}</h1>")
-            continue
-        if stripped.startswith("## "):
-            if in_list:
-                html.append("</ul>")
-                in_list = False
-            html.append(f"<h2>{escape(stripped[3:].strip())}</h2>")
-            continue
-        if stripped.startswith("### "):
-            if in_list:
-                html.append("</ul>")
-                in_list = False
-            html.append(f"<h3>{escape(stripped[4:].strip())}</h3>")
-            continue
-        if stripped.startswith("- "):
-            if not in_list:
-                html.append("<ul>")
-                in_list = True
-            html.append(f"<li>{escape(stripped[2:].strip())}</li>")
-            continue
-        if in_list:
-            html.append("</ul>")
-            in_list = False
-        html.append(f"<p>{escape(stripped)}</p>")
-    if in_list:
-        html.append("</ul>")
-    return "\n".join(html)
+    import bleach
+    import markdown
+
+    def allow_attribute(tag, name, value):
+        if tag == "a":
+            return name in {"href", "title"}
+        if tag == "img":
+            if name in {"alt", "title"}:
+                return True
+            # 导出只能读取报告图片目录，不能加载远程图片或任意本机文件。
+            return name == "src" and bool(re.fullmatch(r"/static/img/report/[\w.-]+", value))
+        return False
+
+    body = markdown.markdown(str(markdown_text or ""), extensions=["tables", "fenced_code", "sane_lists"])
+    return bleach.clean(body, tags={
+        "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "em",
+        "blockquote", "pre", "code", "table", "thead", "tbody", "tr", "th", "td", "hr", "br", "a", "img",
+    }, attributes=allow_attribute, protocols={"http", "https", "mailto"}, strip=True)
 
 
 def render_markdown_export_html(markdown_text: str, *, title: str = "职业发展报告") -> str:
@@ -402,7 +377,7 @@ def render_html_to_pdf_bytes(html_text: str) -> bytes:
     """将完整 HTML 转为 PDF。
 
     使用 PyMuPDF 的 Story 排版（项目已依赖 ``PyMuPDF`` / ``pymupdf``），无需单独安装 WeasyPrint。
-    中文依赖系统已安装字体（如 Windows 下的「微软雅黑」等）。
+    中文由 MuPDF 内置 CJK 回退字体排版，无需 Microsoft Word。
     """
     import io
 
@@ -413,17 +388,50 @@ def render_html_to_pdf_bytes(html_text: str) -> bytes:
         raise ValueError("empty html for pdf export")
     mediabox = fitz.paper_rect("a4")
     where = mediabox + (36, 36, -36, -36)
-    story = fitz.Story(html=text)
+    # Markdown 图片已限制为该目录下的文件名；Archive 不开放任意文件系统路径。
+    text = text.replace('src="/static/img/report/', 'src="')
+    archive = fitz.Archive(str(REPORT_IMAGE_DIR)) if REPORT_IMAGE_DIR.is_dir() else None
+    story = fitz.Story(html=text, archive=archive)
     buf = io.BytesIO()
     writer = fitz.DocumentWriter(buf)
-    more = 1
-    while more:
-        device = writer.begin_page(mediabox)
-        more, _ = story.place(where)
-        story.draw(device)
-        writer.end_page()
-    writer.close()
+    try:
+        for _ in range(200):
+            device = writer.begin_page(mediabox)
+            more, filled = story.place(where)
+            story.draw(device)
+            writer.end_page()
+            if not more:
+                break
+            if fitz.Rect(filled).is_empty:
+                raise ValueError("报告中有无法分页的内容，请缩短过长的表格单元格或代码段后重试。")
+        else:
+            raise ValueError("报告超过 PDF 导出页数上限，请精简内容后重试。")
+    finally:
+        writer.close()
     return buf.getvalue()
+
+
+def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发展报告") -> bytes:
+    """Render the saved report directly, without DOCX conversion or an Office process."""
+    cleaned = markdown_for_user_reading(markdown_text)
+    if not cleaned:
+        raise ValueError("报告正文为空，无法导出 PDF。")
+    body = _render_markdown_html(cleaned)
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    <title>{escape(title)}</title><style>
+    body {{ font-family: sans-serif; font-size: 11pt; line-height: 1.6; color: #182335; }}
+    h1 {{ font-size: 22pt; color: #163a53; margin: 0 0 18pt; }}
+    h2 {{ font-size: 16pt; color: #163a53; margin: 18pt 0 9pt; }}
+    h3, h4 {{ font-size: 12pt; margin: 12pt 0 6pt; }}
+    p {{ margin: 6pt 0; }} ul, ol {{ margin: 6pt 0; padding-left: 20pt; }}
+    blockquote {{ margin: 8pt 0 8pt 14pt; color: #475569; }}
+    table {{ border-collapse: collapse; width: 100%; margin: 10pt 0; }}
+    th, td {{ border: 0.6pt solid #cbd5e1; padding: 6pt; vertical-align: top; }}
+    th {{ background-color: #edf3f8; font-weight: bold; }}
+    pre {{ white-space: pre-wrap; padding: 9pt; background-color: #f1f5f9; font-size: 9pt; }}
+    img {{ max-width: 100%; }} a {{ color: #17658b; }}
+    </style></head><body>{body}</body></html>"""
+    return render_html_to_pdf_bytes(html)
 
 
 def export_markdown_to_docx_bytes(
@@ -510,6 +518,9 @@ _center_images_in_docx(docx_path)
             [python_exe, "-c", script, str(md_path), str(docx_path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
             timeout=180,
         )
         if process.returncode != 0:
@@ -518,47 +529,3 @@ _center_images_in_docx(docx_path)
         if not docx_path.exists():
             raise RuntimeError("Docx_MCP did not produce a .docx file")
         return docx_path.read_bytes()
-
-
-def export_markdown_to_pdf_via_docx_bytes(
-    markdown_text: str,
-    *,
-    conda_env: str = PDF_EXPORT_CONDA_ENV,
-    title: str = "career-report",
-) -> bytes:
-    """Generate PDF by converting the DOCX export through docx2pdf."""
-    safe_title = "".join(
-        ch if ch.isalnum() or ch in {"-", "_", "."} else "-"
-        for ch in str(title or "career-report")
-    ).strip("-") or "career-report"
-    python_exe = _resolve_docx_python(conda_env)
-    docx_bytes = export_markdown_to_docx_bytes(markdown_text, conda_env=conda_env, title=safe_title)
-    script = r"""
-from pathlib import Path
-import sys
-from docx2pdf import convert
-
-docx_path = Path(sys.argv[1])
-pdf_path = Path(sys.argv[2])
-convert(str(docx_path), str(pdf_path))
-"""
-    with tempfile.TemporaryDirectory(prefix="career-report-pdf-") as temp_dir:
-        temp_path = Path(temp_dir)
-        docx_path = temp_path / f"{safe_title}.docx"
-        pdf_path = temp_path / f"{safe_title}.pdf"
-        docx_path.write_bytes(docx_bytes)
-        process = subprocess.run(
-            [python_exe, "-c", script, str(docx_path), str(pdf_path)],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        if process.returncode != 0:
-            error = (process.stderr or process.stdout or "").strip()
-            raise RuntimeError(
-                error
-                or "docx2pdf conversion failed. On Windows, Microsoft Word must be installed."
-            )
-        if not pdf_path.exists():
-            raise RuntimeError("docx2pdf did not produce a .pdf file")
-        return pdf_path.read_bytes()

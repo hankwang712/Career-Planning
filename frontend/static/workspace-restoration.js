@@ -48,6 +48,7 @@
     /** 与上次成功「保存」或服务端加载一致的 Markdown 基线；未保存的本地修改不会写回阅览室正式稿 */
     editorSavedMarkdown: "",
     editorSavePending: false,
+    exportPending: false,
     editorBeforeUnloadBound: false
   };
 
@@ -1280,6 +1281,7 @@
   }
 
   function renderReportSections4(bundle, sections, options = {}) {
+    const narrativeLayout = bundle?.report_document?.reading_layout === "narrative-v1";
     const requestedGroup = String(options.group || "").trim().toLowerCase();
     const groupConfig = REPORT_WORKSPACE_GROUPS[requestedGroup] || null;
     const navOrder = bundle?.report_document?.section_order || [
@@ -2083,7 +2085,7 @@
       .map((key, idx) => ({ key, idx, meta: { ...navMeta[key], icon: String(idx + 1).padStart(2, "0"), label: sections[key]?.label || navMeta[key].label }, section: sections[key] }))
       .filter((item) => Boolean(item.section) && (!allowedKeys || allowedKeys.has(item.key)));
 
-    const groupHeroHtml = groupConfig ? `
+    const groupHeroHtml = groupConfig && !narrativeLayout ? `
       <section class="cr4-group-hero">
         <div class="cr4-group-head">
           <div class="cr4-group-copy">
@@ -2128,7 +2130,7 @@
       const markdown = String(sec.markdown || "").trim();
       const data     = sec.data || {};
       const renderer = bodyRenderers[key];
-      const body     = renderer ? renderer(data) : "";
+      const body     = renderer && !narrativeLayout ? renderer(data) : "";
       const polishTargetId = `cr4-polish-${key}`;
 
       let bodyHtml = "";
@@ -5049,7 +5051,59 @@
 
   window.triggerCareerReportEditorSave = triggerCareerReportEditorSave;
 
-  function exportCareerReportSource(format = "docx") {
+  async function downloadCareerReport(url, format) {
+    const types = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      md: "text/markdown", html: "text/html" };
+    if (reportRuntime.exportPending || !Object.hasOwn(types, format)) return false;
+    const buttons = ["userCenterExportPdfBtn", "userCenterExportDocxBtn"].map((id) => document.getElementById(id)).filter(Boolean);
+    const previousDisabled = buttons.map((button) => button.disabled);
+    const owner = currentUser()?.username;
+    reportRuntime.exportPending = true;
+    buttons.forEach((button) => { button.disabled = true; });
+    toast("正在导出", `正在生成 ${format.toUpperCase()} 文件，请稍候。`, "info", 2500);
+    try {
+      const response = await fetch(url.toString(), { credentials: "include", headers: { Accept: types[format] } });
+      const mime = String(response.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+      if (!response.ok || response.redirected || mime !== types[format]) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || (response.status === 401 || response.redirected
+          ? "登录状态已失效，请重新登录后导出。" : `导出失败（HTTP ${response.status}），请稍后重试。`));
+      }
+      const blob = await response.blob();
+      if (!blob.size || (format === "pdf" && await blob.slice(0, 5).text() !== "%PDF-")) {
+        throw new Error("服务器未返回有效文件，请重试导出。");
+      }
+      if (currentUser()?.username !== owner) return false;
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const utf8Name = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      const plainName = disposition.match(/filename="([^"]+)"|filename=([^;]+)/i);
+      let filename = plainName?.[1] || plainName?.[2] || `职业规划报告.${format}`;
+      if (utf8Name) {
+        try { filename = decodeURIComponent(utf8Name); } catch { /* Keep the safe fallback. */ }
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename.replace(/[\\/\x00-\x1f]/g, "-");
+      try {
+        document.body.appendChild(anchor);
+        anchor.click();
+      } finally {
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      }
+      toast("文件已准备好", `${format.toUpperCase()} 文件已开始下载。`, "success", 2200);
+      return true;
+    } catch (error) {
+      if (currentUser()?.username === owner) toast("导出失败", error.message || "请稍后重试。", "error", 4500);
+      return false;
+    } finally {
+      reportRuntime.exportPending = false;
+      buttons.forEach((button, index) => { button.disabled = previousDisabled[index]; });
+    }
+  }
+
+  async function exportCareerReportSource(format = "docx") {
     const source = reportRuntime.editorSource || {};
     if (source?.source_type !== "formal_report" && !source?.snapshot_id) {
       toast("\u8bf7\u5148\u4fdd\u5b58\u5feb\u7167", "\u672a\u4fdd\u5b58\u7684\u7f16\u8f91\u5185\u5bb9\u4e0d\u80fd\u76f4\u63a5\u5bfc\u51fa\uff0c\u8bf7\u5148\u4fdd\u5b58\u4e3a\u7f16\u8f91\u5feb\u7167\u3002", "warning", 2200);
@@ -5061,14 +5115,7 @@
     if (source?.snapshot_id) {
       url.searchParams.set("snapshot_id", source.snapshot_id);
     }
-    const anchor = document.createElement("a");
-    anchor.href = url.toString();
-    anchor.target = "_blank";
-    anchor.rel = "noreferrer";
-    toast("\u5f00\u59cb\u5bfc\u51fa", `\u6b63\u5728\u5bfc\u51fa ${String(format || "docx").toUpperCase()} \u6587\u6863\u3002`, "success", 1800);
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    return downloadCareerReport(url, url.searchParams.get("format"));
   }
 
   const REPORT_EDITOR_LAYOUT_KEY = "career_report_editor_col_layout_v1";
@@ -5440,7 +5487,7 @@
     toast("报告已自动保存", "每次生成完成后，系统都会自动写入新的报告版本。", "success", 2000);
   }
 
-  function exportReport(format = "pdf") {
+  async function exportReport(format = "pdf") {
     if (!window.appState?.careerReport?.report_document) {
       toast("暂无可导出报告", "请先生成完整职业报告。", "warning", 1800);
       return;
@@ -5452,13 +5499,7 @@
     const url = new URL(resolveUrl("/api/career-report/export"), window.location.origin);
     url.searchParams.set("format", exportFormat);
     if (reportId) url.searchParams.set("report_id", reportId);
-    const anchor = document.createElement("a");
-    anchor.href = url.toString();
-    anchor.target = "_blank";
-    anchor.rel = "noreferrer";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    return downloadCareerReport(url, exportFormat);
   }
 
   function normalizeAvatarState(raw) {

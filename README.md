@@ -253,7 +253,7 @@ flowchart TB
 | AI 与工作流 | OpenAI SDK、LangChain、LangGraph、SQLite 检查点 | `backend/services/report/`、`experiments/news_advisor/` |
 | 聊天记忆 | SQLite 持久化、Redis 缓存、Chroma 语义索引 | `backend/services/chat/` |
 | 岗位数据与图谱 | 城市岗位数据、职业知识、LightRAG、PostgreSQL / pgvector | `data/`、`artifacts/research/` |
-| 文档处理 | PyMuPDF、pypdf、pdfplumber、python-docx、docx2pdf、Tesseract OCR | `backend/services/resume/`、`backend/services/report/exporters.py` |
+| 文档处理 | PyMuPDF、pypdf、pdfplumber、python-docx、Tesseract OCR | `backend/services/resume/`、`backend/services/report/exporters.py` |
 | 图表与交互 | ECharts、Chart.js、Fuse.js、GSAP | `frontend/static/` |
 | 资讯处理 | feedparser、trafilatura、readability-lxml、lxml | `backend/services/news/` |
 | 构建与部署 | npm workspaces、GitHub Actions、Docker Compose、Nginx | `package.json`、`.github/workflows/`、`deploy/` |
@@ -265,13 +265,19 @@ flowchart LR
     A[简历分析] --> B[岗位分析]
     B --> C[招聘检索<br/>未请求时跳过]
     C --> D[职业决策]
+    D -->|需要补查岗位证据| I[岗位 Agent 定向补查<br/>最多两轮 · 保留原有证据]
+    I --> D
     D --> E[暂停等待用户<br/>补充信息 · 确认方向与时间]
     E --> F[根据补充信息修订]
     F --> G[行动规划]
     G --> H[报告展示与导出]
 ```
 
-工作流通过 SQLite 检查点保存状态，在用户确认后恢复执行。报告包含个人画像、目标定位、就业市场、岗位适配、能力差距、成长路径、行动计划、动态评估、参考依据，并附执行摘要。生成时保留资料快照和报告版本，便于核对结论来源。
+工作流通过 SQLite 检查点保存状态，在用户确认后恢复执行。报告先说明核心结论与个人经历，再解释岗位适配和准备重点，给出近期行动、成长与调整安排，并附参考依据。生成时保留资料快照和报告版本，便于核对结论来源。
+
+决策 Agent 可以将影响结论的岗位证据缺口交回岗位 Agent 补查，再综合新旧原文重新判断。整份报告最多补查两轮，每轮最多三项，重复问题不再执行；用户经历与意愿仍通过追问确认。可选招聘搜索失败时，系统保留限制说明并继续核心分析。补查记录随检查点和报告保存，详见[多智能体协作与异常处理](docs/agent-collaboration.md)。
+
+报告阅读版按六部分组织，以连贯段落解释职业判断，只对近期执行任务使用列表。默认字段、重复检查项和整套简历诊断不进入正文；企业与岗位来源摘录集中放在附录，内部编号及完整记录保留在分析数据中。教育日期及正文标记有专项检查，详见[报告内容与质量检查](docs/report-content-quality.md)。
 
 ### 🧠 聊天记忆目前支持什么
 
@@ -325,7 +331,7 @@ flowchart LR
 | Chroma 记忆索引 | 配置 embedding 接口 | 在后端进程中使用本地持久化索引，无需另启 Chroma 服务；未就绪时回退到已保存记忆和资料。 |
 | 岗位图谱 | 本地 LightRAG、PostgreSQL / pgvector、研究配置和岗位材料 | 入口见 `artifacts/research/job_graph.py`；LightRAG 检出目录为 `artifacts/research/LightRAG/`，不随主仓库提供。 |
 | OCR | 安装 Tesseract 程序及所需语言数据 | 仅安装 Python 的 `pytesseract` 包不够。 |
-| PDF 导出 | `docx2pdf` 转换环境 | 当前通过 DOCX 转 PDF；Windows 需要 Microsoft Word，DOCX 本身由 `python-docx` 生成。 |
+| PDF 导出 | 主站 Python 环境中的 PyMuPDF | 直接从报告正文生成 PDF，支持中文、表格与自动分页，无需 Microsoft Word 或额外转换环境；可用 `npm run check:report-export` 验证。 |
 
 **单独启动 Redis**：当前 Compose 使用外部数据卷，首次运行需先创建。
 
