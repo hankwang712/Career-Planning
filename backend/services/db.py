@@ -309,36 +309,6 @@ def load_users():
     return [dict(row) for row in rows]
 
 
-def save_users(users):
-    conn = _get_conn()
-    cur = conn.cursor()
-    for u in users:
-        if not isinstance(u, dict):
-            continue
-        cur.execute(
-            """
-            INSERT OR REPLACE INTO users (username, password_hash, role, display_name)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                str(u.get("username") or "").strip(),
-                str(u.get("password_hash") or "").strip(),
-                str(u.get("role") or "user").strip() or "user",
-                str(u.get("display_name") or u.get("username") or "").strip(),
-            ),
-        )
-    usernames = [u["username"] for u in users if isinstance(u, dict) and u.get("username")]
-    if usernames:
-        placeholders = ",".join("?" * len(usernames))
-        cur.execute(
-            f"DELETE FROM users WHERE username NOT IN ({placeholders})",
-            usernames,
-        )
-    else:
-        cur.execute("DELETE FROM users")
-    conn.commit()
-
-
 def find_user(username):
     conn = _get_conn()
     cur = conn.cursor()

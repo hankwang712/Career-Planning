@@ -31,18 +31,14 @@ import random
 from flask import Flask, has_request_context, jsonify, redirect, render_template, request, send_file, send_from_directory, session, url_for
 from markupsafe import Markup, escape
 from openai import OpenAI
-from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from services.news import (
     get_career_news_payload,
     get_kb_stats,
     search_news_kb,
-    search_news_for_agent,
-    format_rag_context,
 )
 from services.report import (
     CAREER_REPORT_STAGE_DEFS,
-    REPORT_VERSION,
     build_stage_progress,
     empty_report_job,
     empty_report_state,
@@ -70,7 +66,6 @@ from services.report.exporters import (
 )
 from services.report.enhancements import (
     CAREER_FEEDBACK_VERSION,
-    CAREER_REPORT_PIPELINE_VERSION,
     PORTRAIT_PROMPT_PIPELINE_VERSION,
     PORTRAIT_TEMPLATE_VERSION,
     build_portrait_prompt_layers,
@@ -78,7 +73,6 @@ from services.report.enhancements import (
     normalize_feedback_memory,
 )
 from services.resume import (
-    FLEXIBLE_MATCH_ANALYSIS_PROMPT,
     HR_JUDGE_PROMPT,
     RESUME_REVIEW_PROMPT,
     STRUCTURED_RESUME_PROMPT,

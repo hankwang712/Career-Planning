@@ -7,7 +7,6 @@ from typing import Any
 
 PORTRAIT_PROMPT_PIPELINE_VERSION = "2026.04-portrait-pipeline-rich-v2"
 PORTRAIT_TEMPLATE_VERSION = "2026.04-portrait-dsl-v1"
-CAREER_REPORT_PIPELINE_VERSION = "2026.04-agent-loop-v2"
 CAREER_FEEDBACK_VERSION = "2026.04-feedback-memory-v1"
 
 
@@ -18,35 +17,6 @@ PORTRAIT_REQUIRED_PHRASES = [
     "无文字",
     "职业",
 ]
-
-
-TREND_SKILL_KEYWORDS = {
-    "AI 协作": {
-        "keywords": ["ai", "agent", "大模型", "生成式", "自动化", "copilot", "智能体"],
-        "action": "补一段你如何用 AI 缩短交付周期或提高质量的案例。",
-        "implication": "岗位更重视把 AI 工具变成真实产出的能力，而不只是会用单点工具。",
-    },
-    "数据分析": {
-        "keywords": ["数据", "分析", "指标", "sql", "bi", "洞察", "增长"],
-        "action": "准备可复用的数据分析案例，说明你如何从指标到行动闭环。",
-        "implication": "企业更关注能把数据转成判断和执行动作的复合型能力。",
-    },
-    "产品表达": {
-        "keywords": ["产品", "需求", "用户", "体验", "转化", "运营"],
-        "action": "补充一段你如何定义问题、拆解需求并推动落地的证据。",
-        "implication": "岗位对跨团队表达、需求澄清和产品化思维要求更高。",
-    },
-    "项目交付": {
-        "keywords": ["交付", "项目", "落地", "执行", "协同", "推进"],
-        "action": "把复杂任务拆解成里程碑，展示你推进闭环的做法。",
-        "implication": "招聘方会更在意可复制的推进能力和项目闭环经验。",
-    },
-    "内容与传播": {
-        "keywords": ["内容", "品牌", "传播", "文案", "社区", "增长内容"],
-        "action": "补充可量化的内容产出或传播结果，避免只写职责。",
-        "implication": "内容岗位越来越强调数据反馈、分发效率和多平台适配。",
-    },
-}
 
 
 VERDICT_LABELS = {
@@ -88,11 +58,6 @@ def _unique_text(values: list[Any] | tuple[Any, ...] | None, limit: int = 6, ite
         if len(items) >= limit:
             break
     return items
-
-
-def _contains_any(text: str, values: list[str]) -> bool:
-    lowered = str(text or "").lower()
-    return any(str(item or "").lower() in lowered for item in values if str(item or "").strip())
 
 
 def _split_feedback_note(text: str) -> list[str]:
@@ -375,136 +340,4 @@ def normalize_feedback_memory(raw_feedback: Any, limit: int = 8) -> dict[str, An
         "verdict_counts": verdict_counts,
         "guidance": guidance,
         "entries": entries,
-    }
-
-
-def evaluate_report_evidence_quality(profile_payload: dict[str, Any], profile_snapshot: dict[str, Any]) -> dict[str, Any]:
-    assessment = profile_payload.get("assessment") if isinstance(profile_payload.get("assessment"), dict) else {}
-    interview = profile_payload.get("interview") if isinstance(profile_payload.get("interview"), dict) else {}
-    resume = profile_payload.get("resume") if isinstance(profile_payload.get("resume"), dict) else {}
-    resume_profile = resume.get("profile") if isinstance(resume.get("profile"), dict) else {}
-
-    project_highlights = resume_profile.get("project_highlights") if isinstance(resume_profile.get("project_highlights"), list) else []
-    evidence_spans = resume_profile.get("evidence_spans") if isinstance(resume_profile.get("evidence_spans"), list) else []
-    interview_score = _clamp(interview.get("completionScore"))
-    missing_items = _unique_text(profile_snapshot.get("missing_items") or [], limit=6, item_limit=48)
-
-    capability_items = []
-    direct_capabilities = []
-    inferred_capabilities = []
-    capability_vector = profile_snapshot.get("capability_vector") if isinstance(profile_snapshot.get("capability_vector"), list) else []
-    for item in capability_vector:
-        if not isinstance(item, dict):
-            continue
-        label = _clean_text(item.get("label"), 32)
-        sources = _unique_text(item.get("sources") or [], limit=4, item_limit=32)
-        lowered_sources = " ".join(sources).lower()
-        if any(token in lowered_sources for token in ["resume", "简历", "project", "项目", "interview", "访谈"]):
-            quality = "direct"
-            direct_capabilities.append(label)
-        elif sources:
-            quality = "partial"
-            inferred_capabilities.append(label)
-        else:
-            quality = "inferred"
-            inferred_capabilities.append(label)
-        capability_items.append(
-            {
-                "label": label,
-                "quality": quality,
-                "sources": sources,
-            }
-        )
-
-    source_mix = {
-        "assessment": 100 if any((assessment.get("mbti") or {}).values()) or any((assessment.get("holland") or {}).values()) else 35,
-        "resume": 100 if str(resume.get("status") or "") == "analyzed" else 25,
-        "interview": interview_score,
-        "projects": min(100, len(project_highlights) * 22),
-        "evidence_spans": min(100, len(evidence_spans) * 18),
-    }
-
-    score = _clamp(
-        (source_mix["assessment"] * 0.12)
-        + (source_mix["resume"] * 0.26)
-        + (source_mix["interview"] * 0.2)
-        + (source_mix["projects"] * 0.22)
-        + (source_mix["evidence_spans"] * 0.2)
-        - (len(missing_items) * 4)
-    )
-
-    if score >= 80:
-        band = "高"
-    elif score >= 60:
-        band = "中"
-    else:
-        band = "低"
-
-    summary = (
-        f"当前证据质量为{band}，直接证据覆盖 {len(direct_capabilities)} 项能力。"
-        if direct_capabilities
-        else f"当前证据质量为{band}，核心判断仍偏依赖测评与间接信号。"
-    )
-
-    review_actions = []
-    if str(resume.get("status") or "") != "analyzed":
-        review_actions.append("优先补齐可解析的简历或项目经历。")
-    if interview_score < 60:
-        review_actions.append("通过补充职业访谈细节提高价值观与动机判断的可信度。")
-    if len(project_highlights) < 2:
-        review_actions.append("增加可量化的项目结果，降低结论对间接信号的依赖。")
-    if missing_items:
-        review_actions.append(f"补齐以下缺口：{'；'.join(missing_items[:3])}。")
-
-    return {
-        "score": score,
-        "band": band,
-        "summary": summary,
-        "strong_signals": _unique_text(direct_capabilities, limit=4, item_limit=24),
-        "weak_signals": _unique_text(inferred_capabilities, limit=4, item_limit=24),
-        "review_actions": _unique_text(review_actions, limit=4, item_limit=88),
-        "source_mix": source_mix,
-        "capability_items": capability_items,
-    }
-
-
-def build_trend_skill_brief(news_payload: dict[str, Any], signals: list[dict[str, Any]]) -> dict[str, Any]:
-    texts = []
-    for item in (news_payload.get("items") if isinstance(news_payload.get("items"), list) else [])[:6]:
-        if not isinstance(item, dict):
-            continue
-        texts.append(str(item.get("title") or ""))
-        texts.append(str(item.get("summary") or item.get("desc") or ""))
-    for signal in signals or []:
-        if not isinstance(signal, dict):
-            continue
-        texts.append(str(signal.get("title") or ""))
-        texts.append(str(signal.get("summary") or ""))
-    merged_text = " ".join(texts).lower()
-
-    scored_skills = []
-    for skill_name, config in TREND_SKILL_KEYWORDS.items():
-        hits = sum(1 for keyword in config["keywords"] if keyword.lower() in merged_text)
-        if hits:
-            scored_skills.append((skill_name, hits, config))
-    scored_skills.sort(key=lambda item: item[1], reverse=True)
-
-    risk_count = sum(1 for item in signals or [] if str(item.get("impact") or "") == "风险信号")
-    opportunity_count = sum(1 for item in signals or [] if str(item.get("impact") or "") == "机会信号")
-    if opportunity_count > risk_count:
-        market_temperature = "回暖"
-    elif risk_count > opportunity_count:
-        market_temperature = "承压"
-    else:
-        market_temperature = "波动"
-
-    top_skills = [item[0] for item in scored_skills[:4]]
-    implications = _unique_text([item[2]["implication"] for item in scored_skills[:3]], limit=3, item_limit=96)
-    actions = _unique_text([item[2]["action"] for item in scored_skills[:3]], limit=3, item_limit=96)
-
-    return {
-        "market_temperature": market_temperature,
-        "skill_focus": top_skills,
-        "role_implications": implications,
-        "action_signals": actions,
     }

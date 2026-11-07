@@ -450,29 +450,6 @@ def store_news_items(items: list[dict[str, Any]], fetch_content: bool = True) ->
 
 
 # ---------------------------------------------------------------------------
-# 文章正文抓取
-# ---------------------------------------------------------------------------
-
-def _fetch_article_content(url: str) -> str:
-    """
-    抓取文章 URL，提取纯文本正文（readability-lxml 对齐 web-content-extractor / Mozilla Readability，
-    不足时再 trafilatura）。Google News 包装 URL 会先解析到媒体站再提取。逻辑见 article_extract。
-    """
-    if not url or not url.startswith("http"):
-        return ""
-
-    from .article_extract import extract_article_plaintext_detailed
-
-    text, _ = extract_article_plaintext_detailed(url, timeout=ARTICLE_FETCH_TIMEOUT)
-    if not text:
-        return ""
-
-    if len(text) > ARTICLE_CONTENT_MAX_CHARS:
-        text = f"{text[: ARTICLE_CONTENT_MAX_CHARS - 1].rstrip()}…"
-    return text
-
-
-# ---------------------------------------------------------------------------
 # 分块工具（500 token / overlap=50）
 # ---------------------------------------------------------------------------
 

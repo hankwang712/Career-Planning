@@ -1,6 +1,5 @@
 """Offline regression checks; collection fixtures never access recruiting sites."""
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
@@ -12,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flask import Flask, jsonify, session
 from pydantic import ValidationError
 from services import auth, db
-from services.job_market.api import JobQuery, create_blueprint
+from services.job_market.api import create_blueprint
 from services.job_market.collector import CollectionSettings, Collector
 from services.job_market.store import MarketStore, after, canonical_url, normalize, salary_range
 

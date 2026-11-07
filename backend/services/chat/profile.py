@@ -1,6 +1,6 @@
 import json
 
-from .documents import redact_contacts
+from ..resume.documents import redact_contacts
 from .storage import normalized
 
 
