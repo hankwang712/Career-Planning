@@ -231,7 +231,7 @@ flowchart LR
 
 简历、目标岗位和招聘雷达并行分析，结果汇总后进入职业决策与行动规划。工作流保存检查点，支持失败重试、用户补充信息后继续执行。
 
-招聘雷达从公开招聘汇总表筛选岗位，再读取招聘链接核对内容，详见[招聘雷达说明](backend/tools/recruitment_radar/README.md)。
+招聘雷达从公开招聘汇总表筛选岗位，再读取招聘链接核对内容。独立测试台启动命令：`python backend/tools/recruitment_lab/app.py`，访问 <http://127.0.0.1:8766/>；数据工作台位于 `/radar`，可手动同步、筛选及导入岗位。模型与可选正文提取服务使用根目录 `.env` 配置。
 
 <a id="configuration"></a>
 
@@ -300,3 +300,13 @@ career-agent/
 ├── .env.example                  # 环境配置模板
 └── compose.yml                   # PostgreSQL / pgvector 与 Redis
 ```
+
+## 致谢
+
+本项目参考并使用了以下开源项目，感谢作者的分享：
+
+- [JobHunter](https://github.com/Bynlk/JobHunter)：招聘信息采集。
+- [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)：校招数据聚合与招聘雷达。
+- [LightRAG](https://github.com/HKUDS/LightRAG)：岗位知识图谱与检索。
+
+第三方代码的许可证及版权声明保留在对应目录中。

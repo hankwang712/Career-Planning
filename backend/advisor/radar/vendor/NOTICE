@@ -3,8 +3,7 @@ Upstream: https://github.com/jiabaobei/xiaozhao-radar
 Revision: 5615418132c4affb3c689eb1fc603e12d1c112a8
 License: Apache License 2.0 (see LICENSE).
 
-Retained: Tencent Docs parsing source, source catalog, historical recruitment snapshot,
-upstream README and HTML implementation reference.
-Modified: shared API credentials removed from HTML reference; functionality ported to
-Python backend adapters, bounded crawling, intent-based agent review and a new local UI.
+Retained: Tencent Docs parsing source, source catalog and historical recruitment snapshot.
+Modified: functionality ported to Python backend adapters, bounded crawling,
+intent-based agent review and a new local UI.
 No upstream shared API credential is used by this application.
