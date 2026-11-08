@@ -1,7 +1,42 @@
 name: career
 
-include:
-  - path: ./artifacts/research/compose.postgres.yml
-    env_file: ./artifacts/research/.env
-  - path: ./experiments/compose.memory.yml
-    env_file: ./experiments/.env
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-career}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在根目录.env中填写数据库密码}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-career_rag}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - career_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: ${MEMORY_REDIS_IMAGE:-redis:7.4-alpine}
+    command: [redis-server, --appendonly, 'yes', --appendfsync, everysec, --maxmemory-policy, noeviction]
+    ports:
+      - "127.0.0.1:${MEMORY_REDIS_PORT:-6380}:6379"
+    volumes:
+      - memory-redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  # Preserve the existing external database volumes.
+  career_pgdata:
+    external: true
+    name: research_career_pgdata
+  memory-redis:
+    external: true
+    name: career-agent-memory_memory-redis

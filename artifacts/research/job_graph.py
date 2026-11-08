@@ -1625,7 +1625,7 @@ def main():
                                            "merge", "merge-apply", "merge-undo", "merge-review", "merges", "entities"])
     for child in (importing, optimizing, serving, career):
         child.add_argument("--workspace")
-        child.add_argument("--env-file", type=Path, default=ROOT / ".env")
+        child.add_argument("--env-file", type=Path, default=PROJECT_ROOT / ".env")
         child.add_argument("--working-dir", type=Path, default=ROOT / "jd_rag_storage")
         child.add_argument("--webui-port", type=int)
         child.add_argument("--no-embedding-cache", action="store_true", help="禁用本地向量缓存，直接请求embedding接口")

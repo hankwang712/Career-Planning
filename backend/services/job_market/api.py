@@ -115,7 +115,7 @@ def create_blueprint(collector, login_required, admin_required, current_user):
             from openpyxl import Workbook
             from openpyxl.styles import Font, PatternFill
         except ImportError:
-            return jsonify(message="导出组件未安装，请安装 backend/requirements-jobs.txt。"), 503
+            return jsonify(message="导出组件未安装，请安装 requirements.txt。"), 503
         query = JobQuery.model_validate(request.args.to_dict())
         result = store.jobs(query.filters(), page=1, size=10000, sort=query.sort)
         workbook = Workbook()

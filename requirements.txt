@@ -1,0 +1,45 @@
+# Application, Agents, recruitment collectors and graph CLI helpers.
+# Versions intentionally omitted; keep the Windows-only platform marker.
+# The separately maintained, patched LightRAG checkout installs its own extras.
+anyio
+bleach
+brotli
+chroma-hnswlib; sys_platform == "win32"
+chromadb
+fastapi
+feedparser
+Flask
+fonttools
+httpx
+langchain
+langchain-core
+langchain-openai
+langgraph
+langgraph-checkpoint-sqlite
+lxml
+Markdown
+MarkupSafe
+numpy
+openai
+openpyxl
+packaging
+pdfplumber
+Pillow
+playwright
+playwright-stealth
+protobuf
+psutil
+pydantic
+PyMuPDF
+pypdf
+pytesseract
+python-docx
+python-dotenv
+readability-lxml
+redis
+starlette
+tqdm
+trafilatura
+tzdata
+uvicorn
+Werkzeug

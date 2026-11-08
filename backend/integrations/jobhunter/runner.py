@@ -32,7 +32,7 @@ def main():
         from crawler.shixiseng_crawler import ShixisengCrawler
         from crawler.website_crawler import WebsiteCrawler
     except ImportError:
-        emit("finished", status="unavailable", message="采集依赖未安装，请安装 backend/requirements-jobs.txt 并准备 Chromium。")
+        emit("finished", status="unavailable", message="采集依赖未安装，请安装 requirements.txt 并准备 Chromium。")
         return 2
     if not os.environ.get("JOBHUNTER_BROWSER") and os.name == "nt":
         for browser in (r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"):

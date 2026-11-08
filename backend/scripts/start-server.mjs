@@ -3,10 +3,13 @@ import path from "node:path";
 import process from "node:process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..", "..");
+const envFile = path.join(repoRoot, ".env");
+if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
 const frontendDir = path.join(repoRoot, "frontend");
 const frontendRequire = createRequire(path.join(frontendDir, "package.json"));
 const isWin = process.platform === "win32";
@@ -81,16 +84,6 @@ function spawnTagged(command, args, label, extraEnv = {}) {
     process.stderr.write(`[${label}] ${error.message}\n`);
   });
   return child;
-}
-
-if (process.argv.includes("--check")) {
-  ensureAvailable();
-  const pyCompile = runCheck(pythonCmd, ["-m", "compileall", "-q", "backend"]);
-  if (pyCompile.status !== 0) {
-    fail(pyCompile.stderr || pyCompile.stdout || "backend 语法检查失败。", pyCompile.status || 1);
-  }
-  log("start-server check passed");
-  process.exit(0);
 }
 
 ensureAvailable();
