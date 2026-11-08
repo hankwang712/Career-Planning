@@ -8961,15 +8961,98 @@ const REPORT_AGENT_FLOW = [
   { key: "report_writer", title: "报告合成", role: "结果整理", detail: "整理已校验结果供阅读与导出", icon: "report", x: 1310, y: 326 }
 ];
 
-const REPORT_AGENT_NODE_WIDTH = 220;
-const REPORT_AGENT_NODE_MID_Y = 118;
-const REPORT_AGENT_MAP_W = 1600;
-const REPORT_AGENT_MAP_H = 880;
-const REPORT_AGENT_EDGES = [
-  ["resume_analysis", "career_decision"], ["job_analysis", "career_decision"],
-  ["recruitment_search", "career_decision"], ["career_decision", "review"],
-  ["review", "action_planning"], ["action_planning", "report_writer"]
-];
+const reportWizardUiState = { stage: 1, runtimeKey: "", started: false, manual: false };
+
+function renderReportWizard() {
+  const state = getReportRuntimeState();
+  const runtimeKey = state?.job_id || state?.report_id || "";
+  if (runtimeKey && runtimeKey !== reportWizardUiState.runtimeKey) {
+    reportWizardUiState.runtimeKey = runtimeKey;
+    if (isCareerReportRunningStatus(state?.status)
+      || (!reportWizardUiState.manual && !isCareerReportReadyStatus(state?.status))) reportWizardUiState.stage = 3;
+    reportWizardUiState.started = true;
+  }
+  const stage = reportWizardUiState.stage;
+  const executionTitle = document.getElementById("reportExecutionTitle");
+  if (executionTitle) executionTitle.textContent = isCareerReportReadyStatus(state?.status) ? "这一站，已经为你梳理好了。"
+    : state?.status === "waiting_input" ? "聊聊你的想法，再继续规划。"
+    : ["failed", "canceled"].includes(state?.status) ? "进度已保留，可以接着完成。" : "Agent 团队，正在一起探索。";
+  const ready = Boolean(getResumeProfileFromCache()?.file_name);
+  const locked = reportGenerationStarting || reportResumeUiState.pending || resumeTaskState.uploadInFlight
+    || resumeTaskState.analyzeInFlight || isCareerReportRunningStatus(state?.status);
+  const panels = ["reportResumePanel", "reportWorkflowInput", "reportExecutionPanel"];
+  panels.forEach((id, index) => {
+    const element = document.getElementById(id);
+    if (element) element.hidden = stage !== index + 1;
+  });
+  document.querySelectorAll("[data-report-step]").forEach((button) => {
+    const step = Number(button.dataset.reportStep);
+    button.disabled = step === 2 ? !ready : step === 3 ? !reportWizardUiState.started : false;
+    button.classList.toggle("is-current", step === stage);
+    button.classList.toggle("is-complete", step === 1 ? ready : step === 2 ? reportWizardUiState.started : isCareerReportReadyStatus(state?.status));
+    if (step === stage) button.setAttribute("aria-current", "step");
+    else button.removeAttribute("aria-current");
+  });
+  const hint = document.getElementById("reportStepResumeHint");
+  if (hint) hint.textContent = ready ? "简历已准备好" : "从你的经历开始";
+  const next = document.getElementById("reportResumeNext");
+  if (next) next.disabled = !ready || reportResumeUiState.pending || resumeTaskState.uploadInFlight;
+  const start = document.getElementById("reportStageStart");
+  if (start) {
+    start.disabled = locked || !ready;
+    start.textContent = reportGenerationStarting ? "正在启动…" : "启动多智能体 ↗";
+  }
+  const primary = document.getElementById("reportLaunchBtn");
+  if (primary && !reportGenerationStarting) {
+    primary.disabled = stage === 1 ? !ready || reportResumeUiState.pending : locked;
+    primary.textContent = isCareerReportRunningStatus(state?.status) ? "生成中…"
+      : stage === 1 ? "下一步：填写目标" : stage === 2 ? "启动多智能体" : "重新设定目标";
+  }
+  const form = document.getElementById("reportWorkflowInput");
+  if (form && !form.dataset.wizardBound) {
+    form.dataset.wizardBound = "1";
+    form.addEventListener("input", () => {
+      reportGenerationError = "";
+      const feedback = document.getElementById("reportLaunchFeedback");
+      if (feedback && !reportGenerationStarting) feedback.hidden = true;
+    });
+  }
+}
+
+function showReportWizardStage(stage) {
+  if (stage === 2 && !getResumeProfileFromCache()?.file_name) return;
+  if (stage === 3 && !reportWizardUiState.started) return;
+  reportWizardUiState.stage = stage;
+  reportWizardUiState.manual = true;
+  renderReportWizard();
+  if (stage !== 3) window.ReportReview?.close();
+  else renderReportWorkflowReview(getReportRuntimeState());
+  const target = document.getElementById(stage === 1 ? "reportResumeSelectBtn" : stage === 2 ? "reportWorkflowTargets" : "reportStatusTitle");
+  requestAnimationFrame(() => {
+    if (target && stage !== 3) target.focus({ preventScroll: true });
+  });
+}
+
+function reportWizardPrimaryAction() {
+  if (reportWizardUiState.stage === 1) showReportWizardStage(2);
+  else if (reportWizardUiState.stage === 2) void startCareerReportGeneration();
+  else showReportWizardStage(getResumeProfileFromCache()?.file_name ? 2 : 1);
+}
+
+function reportAgentCurrentMessage(item, state) {
+  if (["canceled", "cancelled"].includes(state?.status) && item.nodeStatus !== "done") return "本次任务已停止，进度已保留";
+  if (item.nodeStatus === "skipped") return "本次没有启用招聘雷达";
+  if (item.key === "review" && item.nodeStatus === "active") return "轮到你了：确认方向与时间，让规划继续";
+  const activity = state?.agent_activity?.[item.key];
+  if (activity?.message && item.nodeStatus !== "pending" && !(item.nodeStatus === "done" && activity.status !== "done")) return String(activity.message).slice(0, 180);
+  if (item.nodeStatus === "done") return ({ resume_analysis: "经历与技能已梳理，交给职业顾问综合判断", job_analysis: "岗位要求已整理，接下来一起比较方向", recruitment_search: "机会筛选已结束，来源与待确认项已整理", career_decision: "职业方向已完成分析，进入确认与规划", review: "方向与时间已确认，开始安排下一步", action_planning: "行动与学习计划已整理，交给报告合成", report_writer: "报告已准备好，可以阅读与导出" })[item.key];
+  if (item.nodeStatus === "failed") return "这一步暂未完成，可以从保存处重试";
+  if (item.nodeStatus === "active") {
+    if (state?.stage === item.key && state.stage_detail) return state.stage_detail;
+    return ({ resume_analysis: "正在梳理你的经历与技能证据", job_analysis: "正在对照目标岗位，查找能力要求", recruitment_search: "正在筛选匹配的招聘机会", career_decision: "正在汇总各方分析，比较职业方向", action_planning: "正在安排任务、时间与交付成果", report_writer: "正在整理最终报告与参考依据" })[item.key];
+  }
+  return item.key === "career_decision" ? "等待前面的分析汇合，再一起判断方向" : item.key === "review" ? "分析完成后，我们会请你确认几个问题" : "等前一步准备好，就由我来接棒";
+}
 
 function getReportRuntimeState() {
   const state = typeof window.getCareerReportStateSafe === "function"
@@ -8989,28 +9072,16 @@ function getReportProgressMap(state) {
   return map;
 }
 
-function reportMaLegendStatusClass(nodeStatus) {
-  if (nodeStatus === "done") return "completed";
-  if (nodeStatus === "active") return "active";
-  if (nodeStatus === "failed") return "failed";
-  return "pending";
-}
-
 function reportMaLegendStatusText(nodeStatus) {
   if (nodeStatus === "done") return "已完成";
   if (nodeStatus === "active") return "处理中";
   if (nodeStatus === "failed") return "失败";
+  if (nodeStatus === "canceled") return "已停止";
   return "待启动";
 }
 
-function reportAgentMetricsHtml(item) {
-  const ns = item.nodeStatus;
-  const cls = ns === "done" ? "green" : ns === "active" ? "yellow" : ns === "failed" ? "pink" : "gray";
-  const text = ns === "done" ? "✅ 已就绪" : ns === "active" ? "⏳ 进行中" : ns === "failed" ? "⚠️ 异常" : "○ 待触发";
-  return `<span class="metric-tag ${cls}">${text}</span>`;
-}
-
 function reportAgentPortraitHtml(item) {
+  if (item.key === "review") return `<div class="report-ma-portrait report-ma-portrait--user">${getReportUserAvatarHtml()}</div>`;
   const url = REPORT_AGENT_IMAGE_URL[item.key];
   if (url) {
     return `<div class="report-ma-portrait report-ma-portrait--img"><img src="${escHtml(url)}" alt="${escHtml(item.title)}" loading="lazy" decoding="async" /></div>`;
@@ -9033,13 +9104,6 @@ function reportAgentIconSvg(icon) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[icon] || paths.report}</svg>`;
 }
 
-function reportAgentStatusLabel(status) {
-  if (status === "done") return "已完成";
-  if (status === "active") return "传递中";
-  if (status === "failed") return "失败";
-  return "待触发";
-}
-
 function getReportUserAvatarHtml() {
   const avatarState = typeof window.getAccountAvatarState === "function" ? window.getAccountAvatarState() : null;
   const imageUrl = String(avatarState?.image_url || "").trim();
@@ -9049,19 +9113,6 @@ function getReportUserAvatarHtml() {
     return `<span class="report-agent-user-avatar"><img src="${escHtml(imageUrl)}" alt="${escHtml(displayName)}"></span>`;
   }
   return `<span class="report-agent-user-avatar fallback">${escHtml(displayName.charAt(0).toUpperCase() || "用")}</span>`;
-}
-
-function reportAgentEdgePath(from, to) {
-  const x1 = Number(from.x || 0) + REPORT_AGENT_NODE_WIDTH;
-  const y1 = Number(from.y || 0) + REPORT_AGENT_NODE_MID_Y;
-  // 留一点点空隙，视觉上连入卡片更优雅
-  const x2 = Number(to.x || 0) - 2;
-  const y2 = Number(to.y || 0) + REPORT_AGENT_NODE_MID_Y;
-  
-  // 使用更平滑的三次贝塞尔曲线 (Cubic Bezier)
-  // 控制点完全居中，这样可以形成从卡片中间水平引出然后平滑分叉的“树枝状”完美结构
-  const midX = x1 + (x2 - x1) * 0.5;
-  return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
 
 function renderReportAgentMap(profile, roles) {
@@ -9092,76 +9143,30 @@ function renderReportAgentMap(profile, roles) {
     } else if ((running && index === activeIndex) || progressStatus === "active") {
       nodeStatus = "active";
     }
+    const activity = state?.agent_activity?.[item.key];
+    if (!completed && ["queued", "running"].includes(status) && activity?.status) nodeStatus = activity.status;
+    if (activity?.status === "skipped") nodeStatus = "skipped";
+    if (["failed", "error", "canceled", "cancelled"].includes(status) && activity?.status === "failed") nodeStatus = "failed";
+    else if (["failed", "error", "canceled", "cancelled"].includes(status) && nodeStatus === "active") nodeStatus = "pending";
     return { ...item, nodeStatus };
   });
-  const nodeMap = new Map(nodes.map((item) => [item.key, item]));
-  const edges = REPORT_AGENT_EDGES.map(([fromKey, toKey]) => {
-    const from = nodeMap.get(fromKey);
-    const to = nodeMap.get(toKey);
-    if (!from || !to) return "";
-    const edgeStatus = to.nodeStatus === "active"
-      ? "active"
-      : from.nodeStatus === "done" && to.nodeStatus === "done"
-        ? "done"
-        : "pending";
-    return `<path class="report-agent-edge is-${edgeStatus}" d="${reportAgentEdgePath(from, to)}"></path>`;
-  }).join("");
-
   const nodeHtml = nodes
     .map((item, index) => {
       const step = String(index + 1).padStart(2, "0");
-      const maStatus = reportMaLegendStatusClass(item.nodeStatus);
       const hub = item.key === "career_decision" ? " hub" : "";
       return `
-    <article class="report-agent-node report-ma-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
-      <div class="report-ma-badge">${step}</div>
-      <div class="report-ma-flow-status status-badge ${maStatus}">${escHtml(reportMaLegendStatusText(item.nodeStatus))}</div>
+    <article class="report-agent-node report-task-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}">
+      <div class="report-agent-speech" role="status"><span class="report-speech-label"><i aria-hidden="true"></i>${item.nodeStatus === "skipped" ? "本次跳过" : reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentCurrentMessage(item, state))}</p></div>
+      <div class="report-agent-character">
       ${reportAgentPortraitHtml(item)}
+      <span class="report-agent-character-number">${step}</span>
+      </div>
       <div class="report-ma-name">${escHtml(item.title)}</div>
-      <div class="report-ma-role">${escHtml(item.role)}</div>
       <p class="report-ma-detail">${escHtml(item.detail)}</p>
-      <div class="report-ma-metrics">${reportAgentMetricsHtml(item)}</div>
     </article>`;
-    })
-    .join("");
+    });
 
-  return `
-    <div class="report-agent-map-viewport">
-    <div class="report-agent-map-inner">
-      <div class="report-agent-phase phase-parallel">并行分析</div>
-      <div class="report-agent-phase phase-serial">依赖汇合</div>
-      <div class="report-agent-phase phase-output">输出</div>
-      <svg class="report-agent-edges" viewBox="0 0 ${REPORT_AGENT_MAP_W} ${REPORT_AGENT_MAP_H}" preserveAspectRatio="none" aria-hidden="true">${edges}</svg>
-      ${nodeHtml}
-    </div>
-    </div>
-  `;
-}
-
-function updateReportAgentMapFit() {
-  const map = document.getElementById("reportAgentMap");
-  if (!map) return;
-  const viewport = map.querySelector(".report-agent-map-viewport");
-  if (!viewport) return;
-  const style = getComputedStyle(map);
-  const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
-  const cw = Math.max(0, map.clientWidth - padX);
-  // 区块 display:none 时宽度为 0，勿把 scale 写成 0；可见后 ResizeObserver 会再算
-  const scale = cw > 0 ? Math.min(1, cw / REPORT_AGENT_MAP_W) : 1;
-  viewport.style.setProperty("--report-map-scale", String(scale));
-}
-
-function ensureReportAgentMapFitObserver() {
-  const map = document.getElementById("reportAgentMap");
-  if (!map || map.dataset.reportMapFitBound === "1") return;
-  map.dataset.reportMapFitBound = "1";
-  const run = () => updateReportAgentMapFit();
-  if (typeof ResizeObserver !== "undefined") {
-    const ro = new ResizeObserver(run);
-    ro.observe(map);
-  }
-  window.addEventListener("resize", run);
-  window.addEventListener("orientationchange", run);
+  return `<div class="report-collaboration-board"><div class="report-lane-heading"><span>一起探索</span><p>简历、岗位与招聘机会，可以同时分析。</p><span class="report-lane-chip">并行协作</span></div><div class="report-parallel-team">${nodeHtml.slice(0, 3).join("")}</div><div class="report-team-handoff" aria-hidden="true"><span></span>汇合分析，继续向前 ↓<span></span></div><div class="report-sequential-team">${nodeHtml.slice(3).join("")}</div></div>`;
 }
 
 function renderReportWorkspace(profile, roles) {
@@ -9226,10 +9231,8 @@ function renderReportWorkspace(profile, roles) {
   renderReportWorkflowReview(state);
   if (mapEl) {
     mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
-    ensureReportAgentMapFitObserver();
-    updateReportAgentMapFit();
-    requestAnimationFrame(() => updateReportAgentMapFit());
   }
+  renderReportWizard();
 }
 
 const CAREER_REPORT_POLL_MS = 4000;
@@ -9281,6 +9284,7 @@ function mergeCareerReportStatusPayload(payload) {
     stage_label: job.stage_label || state.stage_label || "",
     stage_detail: job.stage_detail || job.message || state.stage_detail || "",
     progress: Array.isArray(job.progress) && job.progress.length ? job.progress : (Array.isArray(state.progress) ? state.progress : []),
+    agent_activity: job.agent_activity && Object.keys(job.agent_activity).length ? job.agent_activity : (state.agent_activity || {}),
     generated_at: state.generated_at || "",
     updated_at: new Date().toLocaleString("zh-CN", { hour12: false }),
     model: job.model || state.model || "",
@@ -9510,7 +9514,7 @@ function renderReportResumePanel(data = getResumeProfileFromCache()) {
   if (badge) badge.textContent = busy ? (reportResumeUiState.phase || "正在处理") : ready ? "已上传" : "未上传";
   if (hint) hint.textContent = reportResumeUiState.error || (busy
     ? "当前任务正在处理，请稍候。"
-    : ready ? "简历已上传。填写下方目标岗位，点击“启动生成”，分析流程会自动读取这份简历。"
+    : ready ? "简历已准备好。点击下一步，填写目标与偏好。"
     : "先上传简历，再填写目标岗位，点击“启动生成”开始多智能体分析。");
   if (select) { select.disabled = locked; select.textContent = hasFile ? "更换简历" : "上传简历"; }
   if (input) input.disabled = locked;
@@ -9537,6 +9541,7 @@ function renderReportResumePanel(data = getResumeProfileFromCache()) {
     if (statusTitle) statusTitle.textContent = reportGenerationError ? "多智能体流程未启动" : "正在启动多智能体流程";
     if (statusHint) statusHint.textContent = reportGenerationError || "正在提交简历和分析目标，任务创建后将在下方显示执行进度。";
   }
+  renderReportWizard();
 }
 
 async function refreshReportResumePanel(force = true) {
@@ -9622,6 +9627,10 @@ async function startCareerReportGeneration() {
     showToast("请先登录", "请登录后生成职业报告。", "warning", 1800);
     return;
   }
+  if (reportWizardUiState.stage !== 2) {
+    showReportWizardStage(getResumeProfileFromCache()?.file_name ? 2 : 1);
+    return;
+  }
   if (reportGenerationStarting || reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
     return showToast("请稍候", "简历或报告任务正在执行中。", "warning", 2000);
   }
@@ -9649,6 +9658,7 @@ async function startCareerReportGeneration() {
     }
     const resume = await loadResumeProfile(true);
     if (!resume.file_name) {
+      showReportWizardStage(1);
       document.getElementById("reportResumePanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
       throw new Error("请先在上方上传 PDF 或 DOCX 简历。");
     }
@@ -9671,6 +9681,9 @@ async function submitCareerReportWorkflow(payload) {
   reportGenerationError = "";
   window.ReportReview?.reset();
   reportWorkflowSnapshot = null;
+  reportWizardUiState.stage = 3;
+  reportWizardUiState.started = true;
+  reportWizardUiState.manual = false;
   applyCareerReportRuntimeState({ status: "queued", job_id: result.job_id, report_id: result.report_id,
     stage: "resume_analysis", stage_detail: "任务已提交，正在执行 Agent。", progress: [] });
   void pollCareerReportJob(result.job_id);
@@ -9686,7 +9699,7 @@ function renderReportWorkflowReview(state) {
   const visible = ["waiting_input", "failed"].includes(state?.status) && reportId;
   container.classList.toggle("hidden", !visible);
   if (!visible) { window.ReportReview?.close(); return; }
-  const active = !document.getElementById("report")?.classList.contains("hidden");
+  const active = reportWizardUiState.stage === 3 && !document.getElementById("report")?.classList.contains("hidden");
   if (reportWorkflowSnapshot?.reportId === reportId) {
     window.ReportReview?.autoOpen(active && state.status === "waiting_input");
     return;
@@ -9705,7 +9718,7 @@ function renderReportWorkflowReview(state) {
     }
     window.ReportReview.mount(container, reportWorkflowSnapshot, {
       onSubmit: continueCareerReportWorkflow,
-      active: !document.getElementById("report")?.classList.contains("hidden") && getCareerReportStateSafe()?.status === "waiting_input"
+      active: reportWizardUiState.stage === 3 && !document.getElementById("report")?.classList.contains("hidden") && getCareerReportStateSafe()?.status === "waiting_input"
     });
   }).catch((error) => {
     if (epoch === accountRequestEpoch) container.textContent = error.message || "读取失败，请刷新页面重试。";
@@ -9995,6 +10008,8 @@ function clearPrivateWorkspace() {
   accountRequestEpoch += 1;
   window.ReportReview?.reset();
   Object.assign(reportResumeUiState, { pending: false, phase: "", error: "" });
+  Object.assign(reportWizardUiState, { stage: 1, runtimeKey: "", started: false, manual: false });
+  document.getElementById("reportWorkflowInput")?.reset();
   reportGenerationStarting = false;
   reportGenerationError = "";
   inFlightGetRequests.clear();

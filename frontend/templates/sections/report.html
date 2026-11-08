@@ -2,20 +2,29 @@
     <div class="report-launch-page">
         <div class="report-launch-hero">
             <div>
-                <p class="report-launch-kicker">Career Report Pipeline</p>
+                <p class="report-launch-kicker">一步一步，找到下一站</p>
                 <h2 class="report-launch-title">职业生涯发展报告生成台</h2>
             </div>
             <div class="report-launch-actions">
-                <button id="reportLaunchBtn" type="button" class="report-launch-primary" onclick="startCareerReportGeneration()">启动生成</button>
+                <button id="reportLaunchBtn" type="button" class="report-launch-primary" onclick="reportWizardPrimaryAction()">下一步：填写目标</button>
                 <button id="reportCancelBtn" type="button" class="report-launch-danger hidden" onclick="cancelCareerReportGeneration()">停止生成</button>
                 <button type="button" class="report-launch-secondary" onclick="window.openUserCenterPage ? openUserCenterPage('report-workspace') : (window.location.href='/user-center#report-workspace')">查看报告中心</button>
             </div>
         </div>
 
+        <nav class="report-stage-nav" aria-label="报告生成阶段">
+            <button type="button" data-report-step="1" aria-current="step" onclick="showReportWizardStage(1)"><span class="report-step-number">01</span><span><strong>准备简历</strong><small id="reportStepResumeHint">从你的经历开始</small></span><span class="report-step-check" aria-hidden="true">✓</span></button>
+            <span class="report-step-connector" aria-hidden="true"></span>
+            <button type="button" data-report-step="2" disabled onclick="showReportWizardStage(2)"><span class="report-step-number">02</span><span><strong>设定方向</strong><small>目标岗位与求职偏好</small></span><span class="report-step-check" aria-hidden="true">✓</span></button>
+            <span class="report-step-connector" aria-hidden="true"></span>
+            <button type="button" data-report-step="3" disabled onclick="showReportWizardStage(3)"><span class="report-step-number">03</span><span><strong>Agent 协作</strong><small>一起完成你的职业报告</small></span><span class="report-step-check" aria-hidden="true">✓</span></button>
+        </nav>
+
         <p id="reportLaunchFeedback" class="report-launch-feedback" role="status" aria-live="polite" hidden></p>
 
-        <section id="reportResumePanel" class="report-resume-panel" aria-labelledby="reportResumeTitle">
+        <section id="reportResumePanel" class="report-resume-panel report-wizard-stage" aria-labelledby="reportResumeTitle">
             <div class="report-resume-heading"><div><span class="report-input-step">01 · 简历材料</span><h3 id="reportResumeTitle">上传用于分析的简历</h3></div><span id="reportResumeStatus" class="report-resume-status" role="status">未上传</span></div>
+            <div class="report-resume-intro"><div><p class="report-stage-eyebrow">EVERY EXPERIENCE COUNTS</p><h4>让每一段经历，都成为出发点。</h4><p>准备好你的简历，我们将从经历与技能中梳理优势，再对照你想去的方向。</p><div class="report-intro-tags"><span>经历梳理</span><span>技能识别</span><span>方向探索</span></div></div><div class="report-document-art" aria-hidden="true"><div class="report-art-page"><span></span><i></i><i></i><b></b><i></i><i></i></div><span class="report-art-note">你的下一站，从这里开始 ↗</span></div></div>
             <div id="reportResumeDropzone" class="report-resume-dropzone" ondragover="event.preventDefault(); this.classList.add('is-dragging');" ondragleave="this.classList.remove('is-dragging');" ondrop="onReportResumeDrop(event)">
                 <div class="report-resume-document-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div>
                 <div class="report-resume-file-info"><strong id="reportResumeFileName">选择简历文件，或拖拽到这里</strong><p id="reportResumeFileMeta">支持 PDF、DOCX，单个文件不超过 12 MB。</p></div>
@@ -23,10 +32,12 @@
                 <input id="reportResumeFileInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="onReportResumeSelected(event)" hidden>
             </div>
             <p id="reportResumeHint" class="report-resume-hint" role="status" aria-live="polite">先上传简历，再填写目标岗位，点击“启动生成”开始多智能体分析。</p>
+            <div class="report-stage-footer"><span>准备好材料，再告诉我们你想去哪里。</span><button id="reportResumeNext" type="button" class="report-launch-primary" disabled onclick="showReportWizardStage(2)">下一步：设定方向 <span aria-hidden="true">→</span></button></div>
         </section>
 
-        <form id="reportWorkflowInput" class="report-workflow-form" onsubmit="event.preventDefault(); startCareerReportGeneration();">
+        <form id="reportWorkflowInput" class="report-workflow-form report-wizard-stage" hidden onsubmit="event.preventDefault(); startCareerReportGeneration();">
             <div class="report-input-heading"><span class="report-input-step">02 · 分析目标</span><h3>填写目标与偏好</h3></div>
+            <p class="report-stage-description">给探索一个方向，剩下的交给你的 Agent 团队。</p>
             <label>目标岗位或方向（每行一个，最多五个）
                 <textarea id="reportWorkflowTargets" rows="2" maxlength="1500" placeholder="例如：大模型应用开发工程师" required></textarea>
             </label>
@@ -58,9 +69,11 @@
                 <label>招聘雷达需求<input id="reportWorkflowSearch" maxlength="3000" placeholder="例如：寻找上海或杭州的大模型应用实习，保留投递链接"></label>
                 <p>从招聘汇总与企业官网发现机会，优先核验相关岗位，并在报告中标注来源、日期和待确认条件。</p>
             </details>
-            <p>简历分析后，只需确认少量尚未说明的信息，即可生成行动计划。</p>
+            <div class="report-stage-footer"><button type="button" class="report-launch-secondary" onclick="showReportWizardStage(1)">← 返回简历</button><button id="reportStageStart" type="submit" class="report-launch-primary">启动多智能体 <span aria-hidden="true">↗</span></button></div>
         </form>
 
+        <section id="reportExecutionPanel" class="report-wizard-stage report-execution-panel" hidden aria-label="第三阶段：多智能体协作">
+        <div class="report-execution-intro"><div><span class="report-input-step">03 · 多智能体协作</span><h3 id="reportExecutionTitle">你的职业探索团队，正在就位。</h3><p>每位 Agent 专注一项任务，右上角的对话气泡会显示当前进展。</p></div><span class="report-team-mark" aria-hidden="true">✦</span></div>
         <div id="reportStatus" class="report-launch-status">
             <div>
                 <p id="reportStatusTitle" class="report-launch-status-title">等待启动多智能体流程</p>
@@ -91,5 +104,6 @@
             </div>
             <div id="reportAgentMap" class="report-agent-map"></div>
         </div>
+        </section>
     </div>
 </section>
