@@ -290,3 +290,74 @@
   .lm-panel .lm-search-main .lm-btn { padding-inline:15px; }
   .lm-panel .lm-filter-row, .lm-panel .lm-advanced .lm-filter-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+/* Job detail: a stable header and application bar around a readable source document. */
+#lmDetailDialog { width:min(980px,calc(100vw - 32px)); height:min(880px,calc(100dvh - 64px)); max-height:none; padding:0; overflow:hidden; color:#35465e; border:1px solid #e2e8f1; border-radius:22px; box-shadow:0 26px 90px #142a4c30; }
+#lmDetailDialog[open] { display:flex; flex-direction:column; }
+#lmDetailDialog .lm-dialog-close { z-index:2; top:18px; right:20px; width:32px; height:32px; color:#748397; background:#f2f5f9; line-height:1; }
+#lmDetailContent { display:flex; flex:1; flex-direction:column; min-height:0; }
+.lm-detail-shell { display:flex; flex:1; flex-direction:column; min-height:0; }
+.lm-detail-header { flex-shrink:0; padding:25px 32px 22px; border-bottom:1px solid #e9edf4; background:linear-gradient(120deg,#f8fbff,#fff 70%); }
+.lm-detail-source { margin:0 42px 18px 0; color:#8393a9; font-size:10px; letter-spacing:.04em; }
+.lm-detail-heading { display:flex; align-items:center; gap:14px; min-width:0; }
+.lm-detail-heading > div { min-width:0; }
+.lm-detail-company-mark { display:grid; place-items:center; flex-shrink:0; width:52px; height:52px; border:1px solid #dfe9ed; border-radius:14px; background:#edf5f4; color:#51847b; font-size:23px; font-weight:700; }
+.lm-detail-company { margin:0 0 4px; color:#74859b; font-size:12px; }
+#lmDetailDialog #lmDetailTitle { margin:0; color:#263c59; font-size:25px; font-weight:750; line-height:1.45; outline:none; overflow-wrap:anywhere; }
+.lm-detail-summary { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-top:20px; }
+.lm-detail-summary .lm-tags { min-width:0; }
+.lm-detail-summary .lm-tags span { padding:5px 9px; background:#f0f4f9; color:#718299; font-size:11px; }
+.lm-detail-salary { display:flex; align-items:center; gap:10px; flex-shrink:0; margin:0; color:#327d6c; font-size:19px; font-weight:700; }
+.lm-detail-salary > span { color:#97a3b1; font-size:10px; font-weight:400; }
+.lm-detail-salary.is-undisclosed { color:#96a1b0; font-size:12px; font-weight:400; }
+.lm-detail-scroll { min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.lm-detail-columns { display:grid; grid-template-columns:minmax(0,1fr) 205px; gap:34px; padding:28px 30px 34px 32px; }
+.lm-detail-main { min-width:0; }
+#lmDetailDialog .lm-detail-section h4 { display:flex; align-items:center; gap:8px; margin:0 0 16px; color:#354a65; font-size:15px; font-weight:700; }
+.lm-detail-section h4::before { content:""; width:3px; height:14px; background:#6f98df; border-radius:2px; }
+.lm-detail-section + .lm-detail-section { margin-top:30px; padding-top:25px; border-top:1px solid #edf0f5; }
+.lm-detail-copy { color:#5c6b80; font-size:13px; line-height:1.95; overflow-wrap:anywhere; }
+.lm-detail-copy p { margin:0 0 13px; }
+.lm-description-list { margin:0; padding-left:23px; }
+.lm-detail-copy ol.lm-description-list { list-style:decimal outside; }
+.lm-detail-copy ul.lm-description-list { list-style:disc outside; }
+.lm-description-list li { margin:0 0 17px; padding-left:5px; }
+.lm-description-list li::marker { color:#8b9cb4; font-size:12px; font-weight:600; }
+.lm-responsibility-label { display:block; margin-bottom:5px; color:#40516a; font-size:13px; font-weight:650; }
+.lm-item-body { display:block; }
+.lm-detail-sidebar { align-self:start; padding:17px; border:1px solid #e9edf4; border-radius:13px; background:#f9fafc; }
+#lmDetailDialog .lm-detail-sidebar h4 { margin:0 0 17px; color:#65768c; font-size:12px; font-weight:650; }
+.lm-detail-sidebar dl { display:grid; gap:15px; margin:0; }
+.lm-detail-sidebar dl > div { min-width:0; }
+.lm-detail-sidebar dt { margin-bottom:4px; color:#99a5b4; font-size:10px; }
+.lm-detail-sidebar dd { margin:0; color:#64758c; font-size:12px; line-height:1.65; overflow-wrap:anywhere; }
+.lm-detail-trace { margin-top:20px; padding-top:15px; border-top:1px solid #e5eaf1; }
+.lm-detail-trace summary { color:#8191a7; font-size:10px; cursor:pointer; }
+.lm-detail-trace dl { margin-top:16px; }
+.lm-detail-extra, .lm-detail-original { margin-top:25px; padding:15px 0 0; border-top:1px solid #e9edf4; }
+.lm-detail-extra summary, .lm-detail-original summary { color:#8b99ad; font-size:11px; cursor:pointer; }
+.lm-detail-extra .lm-detail-copy { margin-top:16px; }
+.lm-original-text { margin-top:15px; padding:16px; border-radius:10px; background:#f7f9fc; color:#7a889c; font-size:11px; line-height:1.9; white-space:pre-wrap; overflow-wrap:anywhere; }
+.lm-detail-footer { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-shrink:0; padding:17px 30px; border-top:1px solid #e8edf4; background:#fff; }
+.lm-detail-footer > div { display:grid; gap:5px; min-width:0; }
+.lm-detail-footer strong { color:#6a7d94; font-size:11px; font-weight:500; overflow-wrap:anywhere; }
+.lm-detail-footer > div > span { color:#9ba6b5; font-size:10px; }
+.lm-detail-footer .lm-btn { display:inline-flex; align-items:center; gap:18px; flex-shrink:0; text-decoration:none; border-radius:10px; padding:12px 18px; background:#326bea; color:white; border-color:#326bea; font-size:12px; }
+.lm-detail-no-link { color:#8d99a8; font-size:12px; }
+.lm-detail-empty { color:#8795a8; font-size:13px; line-height:1.9; }
+.lm-detail-loading { padding:35px; color:#8593a7; font-size:13px; }
+@media(max-width:700px) {
+  #lmDetailDialog { width:calc(100vw - 20px); height:calc(100dvh - 28px); border-radius:17px; }
+  .lm-detail-header { padding:23px 22px 19px; }
+  #lmDetailDialog #lmDetailTitle { font-size:21px; }
+  .lm-detail-company-mark { width:42px; height:42px; border-radius:12px; font-size:20px; }
+  .lm-detail-columns { grid-template-columns:minmax(0,1fr); gap:25px; padding:23px 22px; }
+  .lm-detail-sidebar dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .lm-detail-sidebar { padding:17px; }
+  .lm-detail-summary { flex-wrap:wrap; gap:12px; }
+  .lm-detail-salary { font-size:16px; }
+  .lm-detail-salary.is-undisclosed { font-size:12px; }
+  .lm-detail-footer { flex-direction:column; align-items:stretch; gap:12px; padding:14px 20px; }
+  .lm-detail-footer > div { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; }
+  .lm-detail-footer .lm-btn { justify-content:center; padding:12px 15px; }
+}

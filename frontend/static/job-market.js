@@ -10,6 +10,7 @@
   const units = { month: "月", day: "天", year: "年", hour: "小时", unknown: "待确认" };
   const sourceNames = { ncss: "国家就业平台", api: "企业直招", shixiseng: "实习僧", website: "企业官网" };
   let active = false, page = 1, pages = 1, generation = 0, timer = null, statusData = null, busy = false;
+  let detailRequest = 0;
   const filters = new URLSearchParams({ days: "30", sort: "recent" });
   const number = value => Number(value || 0).toLocaleString("zh-CN");
   const time = (value, full = false) => value ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", ...(full ? { hour: "2-digit", minute: "2-digit" } : {}) }) : "尚无记录";
@@ -119,17 +120,94 @@
     root.setAttribute("aria-busy", "false");
     if (results[2].status === "rejected") schedulePoll(false);
   }
+  function descriptionSections(value) {
+    const text = String(value || "").replace(/\r\n?/g, "\n").replace(/\u00a0/g, " ").trim();
+    if (!text) return [];
+    const pattern = /(^|[\n\t 　])(?:[一二三四五六七八九十]+[、．.]\s*)?(岗位职责|职位描述|工作职责|工作内容|岗位描述|职责描述|任职要求|职位要求|任职资格|岗位要求|资格要求|任职条件|基本信息|基础信息|招聘信息|招聘对象|薪酬福利|福利待遇)(?:\s*[:：]\s*|\s+|(?=\d{1,2}[、.．]))/g;
+    const sections = [];
+    let cursor = 0, heading = "招聘说明", kind = "intro", match;
+    const append = end => {
+      const body = text.slice(cursor, end).trim();
+      if (body) sections.push({ heading, kind, text: body });
+    };
+    while ((match = pattern.exec(text))) {
+      append(match.index);
+      const label = match[2];
+      kind = /职责|描述|工作内容/.test(label) ? "duties" : /要求|资格|条件/.test(label) ? "requirements" : /福利/.test(label) ? "benefits" : "recruitment";
+      heading = { duties: "岗位职责", requirements: "任职要求", benefits: "福利待遇", recruitment: "招聘信息" }[kind];
+      cursor = pattern.lastIndex;
+    }
+    append(text.length);
+    if (sections.length === 1 && sections[0].kind === "intro") sections[0].heading = "岗位详情";
+    return sections;
+  }
+
+  function descriptionHtml(text) {
+    const normalized = text.replace(/[ \t]+/g, " ")
+      .replace(/\s+(?=(?:毕业起止时间要求|职位类别|招聘项目|笔试方向)\s)/g, "\n")
+      .replace(/([。；;])\s*(?=\d{1,2}[.、．](?!\d))/g, "$1\n")
+      .replace(/\s+(?=(\d{1,2})[.、．](?!\d))/g, (space, number, offset, source) =>
+        /[A-Za-z][\w.+-]*\s*$/.test(source.slice(0, offset)) ? space : "\n");
+    const lines = normalized.split(/\n+/).map(line => line.trim()).filter(Boolean);
+    let html = "", list = "";
+    const endList = () => { if (list) { html += `</${list}>`; list = ""; } };
+    const body = value => {
+      const label = value.match(/^(.{2,30}?)\s*[●•]\s*(.+)$/);
+      return label ? `<strong class="lm-responsibility-label">${esc(label[1])}</strong><span class="lm-item-body">${esc(label[2])}</span>` : esc(value);
+    };
+    for (const line of lines) {
+      const numbered = line.match(/^(\d{1,2})[.、．](?!\d)\s*(.+)$/);
+      const bullet = line.match(/^[●•▪◆·]\s*(.+)$/);
+      const tag = numbered ? "ol" : bullet ? "ul" : "";
+      if (tag) {
+        if (list !== tag) { endList(); html += `<${tag} class="lm-description-list">`; list = tag; }
+        html += `<li${numbered ? ` value="${Number(numbered[1])}"` : ""}>${body(numbered ? numbered[2] : bullet[1])}</li>`;
+      } else {
+        endList();
+        // Recover readable paragraphs from old records without rewriting their sentences.
+        const sentences = line.length > 240 ? line.match(/[^。！？]+[。！？]?/g) || [line] : [line];
+        let paragraph = "";
+        for (const sentence of sentences) {
+          paragraph += sentence;
+          if (paragraph.length >= 180) { html += `<p>${body(paragraph)}</p>`; paragraph = ""; }
+        }
+        if (paragraph) html += `<p>${body(paragraph)}</p>`;
+      }
+    }
+    endList();
+    return html;
+  }
+
+  function jobDetailHtml(row) {
+    const sections = descriptionSections(row.job_desc);
+    const hasSections = sections.some(section => section.kind !== "intro");
+    const sectionHtml = section => `<section class="lm-detail-section" data-detail-section="${section.kind}"><h4>${esc(section.heading)}</h4><div class="lm-detail-copy">${descriptionHtml(section.text)}</div></section>`;
+    const ordered = ["duties", "requirements", "benefits", "recruitment"]
+      .flatMap(kind => sections.filter(section => section.kind === kind));
+    if (row.welfare && !ordered.some(section => section.kind === "benefits")) ordered.push({ heading: "福利待遇", kind: "benefits", text: row.welfare });
+    let url = "", host = "";
+    try { const target = new URL(row.job_url); if (["https:", "http:"].includes(target.protocol)) { url = target.href; host = target.hostname; } } catch (_) { /* No actionable source URL. */ }
+    const stamp = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "未提供";
+    const company = row.company_name || "公司未提供";
+    const facts = [["工作地点", row.location], ["招聘类型", types[row.job_type]], ["学历要求", row.education], ["所属行业", row.industry], ["企业性质", row.company_nature], ["企业规模", row.company_size], ["来源发布日期", row.publish_date]];
+    return `<div class="lm-detail-shell"><header class="lm-detail-header"><p class="lm-detail-source">${esc(row.source_label || "招聘来源")}</p><div class="lm-detail-heading"><span class="lm-detail-company-mark" aria-hidden="true">${esc(Array.from(company)[0])}</span><div><p class="lm-detail-company">${esc(company)}</p><h3 id="lmDetailTitle" tabindex="-1">${esc(row.job_title || "岗位详情")}</h3></div></div><div class="lm-detail-summary"><div class="lm-tags">${[row.location, row.education, types[row.job_type]].filter(Boolean).map(text => `<span>${esc(text)}</span>`).join("")}</div><p class="lm-detail-salary${row.salary ? "" : " is-undisclosed"}"><span>薪资</span>${esc(row.salary || "未提供")}</p></div></header><div class="lm-detail-scroll"><div class="lm-detail-columns"><main class="lm-detail-main">${hasSections ? ordered.map(sectionHtml).join("") : sections.length ? sections.map(sectionHtml).join("") + ordered.map(sectionHtml).join("") : `<p class="lm-detail-empty">来源暂未返回岗位正文，可通过下方入口查看原站。</p>`}${hasSections && sections.some(section => section.kind === "intro") ? `<details class="lm-detail-extra"><summary>其他招聘说明</summary>${sections.filter(section => section.kind === "intro").map(section => `<div class="lm-detail-copy">${descriptionHtml(section.text)}</div>`).join("")}</details>` : ""}<details class="lm-detail-original"><summary>查看完整采集原文</summary><div class="lm-original-text">${esc(row.job_desc || "暂无原文")}</div></details></main><aside class="lm-detail-sidebar"><h4>岗位信息</h4><dl>${facts.filter(([,value]) => value).map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl><details class="lm-detail-trace"><summary>来源与采集记录</summary><dl>${[["来源", row.source_label || "未提供"], ["首次发现", stamp(row.first_seen)], ["最近采集", stamp(row.last_seen)], ["内容变化", stamp(row.changed_at)]].map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl></details></aside></div></div><footer class="lm-detail-footer"><div><strong>${esc(host || row.source_label || "招聘来源")}</strong><span>招聘状态与投递条件以原站为准</span></div>${url ? `<a class="lm-btn lm-btn-primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">查看原站并投递 <span aria-hidden="true">↗</span></a>` : `<span class="lm-detail-no-link">暂无原站链接</span>`}</footer></div>`;
+  }
+
   async function detail(id) {
     toggleSources(false);
     const dialog = el("lmDetailDialog");
-    el("lmDetailContent").innerHTML = '<h3 id="lmDetailTitle">正在读取岗位详情…</h3>';
-    dialog.showModal();
+    const ticket = ++detailRequest;
+    el("lmDetailContent").innerHTML = '<div class="lm-detail-loading"><h3 id="lmDetailTitle">正在读取岗位详情…</h3><p>正在整理岗位职责、要求与招聘信息</p></div>';
+    if (!dialog.open) dialog.showModal();
     try {
       const response = await window.requestJson(`${API}/jobs/${encodeURIComponent(id)}`);
       const row = response.data;
-      if (!dialog.open) return;
-      el("lmDetailContent").innerHTML = `<p class="lm-eyebrow">${esc(row.source_label)}</p><h3 id="lmDetailTitle">${esc(row.job_title)}</h3><p class="lm-muted">${esc(row.company_name)}</p><p class="lm-salary">${esc(row.salary || "薪资未提供")}</p><div class="lm-tags">${[row.location, row.education, types[row.job_type], row.industry, row.company_nature, row.company_size].filter(Boolean).map(text => `<span>${esc(text)}</span>`).join("")}</div>${row.welfare ? `<h4>福利与待遇</h4><p class="lm-detail-description">${esc(row.welfare)}</p>` : ""}<h4>岗位描述与要求</h4><div class="lm-detail-description">${esc(row.job_desc || "来源暂未返回详细描述，请打开原站核对招聘要求。")}</div><div class="lm-detail-meta"><span>来源发布：${esc(row.publish_date || "未提供")}</span><span>首次发现：${time(row.first_seen, true)}</span><span>最近采集：${time(row.last_seen, true)}</span><span>内容变化：${time(row.changed_at, true)}</span></div><p class="lm-muted">来源分类可能根据标题推断；岗位是否仍开放、投递条件与薪资请以原站为准。</p><a class="lm-btn lm-btn-primary lm-detail-link" href="${esc(row.job_url)}" target="_blank" rel="noopener noreferrer">查看原站与投递入口 ↗</a>`;
-    } catch (error) { el("lmDetailContent").textContent = error.message; }
+      if (!dialog.open || ticket !== detailRequest) return;
+      el("lmDetailContent").innerHTML = jobDetailHtml(row);
+      el("lmDetailTitle")?.focus({ preventScroll: true });
+    } catch (error) {
+      if (dialog.open && ticket === detailRequest) el("lmDetailContent").innerHTML = `<div class="lm-detail-loading"><h3 id="lmDetailTitle">岗位详情暂时无法读取</h3><p>${esc(error.message)}</p></div>`;
+    }
   }
   function openSettings() {
     if (!statusData?.can_manage) return;

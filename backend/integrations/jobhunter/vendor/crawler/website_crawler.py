@@ -508,7 +508,7 @@ class WebsiteCrawler(BaseCrawler):
                             if detail_el:
                                 text = detail_el.inner_text().strip()
                                 if len(text) > 50:
-                                    job['job_desc'] = self.clean_text(text[:3000])
+                                    job['job_desc'] = self.clean_text(text[:3000], preserve_lines=True)
                                     break
                         
                         # 如果没找到详情，尝试获取页面主体
@@ -517,7 +517,7 @@ class WebsiteCrawler(BaseCrawler):
                             if body:
                                 text = body.inner_text().strip()
                                 if len(text) > 100:
-                                    job['job_desc'] = self.clean_text(text[:2000])
+                                    job['job_desc'] = self.clean_text(text[:2000], preserve_lines=True)
                 finally:
                     detail_page.close()
                 

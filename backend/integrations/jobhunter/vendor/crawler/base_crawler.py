@@ -402,7 +402,7 @@ class BaseCrawler(ABC):
         logger.warning(f"无法解析日期: {date_text}")
         return ''
     
-    def clean_text(self, text):
+    def clean_text(self, text, preserve_lines=False):
         """
         清理文本内容，去除多余空白和 HTML 标签
         
@@ -416,9 +416,17 @@ class BaseCrawler(ABC):
             return ''
         
         # 去除 HTML 标签
+        if preserve_lines:
+            text = re.sub(r'<(?:br\s*/?|/?(?:p|div|li|h[1-6]))\b[^>]*>', '\n', text, flags=re.I)
         text = re.sub(r'<[^>]+>', '', text)
         # 去除多余空白
-        text = re.sub(r'\s+', ' ', text)
+        if preserve_lines:
+            text = text.replace('\r\n', '\n').replace('\r', '\n')
+            text = re.sub(r'[^\S\n]+', ' ', text)
+            text = re.sub(r' *\n *', '\n', text)
+            text = re.sub(r'\n{3,}', '\n\n', text)
+        else:
+            text = re.sub(r'\s+', ' ', text)
         # 去除首尾空白
         text = text.strip()
         

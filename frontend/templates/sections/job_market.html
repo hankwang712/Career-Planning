@@ -44,5 +44,5 @@
         <details class="lm-insights lm-side-card"><summary>样本分布 <span>城市与技能关键词</span></summary><div id="lmInsights" class="lm-insights-grid"></div></details>
     </aside></div>
 </div>
-<dialog id="lmDetailDialog" class="lm-dialog" aria-labelledby="lmDetailTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-detail" aria-label="关闭岗位详情">×</button><div id="lmDetailContent"></div></dialog>
+<dialog id="lmDetailDialog" class="lm-dialog lm-job-dialog" aria-labelledby="lmDetailTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-detail" aria-label="关闭岗位详情">×</button><div id="lmDetailContent" aria-live="polite"></div></dialog>
 <dialog id="lmSettingsDialog" class="lm-dialog lm-settings-dialog" aria-labelledby="lmSettingsTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-settings" aria-label="关闭采集管理">×</button><p class="lm-eyebrow">COLLECTION SETTINGS</p><h3 id="lmSettingsTitle">岗位采集计划</h3><p class="lm-muted">计划供全站共用，修改后按新间隔安排下一次采集。</p><form id="lmSettingsForm"><div id="lmSettingsFields"></div><p id="lmSettingsFeedback" role="status"></p><button type="submit" class="lm-btn lm-btn-primary">保存采集计划</button></form></dialog>
