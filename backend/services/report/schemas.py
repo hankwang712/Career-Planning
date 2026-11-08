@@ -57,6 +57,7 @@ def empty_report_state() -> dict[str, Any]:
         "stage_detail": "",
         "error_message": "",
         "progress": [],
+        "agent_activity": {},
         "model": "",
         "generation_mode": "",
         "focus_role_id": "",
@@ -82,4 +83,5 @@ def empty_report_job() -> dict[str, Any]:
         "finished_at": 0,
         "report_id": "",
         "progress": [],
+        "agent_activity": {},
     }

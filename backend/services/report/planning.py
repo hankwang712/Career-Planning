@@ -1,12 +1,16 @@
 import json
 import logging
 import re
+from copy import deepcopy
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables.config import merge_configs
 from pydantic import ValidationError, model_validator
 
-from backend.advisor.agents.action_planning import ActionPlanningAgent
+from backend.advisor.agents.action_planning import ActionPlanningAgent, verify_action_plan
+from backend.advisor.schemas.action_planning import ActionPlan, PlanningConstraints
 from backend.advisor.telemetry import AgentMetrics
 from backend.advisor.utils.dates import verify_education_timeline_claims
 
@@ -22,10 +26,80 @@ def validation_detail(error):
     return "；".join(parts)[:1600]
 
 
+def repair_reduced_dependencies(plan, prepared):
+    """Repair only a reduced subset; never change task content, evidence or resource limits."""
+    errors = verify_action_plan(plan, prepared)
+    if not any(error.startswith("缩减方案遗漏") for error in errors):
+        return None
+    if any(not error.startswith(("缩减方案遗漏", "缩减方案第 ")) for error in errors):
+        return None
+
+    tasks = {task.task_id: task for task in plan.tasks}
+    before = list(plan.reduced_plan.keep_task_ids)
+    required = set(before)
+    pending = list(before)
+    while pending:
+        for dependency in tasks[pending.pop()].depends_on:
+            if dependency not in required:
+                required.add(dependency)
+                pending.append(dependency)
+
+    weeks = {week["week"]: week for week in prepared["weeks"]}
+    kept, hours = set(), {}
+    for task in plan.tasks:
+        if task.task_id not in required or not set(task.depends_on) <= kept:
+            continue
+        capacity = plan.reduced_plan.weekly_hours * weeks[task.week]["days"] / 7
+        if hours.get(task.week, 0) + task.hours <= capacity + 1e-6:
+            kept.add(task.task_id)
+            hours[task.week] = hours.get(task.week, 0) + task.hours
+    if not kept:
+        return None
+
+    after = [task.task_id for task in plan.tasks if task.task_id in kept]
+    deferred = [task for task in plan.tasks if task.task_id in set(before) - kept]
+    added = [task for task in plan.tasks if task.task_id in kept - set(before)]
+    explanation = f"每周按 {plan.reduced_plan.weekly_hours:g} 小时安排，保留任务及其必要的前置准备。"
+    if added:
+        explanation += "补入前置任务：" + "、".join(task.title for task in added) + "。"
+    if deferred:
+        explanation += "缩减时间下暂缓：" + "、".join(task.title for task in deferred) + "。"
+    repaired = plan.model_copy(deep=True)
+    repaired.reduced_plan.keep_task_ids = after
+    repaired.reduced_plan.reason = explanation
+    if verify_action_plan(repaired, prepared):
+        return None
+    plan.reduced_plan = repaired.reduced_plan
+    return {"requested_task_ids": before, "kept_task_ids": after,
+            "added_dependency_ids": [task.task_id for task in added],
+            "deferred_task_ids": [task.task_id for task in deferred]}
+
+
 class ReportActionPlanningAgent(ActionPlanningAgent):
-    def __init__(self, model, *, stage_callback=None, **kwargs):
+    def __init__(self, model, *, stage_callback=None, resume_planning=False, **kwargs):
         super().__init__(model, **kwargs)
         self.stage_callback = stage_callback
+        self.resume_planning = resume_planning
+
+    def prepare(self, payload):
+        supplied = deepcopy(payload)
+        constraints = PlanningConstraints.model_validate(supplied["constraints"])
+        today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+        adjustment = None
+        if self.resume_planning and constraints.start_date and constraints.start_date < today:
+            if constraints.deadline < today:
+                raise ValueError("原行动规划的截止日期已过去，请重新确认规划日期后再生成")
+            adjustment = {"requested_start_date": constraints.start_date.isoformat(),
+                          "effective_start_date": today.isoformat(), "deadline": constraints.deadline.isoformat()}
+            supplied["constraints"] = {**constraints.model_dump(mode="json"), "start_date": today.isoformat()}
+        prepared = super().prepare(supplied)
+        if adjustment:
+            prepared["start_date_adjustment"] = adjustment
+            prepared["input_limitations"].append(
+                f"原计划起点 {adjustment['requested_start_date']} 已过去，恢复时从 {today.isoformat()} 起安排剩余任务；"
+                "截止日期、每周可用时间和预算保持不变。")
+            self.notify("原计划开始日期已过去，正在从今天起重算剩余时间，截止日期不变")
+        return prepared
 
     def get_output_schema(self, prepared):
         parent = super().get_output_schema(prepared)
@@ -55,6 +129,7 @@ class ReportActionPlanningAgent(ActionPlanningAgent):
                     *self.make_inputs(prepared)["messages"]]
         attempts = min(self.max_model_calls, 3)
         result = None
+        accepted_adjustment = None
         for attempt in range(1, attempts + 1):
             self.notify(f"正在生成行动计划（第 {attempt}/{attempts} 次），随后校验工时、预算与依赖")
             try:
@@ -79,10 +154,15 @@ class ReportActionPlanningAgent(ActionPlanningAgent):
                 detail = "输出被截断，请减少任务数量、精简说明，同时保留所有必填字段与约束。"
             else:
                 try:
-                    draft = schema.model_validate_json(content)
+                    candidate = ActionPlan.model_validate_json(content)
+                    adjustment = repair_reduced_dependencies(candidate, prepared)
+                    draft = schema.model_validate(candidate.model_dump(mode="json"))
                 except ValidationError as error:
                     detail = validation_detail(error)
                 else:
+                    accepted_adjustment = adjustment
+                    if adjustment:
+                        self.notify("已核对缩减方案的前置依赖，并按缩减工时保留可执行任务")
                     self.notify("行动计划已通过结构、工时、预算与依赖校验")
                     result = self.format_result(draft)
                     break
@@ -98,6 +178,10 @@ class ReportActionPlanningAgent(ActionPlanningAgent):
                     "\n请返回修正后的完整 JSON。保持原始证据和 check_id，不增加用户时间或预算，无法安排的任务放入 deferred_actions。")])
 
         result["execution"] = {**metrics.summary(), "output_mode": "validated_json", "attempts": attempt}
+        if accepted_adjustment:
+            result["execution"]["reduced_plan_adjustment"] = accepted_adjustment
+        if prepared.get("start_date_adjustment"):
+            result["execution"]["start_date_adjustment"] = prepared["start_date_adjustment"]
         model_name = getattr(self.model, "model_name", None) or getattr(self.model, "model", None)
         if isinstance(model_name, str):
             result["execution"]["model"] = model_name

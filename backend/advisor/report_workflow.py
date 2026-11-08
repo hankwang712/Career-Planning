@@ -6,17 +6,36 @@ from typing import Annotated, Literal, TypedDict
 from zoneinfo import ZoneInfo
 
 from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import merge_configs
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send, interrupt
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .agents import ActionPlanningAgent, CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
 from .agents.job import JobAnalysisAgent
-from .graph import AgentExecutionError, followup_questions
 from .report_collaboration import MAX_EVIDENCE_ROUNDS, merge_job_evidence, pending_evidence_requests
 from .schemas.action_planning import PlanningConstraints
 from .schemas.followup import Clarification
 from .schemas.recruitment_search import RecruitmentSearchInput
+from .activity import AgentActivity
+
+
+class AgentExecutionError(RuntimeError):
+    def __init__(self, result: dict):
+        self.result = result
+        message = f"{result['agent']}: {result['status']}"
+        if result.get("error"):
+            message += f"；{result['error']}"
+        super().__init__(message)
+
+
+def followup_questions(result: dict) -> list[str]:
+    data = result.get("data", {})
+    questions = list(data.get("followup_questions", []))
+    if result.get("agent") == "resume_analysis":
+        questions.extend(data.get("missing_information", []))
+        questions.extend(question for item in data.get("experiences", []) for question in item.get("followup_questions", []))
+    return list(dict.fromkeys(question for question in questions if question.strip()))
 
 
 class ReportInput(BaseModel):
@@ -107,11 +126,13 @@ async def gather_results(*operations):
     return results
 
 
-def build_report_graph(model_provider, *, checkpointer, stage_callback=None, agent_factory=None,
+def build_report_graph(model_provider, *, checkpointer, stage_callback=None, agent_factory=None, agent_status_callback=None,
                        max_parallel_agents=3):
     if not 1 <= max_parallel_agents <= 10:
         raise ValueError("并发 Agent 数量必须在 1~10 之间")
     slots = asyncio.Semaphore(max_parallel_agents)
+    activities = {}
+    activity_failures = {}
     classes = {"resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
                "recruitment_search": RecruitmentSearchAgent, "career_decision": CareerDecisionAgent,
                "action_planning": ActionPlanningAgent}
@@ -123,17 +144,53 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         if stage_callback:
             stage_callback(name, labels[name], detail)
 
+    def activity(name, token, status, detail):
+        tasks = activities.setdefault(name, {})
+        if status in {"active", "pending"}:
+            tasks[token] = (status, detail)
+        else:
+            tasks.pop(token, None)
+        if status == "failed":
+            activity_failures[name] = detail
+        running = [value for value in tasks.values() if value[0] == "active"]
+        if running:
+            status, detail = running[-1]
+            if len(running) > 1:
+                detail += f"（共 {len(running)} 项并行任务）"
+        elif tasks and status != "failed":
+            status, detail = "pending", "等待执行其余目标岗位分析"
+        if name in activity_failures:
+            status, detail = "failed", activity_failures[name]
+        if agent_status_callback:
+            agent_status_callback(name, status, detail)
+
     async def run(name, payload, config, *, detail=None, parallel=False):
-        async with slots:
-            notify("parallel_analysis" if parallel else name, detail or f"正在执行{labels[name]}")
-            started = perf_counter()
-            agent = agent_factory(name) if agent_factory else classes[name](model_provider())
-            result = await agent.arun(deepcopy(payload), config=config)
-            result.setdefault("execution", {})["stage_elapsed_seconds"] = round(perf_counter() - started, 3)
-            allowed = {"ok", "insufficient_evidence"} if name == "recruitment_search" else {"ok"}
-            if result["status"] not in allowed:
-                raise AgentExecutionError(result)
-            return result
+        token = object()
+        activity(name, token, "pending", "等待空闲执行位置")
+        try:
+            async with slots:
+                message = detail or {"resume_analysis": "正在梳理简历中的经历、技能与项目证据",
+                    "career_decision": "正在汇总各方分析，对照经历与岗位要求比较方向",
+                    "action_planning": "正在根据目标与可投入时间安排行动计划",
+                    "recruitment_search": "正在理解岗位需求，准备筛选招聘机会"}.get(name, f"正在执行{labels[name]}")
+                notify("parallel_analysis" if parallel else name, message)
+                activity(name, token, "active", message)
+                started = perf_counter()
+                agent = agent_factory(name) if agent_factory else classes[name](model_provider())
+                monitor = AgentActivity(lambda text: activity(name, token, "active", text))
+                result = await agent.arun(deepcopy(payload), config=merge_configs(config, {"callbacks": [monitor]}))
+                result.setdefault("execution", {})["stage_elapsed_seconds"] = round(perf_counter() - started, 3)
+                allowed = {"ok", "insufficient_evidence"} if name == "recruitment_search" else {"ok"}
+                if result["status"] not in allowed:
+                    raise AgentExecutionError(result)
+                activity(name, token, "done", "分析已完成，结果已交给后续步骤")
+                return result
+        except asyncio.CancelledError:
+            activity(name, token, "canceled", "本次任务已停止")
+            raise
+        except Exception:
+            activity(name, token, "failed", "本次分析未完成，可从已保存的步骤重试")
+            raise
 
     async def resume(state, config: RunnableConfig, *, parallel=False):
         inputs = ReportInput.model_validate(state["input"])
@@ -176,6 +233,7 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         if not payload:
             notify("parallel_analysis" if parallel else "recruitment_search", "未请求招聘搜索，跳过此步骤")
             result = {"agent": "recruitment_search", "status": "skipped", "data": {}}
+            activity("recruitment_search", None, "skipped", "本次未启用招聘雷达")
         else:
             result = await search_with_fallback(payload, config, parallel=parallel)
         return {"results": {"recruitment_search": result}}
@@ -287,7 +345,11 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         payload = {"decision_input": state["decision_input"], "decision_result": state["results"]["career_decision"],
                    "target_id": state["review"]["target_id"], "constraints": state["review"]["constraints"]}
         result = await run("action_planning", payload, config)
-        return {"results": {**state["results"], "action_planning": result}}
+        review = deepcopy(state["review"])
+        if result.get("constraints"):
+            # A resumed plan may reduce its remaining window after crossing midnight.
+            review["constraints"] = result["constraints"]
+        return {"results": {**state["results"], "action_planning": result}, "review": review}
 
     async def parallel_resume(state, config: RunnableConfig):
         return await resume(state, config, parallel=True)

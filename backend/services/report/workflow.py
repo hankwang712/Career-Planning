@@ -38,7 +38,7 @@ def _lock_for(thread_id):
 
 
 @asynccontextmanager
-async def _graph(runtime=None, stage_callback=None):
+async def _graph(runtime=None, stage_callback=None, agent_status_callback=None):
     from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     from backend.advisor.report_workflow import build_report_graph
@@ -67,7 +67,8 @@ async def _graph(runtime=None, stage_callback=None):
 
     def agent_factory(name):
         if name == "action_planning":
-            return ReportActionPlanningAgent(model_provider(), stage_callback=stage_callback)
+            return ReportActionPlanningAgent(model_provider(), stage_callback=stage_callback,
+                                             resume_planning=bool(runtime and runtime.get("continuation") is not None))
         agent = classes[name](model_provider())
         if name == "career_decision":
             agent.system_prompt += "\n" + REVIEW_POLICY
@@ -79,7 +80,7 @@ async def _graph(runtime=None, stage_callback=None):
         async with DefaultAsyncHttpxClient() as async_client:
             async with AsyncSqliteSaver.from_conn_string(str(APP_DATA_DIR / "agent_checkpoints.sqlite3")) as saver:
                 yield build_report_graph(model_provider, checkpointer=saver, stage_callback=stage_callback,
-                                         agent_factory=agent_factory)
+                                         agent_factory=agent_factory, agent_status_callback=agent_status_callback)
 
 
 def _snapshot(snapshot):
@@ -138,7 +139,7 @@ def validate_report_continuation(payload, snapshot):
     return None
 
 
-async def _execute(username, report_id, inputs, runtime, callback, profile=None):
+async def _execute(username, report_id, inputs, runtime, callback, profile=None, agent_status_callback=None):
     from langgraph.types import Command
 
     document_metadata = None
@@ -146,6 +147,8 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None)
         from backend.advisor.tools.document import read_document
         if callback:
             callback("resume_analysis", "简历分析", "正在使用文档工具读取上传的简历")
+        if agent_status_callback:
+            agent_status_callback("resume_analysis", "active", "正在读取上传的简历文档")
         supplied = dict(inputs)
         file_path = supplied.pop("file_path")
         if runtime.get("document_cache") is not None:
@@ -159,7 +162,8 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None)
         document_metadata = {key: document[key] for key in ("status", "warnings", "processed_pages", "total_pages") if key in document}
 
     config = {"configurable": {"thread_id": _thread_id(username, report_id)}, "recursion_limit": 100}
-    async with _graph(runtime, callback) as graph:
+    activity_options = {"agent_status_callback": agent_status_callback} if agent_status_callback else {}
+    async with _graph(runtime, callback, **activity_options) as graph:
         continuation = runtime.get("continuation")
         if continuation is not None:
             current = _snapshot(await graph.aget_state(config))
@@ -187,13 +191,13 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None)
 
 
 def generate_career_report_bundle(*, username, report_id, profile_payload, runtime_llm, stage_callback=None,
-                                  role_payload=None, news_payload=None, focus_role_id="", model_name=""):
+                                  role_payload=None, news_payload=None, focus_role_id="", model_name="", agent_status_callback=None):
     lock = _lock_for(_thread_id(username, report_id))
     if not lock.acquire(blocking=False):
         raise ValueError("此报告正在执行，请等待当前任务完成")
     try:
         state = asyncio.run(_execute(username, report_id, profile_payload.get("agent_workflow"), runtime_llm,
-                                     stage_callback, profile_payload))
+                                     stage_callback, profile_payload, agent_status_callback))
         if stage_callback:
             stage_callback("report_writer", "报告合成", "正在将已校验的 Agent 结果整理为报告")
         from .workflow_report import build_report_bundle

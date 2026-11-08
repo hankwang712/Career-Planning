@@ -3463,6 +3463,7 @@ def _public_career_report_state(raw_state):
             "stage_detail": str(raw_state.get("stage_detail") or ""),
             "error_message": str(raw_state.get("error_message") or ""),
             "progress": raw_state.get("progress") if isinstance(raw_state.get("progress"), list) else [],
+            "agent_activity": raw_state.get("agent_activity") if isinstance(raw_state.get("agent_activity"), dict) else {},
             "model": str(raw_state.get("model") or ""),
             "generation_mode": str(raw_state.get("generation_mode") or ""),
             "focus_role_id": str(raw_state.get("focus_role_id") or ""),
@@ -3508,6 +3509,7 @@ def _public_career_report_job(raw_job):
             "finished_at": int(raw_job.get("finished_at") or 0),
             "report_id": str(raw_job.get("report_id") or ""),
             "progress": raw_job.get("progress") if isinstance(raw_job.get("progress"), list) else [],
+            "agent_activity": raw_job.get("agent_activity") if isinstance(raw_job.get("agent_activity"), dict) else {},
             "model": str(raw_job.get("model") or ""),
             "generation_mode": str(raw_job.get("generation_mode") or ""),
         })
@@ -3961,6 +3963,9 @@ def _is_career_report_job_cancelled(job_id):
 def _save_career_report_progress(username, job_id, stage, stage_label, detail, **extra):
     state = _load_user_state(username)
     report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    with CAREER_REPORT_LOCK:
+        live_job = CAREER_REPORT_JOBS.get(job_id)
+        live_activity = dict(live_job.get("agent_activity") or {}) if live_job else report_state.get("agent_activity", {})
     report_state.update(
         {
             "status": extra.get("status") or "running",
@@ -3969,6 +3974,7 @@ def _save_career_report_progress(username, job_id, stage, stage_label, detail, *
             "stage_label": stage_label,
             "stage_detail": detail,
             "progress": build_stage_progress(stage),
+            "agent_activity": dict(extra.get("agent_activity", live_activity)),
             "error_message": str(extra.get("error_message") or ""),
             "generated_at": str(extra.get("generated_at") or report_state.get("generated_at") or ""),
             "report_id": str(extra.get("report_id") or report_state.get("report_id") or ""),
@@ -6924,8 +6930,22 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
         status="running",
     )
 
+    agent_activity = {}
+    activity_lock = threading.Lock()
+
+    def _agent_status_callback(agent, status, detail):
+        if _is_career_report_job_cancelled(job_id):
+            return
+        with activity_lock:
+            agent_activity[agent] = {"status": status, "message": str(detail)[:180],
+                                     "updated_at": datetime.now().isoformat(timespec="seconds")}
+            snapshot = {key: dict(value) for key, value in agent_activity.items()}
+        _update_career_report_job(job_id, agent_activity=snapshot)
+
     def _stage_callback(stage_key, stage_label, detail):
         _ensure_not_cancelled()
+        if stage_key in {item["key"] for item in CAREER_REPORT_STAGE_DEFS}:
+            _agent_status_callback(stage_key, "active", detail)
         _log("阶段切换", stage=stage_key, label=stage_label, detail=detail)
         _update_career_report_job(
             job_id,
@@ -6946,6 +6966,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             generation_mode=generation_mode,
             report_id=report_id,
             status="running",
+            agent_activity={key: dict(value) for key, value in agent_activity.items()},
         )
 
     try:
@@ -6958,6 +6979,7 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
             news_payload=None,
             focus_role_id=focus_role_id,
             stage_callback=_stage_callback,
+            agent_status_callback=_agent_status_callback,
             runtime_llm=runtime_llm_with_caller,
             model_name=model_name,
         )
@@ -7368,6 +7390,7 @@ def api_career_report_generate_status():
                     "progress": selected.get("progress")
                     if isinstance(selected.get("progress"), list)
                     else merged_state.get("progress"),
+                    "agent_activity": selected.get("agent_activity") or merged_state.get("agent_activity", {}),
                     "model": str(selected.get("model") or merged_state.get("model") or ""),
                     "generation_mode": str(selected.get("generation_mode") or merged_state.get("generation_mode") or ""),
                     "error_message": "",
