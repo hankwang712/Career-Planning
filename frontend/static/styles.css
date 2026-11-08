@@ -16148,7 +16148,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
 .report-agent-map-viewport {
     position: relative;
     width: 100%;
-    height: calc(780px * var(--report-map-scale, 1));
+    height: calc(880px * var(--report-map-scale, 1));
     overflow: hidden;
 }
 
@@ -16156,9 +16156,9 @@ nav.gradient-bg .nav-action-strip .action-icon {
     position: absolute;
     left: 50%;
     top: 0;
-    width: 2040px;
-    height: 780px;
-    margin-left: -1020px;
+    width: 1600px;
+    height: 880px;
+    margin-left: -800px;
     transform: scale(var(--report-map-scale, 1));
     transform-origin: top center;
 }
@@ -16215,10 +16215,9 @@ nav.gradient-bg .nav-action-strip .action-icon {
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-.phase-input { left: 88px; }
-.phase-parallel { left: 410px; color: #047857; }
-.phase-serial { left: 960px; color: #1d4ed8; }
-.phase-output { left: 1830px; color: #b45309; }
+.phase-parallel { left: 88px; color: #047857; }
+.phase-serial { left: 420px; color: #1d4ed8; }
+.phase-output { left: 1380px; color: #b45309; }
 
 .report-agent-node.report-ma-card {
     position: absolute;

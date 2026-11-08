@@ -13,7 +13,7 @@ DECISIONS = {"recommended": "建议优先考虑", "conditional": "满足条件�
 
 
 def build_report_bundle(username, report_id, profile, state, model_name):
-    from experiments.news_advisor.telemetry import summarize_executions
+    from backend.advisor.telemetry import summarize_executions
 
     results = state["results"]
     decision = results["career_decision"].get("data", {})

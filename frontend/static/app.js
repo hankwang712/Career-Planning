@@ -8952,20 +8952,24 @@ const REPORT_AGENT_IMAGE_URL = {
 };
 
 const REPORT_AGENT_FLOW = [
-  { key: "resume_analysis", title: "简历分析", role: "ResumeAnalysisAgent", detail: "诊断简历证据与待补充事实", icon: "file", x: 20, y: 282 },
-  { key: "job_analysis", title: "岗位分析", role: "JobAnalysisAgent", detail: "检索 JD 样本并核对原文引证", icon: "match", x: 310, y: 282 },
-  { key: "recruitment_search", title: "招聘搜索", role: "RecruitmentSearchAgent", detail: "按需搜索招聘信息与核实条件", icon: "trend", x: 600, y: 282 },
-  { key: "career_decision", title: "职业决策", role: "CareerDecisionAgent", detail: "逐项对照岗位要求与候选人事实", icon: "target", x: 890, y: 282 },
-  { key: "review", title: "补充与确认", role: "用户确认", detail: "回答追问，选择目标和时间安排", icon: "verify", x: 1180, y: 282 },
-  { key: "action_planning", title: "行动规划", role: "ActionPlanningAgent", detail: "安排依赖、工时、交付物与验收标准", icon: "route", x: 1470, y: 282 },
-  { key: "report_writer", title: "报告合成", role: "结果整理", detail: "整理已校验结果供阅读与导出", icon: "report", x: 1760, y: 282 }
+  { key: "resume_analysis", title: "简历分析", role: "ResumeAnalysisAgent", detail: "诊断简历证据与待补充事实", icon: "file", x: 20, y: 56 },
+  { key: "job_analysis", title: "岗位分析", role: "JobAnalysisAgent", detail: "并行分析各目标岗位，核对原文引证", icon: "match", x: 20, y: 326 },
+  { key: "recruitment_search", title: "招聘雷达", role: "RecruitmentSearchAgent", detail: "检索招聘汇总与企业官网，优先核验相关岗位", icon: "trend", x: 20, y: 596 },
+  { key: "career_decision", title: "职业决策", role: "CareerDecisionAgent", detail: "汇总分析结果，对照岗位与候选人事实", icon: "target", x: 350, y: 326 },
+  { key: "review", title: "补充与确认", role: "用户确认", detail: "回答追问，选择目标和时间安排", icon: "verify", x: 670, y: 326 },
+  { key: "action_planning", title: "行动规划", role: "ActionPlanningAgent", detail: "安排依赖、工时、交付物与验收标准", icon: "route", x: 990, y: 326 },
+  { key: "report_writer", title: "报告合成", role: "结果整理", detail: "整理已校验结果供阅读与导出", icon: "report", x: 1310, y: 326 }
 ];
 
 const REPORT_AGENT_NODE_WIDTH = 220;
 const REPORT_AGENT_NODE_MID_Y = 118;
-const REPORT_AGENT_MAP_W = 2040;
-const REPORT_AGENT_MAP_H = 780;
-const REPORT_AGENT_EDGES = REPORT_AGENT_FLOW.slice(1).map((item, index) => [REPORT_AGENT_FLOW[index].key, item.key]);
+const REPORT_AGENT_MAP_W = 1600;
+const REPORT_AGENT_MAP_H = 880;
+const REPORT_AGENT_EDGES = [
+  ["resume_analysis", "career_decision"], ["job_analysis", "career_decision"],
+  ["recruitment_search", "career_decision"], ["career_decision", "review"],
+  ["review", "action_planning"], ["action_planning", "report_writer"]
+];
 
 function getReportRuntimeState() {
   const state = typeof window.getCareerReportStateSafe === "function"
@@ -9124,7 +9128,6 @@ function renderReportAgentMap(profile, roles) {
   return `
     <div class="report-agent-map-viewport">
     <div class="report-agent-map-inner">
-      <div class="report-agent-phase phase-input">输入</div>
       <div class="report-agent-phase phase-parallel">并行分析</div>
       <div class="report-agent-phase phase-serial">依赖汇合</div>
       <div class="report-agent-phase phase-output">输出</div>
@@ -9341,7 +9344,7 @@ function buildCareerReportGenerationPayload() {
       preferences: String(document.getElementById("reportWorkflowPreferences")?.value || "").trim(),
       additional_evidence: String(document.getElementById("reportWorkflowEvidence")?.value || "").trim(),
       recruitment: document.getElementById("reportWorkflowSearch")?.value.trim()
-        ? { request: document.getElementById("reportWorkflowSearch").value.trim(), channel: document.getElementById("reportWorkflowChannel")?.value || "web", limit: 5 }
+        ? { request: document.getElementById("reportWorkflowSearch").value.trim(), channel: "radar", limit: 5 }
         : null
     }
   };

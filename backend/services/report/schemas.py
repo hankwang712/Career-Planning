@@ -7,7 +7,7 @@ REPORT_VERSION = "2026.11-career-development-v3"
 CAREER_REPORT_STAGE_DEFS = [
     {"key": "resume_analysis", "label": "简历分析", "agent": "ResumeAnalysisAgent"},
     {"key": "job_analysis", "label": "岗位分析", "agent": "JobAnalysisAgent"},
-    {"key": "recruitment_search", "label": "招聘搜索", "agent": "RecruitmentSearchAgent"},
+    {"key": "recruitment_search", "label": "招聘雷达", "agent": "RecruitmentSearchAgent"},
     {"key": "career_decision", "label": "职业决策", "agent": "CareerDecisionAgent"},
     {"key": "review", "label": "补充与确认", "agent": "用户确认"},
     {"key": "action_planning", "label": "行动规划", "agent": "ActionPlanningAgent"},
@@ -27,7 +27,9 @@ def build_stage_progress(stage_key: str) -> list[dict[str, Any]]:
             break
     progress = []
     for index, item in enumerate(CAREER_REPORT_STAGE_DEFS):
-        if index < active_index:
+        if key == "parallel_analysis":
+            status = "active" if index < 3 else "pending"
+        elif index < active_index:
             status = "done"
         elif index == active_index:
             status = "active"

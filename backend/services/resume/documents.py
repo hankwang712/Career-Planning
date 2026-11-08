@@ -65,7 +65,7 @@ class ResumeDocuments:
 
     @staticmethod
     def read_document(path):
-        from experiments.news_advisor.tools.document import read_document
+        from backend.advisor.tools.document import read_document
         return read_document.invoke({"file_path": path, "max_pages": 20})
 
     @staticmethod

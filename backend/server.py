@@ -7132,14 +7132,14 @@ def api_career_report_generate_start():
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify({"message": str(exc)}), 400
     except ImportError:
-        return jsonify({"message": "请先安装 backend/requirements.txt 中的 Agent 依赖。"}), 503
+        return jsonify({"message": "请先安装 requirements.txt 中的 Agent 依赖。"}), 503
 
     selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
-    # The report and assistant both reuse experiments/.env when no UI provider is configured.
+    # The report and assistant both reuse .env when no UI provider is configured.
     base_url, api_key, model = _get_chat_runtime(selection_snapshot)
     if not (base_url and api_key and model):
         _career_report_console_log(report_id, "启动请求被拒绝", reason="model_not_configured")
-        return jsonify({"message": "未找到可用的对话模型，请在主系统配置模型，或补全 experiments/.env 中的 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL。"}), 400
+        return jsonify({"message": "未找到可用的对话模型，请在主系统配置模型，或补全 .env 中的 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL。"}), 400
     runtime_llm = {"model": model, "base_url": base_url, "api_key": api_key,
                    "selection": dict(selection_snapshot), "continuation": continuation}
 
@@ -8292,7 +8292,7 @@ if __name__ == "__main__":
     print(f"  访问地址：http://{host}:{port}")
     print("  数据目录：", BOSS_INFO_DIR)
     print("  用户数据目录：", APP_DATA_DIR)
-    print("  PDF 导出引擎：", f"PyMuPDF {fitz.VersionBind}" if fitz is not None else "PyMuPDF 未安装，请安装 backend/requirements.txt")
+    print("  PDF 导出引擎：", f"PyMuPDF {fitz.VersionBind}" if fitz is not None else "PyMuPDF 未安装，请安装 requirements.txt")
     print("  按 Ctrl+C 停止")
     print("=" * 50)
 

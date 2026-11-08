@@ -41,9 +41,9 @@ def _lock_for(thread_id):
 async def _graph(runtime=None, stage_callback=None):
     from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-    from experiments.news_advisor.report_workflow import build_report_graph
-    from experiments.news_advisor.agents import CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
-    from experiments.news_advisor.agents.job import JobAnalysisAgent
+    from backend.advisor.report_workflow import build_report_graph
+    from backend.advisor.agents import CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
+    from backend.advisor.agents.job import JobAnalysisAgent
     from .planning import ReportActionPlanningAgent
 
     def model_provider():
@@ -83,7 +83,7 @@ async def _graph(runtime=None, stage_callback=None):
 
 
 def _snapshot(snapshot):
-    from experiments.news_advisor.report_collaboration import collaboration_summary
+    from backend.advisor.report_collaboration import collaboration_summary
 
     pending = [item.value for task in snapshot.tasks for item in task.interrupts]
     return {
@@ -109,7 +109,7 @@ def read_report_workflow(username, report_id):
 
 
 def validate_report_request(payload, raw_resume="", *, file_path=""):
-    from experiments.news_advisor.report_workflow import ReportInput
+    from backend.advisor.report_workflow import ReportInput
     supplied = dict(payload)
     # Only the server selects the account's uploaded file; the browser cannot supply paths or resume text.
     supplied["raw_resume"] = "" if file_path else raw_resume
@@ -124,7 +124,7 @@ def validate_report_request(payload, raw_resume="", *, file_path=""):
 
 
 def validate_report_continuation(payload, snapshot):
-    from experiments.news_advisor.report_workflow import validate_review
+    from backend.advisor.report_workflow import validate_review
     if not snapshot["checkpoint_id"]:
         raise ValueError("没有找到此账户的报告工作流")
     if snapshot["complete"]:
@@ -143,7 +143,7 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None)
 
     document_metadata = None
     if runtime.get("continuation") is None and inputs.get("file_path"):
-        from experiments.news_advisor.tools.document import read_document
+        from backend.advisor.tools.document import read_document
         if callback:
             callback("resume_analysis", "简历分析", "正在使用文档工具读取上传的简历")
         supplied = dict(inputs)

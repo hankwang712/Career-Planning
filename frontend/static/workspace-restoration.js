@@ -5,7 +5,7 @@
   const DEFAULT_STAGE_PROGRESS = [
     { key: "resume_analysis", label: "简历分析", status: "pending" },
     { key: "job_analysis", label: "岗位分析", status: "pending" },
-    { key: "recruitment_search", label: "招聘搜索", status: "pending" },
+    { key: "recruitment_search", label: "招聘雷达", status: "pending" },
     { key: "career_decision", label: "职业决策", status: "pending" },
     { key: "review", label: "补充与确认", status: "pending" },
     { key: "action_planning", label: "行动规划", status: "pending" },

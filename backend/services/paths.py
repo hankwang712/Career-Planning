@@ -1,4 +1,8 @@
 from pathlib import Path
+from .environment import load_environment
+
+
+load_environment()
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

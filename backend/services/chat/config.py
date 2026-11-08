@@ -1,11 +1,11 @@
 import os
 
-from ..paths import PROJECT_ROOT
+from ..environment import ENV_FILE
 
 
 def model_runtime(prefix):
     from dotenv import dotenv_values
-    values = {**dotenv_values(PROJECT_ROOT / "experiments" / ".env", encoding="utf-8-sig"), **os.environ}
+    values = {**dotenv_values(ENV_FILE, encoding="utf-8-sig"), **os.environ}
     return tuple(str(values.get(prefix + key) or "").strip() for key in ("BASE_URL", "API_KEY", "MODEL"))
 
 

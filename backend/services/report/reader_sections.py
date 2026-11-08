@@ -167,6 +167,15 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
         for finding in search.get("data", {}).get("findings", []):
             source = next((source for source in search.get("sources", []) if source.get("source_id") == finding["source_id"]), {})
             appendix += "\n\n" + sentence(finding["summary"])
+            kind = {"aggregate": "公开招聘汇总", "snapshot": "历史快照", "official_site": "企业官网或公告", "import": "导入记录"}.get(source.get("source_type"), "招聘来源")
+            if source.get("origin") == "radar":
+                appendix += "\n\n来源：招聘雷达 · " + kind
+                if source.get("published_at"):
+                    appendix += "；公告日期：" + str(source["published_at"])
+                if source.get("updated_at"):
+                    appendix += "；来源更新：" + str(source["updated_at"]) + "（不等于公告发布日期）"
+                if finding.get("unverified_conditions"):
+                    appendix += "\n\n待确认：" + "；".join(finding["unverified_conditions"][:3])
             if source.get("url"):
                 appendix += "\n\n" + source["url"]
     add("appendix", appendix)

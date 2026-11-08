@@ -20,10 +20,10 @@ def freeze_profile(profile):
 
 
 def capture_provenance(inputs, profile, model_name):
-    prompt_dir = PROJECT_ROOT / "experiments" / "news_advisor" / "prompt"
+    prompt_dir = PROJECT_ROOT / "backend" / "advisor" / "prompt"
     prompts = {path.stem: sha256(path.read_bytes()).hexdigest()
                for path in sorted(prompt_dir.glob("*.py")) if path.name != "__init__.py"}
-    workflow = PROJECT_ROOT / "experiments" / "news_advisor" / "report_workflow.py"
+    workflow = PROJECT_ROOT / "backend" / "advisor" / "report_workflow.py"
     return {
         "captured_at": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
         "report_version": REPORT_VERSION, "initial_model": model_name,
@@ -33,13 +33,13 @@ def capture_provenance(inputs, profile, model_name):
         "prompt_revisions": prompts, "workflow_revision": sha256(workflow.read_bytes()).hexdigest(),
         "component_revisions": {
             path.relative_to(PROJECT_ROOT).as_posix(): sha256(path.read_bytes()).hexdigest()
-            for path in sorted((PROJECT_ROOT / "experiments" / "news_advisor").rglob("*.py"))
+            for path in sorted((PROJECT_ROOT / "backend" / "advisor").rglob("*.py"))
         },
     }
 
 
 def report_provenance(state):
-    from experiments.news_advisor.report_collaboration import collaboration_summary
+    from backend.advisor.report_collaboration import collaboration_summary
 
     result = deepcopy(state.get("provenance", {}))
     result["snapshot_status"] = "frozen" if "profile_snapshot" in state else "legacy_unavailable"

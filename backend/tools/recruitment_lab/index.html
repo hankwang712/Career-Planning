@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>招聘雷达 Agent 测试台</title>
+  <style>
+    :root{color-scheme:light;--ink:#192a25;--muted:#738078;--line:#dfe5df;--green:#226b50;--paper:#fafbf8}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}button,input,select,textarea{font:inherit}button,a{touch-action:manipulation}button{cursor:pointer}button:disabled{cursor:default;opacity:.5}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #8ec9af;outline-offset:3px}
+    main{max-width:1320px;margin:auto;padding:36px 30px 60px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:32px}.eyebrow{font:11px ui-monospace,monospace;letter-spacing:2px;color:var(--green)}h1{font-size:27px;letter-spacing:-.7px;margin:9px 0 6px;font-weight:650}h2{font-size:16px;margin:0}h3{font-size:14px;margin:0 0 8px}p{margin:8px 0}.muted{color:var(--muted)}.small{font-size:12px}.connection{text-align:right;max-width:390px}.badges{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:white;font-size:12px}.badge.ok{color:var(--green);border-color:#c5dccf}.badge.bad{color:#a55a28;border-color:#e8d4be}.quiet{border:0;background:none;color:var(--green);padding:3px 0;font-size:12px}
+    .layout{display:grid;grid-template-columns:360px minmax(0,1fr);gap:24px;align-items:start}.card{background:white;border:1px solid var(--line);border-radius:14px;overflow:hidden}.pad{padding:22px}.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.step{font:12px ui-monospace,monospace;color:var(--muted)}label{display:block;font-size:12px;font-weight:600;margin-bottom:7px}textarea,input,select{width:100%;border:1px solid #d4dcd5;border-radius:8px;background:#fff;padding:10px;color:var(--ink)}textarea{resize:vertical;min-height:180px;line-height:1.8}textarea::placeholder{color:#9aa59f}.examples{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 20px}.chip{border:1px solid var(--line);background:#f8faf7;border-radius:6px;padding:4px 8px;font-size:11px;color:#5d6f63}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}details{margin:15px 0}summary{cursor:pointer;font-size:12px;color:var(--muted)}.actions{display:flex;gap:9px;margin-top:18px}.primary,.secondary{border-radius:8px;padding:10px 15px;font-weight:600;border:1px solid var(--line)}.primary{background:var(--green);border-color:var(--green);color:white;flex:1}.secondary{background:white;color:#59675f}.footnote{border-top:1px solid var(--line);padding:15px 22px;background:#fcfdfb;font-size:11px;color:var(--muted)}.stack{display:grid;gap:20px}.section-head{padding:17px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.run-state{font:12px ui-monospace,monospace;color:var(--muted)}.timeline{padding:6px 22px;max-height:390px;overflow:auto}.empty{padding:42px 22px;text-align:center;color:var(--muted);font-size:13px}.log{border-bottom:1px solid #edf0ec;padding:13px 0}.log:last-child{border-bottom:0}.log-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.log-title{font-size:13px;font-weight:550}.log-time{font:11px ui-monospace,monospace;color:var(--muted);white-space:nowrap}.log pre{font:11px/1.6 ui-monospace,monospace;margin:7px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:#64736b}.log-state{font-size:11px;color:var(--green);margin-top:5px}.log-state.error,.error{color:#a34232}.notice{padding:12px 14px;border:1px solid #efd8d0;background:#fff9f7;border-radius:8px;margin:14px 0;font-size:12px}.result-body{padding:22px}.result-body:empty{display:none}.summary-text{white-space:pre-wrap;line-height:1.9}.intent{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}.intent span{font-size:11px;background:#f1f5ee;border-radius:5px;padding:4px 8px;color:#49634e}.finding{border-top:1px solid var(--line);padding:18px 0}.finding:last-child{padding-bottom:0}.finding a,.source a{color:var(--green);text-decoration:none;overflow-wrap:anywhere}.finding a:hover,.source a:hover{text-decoration:underline}.finding blockquote{border-left:2px solid #c9dcd0;margin:12px 0;padding:0 0 0 12px;color:#5a6e60;font-size:12px;white-space:pre-wrap}.finding .badge{margin-bottom:8px}.source{border-top:1px solid var(--line);padding:12px 0}.source pre,.json{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 ui-monospace,monospace;background:#f6f8f4;padding:12px;border-radius:8px;max-height:360px;overflow:auto}.followup{border-top:1px solid var(--line);margin-top:20px;padding-top:18px}.followup textarea{min-height:70px;margin-bottom:12px}.limitations{font-size:12px;color:var(--muted);padding-left:18px}.hidden{display:none!important}.live-dot{height:6px;width:6px;display:inline-block;background:var(--green);border-radius:50%;margin-right:7px}.busy .live-dot{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.25}}@media(prefers-reduced-motion:reduce){.busy .live-dot{animation:none}}@media(max-width:850px){main{padding:22px 16px}header{display:block}.connection{text-align:left;margin-top:18px;max-width:none}.badges{justify-content:flex-start}.layout{grid-template-columns:1fr}textarea{min-height:140px}}
+  </style>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">CAREER AGENT / RECRUITMENT RADAR</div><h1>招聘雷达 Agent 测试台</h1><p class="muted small">输入需求，检索招聘汇总和企业官网，查看岗位依据与待核实条件。</p></div>
+    <div class="connection"><div class="badges"><span class="badge" id="modelStatus">模型 · 检查中</span><span class="badge" id="radarStatus">招聘雷达 · 检查中</span></div><button type="button" class="quiet" id="refreshStatus">重新检查连接 ↻</button><div class="small muted" id="connectionMessage"></div></div>
+  </header>
+  <div id="verificationNotice" class="notice hidden" role="status"></div>
+  <div class="layout">
+    <aside class="card">
+      <form id="requestForm" class="pad">
+        <div class="panel-heading"><h2>你的搜索需求</h2><span class="step">01 / INPUT</span></div>
+        <p class="small muted">数据来源：招聘雷达 · 公开招聘汇总与企业官网</p>
+        <p class="small"><a href="/radar" target="_blank" rel="noopener noreferrer">打开招聘数据工作台：同步、官网采集、导入与导出 ↗</a></p>
+        <label for="request">用自然语言描述想找什么</label>
+        <textarea id="request" name="request" maxlength="3000" required placeholder="例如：我想走大模型应用方向，找最近一个月相关的实习招聘公众号文章，城市暂时不限。"></textarea>
+        <div class="examples"><button type="button" class="chip" data-example="我想走大模型应用方向，帮我找最近一个月相关的实习招聘公众号文章，城市不限。">大模型实习</button><button type="button" class="chip" data-example="帮我找近7天上海或杭州的后端开发实习公众号招聘信息，保留发布日期和原文链接。">后端实习</button><button type="button" class="chip" data-example="看看联想最近一个月发布的校园招聘公众号信息，没有明确岗位和届别的请注明。">企业校招</button></div>
+        <div class="fields"><div><label for="days">时间窗口</label><select id="days"><option value="">由需求理解</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option><option value="365">最近一年</option></select></div><div><label for="limit">最多展示结果</label><input id="limit" type="number" min="1" max="10" value="5" required></div></div>
+        <p class="small muted">从招聘汇总表召回岗位，先做语义初筛，再优先读取相关候选的官网或公告。岗位匹配、正文读取、日期依据与投递入口分别显示；与多智能体报告共用同一流程。</p>
+        <details><summary>调用预算</summary><div class="fields"><div><label for="modelCalls">模型调用上限</label><input id="modelCalls" type="number" min="1" max="10" value="5" required></div><div><label for="toolCalls">工具调用上限</label><input id="toolCalls" type="number" min="1" max="20" value="8" required></div><div><label for="timeout">单次模型超时 / 秒</label><input id="timeout" type="number" min="10" max="300" value="180" required></div></div></details>
+        <div class="actions"><button class="primary" id="startButton" type="submit">开始测试 →</button><button class="secondary" id="stopButton" type="button" disabled>停止</button></div>
+        <div class="notice hidden" role="alert" id="formError"></div>
+      </form>
+      <div class="footnote">复用当前 RecruitmentSearchAgent。每次点击“开始测试”都从新需求开始；补充回答会携带本轮原始需求再次搜索。</div>
+    </aside>
+    <div class="stack">
+      <section class="card"><div class="section-head"><h2><span class="live-dot"></span>执行过程</h2><span class="run-state" id="runState" role="status" aria-live="polite">等待输入</span></div><div id="timeline" class="timeline"><div class="empty">运行后，这里会显示实际搜索词和原文读取记录。</div></div></section>
+      <section class="card" id="candidatePanel"><div class="section-head"><h2>检索到的全部招聘候选</h2><span class="small muted" id="candidateCount">0 条</span></div><div id="candidateList" class="result-body"><p class="small muted">检索后逐条显示岗位、招聘或公告链接，包括过期、读取失败和未检查的候选；可自行打开核对。</p></div></section>
+      <section class="card"><div class="section-head"><h2>Agent 输出</h2><button type="button" id="downloadButton" class="quiet" disabled>下载本轮 JSON ↓</button></div><div id="resultEmpty" class="empty">搜索结论、来源和需要补充的问题会显示在这里。</div><div id="result" class="result-body"></div></section>
+    </div>
+  </div>
+</main>
+</body>
+</html>

@@ -6,9 +6,9 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables.config import merge_configs
 from pydantic import ValidationError, model_validator
 
-from experiments.news_advisor.agents.action_planning import ActionPlanningAgent
-from experiments.news_advisor.telemetry import AgentMetrics
-from experiments.news_advisor.utils.dates import verify_education_timeline_claims
+from backend.advisor.agents.action_planning import ActionPlanningAgent
+from backend.advisor.telemetry import AgentMetrics
+from backend.advisor.utils.dates import verify_education_timeline_claims
 
 logger = logging.getLogger(__name__)
 
