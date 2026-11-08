@@ -32,11 +32,11 @@ def _start_local(settings: JobRAGConfig, port: int) -> None:
         message = (
             "数据库启动失败，请先打开 Docker Desktop，并确认根目录 .env 和 compose.yml 配置正确"
             if index == 0 else
-            "LightRAG 启动失败，请使用 yolov11 环境，并查看 artifacts/research/.job_graph/logs/webui.log"
+            "LightRAG 启动失败，请查看 artifacts/research/.job_graph/logs/webui.log 中的具体原因"
         )
         try:
             result = subprocess.run(
-                command, cwd=RESEARCH_DIR, capture_output=True, timeout=90 if index == 0 else 45,
+                command, cwd=ENV_FILE.parent, stdin=subprocess.DEVNULL, capture_output=True, timeout=90 if index == 0 else 45,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
         except (OSError, subprocess.TimeoutExpired) as error:

@@ -1458,7 +1458,7 @@ def start_webui(args):
             [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "serve",
              "--workspace", args.workspace, "--env-file", str(args.env_file.resolve()),
              "--working-dir", str(args.working_dir.resolve()), "--webui-port", str(args.webui_port), *schema_options],
-            cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT,
+            cwd=PROJECT_ROOT, env=environment, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             start_new_session=os.name != "nt",
         )
@@ -1479,7 +1479,15 @@ def start_webui(args):
 def serve(args):
     from dotenv import load_dotenv
     import runpy
-    os.chdir(ROOT)
+    # LightRAG also checks .env relative to cwd before starting its API.
+    # Keep its working directory aligned with the application's shared root config.
+    args.env_file = args.env_file.resolve()
+    args.working_dir = args.working_dir.resolve()
+    if getattr(args, "career_db", None):
+        args.career_db = args.career_db.resolve()
+    if getattr(args, "catalog", None):
+        args.catalog = args.catalog.resolve()
+    os.chdir(PROJECT_ROOT)
     load_dotenv(args.env_file, override=False)
     if getattr(args, "schema", "legacy") == "career":
         if os.getenv("PG_WORKSPACE") and os.environ["PG_WORKSPACE"] != args.workspace:
