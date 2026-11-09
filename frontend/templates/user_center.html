@@ -1076,6 +1076,8 @@
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='user-center-report.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='product-theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
     {% include "partials/app_cursor.html" %}
 </head>
 <body class="user-center-page" data-page="user-center">
@@ -1624,7 +1626,9 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}"></script>
+    <script src="{{ url_for('static', filename='report-reader-layout.js') }}"></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}"></script>
+    <script src="{{ url_for('static', filename='report-link-previews.js') }}"></script>
     <script src="{{ url_for('static', filename='career-profile.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>

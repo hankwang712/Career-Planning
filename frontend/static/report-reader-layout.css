@@ -1,0 +1,61 @@
+.career-report-md-prose .cr-reader-layout {
+    --reader-navy: #17355d;
+    --reader-ink: #35485f;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: var(--reader-ink);
+    line-height: 1.9;
+}
+.career-report-md-prose .cr-reader-document-title { display: none; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout :is(p,li,h1,h2,h3,h4,blockquote,summary,details,strong,a) {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.career-report-md-prose .cr-reader-chapter { margin: 0 0 40px; min-width: 0; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-chapter > h2.career-report-md-h2 {
+    display: flex; align-items: center; gap: 13px; margin: 32px 0 24px;
+    padding: 15px 20px; border: 0; border-radius: 10px; background: #17355d;
+    color: #fff; font-size: 20px; line-height: 1.5; letter-spacing: 0;
+}
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-chapter > h2::before { display: none; }
+.cr-reader-chapter-index { color: #a9c6eb; font-size: 12px; font-variant-numeric: tabular-nums; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout h3.career-report-md-h3 {
+    padding: 10px 14px; margin: 26px 0 16px; border-left: 3px solid #668cbd;
+    background: #f1f6fa; color: #22547b; border-radius: 0 7px 7px 0; font-size: 16px;
+}
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout h4.career-report-md-h4 { margin: 0 0 12px; font-size: 14px; color: #17355d; font-weight: 650; line-height: 1.7; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.career-report-md-p { margin: 0 0 16px; color: #465a70; font-size: 14px; line-height: 1.95; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-conclusion { padding: 16px 20px; background: #f0f5fd; border-radius: 8px; color: #1c548d; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note { padding: 12px 16px; margin-bottom: 10px; border-radius: 7px; font-size: 13px; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note--problem { background: #fff4f1; color: #9d4433; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note--improve { background: #f0faf6; color: #176b55; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note--rewrite { background: #f1f5ff; color: #4265ad; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note--pending { background: #fff9ed; color: #88651f; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-note--action { padding: 4px 0; color: #465a70; }
+.cr-reader-note strong { color: inherit; }
+.cr-reader-evidence { padding: 10px 14px; margin: 10px 0 16px; background: #f5f7fa; border-radius: 7px; color: #6e7c8e; font-size: 12px; }
+.cr-reader-evidence summary { cursor: pointer; width: fit-content; line-height: 1.8; }
+.cr-reader-evidence[open] summary { margin-bottom: 8px; }
+.cr-reader-evidence blockquote { margin: 0; padding: 0; border: 0; line-height: 1.9; overflow-wrap: anywhere; }
+.cr-reader-issue { margin: 0 0 22px; padding: 16px 0 4px; border-bottom: 1px solid #e9eef5; }
+.cr-reader-opportunity { margin: 18px 0; padding: 18px 20px 4px; border: 1px solid #e0e8f2; border-radius: 12px; background: #fff; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-opportunity h3.career-report-md-h3 { margin-top: 0; padding: 0; border: 0; background: none; }
+body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.cr-reader-source-meta { color: #8190a3; font-size: 11px; line-height: 1.9; }
+.cr-reader-task { margin: 16px 0; padding: 18px 20px 8px; border: 1px solid #e2eaf3; border-left: 3px solid #7599c9; border-radius: 0 10px 10px 0; }
+.cr-reader-task ol { padding-left: 20px; margin: 0 0 12px; color: #17355d; font-size: 14px; }
+.cr-reader-task li { padding-left: 3px; }
+.cr-md-toc-h4 { display: block; width: calc(100% - 14px); margin-left: 14px; padding: 6px 8px 6px 10px; border: 0; border-left: 1px solid #dce5f1; background: transparent; color: #7b8da3; text-align: left; font: inherit; font-size: 11px; line-height: 1.65; cursor: pointer; }
+.cr-md-toc-h4:hover { color: #22547b; background: #f1f6fa; }
+.tree-item.level-3 { padding-left: 38px; font-size: 11px; }
+.cr-reader-layout :is(a,summary):focus-visible { outline: 2px solid #7199d1; outline-offset: 3px; }
+.cr-reader-layout .career-report-source-link { text-decoration-thickness: 1px; }
+@media (max-width:640px) {
+    body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-chapter > h2.career-report-md-h2 { padding: 12px 14px; font-size: 17px; border-radius: 8px; }
+    body :is(#report-workspace, .career-report-shell, .report-editor-md-article-body) .career-report-md-prose .cr-reader-layout p.career-report-md-p { font-size: 13px; }
+    .cr-reader-opportunity,.cr-reader-task { padding: 14px 12px 4px; }
+}
+@media print {
+    .cr-reader-evidence blockquote { display: block !important; }
+    .cr-reader-evidence summary { display: none; }
+    .cr-reader-layout { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .cr-reader-chapter h2,.cr-reader-layout h3 { break-after: avoid; }
+    .cr-reader-issue,.cr-reader-task { break-inside: avoid; }
+}

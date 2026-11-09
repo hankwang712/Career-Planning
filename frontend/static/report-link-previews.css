@@ -1,0 +1,33 @@
+a.report-link-card {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 18px;
+    align-items: stretch;
+    width: 100%;
+    max-width: 850px;
+    margin: 14px 0 20px;
+    padding: 12px;
+    border: 1px solid #dce3ec;
+    border-radius: 14px;
+    background: #fff;
+    color: #26354b;
+    text-decoration: none;
+    box-sizing: border-box;
+    box-shadow: 0 2px 7px #213b5d05;
+    transition: border-color .18s, box-shadow .18s;
+    overflow: hidden;
+}
+a.report-link-card:hover { border-color: #a4bbde; box-shadow: 0 5px 18px #2949720d; text-decoration: none; }
+a.report-link-card:focus-visible { outline: 2px solid #6d94d2; outline-offset: 3px; }
+.report-link-media { position: relative; display: grid; place-items: center; min-height: 112px; overflow: hidden; border-radius: 9px; background: linear-gradient(135deg, #f1f5fc, #e6edf8); color: #7f9ac1; }
+.report-link-media svg { width: 38px; height: 38px; }
+.report-link-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; border-radius: inherit; }
+.report-link-content { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; padding: 3px 4px 3px 0; }
+.report-link-source { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #5075a8; }
+a.report-link-card .report-link-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0; color: #26354b; font: 650 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.report-link-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font: 12px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #7a879a; }
+.report-link-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; color: #8997ab; font: 10px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.report-link-site { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-link-footer > :last-child { flex-shrink: 0; }
+@media (max-width: 560px) { a.report-link-card { grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding: 10px; } .report-link-media { min-height: 118px; } a.report-link-card .report-link-title { font-size: 13px; } .report-link-description { font-size: 11px; } }
+@media (prefers-reduced-motion: reduce) { a.report-link-card { transition: none; } }

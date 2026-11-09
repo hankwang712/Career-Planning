@@ -155,31 +155,43 @@
     const lines = String(md || "").split("\n");
     const h2 = [];
     const h3 = [];
+    const h4 = [];
     let h2i = 0;
     let h3i = 0;
     let curH2 = -1;
+    let curH3 = -1;
+    let h4i = 0;
     for (const raw of lines) {
       const t = raw.trim();
       if (/^## /.test(t) && !/^###/.test(t)) {
         curH2 = h2i++;
         h3i = 0;
+        curH3 = -1;
+        h4i = 0;
         h2.push(`cr-md-h2-${curH2}`);
       } else if (/^### /.test(t)) {
+        curH3 = h3i;
+        h4i = 0;
         const id = curH2 < 0 ? `cr-md-h3-0-${h3i++}` : `cr-md-h3-${curH2}-${h3i++}`;
         h3.push(id);
+      } else if (/^#### /.test(t)) {
+        h4.push(`cr-md-h4-${Math.max(0, curH2)}-${Math.max(0, curH3)}-${h4i++}`);
       }
     }
-    return { h2, h3 };
+    return { h2, h3, h4 };
   }
 
   /**
    * 从阅读态 Markdown 解析 ## / ### 层级，用于树形目录（id 与 buildHeadingAnchorQueues 一致）。
    */
   function buildMarkdownTocBranches(md) {
-    const lines = String(md || "").split("\n");
+    const numbered = window.CareerReportReader ? window.CareerReportReader.numberMarkdown(md) : md;
+    const lines = String(numbered || "").split("\n");
     let h2i = 0;
     let h3i = 0;
     let curH2 = -1;
+    let curH3 = -1;
+    let h4i = 0;
     const branches = [];
     let lineNo = 0;
     for (const raw of lines) {
@@ -188,6 +200,8 @@
       if (/^## /.test(t) && !/^###/.test(t)) {
         curH2 = h2i++;
         h3i = 0;
+        curH3 = -1;
+        h4i = 0;
         branches.push({
           id: `cr-md-h2-${curH2}`,
           title: t.replace(/^##\s+/, ""),
@@ -195,12 +209,19 @@
           subs: []
         });
       } else if (/^### /.test(t)) {
+        curH3 = h3i;
+        h4i = 0;
         const title = t.replace(/^###\s+/, "");
         const id = curH2 < 0 ? `cr-md-h3-0-${h3i++}` : `cr-md-h3-${curH2}-${h3i++}`;
-        const sub = { id, title, line: lineNo };
+        const sub = { id, title, line: lineNo, depth: 3 };
         if (branches.length && branches[branches.length - 1].subs) {
           branches[branches.length - 1].subs.push(sub);
         }
+      } else if (/^#### /.test(t) && branches.length) {
+        branches[branches.length - 1].subs.push({
+          id: `cr-md-h4-${Math.max(0, curH2)}-${Math.max(0, curH3)}-${h4i++}`,
+          title: t.replace(/^####\s+/, ""), line: lineNo, depth: 4
+        });
       }
     }
     return branches;
@@ -229,7 +250,7 @@
               .map((s) => {
                 const shortTitle = s.title.length > subsClip ? `${s.title.slice(0, subsClip)}…` : s.title;
                 const sline = Number(s.line) || 1;
-                return `<div class="tree-item level-2" data-editor-goto-line="${sline}" role="button" tabindex="0">
+                return `<div class="tree-item ${s.depth === 4 ? "level-3" : "level-2"}" data-editor-goto-line="${sline}" role="button" tabindex="0">
               <span class="toc-radio" aria-hidden="true"></span>
               <span class="tree-label">${esc(shortTitle)}</span>
             </div>`;
@@ -258,7 +279,7 @@
         ? `<div class="cr-md-toc-subs"${startExpanded ? "" : " hidden"}>${br.subs
             .map((s) => {
               const shortTitle = s.title.length > subsClip ? `${s.title.slice(0, subsClip)}…` : s.title;
-              return `<button type="button" class="cr-md-toc-h3" data-report-scroll-target="${esc(s.id)}">${esc(shortTitle)}</button>`;
+              return `<button type="button" class="${s.depth === 4 ? "cr-md-toc-h4" : "cr-md-toc-h3"}" data-report-scroll-target="${esc(s.id)}">${esc(shortTitle)}</button>`;
             })
             .join("")}</div>`
         : "";
@@ -411,12 +432,42 @@
     });
   }
 
+  function formatReportReadingMarkdown(markdown) {
+    // Reading-only whitespace: keep the saved report, citations and editor source intact.
+    const splitParagraph = (block) => {
+      if (block.length < 260 || /^(?: {4}|\t)/.test(block) || /(?:^|\n)\s*(?:#{1,6}\s|>|[-*+]\s|\d+[.)]\s|\|)/.test(block) || /^\s*https?:\/\/\S+\s*$/.test(block)) return block;
+      const indent = block.match(/^[ \t]*/)[0];
+      const text = block.slice(indent.length);
+      const ranges = [...text.matchAll(/`[^`\n]*`|!?\[[^\]\n]*\]\([^\n)]*\)|https?:\/\/[^\s<>]+/g)].map(match => [match.index, match.index + match[0].length]);
+      const pairs = { "「": "」", "『": "』", "“": "”", "‘": "’", "《": "》", "（": "）", "(": ")", "【": "】", "[": "]" };
+      const stack = [], parts = [];
+      let start = 0, range = 0;
+      for (let index = 0; index < text.length; index++) {
+        if (ranges[range]?.[0] === index) { index = ranges[range++][1] - 1; continue; }
+        const char = text[index];
+        if (char === "\\") { index++; continue; }
+        if (pairs[char]) stack.push(pairs[char]);
+        else if (stack[stack.length - 1] === char) stack.pop();
+        const boundary = /[。！？；]/.test(char) || /[。！？；][”’」』》）】)]*$/.test(text.slice(Math.max(start, index - 12), index + 1));
+        if (!stack.length && boundary && index - start >= 150 && text.length - index > 60) {
+          parts.push(indent + text.slice(start, index + 1).trim());
+          start = index + 1;
+        }
+      }
+      parts.push(indent + text.slice(start).trim());
+      return parts.join("\n\n");
+    };
+    return String(markdown).replace(/\r\n/g, "\n").split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
+      .map(part => /^(?:```|~~~)/.test(part) ? part : part.split(/\n[ \t]*\n/).map(splitParagraph).join("\n\n")).join("");
+  }
+
   function renderMarkdownBasic(md, options) {
     if (!md) return "";
     const opts = options && typeof options === "object" ? options : {};
     const wrapProse = opts.wrapProse !== false;
     const injectAnchors = opts.injectHeadingAnchors === true;
-    let text = String(md);
+    const numbered = opts.enhancedLayout && window.CareerReportReader ? window.CareerReportReader.prepare(md) : md;
+    let text = opts.readableParagraphs === false ? String(numbered) : formatReportReadingMarkdown(numbered);
     const anchorQueues = injectAnchors ? buildHeadingAnchorQueues(text) : null;
     // Escape HTML（保留 `>`，否则 Markdown 引用行 `> ...` 无法识别）
     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -429,7 +480,11 @@
     if (anchorQueues) {
       let i2 = 0;
       let i3 = 0;
-      text = text.replace(/^#### (.+)$/gm, '<h4 class="career-report-md-h4">$1</h4>');
+      let i4 = 0;
+      text = text.replace(/^#### (.+)$/gm, (m, t) => {
+        const id = anchorQueues.h4[i4++] || "";
+        return `<h4 class="career-report-md-h4"${id ? ` id="${id}"` : ""}>${t}</h4>`;
+      });
       text = text.replace(/^### (.+)$/gm, (m, t) => {
         const id = anchorQueues.h3[i3++] || "";
         return id ? `<h3 class="career-report-md-h3" id="${id}">${t}</h3>` : `<h3 class="career-report-md-h3">${t}</h3>`;
@@ -447,6 +502,7 @@
     }
     // Bold
     text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    text = text.replace(/^((?:改进方式|基于已有事实的改写|还需补充|原文依据|待确认|与求职需求的关系)[：:])/gm, '<strong class="career-report-inline-label">$1</strong>');
     // Images ![alt](url) 与 ![alt](url "title") — 块级展示，避免整行仍以纯文本出现
     text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, dest) => {
       let href = String(dest || "").trim();
@@ -461,6 +517,16 @@
       const titleAttr = title ? ` title="${esc(title)}"` : "";
       return `<div class="career-report-md-figure"><img class="career-report-md-img" src="${safeSrc}" alt="${safeAlt}"${titleAttr} loading="lazy" decoding="async" /></div>`;
     });
+    // Recruiting links remain actionable in the report reader.
+    const linkify = (part) => part.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (original, label, destination) => {
+      try {
+        const url = new URL(destination.replace(/&amp;/g, "&"));
+        if (!["https:", "http:"].includes(url.protocol) || !url.hostname || url.username || url.password) return label;
+        return `<a class="career-report-source-link" data-preview-report-id="${esc(opts.previewReportId || "")}" data-preview-snapshot-id="${esc(opts.previewSnapshotId || "")}" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      } catch (_) { return label; }
+    });
+    text = text.split(/(<pre\b[^>]*>[\s\S]*?<\/pre>|<code\b[^>]*>[\s\S]*?<\/code>|<[^>]+>)/g)
+      .map((part) => part.startsWith("<") ? part : linkify(part)).join("");
     // Blockquotes（连续以 > 开头的行）
     text = text.replace(/(?:^>[^\n]*(?:\n|$))+?/gm, (block) => {
       const inner = block
@@ -491,8 +557,9 @@
     });
     // Numbered lists（允许 1. xxx 或 1.  多空格）
     text = text.replace(/((?:^\d+\.\s+.+\n?)+)/gm, (block) => {
+      const start = Number(block.trim().match(/^\d+/)?.[0] || 1);
       const items = block.trim().split("\n").map((l) => `<li>${l.replace(/^\d+\.\s+/, "")}</li>`).join("");
-      return `<ol class="career-report-md-ol">${items}</ol>`;
+      return `<ol class="career-report-md-ol" start="${start}">${items}</ol>`;
     });
     // Unordered lists（* 或 -，允许缩进与 * 后多空格，与常见 md 导出一致）
     text = text.replace(/((?:^\s*[*+-]\s+.+\n?)+)/gm, (block) => {
@@ -506,7 +573,7 @@
     // Horizontal rules
     text = text.replace(/^---+$/gm, '<hr class="career-report-md-hr">');
     // Paragraphs (double newlines)
-    text = text.replace(/\n\n+/g, "</p><p>");
+    text = text.replace(/\n\n+/g, '</p><p class="career-report-md-p">');
     text = `<p class="career-report-md-p">${text}</p>`;
     // Single newlines
     text = text.replace(/\n/g, "<br>");
@@ -514,6 +581,7 @@
     text = text.replace(/<p class="career-report-md-p">\s*<\/p>/g, "");
     text = text.replace(/<p class="career-report-md-p">(<(?:h[1-4]|ul|ol|div|blockquote|pre|hr)[^>]*>)/g, "$1");
     text = text.replace(/(<\/(?:h[1-4]|ul|ol|div|blockquote|pre|hr)>)<\/p>/g, "$1");
+    text = text.replace(/(<\/(?:h[1-4]|ul|ol|div|blockquote|pre)>)(?:<br\s*\/?>|\s)*<\/p>/g, "$1");
     // 兼容：上面替换若未加 class 的残留 p 标签
     text = text.replace(/<p>(<(?:h[1-4]|ul|ol|div|blockquote|pre|hr)[^>]*>)/g, "$1");
     text = text.replace(/(<\/(?:h[1-4]|ul|ol|div|blockquote|pre|hr)>)<\/p>/g, "$1");
@@ -523,6 +591,9 @@
       "$1"
     );
     text = text.replace(/<p>(?:<br\s*\/?>|\s)*(\s*<div class="career-report-md-figure">[\s\S]*?<\/div>\s*)<\/p>/g, "$1");
+    if (opts.enhancedLayout && window.CareerReportReader) {
+      text = window.CareerReportReader.enhance(text);
+    }
     if (wrapProse) {
       return `<div class="career-report-md-prose">${text}</div>`;
     }
@@ -580,7 +651,8 @@
   }
 
   function markdownForCareerReportReading(md) {
-    return stripPipelineSummaryLines(stripMachineReadableSectionsFromMarkdown(md));
+    const cleaned = stripPipelineSummaryLines(stripMachineReadableSectionsFromMarkdown(md));
+    return window.CareerReportReader ? window.CareerReportReader.prepare(cleaned) : cleaned;
   }
 
   /** 顶层尚无合并正文时，按流水线顺序拼接各模块 Markdown，阅读态与单文件报告一致 */
@@ -1281,7 +1353,7 @@
   }
 
   function renderReportSections4(bundle, sections, options = {}) {
-    const narrativeLayout = bundle?.report_document?.reading_layout === "narrative-v1";
+    const narrativeLayout = ["narrative-v1", "narrative-v2", "numbered-reader-v3"].includes(bundle?.report_document?.reading_layout);
     const requestedGroup = String(options.group || "").trim().toLowerCase();
     const groupConfig = REPORT_WORKSPACE_GROUPS[requestedGroup] || null;
     const navOrder = bundle?.report_document?.section_order || [
@@ -2137,7 +2209,7 @@
       let tailHtml = "";
       if (markdown) {
         bodyHtml = `
-          <div class="cr4-module-markdown cr4-module-markdown--primary career-report-md-article">${renderMarkdownBasic(markdownForCareerReportReading(markdown))}</div>
+          <div class="cr4-module-markdown cr4-module-markdown--primary career-report-md-article">${renderMarkdownBasic(markdownForCareerReportReading(markdown), { enhancedLayout: true, previewReportId: bundle?.meta?.report_id })}</div>
           ${body ? `
             <details class="cr4-module-structure">
               <summary>结构化摘要（从正文提取，便于扫读）</summary>
@@ -4198,7 +4270,7 @@
     host.innerHTML = markdown.trim()
       ? `
         <article class="report-editor-md-article report-editor-md-article--bare">
-          <div class="report-editor-md-article-body">${renderMarkdownBasic(markdown, { injectHeadingAnchors: true })}</div>
+          <div class="report-editor-md-article-body">${renderMarkdownBasic(markdown, { enhancedLayout: true, injectHeadingAnchors: true, previewReportId: reportRuntime.editorSource?.report_id, previewSnapshotId: reportRuntime.editorSource?.snapshot_id })}</div>
         </article>
       `
       : `<div class="report-editor-md-empty-state"><strong>当前报告为空</strong><span>请先生成或加载报告内容。</span></div>`;
@@ -6571,7 +6643,7 @@
       return `
         <div class="crdoc-page crdoc-page--reader">
           <section id="cr-full-markdown-anchor" class="career-report-section-card crdoc-article-card career-report-md-wrap">
-            <div class="cr4-module-markdown cr4-module-markdown--reader career-report-md-article">${renderMarkdownBasic(readingMd, { injectHeadingAnchors: true })}</div>
+            <div class="cr4-module-markdown cr4-module-markdown--reader career-report-md-article">${renderMarkdownBasic(readingMd, { enhancedLayout: true, injectHeadingAnchors: true, previewReportId: bundle?.meta?.report_id })}</div>
           </section>
         </div>
       `;

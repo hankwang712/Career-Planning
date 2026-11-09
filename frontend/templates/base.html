@@ -10,6 +10,8 @@
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     {{ vite_asset_tags('src/entries/workspace.js') }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
     <style>
       :root {
         --app-font-stack: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -377,9 +379,9 @@
                 <div>
                     <h4 class="font-semibold mb-3">联系我们</h4>
                     <ul class="space-y-2 text-sm text-gray-400">
-                        <li>📧 support@mingshan.com</li>
+                        <li>📧 wanghank712@163.com</li>
                         <li>📞 400-XXX-XXXX</li>
-                        <li>🏢 深圳市南山区科技园</li>
+                        <li>🏢 杭州市西湖区文一西路88号</li>
                     </ul>
                 </div>
             </div>
@@ -628,7 +630,9 @@
     <script src="{{ url_for('static', filename='report-review.js') }}" defer></script>
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
     <script src="{{ url_for('static', filename='job-market.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='report-link-previews.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}">
     <script src="{{ url_for('static', filename='assessment-center.js') }}" defer></script>

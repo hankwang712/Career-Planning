@@ -6,6 +6,7 @@ from .provenance import report_provenance
 from .development import HORIZONS, build_development_path, task_horizon
 from .presentation import ReportPresentation, validate_reader_report
 from .reader_sections import READER_LAYOUT, build_reader_sections
+from .reading_format import number_report_headings
 
 
 DECISIONS = {"recommended": "建议优先考虑", "conditional": "满足条件后考虑",
@@ -46,6 +47,7 @@ def build_report_bundle(username, report_id, profile, state, model_name):
     # Preserve the established document title while changing the reading layout.
     title += " · 职业生涯发展报告"
     markdown = f"# {title}\n\n" + "\n\n".join("## " + sections[key]["label"] + "\n\n" + sections[key]["markdown"] for key in order)
+    markdown = number_report_headings(markdown)
     validate_reader_report(markdown)
     summary = presentation.clean(decision.get("summary", ""))
     strengths, gaps, traces, gap_rows = [], [], [], []
@@ -63,7 +65,7 @@ def build_report_bundle(username, report_id, profile, state, model_name):
     meta = {"report_id": report_id, "username": username, "generated_at": generated_at, "status": "ready",
             "version": REPORT_VERSION, "pipeline_version": "experiments-langgraph-v5", "model": model_name,
             "provenance": report_provenance(state), "execution": summarize_executions(results),
-            "content_validation": {"version": "reader-v2", "internal_references": "passed", "reading_layout": READER_LAYOUT},
+            "content_validation": {"version": "reader-v3", "internal_references": "passed", "reading_layout": READER_LAYOUT},
             "generation_mode": "langgraph", "focus_role_id": selected["target_id"], "focus_role_name": selected["title"],
             "title": title, "summary": summary}
     return {"meta": meta, "profile_snapshot": {key: value for key, value in profile.items() if key not in {"agent_memory", "agent_workflow"}},

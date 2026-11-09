@@ -49,7 +49,10 @@ class ReportPresentation:
         decision = state["results"]["career_decision"]
         for source in decision.get("sources", []):
             self.labels[source["source_id"]] = self.labels.get(source.get("chunk_id"),
-                {"resume": "简历原文", "additional_evidence": "补充说明", "preferences": "求职偏好"}.get(source.get("kind"), "参考材料"))
+                source.get("title") or {"resume": "简历原文", "additional_evidence": "补充说明", "preferences": "求职偏好"}.get(source.get("kind"), "参考材料"))
+            if source.get("recruitment_reference"):
+                self.sources.append({"target_id": source["target_id"], "chunk_id": source["source_id"],
+                                     "label": self.labels[source["source_id"]], "quotes": []})
         self.task_labels = {task["task_id"]: f"任务 {index}" for index, task in enumerate(
             state["results"]["action_planning"].get("data", {}).get("tasks", []), 1)}
         for assessment in decision.get("data", {}).get("assessments", []):

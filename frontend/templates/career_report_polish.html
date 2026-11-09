@@ -16,6 +16,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
     {% include "partials/app_cursor.html" %}
 </head>
 <body>
@@ -27,6 +29,8 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
     <script src="{{ url_for('static', filename='app-hotfix.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
     <script src="{{ url_for('static', filename='workspace-restoration.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='report-link-previews.js') }}" defer></script>
 </body>
 </html>

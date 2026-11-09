@@ -3301,10 +3301,10 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
         "role_match": "目标岗位对比",
         "path_plan": "职业路径",
     }
-    if report_document.get("reading_layout") == "narrative-v1":
-        required_sections = {"executive_summary": "核心结论", "personal_traits": "个人经历",
-                             "matching_decision": "岗位适配", "gap_action_plan": "近期行动",
-                             "development_path": "成长与调整", "appendix": "参考依据"}
+    if report_document.get("reading_layout") in {"narrative-v1", "narrative-v2", "numbered-reader-v3"}:
+        required_sections = {"executive_summary": "核心结论", "personal_traits": "简历分析",
+                             "matching_decision": "岗位对照", "gap_action_plan": "成长规划",
+                             "development_path": "总结与下一步", "appendix": "参考依据"}
     elif report_document.get("section_order"):
         required_sections = {"personal_traits": "个人画像", "target_job_analysis": "职业目标", "macro_environment": "就业市场",
                              "matching_decision": "岗位适配", "ability_gaps": "能力差距", "development_path": "成长路径",
@@ -3315,7 +3315,7 @@ def _run_career_report_completeness_check(bundle, markdown_text="", snapshot=Non
             issues.append({"level": "warning", "type": "missing_section", "message": f"缺少“{label}”章节。"})
 
     markdown_value = str(markdown_text or report_document.get("markdown") or "").strip()
-    if report_document.get("reading_layout") != "narrative-v1" and len(markdown_value) < 600:
+    if report_document.get("reading_layout") not in {"narrative-v1", "narrative-v2", "numbered-reader-v3"} and len(markdown_value) < 600:
         issues.append({"level": "warning", "type": "content_length", "message": "报告正文偏短，请检查关键判断、依据和行动安排是否完整。"})
 
     explainability_summary = report_document.get("explainability_summary") if isinstance(report_document.get("explainability_summary"), dict) else {}
@@ -7649,6 +7649,60 @@ def api_career_report_version():
         "data": _public_career_report_bundle(bundle),
         "tracker": tracker,
     })
+
+
+def _career_report_preview_context():
+    from services.report.link_preview import public_preview_url, report_contains_url
+
+    url = public_preview_url(request.args.get("url"))
+    if not url:
+        return None, (jsonify({"message": "仅支持公开网页链接。"}), 400)
+    username = _current_user()["username"]
+    report_id = str(request.args.get("report_id") or "").strip()
+    bundle = _read_career_report_bundle_by_id(username, report_id)
+    if not isinstance(bundle, dict) or not bundle.get("meta"):
+        return None, (jsonify({"message": "未找到对应的职业报告。"}), 404)
+    resolved_id = str(bundle["meta"].get("report_id") or report_id)
+    snapshot_id = str(request.args.get("snapshot_id") or "").strip()
+    snapshot = _read_career_report_snapshot(username, resolved_id, snapshot_id) if snapshot_id else None
+    if snapshot_id and not snapshot:
+        return None, (jsonify({"message": "未找到对应的编辑快照。"}), 404)
+    if not report_contains_url(bundle, url, snapshot):
+        return None, (jsonify({"message": "此链接不在当前报告中。"}), 404)
+    return {"url": url, "report_id": resolved_id, "snapshot_id": snapshot_id}, None
+
+
+@app.route("/api/career-report/link-preview", methods=["GET"])
+@_login_required
+def api_career_report_link_preview():
+    from services.report.link_preview import get_link_preview
+
+    context, error = _career_report_preview_context()
+    if error is not None:
+        return error
+    preview = get_link_preview(context["url"])
+    image = preview.pop("image", "")
+    preview["image_url"] = url_for("api_career_report_link_preview_image", **context) if image else ""
+    response = jsonify({"data": preview})
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@app.route("/api/career-report/link-preview/image", methods=["GET"])
+@_login_required
+def api_career_report_link_preview_image():
+    from services.report.link_preview import get_link_preview_image
+
+    context, error = _career_report_preview_context()
+    if error is not None:
+        return error
+    image = get_link_preview_image(context["url"])
+    if image is None:
+        return "", 404
+    response = app.response_class(image[0], mimetype=image[1])
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.route("/api/career-report/source", methods=["GET"])

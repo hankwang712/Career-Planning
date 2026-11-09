@@ -2042,12 +2042,22 @@
 }
 
 .report-editor-md-article-body .career-report-md-prose {
-  max-width: 100%;
+  max-width: min(820px, 100%);
   min-width: 0;
   margin: 0 auto;
   font-size: 0.95rem;
-  line-height: 1.9;
+  line-height: 1.95;
   color: #314656;
+}
+
+.report-editor-md-article-body .career-report-md-prose .career-report-md-p {
+  margin: 0 0 1.25rem;
+  line-height: 1.95;
+}
+
+.report-editor-md-article-body .career-report-inline-label {
+  color: #345974;
+  font-weight: 650;
 }
 
 .report-editor-md-article-body .career-report-md-h2 {

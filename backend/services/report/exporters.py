@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..paths import REPORT_IMAGE_DIR
+from .reading_format import readable_markdown, number_report_headings, structure_report_markdown
+from .html_layout import EXPORT_CSS, decorate_export_html, BACKGROUND_ROLES
 
 
 def _strip_pipeline_summary_lines(text: str) -> str:
@@ -146,7 +148,7 @@ def markdown_for_user_reading(text: str) -> str:
     cleaned = _extract_inline_images_to_local(text)
     cleaned = strip_machine_readable_markdown_sections(cleaned)
     cleaned = normalize_br_tags_in_markdown(cleaned)
-    return _strip_pipeline_summary_lines(cleaned)
+    return number_report_headings(readable_markdown(structure_report_markdown(_strip_pipeline_summary_lines(cleaned))))
 
 
 _DOCX_HEADING_LINE_RE = re.compile(r"^(##|###)\s+")
@@ -290,10 +292,11 @@ def _render_markdown_html(markdown_text: str) -> str:
         return False
 
     body = markdown.markdown(str(markdown_text or ""), extensions=["tables", "fenced_code", "sane_lists"])
-    return bleach.clean(body, tags={
+    sanitized = bleach.clean(body, tags={
         "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "em",
         "blockquote", "pre", "code", "table", "thead", "tbody", "tr", "th", "td", "hr", "br", "a", "img",
     }, attributes=allow_attribute, protocols={"http", "https", "mailto"}, strip=True)
+    return decorate_export_html(sanitized)
 
 
 def render_markdown_export_html(markdown_text: str, *, title: str = "职业发展报告") -> str:
@@ -349,6 +352,7 @@ def render_markdown_export_html(markdown_text: str, *, title: str = "职业发�
       margin: 0.5rem 0 1rem;
       padding-left: 1.2rem;
     }}
+    {EXPORT_CSS}
   </style>
 </head>
 <body>
@@ -366,7 +370,7 @@ def render_report_html(report: dict[str, Any]) -> str:
     meta = report.get("meta") if isinstance(report.get("meta"), dict) else {}
     document = report.get("report_document") if isinstance(report.get("report_document"), dict) else {}
     bundled_html = str(document.get("html") or "").strip()
-    if bundled_html:
+    if bundled_html and not document.get("markdown"):
         return bundled_html
     markdown_text = render_report_markdown(report)
     title = str(document.get("title") or meta.get("title") or "职业发展报告").strip() or "职业发展报告"
@@ -379,36 +383,64 @@ def render_html_to_pdf_bytes(html_text: str) -> bytes:
     使用 PyMuPDF 的 Story 排版（项目已依赖 ``PyMuPDF`` / ``pymupdf``），无需单独安装 WeasyPrint。
     中文由 MuPDF 内置 CJK 回退字体排版，无需 Microsoft Word。
     """
-    import io
-
     import pymupdf as fitz
+    from lxml import html
 
     text = str(html_text or "").strip()
     if not text:
         raise ValueError("empty html for pdf export")
     mediabox = fitz.paper_rect("a4")
-    where = mediabox + (36, 36, -36, -36)
+    where = mediabox + (68, 45, -68, -45)
     # Markdown 图片已限制为该目录下的文件名；Archive 不开放任意文件系统路径。
     text = text.replace('src="/static/img/report/', 'src="')
     archive = fitz.Archive(str(REPORT_IMAGE_DIR)) if REPORT_IMAGE_DIR.is_dir() else None
+    tree = html.fromstring(text)
+    backgrounds = {}
+    for element in tree.iter():
+        role = BACKGROUND_ROLES.get(element.get("class"))
+        if element.tag == "h2":
+            role = ("17355D", 11, 9)
+        elif element.tag == "h3":
+            role = ("F1F6FA", 9, 7)
+        if role and element.get("id"):
+            backgrounds[element.get("id")] = role
+    # MuPDF can repeat CSS backgrounds from previous pages over continuation text.
+    # Paint semantic backgrounds from the actual placed element rectangles instead.
+    text = re.sub(r"background-color:\s*#[0-9a-fA-F]+", "background-color:transparent", text)
     story = fitz.Story(html=text, archive=archive)
-    buf = io.BytesIO()
-    writer = fitz.DocumentWriter(buf)
-    try:
-        for _ in range(200):
-            device = writer.begin_page(mediabox)
-            more, filled = story.place(where)
-            story.draw(device)
-            writer.end_page()
-            if not more:
-                break
-            if fitz.Rect(filled).is_empty:
-                raise ValueError("报告中有无法分页的内容，请缩短过长的表格单元格或代码段后重试。")
-        else:
+    bookmarks, seen, panels = [], set(), {}
+    def rectangle(rect_num, filled):
+        if rect_num >= 200:
             raise ValueError("报告超过 PDF 导出页数上限，请精简内容后重试。")
+        if rect_num and fitz.Rect(filled).is_empty:
+            raise ValueError("报告中有无法分页的内容，请缩短过长的表格单元格或代码段后重试。")
+        return mediabox, where, None
+    def position(item):
+        if item.id in backgrounds:
+            key = (item.page_num, item.id)
+            box = fitz.Rect(item.rect)
+            panels[key] = panels[key] | box if key in panels else box
+        if item.heading in {2, 3, 4} and item.open_close & 1 and item.id not in seen:
+            seen.add(item.id)
+            bookmarks.append([min(item.heading - 1, bookmarks[-1][0] + 1 if bookmarks else 1), item.text, item.page_num])
+    # Drawing a Story alone does not create clickable PDF annotations. Keep its link positions.
+    pdf = story.write_with_links(rectangle, positionfn=position)
+    try:
+        if bookmarks:
+            pdf.set_toc(bookmarks)
+        for index, page in enumerate(pdf):
+            for (page_num, identifier), box in panels.items():
+                if page_num != index + 1:
+                    continue
+                color, xpad, ypad = backgrounds[identifier]
+                fill = tuple(int(color[offset:offset + 2], 16) / 255 for offset in (0, 2, 4))
+                area = (box + (-xpad, -ypad, xpad, ypad)) & where
+                if not area.is_empty:
+                    page.draw_rect(area, color=None, fill=fill, overlay=False)
+            page.insert_text((page.rect.width - 45, page.rect.height - 20), str(index + 1), fontsize=8, color=(.4, .48, .56))
+        return pdf.tobytes(garbage=3, deflate=True)
     finally:
-        writer.close()
-    return buf.getvalue()
+        pdf.close()
 
 
 def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发展报告") -> bytes:
@@ -419,17 +451,7 @@ def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发�
     body = _render_markdown_html(cleaned)
     html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
     <title>{escape(title)}</title><style>
-    body {{ font-family: sans-serif; font-size: 11pt; line-height: 1.6; color: #182335; }}
-    h1 {{ font-size: 22pt; color: #163a53; margin: 0 0 18pt; }}
-    h2 {{ font-size: 16pt; color: #163a53; margin: 18pt 0 9pt; }}
-    h3, h4 {{ font-size: 12pt; margin: 12pt 0 6pt; }}
-    p {{ margin: 6pt 0; }} ul, ol {{ margin: 6pt 0; padding-left: 20pt; }}
-    blockquote {{ margin: 8pt 0 8pt 14pt; color: #475569; }}
-    table {{ border-collapse: collapse; width: 100%; margin: 10pt 0; }}
-    th, td {{ border: 0.6pt solid #cbd5e1; padding: 6pt; vertical-align: top; }}
-    th {{ background-color: #edf3f8; font-weight: bold; }}
-    pre {{ white-space: pre-wrap; padding: 9pt; background-color: #f1f5f9; font-size: 9pt; }}
-    img {{ max-width: 100%; }} a {{ color: #17658b; }}
+    {EXPORT_CSS}
     </style></head><body>{body}</body></html>"""
     return render_html_to_pdf_bytes(html)
 
@@ -447,34 +469,8 @@ from docx_mcp.document import DocxDocument
 from docx_mcp.markdown import MarkdownConverter
 
 
-def _paragraph_has_image(paragraph):
-    for el in paragraph._element.iter():
-        tag = el.tag if isinstance(el.tag, str) else str(el.tag)
-        if tag.endswith("}drawing") or tag.endswith("drawing") or tag.endswith("}pict") or tag.endswith("pict"):
-            return True
-    return False
-
-
-def _center_images_in_docx(path):
-    try:
-        from docx import Document as DocxPy
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-    except ImportError:
-        return
-    try:
-        doc = DocxPy(str(path))
-        for p in doc.paragraphs:
-            if _paragraph_has_image(p):
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for p in cell.paragraphs:
-                        if _paragraph_has_image(p):
-                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.save(str(path))
-    except Exception:
-        pass
+sys.path.insert(0, sys.argv[3])
+from backend.services.report.docx_layout import format_report_docx
 
 
 md_path = Path(sys.argv[1])
@@ -484,7 +480,7 @@ document = DocxDocument.create(str(docx_path))
 MarkdownConverter.convert(document, markdown, base_dir=md_path.parent)
 document.save(str(docx_path))
 document.close()
-_center_images_in_docx(docx_path)
+format_report_docx(docx_path)
 """
     safe_title = "".join(
         ch if ch.isalnum() or ch in {"-", "_", "."} else "-"
@@ -515,7 +511,7 @@ _center_images_in_docx(docx_path)
         md_content = docx_prepare_markdown(md_content)
         md_path.write_text(md_content, encoding="utf-8")
         process = subprocess.run(
-            [python_exe, "-c", script, str(md_path), str(docx_path)],
+            [python_exe, "-c", script, str(md_path), str(docx_path), str(Path(__file__).resolve().parents[3])],
             capture_output=True,
             text=True,
             encoding="utf-8",

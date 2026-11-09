@@ -166,11 +166,10 @@
     color: #a34036;
 }
 
-.report-availability-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.report-extra-options { margin-top: 6px; border-top: 1px solid #e4ebf1; padding-top: 14px; }
-.report-extra-options summary, .report-review-analysis summary { color: #56738d; cursor: pointer; font-size: 13px; }
-.report-extra-options[open] summary { margin-bottom: 18px; }
-.report-extra-options > label { margin-top: 14px; }
+.report-availability-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.report-availability-fields label { min-width: 0; }
+.report-availability-fields small { color: #8391a4; font-size: 11px; font-weight: 400; line-height: 1.6; }
+.report-review-analysis summary { color: #56738d; cursor: pointer; font-size: 13px; }
 .report-review-overview { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .report-review-panel { margin: 20px 0; padding: 24px; border: 1px solid #dfe4ef; border-radius: 18px; background: #fff; }
 .report-review-overview h3 { margin: 4px 0 8px; font-size: 20px; color: #213c55; }

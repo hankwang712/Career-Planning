@@ -19,7 +19,7 @@ ARRIVAL_OPTIONS = {
 
 
 def apply_availability(payload, preferences=""):
-    """只保存用户明确选择的实习安排，不换算为学习/求职准备工时。"""
+    """保存用户的实习安排，不换算为学习工时。"""
     if payload is None:
         return {}, preferences
     if not isinstance(payload, dict) or set(payload) - {"arrival", "days_per_week"}:

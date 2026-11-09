@@ -6241,7 +6241,7 @@
 
 /* 工作台「全屏阅读」：在可用宽度内拉宽正文，减少两侧空白 */
 .uc-report-workbench .career-report-main .career-report-md-prose {
-    max-width: min(70rem, 100%);
+    max-width: min(51.25rem, 100%);
 }
 
 .uc-report-workbench .career-report-main .crdoc-reader-copy .ucrd-full-head-summary {
@@ -6249,7 +6249,7 @@
 }
 
 .career-report-main .career-report-md-prose .career-report-md-p {
-    margin: 0 0 1rem;
+    margin: 0 0 1.25rem;
 }
 
 .career-report-main .career-report-md-prose .career-report-md-h1 {
