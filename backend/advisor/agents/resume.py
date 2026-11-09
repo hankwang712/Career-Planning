@@ -139,6 +139,12 @@ class ResumeAnalysisAgent(BaseAgent):
                     source = normalize_quote(prepared.get(fact.source, ""))
                     if not quote or quote not in source:
                         raise ValueError("职业画像必须引用对应用户材料中的连续原文")
+                for highlight in self.highlights:
+                    for evidence in highlight.evidence:
+                        if evidence.source == "education_context" or evidence.status == "missing" or not normalize_quote(evidence.quote) or normalize_quote(evidence.quote) not in normalize_quote(prepared.get(evidence.source, "")):
+                            raise ValueError("简历优势必须引用用户材料中的真实连续原文")
+                    if highlight.visibility == "understated" and not highlight.suggestion:
+                        raise ValueError("表达不足的优势必须说明如何突出已有事实")
                 return self
 
         return EvidencedResumeAnalysis

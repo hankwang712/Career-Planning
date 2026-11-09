@@ -1,4 +1,6 @@
 from typing import Annotated, Literal
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -17,8 +19,17 @@ class RecruitmentSearchInput(SearchRecord):
     request: Annotated[str, Field(min_length=1, max_length=3000)]
     channel: Literal["radar"] = "radar"
     days: Annotated[int, Field(ge=1, le=365)] | None = None
-    limit: int = Field(default=5, ge=1, le=10)
+    published_after: date | None = Field(default=None, description="招聘公告实际发布日期的起始日期（含当天），优先于 days，不是入职时间")
+    limit: int = Field(default=12, ge=1, le=20)
+    candidate_context: str = Field(default="", max_length=12000, description="仅供理解经历与检索方向；不得把简历原文或个人身份信息放进搜索查询")
     clarifications: list[Clarification] = Field(default_factory=list)
+
+    @field_validator("published_after")
+    @classmethod
+    def valid_publication_start(cls, value):
+        if value and value > datetime.now(ZoneInfo("Asia/Shanghai")).date():
+            raise ValueError("招聘信息发布起始日期不能晚于今天")
+        return value
 
     @field_validator("channel", mode="before")
     @classmethod
@@ -29,6 +40,7 @@ class RecruitmentSearchInput(SearchRecord):
 
 
 class SearchIntent(SearchRecord):
+    published_after: date | None = Field(default=None, description="招聘公告实际发布起始日期（含当天）；不能使用更新日期代替")
     direction: Text | None = Field(default=None, description="用户表达的职业方向，如大模型、智能驾驶；未表达时为空")
     companies: list[Text] = Field(default_factory=list)
     roles: list[Text] = Field(default_factory=list)
@@ -85,7 +97,7 @@ class RecruitmentSearchResult(SearchRecord):
     outcome: Literal["found", "no_match", "needs_clarification", "unavailable"]
     summary: Text
     intent: SearchIntent
-    findings: list[RecruitmentFinding] = Field(default_factory=list, max_length=10)
+    findings: list[RecruitmentFinding] = Field(default_factory=list, max_length=20)
     followup_questions: list[Text] = Field(default_factory=list, max_length=3)
     limitations: list[Text] = Field(default_factory=list)
 

@@ -24,7 +24,7 @@ async def search_recruitment_radar(query: str, intent: dict, config: RunnableCon
 
 @tool
 async def verify_recruitment_radar_candidates(jobs: list[dict], config: RunnableConfig,
-    read_limit: Annotated[int, Field(ge=1, le=8)] = 5) -> dict:
+    read_limit: Annotated[int, Field(ge=1, le=40)] = 20) -> dict:
     """对已通过岗位语义初筛的候选读取公告及官网，优先补齐最终展示项，不读取已排除岗位。"""
     async def publish(phase, **fields):
         await adispatch_custom_event("recruitment_progress", {"phase": phase, **fields}, config=config)

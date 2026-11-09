@@ -23,11 +23,13 @@ import zlib
 import httpx
 
 from .vendor.sync_tencent_docs import field_value, is_expired, map_industry, parse_sheet
+from ..utils.recruitment_dates import publication_state
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT.parents[2] / "data" / "app_data" / "recruitment-radar"
 DOCUMENT = "https://docs.qq.com/smartsheet/DTkRMUVhoUWJXZEhJ"
-SHEETS = [("tTNjGc", "27届内推汇总", 900), ("tvVDZj", "实习提前批每日更新", 6000)]
+SHEETS = [("tTNjGc", "27届内推汇总", 900), ("tvVDZj", "实习提前批每日更新", 6000),
+          ("tK4q9U", "日常实习补充汇总", 900)]
 class CrossLoopLock:
     """Reports run in separate asyncio.run loops/threads; share resources without loop-bound locks."""
     def __init__(self):
@@ -105,7 +107,8 @@ def normalize_job(row, *, source_type="import", source_name="导入数据", snap
         "batch": pick("batch", "w", "批次"), "deadline": pick("deadline", "d", "招聘截止日期"),
         "url": public_url(pick("url", "u", "投递链接or推文", "投递链接")),
         "announcement_url": public_url(pick("announcement_url", "官方公告")),
-        "updated_at": pick("updated_at", "更新日期"), "published_at": pick("published_at", "datePosted", "发布日期"),
+        "updated_at": pick("updated_at", "更新日期", "更新时间"),
+        "published_at": pick("published_at", "datePosted", "发布日期", "发布时间", "公告发布日期", "招聘发布日期"),
         "industry": pick("industry", "ind", "行业") or "综合", "source_type": source_type,
         "source_name": source_name, "snapshot_at": snapshot_at,
         "description": pick("description", "content", "正文"),
@@ -176,7 +179,9 @@ async def fetch_sheet(client, sheet_id, end):
 async def sync_jobs(force=False, publish=None):
     async with SYNC_LOCK:
         previous = read_json(STATE / "live.json", {})
-        if not force and previous.get("jobs"):
+        synced_ids = {sheet.get("sheet_id") for sheet in previous.get("sheets", []) if sheet.get("status") == "ok"}
+        complete_sheets = {sheet_id for sheet_id, _, _ in SHEETS} <= synced_ids
+        if not force and previous.get("jobs") and complete_sheets:
             try:
                 if datetime.now().astimezone() - datetime.fromisoformat(previous["fetched_at"]) < timedelta(hours=6):
                     return {**read_jobs(), "status": "cached", "sync": previous.get("sheets", [])}
@@ -214,7 +219,7 @@ async def sync_jobs(force=False, publish=None):
                         fresh.append(job)
                 if error:
                     fresh.extend(job for job in previous.get("jobs", []) if job.get("source_sheet") == name)
-                summaries.append({"sheet": name, "records": len(records), "status": "partial" if error else "ok", "error": error})
+                summaries.append({"sheet_id": sheet_id, "sheet": name, "records": len(records), "status": "partial" if error else "ok", "error": error})
         if fresh:
             saved = {"fetched_at": datetime.now().astimezone().isoformat(), "jobs": deduplicate(fresh), "sheets": summaries,
                      "limitations": failures}
@@ -270,6 +275,58 @@ class PageParser(HTMLParser):
                 self.anchor[1].append(data)
 
 
+class ArticleParser(PageParser):
+    """Read WeChat's article container, excluding navigation and embedded scripts."""
+    def __init__(self):
+        super().__init__()
+        self.depth = 0
+        self.images = []
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if values.get("id") == "js_content":
+            self.depth = 1
+        elif self.depth and tag not in {"img", "br", "hr", "input", "meta", "link", "source", "wbr"}:
+            self.depth += 1
+        if self.depth:
+            super().handle_starttag(tag, attrs)
+            if tag == "img":
+                src = values.get("data-src") or values.get("src")
+                if src:
+                    self.images.append(src)
+    def handle_endtag(self, tag):
+        if self.depth:
+            super().handle_endtag(tag)
+            self.depth -= 1
+    def handle_data(self, data):
+        if self.depth:
+            super().handle_data(data)
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in {"img", "br", "hr", "input", "meta", "link", "source", "wbr"}:
+            self.handle_endtag(tag)
+
+
+def page_publication(html, metadata):
+    """Only explicit publication fields; never infer publication from crawling/update time."""
+    from .browser import _publication
+    for key in ("article:published_time", "datePublished", "date", "pubdate", "publishdate", "publish_time"):
+        if metadata.get(key):
+            value = metadata[key]
+            parsed = _publication(value, value)
+            if parsed:
+                return parsed
+    match = re.search(r'\b(?:ct|create_time)\s*[:=]\s*["\']?(\d{10,13})\b', html)
+    if match:
+        return _publication(match[1], "") or ""
+    match = re.search(r'id=["\']publish_time["\'][^>]*>([^<]+)', html)
+    if match:
+        parsed = _publication("", match[1])
+        if parsed:
+            return parsed
+    match = re.search(r'["\']datePublished["\']\s*:\s*["\']([^"\']+)', html)
+    return (_publication("", match[1]) or "") if match else ""
+
+
 async def direct_extract(url):
     async with httpx.AsyncClient(timeout=16, trust_env=False, headers={"User-Agent": USER_AGENT}) as client:
         for _ in range(6):
@@ -282,18 +339,26 @@ async def direct_extract(url):
                 data = bytearray()
                 async for chunk in response.aiter_bytes():
                     data.extend(chunk)
-                    if len(data) > 3_000_000:
-                        raise ValueError("页面超过3MB读取上限")
+                    if len(data) > 12_000_000:
+                        raise ValueError("页面超过12MB读取上限")
                 html = bytes(data).decode(response.encoding or "utf-8", "replace")
                 parser = PageParser()
                 parser.feed(html)
+                images = []
+                if urlsplit(url).hostname == "mp.weixin.qq.com":
+                    article = ArticleParser()
+                    article.feed(html)
+                    parser.parts, parser.links = article.parts, article.links
+                    images = list(dict.fromkeys(urljoin(url, src) for src in article.images if public_url(urljoin(url, src))))
                 content = re.sub(r"[ \t]+", " ", "".join(parser.parts))
                 content = re.sub(r"\n\s*\n+", "\n", content).strip()
                 if re.search(r"验证码|环境异常|访问过于频繁|安全验证", content) and len(content) < 1500:
                     raise ValueError("页面要求验证，未取得有效正文")
                 links = [{**link, "url": urljoin(url, link["url"])} for link in parser.links if public_url(urljoin(url, link["url"]))]
-                published = parser.metadata.get("article:published_time") or parser.metadata.get("date") or ""
-                return {"content": content[:16000], "links": links[:300], "url": url, "published_at": published, "method": "direct_http"}
+                published = page_publication(html, parser.metadata)
+                return {"content": content[:60000], "truncated": len(content) > 60000,
+                        "image_urls": images, "image_count": len(images), "links": links[:300], "url": url,
+                        "published_at": published, "method": "direct_http"}
         raise ValueError("页面重定向次数过多")
 
 
@@ -308,7 +373,9 @@ async def provider_extract(url, provider):
                 json={"url": url, "formats": ["markdown"], "onlyMainContent": True})
             response.raise_for_status()
             data = response.json().get("data", {})
-            return {"content": data.get("markdown", "")[:16000], "links": [], "url": url,
+            markdown = data.get("markdown", "")
+            return {"content": markdown[:60000], "truncated": len(markdown) > 60000,
+                    "image_urls": list(dict.fromkeys(re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", markdown))), "links": [], "url": url,
                     "published_at": data.get("metadata", {}).get("publishedTime", ""), "method": provider}
         headers = {"Content-Type": "application/json"}
         if os.getenv("ANYSEARCH_API_KEY"):
@@ -320,7 +387,9 @@ async def provider_extract(url, provider):
         if data.get("error") or data.get("result", {}).get("isError"):
             raise ValueError("AnySearch返回抽取错误")
         content = "\n".join(block.get("text", "") for block in data.get("result", {}).get("content", []) if block.get("type") == "text")
-        return {"content": content[:16000], "links": [], "url": url, "published_at": "", "method": provider}
+        return {"content": content[:60000], "truncated": len(content) > 60000,
+                "image_urls": list(dict.fromkeys(re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", content))),
+                "links": [], "url": url, "published_at": "", "method": provider}
 
 
 def browser_extract(url):
@@ -331,9 +400,11 @@ def browser_extract(url):
             return {"status": "blocked", "content": "", "links": [], "url": url, "verification": pending,
                     "error": "同一网站的验证页尚未完成，未重复打开文章", "method": "browser"}
         if urlsplit(url).hostname == "mp.weixin.qq.com":
-            raw = _read_article(browser, re.sub(r"^http:", "https:", url), 16000)
+            raw = _read_article(browser, re.sub(r"^http:", "https:", url), 60000)
             return {"status": raw["status"], "content": raw.get("content", ""), "links": raw.get("links", []),
                     "url": raw.get("url", url), "published_at": raw.get("published_at", ""), "method": "browser",
+                    "image_urls": raw.get("image_urls", []), "image_count": raw.get("image_count", 0),
+                    "truncated": raw.get("truncated", False), "images_truncated": raw.get("images_truncated", False),
                     "verification": raw.get("verification"), "error": raw.get("error")}
         tab = browser.open(url)
         script = r"""(() => {const root=document.querySelector('main,[role=main]')||document.body;
@@ -346,7 +417,77 @@ def browser_extract(url):
             state = browser.preserve_verification(tab, data.get("url") or url)
             return {"status": "blocked", "content": "", "links": [], "url": url, "verification": state,
                     "error": "页面要求手动验证，已保留Chrome标签页", "method": "browser"}
-        return {**data, "content": data.get("content", "")[:16000], "status": "ok" if data.get("content") else "unavailable", "method": "browser"}
+        return {**data, "content": data.get("content", "")[:60000], "truncated": len(data.get("content", "")) > 60000,
+                "status": "ok" if data.get("content") else "unavailable", "method": "browser"}
+
+
+async def read_article_images(page):
+    """Read article images as evidence, preserving failures and explicit coverage limits."""
+    urls = list(dict.fromkeys(page.get("image_urls", [])))
+    if not urls:
+        return page
+    from ..config import get_ai_config
+    from ..tools.document import _ocr
+    from PIL import Image
+    failures, texts = [], []
+    try:
+        get_ai_config("ocr", default_base_url="https://api.siliconflow.cn/v1", default_model="deepseek-ai/DeepSeek-OCR")
+    except ValueError:
+        return {**page, "image_read_state": "unavailable", "image_errors": ["图片 OCR 未配置，图片内容尚未读取"], "images_read": 0}
+    def recognize(data):
+        with Image.open(io.BytesIO(data)) as image:
+            if image.width <= 32 and image.height <= 32:
+                return ""  # Tracking pixels and tiny decorative icons do not contain a readable JD.
+            if image.width * image.height > 35_000_000:
+                raise ValueError("图片像素过大，未完成识别")
+            image.load()
+            image = image.convert("RGB")
+            if image.width > 1600:
+                image = image.resize((1600, max(1, round(image.height * 1600 / image.width))))
+            if image.height > 2200 * 16:
+                raise ValueError("长图超过16段识别上限，未完成识别")
+            parts = []
+            for top in range(0, image.height, 2200):
+                buf = io.BytesIO()
+                image.crop((0, top, image.width, min(image.height, top + 2200))).save(buf, format="PNG")
+                parts.append(_ocr(buf.getvalue(), "image/png"))
+            return "\n\n".join(parts)
+    async with httpx.AsyncClient(timeout=30, trust_env=False, headers={"User-Agent": USER_AGENT}) as client:
+        for index, url in enumerate(urls[:30], 1):
+            try:
+                for _ in range(6):
+                    await validate_target(url)
+                    async with client.stream("GET", url) as response:
+                        if response.is_redirect:
+                            url = urljoin(url, response.headers.get("location", ""))
+                            continue
+                        response.raise_for_status()
+                        data = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            data.extend(chunk)
+                            if len(data) > 8_000_000:
+                                raise ValueError("图片超过8MB识别上限")
+                        break
+                else:
+                    raise ValueError("图片重定向次数过多")
+                content = await asyncio.to_thread(recognize, bytes(data))
+                if content:
+                    texts.append(f"图片{index}识别正文（需结合原图核对）：\n{content}")
+            except (httpx.HTTPError, ValueError, OSError, Image.DecompressionBombError) as error:
+                reason = str(error)[:160] if isinstance(error, ValueError) else type(error).__name__
+                failures.append(f"图片{index}读取或OCR失败（{reason}），未把该图片视为已读")
+    if len(urls) > 30 or page.get("images_truncated"):
+        failures.append("文章图片超过本轮识别数量上限，仍有图片未读")
+    joined = "\n\n".join(filter(None, [page.get("content", ""), *texts]))
+    return {**page, "content": joined[:60000], "truncated": page.get("truncated", False) or len(joined) > 60000,
+            "image_read_state": "partial" if failures else "complete", "image_errors": failures,
+            "images_read": min(len(urls), 30) - sum("OCR失败" in value for value in failures)}
+
+
+async def complete_page(page):
+    page = await read_article_images(page)
+    partial = page.get("truncated") or page.get("image_read_state") in {"partial", "unavailable"}
+    return {**page, "status": "partial" if partial else "ok"}
 
 
 async def extract_page(url, *, render=False):
@@ -359,11 +500,11 @@ async def extract_page(url, *, render=False):
     for method in methods:
         try:
             data = await direct_extract(url) if method == "direct_http" else await provider_extract(url, method)
-            if len(data["content"].strip()) < 100:
+            if len(data["content"].strip()) < 100 and not data.get("image_urls"):
                 raise ValueError("未读到足够正文，可能是动态页面")
-            if method == "direct_http" and not re.search(r"招聘|岗位|职位|实习|校招|任职|职责|career|vacanc|job", data["content"], re.I):
+            if method == "direct_http" and not data.get("image_urls") and not re.search(r"招聘|岗位|职位|实习|校招|任职|职责|career|vacanc|job", data["content"], re.I):
                 raise ValueError("页面未出现招聘正文，可能需要渲染")
-            return {**data, "status": "ok", "errors": errors}
+            return {**await complete_page(data), "errors": errors}
         except (httpx.HTTPError, ValueError, OSError) as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             errors.append({"method": method, "error": type(exc).__name__, "http_status": status,
@@ -380,12 +521,14 @@ async def extract_page(url, *, render=False):
                     raise
             if rendered["status"] == "blocked":
                 return {**rendered, "errors": errors}
-            if len(rendered.get("content", "")) >= 100:
-                return {**rendered, "status": "ok", "errors": errors}
+            if len(rendered.get("content", "")) >= 100 or rendered.get("image_urls"):
+                return {**await complete_page(rendered), "errors": errors}
         except (httpx.HTTPError, ValueError, OSError, KeyError) as exc:
-            errors.append({"method": "browser", "error": type(exc).__name__})
+            errors.append({"method": "browser", "error": type(exc).__name__,
+                           "reason": "浏览器正文读取通道未连接，请启动CDP代理并允许Chrome调试连接" if isinstance(exc, httpx.ConnectError)
+                           else "浏览器未取得正文或等待超时"})
     return {"status": "unavailable", "content": "", "url": url, "links": [], "errors": errors,
-            "error": "未取得有效正文；可能需要动态渲染、登录或浏览器验证，线索仍保留。"}
+            "error": "未取得有效正文；" + "；".join(dict.fromkeys(item.get("reason", "读取失败") for item in errors))}
 
 
 JOB_WORDS = re.compile(r"招聘|校招|应届|毕业生|实习|管培|招录|职位|岗位|工程师|算法|研发|开发|career|job|opening", re.I)
@@ -445,13 +588,33 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
     roles = list(dict.fromkeys([*intent.get("roles", []), *intent.get("expanded_roles", [])]))
     ranked, audits = [], []
     for job in data["jobs"]:
+        if intent.get("published_after") and publication_state(job.get("published_at"), published_after=intent["published_after"]) == "outside_window":
+            continue
         score = match_score(job, roles, intent.get("cities", []), intent.get("companies", []), intent.get("recruitment_types", []), request)
         if score:
             ranked.append((score, job))
     ranked.sort(key=lambda pair: (not is_expired(pair[1]["deadline"]), pair[0], bool(pair[1].get("url") or pair[1].get("announcement_url")), pair[1].get("updated_at", "")), reverse=True)
-    selected = [dict(job) for _, job in ranked[:limit]]
+    if intent.get("published_after"):
+        ranked.sort(key=lambda pair: publication_state(pair[1].get("published_at"), published_after=intent["published_after"]) != "within_window")
+    # Do not let the larger city's pool consume the entire recall window.
+    cities = intent.get("cities", [])
+    remaining, selected = [job for _, job in ranked], []
+    if len(cities) > 1:
+        while remaining and len(selected) < limit:
+            added = False
+            for city in cities:
+                job = next((row for row in remaining if city in row["city"]), None)
+                if job is not None and len(selected) < limit:
+                    selected.append(dict(job))
+                    remaining.remove(job)
+                    added = True
+            if not added:
+                break
+    selected.extend(dict(job) for job in remaining[:limit - len(selected)])
     if read_limit:
         await enrich_jobs(selected, read_limit=read_limit, publish=publish)
+        if intent.get("published_after"):
+            selected = [job for job in selected if publication_state(job.get("published_at"), published_after=intent["published_after"]) != "outside_window"]
     for index, job in enumerate(selected, 1):
         reason = "截止日期已过" if is_expired(job["deadline"]) else "招聘汇总线索，等待岗位语义核对"
         audit = {"page": 1, "rank": index, "title": f"{job['company']} · {job['role']}", "url": job["url"],
@@ -487,18 +650,24 @@ async def enrich_jobs(selected, read_limit=5, publish=None):
             attempts.extend({**attempt, "url": url} for attempt in page.get("errors", []))
             if page.get("verification"):
                 verification = page["verification"]
-            if page["status"] == "ok":
+            if page["status"] in {"ok", "partial"}:
                 break
             attempts.append({"url": url, "reason": page.get("error", "未取得正文")})
-        job["detail_state"] = "read" if page["status"] == "ok" else "failed"
-        job["detail_error"] = page.get("error")
+        job["detail_state"] = "read" if page["status"] == "ok" else "partial" if page["status"] == "partial" else "failed"
+        job["detail_error"] = page.get("error") or "；".join(page.get("image_errors", [])) or ("原文超过正文读取上限" if page.get("truncated") else "")
         job["detail_attempts"] = attempts
-        if verification and page["status"] != "ok":
+        if verification and page["status"] not in {"ok", "partial"}:
             job["verification"] = verification
-        if page["status"] == "ok":
+        if page["status"] in {"ok", "partial"}:
             job.update(description=page["content"], detail_url=page["url"], extraction_method=page["method"])
+            job.update(content_truncated=bool(page.get("truncated")), image_read_state=page.get("image_read_state", "none"),
+                       image_count=page.get("image_count", 0), images_read=page.get("images_read", 0))
             if page.get("published_at"):
                 job["published_at"] = page["published_at"]
+                job["published_at_source"] = "article_metadata"
+        if publish:
+            await publish("read_complete", title=f"{job['company']} · {job['role']}", detail_state=job["detail_state"],
+                          published_at=job.get("published_at"), reason=job.get("detail_error") or "正文与图片读取完成")
     read_candidates, picked_urls = [], set()
     for job in selected:
         url = job.get("announcement_url") or job.get("url")

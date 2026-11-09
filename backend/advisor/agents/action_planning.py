@@ -125,6 +125,8 @@ class ActionPlanningAgent(BaseAgent):
                         if source["kind"] != "job" or source.get("target_id") == request.target_id],
             "constraints": constraints, "weeks": weeks,
             "education_timeline": upstream["education_timeline"],
+            "resume_diagnostics": upstream["resume_analysis"].get("diagnostics", {}),
+            "recruitment_context": upstream["recruitment_context"],
             "input_limitations": list(dict.fromkeys(
                 upstream["input_limitations"] + decision["limitations"]
             )),

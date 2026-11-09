@@ -20,7 +20,7 @@ class RecruitmentSearchAgent(BaseAgent):
         self.max_search_calls = max_search_calls
 
     def prepare(self, payload):
-        return {"request": RecruitmentSearchInput.model_validate(payload).model_dump(),
+        return {"request": RecruitmentSearchInput.model_validate(payload).model_dump(mode="json"),
             "analysis_date": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
             "_sources": {}, "_tool_runs": [], "_search_calls": 0, "_discarded_sources": [], "_search_audits": []}
 

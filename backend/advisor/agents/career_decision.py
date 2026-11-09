@@ -27,7 +27,7 @@ def recruitment_context(result: dict) -> dict:
         return context
     sources = {source["source_id"]: source for source in result.get("sources", [])
                if source.get("source_id") and (source.get("read_state") == "read" or
-                   source.get("origin") == "radar" and source.get("read_state") == "listing"
+                   source.get("origin") == "radar" and source.get("read_state") in {"listing", "partial"}
                    and source.get("source_type") in {"aggregate", "snapshot", "import", "official_site"}
                    and isinstance(source.get("job"), dict) and source["job"].get("role"))}
     omitted = False
@@ -42,14 +42,17 @@ def recruitment_context(result: dict) -> dict:
             omitted = True
             continue
         listing = source.get("read_state") == "listing"
+        partial = source.get("read_state") == "partial"
         unverified = list(finding.get("unverified_conditions", []))
         if listing:
             unverified.append("依据为招聘汇总条目，未读取具体岗位全文，不能证明岗位职责、开放状态或用户符合任职条件")
+        elif partial:
+            unverified.append("岗位原文仅部分读取，只能引用已读部分，不能推断未读图片或段落中的条件")
         context["findings"].append({
             "reference": "search:" + source["source_id"], "title": source.get("title", ""),
             "url": source.get("url", ""), "published_at": source.get("published_at"),
-            "match_status": "needs_confirmation" if listing else finding.get("match_status", "needs_confirmation"),
-            "evidence_kind": "recruitment_listing" if listing else "read_page", "source_type": source.get("source_type", "historical"),
+            "match_status": "needs_confirmation" if listing or partial else finding.get("match_status", "needs_confirmation"),
+            "evidence_kind": "recruitment_listing" if listing else "partial_page" if partial else "read_page", "source_type": source.get("source_type", "historical"),
             "updated_at": source.get("updated_at"), "verification_details": source.get("verification_details", {}),
             "evidence_quotes": quotes, "unverified_conditions": list(dict.fromkeys(unverified)),
         })
@@ -186,6 +189,21 @@ class CareerDecisionAgent(BaseAgent):
             prepared_target, job_sources = _prepare_target(target, index)
             targets.append(prepared_target)
             sources.extend(job_sources)
+            # Current recruiting pages supplement direction samples. Keep each employer's
+            # original separate, and never change the requirements of a specific selected job.
+            if target.target_type == "direction":
+                originals = {row.get("source_id"): row for row in request.recruitment_search.get("sources", [])}
+                for finding in recruitment["findings"]:
+                    original = originals.get(finding["reference"].removeprefix("search:"), {})
+                    if finding["evidence_kind"] not in {"read_page", "partial_page"} or not original.get("content"):
+                        continue
+                    identifier = f"{target.target_id}RS{len(prepared_target['source_ids']) + 1}"
+                    sources.append({"source_id": identifier, "kind": "job", "target_id": target.target_id,
+                                    "content": original["content"], "title": original.get("title", "招聘岗位"),
+                                    "url": original.get("url", ""), "recruitment_reference": finding["reference"],
+                                    "read_state": original.get("read_state", "read"),
+                                    "published_at": original.get("published_at"), "availability": "unknown"})
+                    prepared_target["source_ids"].append(identifier)
             limitations.append(f"目标 {target.target_id} 仅依据本次岗位样本，不代表整个方向或当前仍在招聘。")
             scope = result.get("scope") or {}
             # 上游模型的局限可能只适用于岗位分析阶段；保留在 job_analysis 中供复核，
@@ -202,7 +220,8 @@ class CareerDecisionAgent(BaseAgent):
             "evidence_rounds_remaining": request.evidence_rounds_remaining,
             "evidence_feedback": [item.model_dump() for item in request.evidence_feedback],
             # 简历质量诊断不是能力事实来源；隔离其未经验证的推断，避免错误意见被下游复述。
-            "resume_analysis": {"status": request.resume_analysis.get("status"), "document": document},
+            "resume_analysis": {"status": request.resume_analysis.get("status"), "document": document,
+                                "diagnostics": request.resume_analysis.get("data", {})},
             "input_limitations": list(dict.fromkeys(limitations)),
         }
 

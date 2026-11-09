@@ -21,6 +21,7 @@ class ResumeInput(Record):
     max_pages: int = Field(default=20, ge=1, le=100)
     raw_resume: str = ""
     target_role: str = ""
+    preferences: str = ""
     job_description: str = Field(default="", description="可选，仅作为简历诊断背景，不执行岗位匹配")
     candidate_level: str = ""
     education_context: str = ""
@@ -83,6 +84,13 @@ class CareerProfileFact(Record):
     quote: Text = Field(description="支持该画像事实的连续原文；不推断未说明的毕业年份、兴趣或能力水平")
 
 
+class ResumeHighlight(Record):
+    strength: Text = Field(description="有原文支持的具体优势，不把技能名称等同于熟练程度")
+    evidence: list[Evidence] = Field(min_length=1)
+    visibility: Literal["clear", "understated"]
+    suggestion: Text | None = Field(default=None, description="优势表达不足时说明如何突出；表达充分时可为空")
+
+
 class ResumeAnalysis(Record):
     summary: Text
     dimensions: list[Dimension]
@@ -90,6 +98,7 @@ class ResumeAnalysis(Record):
     issues: list[Issue]
     recommendations: list[Text]
     missing_information: list[Text]
+    highlights: list[ResumeHighlight] = Field(default_factory=list, max_length=6)
     career_profile: list[CareerProfileFact] = Field(default_factory=list, max_length=16, description="可追溯的职业画像；只提取材料明确说明的信息，缺失项不填")
 
     @computed_field

@@ -11,6 +11,8 @@ RESUME_ANALYSIS_PROMPT = """
 一、职责和输入
 文件由 Agent 先调用 read_document 转为 Markdown，读取失败不会进入分析。
 raw_resume 为提取的正文或用户直接提供的简历，additional_evidence 为补充的真实经历事实。
+preferences 是本次用户明确提交的求职偏好，优先于简历和历史材料中的旧城市、旧岗位及旧实习意向。
+求职城市不等于居住城市；不能用历史建议、旧报告或经历地点推断当前想去哪里工作。
 clarifications 保存历次追问与用户回答，回答也已合并到 additional_evidence。问题仅帮助理解回答，
 不能把问题中的假设作为用户事实或引用证据。回答有歧义或与旧材料冲突时继续核实，不擅自消解冲突。
 candidate_level 为可选阶段信息，target_role 和 job_description 仅作为内容取舍与表达重点的背景。
@@ -37,7 +39,7 @@ clear/weak 必须引用原句。经历的 source_quote 必须来自 raw_resume�
 不能凭课程、工具、证书或头衔名称直接确认熟练度和实际能力。
 
 三、统一输出与维度等级
-只使用五类核心输出对象：ResumeAnalysis、Evidence、Dimension、ExperienceReview、Issue。
+使用 ResumeAnalysis、Evidence、Dimension、ExperienceReview、Issue 和 ResumeHighlight 输出。
 整体 summary 概括候选人阶段、主要优势、核心缺口与分析范围，结论由 dimensions 的原文证据支撑。
 dimensions 是唯一的逐维分析，不再另外重复输出贡献、行动、结果或技术专项分析对象。
 每个 Dimension 只填 key、level、assessment、evidence，不输出 weight 或 applicable。
@@ -102,7 +104,16 @@ name 使用原文名称或短语，experience_type 依据经历内容确定，�
 用 STAR/PAR 辅助理解即可，不要求每句话凑齐模板。追问具体到本段经历，不能所有条目都问“技术难点”。
 
 六、问题诊断与建议
+评价要直接、有判断、有原句依据，明确指出哪段内容说服力不足以及对求职的影响；不辱骂、不贴人格标签，也不将材料缺失说成能力差。
+highlights 记录真正存在的优势，每项写 strength、evidence、visibility 和 suggestion。
+visibility=clear 表示已经表达充分，suggestion 可为空；understated 表示已有事实有价值但埋在笼统描述中，
+suggestion 要指出应放在哪段、突出什么个人行动或结果。不能从没有提供的事实中发明优势；没有可靠优势时返回空列表。
+优势引用只能来自 raw_resume 或 additional_evidence，不能用学校名气、岗位要求或外部资料代替个人证据。
 Issue 包括 problem、evidence、suggestion、rewrite、missing_evidence。
+problem 先用一句话点明本条最重要的问题，再解释它如何影响目标岗位判断；不把同一问题换词说三遍。
+suggestion 必须明确在哪一段补什么事实，以及如何取得或验证这项事实；已有数据缺口先告诉用户该回查哪份实验记录、分工记录或项目交付，不只重复“补充、完善、突出”。
+recommendations 按影响优先级提供3—5条短行动，已有完整issues时不再复述问题背景、引文和全部验收标准。确实不足3条时不凑数。
+missing_information 只归纳尚未回答的事实问题，已经由用户确认的到岗日期、使用场景或独立开发事实不能继续追问。
 problem 说明具体问题与影响；suggestion 说明在哪句话补什么事实、如何调整或验证，不能只说“量化成果”。
 优先处理有证据的事实/时间矛盾、核心能力证明缺口、个人贡献不清，再处理普通表达问题。
 rewrite 仅重组已有事实，不新增数字、技术、规模、责任、选择理由或因果关系，不能把“参与”改成“主导”。
@@ -110,6 +121,10 @@ rewrite 仅重组已有事实，不新增数字、技术、规模、责任、选
 指标提升幅度本身不能说明成果强弱；缺重复实验、基线或方差时只指出验证口径不全，不凭提升较小判断无效。
 技能栏中的自述不等于虚构。缺项目例子时建议补充场景，不直接建议删除工具、框架或技能，除非原文已证明不实或用户确认不会。
 无法可靠改写时为 null，missing_evidence 说明所需事实，不用虚构示例或占位数字填空。
+改写前逐项核对每个新增断言是否已经由用户材料确认；“建议补做/补充”的内容不能提前写成已经完成。
+例如原文只给RAGAS相对提升，不能在rewrite里加入“同一LLM、相同top-k、重复评测均值”等未确认的实验设置。
+用户未给到岗月份时不能擅自建议一个确定月份；只在suggestion中要求填入真实日期。
+输出前自检summary与逐段诊断是否一致：一处已确认独立开发，另一处不能称所有项目都缺个人分工；不能把OCR文本错位断言为原Word/PDF的视觉排版错误。
 经历内部问题放在对应 experiences[].issues；跨模块或整体问题放在整体 issues，避免重复。
 recommendations 给出有完成标准的具体行动；missing_information 汇总影响结论的关键待补事实与读取限制。
 数量由实际问题决定，不为固定条数凑内容，不输出整份重写简历或泛泛的鼓励和否定。

@@ -218,8 +218,8 @@ def _read_article(browser: _BrowserSession, url: str, max_chars: int) -> dict:
             "title": raw.get("title", ""), "account": raw.get("account", ""),
             "published_at": published_at, "published_at_source": "article_metadata" if published_at else "unknown",
             "content": content[:60000], "truncated": len(content) > 60000,
-            "image_urls": images[:20], "image_count": len(images),
-            "images_truncated": len(images) > 20, "links": links[:50], "links_truncated": len(links) > 50,
+            "image_urls": images[:30], "image_count": len(images),
+            "images_truncated": len(images) > 30, "links": links[:50], "links_truncated": len(links) > 50,
             "recruitment_status": "unknown", "publisher_verified": False,
             "limitations": ["未进行图片 OCR；图片中可能包含岗位、截止时间或二维码。"] if images else [],
         }
