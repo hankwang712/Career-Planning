@@ -62,13 +62,11 @@
                         <option value="7">7 天</option><option value="0">尚未确定</option>
                     </select>
                 </label>
+                <label>招聘信息发布起始日期（选填）
+                    <input id="reportWorkflowPublishedAfter" type="date" aria-describedby="reportPublishedAfterHint">
+                    <small id="reportPublishedAfterHint">查找该日期起发布的招聘信息，发布日期未核实的线索会单独标注。</small>
+                </label>
             </div>
-            <details class="report-extra-options">
-                <summary>更多选项（选填）</summary>
-                <label>简历之外的补充经历<textarea id="reportWorkflowEvidence" rows="2" maxlength="20000" placeholder="没有需要补充的内容可留空"></textarea></label>
-                <label>招聘雷达需求<input id="reportWorkflowSearch" maxlength="3000" placeholder="例如：寻找上海或杭州的大模型应用实习，保留投递链接"></label>
-                <p>从招聘汇总与企业官网发现机会，优先核验相关岗位，并在报告中标注来源、日期和待确认条件。</p>
-            </details>
             <div class="report-stage-footer"><button type="button" class="report-launch-secondary" onclick="showReportWizardStage(1)">← 返回简历</button><button id="reportStageStart" type="submit" class="report-launch-primary">启动多智能体 <span aria-hidden="true">↗</span></button></div>
         </form>
 
@@ -99,6 +97,7 @@
                 <div class="report-workflow-legend">
                     <span><span class="legend-dot completed"></span>已完成</span>
                     <span><span class="legend-dot active"></span>处理中</span>
+                    <span><span class="legend-dot failed"></span>错误</span>
                     <span><span class="legend-dot pending"></span>待启动</span>
                 </div>
             </div>

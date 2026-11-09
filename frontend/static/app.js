@@ -8964,6 +8964,8 @@ const REPORT_AGENT_FLOW = [
 const reportWizardUiState = { stage: 1, runtimeKey: "", started: false, manual: false };
 
 function renderReportWizard() {
+  const publicationStart = document.getElementById("reportWorkflowPublishedAfter");
+  if (publicationStart) publicationStart.max = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const state = getReportRuntimeState();
   const runtimeKey = state?.job_id || state?.report_id || "";
   if (runtimeKey && runtimeKey !== reportWizardUiState.runtimeKey) {
@@ -9073,6 +9075,8 @@ function getReportProgressMap(state) {
 }
 
 function reportMaLegendStatusText(nodeStatus) {
+  if (nodeStatus === "waiting") return "需要你的确认";
+  if (nodeStatus === "skipped") return "本次跳过";
   if (nodeStatus === "done") return "已完成";
   if (nodeStatus === "active") return "处理中";
   if (nodeStatus === "failed") return "失败";
@@ -9081,7 +9085,7 @@ function reportMaLegendStatusText(nodeStatus) {
 }
 
 function reportAgentPortraitHtml(item) {
-  if (item.key === "review") return `<div class="report-ma-portrait report-ma-portrait--user">${getReportUserAvatarHtml()}</div>`;
+  if (item.key === "review") return `<div class="report-ma-portrait report-ma-portrait--img"><img src="/static/img/multi-agent/competency-assessor.png" alt="补充与确认" decoding="async" /></div>`;
   const url = REPORT_AGENT_IMAGE_URL[item.key];
   if (url) {
     return `<div class="report-ma-portrait report-ma-portrait--img"><img src="${escHtml(url)}" alt="${escHtml(item.title)}" loading="lazy" decoding="async" /></div>`;
@@ -9115,8 +9119,359 @@ function getReportUserAvatarHtml() {
   return `<span class="report-agent-user-avatar fallback">${escHtml(displayName.charAt(0).toUpperCase() || "用")}</span>`;
 }
 
+const reportAgentConsoleState = { selected: "", collapsed: false, tab: "overview", nodes: [], scope: "", snapshot: null, loading: false, loadedVersion: "", error: "", retrying: false };
+const REPORT_AGENT_INPUTS = {
+  resume_analysis: ["上传的简历与补充事实", []],
+  job_analysis: ["目标岗位与岗位描述", []],
+  recruitment_search: ["目标方向与招聘检索条件", []],
+  career_decision: ["简历证据、岗位要求与招聘结果", ["resume_analysis", "job_analysis", "recruitment_search"]],
+  review: ["职业决策与待确认问题", ["career_decision"]],
+  action_planning: ["职业决策与已确认的目标、时间条件", ["career_decision"]],
+  report_writer: ["已校验的分析结果与行动计划", ["career_decision", "action_planning"]]
+};
+
+function reportAgentConsoleResult(key) {
+  const state = getReportRuntimeState();
+  const snapshot = reportAgentConsoleState.snapshot;
+  const report = appState.careerReport;
+  const stored = report?.meta?.report_id === state?.report_id ? report?.agent_results : null;
+  if (key === "review") return snapshot?.review || snapshot?.results?.action_planning?.data?.constraints || null;
+  if (key === "report_writer") return report?.meta?.report_id === state?.report_id ? report.report_document : null;
+  return snapshot?.results?.[key] || stored?.[key] || null;
+}
+
+function reportAgentConsoleSummary(item, state) {
+  if (item.nodeStatus === "waiting") return "请确认目标方向与时间安排";
+  const result = reportAgentConsoleResult(item.key);
+  if (item.nodeStatus === "failed") return String(result?.error || state?.agent_activity?.[item.key]?.message || state?.error_message || "执行未完成，点击查看原因");
+  const data = result?.data || result;
+  if (item.nodeStatus === "done" && data) {
+    if (typeof data.summary === "string" && data.summary) return data.summary;
+    if (Array.isArray(data.targets)) return `已整理 ${data.targets.length} 个目标岗位的分析结果`;
+    if (Array.isArray(data.tasks)) return `已生成 ${data.tasks.length} 项行动任务`;
+    if (Array.isArray(data.assessments)) return `已完成 ${data.assessments.length} 个方向的决策评估`;
+  }
+  return reportAgentCurrentMessage(item, state);
+}
+
+function reportAgentMetrics(item) {
+  const execution = reportAgentConsoleResult(item.key)?.execution || {};
+  const unknown = "未提供";
+  const seconds = execution.stage_elapsed_seconds ?? execution.elapsed_seconds;
+  return [
+    ["耗时", typeof seconds === "number" ? `${seconds.toFixed(1)} 秒` : unknown],
+    ["模型", execution.model || (item.key === "review" ? "人工确认" : unknown)],
+    ["Token", typeof execution.total_tokens === "number" ? `${execution.total_tokens}${execution.usage_status === "partial" ? "（部分）" : ""}` : unknown],
+    ["工具调用", typeof execution.tool_calls === "number" ? `${execution.tool_calls} 次` : unknown]
+  ];
+}
+
+function reportAgentNextStep(item) {
+  if (["resume_analysis", "job_analysis", "recruitment_search"].includes(item.key)) return "三路分析汇合后交给职业决策";
+  if (item.key === "career_decision") return "按决策结果进入补充确认或直接规划";
+  if (item.key === "review") return "确认后复核决策，再进入行动规划";
+  if (item.key === "action_planning") return "交给报告合成，整理并保存报告";
+  return "前往报告中心阅读与导出";
+}
+
+function reportAgentHoverHtml(item, state) {
+  return `<div class="report-agent-hover" role="tooltip"><strong>${escHtml(item.title)} · ${reportMaLegendStatusText(item.nodeStatus)}</strong><p>${escHtml(reportAgentConsoleSummary(item, state))}</p><dl>${reportAgentMetrics(item).slice(0, 2).map(([label, value]) => `<div><dt>${label}</dt><dd>${escHtml(value)}</dd></div>`).join("")}</dl><p>输入：${escHtml(REPORT_AGENT_INPUTS[item.key][0])}</p><p>下一步：${escHtml(reportAgentNextStep(item))}</p><small>点击查看完整输入、输出与执行记录</small></div>`;
+}
+
+function updateReportAgentInspectorLayout(mapEl) {
+  const ui = reportAgentConsoleState;
+  const expanded = Boolean(ui.selected && !ui.collapsed);
+  mapEl.querySelector(".report-agent-console")?.classList.toggle("has-selection", expanded);
+  const panel = mapEl.querySelector(".report-agent-inspector");
+  if (panel) panel.hidden = !expanded;
+  const toggle = mapEl.querySelector("[data-agent-toggle]");
+  if (toggle) {
+    toggle.hidden = !ui.selected;
+    toggle.classList.toggle("is-collapsed", ui.collapsed);
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.setAttribute("aria-label", expanded ? "收起执行详情" : "展开执行详情");
+    toggle.title = expanded ? "收起执行详情" : "展开执行详情";
+    toggle.textContent = expanded ? "›" : "‹ 详情";
+  }
+}
+
+function renderReportAgentInspector(mapEl) {
+  const panel = mapEl.querySelector(".report-agent-inspector");
+  const ui = reportAgentConsoleState;
+  const item = ui.nodes.find((node) => node.key === ui.selected);
+  if (!panel || !item) return;
+  const focusedTab = panel.contains(document.activeElement) ? document.activeElement?.dataset?.agentTab : null;
+  const scrollTop = panel.scrollTop;
+  const outputScroll = panel.querySelector("pre")?.scrollTop || 0;
+  const state = getReportRuntimeState();
+  const result = reportAgentConsoleResult(item.key);
+  const snapshot = ui.snapshot;
+  const tabs = [["overview", "概览"], ["input", "输入"], ["output", "输出"], ["logs", "记录"]];
+  const json = (value, empty) => value == null ? `<p class="report-inspector-empty">${empty}</p>` : `<pre>${escHtml(JSON.stringify(value, null, 2))}</pre>`;
+  let content;
+  if (ui.tab === "input") {
+    const upstream = Object.fromEntries(REPORT_AGENT_INPUTS[item.key][1].map((key) => [key, reportAgentConsoleResult(key)]).filter(([, value]) => value != null));
+    content = `<h4>输入来源</h4><p>${escHtml(REPORT_AGENT_INPUTS[item.key][0])}</p>${json(Object.keys(upstream).length ? upstream : null, "此节点的原始输入暂不可查看。")}`;
+  } else if (ui.tab === "output") {
+    content = `<h4>${item.nodeStatus === "waiting" ? "待确认内容" : "已保存的输出"}</h4>${json(result, item.nodeStatus === "pending" ? "尚未执行，暂无输出。" : "暂无已保存的输出，执行结果保存后可在此查看。")}`;
+  } else if (ui.tab === "logs") {
+    const activity = state?.agent_activity?.[item.key];
+    content = `<h4>最新执行记录</h4><p>状态：${reportMaLegendStatusText(item.nodeStatus)}</p>${activity ? `<p>${escHtml(activity.updated_at || "")}</p><p>${escHtml(activity.message || "")}</p>` : `<p>暂无节点执行记录。</p>`}${result?.error ? `<p class="report-inspector-error">${escHtml(String(result.error))}</p>` : ""}${item.nodeStatus === "failed" ? json(snapshot?.errors?.length ? snapshot.errors : null, "暂无额外错误记录。") : ""}<small>这里展示服务端最新记录；完整日志流尚未接入。</small>`;
+  } else {
+    content = `<div class="report-inspector-summary"><span>${reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentConsoleSummary(item, state))}</p></div><dl class="report-inspector-metrics">${reportAgentMetrics(item).map(([label, value]) => `<div><dt>${label}</dt><dd>${escHtml(value)}</dd></div>`).join("")}</dl><h4>输入来源</h4><p>${escHtml(REPORT_AGENT_INPUTS[item.key][0])}</p><h4>下一步</h4><p>${escHtml(reportAgentNextStep(item))}</p>`;
+  }
+  panel.hidden = Boolean(ui.collapsed);
+  panel.innerHTML = `<header><div><small>AGENT 执行详情</small><h3>${escHtml(item.title)}</h3><p>${escHtml(item.detail)}</p></div><button type="button" data-agent-close aria-label="关闭执行详情">×</button></header><div class="report-inspector-tabs" role="tablist" aria-label="执行详情分类">${tabs.map(([key, title]) => `<button type="button" role="tab" data-agent-tab="${key}" aria-selected="${ui.tab === key}" aria-controls="reportAgentInspectorContent" id="reportAgentTab-${key}">${title}</button>`).join("")}</div><div class="report-inspector-content" id="reportAgentInspectorContent" role="tabpanel" aria-labelledby="reportAgentTab-${ui.tab}">${ui.loading ? '<p class="report-inspector-loading" role="status">正在读取已保存的执行结果…</p>' : ""}${ui.error ? `<p class="report-inspector-error" role="alert">${escHtml(ui.error)}</p><button type="button" data-agent-refresh>重新读取</button>` : ""}${content}</div>${item.nodeStatus === "failed" && snapshot?.checkpoint_id && state?.status === "failed" ? `<button type="button" class="report-inspector-action" data-agent-retry ${ui.retrying ? "disabled" : ""}>${ui.retrying ? "正在恢复…" : "从已保存进度重试流程"}</button>` : item.nodeStatus === "waiting" ? '<button type="button" class="report-inspector-action" data-agent-confirm>补充信息并确认</button>' : ""}`;
+  mapEl.querySelectorAll("[data-agent-key]").forEach((node) => {
+    node.classList.toggle("is-selected", node.dataset.agentKey === ui.selected);
+    node.setAttribute("aria-expanded", String(node.dataset.agentKey === ui.selected && !ui.collapsed));
+  });
+  updateReportAgentInspectorLayout(mapEl);
+  panel.scrollTop = scrollTop;
+  const output = panel.querySelector("pre");
+  if (output) output.scrollTop = outputScroll;
+  if (focusedTab) panel.querySelector(`[data-agent-tab="${focusedTab}"]`)?.focus({ preventScroll: true });
+}
+
+async function loadReportAgentSnapshot(mapEl, force = false) {
+  const ui = reportAgentConsoleState;
+  const state = getReportRuntimeState();
+  if (!state?.report_id || ui.loading) return;
+  const version = `${state.report_id}:${state.updated_at || ""}:${state.stage}:${state.status}`;
+  if (!force && ui.loadedVersion === version) return;
+  const epoch = accountRequestEpoch, scope = ui.scope;
+  ui.loading = true;
+  ui.error = "";
+  renderReportAgentInspector(mapEl);
+  try {
+    const snapshot = await requestJson(`/api/career-report/workflow/${encodeURIComponent(state.report_id)}`);
+    if (epoch !== accountRequestEpoch || ui.scope !== scope) return;
+    ui.snapshot = snapshot;
+    ui.loadedVersion = version;
+  } catch (error) {
+    if (epoch === accountRequestEpoch && ui.scope === scope) ui.error = error.message || "读取执行结果失败";
+  } finally {
+    if (epoch === accountRequestEpoch && ui.scope === scope) {
+      ui.loading = false;
+      renderReportAgentInspector(mapEl);
+      ui.nodes.forEach((item) => {
+        const node = mapEl.querySelector(`[data-agent-key="${item.key}"]`);
+        const speech = node?.querySelector(".report-agent-speech p");
+        if (speech) speech.textContent = reportAgentConsoleSummary(item, getReportRuntimeState());
+        const hover = node?.querySelector(".report-agent-hover");
+        if (hover) hover.outerHTML = reportAgentHoverHtml(item, getReportRuntimeState());
+      });
+    }
+  }
+}
+
+const reportAgentCamera = { scope: "", initialized: false, autoFit: true, scale: 1, x: 0, y: 0, width: 0, height: 0, drag: null, suppressClickUntil: 0 };
+
+function applyReportAgentCamera(mapEl) {
+  const world = mapEl.querySelector(".report-board-world");
+  if (!world || !reportAgentCamera.initialized) return;
+  const { x, y, scale } = reportAgentCamera;
+  world.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+  world.style.visibility = "visible";
+  const output = mapEl.querySelector("[data-board-scale]");
+  if (output) output.textContent = `${Math.round(scale * 100)}%`;
+}
+
+function fitReportAgentBoard(mapEl) {
+  const canvas = mapEl.querySelector(".report-console-canvas");
+  const world = mapEl.querySelector(".report-board-world");
+  if (!canvas?.clientWidth || !canvas.clientHeight || !world?.offsetHeight) return;
+  const camera = reportAgentCamera;
+  camera.scale = Math.min((canvas.clientWidth - 40) / world.offsetWidth, (canvas.clientHeight - 40) / world.offsetHeight, 1);
+  camera.x = (canvas.clientWidth - world.offsetWidth * camera.scale) / 2;
+  camera.y = (canvas.clientHeight - world.offsetHeight * camera.scale) / 2;
+  camera.width = canvas.clientWidth;
+  camera.height = canvas.clientHeight;
+  camera.initialized = true;
+  camera.autoFit = true;
+  applyReportAgentCamera(mapEl);
+}
+
+function resizeReportAgentBoard(mapEl) {
+  const canvas = mapEl.querySelector(".report-console-canvas");
+  if (!canvas?.clientWidth || !canvas.clientHeight) return;
+  const camera = reportAgentCamera;
+  if (!camera.initialized || camera.autoFit) return fitReportAgentBoard(mapEl);
+  // Keep the viewed area centered when the inspector opens or the window changes size.
+  camera.x += (canvas.clientWidth - camera.width) / 2;
+  camera.y += (canvas.clientHeight - camera.height) / 2;
+  camera.width = canvas.clientWidth;
+  camera.height = canvas.clientHeight;
+  applyReportAgentCamera(mapEl);
+}
+
+function zoomReportAgentBoard(mapEl, factor, anchor) {
+  const canvas = mapEl.querySelector(".report-console-canvas");
+  if (!canvas?.clientWidth) return;
+  if (!reportAgentCamera.initialized) fitReportAgentBoard(mapEl);
+  const camera = reportAgentCamera;
+  const nextScale = Math.max(.08, Math.min(3, camera.scale * factor));
+  const x = anchor?.x ?? canvas.clientWidth / 2;
+  const y = anchor?.y ?? canvas.clientHeight / 2;
+  camera.x = x - (x - camera.x) * nextScale / camera.scale;
+  camera.y = y - (y - camera.y) * nextScale / camera.scale;
+  camera.scale = nextScale;
+  camera.autoFit = false;
+  applyReportAgentCamera(mapEl);
+}
+
+function bindReportAgentBoard(mapEl) {
+  if (mapEl.dataset.boardBound) return;
+  mapEl.dataset.boardBound = "1";
+  mapEl.addEventListener("wheel", (event) => {
+    const canvas = event.target.closest(".report-console-canvas");
+    if (!canvas) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
+    zoomReportAgentBoard(mapEl, Math.exp(-Math.max(-600, Math.min(600, delta)) * .0015), {
+      x: event.clientX - rect.left - canvas.clientLeft, y: event.clientY - rect.top - canvas.clientTop
+    });
+  }, { passive: false });
+  mapEl.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || ![0, 1].includes(event.button) || !event.target.closest(".report-console-canvas") || event.target.closest("button, a, input, .report-agent-hover")) return;
+    if (event.button === 1) event.preventDefault();
+    reportAgentCamera.drag = { pointerId: event.pointerId, scope: reportAgentCamera.scope, startX: event.clientX, startY: event.clientY, x: reportAgentCamera.x, y: reportAgentCamera.y, moved: false };
+  });
+  window.addEventListener("pointermove", (event) => {
+    const camera = reportAgentCamera, drag = camera.drag;
+    if (!drag || drag.pointerId !== event.pointerId || drag.scope !== camera.scope) return;
+    const dx = event.clientX - drag.startX, dy = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      mapEl.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    camera.x = drag.x + dx;
+    camera.y = drag.y + dy;
+    camera.autoFit = false;
+    mapEl.querySelector(".report-console-canvas")?.classList.add("is-panning");
+    applyReportAgentCamera(mapEl);
+  }, { passive: false });
+  const endDrag = (event) => {
+    const camera = reportAgentCamera, drag = camera.drag;
+    if (!drag || (event.pointerId !== undefined && drag.pointerId !== event.pointerId)) return;
+    if (drag.moved) camera.suppressClickUntil = Date.now() + 350;
+    if (mapEl.hasPointerCapture(drag.pointerId)) mapEl.releasePointerCapture(drag.pointerId);
+    camera.drag = null;
+    mapEl.querySelector(".report-console-canvas")?.classList.remove("is-panning");
+  };
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+  window.addEventListener("blur", endDrag);
+  mapEl.addEventListener("dragstart", (event) => {
+    if (event.target.closest(".report-console-canvas")) event.preventDefault();
+  });
+  mapEl.addEventListener("click", (event) => {
+    const control = event.target.closest("[data-board-action]");
+    if (!control) return;
+    const action = control.dataset.boardAction;
+    if (action === "fit") fitReportAgentBoard(mapEl);
+    else zoomReportAgentBoard(mapEl, action === "in" ? 1.2 : 1 / 1.2);
+  });
+  mapEl.addEventListener("keydown", (event) => {
+    if (!event.target.matches(".report-console-canvas")) return;
+    const camera = reportAgentCamera;
+    if (["+", "=", "-", "0", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) event.preventDefault();
+    if (["+", "="].includes(event.key)) zoomReportAgentBoard(mapEl, 1.2);
+    else if (event.key === "-") zoomReportAgentBoard(mapEl, 1 / 1.2);
+    else if (event.key === "0") fitReportAgentBoard(mapEl);
+    else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+      camera.x += event.key === "ArrowLeft" ? 40 : event.key === "ArrowRight" ? -40 : 0;
+      camera.y += event.key === "ArrowUp" ? 40 : event.key === "ArrowDown" ? -40 : 0;
+      camera.autoFit = false;
+      applyReportAgentCamera(mapEl);
+    }
+  });
+}
+
+function bindReportAgentConsole(mapEl) {
+  if (mapEl.dataset.consoleBound) return;
+  mapEl.dataset.consoleBound = "1";
+  let hoverTimer;
+  mapEl.addEventListener("pointerover", (event) => {
+    const node = event.target.closest("[data-agent-key]");
+    if (!node || node.contains(event.relatedTarget)) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      if (node.isConnected && node.matches(":hover")) void loadReportAgentSnapshot(mapEl);
+    }, 300);
+  });
+  mapEl.addEventListener("focusin", (event) => {
+    if (event.target.matches("[data-agent-key]")) void loadReportAgentSnapshot(mapEl);
+  });
+  const close = () => {
+    const selected = reportAgentConsoleState.selected;
+    reportAgentConsoleState.selected = "";
+    reportAgentConsoleState.collapsed = false;
+    updateReportAgentInspectorLayout(mapEl);
+    requestAnimationFrame(() => fitReportAgentBoard(mapEl));
+    const node = mapEl.querySelector(`[data-agent-key="${selected}"]`);
+    node?.classList.remove("is-selected");
+    node?.setAttribute("aria-expanded", "false");
+    node?.focus({ preventScroll: true });
+  };
+  mapEl.addEventListener("click", async (event) => {
+    if (event.detail && Date.now() < reportAgentCamera.suppressClickUntil) return;
+    const node = event.target.closest("[data-agent-key]");
+    if (node) {
+      reportAgentConsoleState.selected = node.dataset.agentKey;
+      reportAgentConsoleState.collapsed = false;
+      reportAgentConsoleState.tab = "overview";
+      mapEl.querySelector(".report-agent-console").classList.add("has-selection");
+      renderReportAgentInspector(mapEl);
+      requestAnimationFrame(() => resizeReportAgentBoard(mapEl));
+      void loadReportAgentSnapshot(mapEl);
+    } else if (event.target.closest("[data-agent-toggle]")) {
+      reportAgentConsoleState.collapsed = !reportAgentConsoleState.collapsed;
+      renderReportAgentInspector(mapEl);
+      requestAnimationFrame(() => reportAgentConsoleState.collapsed ? fitReportAgentBoard(mapEl) : resizeReportAgentBoard(mapEl));
+    } else if (event.target.closest("[data-agent-close]")) close();
+    else if (event.target.closest("[data-agent-tab]")) {
+      reportAgentConsoleState.tab = event.target.closest("[data-agent-tab]").dataset.agentTab;
+      renderReportAgentInspector(mapEl);
+      mapEl.querySelector(`[data-agent-tab="${reportAgentConsoleState.tab}"]`)?.focus({ preventScroll: true });
+    } else if (event.target.closest("[data-agent-refresh]")) void loadReportAgentSnapshot(mapEl, true);
+    else if (event.target.closest("[data-agent-confirm]")) window.ReportReview?.autoOpen(true);
+    else if (event.target.closest("[data-agent-retry]") && !reportAgentConsoleState.retrying) {
+      const snapshot = reportAgentConsoleState.snapshot, state = getReportRuntimeState();
+      if (!snapshot?.checkpoint_id || state?.status !== "failed") return;
+      reportAgentConsoleState.retrying = true;
+      renderReportAgentInspector(mapEl);
+      try {
+        await submitCareerReportWorkflow({ continue_report_id: state.report_id, checkpoint_id: snapshot.checkpoint_id, response: {} });
+      } catch (error) {
+        reportAgentConsoleState.error = error.message || "重试失败";
+      } finally {
+        reportAgentConsoleState.retrying = false;
+        renderReportAgentInspector(mapEl);
+      }
+    }
+  });
+  mapEl.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && reportAgentConsoleState.selected) { event.preventDefault(); close(); }
+    const node = event.target.closest("[data-agent-key]");
+    if (node && ["Enter", " "].includes(event.key)) { event.preventDefault(); node.click(); }
+    const tab = event.target.closest("[data-agent-tab]");
+    if (tab && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      const tabs = [...mapEl.querySelectorAll("[data-agent-tab]")];
+      tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : 3)) % 4].click();
+    }
+  });
+}
+
 function renderReportAgentMap(profile, roles) {
   const state = getReportRuntimeState();
+  const scope = `${accountRequestEpoch}:${state?.report_id || state?.job_id || "idle"}`;
+  if (reportAgentConsoleState.scope !== scope) Object.assign(reportAgentConsoleState, { scope, selected: "", collapsed: false, tab: "overview", snapshot: null, loading: false, loadedVersion: "", error: "" });
+  if (reportAgentCamera.scope !== scope) Object.assign(reportAgentCamera, { scope, initialized: false, autoFit: true, scale: 1, x: 0, y: 0, width: 0, height: 0, drag: null, suppressClickUntil: 0 });
   const progressMap = getReportProgressMap(state);
   const status = String(state?.status || "").trim().toLowerCase();
   const activeStage = String(state?.stage || state?.stage_key || "").trim();
@@ -9136,9 +9491,9 @@ function renderReportAgentMap(profile, roles) {
     let nodeStatus = "pending";
     
     const isBeforeActive = activeIndex >= 0 && index < activeIndex;
-    if (completed || progressStatus === "done" || (running && isBeforeActive)) {
+    if (completed || progressStatus === "done" || (running && isBeforeActive && activeIndex >= 3)) {
       nodeStatus = "done";
-    } else if (index === activeIndex && status === "failed") {
+    } else if (progressStatus === "failed" || (index === activeIndex && ["failed", "error"].includes(status))) {
       nodeStatus = "failed";
     } else if ((running && index === activeIndex) || progressStatus === "active") {
       nodeStatus = "active";
@@ -9148,6 +9503,7 @@ function renderReportAgentMap(profile, roles) {
     if (activity?.status === "skipped") nodeStatus = "skipped";
     if (["failed", "error", "canceled", "cancelled"].includes(status) && activity?.status === "failed") nodeStatus = "failed";
     else if (["failed", "error", "canceled", "cancelled"].includes(status) && nodeStatus === "active") nodeStatus = "pending";
+    if (item.key === "review" && status === "waiting_input") nodeStatus = "waiting";
     return { ...item, nodeStatus };
   });
   const nodeHtml = nodes
@@ -9155,18 +9511,86 @@ function renderReportAgentMap(profile, roles) {
       const step = String(index + 1).padStart(2, "0");
       const hub = item.key === "career_decision" ? " hub" : "";
       return `
-    <article class="report-agent-node report-task-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}">
-      <div class="report-agent-speech" role="status"><span class="report-speech-label"><i aria-hidden="true"></i>${item.nodeStatus === "skipped" ? "本次跳过" : reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentCurrentMessage(item, state))}</p></div>
+    <article class="report-agent-node report-task-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}" role="button" tabindex="0" aria-label="查看${escHtml(item.title)}执行详情" aria-expanded="${reportAgentConsoleState.selected === item.key && !reportAgentConsoleState.collapsed}">
       <div class="report-agent-character">
       ${reportAgentPortraitHtml(item)}
-      <span class="report-agent-character-number">${step}</span>
+      <span class="report-agent-state-mark" aria-hidden="true">${item.nodeStatus === "done" ? "✓" : item.nodeStatus === "failed" ? "!" : item.nodeStatus === "waiting" ? "?" : item.nodeStatus === "active" ? "◔" : "○"}</span>
+      <div class="report-agent-speech" role="status"><span class="report-speech-label"><i aria-hidden="true"></i>${item.nodeStatus === "skipped" ? "本次跳过" : reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentConsoleSummary(item, state))}</p></div>
       </div>
-      <div class="report-ma-name">${escHtml(item.title)}</div>
-      <p class="report-ma-detail">${escHtml(item.detail)}</p>
+      <div class="report-ma-name"><span class="report-agent-step">${step}</span>${escHtml(item.title)}</div>
+      ${reportAgentHoverHtml(item, state)}
     </article>`;
     });
 
-  return `<div class="report-collaboration-board"><div class="report-lane-heading"><span>一起探索</span><p>简历、岗位与招聘机会，可以同时分析。</p><span class="report-lane-chip">并行协作</span></div><div class="report-parallel-team">${nodeHtml.slice(0, 3).join("")}</div><div class="report-team-handoff" aria-hidden="true"><span></span>汇合分析，继续向前 ↓<span></span></div><div class="report-sequential-team">${nodeHtml.slice(3).join("")}</div></div>`;
+  reportAgentConsoleState.nodes = nodes;
+  return `<div class="report-agent-console${reportAgentConsoleState.selected && !reportAgentConsoleState.collapsed ? " has-selection" : ""}"><button type="button" class="report-inspector-toggle" data-agent-toggle aria-controls="reportAgentInspector" aria-label="执行详情" ${reportAgentConsoleState.selected ? "" : "hidden"}></button><div class="report-console-stage"><div class="report-board-header"><div class="report-lane-heading"><span>一起探索</span><p>简历、岗位与招聘机会，可以同时分析。</p><span class="report-lane-chip">并行协作</span></div><div class="report-board-toolbar" role="toolbar" aria-label="白板视图"><button type="button" data-board-action="out" aria-label="缩小白板">−</button><output data-board-scale aria-label="当前缩放比例">100%</output><button type="button" data-board-action="in" aria-label="放大白板">+</button><button type="button" data-board-action="fit" class="report-board-fit">查看全部</button></div></div><div class="report-console-canvas" tabindex="0" role="region" aria-label="智能体白板，可用滚轮缩放，拖拽移动，按 0 查看全部"><div class="report-board-world"><div class="report-collaboration-board"><div class="report-agent-origin">任务启动 · 并行分析</div><svg class="report-agent-connections" aria-hidden="true"></svg><div class="report-parallel-team">${nodeHtml.slice(0, 3).join("")}</div><div class="report-sequential-team">${nodeHtml.slice(3).join("")}</div></div></div></div><p class="report-console-help">滚轮缩放 · 拖拽移动 · 点击角色查看详情 · 查看全部可还原视图</p></div><aside id="reportAgentInspector" class="report-agent-inspector" aria-label="Agent 执行详情" ${reportAgentConsoleState.selected && !reportAgentConsoleState.collapsed ? "" : "hidden"}></aside></div>`;
+}
+
+// Draw only actual dependencies; the three analysis agents run in parallel.
+function drawReportAgentConnections(mapEl) {
+  const board = mapEl.querySelector(".report-collaboration-board");
+  const svg = board?.querySelector(".report-agent-connections");
+  if (!svg || !board.offsetWidth) return;
+  const bounds = board.getBoundingClientRect();
+  const scale = bounds.width / board.offsetWidth || 1;
+  const width = board.offsetWidth, height = board.offsetHeight;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const edges = [
+    ["resume_analysis", "career_decision"], ["job_analysis", "career_decision"],
+    ["recruitment_search", "career_decision"], ["career_decision", "review"],
+    ["review", "action_planning"], ["action_planning", "report_writer"]
+  ];
+  const point = (key) => {
+    const node = board.querySelector(`[data-agent-key="${key}"]`);
+    const rect = node.querySelector(".report-agent-character").getBoundingClientRect();
+    return { node, x: (rect.left - bounds.left) / scale, y: (rect.top - bounds.top) / scale, w: rect.width / scale, h: rect.height / scale };
+  };
+  const stacked = Math.abs(point("resume_analysis").x - point("job_analysis").x) < 20;
+  const origin = board.querySelector(".report-agent-origin");
+  const originRect = origin.getBoundingClientRect();
+  const originX = (originRect.left + originRect.width / 2 - bounds.left) / scale;
+  const originY = (originRect.bottom - bounds.top) / scale;
+  const branches = ["resume_analysis", "job_analysis", "recruitment_search"].map((key) => {
+    const b = point(key);
+    if (b.node.classList.contains("is-skipped")) return "";
+    const x = b.x + b.w / 2, y = b.y - 44;
+    const path = stacked ? `M ${originX} ${originY} H 2 V ${b.y + b.h / 2} H ${b.x - 6}` : `M ${originX} ${originY} V ${originY + 14} H ${x} V ${y}`;
+    const dispatched = b.node.classList.contains("is-active") || b.node.classList.contains("is-done");
+    return `<path class="report-agent-link${dispatched ? " is-done" : ""}" d="${path}" />`;
+  }).join("");
+  svg.innerHTML = branches + edges.map(([from, to]) => {
+    const a = point(from), b = point(to);
+    if (a.node.classList.contains("is-skipped") || b.node.classList.contains("is-skipped")) return "";
+    const done = a.node.classList.contains("is-done") && (b.node.classList.contains("is-active") || b.node.classList.contains("is-done") || b.node.classList.contains("is-waiting"));
+    let path;
+    if (stacked && to === "career_decision") {
+      const gutter = width - 8;
+      path = `M ${a.x + a.w + 8} ${a.y + a.h / 2} H ${gutter} V ${b.y + b.h / 2} H ${b.x + b.w + 8}`;
+    } else if (Math.abs(a.y - b.y) < 20) {
+      path = `M ${a.x + a.w + 8} ${a.y + a.h / 2} H ${b.x - 8}`;
+    } else {
+      const startX = a.x + a.w / 2, endX = b.x + b.w / 2;
+      const startY = a.y + a.h + 38, endY = b.y - 12;
+      const midY = (startY + endY) / 2;
+      path = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
+    }
+    const label = to === "career_decision" ? "分析结果 → 职业决策" : from === "review" ? "确认信息 → 决策复核 → 行动规划" : from === "action_planning" ? "行动计划 → 报告整理" : "职业决策 → 补充与确认";
+    return `<path class="report-agent-link${done ? " is-done" : ""}" d="${path}"><title>${label} · ${done ? "下游已开始接收" : "等待交付"}</title></path>`;
+  }).join("");
+}
+
+let reportAgentMapResizeObserver;
+function observeReportAgentMap(mapEl) {
+  if (!reportAgentMapResizeObserver) {
+    reportAgentMapResizeObserver = new ResizeObserver(() => { resizeReportAgentBoard(mapEl); drawReportAgentConnections(mapEl); });
+    reportAgentMapResizeObserver.observe(mapEl);
+  }
+  const canvas = mapEl.querySelector(".report-console-canvas");
+  if (mapEl._reportObservedCanvas) reportAgentMapResizeObserver.unobserve(mapEl._reportObservedCanvas);
+  if (canvas) reportAgentMapResizeObserver.observe(canvas);
+  mapEl._reportObservedCanvas = canvas;
+  bindReportAgentBoard(mapEl);
+  requestAnimationFrame(() => { resizeReportAgentBoard(mapEl); drawReportAgentConnections(mapEl); });
 }
 
 function renderReportWorkspace(profile, roles) {
@@ -9230,7 +9654,18 @@ function renderReportWorkspace(profile, roles) {
   renderReportResumePanel();
   renderReportWorkflowReview(state);
   if (mapEl) {
+    const focused = mapEl.contains(document.activeElement) ? document.activeElement : null;
+    const focusKey = focused?.dataset?.agentKey;
+    const focusTab = focused?.dataset?.agentTab;
+    const inspectorScroll = mapEl.querySelector(".report-agent-inspector")?.scrollTop || 0;
     mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
+    observeReportAgentMap(mapEl);
+    bindReportAgentConsole(mapEl);
+    renderReportAgentInspector(mapEl);
+    mapEl.querySelector(".report-agent-inspector").scrollTop = inspectorScroll;
+    if (focusKey) mapEl.querySelector(`[data-agent-key="${focusKey}"]`)?.focus({ preventScroll: true });
+    if (focusTab) mapEl.querySelector(`[data-agent-tab="${focusTab}"]`)?.focus({ preventScroll: true });
+    if (reportAgentConsoleState.selected) void loadReportAgentSnapshot(mapEl);
   }
   renderReportWizard();
 }
@@ -9346,10 +9781,12 @@ function buildCareerReportGenerationPayload() {
     workflow: {
       targets: String(document.getElementById("reportWorkflowTargets")?.value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
       preferences: String(document.getElementById("reportWorkflowPreferences")?.value || "").trim(),
-      additional_evidence: String(document.getElementById("reportWorkflowEvidence")?.value || "").trim(),
-      recruitment: document.getElementById("reportWorkflowSearch")?.value.trim()
-        ? { request: document.getElementById("reportWorkflowSearch").value.trim(), channel: "radar", limit: 5 }
-        : null
+      additional_evidence: "",
+      recruitment: {
+        request: `寻找近期招聘机会。目标方向：${document.getElementById("reportWorkflowTargets")?.value || ""}。求职偏好：${document.getElementById("reportWorkflowPreferences")?.value || "未额外指定"}`.slice(0, 3000),
+        channel: "radar", limit: 12,
+        published_after: document.getElementById("reportWorkflowPublishedAfter")?.value || null
+      }
     }
   };
 }
