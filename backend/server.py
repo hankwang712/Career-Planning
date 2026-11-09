@@ -48,6 +48,7 @@ from services.report.workflow import (
     ReportNeedsInput, read_report_workflow, validate_report_request, validate_report_continuation,
 )
 from services.report.review import apply_availability
+from services.report.context import apply_report_memory, explicit_report_cities
 from services.report.legacy_report import (
     _build_dashboard_summary,
     _build_role_cards,
@@ -6985,7 +6986,19 @@ def _run_career_report_job(username, job_id, report_id, profile_payload, role_pa
         )
         _ensure_not_cancelled()
         _log("编排返回，开始写入报告文件")
+        completed_profile = bundle.get("profile_snapshot") or {}
+        city_memory = completed_profile.pop("report_city_memory", [])
         _save_career_report_bundle(username, bundle)
+        submitted_preferences = (completed_profile.get("report_user_inputs") or {}).get("preferences", "")
+        city = explicit_report_cities(submitted_preferences, (bundle.get("agent_results") or {}).get("recruitment_search") or {})
+        if city:
+            for previous in city_memory:
+                if previous["value"] != city:
+                    try:
+                        app.extensions["chat_service"].memory.correct(
+                            username, previous["id"], city, expected_value=previous["value"])
+                    except Exception:
+                        app.logger.exception("report city preference synchronization failed")
         meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
         final_stage = "report_writer"
         _update_career_report_job(
@@ -7136,20 +7149,20 @@ def api_career_report_generate_start():
             profile_payload["report_user_inputs"] = {key: workflow_request.get(key, "")
                 for key in ("preferences", "additional_evidence")}
             shared_memory = app.extensions["chat_service"].career_context(username)
-            if not workflow_request.get("preferences") and shared_memory["preferences"]:
-                workflow_request["preferences"] = shared_memory["preferences"]
+            workflow_request = apply_report_memory(workflow_request, shared_memory)
+            profile_payload["report_city_memory"] = [
+                {"id": row["id"], "value": row["value"]}
+                for row in app.extensions["chat_service"].store.memory_snapshot(username)[1]
+                if row["kind"] == "preference" and row["key"] == "target_city" and row["status"] == "active"]
             availability, preferences = apply_availability(payload.get("availability"), workflow_request.get("preferences", ""))
             if availability:
                 profile_payload["report_availability"] = availability
                 workflow_request["preferences"] = preferences
-            historical_context = "\n".join(filter(None, [shared_memory["evidence"],
-                "历史偏好（当前用户输入优先）：" + shared_memory["preferences"] if shared_memory["preferences"] else ""]))
-            if historical_context:
-                evidence = str(workflow_request.get("additional_evidence") or "")
-                prefix = "\n历史用户原文（当前简历和当前输入优先）：\n"
-                remaining = 20000 - len(evidence) - len(prefix)
-                if remaining > 0:
-                    workflow_request["additional_evidence"] = evidence + prefix + historical_context[:remaining]
+                if isinstance(workflow_request.get("recruitment"), dict):
+                    recruitment = dict(workflow_request["recruitment"])
+                    schedule = "\n时间安排（用户选择）：" + availability["summary"]
+                    recruitment["request"] = str(recruitment.get("request") or "")[:3000 - len(schedule)] + schedule
+                    workflow_request["recruitment"] = recruitment
             profile_payload["agent_workflow"] = validate_report_request(workflow_request, raw_resume, file_path=resume_path)
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify({"message": str(exc)}), 400

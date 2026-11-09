@@ -171,7 +171,7 @@ class MemoryManager:
         _, memories = self.store.memory_snapshot(owner)
         active = [row for row in self.confirmed(memories) if (row["key"], normalized(row["subject"])) not in disputed]
         preferences = "；".join(row["value"] for row in active if row["kind"] == "preference")[:4000]
-        facts = [quote["quote"] for row in active if row["kind"] == "fact" for quote in json.loads(row["evidence"])]
+        facts = [row["value"] for row in active if row["kind"] == "fact"]
         return {"preferences": preferences, "evidence": "\n".join(dict.fromkeys(facts))[:6000]}
 
     def invalidate(self, owner, session_id):
@@ -196,8 +196,8 @@ class MemoryManager:
         self.start()
         return identifier
 
-    def correct(self, owner, memory_id, value):
-        identifier = self.store.correct_memory(owner, memory_id, value)
+    def correct(self, owner, memory_id, value, *, expected_value=None):
+        identifier = self.store.correct_memory(owner, memory_id, value, expected_value=expected_value)
         self.start()
         return identifier
 

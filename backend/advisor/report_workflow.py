@@ -197,6 +197,7 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         result = await run("resume_analysis", {
             "raw_resume": inputs.raw_resume, "additional_evidence": inputs.additional_evidence,
             "target_role": "、".join(inputs.targets),
+            "preferences": inputs.preferences,
         }, config, parallel=parallel)
         return {"results": {"resume_analysis": result}}
 
@@ -235,6 +236,13 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
             result = {"agent": "recruitment_search", "status": "skipped", "data": {}}
             activity("recruitment_search", None, "skipped", "本次未启用招聘雷达")
         else:
+            context = "\n".join(filter(None, [state["input"].get("raw_resume", "")[:8000],
+                                             state["input"].get("additional_evidence", "")[:3000]]))
+            payload = {**payload, "candidate_context": context}
+            preferences = state["input"].get("preferences", "")
+            if preferences:
+                current = "\n本次用户求职偏好（优先于历史材料，不从经历推断城市或实习意向）：\n" + preferences[:2000]
+                payload["request"] = str(payload.get("request") or "")[:3000 - len(current)] + current
             result = await search_with_fallback(payload, config, parallel=parallel)
         return {"results": {"recruitment_search": result}}
 
@@ -326,9 +334,14 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
             operations.append(run("resume_analysis", {
                 "raw_resume": payload["raw_resume"], "additional_evidence": payload["additional_evidence"],
                 "target_role": "、".join(state["input"]["targets"]), "clarifications": answers["resume_analysis"],
+                "preferences": payload.get("preferences", ""),
             }, config))
         if answers.get("recruitment_search"):
             search = deepcopy(state["input"]["recruitment"])
+            preferences = payload.get("preferences", "")
+            if preferences:
+                current = "\n本次用户求职偏好（优先于历史材料）：\n" + preferences[:2000]
+                search["request"] = str(search.get("request") or "")[:3000 - len(current)] + current
             search.setdefault("clarifications", []).extend(answers["recruitment_search"])
             names.append("recruitment_search")
             operations.append(search_with_fallback(search, config))

@@ -195,7 +195,7 @@ class MemoryControls:
     def forget(self, owner, identifier):
         return self.request_memory_deletion(owner, identifier)
 
-    def correct_memory(self, owner, identifier, value):
+    def correct_memory(self, owner, identifier, value, *, expected_value=None):
         from .storage import ChatError, memory_id
         if not isinstance(value, str) or not 1 <= len(value.strip()) <= 1000:
             raise ChatError("请输入 1～1000 字的记忆内容。")
@@ -205,6 +205,8 @@ class MemoryControls:
                 (owner, memory_id(owner, selected["kind"], selected["key"], selected["subject"]))).fetchone()
             if not row:
                 raise ChatError("只能纠正当前账号的有效记忆。", 404)
+            if expected_value is not None and row["value"] != expected_value:
+                return None  # A later user edit wins over an older report finishing.
             canonical = row["id"]
             previous = self._latest_cleanup(conn, owner, identifier, ("edit",))
             conflicts = conn.execute("SELECT 1 FROM memories WHERE owner=? AND id LIKE ? AND status='conflict' LIMIT 1", (owner, canonical + ":conflict:%")).fetchone()
