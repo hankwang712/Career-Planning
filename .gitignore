@@ -31,6 +31,9 @@ node_modules/
 # 7. 当前项目的临时文件目录
 /tmp/
 
+# Local report exports and visual review artifacts
+/output/
+
 # Environment secrets (keep shareable configuration templates)
 .env
 .env.*
