@@ -718,16 +718,14 @@ function getUserCenterReportTone(roleName) {
 
 function renderUserCenterAssetIcon(name, label = "", className = "") {
   const safeName = String(name || "").trim();
-  if (!safeName) return "";
+  if (!/^[a-z0-9-]+$/.test(safeName)) return "";
   const safeClassName = String(className || "").trim();
   const classAttr = safeClassName ? ` class="${safeClassName}"` : "";
-  return `<img${classAttr} src="/static/assets/icons/user-center-report/${encodeURIComponent(safeName)}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"${label ? ` data-label="${escHtml(label)}"` : ""}>`;
+  return `<span${classAttr} style="--report-icon: url('/static/assets/icons/user-center-report/${safeName}.svg')" aria-hidden="true"${label ? ` data-label="${escHtml(label)}"` : ""}></span>`;
 }
 
 function renderUserCenterReportIcon(roleName) {
-  const tone = getUserCenterReportTone(roleName);
-  const iconName = `tone-${tone}`;
-  return renderUserCenterAssetIcon(iconName, tone, "uc-report-library-icon-asset uc-report-library-icon-asset--mark");
+  return '<img class="uc-report-cover-image" src="/static/assets/icons/user-center-report/report-cover.svg" alt="" aria-hidden="true" decoding="async">';
 }
 
 function renderUserCenterMetaIcon(type) {
@@ -852,7 +850,7 @@ function renderUserCenterReportLibrary() {
       : (String(item?.fit_band_label || "").trim() || "待评估");
     const fitTone = Number.isFinite(fitScore)
       ? (fitScore >= 70 ? "high" : fitScore >= 45 ? "mid" : "low")
-      : "neutral";
+      : /不建议|不推荐/.test(fitLabel) ? "low" : /条件|核实|补充|待/.test(fitLabel) ? "mid" : /建议|推荐|优先/.test(fitLabel) ? "high" : "neutral";
     const gapCount = Math.max(0, Number(item?.gap_count || 0));
     const actionCount = Math.max(0, Number(item?.action_count || 0));
     const strengthCount = Math.max(0, Number(item?.strength_count || 0));
@@ -889,12 +887,12 @@ function renderUserCenterReportLibrary() {
         <div class="uc-report-library-foot">
           ${strengthCount > 0 ? `
           <div class="uc-report-library-foot-chips">
-            <span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("section")}优势 ${escHtml(String(strengthCount))}</span>
+            <span class="uc-report-library-chip muted">${renderUserCenterMetaIcon("fit")}已识别 ${escHtml(String(strengthCount))} 项优势</span>
           </div>` : ""}
           <div class="uc-report-library-foot-actions">
             <button type="button" class="uc-report-read-btn" data-report-library-id="${escHtml(rid)}" ${!rid || isDeleting ? "disabled" : ""}>阅读报告 <span aria-hidden="true">→</span></button>
             <button type="button" class="uc-report-library-delete-btn" data-report-delete-id="${escHtml(rid)}" aria-label="删除这份报告卡片" ${!rid || isDeleting ? "disabled" : ""}>
-              ${renderUserCenterMetaIcon("delete")}${isDeleting ? "删除中..." : "删除"}
+              ${renderUserCenterMetaIcon("delete")}<span class="uc-report-delete-label">${isDeleting ? "删除中..." : "删除"}</span>
             </button>
           </div>
         </div>
