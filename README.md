@@ -49,7 +49,7 @@ flowchart LR
 
 ## 🖼️ 主要功能界面
 
-截图更新于 **2026-11-06**，个人资料使用匿名演示数据。
+主要业务界面截图更新于 **2026-11-11**，使用 **system 账号**当前界面与已有内容；下方 LightRAG 图谱保留独立样本演示。
 
 | 实时岗位与行情 | 城市招聘分析 |
 | :---: | :---: |
@@ -72,11 +72,15 @@ flowchart LR
 | [![浅色版生涯助手：连续对话、Markdown 表格与资料入口](asserts/assistant.png)](asserts/assistant.png) | [![Offer 茶水间：面经互助、简历讨论与岗位交流](asserts/community.png)](asserts/community.png) |
 
 <details>
-<summary>📰 查看行业资讯与多智能体协作流程</summary>
+<summary>📰 查看行业资讯、报告卡片库与多智能体协作流程</summary>
 
 **职业与行业快报**：按主题浏览技术、就业与职业成长资讯，保留来源和发布时间。
 
 [![职业规划与计算机行业快报](asserts/career-news.png)](asserts/career-news.png)
+
+**我的报告**：从报告卡片库打开已保存的报告，或对照历史版本。
+
+[![我的报告卡片库：已保存报告与历史版本入口](asserts/report-library.png)](asserts/report-library.png)
 
 **报告协作流程**：从简历分析、岗位证据到目标确认、行动规划与报告合成，页面展示各阶段的执行状态。
 
