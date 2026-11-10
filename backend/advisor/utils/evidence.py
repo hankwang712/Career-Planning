@@ -9,6 +9,12 @@ def copy_source_quote(quote: str, original: str) -> str | None:
     for candidate in (quote, unnumbered):
         needle = "".join(character for character in candidate if not character.isspace())
         offset = content.find(needle) if needle else -1
+        if offset < 0 and needle:
+            # Restore source spelling when only Latin acronym capitalization differs.
+            # The returned quote is still the exact original substring.
+            match = re.search(re.escape(needle), content, re.IGNORECASE)
+            if match:
+                offset = match.start()
         if offset >= 0:
             return original[positions[offset]:positions[offset + len(needle) - 1] + 1]
     return None

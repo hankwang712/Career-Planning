@@ -10,6 +10,7 @@ from ..schemas.career_decision import CareerDecision, CareerDecisionInput, Caree
 from ..schemas.job import JobAnalysis, JobSource
 from ..utils.evidence import copy_source_quote
 from ..utils.dates import education_timeline_context, resume_date_context, verify_education_timeline_claims
+from ..utils.decision_grounding import verify_candidate_boundaries, preparation_only_attendance_quote, model_attribution_questions
 from .base import BaseAgent
 
 
@@ -28,7 +29,7 @@ def recruitment_context(result: dict) -> dict:
     sources = {source["source_id"]: source for source in result.get("sources", [])
                if source.get("source_id") and (source.get("read_state") == "read" or
                    source.get("origin") == "radar" and source.get("read_state") in {"listing", "partial"}
-                   and source.get("source_type") in {"aggregate", "snapshot", "import", "official_site"}
+                   and source.get("source_type") in {"aggregate", "snapshot", "import", "official_site", "jobhunter"}
                    and isinstance(source.get("job"), dict) and source["job"].get("role"))}
     omitted = False
     for finding in data.get("findings", []):
@@ -79,13 +80,31 @@ def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]
             if evidence["chunk_id"] not in source_map:
                 raise ValueError(f"目标 {target.target_id} 引用了不存在的岗位来源")
             evidence["chunk_id"] = source_map[evidence["chunk_id"]]
+    core_evidence = {}
+    declared = result.get("scope", {}).get("requirement_source_ids")
+    for finding in job["findings"]:
+        if finding["category"] == "other":
+            continue
+        for evidence in finding["evidence"]:
+            original_id = next(key for key, mapped in source_map.items() if mapped == evidence["chunk_id"])
+            if declared is not None and original_id not in declared:
+                continue
+            core_evidence.setdefault(evidence["chunk_id"], []).append({
+                "quote": evidence["quote"], "requirement": finding["requirement"],
+                "statement": finding["statement"], "category": finding["category"]})
+    for assessment in job.get("source_assessments", []):
+        if assessment["chunk_id"] in source_map:
+            assessment["chunk_id"] = source_map[assessment["chunk_id"]]
     sources = [{
         "source_id": source_map[source.chunk_id], "kind": "job", "target_id": target.target_id,
         "content": source.content, "chunk_id": source.chunk_id, "file_path": source.file_path,
+        "usable_for_requirements": bool(core_evidence.get(source_map[source.chunk_id])),
+        "requirement_evidence": core_evidence.get(source_map[source.chunk_id], []),
     } for source in originals]
     return {
         "target_id": target.target_id, "title": target.title, "target_type": target.target_type,
         "job_analysis": job, "source_ids": list(source_map.values()),
+        "requirement_source_ids": list(core_evidence),
     }, sources
 
 
@@ -94,6 +113,8 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
     analysis = CareerDecision.model_validate(data)
     errors = verify_education_timeline_claims(data, "\n".join(
         source["content"] for source in prepared["sources"] if source["kind"] == "resume"))
+    factual_text = "\n".join(source["content"] for source in prepared["sources"] if source["kind"] in {"resume", "additional_evidence"})
+    errors.extend(verify_candidate_boundaries(data, factual_text))
     sources = {source["source_id"]: source for source in prepared["sources"]}
     originals = {key: re.sub(r"\s+", " ", source["content"]).strip() for key, source in sources.items()}
     targets = {target["target_id"]: target for target in prepared["targets"]}
@@ -102,8 +123,32 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
         errors.append("assessments 必须各一次覆盖全部可用 target_id")
 
     checks = {}
+    def asserts_confirmed_conflict(text):
+        text = re.sub(r"(?:不构成|不能(?:据此)?判定|不能(?:视为|认定)|不存在|没有).{0,12}(?:明确资格差距|明确硬条件冲突|确定不符合)", "", text)
+        return bool(re.search(r"明确资格差距|明确硬条件冲突|确定不符合", text))
+    if not any(check.status == "confirmed_gap" for item in analysis.assessments for check in item.checks) and asserts_confirmed_conflict(analysis.summary):
+        errors.append("摘要与检查项不一致：没有confirmed_gap，不可写明确资格差距/明确硬条件冲突；应写资格未知、待核实，不能把材料缺项升级为结论")
     for assessment in analysis.assessments:
+        if not any(check.status == "confirmed_gap" for check in assessment.checks) and asserts_confirmed_conflict(assessment.conclusion):
+            errors.append(f"目标{assessment.target_id}的conclusion与checks不一致：没有已确认差距，不能写明确资格差距或冲突")
+        target = targets.get(assessment.target_id, {})
+        if not target.get("requirement_source_ids", target.get("source_ids", [])):
+            if assessment.checks or assessment.decision != "insufficient_information":
+                errors.append(f"目标 {assessment.target_id} 没有相关核心岗位要求，checks应为空且结论为insufficient_information，不能用相邻岗位凑门槛")
+        elif not assessment.checks:
+            errors.append(f"目标 {assessment.target_id} 已有相关要求，应逐项对照，不可用空检查绕过证据校验")
         for check in assessment.checks:
+            if check.status == "confirmed_gap" and check.kind == "hard_condition" and re.search(r"学历|学位|硕士|博士|本科|工作经验|研发经验|年.{0,6}经验", check.requirement):
+                quoted = "\n".join(item.quote for item in check.candidate_evidence)
+                if not re.search(r"最高学历|没有|不具备|未取得|仅有|只有|无相关|累计.{0,8}(?:工作|经验)|(?:工作|研发|相关)经验(?:为|共|累计|：|:)\s*\d+", quoted):
+                    errors.append(f"{check.check_id} 缺少用户明示最高学历/完整工作年限或明确不满足的证据，不能用可见教育或实习片段判confirmed_gap")
+            if check.status == "confirmed_gap" and re.search(r"未说明|没有说明|没有显示|未显示|缺少.{0,12}证据|没有.{0,12}证据|未提供|未体现|目前可见", check.reasoning):
+                explicit = "\n".join(item.quote for item in check.candidate_evidence)
+                if not re.search(r"没有|不具备|不满足|未取得|最高学历|仅有|只有|无相关|无法|不能|不接受|累计.{0,6}(?:工作|经验)|相关工作经验(?:为|共)", explicit):
+                    errors.append(f"{check.check_id} 仅依据材料未说明/未显示，不能判confirmed_gap；应unknown/evidence_missing，并独立核实最高学历或完整工作年限")
+            if check.status == "supported" and re.search(r"兴趣", check.requirement) and re.search(r"明确.{0,12}兴趣|浓厚兴趣", check.reasoning):
+                if not any(re.search(r"兴趣|热爱|喜欢|希望从事|有志于|愿意持续", item.quote) for item in check.candidate_evidence):
+                    errors.append(f"{check.check_id} 将比较/探索方向当成明确兴趣；引用没有表达兴趣的原句时保留未知，不推断个人意愿")
             if check.check_id in checks:
                 errors.append(f"check_id 重复：{check.check_id}")
             checks[check.check_id] = assessment.target_id
@@ -115,8 +160,22 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
                         continue
                     if side == "job":
                         valid = source["kind"] == "job" and source.get("target_id") == assessment.target_id
+                        if not source.get("usable_for_requirements", True):
+                            errors.append(f"{assessment.target_id}/{check.check_id} 使用了无关或仅排除说明的岗位来源，不能作为目标要求")
+                        approved = source.get("requirement_evidence")
+                        if approved is not None:
+                            normalize = lambda text: re.sub(r"\s+", "", text)
+                            supports = [item for item in approved if normalize(citation.quote) in normalize(item["quote"])
+                                        or normalize(item["quote"]) in normalize(citation.quote)]
+                            if not supports:
+                                errors.append(f"{check.check_id} 的岗位引文未对应上游已核实核心要求，请使用requirement_evidence中的原文")
+                            elif check.importance == "required" and not any(item["requirement"] == "required" for item in supports):
+                                errors.append(f"{check.check_id} 把优先或未明确强制的条件提升成required，请保留原强制程度")
                     else:
                         valid = source["kind"] in {"resume", "additional_evidence", "preferences"}
+                        if check.kind == "hard_condition" and re.search(r"到岗|出勤|每周.{0,6}天|连续.{0,8}月", check.requirement):
+                            if preparation_only_attendance_quote(citation.quote):
+                                errors.append(f"{check.check_id} 用准备工时/预算证明出勤资格，请独立核实到岗条件")
                     if not valid:
                         errors.append(f"{assessment.target_id}/{check.check_id} 的证据来源归属错误：{citation.source_id}")
                     if re.sub(r"\s+", " ", citation.quote).strip() not in originals[citation.source_id]:
@@ -133,6 +192,8 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
                     errors.append(f"目标 {assessment.target_id} 有明确硬条件冲突，当前不应推荐")
             elif any(check.status != "supported" for check in hard) and assessment.decision == "recommended":
                 errors.append(f"目标 {assessment.target_id} 有待确认的硬条件，应保留条件性结论")
+        elif assessment.decision == "not_recommended" and not any(check.status == "confirmed_gap" for check in assessment.checks):
+            errors.append(f"目标 {assessment.target_id} 没有已确认冲突，仅有材料缺项或相邻任务差异，不能否定整个方向；保留conditional或insufficient_information并说明样本范围")
 
     for action in analysis.next_actions:
         if checks.get(action.check_id) != action.target_id:
@@ -189,21 +250,9 @@ class CareerDecisionAgent(BaseAgent):
             prepared_target, job_sources = _prepare_target(target, index)
             targets.append(prepared_target)
             sources.extend(job_sources)
-            # Current recruiting pages supplement direction samples. Keep each employer's
-            # original separate, and never change the requirements of a specific selected job.
-            if target.target_type == "direction":
-                originals = {row.get("source_id"): row for row in request.recruitment_search.get("sources", [])}
-                for finding in recruitment["findings"]:
-                    original = originals.get(finding["reference"].removeprefix("search:"), {})
-                    if finding["evidence_kind"] not in {"read_page", "partial_page"} or not original.get("content"):
-                        continue
-                    identifier = f"{target.target_id}RS{len(prepared_target['source_ids']) + 1}"
-                    sources.append({"source_id": identifier, "kind": "job", "target_id": target.target_id,
-                                    "content": original["content"], "title": original.get("title", "招聘岗位"),
-                                    "url": original.get("url", ""), "recruitment_reference": finding["reference"],
-                                    "read_state": original.get("read_state", "read"),
-                                    "published_at": original.get("published_at"), "availability": "unknown"})
-                    prepared_target["source_ids"].append(identifier)
+            # Recruiting opportunities remain separately traceable context. A page has not
+            # been reviewed against every direction merely because it was read successfully.
+            # Only the target's JobAnalysis can authorize requirement evidence.
             limitations.append(f"目标 {target.target_id} 仅依据本次岗位样本，不代表整个方向或当前仍在招聘。")
             scope = result.get("scope") or {}
             # 上游模型的局限可能只适用于岗位分析阶段；保留在 job_analysis 中供复核，
@@ -213,15 +262,18 @@ class CareerDecisionAgent(BaseAgent):
             ]
             limitations.extend(f"目标 {target.target_id}：{detail}" for detail in details)
         return {
+            "model_attribution_questions": model_attribution_questions(request.raw_resume),
             "analysis_date": analysis_date.isoformat(), "date_context": resume_date_context(request.raw_resume, analysis_date),
             "education_timeline": education_timeline_context(request.raw_resume),
             "question": request.question, "sources": sources, "targets": targets,
+            "capacity_boundary": "准备/学习工时和预算仅约束准备计划，不代表工作出勤、实习时长或到岗能力；这些条件须独立确认。",
             "recruitment_context": recruitment,
             "evidence_rounds_remaining": request.evidence_rounds_remaining,
             "evidence_feedback": [item.model_dump() for item in request.evidence_feedback],
             # 简历质量诊断不是能力事实来源；隔离其未经验证的推断，避免错误意见被下游复述。
             "resume_analysis": {"status": request.resume_analysis.get("status"), "document": document,
-                                "diagnostics": request.resume_analysis.get("data", {})},
+                "diagnostics": {key: request.resume_analysis.get("data", {}).get(key, [])
+                                for key in ("highlights", "missing_information")}},
             "input_limitations": list(dict.fromkeys(limitations)),
         }
 
@@ -229,6 +281,9 @@ class CareerDecisionAgent(BaseAgent):
         return bool(prepared["targets"]) and any(
             source["kind"] in {"resume", "additional_evidence"} for source in prepared["sources"]
         )
+
+    async def _arun_prepared(self, prepared, config=None):
+        return await self._arun_validated_json(prepared, config=config)
 
     def get_output_schema(self, prepared: dict):
         originals = {source["source_id"]: source["content"] for source in prepared["sources"]}

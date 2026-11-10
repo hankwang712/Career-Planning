@@ -44,6 +44,15 @@ class JobFinding(JobRecord):
     evidence: list[JobEvidence] = Field(min_length=1)
 
 
+class JobSourceAssessment(JobRecord):
+    chunk_id: str = Field(min_length=1)
+    relevance: Literal["direct", "adjacent", "unrelated"]
+    reason: str = Field(min_length=1, max_length=500,
+                        description="按实际工作任务判断与目标的联系，相关技术名词重叠不等于岗位相关")
+    quote: str = Field(min_length=2, max_length=1200,
+                       description="足以判断实际职责的连续原文；不能只引Python等通用技能")
+
+
 class RelatedRole(JobRecord):
     title: str = Field(min_length=1)
     reason: str = Field(min_length=1, description="与目标岗位相近的职责或技能；不代表用户已胜任或存在晋升通道")
@@ -55,3 +64,5 @@ class JobAnalysis(JobRecord):
     findings: list[JobFinding] = Field(min_length=1)
     related_roles: list[RelatedRole] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
+    source_assessments: list[JobSourceAssessment] = Field(default_factory=list,
+        description="逐条覆盖本次召回来源；先审实际职责相关性，direct来源才能支持核心岗位要求")

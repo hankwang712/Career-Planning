@@ -1,6 +1,22 @@
 """Semantic export layout used by HTML and PDF, independently of browser scripts."""
 import re
 
+
+def normalize_typography(values):
+    if not isinstance(values, dict):
+        return {}
+    return {key: float(value) for key, value in values.items()
+            if key in {"title", "h2", "h3", "h4", "body"}
+            and isinstance(value, (int, float)) and not isinstance(value, bool)
+            and 10 <= value <= 48}
+
+
+def typography_css(values):
+    selectors = {"title": "h1", "h2": "h2", "h3": "h3", "h4": "h4",
+                 "body": "body,p,li,td,th,blockquote,pre,p.note-evidence,p.source-meta"}
+    return "\n".join(f"{selectors[key]} {{ font-size: {value * 0.75:g}pt; }}"
+                     for key, value in normalize_typography(values).items())
+
 BACKGROUND_ROLES = {
     "conclusion": ("F0F5FD", 11, 9), "note-problem": ("FFF4F1", 9, 7),
     "note-improve": ("F0FAF6", 9, 7), "note-rewrite": ("F1F5FF", 9, 7),

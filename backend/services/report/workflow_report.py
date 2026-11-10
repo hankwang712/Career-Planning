@@ -7,6 +7,7 @@ from .development import HORIZONS, build_development_path, task_horizon
 from .presentation import ReportPresentation, validate_reader_report
 from .reader_sections import READER_LAYOUT, build_reader_sections
 from .reading_format import number_report_headings
+from .quality import validate_analysis_for_publication, validate_rendered_tasks
 
 
 DECISIONS = {"recommended": "建议优先考虑", "conditional": "满足条件后考虑",
@@ -17,6 +18,7 @@ def build_report_bundle(username, report_id, profile, state, model_name):
     from backend.advisor.telemetry import summarize_executions
 
     results = state["results"]
+    validate_analysis_for_publication(state)
     decision = results["career_decision"].get("data", {})
     plan = results["action_planning"].get("data", {})
     review = state["review"]
@@ -43,6 +45,7 @@ def build_report_bundle(username, report_id, profile, state, model_name):
         actions.append({"id": task["task_id"], "title": task["title"], "deliverable": task["deliverable"],
                         "acceptance_criteria": task["acceptance_criteria"], "deadline": due.isoformat()})
     sections, order = build_reader_sections(state, profile, presentation, selected, assessment, checks, start)
+    validate_rendered_tasks(sections.get("gap_action_plan", {}).get("markdown", ""), plan.get("tasks", []), start, constraints["deadline"])
     title = selected["title"]
     # Preserve the established document title while changing the reading layout.
     title += " · 职业生涯发展报告"

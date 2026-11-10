@@ -1,5 +1,36 @@
 (function () {
   "use strict";
+  const typographyKey = "career-report-typography-v1";
+  const defaults = { title: 28, h2: 22, h3: 18, h4: 16, body: 14 };
+  let typography = {};
+  try { typography = JSON.parse(localStorage.getItem(typographyKey) || "{}"); } catch (_) {}
+  typography = Object.fromEntries(Object.entries(defaults).map(([key, value]) =>
+    [key, Number.isFinite(typography?.[key]) && typography[key] >= 10 && typography[key] <= 48 ? typography[key] : value]));
+  function applyTypography() {
+    Object.entries(typography).forEach(([key, value]) => document.documentElement.style.setProperty(`--report-font-${key}`, `${value}px`));
+    document.querySelectorAll("[data-report-font]").forEach(input => { input.value = typography[input.dataset.reportFont]; });
+  }
+  function typographyControls() {
+    return `<details class="cr-reader-typography"><summary>报告字号</summary><div class="cr-reader-typography-fields">${Object.entries({ title: "报告标题", h2: "一级标题", h3: "二级标题", h4: "三级标题", body: "正文" }).map(([key, label]) =>
+      `<label>${label}<input type="number" min="10" max="48" step="1" value="${typography[key]}" data-report-font="${key}" aria-label="${label}字号（像素）"><span>px</span></label>`).join("")}<button type="button" data-report-font-reset>恢复默认</button></div></details>`;
+  }
+  document.addEventListener("change", event => {
+    const key = event.target.dataset?.reportFont;
+    if (!Object.hasOwn(defaults, key)) return;
+    const value = Number(event.target.value);
+    if (Number.isInteger(value) && value >= 10 && value <= 48) {
+      typography[key] = value;
+      try { localStorage.setItem(typographyKey, JSON.stringify(typography)); } catch (_) {}
+    }
+    applyTypography();
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest("[data-report-font-reset]")) return;
+    typography = { ...defaults };
+    try { localStorage.removeItem(typographyKey); } catch (_) {}
+    applyTypography();
+  });
+  applyTypography();
   function shortHeading(value, limit = 38) {
     const chars = Array.from(String(value).trim().replace(/\s+/g, " "));
     const pairs = { "（": "）", "(": ")", "“": "”", "「": "」", "《": "》" };
@@ -138,7 +169,7 @@
       }
       (group || chapter).append(node);
     });
-    return output.outerHTML;
+    return typographyControls() + output.outerHTML;
   }
-  window.CareerReportReader = { enhance, prepare, numberMarkdown };
+  window.CareerReportReader = { enhance, prepare, numberMarkdown, getTypography: () => ({ ...typography }) };
 })();

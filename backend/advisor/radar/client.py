@@ -24,6 +24,7 @@ import httpx
 
 from .vendor.sync_tencent_docs import field_value, is_expired, map_industry, parse_sheet
 from ..utils.recruitment_dates import publication_state
+from .job_sources import deduplicate_jobs, read_jobhunter_jobs
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT.parents[2] / "data" / "app_data" / "recruitment-radar"
@@ -121,14 +122,7 @@ def normalize_job(row, *, source_type="import", source_name="导入数据", snap
 
 
 def deduplicate(jobs):
-    result = {}
-    for job in jobs:
-        if not job:
-            continue
-        key = tuple(job.get(k, "") for k in ("company", "role", "city", "batch", "url"))
-        if key not in result or text(job.get("updated_at")) > text(result[key].get("updated_at")):
-            result[key] = job
-    return list(result.values())
+    return deduplicate_jobs(jobs)
 
 
 def read_jobs():
@@ -551,20 +545,40 @@ def extract_jobs(page, site):
     return deduplicate(jobs)
 
 
+def role_match_score(job, role):
+    """Specific direction words must match; generic '开发/算法' alone cannot consume recall."""
+    title = str(job.get("role", "")).casefold()
+    role = str(role).casefold()
+    if re.search(r"大模型.*应用|llm.*应用|rag|agent|智能体", role):
+        # Agent/RAG are common names for LLM application roles. Conversely,
+        # a generic foundation-model algorithm title does not establish this direction.
+        application = re.findall(r"rag|agent|智能体|大模型应用|ai应用", title)
+        if application:
+            return 10 if len(title) < 70 else 5
+        if not re.search(r"rag|agent|智能体|应用开发|应用工程", str(job.get("description", "")), re.I):
+            return 0
+        return 3
+    terms = [term for term in re.split(r"[\s、/，,（）()]+", role) if term]
+    score = sum(4 for term in terms if term in title)
+    compact = re.sub(r"\s+", "", role)
+    if len(compact) >= 3 and compact in re.sub(r"\s+", "", title):
+        return max(score, 12)
+    distinctive = re.findall(r"多模态|大模型|智能驾驶|计算机视觉|自然语言|强化学习|推荐|搜索|后端|服务端|前端|运营|产品|设计|测试|金融|财务|销售|agent|rag|vlm|llm|java|python", role, re.I)
+    if distinctive:
+        return max(score, sum(3 for term in distinctive if term in title)) if any(term in title for term in distinctive) else 0
+    core = re.sub(r"工程师|实习生|研究员|专家|资深|高级|初级|开发|研发|算法|方向|岗位", "", compact)
+    if len(core) >= 2:
+        return max(score, 3) if core in title else 0
+    return max(score, 2) if compact and compact in title else 0
+
+
+def candidate_identity(job):
+    return tuple(str(job.get(key, "")).strip() for key in ("company", "role", "city", "batch", "url"))
+
+
 def match_score(job, roles=(), cities=(), companies=(), recruitment_types=(), query=""):
-    role_text = job["role"].casefold()
     haystack = " ".join(text(job.get(k)) for k in ("company", "role", "city", "batch", "industry")).casefold()
-    score = 0
-    for role in roles:
-        terms = [term for term in re.split(r"[\s、/，,]+", role.casefold()) if term]
-        score = max(score, sum(4 for term in terms if term in role_text))
-        compact_role = re.sub(r"\s+", "", role.casefold())
-        compact_title = re.sub(r"\s+", "", role_text)
-        if len(compact_role) >= 3 and compact_role in compact_title:
-            score = max(score, 12)
-        # Short common role concepts keep matching useful with natural-language expansions.
-        concepts = re.findall(r"大模型|算法|后端|服务端|前端|研发|开发|运营|产品|设计|测试|金融|财务|销售|agent|rag|java|python", role, re.I)
-        score = max(score, sum(2 for term in concepts if term.casefold() in role_text))
+    score = max((role_match_score(job, role) for role in roles), default=0)
     if roles and score == 0:
         return 0
     if cities and not any(city in job["city"] for city in cities) and job["city"] and job["city"] not in {"多地", "全国"}:
@@ -584,10 +598,38 @@ def match_score(job, roles=(), cities=(), companies=(), recruitment_types=(), qu
 
 
 async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
-    data = await sync_jobs(publish=publish)
+    async def radar_data():
+        try:
+            return await sync_jobs(publish=publish)
+        except (httpx.HTTPError, OSError, ValueError):
+            cached = read_jobs()
+            cached["limitations"].append("Radar 同步未完成，本轮使用其缓存及 JobHunter 本地岗位。")
+            return {**cached, "status": "partial"}
+    data, market = await asyncio.gather(radar_data(), asyncio.to_thread(read_jobhunter_jobs))
+    market_jobs = []
+    for row in market["jobs"]:
+        job = normalize_job(row, source_type="jobhunter", source_name=row["source_name"], snapshot_at=row["snapshot_at"])
+        if job:
+            job.update(source_record_id=row["source_record_id"], salary=row.get("salary", ""),
+                       published_at_source=row["published_at_source"])
+            market_jobs.append(job)
+    radar_count = len(data["jobs"])
+    combined = [*data["jobs"], *market_jobs]
+    data["jobs"] = deduplicate(combined)
+    data["limitations"] = list(dict.fromkeys([*data["limitations"], *market["limitations"]]))
+    merge_stats = {"radar_records": radar_count, "jobhunter_records": len(market_jobs),
+                   "merged_records": len(data["jobs"]), "duplicates_removed": len(combined) - len(data["jobs"]),
+                   "jobhunter_status": market["status"]}
+    if market["status"] == "unavailable":
+        data["status"] = "partial"
+    if publish:
+        await publish("merge", title="合并 Radar 与 JobHunter 岗位", **merge_stats)
     roles = list(dict.fromkeys([*intent.get("roles", []), *intent.get("expanded_roles", [])]))
+    excluded = {tuple(row) for row in intent.get("_excluded_records", []) if isinstance(row, (list, tuple)) and len(row) == 5}
     ranked, audits = [], []
     for job in data["jobs"]:
+        if candidate_identity(job) in excluded:
+            continue
         if intent.get("published_after") and publication_state(job.get("published_at"), published_after=intent["published_after"]) == "outside_window":
             continue
         score = match_score(job, roles, intent.get("cities", []), intent.get("companies", []), intent.get("recruitment_types", []), request)
@@ -596,18 +638,22 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
     ranked.sort(key=lambda pair: (not is_expired(pair[1]["deadline"]), pair[0], bool(pair[1].get("url") or pair[1].get("announcement_url")), pair[1].get("updated_at", "")), reverse=True)
     if intent.get("published_after"):
         ranked.sort(key=lambda pair: publication_state(pair[1].get("published_at"), published_after=intent["published_after"]) != "within_window")
-    # Do not let the larger city's pool consume the entire recall window.
+    # Reserve coverage across each requested direction and city, rather than
+    # allowing one broad direction or larger city's pool to consume the budget.
     cities = intent.get("cities", [])
     remaining, selected = [job for _, job in ranked], []
-    if len(cities) > 1:
+    directions = intent.get("roles", []) or [""]
+    if len(cities) > 1 or len(directions) > 1:
         while remaining and len(selected) < limit:
             added = False
-            for city in cities:
-                job = next((row for row in remaining if city in row["city"]), None)
-                if job is not None and len(selected) < limit:
-                    selected.append(dict(job))
-                    remaining.remove(job)
-                    added = True
+            for direction in directions:
+                for city in cities or [""]:
+                    job = next((row for row in remaining if (not city or city in row["city"])
+                                and (not direction or role_match_score(row, direction))), None)
+                    if job is not None and len(selected) < limit:
+                        selected.append(dict(job))
+                        remaining.remove(job)
+                        added = True
             if not added:
                 break
     selected.extend(dict(job) for job in remaining[:limit - len(selected)])
@@ -619,13 +665,15 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
         reason = "截止日期已过" if is_expired(job["deadline"]) else "招聘汇总线索，等待岗位语义核对"
         audit = {"page": 1, "rank": index, "title": f"{job['company']} · {job['role']}", "url": job["url"],
             "article_url": job.get("announcement_url"), "published_at": job.get("published_at"), "updated_at": job.get("updated_at"),
-            "source_type": job["source_type"], "status": "old" if is_expired(job["deadline"]) else "retained", "reason": reason,
+            "source_type": job["source_type"], "source_name": job["source_name"], "provenance": job.get("provenance", []),
+            "status": "old" if is_expired(job["deadline"]) else "retained", "reason": reason,
             "read": job["detail_state"] == "read", "content_preview": job.get("description", "")[:1000]}
         audits.append(audit)
         if publish:
-            await publish("candidate", query="校招雷达招聘汇总与官网", **audit)
+            await publish("candidate", query="Radar 与 JobHunter 合并岗位检索", **audit)
     return {"status": data["status"], "jobs": selected, "total_records": len(data["jobs"]), "matched_records": len(ranked),
-        "candidates": audits, "limitations": data["limitations"], "mode": data["mode"], "fetched_at": data.get("fetched_at")}
+        "candidates": audits, "limitations": data["limitations"], "mode": data["mode"], "fetched_at": data.get("fetched_at"),
+        "merge_stats": merge_stats}
 
 
 async def enrich_jobs(selected, read_limit=5, publish=None):

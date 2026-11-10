@@ -5,7 +5,8 @@
     "dev": "vite",
     "build": "node scripts/sync-vendors.mjs && vite build",
     "sync:vendors": "node scripts/sync-vendors.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "node tests/app-cursor.cjs && node tests/report-agent-console.cjs && node tests/career-profile.cjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -15,6 +16,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
+    "playwright": "1.60.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "vite": "^6.2.0"

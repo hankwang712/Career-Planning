@@ -1,12 +1,23 @@
-/* Shared native cursor. The hotspot is the glove's raised fingertip. */
+/* Native fallback; the page overlay avoids browser cursor clipping at viewport edges. */
 @media (any-hover:hover) and (any-pointer:fine) {
     :root {
         --app-cursor:url("assets/cursors/white-glove.png") 6 3;
     }
 
     html,html * {
-        cursor:var(--app-cursor),auto!important;
+        cursor:var(--app-cursor-value,var(--app-cursor),auto)!important;
     }
+
+    html[data-app-cursor-overlay] { --app-cursor-value:none; }
+    .app-cursor-overlay {
+        position:fixed; inset:auto; top:0; left:0; margin:0; padding:0;
+        width:36px; height:42px; border:0; background:transparent;
+        background-image:url("assets/cursors/white-glove.png"); background-size:contain;
+        pointer-events:none!important; user-select:none; z-index:2147483647;
+        transform:translate3d(var(--cursor-x,-100px),var(--cursor-y,-100px),0);
+        visibility:hidden; overflow:visible;
+    }
+    .app-cursor-overlay.is-visible { visibility:visible; }
 
     textarea,
     input:not([type="button"],[type="submit"],[type="reset"],[type="checkbox"],[type="radio"],[type="range"],[type="color"],[type="file"]),
@@ -14,7 +25,7 @@
         cursor:text!important;
     }
 
-    :disabled,[aria-disabled="true"] {
+    :disabled,:disabled *,[aria-disabled="true"],[aria-disabled="true"] * {
         cursor:not-allowed!important;
     }
 
@@ -26,7 +37,12 @@
         cursor:grabbing!important;
     }
 
-    .report-editor-col-resizer,
+    .report-console-canvas,.report-console-canvas * { cursor:grab!important; }
+    .report-console-canvas :is(button,a,input,[data-agent-key]),
+    .report-console-canvas :is(button,a,input,[data-agent-key]) * { cursor:var(--app-cursor-value,var(--app-cursor),auto)!important; }
+    .report-console-canvas.is-panning,.report-console-canvas.is-panning * { cursor:grabbing!important; }
+
+    .report-editor-col-resizer,.report-editor-col-resizer *,
     body[style*="col-resize"],body[style*="col-resize"] * {
         cursor:col-resize!important;
     }

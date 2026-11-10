@@ -7,7 +7,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware, after_model
 from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
 from langchain.agents.structured_output import StructuredOutputError
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import merge_configs
 from langgraph.errors import GraphRecursionError
@@ -140,6 +140,56 @@ class BaseAgent(ABC):
 
     async def arun(self, payload: dict, config: RunnableConfig | None = None) -> dict:
         return await self._arun_prepared(self.prepare(payload), config=config)
+
+    async def _arun_validated_json(self, prepared, config=None):
+        """Use explicit schema feedback for analyses whose tools already ran before generation."""
+        if not self.should_run(prepared):
+            return {**self.format_result(), "execution": AgentMetrics().summary()}
+        schema = self.get_output_schema(prepared)
+        metrics, feedback = AgentMetrics(), []
+        messages = [SystemMessage(content=self.system_prompt + "\n直接返回符合下列Schema的JSON对象，不调用工具，不使用Markdown围栏：\n"
+                    + json.dumps(schema.model_json_schema(mode="validation"), ensure_ascii=False)),
+                    *self.make_inputs(prepared)["messages"]]
+        attempts = min(3, self.max_model_calls)
+        for attempt in range(1, attempts + 1):
+            try:
+                response = await self.model.bind(response_format={"type": "json_object"}).ainvoke(
+                    messages, config=merge_configs(config, {"callbacks": [metrics]}))
+            except Exception as error:
+                result = self.format_result(error=error)
+                break
+            content = response.content
+            if isinstance(content, list):
+                content = "".join(block if isinstance(block, str) else block.get("text", "")
+                                  for block in content if isinstance(block, (str, dict)))
+            if not isinstance(content, str):
+                content = ""
+            import re
+            fenced = re.fullmatch(r"\s*```(?:json)?\s*([\s\S]*?)\s*```\s*", content)
+            if fenced:
+                content = fenced[1]
+            if (response.response_metadata or {}).get("finish_reason") == "length":
+                detail = "输出达到长度上限；请精简说明，保留实际经历、来源和必要字段，不能删除事实限定。"
+            else:
+                try:
+                    draft = schema.model_validate_json(content)
+                except ValidationError as error:
+                    detail = "；".join(".".join(map(str, item["loc"])) + ": " + item["msg"]
+                        for item in error.errors(include_input=False, include_context=False, include_url=False)[:8])
+                else:
+                    result = self.format_result(draft)
+                    break
+            feedback.append({"attempt": attempt, "error": detail})
+            result = {"agent": self.name, "status": "validation_failed", "data": {}, "error": detail}
+            if attempt < attempts:
+                messages.extend([AIMessage(content=content), HumanMessage(content=
+                    "上次JSON未通过事实/结构校验，逐项修正后返回完整JSON。保持已给事实和真实引文；"
+                    "没有证据的画像项删除，无法可靠改写时rewrite=null，不补造来源或个人归属：\n" + detail)])
+        result["execution"] = {**metrics.summary(), "output_mode": "validated_json", "attempts": attempt,
+            "model": getattr(self.model, "model_name", None) or getattr(self.model, "model", None)}
+        if feedback:
+            result["validation_feedback"] = feedback
+        return result
 
     async def _arun_prepared(self, prepared: dict, config: RunnableConfig | None = None) -> dict:
         """执行已整理的输入，供需要基于同一份材料校验结果的子类复用。"""

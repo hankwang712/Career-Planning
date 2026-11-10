@@ -10,6 +10,8 @@ from ..resume_rubric import DEFAULT_EXPERIENCE_WEIGHTS, EXPERIENCE_WEIGHTS, RESU
 from ..schemas.resume import ResumeAnalysis, ResumeInput
 from ..tools.document import read_document
 from ..utils.dates import education_timeline_context, resume_date_context, verify_education_timeline_claims
+from ..utils.resume_grounding import normalized, verify_resume_grounding
+from ..utils.decision_grounding import model_attribution_questions
 from .base import BaseAgent
 
 
@@ -103,6 +105,13 @@ class ResumeAnalysisAgent(BaseAgent):
             role = ""
         prepared["target_role"] = role
         prepared["document"] = document
+        prepared["analysis_boundaries"] = {
+            "original_visual_layout_available": False,
+            "text_extraction_limit": "仅有正文；双栏编号、断行和单字漏识别不能作为原稿排版或错别字扣分依据，只能建议核对原稿。",
+            "rewrite_policy": "仅摘录重组本条证据已经明确的事实；未知个人分工、团队人数、实现细节只追问，rewrite=null。",
+            "experience_policy": "只有奖项名称的列表不构成可评分经历；保留在教育成长维度。",
+            "qualification_policy": "学段日期结束不等于已毕业或已取得学位；学校和专业不证明未写明的学历层次。",
+        }
         prepared["additional_evidence"] = "\n".join(filter(None, [
             prepared["additional_evidence"],
             *(item["answer"] for item in prepared["clarifications"]),
@@ -122,23 +131,28 @@ class ResumeAnalysisAgent(BaseAgent):
         # 只有岗位或补充材料而没有简历正文时，不让模型虚构一份诊断。
         return bool(prepared["raw_resume"])
 
+    async def _arun_prepared(self, prepared, config=None):
+        return await self._arun_validated_json(prepared, config=config)
+
     def get_output_schema(self, prepared: dict):
-        def normalize_quote(text):
-            # OCR 会把百分数写为 \(3\%\)；仅去除数学定界符和字符转义，保留事实。
-            text = re.sub(r"\\[()\[\]]|\\(?=[%_#&{}$])", "", text)
-            return re.sub(r"\s+", "", text)
+        normalize_quote = normalized
 
         class EvidencedResumeAnalysis(ResumeAnalysis):
             @model_validator(mode="after")
             def verify_profile_quotes(self):
+                for question in model_attribution_questions(prepared.get("raw_resume", "")):
+                    if question not in self.missing_information:
+                        self.missing_information.append(question)
                 errors = verify_education_timeline_claims(self.model_dump(), prepared.get("raw_resume", ""))
+                errors.extend(verify_resume_grounding(self.model_dump(), prepared))
                 if errors:
                     raise ValueError("；".join(errors))
                 for fact in self.career_profile:
                     quote = normalize_quote(fact.quote)
                     source = normalize_quote(prepared.get(fact.source, ""))
                     if not quote or quote not in source:
-                        raise ValueError("职业画像必须引用对应用户材料中的连续原文")
+                        raise ValueError(f"职业画像 {fact.field} 的 quote 不是 {fact.source} 的连续原文（该来源{'为空' if not source else '未含此引文'}）；"
+                                         "请删除该画像项或引用真实来源，不把 target_role/preferences 复制成 additional_evidence")
                 for highlight in self.highlights:
                     for evidence in highlight.evidence:
                         if evidence.source == "education_context" or evidence.status == "missing" or not normalize_quote(evidence.quote) or normalize_quote(evidence.quote) not in normalize_quote(prepared.get(evidence.source, "")):

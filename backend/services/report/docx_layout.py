@@ -14,7 +14,7 @@ NOTE_STYLES = [
 ]
 
 
-def format_report_docx(path):
+def format_report_docx(path, typography=None):
     from docx import Document
     from docx.enum.style import WD_STYLE_TYPE
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -138,4 +138,20 @@ def format_report_docx(path):
                 recolor(paragraph, "1B5B8B")
             if re.match(r"^(?:来源|地点)[：:]", text):
                 recolor(paragraph, "667B90", 9)
+    from .html_layout import normalize_typography
+    sizes = normalize_typography(typography)
+    if sizes:
+        style_keys = {"Title": "title", "Heading 1": "h2", "Heading 2": "h3", "Heading 3": "h4"}
+        for paragraph in doc._element.body.xpath(".//w:p"):
+            from docx.text.paragraph import Paragraph
+            item = Paragraph(paragraph, doc._body)
+            key = style_keys.get(item.style.name, "body")
+            if key in sizes:
+                # Include hyperlink runs, which paragraph.runs does not expose.
+                for run in paragraph.xpath(".//w:r"):
+                    from docx.text.run import Run
+                    Run(run, item).font.size = Pt(sizes[key] * 0.75)
+        for name, key in {**style_keys, "Normal": "body"}.items():
+            if key in sizes:
+                doc.styles[name].font.size = Pt(sizes[key] * 0.75)
     doc.save(str(path))

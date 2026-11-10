@@ -213,6 +213,10 @@ function renderResult(event) {
       const row = element("div", undefined, "source");
       const count = search.coverage || {};
       row.append(element("h3", search.query), element("p", `检查 ${count.pages_checked || 0} 页；识别 ${count.indexed_candidates || 0} 条，检查 ${count.checked_candidates || 0} 条，读取 ${count.read_articles || 0} 篇。`, "small muted"));
+      if (search.merge_stats) {
+        const merged = search.merge_stats;
+        row.append(element("p", `Radar ${merged.radar_records} 条 + JobHunter ${merged.jobhunter_records} 条，合并后 ${merged.merged_records} 条，去除重复 ${merged.duplicates_removed} 条。`, "small muted"));
+      }
       const list = element("ul", undefined, "limitations");
       for (const candidate of search.candidates || []) list.append(element("li", `第${candidate.page}页第${candidate.rank}条 · ${candidate.title} · ${statuses[candidate.status] || candidate.status}：${candidate.reason}`));
       row.append(list);
@@ -286,9 +290,10 @@ function receive(event) {
       planning: "理解岗位与招聘类别", plan: "已生成岗位语义查询计划", collecting: "按查询计划收集多条候选", verifying: "优先核验岗位相关候选的原文与入口", reviewing: "批量核对正文与用户需求",
       review_complete: `正文核对完成：有效 ${event.qualified}/${event.target} 条`, expanding: "有效招聘不足，补查对应岗位", page: `继续检查第${event.page}页`,
       candidate: `第${event.page}页第${event.rank}条 · ${({retained:"保留候选",excluded:"已排除",old:"日期超出范围",future:"日期异常",failed:"读取失败",duplicate:"重复",not_checked:"未检查"})[event.status] || "核对"}`,
-      coverage: `本次查询：检查 ${event.checked_candidates} 条，保留 ${event.retained} 条候选`, sync: "同步腾讯文档公开招聘汇总", validation: "正在修正正文核对结果", verification: "需要手动完成浏览器验证，已暂停搜索" };
+      coverage: `本次查询：检查 ${event.checked_candidates} 条，保留 ${event.retained} 条候选`, sync: "同步腾讯文档公开招聘汇总", merge: "合并 Radar 与 JobHunter 岗位并去重", validation: "正在修正正文核对结果", verification: "需要手动完成浏览器验证，已暂停搜索" };
     currentAction = labels[event.phase] || "核对招聘信息";
     let detail = event.phase === "search" ? `实际搜索词：${event.query}` : [event.title, event.reason].filter(Boolean).join("\n");
+    if (event.phase === "merge") detail = `Radar ${event.radar_records} 条 + JobHunter ${event.jobhunter_records} 条，去重后 ${event.merged_records} 条；移除 ${event.duplicates_removed} 条重复。`;
     if (event.queries) detail = event.queries.map((query, index) => `${index + 1}. ${query.query} · ${query.recruitment_type}\n${query.purpose}`).join("\n");
     if (event.phase === "review_complete") detail = (event.reviews || []).map((review) => `${review.source_id} · ${({qualified:"有效招聘",lead:"待核实",rejected:"排除"})[review.verdict]} · ${review.reason}`).join("\n");
     log(currentAction, detail, seconds);

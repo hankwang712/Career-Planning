@@ -109,7 +109,10 @@ class ReportPresentation:
 
 
 def profile_lines(resume, profile):
-    facts = {item["field"]: item["value"] for item in resume.get("career_profile", [])}
+    grouped = {}
+    for item in resume.get("career_profile", []):
+        grouped.setdefault(item["field"], []).append(item["value"])
+    facts = {field: "；".join(unique_text(values)) for field, values in grouped.items()}
     basics = profile.get("basics") or {}
     lines = []
     for label, fact, field in (("学历与在读状态", "education", "education"), ("专业", "major", "major"),

@@ -231,7 +231,7 @@ flowchart LR
 
 简历、目标岗位和招聘雷达并行分析，结果汇总后进入职业决策与行动规划。工作流保存检查点，支持失败重试、用户补充信息后继续执行。
 
-招聘雷达从公开招聘汇总表筛选岗位，再读取招聘链接核对内容。独立测试台启动命令：`python backend/tools/recruitment_lab/app.py`，访问 <http://127.0.0.1:8766/>；数据工作台位于 `/radar`，可手动同步、筛选及导入岗位。模型与可选正文提取服务使用根目录 `.env` 配置。
+招聘雷达合并 Radar 公开招聘汇总与 JobHunter 本地岗位库，按公司、岗位、城市、招聘批次和职位 ID 去重后筛选，再读取招聘链接核对内容。合并保留各来源及日期，不修改原始岗位库；岗位采集时间不代表公告发布日期或仍开放。JobHunter 尚未采集或岗位库暂不可用时，会说明缺项并继续使用 Radar。独立测试台启动命令：`python backend/tools/recruitment_lab/app.py`，访问 <http://127.0.0.1:8766/>；数据工作台位于 `/radar`，可手动同步、筛选及导入岗位。模型与可选正文提取服务使用根目录 `.env` 配置。
 
 <a id="configuration"></a>
 
@@ -300,6 +300,12 @@ career-agent/
 ├── .env.example                  # 环境配置模板
 └── compose.yml                   # PostgreSQL / pgvector 与 Redis
 ```
+
+## 回归测试
+
+后端使用已安装项目依赖的 Python 环境运行：`python -m unittest discover -s backend/tests`。
+前端先运行 `npm install` 和 `npx playwright install chromium`，再运行 `npm run test:browser --workspace frontend`。
+浏览器测试默认不保存截图；需要视觉检查时，可将 `CAREER_TEST_SCREENSHOTS` 设置为本地输出目录（例如 `output/browser-tests`）。
 
 ## 致谢
 

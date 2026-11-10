@@ -6,6 +6,29 @@
   const tests = { mbti: "MBTI 性格倾向", holland: "霍兰德职业兴趣", deep: "深层 MBTI", friends: "老友记角色", insideout: "情绪主导", sbti: "SBTI 人格扩展" };
   const sources = { manual: "本人填写", resume: "简历提取", assessment: "测评中心", local_assessment: "浏览器测评记录" };
   const statuses = { active: "进行中", completed: "已达成", paused: "已暂停" };
+  const entryConfig = {
+    education: { icon: "school", title: "学校名称", placeholder: "例如：浙江大学", fields: [["major", "专业", "例如：计算机科学与技术"], ["degree", "学历", "例如：本科"], ["period", "就读时间", "例如：2023.09 — 2027.06"]], detail: "课程、研究与在校收获", hint: "记录与你的职业方向相关的课程、研究或在校成果。" },
+    experience: { icon: "work", title: "项目 / 公司名称", placeholder: "例如：智能求职助手项目", fields: [["role", "担任角色", "例如：后端开发 / 项目负责人"], ["organization", "所属团队 / 公司", "例如：校内创新团队"], ["period", "起止时间", "例如：2026.03 — 至今"]], detail: "具体贡献与成果", hint: "写清你负责什么、如何完成，以及最终取得的成果。可以分行记录。" },
+    certificate: { icon: "award", title: "证书名称", placeholder: "例如：大学英语六级", fields: [["issuer", "颁发机构", "例如：教育部教育考试院"], ["obtained", "取得时间", "例如：2026.06"]], detail: "成绩与补充说明", hint: "可以补充成绩、有效期，或证书对应的专业能力。" },
+    interest: { icon: "spark", title: "感兴趣的方向", placeholder: "例如：AI 产品与应用开发", fields: [["activity", "正在探索的活动", "例如：开源贡献、产品设计、阅读研究"]], detail: "为什么感兴趣", hint: "哪些工作会让你主动投入？写下你想持续探索的事情。" },
+    preference: { icon: "compass", title: "偏好名称", placeholder: "例如：我的第一份实习", fields: [["cities", "期望城市", "例如：杭州、上海"], ["mode", "工作方式", "例如：线下 / 混合办公"], ["industry", "行业方向", "例如：互联网、人工智能"]], detail: "其他期待与限制", hint: "可以补充到岗时间、每周出勤天数和你看重的工作氛围。" }
+  };
+  const iconPaths = { school: '<path d="m3 9 9-5 9 5-9 5-9-5Z"/><path d="M6 11v6c4 3 8 3 12 0v-6M21 9v7"/>', work: '<rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V4h8v3M3 12c5 4 13 4 18 0M10 13h4"/>', award: '<circle cx="12" cy="8" r="5"/><path d="m8 12-2 9 6-3 6 3-2-9"/>', spark: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z"/>', arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>' };
+  const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name] || iconPaths.spark}</svg>`;
+  function splitEntry(row) {
+    const values = {}, lines = [];
+    const fields = entryConfig[row.kind]?.fields || [];
+    String(row.description || "").split("\n").forEach(line => {
+      const match = fields.find(([, label]) => line.startsWith(label + "："));
+      if (match && !Object.hasOwn(values, match[0])) values[match[0]] = line.slice(match[1].length + 1);
+      else lines.push(line);
+    });
+    return { values, description: lines.join("\n").trim() };
+  }
+  function entryRow(row) {
+    const { values, description } = splitEntry(row);
+    return `<article class="cp-row cp-entry cp-entry--${row.kind}"><span class="cp-entry-icon">${icon(entryConfig[row.kind].icon)}</span><div class="cp-entry-body"><div class="cp-row-top"><h4>${esc(row.title)}</h4>${values.period || values.obtained ? `<span class="cp-entry-date">${esc(values.period || values.obtained)}</span>` : ""}</div><div class="cp-entry-tags">${Object.entries(values).filter(([key]) => !["period", "obtained"].includes(key)).map(([, value]) => `<span class="cp-tag">${esc(value)}</span>`).join("")}</div>${description ? `<p class="cp-entry-description">${esc(description)}</p>` : ""}<div class="cp-entry-footer">${metadata(row)}${actions("entries", row)}</div></div></article>`;
+  }
   let data = null, editing = null, loading = false, loadedOwner = "";
   const el = id => document.getElementById(id);
   const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
@@ -29,17 +52,20 @@
     el("cpSkillCount").textContent = data.skills.length;
     const updated = [profile, ...data.entries, ...data.skills, ...data.evidence, ...data.goals, ...data.assessments, ...data.resumes].map(row => row.updated_at).filter(Boolean).sort().at(-1);
     el("cpUpdated").textContent = updated ? `最近更新 ${date(updated)} · 资料按来源保留，可持续补充` : "从一段经历或一项技能开始，建立你的第一份职业档案。";
-    const basics = `<h3 class="cp-name">${esc(profile.display_name || user?.display_name || "我的职业画像")}</h3><p class="cp-headline">${esc(profile.headline || "写下一句话，介绍你正在探索的职业方向。")}</p><div class="cp-facts">${[stages[profile.stage], profile.city].filter(Boolean).map(text => `<span class="cp-tag">${esc(text)}</span>`).join("")}</div><p>${esc(profile.summary || "还没有个人简介。可以描述你的背景、擅长的工作，以及希望发展的方向。")}</p>${profile.id ? metadata(profile) + button("history", "查看资料修改记录", "profile", profile.id) : ""}`;
+    const name = profile.display_name || user?.display_name || "我的职业画像";
+    const basics = `<div class="cp-person"><span class="cp-avatar">${esc(Array.from(name)[0])}</span><div><span class="cp-eyebrow">CAREER IDENTITY</span><h3 class="cp-name">${esc(name)}</h3><p class="cp-headline">${esc(profile.headline || "下一站的方向，由你定义。")}</p></div></div><div class="cp-facts">${[stages[profile.stage], profile.city].filter(Boolean).map(text => `<span class="cp-tag">${esc(text)}</span>`).join("")}</div><p class="cp-bio">${esc(profile.summary || "把你的专业背景、擅长的事和期待的方向写在这里，让每一段经历都有自己的位置。")}</p><div class="cp-entry-footer">${profile.id ? metadata(profile) : '<span class="cp-meta">从认识自己开始</span>'}<div class="cp-actions">${button("edit-profile", "完善个人介绍 ↗")}${profile.id ? button("history", "查看修改记录", "profile", profile.id) : ""}</div></div>`;
     const entryCards = Object.entries(kinds).map(([kind, label]) => {
       const rows = data.entries.filter(row => row.kind === kind);
-      const content = rows.length ? rows.map(row => `<article class="cp-row"><h4>${esc(row.title)}</h4><p>${esc(row.description)}</p>${metadata(row)}${actions("entries", row)}</article>`).join("") : empty(`补充${label}`, { education: "学校、专业、学历与毕业时间", experience: "你的职责、完成的工作与具体成果", certificate: "证书名称、颁发机构与取得时间", interest: "你愿意持续投入的领域与活动", preference: "期望城市、工作方式与行业偏好" }[kind]);
-      return card(label, content, `<button type="button" class="cp-text-btn" data-cp-action="add-entry" data-kind="${kind}">＋ 添加</button>`);
+      const content = rows.length ? rows.map(entryRow).join("") : `<button type="button" class="cp-entry-empty" data-cp-action="add-entry" data-kind="${kind}"><span class="cp-empty-icon">${icon(entryConfig[kind].icon)}</span><span><strong>${{ education: "记录你的学习起点", experience: "让做过的事，成为你的底气", certificate: "留下一份专业认可", interest: "找到愿意投入的事", preference: "描绘理想工作的样子" }[kind]}</strong><small>${{ education: "学校、专业与在校收获", experience: "项目、实习或工作，都值得记录", certificate: "证书、资格与取得时间", interest: "感兴趣的领域与正在探索的活动", preference: "城市、行业与工作方式" }[kind]}</small></span><span class="cp-empty-arrow">＋</span></button>`;
+      return `<div class="cp-entry-section cp-entry-section--${kind}">${card(`<span class="cp-section-icon">${icon(entryConfig[kind].icon)}</span>${label}<span class="cp-section-count">${rows.length.toString().padStart(2, "0")}</span>`, content, `<button type="button" class="cp-text-btn" data-cp-action="add-entry" data-kind="${kind}">＋ 添加</button>`)}</div>`;
     });
     const goals = data.goals.filter(row => row.status === "active");
-    const summary = `<div class="cp-note">${data.skills.length} 项技能 · ${data.evidence.length} 条证据 · ${goals.length} 个进行中的目标</div><p>经历、测评和对话提供不同角度的线索。技能是否经过验证，以对应证据为准。</p><div class="cp-actions">${button("tab-skills", "维护技能证据 ↗")}${button("tab-goals", "管理职业目标 ↗")}</div>`;
+    const filled = Object.keys(kinds).filter(kind => data.entries.some(row => row.kind === kind)).length;
+    const nextKind = Object.keys(kinds).find(kind => !data.entries.some(row => row.kind === kind));
+    const summary = `<div class="cp-progress-head"><span>你的经历拼图</span><strong>${filled}<small> / 5 类资料</small></strong></div><div class="cp-progress-track" role="progressbar" aria-label="已记录的资料类别" aria-valuenow="${filled}" aria-valuemin="0" aria-valuemax="5">${Object.keys(kinds).map(kind => `<span class="${data.entries.some(row => row.kind === kind) ? "is-filled" : ""}"></span>`).join("")}</div><div class="cp-stat-grid"><button data-cp-action="tab-skills" type="button"><strong>${data.skills.length}</strong><span>技能</span></button><button data-cp-action="tab-skills" type="button"><strong>${data.evidence.length}</strong><span>技能证据</span></button><button data-cp-action="tab-goals" type="button"><strong>${goals.length}</strong><span>进行中的目标</span></button></div>${nextKind ? `<button class="cp-next-step" type="button" data-cp-action="add-entry" data-kind="${nextKind}"><span>下一步，补充${kinds[nextKind]}</span>${icon("arrow")}</button>` : '<p class="cp-puzzle-done">五类资料已齐备，随时记录新的收获。</p>'}`;
     const memoryLabels = { education: "教育背景", major: "专业", graduation: "毕业时间", skill: "技能", experience: "经历", preference: "职业偏好" };
     const memoryRows = (data.memories || []).map(row => `<article class="cp-row"><h4>${esc(row.subject === "profile" ? memoryLabels[row.key] || "职业线索" : row.subject)}</h4><p>${esc(row.value)}</p><span class="cp-tag ${row.status === "conflict" ? "is-warning" : ""}">${row.status === "conflict" ? "存在冲突，待确认" : "对话自述"}</span><p class="cp-meta">来源：生涯助手记忆 · ${date(row.updated_at)} · 尚未核验</p></article>`).join("");
-    el("cpOverview").innerHTML = `<div class="cp-grid"><div class="cp-stack">${card("基础职业画像", basics)}${entryCards[0]}${entryCards[1]}</div><aside class="cp-stack">${card("档案概况", summary)}${entryCards.slice(2).join("")}${card("对话中的职业线索", memoryRows || empty("暂时没有职业记忆", "与生涯助手交流后，已保存的事实会在这里显示。"), '<a class="cp-text-btn" href="/assistant.html">管理记忆 ↗</a>')}</aside></div>`;
+    el("cpOverview").innerHTML = `<div class="cp-overview-top"><section class="uc-surface cp-card cp-identity-card">${basics}</section><section class="uc-surface cp-card cp-puzzle-card">${summary}</section></div><div class="cp-collection-heading"><div><span class="cp-eyebrow">MY COLLECTION</span><h3>每一段经历，都在塑造你</h3></div><span>记录真实的过程，也留下成长的证据</span></div><div class="cp-collection">${entryCards.join("")}</div><div class="cp-memory-section">${card("从对话中发现的线索", memoryRows || '<p class="cp-memory-empty">和生涯助手聊聊你的经历，已保存的职业线索会归集到这里。</p>', '<a class="cp-text-btn" href="/assistant.html">前往生涯助手 ↗</a>')}</div>`;
     renderSkills();
     el("cpGoals").innerHTML = card("职业发展目标", data.goals.length ? data.goals.map(row => `<article class="cp-row"><div class="cp-row-top"><h4>${esc(row.title)}</h4><span class="cp-tag">${statuses[row.status]}</span></div><p>${esc(row.description)}</p><span class="cp-goal-date">目标日期：${row.target_date ? esc(row.target_date) : "尚未设定"}</span>${metadata(row)}${actions("goals", row)}</article>`).join("") : empty("你想走向哪里？", "设定一个目标方向，再写下希望达成的成果与时间。"), button("add", "＋ 添加目标", "goals"));
     const assessments = [...data.assessments].sort((a, b) => b.completed_at.localeCompare(a.completed_at));
@@ -95,7 +121,7 @@
   }
 
   function field(name, label, value = "", options = {}) {
-    const attrs = `name="${name}" id="cpField-${name}" ${options.required ? "required" : ""}`;
+    const attrs = `name="${name}" id="cpField-${name}" ${options.required ? "required" : ""} ${options.placeholder ? `placeholder="${esc(options.placeholder)}"` : ""}`;
     const control = options.values ? `<select ${attrs}>${Object.entries(options.values).map(([key, text]) => `<option value="${key}" ${value === key ? "selected" : ""}>${esc(text)}</option>`).join("")}</select>`
       : options.multiline ? `<textarea ${attrs} maxlength="2000" rows="4">${esc(value)}</textarea>`
       : `<input ${attrs} type="${options.type || "text"}" maxlength="${options.required ? 120 : 2000}" value="${esc(value)}">`;
@@ -110,7 +136,13 @@
     el("cpEditorTitle").textContent = `${row.id ? "编辑" : "添加"}${titles[key]}`;
     let fields = "";
     if (key === "profile") fields = field("display_name", "姓名 / 昵称", value.display_name) + field("headline", "一句话职业定位", value.headline) + field("city", "所在城市", value.city) + field("stage", "当前阶段", value.stage || "", { values: { "": "请选择", ...stages } }) + field("summary", "个人简介", value.summary, { multiline: true });
-    if (key === "entries") fields = field("title", value.kind === "education" ? "学校 / 教育经历" : "名称", value.title, { required: true }) + field("description", "详细说明", value.description, { multiline: true });
+    if (key === "entries") {
+      const config = entryConfig[value.kind], parsed = splitEntry(value);
+      fields = `<div class="cp-editor-intro"><span class="cp-empty-icon">${icon(config.icon)}</span><p>${config.hint}</p></div>`
+        + field("title", config.title, value.title, { required: true, placeholder: config.placeholder })
+        + `<div class="cp-entry-fields">${config.fields.map(([name, label, placeholder]) => field("entry_" + name, label, parsed.values[name], { placeholder })).join("")}</div>`
+        + field("description", config.detail, parsed.description, { multiline: true, placeholder: config.hint });
+    }
     if (key === "skills") fields = field("name", "技能名称", value.name, { required: true }) + field("category", "所属领域（选填）", value.category);
     if (key === "evidence") fields = field("kind", "证据类型", value.kind || "self_report", { values: { self_report: "用户自述", experience_support: "经历支持（待核验）" } }) + field("title", "证据标题", value.title, { required: true }) + field("description", "你完成的工作、取得的结果与对应材料", value.description, { multiline: true }) + field("url", "项目 / 证书 / 作品链接（选填）", value.url, { type: "url" });
     if (key === "goals") fields = field("title", "目标岗位 / 发展方向", value.title, { required: true }) + field("description", "期望成果与衡量方式", value.description, { multiline: true }) + field("target_date", "目标日期（选填）", value.target_date, { type: "date" }) + field("status", "当前状态", value.status || "active", { values: statuses });
@@ -126,7 +158,19 @@
     if (!editing || editing.owner !== window.getCurrentUser?.()?.username) return;
     const context = editing;
     const payload = { version: context.version, ...Object.fromEntries(new FormData(event.target)) };
-    if (context.key === "entries") payload.kind = context.defaults.kind || data.entries.find(row => row.id === context.id)?.kind;
+    if (context.key === "entries") {
+      payload.kind = context.defaults.kind || data.entries.find(row => row.id === context.id)?.kind;
+      const details = entryConfig[payload.kind].fields.map(([name, label]) => {
+        const value = String(payload["entry_" + name] || "").trim();
+        delete payload["entry_" + name];
+        return value ? `${label}：${value}` : "";
+      }).filter(Boolean);
+      payload.description = [...details, payload.description.trim()].filter(Boolean).join("\n");
+      if (payload.description.length > 2000) {
+        el("cpEditorMessage").textContent = "这条记录的内容合计需在 2000 字以内，请精简后保存。";
+        return;
+      }
+    }
     if (context.key === "evidence") payload.skill_id = context.defaults.skill_id || data.evidence.find(row => row.id === context.id)?.skill_id;
     if (context.key === "goals" && !payload.target_date) payload.target_date = null;
     el("cpSave").disabled = true;

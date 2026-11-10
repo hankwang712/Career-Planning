@@ -1,4 +1,10 @@
 import re
+import asyncio
+import hashlib
+import heapq
+import os
+from pathlib import Path
+from functools import lru_cache
 
 import httpx
 
@@ -9,6 +15,48 @@ from ..schemas.job import JobAnalysisInput, JobSource
 
 class JobRetrievalError(RuntimeError):
     """可安全展示给调用方的检索错误，不携带密钥或服务器原始错误正文。"""
+
+
+@lru_cache(maxsize=16)
+def _local_candidates(path_text, modified, target, question, limit):
+    """Bounded lexical recall from the same original JD export; never classifies a requirement."""
+    from artifacts.research.job_graph import iter_job_documents
+
+    target = re.sub(r"工程师|实习生|开发|方向|高级|资深|招聘|算法|[（）()、，,与和]", " ", target)
+    terms = list(dict.fromkeys(term.casefold() for term in re.findall(r"[A-Za-z][A-Za-z0-9.+-]*|[\u4e00-\u9fff]{2,}", target)))
+    if not terms:
+        return []
+    best = []
+    for document in iter_job_documents(Path(path_text)):
+        content = document.text
+        title = content.splitlines()[0].partition("：")[2].casefold()
+        body = content.casefold()
+        title_hits = sum(term in title for term in terms)
+        body_hits = sum(term in body for term in terms)
+        if not title_hits and body_hits < min(2, len(terms)):
+            continue
+        # A specific title match dominates incidental mentions in unrelated descriptions.
+        score = title_hits * 12 + body_hits
+        candidate = (score, -document.index, document.index, content, document.document_id)
+        if len(best) < limit:
+            heapq.heappush(best, candidate)
+        elif candidate[:2] > best[0][:2]:
+            heapq.heapreplace(best, candidate)
+    return [{"chunk_id": "local-jd-" + hashlib.sha256(content.encode("utf-8")).hexdigest()[:32],
+             "file_path": Path(path_text).as_posix() + f"#record={record}", "reference_id": "local_export",
+             "content": f"招聘记录内部键：{identifier}\n{content}"}
+            for _, _, record, content, identifier in sorted(best, reverse=True)]
+
+
+def local_job_candidates(request, limit=3):
+    path = Path(os.environ.get("JOB_JD_SOURCE_PATH") or Path(__file__).resolve().parents[3] / "job_descriptions.txt")
+    if not path.is_file():
+        return []
+    try:
+        return _local_candidates(str(path.resolve()), path.stat().st_mtime_ns, request.target_role, request.question, limit)
+    except (OSError, ValueError):
+        # An unavailable local export does not discard valid graph results.
+        return []
 
 
 class LightRAGJobRetriever:
@@ -49,6 +97,12 @@ class LightRAGJobRetriever:
                 if source.chunk_id not in seen:
                     seen.add(source.chunk_id)
                     sources.append(source.model_dump())
+            # Supplement semantic misses with a few original records, then let the Agent
+            # assess actual responsibilities. This is recall, not a relevance verdict.
+            local = await asyncio.to_thread(local_job_candidates, request, min(3, request.chunk_top_k))
+            graph_paths = {source["file_path"] for source in sources}
+            local = [source for source in local if source["file_path"] not in graph_paths]
+            sources = [*local, *sources]
             # 限制条数时保留整个 chunk，避免在岗位要求中间硬切文本。
             returned_count = len(sources)
             sources = sources[:request.chunk_top_k]
@@ -66,6 +120,8 @@ class LightRAGJobRetriever:
                     "unidentified_source_count": sum(
                         source["file_path"] not in record_paths for source in sources
                     ),
+                    "local_export_candidates": sum(source["reference_id"] == "local_export" for source in sources),
+                    "retrieval_methods": ["lightrag", "bounded_local_export"] if local else ["lightrag"],
                     "entity_count": len(data.get("entities", [])),
                     "relationship_count": len(data.get("relationships", [])),
                     "description": "仅本次检索样本；JD 数按 record 来源去重，不代表全库或招聘市场统计。",

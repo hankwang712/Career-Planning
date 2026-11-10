@@ -109,6 +109,9 @@ def validate_review(payload: dict, pending: dict) -> dict:
     review = ReportReview.model_validate(payload)
     if review.target_id not in {target["target_id"] for target in pending["targets"]}:
         raise ValueError("请选择本次已分析的目标")
+    assessment = next((item for item in pending.get("assessments", []) if item["target_id"] == review.target_id), None)
+    if assessment and assessment["decision"] == "insufficient_information" and not assessment.get("checks"):
+        raise ValueError("所选方向尚无可核对的岗位要求，暂不能生成有依据的行动计划；请先补充该方向的岗位材料或选择已有对照证据的方向")
     for agent, answers in review.answers.items():
         allowed = set(pending["questions"].get(agent, []))
         questions = [answer.question for answer in answers]

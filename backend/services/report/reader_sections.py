@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 import re
 from urllib.parse import quote, urlsplit
+from backend.advisor.utils.decision_grounding import model_attribution_questions
 
 from .presentation import SCOPE_NOTE, profile_lines, reader_limitations, unique_text
 from .reading_format import readable_markdown, short_report_heading
@@ -57,7 +58,7 @@ def report_link(url, label="查看岗位与投递入口"):
     return f"[{label}]({quote(url, safe=':/?#[]@!$&*+,;=%~-._')})"
 
 
-def resume_review(resume):
+def resume_review(resume, *, include_recommendations=True):
     # The profile and highlights already introduce the candidate; omit the repeated full summary.
     parts = []
     highlights = resume.get("highlights", [])
@@ -104,7 +105,7 @@ def resume_review(resume):
         elif not experience.get("issues"):
             parts.append(paragraphs(dim["assessment"] for dim in experience.get("dimensions", [])))
         issues(experience.get("issues", []))
-    if resume.get("recommendations"):
+    if include_recommendations and resume.get("recommendations"):
         parts.append("### 优先修改顺序")
         has_independent_work = any("独立开发" in (item.get("source_quote", "") + " ".join(dim.get("assessment", "") for dim in item.get("dimensions", []))) for item in resume.get("experiences", []))
         for recommendation in unique_text(resume["recommendations"]):
@@ -143,8 +144,11 @@ def recruitment_review(results, presentation):
         parts.append(f"### {index}. " + title)
         metadata = []
         if source.get("origin") == "radar":
-            kind = {"aggregate": "公开招聘汇总", "snapshot": "历史快照", "official_site": "企业官网或公告", "import": "导入记录"}.get(source.get("source_type"), "招聘来源")
+            kind = {"aggregate": "公开招聘汇总", "snapshot": "历史快照", "official_site": "企业官网或公告", "import": "导入记录", "jobhunter": "JobHunter 岗位库"}.get(source.get("source_type"), "招聘来源")
             metadata.append("来源：招聘雷达 · " + kind)
+            origins = list(dict.fromkeys(row.get("source_name") for row in source.get("provenance", []) if row.get("source_name")))
+            if origins:
+                metadata.append("采集来源：" + "、".join(origins))
         if job.get("city"):
             metadata.append("地点：" + job["city"])
         if source.get("published_at"):
@@ -186,14 +190,18 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
     tasks = plan.get("tasks", [])
     constraints = state["review"]["constraints"]
     sections = {}
-    seen_paragraphs = set()
 
     def add(key, text):
         text = presentation.clean(text, target_id=selected["target_id"],
                                   task_refs=key in {"gap_action_plan", "development_path"}).strip()
         text = readable_markdown(text)
         blocks = []
+        seen_paragraphs = set()
         for block in text.split("\n\n"):
+            if re.match(r"\s*#", block):
+                # Identical time/requirements under another task belong to that task.
+                # Never deduplicate across sections or heading-defined entities.
+                seen_paragraphs.clear()
             identity = re.sub(r"\s+", "", block)
             narrative = len(identity) >= 20 and not re.match(r"\s*(?:#|>|[-*] |\d+\.)", block)
             if narrative and identity in seen_paragraphs:
@@ -218,7 +226,8 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
     if not facts and resume.get("summary"):
         # Keep the factual introduction; strengths, diagnoses and priorities have their own sections.
         personal.append(re.split(r"(?<=[。！？])", resume["summary"], maxsplit=1)[0])
-    add("personal_traits", "\n\n".join(filter(None, [" ".join(sentence(item) for item in unique_text(personal)), resume_review(resume)])))
+    add("personal_traits", "\n\n".join(filter(None, [" ".join(sentence(item) for item in unique_text(personal)),
+        resume_review(resume, include_recommendations=not bool(tasks))])))
 
     strengths, gaps = priority_checks(checks, tasks)
     fit = [assessment.get("conclusion", "")]
@@ -319,8 +328,9 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
     citations = presentation.appendix_sources()
     if citations:
         appendix += "\n\n" + citations
-    if resume.get("missing_information"):
-        appendix += "\n\n### 待补材料备查\n\n" + "\n".join(f"{index}. {item}" for index, item in enumerate(unique_text(resume["missing_information"]), 1))
+    pending_materials = resume.get("missing_information", []) + model_attribution_questions(state.get("input", {}).get("raw_resume", ""))
+    if pending_materials:
+        appendix += "\n\n### 待补材料备查\n\n" + "\n".join(f"{index}. {item}" for index, item in enumerate(unique_text(pending_materials), 1))
     search = results.get("recruitment_search", {})
     if search.get("status") not in {None, "skipped", "ok"}:
         appendix += "\n\n招聘信息查询暂不可用，相关岗位的当前招聘状态需要另行核实。"

@@ -7928,6 +7928,11 @@ def api_career_report_tracker_item():
 @_login_required
 def api_career_report_export():
     user = _current_user()
+    from services.report.html_layout import normalize_typography, typography_css
+    try:
+        typography = normalize_typography(json.loads(request.args.get("typography") or "{}"))
+    except (ValueError, TypeError):
+        return jsonify({"message": "报告字号参数无效。"}), 400
     export_format = str(request.args.get("format") or "pdf").strip().lower()
     if export_format not in {"html", "md", "docx", "pdf"}:
         return jsonify({"message": "仅支持 html / md / docx / pdf 导出。"}), 400
@@ -7977,6 +7982,8 @@ def api_career_report_export():
         )
 
     if export_format == "html":
+        if html_for_render and typography:
+            html_for_render = html_for_render.replace("</style>", typography_css(typography) + "\n</style>")
         return app.response_class(
             html_for_render or "",
             mimetype="text/html; charset=utf-8",
@@ -7985,7 +7992,7 @@ def api_career_report_export():
 
     if export_format == "pdf":
         try:
-            pdf_bytes = export_markdown_to_pdf_bytes(markdown_text, title=source_label)
+            pdf_bytes = export_markdown_to_pdf_bytes(markdown_text, title=source_label, typography=typography)
         except Exception as exc:
             app.logger.exception("career report pdf export failed")
             return jsonify({"message": str(exc)[:500] or "PDF 导出失败。"}), 500
@@ -7999,7 +8006,7 @@ def api_career_report_export():
         return response
 
     try:
-        docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=source_label)
+        docx_bytes = export_markdown_to_docx_bytes(markdown_text, title=source_label, typography=typography)
     except Exception as exc:
         app.logger.exception("career report docx export failed")
         return jsonify({"message": str(exc)[:500] or "DOCX 导出失败。"}), 500

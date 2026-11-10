@@ -19438,8 +19438,10 @@ nav.gradient-bg .nav-action-strip .action-icon {
 .report-console-canvas .report-speech-label { font-size: 10px; }
 .report-speech-label i { display: none; }
 .report-task-card.is-pending .report-ma-portrait { filter: saturate(.55); opacity: .8; }
-.report-console-canvas .report-task-card.is-selected .report-ma-name,
-.report-console-canvas .report-task-card:focus-visible .report-ma-name { outline: 2px solid #7398ed; outline-offset: 4px; }
+.report-agent-identity { display: flex; flex-direction: column; align-items: flex-start; width: max-content; border-radius: 14px; }
+.report-console-canvas .report-task-card .report-ma-name { border-color: transparent; border-radius: 0; background: transparent; }
+.report-console-canvas .report-task-card.is-selected .report-agent-identity,
+.report-console-canvas .report-task-card:focus-visible .report-agent-identity { outline: 2px solid #7398ed; outline-offset: 7px; }
 .report-task-card.is-waiting { --agent-color: #d79500; --agent-tint: #fff7df; --agent-border: #f1cc6c; }
 .report-task-card.is-waiting .report-agent-character::before { background: #fff0be; box-shadow: 0 0 20px #f5c44940; }
 .report-console-help { margin: 12px 0 0; color: #8392a8; font-size: 11px; text-align: center; }

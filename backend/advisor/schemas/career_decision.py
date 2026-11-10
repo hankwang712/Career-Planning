@@ -81,7 +81,7 @@ class TargetAssessment(DecisionRecord):
     target_id: Text
     decision: Literal["recommended", "conditional", "not_recommended", "insufficient_information"]
     conclusion: Text
-    checks: list[RequirementCheck] = Field(min_length=1)
+    checks: list[RequirementCheck] = Field(default_factory=list, description="仅对有目标相关岗位证据的要求作检查；没有相关证据时为空并使用insufficient_information")
 
 
 class DecisionAction(DecisionRecord):

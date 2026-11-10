@@ -9221,7 +9221,12 @@ function renderReportAgentInspector(mapEl) {
     content = `<div class="report-inspector-summary"><span>${reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentConsoleSummary(item, state))}</p></div><dl class="report-inspector-metrics">${reportAgentMetrics(item).map(([label, value]) => `<div><dt>${label}</dt><dd>${escHtml(value)}</dd></div>`).join("")}</dl><h4>输入来源</h4><p>${escHtml(REPORT_AGENT_INPUTS[item.key][0])}</p><h4>下一步</h4><p>${escHtml(reportAgentNextStep(item))}</p>`;
   }
   panel.hidden = Boolean(ui.collapsed);
-  panel.innerHTML = `<header><div><small>AGENT 执行详情</small><h3>${escHtml(item.title)}</h3><p>${escHtml(item.detail)}</p></div><button type="button" data-agent-close aria-label="关闭执行详情">×</button></header><div class="report-inspector-tabs" role="tablist" aria-label="执行详情分类">${tabs.map(([key, title]) => `<button type="button" role="tab" data-agent-tab="${key}" aria-selected="${ui.tab === key}" aria-controls="reportAgentInspectorContent" id="reportAgentTab-${key}">${title}</button>`).join("")}</div><div class="report-inspector-content" id="reportAgentInspectorContent" role="tabpanel" aria-labelledby="reportAgentTab-${ui.tab}">${ui.loading ? '<p class="report-inspector-loading" role="status">正在读取已保存的执行结果…</p>' : ""}${ui.error ? `<p class="report-inspector-error" role="alert">${escHtml(ui.error)}</p><button type="button" data-agent-refresh>重新读取</button>` : ""}${content}</div>${item.nodeStatus === "failed" && snapshot?.checkpoint_id && state?.status === "failed" ? `<button type="button" class="report-inspector-action" data-agent-retry ${ui.retrying ? "disabled" : ""}>${ui.retrying ? "正在恢复…" : "从已保存进度重试流程"}</button>` : item.nodeStatus === "waiting" ? '<button type="button" class="report-inspector-action" data-agent-confirm>补充信息并确认</button>' : ""}`;
+  const html = `<header><div><small>AGENT 执行详情</small><h3>${escHtml(item.title)}</h3><p>${escHtml(item.detail)}</p></div><button type="button" data-agent-close aria-label="关闭执行详情">×</button></header><div class="report-inspector-tabs" role="tablist" aria-label="执行详情分类">${tabs.map(([key, title]) => `<button type="button" role="tab" data-agent-tab="${key}" aria-selected="${ui.tab === key}" aria-controls="reportAgentInspectorContent" id="reportAgentTab-${key}">${title}</button>`).join("")}</div><div class="report-inspector-content" id="reportAgentInspectorContent" role="tabpanel" aria-labelledby="reportAgentTab-${ui.tab}">${ui.loading && !ui.snapshot ? '<p class="report-inspector-loading" role="status">正在读取已保存的执行结果…</p>' : ""}${ui.error ? `<p class="report-inspector-error" role="alert">${escHtml(ui.error)}</p><button type="button" data-agent-refresh>重新读取</button>` : ""}${content}</div>${item.nodeStatus === "failed" && snapshot?.checkpoint_id && state?.status === "failed" ? `<button type="button" class="report-inspector-action" data-agent-retry ${ui.retrying ? "disabled" : ""}>${ui.retrying ? "正在恢复…" : "从已保存进度重试流程"}</button>` : item.nodeStatus === "waiting" ? '<button type="button" class="report-inspector-action" data-agent-confirm>补充信息并确认</button>' : ""}`;
+  // Polls often carry no visible changes. Keep focus, scroll and DOM intact.
+  if (panel._reportInspectorHtml !== html) {
+    panel.innerHTML = html;
+    panel._reportInspectorHtml = html;
+  }
   mapEl.querySelectorAll("[data-agent-key]").forEach((node) => {
     node.classList.toggle("is-selected", node.dataset.agentKey === ui.selected);
     node.setAttribute("aria-expanded", String(node.dataset.agentKey === ui.selected && !ui.collapsed));
@@ -9512,18 +9517,47 @@ function renderReportAgentMap(profile, roles) {
       const hub = item.key === "career_decision" ? " hub" : "";
       return `
     <article class="report-agent-node report-task-card is-${escHtml(item.nodeStatus)}${hub}" data-agent-key="${escHtml(item.key)}" role="button" tabindex="0" aria-label="查看${escHtml(item.title)}执行详情" aria-expanded="${reportAgentConsoleState.selected === item.key && !reportAgentConsoleState.collapsed}">
+      <div class="report-agent-identity">
       <div class="report-agent-character">
       ${reportAgentPortraitHtml(item)}
       <span class="report-agent-state-mark" aria-hidden="true">${item.nodeStatus === "done" ? "✓" : item.nodeStatus === "failed" ? "!" : item.nodeStatus === "waiting" ? "?" : item.nodeStatus === "active" ? "◔" : "○"}</span>
       <div class="report-agent-speech" role="status"><span class="report-speech-label"><i aria-hidden="true"></i>${item.nodeStatus === "skipped" ? "本次跳过" : reportMaLegendStatusText(item.nodeStatus)}</span><p>${escHtml(reportAgentConsoleSummary(item, state))}</p></div>
       </div>
       <div class="report-ma-name"><span class="report-agent-step">${step}</span>${escHtml(item.title)}</div>
+      </div>
       ${reportAgentHoverHtml(item, state)}
     </article>`;
     });
 
   reportAgentConsoleState.nodes = nodes;
   return `<div class="report-agent-console${reportAgentConsoleState.selected && !reportAgentConsoleState.collapsed ? " has-selection" : ""}"><button type="button" class="report-inspector-toggle" data-agent-toggle aria-controls="reportAgentInspector" aria-label="执行详情" ${reportAgentConsoleState.selected ? "" : "hidden"}></button><div class="report-console-stage"><div class="report-board-header"><div class="report-lane-heading"><span>一起探索</span><p>简历、岗位与招聘机会，可以同时分析。</p><span class="report-lane-chip">并行协作</span></div><div class="report-board-toolbar" role="toolbar" aria-label="白板视图"><button type="button" data-board-action="out" aria-label="缩小白板">−</button><output data-board-scale aria-label="当前缩放比例">100%</output><button type="button" data-board-action="in" aria-label="放大白板">+</button><button type="button" data-board-action="fit" class="report-board-fit">查看全部</button></div></div><div class="report-console-canvas" tabindex="0" role="region" aria-label="智能体白板，可用滚轮缩放，拖拽移动，按 0 查看全部"><div class="report-board-world"><div class="report-collaboration-board"><div class="report-agent-origin">任务启动 · 并行分析</div><svg class="report-agent-connections" aria-hidden="true"></svg><div class="report-parallel-team">${nodeHtml.slice(0, 3).join("")}</div><div class="report-sequential-team">${nodeHtml.slice(3).join("")}</div></div></div></div><p class="report-console-help">滚轮缩放 · 拖拽移动 · 点击角色查看详情 · 查看全部可还原视图</p></div><aside id="reportAgentInspector" class="report-agent-inspector" aria-label="Agent 执行详情" ${reportAgentConsoleState.selected && !reportAgentConsoleState.collapsed ? "" : "hidden"}></aside></div>`;
+}
+
+// Keep the board, inspector and hovered cards mounted between progress polls.
+function updateReportAgentMap(mapEl, profile, roles) {
+  const previousScope = reportAgentConsoleState.scope;
+  const html = renderReportAgentMap(profile, roles);
+  if (!mapEl.querySelector(".report-agent-console") || previousScope !== reportAgentConsoleState.scope) {
+    mapEl.innerHTML = html;
+    return;
+  }
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll("[data-agent-key]").forEach((next) => {
+    const current = mapEl.querySelector(`[data-agent-key="${next.dataset.agentKey}"]`);
+    if (!current) return;
+    const selected = next.dataset.agentKey === reportAgentConsoleState.selected;
+    const className = next.className + (selected ? " is-selected" : "");
+    if (current.className !== className) current.className = className;
+    current.classList.toggle("is-selected", selected);
+    current.setAttribute("aria-expanded", next.getAttribute("aria-expanded"));
+    // Preserve the portrait and speech container so animations and hover don't restart.
+    for (const selector of [".report-ma-portrait", ".report-agent-state-mark", ".report-speech-label", ".report-agent-speech p", ".report-agent-hover"]) {
+      const target = current.querySelector(selector), source = next.querySelector(selector);
+      if (target && source && target.innerHTML !== source.innerHTML) target.innerHTML = source.innerHTML;
+    }
+  });
+  updateReportAgentInspectorLayout(mapEl);
 }
 
 // Draw only actual dependencies; the three analysis agents run in parallel.
@@ -9654,17 +9688,10 @@ function renderReportWorkspace(profile, roles) {
   renderReportResumePanel();
   renderReportWorkflowReview(state);
   if (mapEl) {
-    const focused = mapEl.contains(document.activeElement) ? document.activeElement : null;
-    const focusKey = focused?.dataset?.agentKey;
-    const focusTab = focused?.dataset?.agentTab;
-    const inspectorScroll = mapEl.querySelector(".report-agent-inspector")?.scrollTop || 0;
-    mapEl.innerHTML = renderReportAgentMap(profile, safeRoles);
+    updateReportAgentMap(mapEl, profile, safeRoles);
     observeReportAgentMap(mapEl);
     bindReportAgentConsole(mapEl);
     renderReportAgentInspector(mapEl);
-    mapEl.querySelector(".report-agent-inspector").scrollTop = inspectorScroll;
-    if (focusKey) mapEl.querySelector(`[data-agent-key="${focusKey}"]`)?.focus({ preventScroll: true });
-    if (focusTab) mapEl.querySelector(`[data-agent-tab="${focusTab}"]`)?.focus({ preventScroll: true });
     if (reportAgentConsoleState.selected) void loadReportAgentSnapshot(mapEl);
   }
   renderReportWizard();

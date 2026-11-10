@@ -5124,6 +5124,8 @@
   window.triggerCareerReportEditorSave = triggerCareerReportEditorSave;
 
   async function downloadCareerReport(url, format) {
+    const typography = window.CareerReportReader?.getTypography();
+    if (typography) url.searchParams.set("typography", JSON.stringify(typography));
     const types = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       md: "text/markdown", html: "text/html" };
     if (reportRuntime.exportPending || !Object.hasOwn(types, format)) return false;

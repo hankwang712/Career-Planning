@@ -3,6 +3,10 @@ import re
 
 
 def explicit_recruitment_types(text):
+    # Qualification caveats are not requests for a recruitment channel. Remove
+    # their clauses before looking for positively mentioned categories.
+    text = "，".join(clause for clause in re.split(r"[，,。；;\n]", str(text or ""))
+        if not re.search(r"不(?:能|要)?(?:默认|假定)|未(?:确认|核实)|(?:资格|身份|届别).{0,10}(?:未知|未明|待确认)|不代表|不能证明", clause))
     category = r"(?:校招|校园招聘|社招|社会招聘|实习(?:生)?|春招|春季招聘|秋招|秋季招聘)"
     categories = category + r"(?:\s*(?:、|或|和|/|及|与)?\s*" + category + r")*"
     unrestricted = r"(?:没有限定|没有限制|未限定|不限定|不限制|不限于|不限)"
@@ -20,6 +24,49 @@ def explicit_recruitment_types(text):
                 continue
             allowed.add(category)
     return allowed
+
+
+def normalize_recruitment_types(values):
+    """Map source batch descriptions to channel categories; unknown stays unknown."""
+    result = set()
+    for value in values:
+        value = str(value or "")
+        if re.search(r"实习", value):
+            result.add("实习")
+            for season, pattern in (("春招", r"春招|春季招聘"), ("秋招", r"秋招|秋季招聘")):
+                if re.search(pattern, value):
+                    result.add(season)
+            continue  # A cohort-specific internship is still not a graduate job.
+        for kind, pattern in (("社招", r"社招|社会招聘"), ("校招", r"校招|校园|应届|\d{2,4}届"),
+                              ("春招", r"春招|春季招聘"), ("秋招", r"秋招|秋季招聘")):
+            if re.search(pattern, value):
+                result.add(kind)
+    return result
+
+
+def recruitment_types_conflict(allowed, observed):
+    observed = normalize_recruitment_types(observed)
+    if not allowed or not observed:
+        return False
+    # Spring/autumn are seasons within graduate recruitment, not contradictory channels.
+    compatible = set(observed)
+    if observed & {"春招", "秋招"} and not observed & {"实习", "社招"}:
+        compatible.add("校招")
+    return not (set(allowed) & compatible)
+
+
+def explicit_publication_window(text):
+    """Detect an actual recency request, excluding truthfulness warnings and negations."""
+    for clause in re.split(r"[，,。；;\n]", str(text or "")):
+        if re.search(r"不要冒充|不能冒充|不应冒充|不得冒充|不要(?:只|仅)|不(?:只|仅)(?:找|限)|不(?:限|要求|限制)|无需|不必|日期未知|未核实", clause):
+            continue
+        if re.search(r"优先|尽量|最好", clause) and not re.search(r"只|仅|必须|限定|要求", clause):
+            continue
+        if re.search(r"最近|近期|近[一二三四五六七八九十两\d]+[天周月年]|本周|本月", clause):
+            return True
+        if re.search(r"发布|公告", clause) and re.search(r"20\d{2}(?:[-./年]\d{1,2})(?:[-./月]\d{1,2})?日?.{0,8}(?:起|之后|以后)|(?:起|之后|以后).{0,8}20\d{2}", clause):
+            return True
+    return False
 
 
 HIRING = re.compile(r"招聘|诚聘|急招|热招|在招|招人|招募|招收|招实习|加入我们|欢迎加入|开放岗位|开放职位|扩招|内推|校招|社招|春招|秋招|\bhiring\b|job\s+openings?", re.I)

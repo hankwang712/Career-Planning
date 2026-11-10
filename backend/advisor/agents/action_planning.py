@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import re
 from zoneinfo import ZoneInfo
 
 from langchain_core.runnables import RunnableConfig
@@ -7,6 +8,7 @@ from pydantic import model_validator
 from ..prompt.action_planning import ACTION_PLANNING_PROMPT
 from ..schemas.action_planning import ActionPlan, ActionPlanningInput
 from ..schemas.career_decision import CareerDecision
+from ..utils.decision_grounding import verify_candidate_boundaries
 from .base import BaseAgent
 from .career_decision import CareerDecisionAgent, verify_career_decision
 
@@ -15,7 +17,10 @@ def verify_action_plan(plan: ActionPlan, prepared: dict) -> list[str]:
     """校验关联、依赖及资源约束；任务语义和工时合理性仍需业务复核。"""
     checks = {item["check_id"]: item for item in prepared["assessment"]["checks"]}
     weeks = {item["week"]: item for item in prepared["weeks"]}
-    tasks, hours, errors = {}, {}, []
+    factual_text = "\n".join(source["content"] for source in prepared.get("sources", [])
+                             if source["kind"] in {"resume", "additional_evidence"})
+    tasks, hours = {}, {}
+    errors = verify_candidate_boundaries(plan.model_dump(mode="json"), factual_text)
     blocked_job = prepared["target"]["target_type"] == "job" and any(
         check["kind"] == "hard_condition" and check["importance"] == "required"
         and check["status"] == "confirmed_gap" for check in checks.values()
@@ -28,6 +33,16 @@ def verify_action_plan(plan: ActionPlan, prepared: dict) -> list[str]:
             errors.append(f"任务 {task.task_id} 未关联所选目标的有效 check_id")
         elif check["kind"] == "hard_condition" and task.kind == "practice":
             errors.append(f"任务 {task.task_id} 不能用能力练习解决硬条件")
+        text = "\n".join((task.title, task.deliverable, task.acceptance_criteria))
+        if check and check["kind"] == "hard_condition" and check["status"] == "unknown" and re.search(
+            r"对要求.{0,35}(?:岗位|岗).{0,12}(?:标注|列为).{0,8}(?:暂不匹配|不匹配|不满足|不符合)", text) and not re.search(r"若|如果|确认不满足|已确认", text):
+            errors.append(f"任务 {task.task_id} 的资格仍未知，不能把有经验门槛的岗位直接标为不匹配；应先核实完整经历，确认不满足才排除，未确认保留待核实")
+        if task.kind == "practice" and check and check["status"] in {"evidence_missing", "unknown", "partial"}:
+            if re.search(r"搭建|从零|开发|实现|构建|跑通", text) and not re.search(r"已有|现有|先检查|先核实|若|如果|未做过|没有.{0,8}(?:实践|实现|代码|项目)|缺少.{0,8}(?:实践|实现|代码|项目)", text):
+                errors.append(f"任务 {task.task_id} 的能力证据未知：先检查已有实践，已有则补证据、缺少才最小实践，不直接要求重做")
+        if task.kind == "practice" and prepared["constraints"].get("budget") == 0 and re.search(r"模型|Agent|RAG|向量", text, re.I):
+            if not re.search(r"本地|CPU|免费|模拟|固定响应|已有.{0,8}(?:额度|授权)|无需.{0,5}(?:付费|GPU)|不调用付费", text, re.I):
+                errors.append(f"任务 {task.task_id} 预算为零：请明确CPU本地/模拟响应等无需新增付费资源的执行路径，真实模型效果另行核实")
         if blocked_job and task.kind in {"practice", "apply"}:
             errors.append("具体岗位存在明确硬条件冲突，只能先核实或整理材料")
         if task.kind == "apply" and prepared["assessment"]["decision"] != "recommended":
@@ -124,6 +139,7 @@ class ActionPlanningAgent(BaseAgent):
             "sources": [source for source in upstream["sources"]
                         if source["kind"] != "job" or source.get("target_id") == request.target_id],
             "constraints": constraints, "weeks": weeks,
+            "capacity_boundary": "本阶段工时仅用于求职准备，不推断工作出勤；实践未知时先检查已有成果，缺少才做最小实践。",
             "education_timeline": upstream["education_timeline"],
             "resume_diagnostics": upstream["resume_analysis"].get("diagnostics", {}),
             "recruitment_context": upstream["recruitment_context"],

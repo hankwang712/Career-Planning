@@ -10,7 +10,7 @@ class AgentActivity(AsyncCallbackHandler):
         name = (serialized or {}).get("name", "")
         messages = {
             "read_document": "正在读取简历文档，提取经历与技能",
-            "search_recruitment_radar": "正在从招聘汇总表筛选匹配岗位",
+            "search_recruitment_radar": "正在合并 Radar 与 JobHunter 岗位，去重并筛选",
             "verify_recruitment_radar_candidates": "正在读取招聘原文，核对岗位与投递条件",
         }
         self.publish(messages.get(name, "正在查询岗位资料，核对来源证据"))

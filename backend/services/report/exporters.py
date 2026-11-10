@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import shutil
 import subprocess
@@ -12,6 +13,7 @@ from typing import Any, Optional
 from ..paths import REPORT_IMAGE_DIR
 from .reading_format import readable_markdown, number_report_headings, structure_report_markdown
 from .html_layout import EXPORT_CSS, decorate_export_html, BACKGROUND_ROLES
+from .html_layout import typography_css, normalize_typography
 
 
 def _strip_pipeline_summary_lines(text: str) -> str:
@@ -443,7 +445,7 @@ def render_html_to_pdf_bytes(html_text: str) -> bytes:
         pdf.close()
 
 
-def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发展报告") -> bytes:
+def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发展报告", typography=None) -> bytes:
     """Render the saved report directly, without DOCX conversion or an Office process."""
     cleaned = markdown_for_user_reading(markdown_text)
     if not cleaned:
@@ -452,6 +454,7 @@ def export_markdown_to_pdf_bytes(markdown_text: str, *, title: str = "职业发�
     html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
     <title>{escape(title)}</title><style>
     {EXPORT_CSS}
+    {typography_css(typography)}
     </style></head><body>{body}</body></html>"""
     return render_html_to_pdf_bytes(html)
 
@@ -461,6 +464,7 @@ def export_markdown_to_docx_bytes(
     *,
     conda_env: str = DOCX_MCP_CONDA_ENV,
     title: str = "career-report",
+    typography=None,
 ) -> bytes:
     script = r"""
 from pathlib import Path
@@ -480,7 +484,8 @@ document = DocxDocument.create(str(docx_path))
 MarkdownConverter.convert(document, markdown, base_dir=md_path.parent)
 document.save(str(docx_path))
 document.close()
-format_report_docx(docx_path)
+import json
+format_report_docx(docx_path, typography=json.loads(sys.argv[4]))
 """
     safe_title = "".join(
         ch if ch.isalnum() or ch in {"-", "_", "."} else "-"
@@ -511,7 +516,7 @@ format_report_docx(docx_path)
         md_content = docx_prepare_markdown(md_content)
         md_path.write_text(md_content, encoding="utf-8")
         process = subprocess.run(
-            [python_exe, "-c", script, str(md_path), str(docx_path), str(Path(__file__).resolve().parents[3])],
+            [python_exe, "-c", script, str(md_path), str(docx_path), str(Path(__file__).resolve().parents[3]), json.dumps(normalize_typography(typography))],
             capture_output=True,
             text=True,
             encoding="utf-8",
