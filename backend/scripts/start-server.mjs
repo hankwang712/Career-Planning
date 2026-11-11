@@ -13,7 +13,8 @@ if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
 const frontendDir = path.join(repoRoot, "frontend");
 const frontendRequire = createRequire(path.join(frontendDir, "package.json"));
 const isWin = process.platform === "win32";
-const pythonCmd = isWin ? "python" : "python3";
+const venvPython = path.join(repoRoot, ".venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python");
+const pythonCmd = fs.existsSync(venvPython) ? venvPython : (isWin ? "python" : "python3");
 const explicitViteOrigin = (process.env.VITE_DEV_SERVER_URL || "").trim().replace(/\/+$/, "");
 const useViteDevServer =
   Boolean(explicitViteOrigin) ||
