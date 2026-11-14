@@ -6,7 +6,8 @@ from uuid import uuid4
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS chat_privacy (
     owner TEXT PRIMARY KEY, epoch INTEGER NOT NULL DEFAULT 0, cutoff_seq INTEGER NOT NULL DEFAULT 0,
-    workspace_enabled INTEGER NOT NULL DEFAULT 1, resume_enabled INTEGER NOT NULL DEFAULT 1);
+    workspace_enabled INTEGER NOT NULL DEFAULT 1, resume_enabled INTEGER NOT NULL DEFAULT 1,
+    saved_enabled INTEGER NOT NULL DEFAULT 1, history_enabled INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS memory_suppressions (
     owner TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, subject TEXT NOT NULL,
     source_cutoff_seq INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at REAL NOT NULL,
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS artifact_leases (
 """
 
 SCOPE = {
-    "managed": ["SQLite聊天记录、图片附件及衍生数据", "Redis聊天缓存", "Chroma记忆索引"],
+    "managed": ["SQLite聊天记录、图片附件及衍生数据", "会话笔记与用户级背景摘要"],
     "excluded": ["独立简历文件与解析资料", "已有规划报告", "外部日志和备份", "模型服务商已接收的数据"],
     "retained_metadata": "仅保留任务回执、删除保护槽位与游标，不保留已忘记的值或原文证据。",
     "restore_rule": "已忘记的属性只接受删除之后新的明确“请重新记住”授权；旧消息不能恢复记忆。",
@@ -49,7 +50,8 @@ class MemoryControls:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM chat_privacy WHERE owner=?", (owner,)).fetchone()
             return dict(row) if row else {"owner": owner, "epoch": 0, "cutoff_seq": 0,
-                                          "workspace_enabled": 1, "resume_enabled": 1}
+                                          "workspace_enabled": 1, "resume_enabled": 1,
+                                          "saved_enabled": 1, "history_enabled": 1}
 
     @staticmethod
     def _latest_cleanup(conn, owner, target, scopes):
@@ -72,17 +74,17 @@ class MemoryControls:
             workspace_enabled=CASE WHEN ? THEN 0 ELSE workspace_enabled END,
             resume_enabled=CASE WHEN ? THEN 0 ELSE resume_enabled END WHERE owner=?""", (cutoff, disable_sources, disable_sources, owner))
         cutoff = conn.execute("SELECT cutoff_seq FROM chat_privacy WHERE owner=?", (owner,)).fetchone()[0]
-        sessions = [row[0] for row in conn.execute("SELECT id FROM sessions WHERE owner=?", (owner,))]
         conn.execute("DELETE FROM memory_jobs WHERE session_id IN (SELECT id FROM sessions WHERE owner=?)", (owner,))
         conn.execute("DELETE FROM context_traces WHERE session_id IN (SELECT id FROM sessions WHERE owner=?)", (owner,))
         conn.execute("""UPDATE messages SET status='failed' WHERE role='user' AND seq IN
             (SELECT MAX(m.seq) FROM messages m JOIN sessions s ON s.id=m.session_id
              WHERE s.owner=? AND s.sending_token IS NOT NULL AND m.role='user' GROUP BY s.id)""", (owner,))
-        conn.execute("""UPDATE sessions SET summary='',analyzed_seq=MAX(analyzed_seq,?),memory_seq=MAX(memory_seq,?),sending_token=NULL,
-            sending_until=0,updated_at=? WHERE owner=?""", (cutoff, cutoff, time.time(), owner))
+        conn.execute("""UPDATE sessions SET summary='',notes='',note_title='',note_gist='',analyzed_seq=MAX(analyzed_seq,?),
+            memory_seq=MAX(memory_seq,?),sending_token=NULL,sending_until=0,updated_at=? WHERE owner=?""", (cutoff, cutoff, time.time(), owner))
+        conn.execute("UPDATE user_digest SET summary='',topics='[]',dirty=0 WHERE owner=?", (owner,))
         conn.execute("UPDATE memories SET revision=revision+1,indexed_revision=0 WHERE owner=?", (owner,))
         conn.execute("INSERT INTO memory_owners(owner,revision) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET revision=revision+1", (owner,))
-        return cutoff, sessions
+        return cutoff
 
     def _suppress(self, conn, owner, slot, cutoff, *, active=True):
         conn.execute("""INSERT INTO memory_suppressions(owner,kind,key,subject,source_cutoff_seq,active,created_at)
@@ -168,7 +170,7 @@ class MemoryControls:
                 removed.update(memory for memory, refs in references.items() if refs & source_ids)
             if before == (len(removed), len(source_ids)):
                 break
-        cutoff, sessions = self._barrier(conn, owner)
+        cutoff = self._barrier(conn, owner)
         slots = [{key: item[key] for key in ("kind", "key", "subject")} for item in rows if item["id"] in removed] or slots
         for slot in slots:
             self._suppress(conn, owner, slot, cutoff)
@@ -188,7 +190,7 @@ class MemoryControls:
             conn.execute("UPDATE sessions SET title='新对话' WHERE owner=?", (owner,))
         safe_slots = [{"kind": slot["kind"], "key": slot["key"], "subject_hash": self._subject_token(owner, slot),
                        "slot_id": self._subject_token(owner, slot).removeprefix("sha256:")} for slot in slots]
-        payload = {"cache_sessions": sessions, "cache_owner": True, "vector_owner": True,
+        payload = {"vector_owner": True,
                    "message_ids": sorted(source_ids), "slots": safe_slots}
         return self._queue_cleanup(conn, owner, mode, identifier, payload)
 
@@ -212,7 +214,7 @@ class MemoryControls:
             conflicts = conn.execute("SELECT 1 FROM memories WHERE owner=? AND id LIKE ? AND status='conflict' LIMIT 1", (owner, canonical + ":conflict:%")).fetchone()
             if row["value"] == value.strip() and previous and not conflicts:
                 return previous["id"]
-            cutoff, sessions = self._barrier(conn, owner, disable_sources=False)
+            cutoff = self._barrier(conn, owner, disable_sources=False)
             self._suppress(conn, owner, row, cutoff, active=False)
             conn.execute("UPDATE memories SET value=?,evidence='[]',source_at=?,updated_at=? WHERE owner=? AND id=?",
                          (value.strip(), time.time(), time.time(), owner, canonical))
@@ -222,7 +224,7 @@ class MemoryControls:
                 VALUES(?,?,?,'REPLACE',?,?,'[]','{"reason":"user_correction"}',?)""",
                 (owner, canonical, row["source_session"], row["value"], value.strip(), time.time()))
             return self._queue_cleanup(conn, owner, "edit", identifier,
-                {"cache_sessions": sessions, "cache_owner": True, "vector_owner": True})
+                {"vector_owner": True})
 
     def request_session_deletion(self, owner, session_id):
         from .storage import ChatError
@@ -234,8 +236,10 @@ class MemoryControls:
                     return previous["id"]
                 raise ChatError("对话不存在或已删除。", 404)
             conn.execute("DELETE FROM sessions WHERE owner=? AND id=?", (owner, session_id))
+            # 背景摘要由现存笔记生成；会话删除后需按剩余笔记重建。
+            conn.execute("UPDATE user_digest SET dirty=1,version=version+1 WHERE owner=?", (owner,))
             return self._queue_cleanup(conn, owner, "session", session_id,
-                {"cache_sessions": [session_id], "cache_owner": False, "vector_owner": False})
+                {"vector_owner": False})
 
     def clear_chat_data(self, owner):
         with self.connect(write=True) as conn:
@@ -247,22 +251,20 @@ class MemoryControls:
             pending = conn.execute("SELECT 1 FROM cleanup_jobs WHERE owner=? AND status!='completed' AND scope!='chat' LIMIT 1", (owner,)).fetchone()
             if previous and not exists and privacy and not any(privacy) and (previous["status"] != "completed" or not pending):
                 return previous["id"]
-            cutoff, sessions = self._barrier(conn, owner)
-            for row in conn.execute("SELECT payload FROM cleanup_jobs WHERE owner=?", (owner,)):
-                sessions.extend(json.loads(row["payload"]).get("cache_sessions", []))
+            cutoff = self._barrier(conn, owner)
             conn.execute("DELETE FROM sessions WHERE owner=?", (owner,))
-            for table in ("memories", "memory_events", "memory_sources", "memory_usages", "memory_suppressions", "cleanup_jobs"):
+            for table in ("memories", "memory_events", "memory_sources", "memory_usages", "memory_suppressions", "cleanup_jobs", "user_digest"):
                 conn.execute(f"DELETE FROM {table} WHERE owner=?", (owner,))
             return self._queue_cleanup(conn, owner, "chat", owner,
-                {"cache_sessions": sorted(set(sessions)), "cache_owner": True, "vector_owner": True})
+                {"vector_owner": True})
 
     def source_settings(self, owner, *, workspace_enabled, resume_enabled):
         with self.connect(write=True) as conn:
-            _, sessions = self._barrier(conn, owner, disable_sources=False)
+            self._barrier(conn, owner, disable_sources=False)
             conn.execute("UPDATE chat_privacy SET workspace_enabled=?,resume_enabled=? WHERE owner=?",
                          (workspace_enabled, resume_enabled, owner))
             return self._queue_cleanup(conn, owner, "sources", owner,
-                {"cache_sessions": sessions, "cache_owner": True, "vector_owner": True})
+                {"vector_owner": True})
 
     def cleanup_status(self, owner, identifier=None):
         from .storage import ChatError
@@ -301,7 +303,7 @@ class MemoryControls:
                 if not error and not conn.execute("SELECT 1 FROM cleanup_jobs WHERE owner=? AND status!='completed'", (job["owner"],)).fetchone():
                     conn.execute("UPDATE memories SET revision=revision+1,indexed_revision=0 WHERE owner=?", (job["owner"],))
                     self._queue_cleanup(conn, job["owner"], "repair", job["owner"],
-                        {"cache_sessions": [], "cache_owner": True, "vector_owner": True})
+                        {"vector_owner": True})
                 return False
             if current["status"] == "completed":
                 return False
@@ -358,4 +360,4 @@ class MemoryControls:
                 return previous["id"]
             conn.execute("UPDATE memories SET revision=revision+1,indexed_revision=0 WHERE owner=?", (owner,))
             return self._queue_cleanup(conn, owner, "repair", owner,
-                {"cache_sessions": [], "cache_owner": True, "vector_owner": True})
+                {"vector_owner": True})

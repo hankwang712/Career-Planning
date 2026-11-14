@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
 Text = Annotated[str, StringConstraints(min_length=1, max_length=1000)]
+Line = Annotated[str, StringConstraints(max_length=600)]
 
 
 class ModelOutput(BaseModel):
@@ -31,16 +32,24 @@ class ExtractionOutput(ModelOutput):
     memories: Annotated[list[Candidate], Field(max_length=20)]
 
 
-class SummaryOutput(ModelOutput):
-    summary: Annotated[str, StringConstraints(max_length=2500)]
+class NoteOutput(ModelOutput):
+    """Deliberately loose bounds: the program clamps each section instead of failing the whole job."""
+    title: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    gist: Annotated[str, StringConstraints(min_length=1, max_length=400)]
+    goal: Annotated[str, StringConstraints(max_length=1500)] = ""
+    decisions: Annotated[list[Line], Field(max_length=20)] = Field(default_factory=list)
+    corrections: Annotated[list[Line], Field(max_length=40)] = Field(default_factory=list)
+    open_questions: Annotated[list[Line], Field(max_length=20)] = Field(default_factory=list)
+    advice: Annotated[list[Line], Field(max_length=20)] = Field(default_factory=list)
 
 
-class DecisionOutput(ModelOutput):
-    operation: Literal["ADD", "NOOP", "ENRICH", "REPLACE", "CONFLICT", "RETRACT"]
-    target_id: str | None
-    value: Text
-    reason: Annotated[str, StringConstraints(min_length=1, max_length=500)]
-    requires_confirmation: bool
+class DigestOutput(ModelOutput):
+    goals: Annotated[str, StringConstraints(max_length=1500)]
+    focus: Annotated[str, StringConstraints(max_length=1500)] = ""
+
+
+class SelectionOutput(ModelOutput):
+    selected: Annotated[list[Annotated[str, StringConstraints(max_length=128)]], Field(max_length=10)]
 
 
 def response_format(output_model):

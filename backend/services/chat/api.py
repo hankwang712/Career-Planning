@@ -27,6 +27,12 @@ Content = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, m
 
 class NewSession(BaseModel):
     title: Title = "新对话"
+    incognito: bool = False
+
+
+class Features(BaseModel):
+    saved_enabled: bool
+    history_enabled: bool
 
 
 class RenameSession(BaseModel):
@@ -189,17 +195,34 @@ def create_app(flask_app, *, service, current_user):
 
     User = Annotated[Identity, Depends(authenticate)]
 
+    @api.get("/api/chat/health")
+    def health():
+        """Queue backlog and storage size for probes; contains no user data."""
+        return service.store.health()
+
     @api.get("/api/chat/sessions")
-    def list_sessions(user: User):
+    def list_sessions(user: User, before: str | None = None, limit: int = 50):
         service.prepare_resume(user.owner)
         runtime = service.runtime_provider(user.selection)
-        return {"items": service.store.list_sessions(user.owner), "model": runtime[2] or "尚未配置模型",
-                "configured": all(runtime), "display_name": user.display_name, "image_input": image_capability(runtime)}
+        limit = max(1, min(limit, 200))
+        cursor = None
+        if before:
+            stamp, _, identifier = before.partition(":")
+            try:
+                cursor = (float(stamp), identifier)
+            except ValueError:
+                raise ChatError("分页参数不正确。", 400) from None
+        rows = service.store.list_sessions(user.owner, before=cursor, limit=limit + 1)
+        items = rows[:limit]
+        return {"items": items, "has_more": len(rows) > limit,
+                "next": f"{items[-1]['updated_at']!r}:{items[-1]['id']}" if len(rows) > limit else None,
+                "model": runtime[2] or "尚未配置模型", "configured": all(runtime), "display_name": user.display_name,
+                "image_input": image_capability(runtime), "quota": service.store.quota(user.owner)}
 
     @api.post("/api/chat/sessions", status_code=201)
     def create_session(data: NewSession, user: User):
-        row = service.store.create_session(user.owner, data.title)
-        return {"id": row["id"], "title": row["title"]}
+        row = service.store.create_session(user.owner, data.title, incognito=data.incognito)
+        return {"id": row["id"], "title": row["title"], "incognito": bool(row["incognito"])}
 
     @api.patch("/api/chat/sessions/{session_id}")
     def rename_session(session_id: str, data: RenameSession, user: User):
@@ -231,6 +254,7 @@ def create_app(flask_app, *, service, current_user):
         request_id = str(data.request_id)
         runtime = service.runtime(user.selection)
         service.store.session(user.owner, session_id)
+        service.check_quota(user.owner)
         if (data.images or service.store.turn_image_count(user.owner, session_id, request_id)) and image_capability(runtime) is False:
             raise ChatError("当前模型不支持图片输入，请选择 deepseek-flash 或其他视觉模型。")
         images = prepare_images([image.model_dump() for image in data.images]) if data.images else None
@@ -268,6 +292,23 @@ def create_app(flask_app, *, service, current_user):
     @api.get("/api/chat/memories")
     def memories(user: User, session_id: str | None = None):
         return service.memory_overview(user.owner, session_id)
+
+    @api.patch("/api/chat/features")
+    def features(data: Features, user: User):
+        service.store.set_features(user.owner, **data.model_dump())
+        service.memory.start()
+        return {"ok": True, "controls": service.store.privacy(user.owner)}
+
+    @api.get("/api/chat/history")
+    def history(user: User):
+        digest = service.store.digest(user.owner)
+        return {"summary": digest["summary"], "topics": digest["topics"], "updated_at": digest["updated_at"],
+                "updating": bool(digest["dirty"])}
+
+    @api.delete("/api/chat/history")
+    def reset_history(user: User):
+        service.store.reset_history(user.owner)
+        return {"ok": True}
 
     @api.get("/api/chat/profile")
     def profile(user: User):

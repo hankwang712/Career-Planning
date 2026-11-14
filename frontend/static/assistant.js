@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const state = { sessions: [], active: null, messages: [], hasMore: false, configured: false,
     pending: new Map(), retries: new Map(), view: 0, remoteBusy: false, creating: false, memoryTab: "sources",
-    draftImages: [], readingImages: false, imageEpoch: 0, imageInput: null };
+    draftImages: [], readingImages: false, imageEpoch: 0, imageInput: null, sessionsNext: null, incognito: false };
   let csrfPromise, memoryTimer, toastTimer, streamFrame;
   const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -120,7 +120,7 @@
   function renderSessions() {
     const query = $("sessionSearch").value.trim().toLocaleLowerCase();
     const rows = state.sessions.filter((row) => row.title.toLocaleLowerCase().includes(query));
-    $("sessionCount").textContent = state.sessions.length;
+    $("sessionCount").textContent = state.sessions.length + (state.sessionsNext ? "+" : "");
     $("sessionList").replaceChildren();
     if (!rows.length) {
       const empty = document.createElement("p");
@@ -133,8 +133,9 @@
       wrapper.className = `session-row${row.id === state.active ? " active" : ""}`;
       const button = document.createElement("button");
       button.className = "session-open";
-      button.textContent = row.title;
-      button.title = row.title;
+      const flags = `${row.incognito ? " · 无痕" : ""}${row.archived ? " · 已归档" : ""}`;
+      button.textContent = row.title + flags;
+      button.title = row.title + flags;
       button.setAttribute("aria-current", row.id === state.active ? "page" : "false");
       button.addEventListener("click", () => void openSession(row.id));
       const actions = document.createElement("span");
@@ -150,11 +151,29 @@
       wrapper.append(button, actions);
       $("sessionList").append(wrapper);
     }
+    if (state.sessionsNext && !query) {
+      const more = document.createElement("button");
+      more.className = "sidebar-empty";
+      more.textContent = "加载更多对话";
+      more.addEventListener("click", () => void loadMoreSessions());
+      $("sessionList").append(more);
+    }
+  }
+
+  async function loadMoreSessions() {
+    if (!state.sessionsNext) return;
+    try {
+      const data = await api(`/api/chat/sessions?before=${encodeURIComponent(state.sessionsNext)}`);
+      state.sessions = state.sessions.concat(data.items);
+      state.sessionsNext = data.has_more ? data.next : null;
+      renderSessions();
+    } catch (error) { toast(error.message); }
   }
 
   async function refreshSessions() {
     const data = await api("/api/chat/sessions");
     state.sessions = data.items;
+    state.sessionsNext = data.has_more ? data.next : null;
     state.configured = data.configured;
     state.imageInput = data.image_input ?? null;
     $("modelName").textContent = data.model;
@@ -336,7 +355,9 @@
     catch (error) { if (state.active === id) notice(error.message); }
   }
 
-  function newConversation() {
+  function newConversation(incognito = false) {
+    state.incognito = incognito === true;
+    if (state.incognito) toast("无痕对话：不会写入长期记忆，也不会被其他对话引用。");
     clearDraftImages();
     state.pending.get(state.active)?.flushReveal?.();
     finishSession(state.active);
@@ -369,7 +390,7 @@
       if (!id) {
         state.creating = true;
         updateComposer();
-        const row = await api("/api/chat/sessions", { method: "POST", body: "{}" });
+        const row = await api("/api/chat/sessions", { method: "POST", body: JSON.stringify({ incognito: state.incognito }) });
         id = row.id;
         state.active = id;
         state.view += 1;
@@ -554,7 +575,7 @@
     }
     const info = document.createElement("p");
     info.className = "memory-context-note";
-    info.textContent = `${trace.retrieval === "vector" ? "本轮有语义检索命中" : "本轮直接选取已保存记忆"} · 提供 ${trace.recent_messages} 条近期消息${trace.has_conversation_summary ? "和一份会话摘要" : ""}`;
+    info.textContent = `本轮直接选取已保存记忆${trace.history?.used ? "，并参考了过往对话" : ""} · 提供 ${trace.recent_messages} 条近期消息${trace.has_conversation_summary ? "和一份会话摘要" : ""}`;
     $("memoryContext").append(sources, info);
     if (trace.timings) {
       const timing = document.createElement("p");
@@ -570,7 +591,7 @@
       $("memoryContext").append(resume);
     }
     if (trace.memories?.length) {
-      $("memoryContext").append(memoryDetails("context:memories", `查看本轮提供的 ${trace.memories.length} 条记忆`, trace.memories.map((row) => `${row.value}${row.matched_by_vector ? "（语义检索命中）" : ""}`).join("\n\n"), expanded));
+      $("memoryContext").append(memoryDetails("context:memories", `查看本轮提供的 ${trace.memories.length} 条记忆`, trace.memories.map((row) => row.value).join("\n\n"), expanded));
     }
   }
 
@@ -588,16 +609,21 @@
     if (!$("memoryDialog").open) return;
     const expanded = new Set([...$("memoryDialog").querySelectorAll("details[open][data-memory-detail]")].map((node) => node.dataset.memoryDetail));
     $("memoryMetrics").innerHTML = `<div><span>长期记忆</span><strong>${active.length}<small> 条</small></strong></div><div><span>已载入资料</span><strong>${(data.sources || []).length}<small> 项</small></strong></div><div><span>${data.context?.status === "prepared" ? "本轮准备记忆" : "本轮提供记忆"}</span><strong>${data.context?.memories.length || 0}<small> 条</small></strong></div>`;
-    const index = data.index || { state: "pending", message: "后端状态尚未更新，请重启服务后刷新。" };
-    $("memoryIndexStatus").dataset.state = index.state;
-    $("memoryIndexStatus").textContent = `${index.state === "ready" ? "语义检索正常" : index.state === "degraded" ? "语义检索已降级" : "语义检索待就绪"} · ${index.message} ${index.state === "ready" ? `已同步 ${index.indexed}/${index.total} 条记忆。` : "当前简历与已保存记忆仍可直接使用。"}`;
+    const quota = data.quota || { state: "ok", used: 0, limit: 0 };
+    $("memoryIndexStatus").dataset.state = quota.state === "ok" ? "ready" : "degraded";
+    $("memoryIndexStatus").textContent = `今日已用 ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} tokens${quota.state === "background_paused" ? " · 已超额，后台整理暂停" : quota.state === "chat_limited" ? " · 今日对话额度已用完" : ""}`;
+    $("savedEnabled").checked = Boolean(data.controls?.saved_enabled ?? true);
+    $("historyEnabled").checked = Boolean(data.controls?.history_enabled ?? true);
+    $("historySummary").textContent = data.history?.summary
+      ? `${data.history.summary}${data.history.updating ? "\n（正在更新…）" : ""}`
+      : "还没有背景摘要。完成几次对话后，这里会出现你近期关注的主题；仅在相关时才会被助手参考。";
     renderMemorySources(data, expanded);
     $("resumeSourceEnabled").checked = Boolean(data.controls?.resume_enabled ?? true);
     $("workspaceSourceEnabled").checked = Boolean(data.controls?.workspace_enabled ?? true);
     const cleanup = data.cleanup || [];
     const pendingCleanup = cleanup.filter((task) => task.status !== "completed");
     $("memoryCleanupStatus").textContent = pendingCleanup.length
-      ? `有 ${data.cleanup_pending_count ?? pendingCleanup.length} 项清理尚未完成，相关记忆已停止使用。${pendingCleanup.some((task) => task.error_code === "LegacyCachePending") ? "部分旧缓存等待原有效期结束，后台会继续核对。" : pendingCleanup.some((task) => task.status === "retrying") ? "部分存储暂不可用，后台会继续重试。" : "后台正在处理。"}`
+      ? `有 ${data.cleanup_pending_count ?? pendingCleanup.length} 项清理尚未完成，相关记忆已停止使用。${pendingCleanup.some((task) => task.status === "retrying") ? "部分存储暂不可用，后台会继续重试。" : "后台正在处理。"}`
       : cleanup.length ? "当前应用内的清理任务已完成。外部备份、日志和独立资料不在清理范围内。" : "";
     renderMemoryContext(data.context, expanded);
     memoryTab(state.memoryTab);
@@ -676,7 +702,8 @@
   $("chatForm").addEventListener("submit", (event) => { event.preventDefault(); void send(); });
   $("chatInput").addEventListener("input", () => { $("chatInput").style.height = "auto"; $("chatInput").style.height = `${Math.min($("chatInput").scrollHeight, 180)}px`; updateComposer(); });
   $("chatInput").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); void send(); } });
-  $("newChat").addEventListener("click", newConversation);
+  $("newChat").addEventListener("click", () => newConversation(false));
+  $("newIncognito").addEventListener("click", () => newConversation(true));
   $("sessionSearch").addEventListener("input", renderSessions);
   $("stopReply").addEventListener("click", () => state.pending.get(state.active)?.controller.abort());
   $("attachImage").addEventListener("click", () => $("imageInput").click());
@@ -704,7 +731,7 @@
   $("closeMemory").addEventListener("click", () => $("memoryDialog").close());
   $("memoryDialog").addEventListener("close", () => clearInterval(memoryTimer));
   $("clearChatData").addEventListener("click", async () => {
-    if (!await askAction({ title: "清除全部 Chat 数据？", description: "删除当前账号的聊天、摘要、记忆与快照，并后台清理缓存和向量。独立简历及已有报告保留，旧资料引用会暂停。", danger: true })) return;
+    if (!await askAction({ title: "清除全部 Chat 数据？", description: "删除当前账号的聊天、会话笔记、背景摘要、记忆与快照，并后台清理。独立简历及已有报告保留，旧资料引用会暂停。", danger: true })) return;
     try {
       for (const pending of state.pending.values()) pending.controller.abort();
       await api("/api/chat/chat-data", { method: "DELETE" });
@@ -727,6 +754,20 @@
       } catch (error) { toast(error.message); await refreshMemories(); }
     });
   }
+  for (const id of ["savedEnabled", "historyEnabled"]) {
+    $(id).addEventListener("change", async () => {
+      try {
+        await api("/api/chat/features", { method: "PATCH", body: JSON.stringify({ saved_enabled: $("savedEnabled").checked, history_enabled: $("historyEnabled").checked }) });
+        toast($(id).checked ? "已开启" : "已关闭，助手将不再使用");
+      } catch (error) { toast(error.message); }
+      await refreshMemories();
+    });
+  }
+  $("resetHistory").addEventListener("click", async () => {
+    if (!await askAction({ title: "重置背景摘要？", description: "清除助手对你近期关注主题的概括，旧对话也不再被引用。聊天记录和已保存的记忆不受影响。", danger: true })) return;
+    try { await api("/api/chat/history", { method: "DELETE" }); toast("背景摘要已重置"); await refreshMemories(); }
+    catch (error) { toast(error.message); }
+  });
   $("cancelAction").addEventListener("click", () => $("actionDialog").close("cancel"));
   $("consolidateMemory").addEventListener("click", async () => {
     if (!state.active) return;

@@ -34,7 +34,7 @@
 | 📄 简历分析 | 上传 PDF、DOCX 等简历，诊断经历深度、表达问题与证据缺口，给出有原文依据的修改建议。扫描文档可通过 OCR 读取。 |
 | 🗺️ 职业规划报告 | 结合简历、目标和偏好分阶段生成报告，支持补充信息、确认方向、编辑润色、版本查看与 Word / PDF 导出。 |
 | ✅ 行动与学习计划 | 根据阶段、目标和可投入时间安排近期任务，延伸到中长期成长路线。为准备事项提供交付成果与验收标准。 |
-| 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话，结合工作台资料、简历与已保存记忆回答，支持图片输入。 |
+| 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话。聊天只读取基础画像（学校、专业、学历、毕业时间、求职偏好）与已确认的记忆，相关时才参考过往对话；支持无痕对话和图片输入。 |
 | 📰 资讯与社区 | 查看职业资讯、相关新闻，发布求职经验、岗位讨论及回复。 |
 | 👤 个人与管理中心 | 统一维护职业画像、技能证据、职业目标、测评和简历版本，追溯资料来源与修改历史。管理员管理账户及模型接口。 |
 
@@ -122,13 +122,13 @@ flowchart LR
 
 ## 🚀 快速启动
 
-推荐 **Python 3.12 + Node.js 22 + uv**。需要 Redis 缓存或 LightRAG 图谱时，再安装 Docker Desktop（Windows / macOS）或 Docker Engine + Compose 插件（Linux）。以下命令均在项目根目录执行。
+推荐 **Python 3.12 + Node.js 22 + uv**。需要 LightRAG 图谱时，再安装 Docker Desktop（Windows / macOS）或 Docker Engine + Compose 插件（Linux）。以下命令均在项目根目录执行。
 
 | 工具 | 负责什么 |
 | --- | --- |
 | uv | 安装 Python、创建 `.venv`、安装 Python 库。 |
 | npm | 安装前端依赖、构建页面、启动主站。 |
-| Docker Compose | 创建 PostgreSQL / pgvector 和 Redis 服务及持久化环境。主站在宿主机运行。 |
+| Docker Compose | 创建 PostgreSQL / pgvector 服务及持久化环境。主站在宿主机运行。 |
 
 ### 1. 安装 uv 并获取项目
 
@@ -188,15 +188,17 @@ cp .env.example .env
 
 ```bash
 docker --version
-docker compose version
+docker-compose version
+
+# 创建 PostgreSQL 数据卷，用于持久化保存数据库数据
 docker volume create research_career_pgdata
-docker volume create career-agent-memory_memory-redis
-docker compose up -d --wait postgres redis
-docker compose ps
+
+docker-compose up -d --wait postgres
+docker-compose ps
 ```
 
 
-PostgreSQL 默认连接 `127.0.0.1:5432`，Redis 默认连接 `127.0.0.1:6380`。Docker 创建的是基础服务，图谱数据还需按[知识图谱初始化](#lightrag-setup)导入。
+PostgreSQL 默认连接 `127.0.0.1:5432`。Docker 创建的是基础服务，图谱数据还需按[知识图谱初始化](#lightrag-setup)导入。
 
 ### 4. 构建并启动主站
 
@@ -245,9 +247,7 @@ flowchart TB
     GRAPH[LangGraph 报告工作流]
     LLM[OpenAI 兼容模型接口]
     DB[(SQLite<br/>账户 · 报告 · 对话 · 检查点)]
-    MEMORY[聊天记忆管理器]
-    CACHE[(Redis<br/>近期消息缓存)]
-    VECTOR[(Chroma<br/>记忆语义索引)]
+    MEMORY[聊天记忆管理器<br/>基础画像 · 会话笔记 · 背景摘要]
     RAG[岗位图谱研究模块<br/>LightRAG · PostgreSQL / pgvector]
     UI --> WEB
     WEB --> FLASK
@@ -260,8 +260,6 @@ flowchart TB
     CHAT --> LLM
     CHAT --> MEMORY
     MEMORY --> DB
-    MEMORY -. 按需启用 .-> CACHE
-    MEMORY -. 需要 embedding 配置 .-> VECTOR
 ```
 
 ### 🗺️ 报告如何生成
@@ -296,17 +294,29 @@ flowchart LR
 | --- | --- | --- |
 | 主站对话模型 | AI 分析、对话与报告 | 管理员工作台模型设置。 |
 | 聊天备用模型 | 没有主站模型配置时供聊天使用 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
-| 聊天 embedding 模型 | 启用记忆语义检索 | `AI_EMBEDDING_BASE_URL`、`AI_EMBEDDING_API_KEY`、`AI_EMBEDDING_MODEL`。 |
 | 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
 
 配置统一放在根目录 `.env`，完整示例见 [.env.example](.env.example)。进程环境变量优先于文件配置，主站选定的模型优先于聊天备用模型。
+
+### 聊天记忆参数
+
+聊天记忆开箱即用，以下参数可用环境变量 `CHAT_MEMORY_<名称大写>` 覆盖，均为正整数。
+
+| 参数 | 默认值 | 作用 |
+| --- | --- | --- |
+| `DAILY_TOKENS` | 300000 | 每用户每日 token 配额。超额后暂停后台整理，达到两倍时才限制聊天。 |
+| `ARCHIVE_DAYS` | 180 | 会话多少天未更新后归档：保留笔记，删除消息原文与图片。 |
+| `IMAGE_DAYS` | 90 | 图片保留天数，过期后删除图片并在消息里留文字占位。 |
+| `EVENT_DAYS` | 365 | 记忆变更审计记录的保留天数。 |
+| `WINDOW_TOKENS` | 12000 | 近期消息窗口的 token 预算，以整轮对话为单位取舍。 |
+| `HISTORY_WAIT_MS` | 2500 | 挑选相关旧会话的最长等待时间，超时改用关键词匹配。 |
+
+队列积压与库体积可通过 `GET /api/chat/health` 查看，该接口不含用户数据。
 
 ### 按需启用服务
 
 | 服务 | 启用条件 | 说明 |
 | --- | --- | --- |
-| Redis | 安装 Docker，启动下方 Compose 服务 | 用于近期消息缓存。不可用时，聊天记录仍由 SQLite 保存。 |
-| Chroma 记忆索引 | 配置 embedding 接口 | 在后端进程中使用本地持久化索引，无需另启 Chroma 服务。未就绪时回退到已保存记忆和资料。 |
 | 岗位图谱 | 本地 LightRAG、PostgreSQL / pgvector、模型配置和岗位材料 | 按下方[初始化说明](#lightrag-setup)安装固定版本并应用职业模块补丁，再调用 LLM 抽取。 |
 | OCR | 安装 Tesseract 程序及所需语言数据 | 仅安装 Python 的 `pytesseract` 包不够。 |
 
@@ -314,9 +324,9 @@ flowchart LR
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 postgres redis
+docker compose logs --tail=100 postgres
 docker compose stop
-docker compose up -d --wait postgres redis
+docker compose up -d --wait postgres
 ```
 
 `stop` 停止服务，`up` 重新启动并复用数据卷。已有数据库中修改用户、密码或库名时，仅编辑 `.env` 不会修改已初始化的数据，需同步调整数据库。备份时同时保留 PostgreSQL 数据和下方职业事实库。
@@ -467,7 +477,7 @@ career-agent/
 ├── deploy/                       # Nginx 示例与静态导出目录
 ├── requirements.txt              # Python 依赖
 ├── .env.example                  # 环境配置模板
-└── compose.yml                   # PostgreSQL / pgvector 与 Redis
+└── compose.yml                   # PostgreSQL / pgvector
 ```
 
 ## 致谢

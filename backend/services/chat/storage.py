@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import logging
+import os
 from pathlib import Path
 import sqlite3
 import time
@@ -9,6 +11,11 @@ from uuid import uuid4
 
 from .policy import MemoryPolicy, estimate_tokens
 from .privacy import MemoryControls, SCHEMA as PRIVACY_SCHEMA
+
+logger = logging.getLogger(__name__)
+
+IMAGE_EXPIRED = "\n[图片已过期并已删除]"
+CONSTRAINT_LIMIT = 20
 
 
 class ChatError(Exception):
@@ -39,7 +46,9 @@ class ChatStore(MemoryControls):
                     summary TEXT NOT NULL DEFAULT '', analyzed_seq INTEGER NOT NULL DEFAULT 0,
                     memory_seq INTEGER NOT NULL DEFAULT 0,
                     sending_token TEXT, sending_until REAL NOT NULL DEFAULT 0,
-                    selection TEXT NOT NULL DEFAULT '{}'
+                    selection TEXT NOT NULL DEFAULT '{}',
+                    notes TEXT NOT NULL DEFAULT '', note_title TEXT NOT NULL DEFAULT '', note_gist TEXT NOT NULL DEFAULT '',
+                    incognito INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS sessions_owner ON sessions(owner, updated_at);
                 CREATE TABLE IF NOT EXISTS messages (
@@ -82,6 +91,16 @@ class ChatStore(MemoryControls):
                     after_value TEXT, evidence TEXT NOT NULL, decision TEXT NOT NULL, created_at REAL NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS memory_events_owner ON memory_events(owner,seq);
+                CREATE TABLE IF NOT EXISTS user_digest (
+                    owner TEXT PRIMARY KEY, summary TEXT NOT NULL DEFAULT '', topics TEXT NOT NULL DEFAULT '[]',
+                    dirty INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 0,
+                    lease_until REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0,
+                    onboarding INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS usage_daily (
+                    owner TEXT NOT NULL, day TEXT NOT NULL, tokens INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(owner, day)
+                );
                 CREATE TABLE IF NOT EXISTS context_traces (
                     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                     request_id TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL,
@@ -93,6 +112,15 @@ class ChatStore(MemoryControls):
             if "memory_seq" not in session_columns:
                 conn.execute("ALTER TABLE sessions ADD COLUMN memory_seq INTEGER NOT NULL DEFAULT 0")
                 conn.execute("UPDATE sessions SET memory_seq=analyzed_seq")
+            for column, definition in (("notes", "TEXT NOT NULL DEFAULT ''"), ("note_title", "TEXT NOT NULL DEFAULT ''"),
+                                       ("note_gist", "TEXT NOT NULL DEFAULT ''"), ("incognito", "INTEGER NOT NULL DEFAULT 0"),
+                                       ("archived", "INTEGER NOT NULL DEFAULT 0")):
+                if column not in session_columns:
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {column} {definition}")
+            privacy_columns = {row["name"] for row in conn.execute("PRAGMA table_info(chat_privacy)")}
+            for column in ("saved_enabled", "history_enabled"):
+                if column not in privacy_columns:
+                    conn.execute(f"ALTER TABLE chat_privacy ADD COLUMN {column} INTEGER NOT NULL DEFAULT 1")
             if "sending_epoch" not in session_columns:
                 conn.execute("ALTER TABLE sessions ADD COLUMN sending_epoch INTEGER NOT NULL DEFAULT 0")
             if "kind" not in {row["name"] for row in conn.execute("PRAGMA table_info(memory_jobs)")}:
@@ -143,9 +171,13 @@ class ChatStore(MemoryControls):
 
     @contextmanager
     def connect(self, *, write=False):
+        # timeout 即 busy_timeout：写锁竞争时最多等待 15 秒而不是立刻报错。
         conn = sqlite3.connect(self.path, timeout=15)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
+        # WAL 下 NORMAL 在应用崩溃时不丢已提交数据，只在整机掉电时可能丢最后几次提交；
+        # 换来每次提交不再强制刷盘，聊天写入和任务队列都更快。
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA secure_delete=ON")
         try:
             if write:
@@ -166,23 +198,30 @@ class ChatStore(MemoryControls):
             raise ChatError("对话不存在或已删除。", 404)
         return dict(row)
 
-    def create_session(self, owner, title="新对话"):
+    def create_session(self, owner, title="新对话", *, incognito=False):
         now, session_id = time.time(), uuid4().hex
         with self.connect(write=True) as conn:
-            conn.execute("INSERT INTO sessions(id,owner,title,created_at,updated_at) VALUES(?,?,?,?,?)",
-                         (session_id, owner, title, now, now))
+            conn.execute("INSERT INTO sessions(id,owner,title,created_at,updated_at,incognito) VALUES(?,?,?,?,?,?)",
+                         (session_id, owner, title, now, now, int(bool(incognito))))
         return self.session(owner, session_id)
 
     def session(self, owner, session_id):
         with self.connect() as conn:
             return self.owned(conn, owner, session_id)
 
-    def list_sessions(self, owner):
+    def list_sessions(self, owner, *, before=None, limit=200):
+        """Newest first; `before` is the (updated_at, id) of the last row of the previous page."""
         with self.connect() as conn:
-            rows = conn.execute("""SELECT s.id,s.title,s.created_at,s.updated_at,
-                (SELECT content FROM messages m WHERE m.session_id=s.id ORDER BY seq DESC LIMIT 1) preview
-                FROM sessions s WHERE owner=? ORDER BY updated_at DESC LIMIT 200""", (owner,)).fetchall()
+            cursor = ("AND (s.updated_at<? OR (s.updated_at=? AND s.id<?))", (before[0], before[0], before[1])) if before else ("", ())
+            rows = conn.execute(f"""SELECT s.id,s.title,s.created_at,s.updated_at,s.incognito,s.archived,
+                COALESCE((SELECT content FROM messages m WHERE m.session_id=s.id ORDER BY seq DESC LIMIT 1), s.note_gist) preview
+                FROM sessions s WHERE s.owner=? {cursor[0]} ORDER BY s.updated_at DESC, s.id DESC LIMIT ?""",
+                (owner, *cursor[1], limit)).fetchall()
             return [dict(row) for row in rows]
+
+    def session_titles(self, owner):
+        with self.connect() as conn:
+            return {row["id"]: row["title"] for row in conn.execute("SELECT id,title FROM sessions WHERE owner=?", (owner,))}
 
     def rename(self, owner, session_id, title):
         with self.connect(write=True) as conn:
@@ -229,6 +268,8 @@ class ChatStore(MemoryControls):
         now = time.time()
         with self.connect(write=True) as conn:
             session = self.owned(conn, owner, session_id)
+            if session["archived"]:
+                raise ChatError("该对话已归档，只保留笔记；请新建对话继续。", 409)
             completed = conn.execute("""SELECT * FROM messages WHERE session_id=? AND request_id=?
                 AND role='assistant' AND status='complete'""", (session_id, request_id)).fetchone()
             previous = conn.execute("SELECT * FROM messages WHERE session_id=? AND request_id=? AND role='user'",
@@ -295,7 +336,12 @@ class ChatStore(MemoryControls):
             if session["sending_until"] > time.time():
                 raise ChatError("请等待当前回复完成后再整理记忆。", 409)
             now = time.time()
-            for kind, progress in (("memory", session["memory_seq"]), ("summary", session["analyzed_seq"])):
+            saved = conn.execute("SELECT saved_enabled FROM chat_privacy WHERE owner=?", (owner,)).fetchone()
+            kinds = [("summary", session["analyzed_seq"])]
+            # 无痕会话和关闭"记忆"的用户不提取长期记忆；笔记只服务本会话上下文。
+            if not session["incognito"] and (saved is None or saved[0]):
+                kinds.insert(0, ("memory", session["memory_seq"]))
+            for kind, progress in kinds:
                 cursor = max(progress, session["context_cutoff_seq"])
                 rows = conn.execute("""SELECT * FROM messages WHERE session_id=? AND seq>? AND status='complete'
                     ORDER BY seq""", (session_id, cursor)).fetchall()
@@ -312,19 +358,37 @@ class ChatStore(MemoryControls):
                     attempts=CASE WHEN status IN ('error','done') THEN 0 ELSE attempts END""",
                     (session_id, kind, due, rows[-1]["seq"], priority, reason))
 
-    def claim_job(self, kind=None):
+    def claim_job(self, kind=None, *, min_priority=0, max_priority=None):
+        """Atomically take one due job. Lanes split by priority so an urgent request is never
+        queued behind a slow bulk summary; `max_priority` is exclusive."""
         now, token = time.time(), uuid4().hex
         with self.connect(write=True) as conn:
-            row = conn.execute("""SELECT j.*,s.owner,s.analyzed_seq,s.memory_seq,s.summary,s.selection,
+            # 反复让进程崩溃的任务只会留下过期租约；超过尝试上限就终止，避免无限循环。
+            conn.execute("UPDATE memory_jobs SET status='error' WHERE status='running' AND lease_until<? AND attempts>=3", (now,))
+            row = conn.execute("""SELECT j.*,s.owner,s.analyzed_seq,s.memory_seq,s.summary,s.notes,s.selection,s.incognito,
                 CASE WHEN j.kind='summary' THEN s.analyzed_seq ELSE s.memory_seq END cursor FROM memory_jobs j
                 JOIN sessions s ON s.id=j.session_id WHERE ((j.status='queued' AND j.due_at<=?)
                 OR (j.status='running' AND j.lease_until<?)) AND (? IS NULL OR j.kind=?)
-                ORDER BY j.priority DESC,j.due_at,j.kind LIMIT 1""", (now, now, kind, kind)).fetchone()
+                AND j.priority>=? AND (? IS NULL OR j.priority<?)
+                ORDER BY j.priority DESC,j.due_at,j.kind LIMIT 1""",
+                (now, now, kind, kind, min_priority, max_priority, max_priority)).fetchone()
             if not row:
                 return None
             conn.execute("UPDATE memory_jobs SET status='running',token=?,lease_until=?,attempts=attempts+1 WHERE session_id=? AND kind=?",
                          (token, now + 300, row["session_id"], row["kind"]))
-            return {**dict(row), "token": token, "attempts": row["attempts"] + 1}
+            return {**dict(row), "token": token, "attempts": row["attempts"] + 1, "wait_seconds": max(0.0, now - row["due_at"])}
+
+    def defer_job(self, job, seconds):
+        """Postpone a claimed job without spending one of its retry attempts (used for quota)."""
+        with self.connect(write=True) as conn:
+            conn.execute("""UPDATE memory_jobs SET status='queued',due_at=?,attempts=MAX(attempts-1,0)
+                WHERE session_id=? AND kind=? AND token=? AND status='running'""",
+                (time.time() + seconds, job["session_id"], job["kind"], job["token"]))
+
+    def pending_count(self, session_id, cursor):
+        with self.connect() as conn:
+            return conn.execute("SELECT COUNT(*) FROM messages WHERE session_id=? AND seq>? AND status='complete'",
+                                (session_id, cursor)).fetchone()[0]
 
     def analysis_messages(self, job):
         with self.connect() as conn:
@@ -360,18 +424,41 @@ class ChatStore(MemoryControls):
             if not row.rowcount:
                 raise ChatError("记忆任务已被其他进程接管。", 409)
 
-    def apply_summary(self, job, messages, summary):
-        if job["kind"] != "summary" or not isinstance(summary, str) or len(summary) > 2500 or not messages:
+    def apply_note(self, job, messages, note):
+        """Persist a structured session note; `summary` keeps the rendered text used as conversation context."""
+        summary = note.get("summary") if isinstance(note, dict) else None
+        if job["kind"] != "summary" or not isinstance(summary, str) or not summary.strip() or len(summary) > 2500 or not messages:
             raise ValueError("Invalid summary result")
         with self.connect(write=True) as conn:
             current = self._current_job(conn, job)
             if not current:
                 return False
-            self.owned(conn, job["owner"], job["session_id"])
+            session = self.owned(conn, job["owner"], job["session_id"])
             last = messages[-1]["seq"]
-            conn.execute("UPDATE sessions SET summary=?,analyzed_seq=? WHERE id=?", (summary, last, job["session_id"]))
+            shared = not session["incognito"]
+            conn.execute("UPDATE sessions SET summary=?,notes=?,note_title=?,note_gist=?,analyzed_seq=? WHERE id=?",
+                         (summary, json.dumps(note["notes"], ensure_ascii=False), note["title"] if shared else "",
+                          note["gist"] if shared else "", last, job["session_id"]))
+            history = conn.execute("SELECT history_enabled FROM chat_privacy WHERE owner=?", (job["owner"],)).fetchone()
+            if shared and (history is None or history[0]):
+                self._mark_digest(conn, job["owner"])
             self._complete_job(conn, job, current, last)
             return True
+
+    def skip_memory(self, job, messages):
+        """Finish a memory job without extracting anything (memory switched off or incognito session)."""
+        with self.connect(write=True) as conn:
+            current = self._current_job(conn, job)
+            if not current:
+                return False
+            conn.execute("UPDATE sessions SET memory_seq=? WHERE id=?", (messages[-1]["seq"], job["session_id"]))
+            self._complete_job(conn, job, current, messages[-1]["seq"])
+            return True
+
+    @staticmethod
+    def _mark_digest(conn, owner):
+        conn.execute("""INSERT INTO user_digest(owner,dirty,version) VALUES(?,1,1)
+            ON CONFLICT(owner) DO UPDATE SET dirty=1,version=version+1""", (owner,))
 
     def memory_snapshot(self, owner):
         with self.connect() as conn:
@@ -388,12 +475,6 @@ class ChatStore(MemoryControls):
         with self.connect() as conn:
             return [dict(row) for row in conn.execute("SELECT * FROM memories WHERE owner=? AND (id=? OR id LIKE ?)",
                     (owner, slot, slot + ":conflict:%"))]
-
-    def memories_by_ids(self, owner, ids, *, kind, key):
-        with self.connect() as conn:
-            rows = [conn.execute("SELECT * FROM memories WHERE owner=? AND id=? AND kind=? AND key=? AND status='active'",
-                                 (owner, identifier, kind, key)).fetchone() for identifier in ids[:5]]
-            return [dict(row) for row in rows if row and ":conflict:" not in row["id"]]
 
     def apply_memory_plan(self, job, messages, candidates, decisions, expected_revision):
         from .extraction import validate_candidates
@@ -433,8 +514,13 @@ class ChatStore(MemoryControls):
                     slot = old["id"]
                     if not self.candidate_allowed(owner, {**candidate, "subject": old["subject"]}, sources, conn=conn):
                         continue
-                if old and normalized(old["subject"]) != normalized(candidate["subject"]) and candidate["key"] != "experience":
-                    raise ValueError("Only experience aliases can use semantic targets")
+                if old and normalized(old["subject"]) != normalized(candidate["subject"]):
+                    raise ValueError("Memory targets must keep the same subject")
+                if old is None and candidate["key"] == "constraint" and candidate["operation"] != "retract" and conn.execute(
+                        """SELECT COUNT(*) FROM memories WHERE owner=? AND key='constraint' AND id NOT LIKE '%:conflict:%'
+                        AND status IN ('active','conflict')""", (owner,)).fetchone()[0] >= CONSTRAINT_LIMIT:
+                    logger.info("约束类记忆已达上限 %d，忽略新的约束。", CONSTRAINT_LIMIT)
+                    continue
                 decision = validate_decision(raw_decision, candidate, [old] if old else [])
                 op, value = decision["operation"], decision["value"]
                 source_at = max(source_times[item["message_id"]] for item in candidate["evidence"])
@@ -511,6 +597,10 @@ class ChatStore(MemoryControls):
             for identifier in identifiers:
                 if conn.execute("SELECT 1 FROM memories WHERE id=? AND owner=?", (identifier, owner)).fetchone():
                     conn.execute("INSERT OR IGNORE INTO memory_usages VALUES(?,?,?,?)", (owner, identifier, session_id, request_id))
+            # 使用记录只保留最近若干轮，避免该表随"轮数 x 记忆条数"无限增长。
+            conn.execute("""DELETE FROM memory_usages WHERE owner=? AND session_id=? AND request_id NOT IN
+                (SELECT request_id FROM messages WHERE session_id=? AND role='user' ORDER BY seq DESC LIMIT ?)""",
+                (owner, session_id, session_id, self.policy.usage_turns))
             # Only the latest few audit snapshots are needed; chat history remains separate.
             conn.execute("""DELETE FROM context_traces WHERE session_id=? AND request_id NOT IN
                 (SELECT request_id FROM context_traces WHERE session_id=? ORDER BY created_at DESC LIMIT 10)""", (session_id, session_id))
@@ -521,19 +611,145 @@ class ChatStore(MemoryControls):
             row = conn.execute("SELECT payload,created_at,request_id FROM context_traces WHERE session_id=? ORDER BY created_at DESC LIMIT 1", (session_id,)).fetchone()
             return {**json.loads(row["payload"]), "created_at": row["created_at"], "request_id": row["request_id"]} if row else None
 
-    def index_pending(self):
+    # ---- 用量、保留策略与运行状况 ----
+
+    @staticmethod
+    def _today(now=None):
+        return time.strftime("%Y-%m-%d", time.localtime(now or time.time()))
+
+    def add_usage(self, owner, tokens):
+        if tokens > 0:
+            with self.connect(write=True) as conn:
+                conn.execute("""INSERT INTO usage_daily(owner,day,tokens) VALUES(?,?,?)
+                    ON CONFLICT(owner,day) DO UPDATE SET tokens=tokens+excluded.tokens""", (owner, self._today(), int(tokens)))
+
+    def usage_today(self, owner):
         with self.connect() as conn:
-            return [dict(row) for row in conn.execute("""SELECT m.*,COALESCE(p.epoch,0) privacy_epoch FROM memories m
-                LEFT JOIN chat_privacy p ON p.owner=m.owner WHERE m.revision>m.indexed_revision
-                AND NOT EXISTS(SELECT 1 FROM cleanup_jobs j WHERE j.owner=m.owner AND j.status!='completed') LIMIT 100""").fetchall()]
+            row = conn.execute("SELECT tokens FROM usage_daily WHERE owner=? AND day=?", (owner, self._today())).fetchone()
+            return row[0] if row else 0
 
-    def mark_indexed(self, memory_id, revision):
-        with self.connect(write=True) as conn:
-            conn.execute("UPDATE memories SET indexed_revision=? WHERE id=? AND revision=?", (revision, memory_id, revision))
+    def quota(self, owner):
+        """ok -> background_paused (over quota) -> chat_limited (over twice the quota)."""
+        used, limit = self.usage_today(owner), self.policy.daily_tokens
+        state = "chat_limited" if used >= 2 * limit else "background_paused" if used >= limit else "ok"
+        return {"state": state, "used": used, "limit": limit}
 
-    def reset_index(self):
+    def maintenance(self, now=None):
+        """Retention: expire old images, archive idle sessions (keeping their notes), prune audit events."""
+        now = now or time.time()
+        result = {"images": 0, "archived": 0, "events": 0}
         with self.connect(write=True) as conn:
-            conn.execute("UPDATE memories SET indexed_revision=0")
+            expired = [row[0] for row in conn.execute(
+                """SELECT DISTINCT i.message_id FROM chat_images i JOIN messages m ON m.id=i.message_id
+                WHERE m.created_at<?""", (now - self.policy.image_days * 86400,))]
+            for message_id in expired:
+                conn.execute("UPDATE messages SET content=content||? WHERE id=? AND content NOT LIKE ?",
+                             (IMAGE_EXPIRED, message_id, "%" + IMAGE_EXPIRED.strip() + "%"))
+                result["images"] += conn.execute("DELETE FROM chat_images WHERE message_id=?", (message_id,)).rowcount
+            idle = [row[0] for row in conn.execute(
+                "SELECT id FROM sessions WHERE archived=0 AND updated_at<? AND sending_until<?",
+                (now - self.policy.archive_days * 86400, now))]
+            for session_id in idle:
+                conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+                conn.execute("DELETE FROM memory_jobs WHERE session_id=?", (session_id,))
+                conn.execute("DELETE FROM context_traces WHERE session_id=?", (session_id,))
+                conn.execute("UPDATE sessions SET archived=1 WHERE id=?", (session_id,))
+                result["archived"] += 1
+            result["events"] = conn.execute("DELETE FROM memory_events WHERE created_at<?",
+                                            (now - self.policy.event_days * 86400,)).rowcount
+        return result
+
+    def health(self):
+        now = time.time()
+        with self.connect() as conn:
+            jobs = {row["status"]: row["total"] for row in conn.execute("SELECT status,COUNT(*) total FROM memory_jobs GROUP BY status")}
+            oldest = conn.execute("SELECT MIN(due_at) FROM memory_jobs WHERE status='queued' AND due_at<=?", (now,)).fetchone()[0]
+            images = conn.execute("SELECT COUNT(*),COALESCE(SUM(LENGTH(data)),0) FROM chat_images").fetchone()
+            cleanup = conn.execute("SELECT COUNT(*) FROM cleanup_jobs WHERE status!='completed'").fetchone()[0]
+            dirty = conn.execute("SELECT COUNT(*) FROM user_digest WHERE dirty=1").fetchone()[0]
+        size = sum(os.path.getsize(str(self.path) + suffix) for suffix in ("", "-wal") if os.path.exists(str(self.path) + suffix))
+        return {"jobs": jobs, "oldest_wait_seconds": round(now - oldest, 1) if oldest else 0.0,
+                "error_jobs": jobs.get("error", 0), "pending_cleanup": cleanup, "pending_digests": dirty,
+                "database_bytes": size, "image_count": images[0], "image_bytes": images[1]}
+
+    # ---- 用户级背景摘要与功能开关 ----
+
+    def set_features(self, owner, *, saved_enabled, history_enabled):
+        with self.connect(write=True) as conn:
+            conn.execute("INSERT OR IGNORE INTO chat_privacy(owner) VALUES(?)", (owner,))
+            before = conn.execute("SELECT history_enabled FROM chat_privacy WHERE owner=?", (owner,)).fetchone()[0]
+            conn.execute("UPDATE chat_privacy SET saved_enabled=?,history_enabled=? WHERE owner=?",
+                         (int(saved_enabled), int(history_enabled), owner))
+            if history_enabled and not before:
+                self._mark_digest(conn, owner)  # 重新开启后按现有笔记重建
+
+    def digest(self, owner):
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM user_digest WHERE owner=?", (owner,)).fetchone()
+        if not row:
+            return {"summary": "", "topics": [], "dirty": 0, "updated_at": 0, "onboarding": 0}
+        return {"summary": row["summary"], "topics": json.loads(row["topics"]), "dirty": row["dirty"],
+                "updated_at": row["updated_at"], "onboarding": row["onboarding"]}
+
+    def digest_sessions(self, owner, *, limit=30):
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                """SELECT id,note_title,note_gist,notes,updated_at,selection FROM sessions
+                WHERE owner=? AND incognito=0 AND note_title<>'' ORDER BY updated_at DESC LIMIT ?""", (owner, limit))]
+
+    def claim_digest(self):
+        now = time.time()
+        with self.connect(write=True) as conn:
+            row = conn.execute("""SELECT d.owner,d.version,d.summary,
+                COALESCE(p.history_enabled,1) enabled FROM user_digest d LEFT JOIN chat_privacy p ON p.owner=d.owner
+                WHERE d.dirty=1 AND d.lease_until<? ORDER BY d.updated_at LIMIT 1""", (now,)).fetchone()
+            if not row:
+                return None
+            if not row["enabled"]:
+                conn.execute("UPDATE user_digest SET dirty=0 WHERE owner=?", (row["owner"],))
+                return None
+            conn.execute("UPDATE user_digest SET lease_until=? WHERE owner=?", (now + 300, row["owner"]))
+            latest = conn.execute("SELECT selection FROM sessions WHERE owner=? ORDER BY updated_at DESC LIMIT 1", (row["owner"],)).fetchone()
+            return {"owner": row["owner"], "version": row["version"], "previous": row["summary"],
+                    "selection": latest["selection"] if latest else "{}"}
+
+    def finish_digest(self, owner, version, summary, topics):
+        with self.connect(write=True) as conn:
+            conn.execute("""UPDATE user_digest SET summary=?,topics=?,updated_at=?,lease_until=0,
+                dirty=CASE WHEN version=? THEN 0 ELSE 1 END WHERE owner=?""",
+                (summary, json.dumps(topics, ensure_ascii=False), time.time(), version, owner))
+
+    def release_digest(self, owner):
+        with self.connect(write=True) as conn:
+            conn.execute("UPDATE user_digest SET lease_until=? WHERE owner=?", (time.time() + 120, owner))
+
+    def reset_history(self, owner):
+        """User-facing reset: forget the digest and stop old sessions being offered as references."""
+        with self.connect(write=True) as conn:
+            conn.execute("UPDATE user_digest SET summary='',topics='[]',dirty=0,updated_at=? WHERE owner=?", (time.time(), owner))
+            conn.execute("UPDATE sessions SET note_title='',note_gist='' WHERE owner=?", (owner,))
+
+    def history_candidates(self, owner, exclude):
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                """SELECT id,note_title,note_gist,updated_at FROM sessions WHERE owner=? AND id<>? AND incognito=0
+                AND note_title<>'' ORDER BY updated_at DESC LIMIT 60""", (owner, exclude))]
+
+    def session_notes(self, owner, identifiers):
+        with self.connect() as conn:
+            rows = [conn.execute("SELECT id,note_title,summary,updated_at FROM sessions WHERE owner=? AND id=? AND incognito=0 AND note_title<>''",
+                                 (owner, identifier)).fetchone() for identifier in identifiers]
+            return [dict(row) for row in rows if row]
+
+    def take_onboarding(self, owner, *, limit=2):
+        """Count a profile-completion prompt; at most `limit` per user so a skipped question is not repeated."""
+        with self.connect(write=True) as conn:
+            conn.execute("INSERT OR IGNORE INTO user_digest(owner) VALUES(?)", (owner,))
+            used = conn.execute("SELECT onboarding FROM user_digest WHERE owner=?", (owner,)).fetchone()[0]
+            if used >= limit:
+                return False
+            conn.execute("UPDATE user_digest SET onboarding=onboarding+1 WHERE owner=?", (owner,))
+            return True
 
     def delete_owner(self, owner):
         return self.clear_chat_data(owner)

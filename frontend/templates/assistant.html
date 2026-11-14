@@ -31,6 +31,7 @@
     <aside class="chat-sidebar" id="chatSidebar" aria-label="聊天会话">
         <a class="chat-brand" href="/main.html"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="34" height="34"><span>智航生涯<span class="brand-caption">你的职业探索伙伴</span></span></a>
         <button class="new-chat" id="newChat"><svg><use href="#i-plus"/></svg>开启新对话<span>＋</span></button>
+        <button class="new-chat" id="newIncognito" type="button" title="不写入长期记忆，也不会被其他对话引用"><svg><use href="#i-chat"/></svg>无痕对话<span>◐</span></button>
         <label class="session-search"><svg><use href="#i-chat"/></svg><input id="sessionSearch" type="search" placeholder="搜索对话" aria-label="搜索对话标题" autocomplete="off"></label>
         <div class="sidebar-section-label">最近对话 <span id="sessionCount">0</span></div>
         <nav class="session-list" id="sessionList" aria-label="历史对话"><p class="sidebar-empty">正在加载对话…</p></nav>
@@ -93,6 +94,8 @@
         </nav>
         <section id="memorySourcesPanel" role="tabpanel" aria-labelledby="memorySourcesTab">
             <div class="memory-source-controls"><label><input type="checkbox" id="resumeSourceEnabled"> 在聊天中使用独立简历资料</label><label><input type="checkbox" id="workspaceSourceEnabled"> 在聊天中使用历史工作台资料</label></div>
+            <div class="memory-source-controls"><label><input type="checkbox" id="savedEnabled"> 记住我的基础画像与偏好</label><label><input type="checkbox" id="historyEnabled"> 参考过去的聊天记录（仅在相关时使用）</label></div>
+            <div class="memory-resume-state"><div><strong>背景摘要</strong><p id="historySummary" style="white-space:pre-wrap"></p></div><button type="button" id="resetHistory">重置</button></div>
             <div class="memory-resume-state"><div><strong id="memoryResumeTitle">当前简历</strong><p id="memoryResumeStatus"></p></div><button type="button" id="syncResumeMemory">读取当前简历</button></div>
             <div id="memorySources" class="memory-source-list"></div>
         </section>

@@ -12,6 +12,3 @@ def model_runtime(prefix):
 def fallback_chat_runtime():
     return model_runtime("AI_CHAT_")
 
-
-def embedding_runtime():
-    return model_runtime("AI_EMBEDDING_")

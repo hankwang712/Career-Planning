@@ -1,27 +1,33 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import logging
 import re
 import threading
+import time
 
 from pydantic import ValidationError
 
-from .cache import RecentCache
-from .extraction import EXTRACTION_PROMPT, SUMMARY_PROMPT, SUMMARY_TEXT_PROMPT, validate_candidates
+from .extraction import EXTRACTION_PROMPT, MEMORY_KEYS, NOTE_PROMPT, merge_note, validate_candidates
+from .history import (DIGEST_PROMPT, MAX_NOTES, NOTE_LIMIT, SELECT_PROMPT, choose_fallback, date_of, needs_history,
+                      render_digest)
 from .policy import estimate_tokens, message_windows
-from .reconciliation import RELATION_PROMPT, automatic_decision, validate_decision
-from .schemas import DecisionOutput, ExtractionOutput, SummaryOutput, response_format
+from .reconciliation import automatic_decision, validate_decision
+from .schemas import DigestOutput, ExtractionOutput, NoteOutput, SelectionOutput, response_format
 from .storage import normalized
-from .vector import VectorMemory
 
 logger = logging.getLogger(__name__)
+
+MAINTENANCE_INTERVAL = 6 * 3600
+MODEL_OUTPUTS = {EXTRACTION_PROMPT: ExtractionOutput, NOTE_PROMPT: NoteOutput,
+                 DIGEST_PROMPT: DigestOutput, SELECT_PROMPT: SelectionOutput}
 
 
 def analysis_error_detail(error):
     """Useful diagnostics without provider bodies, API keys or private excerpts."""
     if isinstance(error, ValidationError):
-        fields = {"summary", "memories", "kind", "key", "subject", "value", "operation", "evidence",
-                  "message_id", "quote", "confidence", "scope", "reason", "target_id", "requires_confirmation"}
+        fields = {"title", "gist", "goal", "decisions", "corrections", "open_questions", "advice", "goals", "focus",
+                  "selected", "memories", "kind", "key", "subject", "value", "operation",
+                  "evidence", "message_id", "quote", "confidence", "scope", "reason", "target_id", "requires_confirmation"}
         details = []
         for item in error.errors(include_input=False, include_context=False, include_url=False)[:3]:
             location = ".".join(str(part) if isinstance(part, int) or part in fields else "*" for part in item["loc"])
@@ -36,7 +42,7 @@ def analysis_error_detail(error):
     return {
         "Incomplete or refused memory output": "模型输出被截断、过滤或拒绝",
         "Extraction request exceeds the configured input token budget": "输入超过记忆分析Token预算",
-        "Invalid conversation summary": "摘要格式无效或超过2500字",
+        "Invalid conversation summary": "会话笔记格式无效",
         "Model must return a JSON object": "模型输出不是JSON对象",
         "Evidence must be verbatim user text": "候选证据不属于本批用户原文",
     }.get(str(error), "未记录原始异常文本，以免泄露聊天内容或密钥")
@@ -52,130 +58,144 @@ class MemoryContext:
     recent: list[dict]
     memories: list[dict]
     conflicts: list[dict]
-    vector_matches: set[str]
+    uncovered: int = 0
+    history: dict = field(default_factory=lambda: {"used": False})
 
 
 class MemoryManager:
-    RECENT_LIMIT = 40
-    RECENT_CHARACTERS = 32000
-    VECTOR_WAIT_SECONDS = 0.75
+    LANES = ("urgent", "bulk")
 
-    def __init__(self, store, directory, *, runtime, client_factory, cache=None, vector=None):
+    def __init__(self, store, directory=None, *, runtime, client_factory):
         self.store = store
-        self.cache = cache if cache is not None else RecentCache()
-        self.vector = vector if vector is not None else VectorMemory(directory)
         self.runtime = runtime
         self.client_factory = client_factory
         self.policy = store.policy
-        self._worker = None
+        self._workers = {}
         self._worker_lock = threading.Lock()
-        self._wakeup = threading.Event()
+        self._wakeups = {lane: threading.Event() for lane in self.LANES}
         self._stopping = threading.Event()
-        self._resources_closed = False
-        self._recall_slots = threading.BoundedSemaphore(2)
+        self._last_maintenance = 0.0
 
-    def _semantic_matches(self, owner, query, epoch):
-        # A slow embedding provider must not hold up the main reply. Do not queue
-        # requests behind stalled calls, and discard late results rather than
-        # caching queries or recalled personal data after a privacy change.
-        if self._stopping.is_set() or not self._recall_slots.acquire(blocking=False):
-            return []
-        finished, result = threading.Event(), []
-
-        def search():
-            try:
-                result.extend(self.vector.search(owner, query, epoch=epoch))
-            except Exception:
-                pass  # Confirmed SQLite memories remain available below.
-            finally:
-                self._recall_slots.release()
-                finished.set()
-
-        threading.Thread(target=search, name="assistant-recall", daemon=True).start()
-        return result if finished.wait(self.VECTOR_WAIT_SECONDS) else []
+    # ---- 近期窗口与上下文 ----
 
     def _recent(self, owner, session):
-        epoch = session["privacy_epoch"]
-        version = [session["updated_at"], session["analyzed_seq"], epoch]
-        cached = self.cache.get(owner, session["id"], epoch=epoch)
-        items = cached.get("items") if isinstance(cached, dict) and cached.get("version") == version else None
-        valid = isinstance(items, list) and len(items) <= self.RECENT_LIMIT and all(
-            isinstance(row, dict) and type(row.get("seq")) is int
-            and row.get("role") in ("user", "assistant")
-            and isinstance(row.get("content"), str) and row.get("status") in ("complete", "failed")
-            for row in items)
-        if not valid:
-            items = self.store.messages(owner, session["id"], limit=self.RECENT_LIMIT)["items"]
-            lease = self.store.begin_artifact(owner, "cache", epoch=epoch)
-            if lease:
-                try:
-                    if self.store.artifact_valid(lease):
-                        self.cache.put(owner, session["id"], {"version": version, "items": items}, epoch=epoch)
-                    if not self.store.artifact_valid(lease):
-                        try:
-                            self.cache.cleanup(owner, [session["id"]], entire_owner=False)
-                        except Exception:
-                            self.store.repair_artifacts(owner)
-                finally:
-                    self.store.end_artifact(lease)
-        recent, size = [], 0
-        for row in reversed(items):
-            if row["seq"] <= max(session["analyzed_seq"], session["context_cutoff_seq"]) or row["status"] != "complete":
-                continue
-            if size + len(row["content"]) > self.RECENT_CHARACTERS:
+        """Newest whole turns that fit the token budget; never cut a turn in half.
+
+        Returns the rows plus how many unsummarised messages did not fit, so the caller can flag the gap.
+        """
+        items = self.store.messages(owner, session["id"], limit=self.policy.window_messages)["items"]
+        cursor = max(session["analyzed_seq"], session["context_cutoff_seq"])
+        turns = []
+        for row in reversed([row for row in items if row["seq"] > cursor and row["status"] == "complete"]):
+            if turns and turns[-1][0]["request_id"] == row["request_id"]:
+                turns[-1].insert(0, row)
+            else:
+                turns.append([row])
+        chosen, used = [], 0
+        for turn in turns:
+            cost = sum(estimate_tokens(row["content"]) for row in turn)
+            # The newest turn is always kept, even when it alone exceeds the budget.
+            if chosen and used + cost > self.policy.window_tokens:
                 break
-            recent.append({"role": row["role"], "content": row["content"], **({"images": row["images"]} if row.get("images") else {})})
-            size += len(row["content"])
-        return list(reversed(recent))
+            chosen.append(turn)
+            used += cost
+        rows = [row for turn in reversed(chosen) for row in turn]
+        recent = [{"role": row["role"], "content": row["content"], **({"images": row["images"]} if row.get("images") else {})}
+                  for row in rows]
+        return recent, max(0, self.store.pending_count(session["id"], cursor) - len(rows))
 
     @staticmethod
     def confirmed(memories):
         disputed = {(row["kind"], row["key"], normalized(row["subject"]))
                     for row in memories if row["status"] == "conflict"}
-        return [row for row in memories if row["status"] == "active" and
+        # 旧版本可能已保存 skill/experience 记忆；不再属于基础画像，不进入聊天或报告上下文。
+        return [row for row in memories if row["status"] == "active" and row["key"] in MEMORY_KEYS.get(row["kind"], ()) and
                 (row["kind"], row["key"], normalized(row["subject"])) not in disputed]
 
     def context(self, owner, session_id, query):
-        session = self.store.session(owner, session_id)  # Check ownership before reading any cache.
+        session = self.store.session(owner, session_id)  # Check ownership before reading any session data.
+        settings = self.store.privacy(owner)
         _, memories = self.store.memory_snapshot(owner)
-        active = self.confirmed(memories)
+        saved = bool(settings["saved_enabled"])
+        active = self.confirmed(memories) if saved else []
         identity_query = bool(re.search(r"我是谁|我的(?:背景|学校|学历|专业|毕业|情况|简历)|了解我", query))
-        ids = self._semantic_matches(owner, query, session["privacy_epoch"]) if active and not identity_query and not self.store.cleanup_pending(owner) else []
-        ranks = {memory_id: rank for rank, memory_id in enumerate(ids)}
-        core = [row for row in active if row["kind"] in {"preference", "communication"}][:20]
-        core_ids = {row["id"] for row in core}
-        related = sorted((row for row in active if row["id"] not in core_ids), key=lambda row: (
-            ranks.get(row["id"], len(ranks)),
-            not (identity_query and row["key"] in {"education", "graduation", "major"}), -row["updated_at"]))[:12]
-        conflicts = [{"key": row["key"], "subject": row["subject"]} for row in memories if row["status"] == "conflict"]
-        return MemoryContext(session["summary"], self._recent(owner, session), core + related, conflicts, set(ids))
+        # 基础画像很小，全部放进上下文；身份类问题时事实排在前面。
+        ordered = sorted(active, key=lambda row: (row["kind"] == "fact" and not identity_query,
+                                                  row["kind"] == "fact", -row["updated_at"]))[:32]
+        conflicts = [{"key": row["key"], "subject": row["subject"]} for row in memories if row["status"] == "conflict"] if saved else []
+        recent, uncovered = self._recent(owner, session)
+        return MemoryContext(session["summary"], recent, ordered, conflicts, uncovered,
+                             self.history(owner, session, query, settings))
+
+    # ---- 参考聊天记录：按相关性才使用 ----
+
+    def history(self, owner, session, query, settings):
+        if not settings["history_enabled"] or self.store.cleanup_pending(owner):
+            return {"used": False}
+        digest = self.store.digest(owner)
+        reason = needs_history(query, digest["topics"])
+        if not reason:
+            return {"used": False}
+        candidates = self.store.history_candidates(owner, session["id"])
+        if not digest["summary"] and not candidates:
+            return {"used": False}
+        chosen = self._select_notes(owner, session, query, candidates)
+        notes = [{"id": row["id"], "title": row["note_title"], "date": date_of(row["updated_at"]), "note": row["summary"][:NOTE_LIMIT]}
+                 for row in self.store.session_notes(owner, chosen)]
+        return {"used": True, "reason": reason, "digest": digest["summary"], "notes": notes}
+
+    def _select_notes(self, owner, session, query, candidates):
+        if len(candidates) <= MAX_NOTES:
+            return [row["id"] for row in candidates]
+        finished, result = threading.Event(), []
+
+        def pick():
+            try:
+                payload = {"query": query[:500], "sessions": [
+                    {"id": row["id"], "date": date_of(row["updated_at"]), "title": row["note_title"], "gist": row["note_gist"]}
+                    for row in candidates]}
+                answer = self._complete(SELECT_PROMPT, SelectionOutput, payload, json.loads(session["selection"] or "{}"),
+                                        owner=owner, max_tokens=200)
+                valid = {row["id"] for row in candidates}
+                result.extend(item for item in answer["selected"] if item in valid)
+            except Exception as error:
+                logger.info("旧会话选择未完成，改用关键词匹配：%s", analysis_error_detail(error))
+            finally:
+                finished.set()
+
+        threading.Thread(target=pick, name="assistant-history", daemon=True).start()
+        # A slow selector must not hold up the reply; late results are simply discarded.
+        if finished.wait(self.policy.history_wait_ms / 1000) and result:
+            return result[:MAX_NOTES]
+        return choose_fallback(query, candidates)
+
+    # ---- 对外概览 ----
 
     def overview(self, owner, session_id=None):
         trace = self.store.context_trace(owner, session_id) if session_id else None
         _, rows = self.store.memory_snapshot(owner)
-        titles = {row["id"]: row["title"] for row in self.store.list_sessions(owner)}
+        titles = self.store.session_titles(owner)
         items = [{**{key: row[key] for key in ("id", "kind", "key", "subject", "value", "status", "updated_at")},
                   "source_session": row["source_session"], "source_title": titles.get(row["source_session"], "原对话已删除"),
                   "evidence": [{"quote": item["quote"][:600]} for item in json.loads(row["evidence"])[:5]]} for row in rows]
-        active = [row for row in rows if row["status"] == "active"]
         session = self.store.session(owner, session_id) if session_id else None
+        digest = self.store.digest(owner)
         return {"items": items, "jobs": self.store.memory_status(owner), "cleanup": self.store.cleanup_status(owner),
                 "cleanup_pending_count": self.store.cleanup_count(owner),
-                "controls": self.store.privacy(owner),
-                "index": {**self.vector.status(), "indexed": sum(row["indexed_revision"] >= row["revision"] for row in active),
-                          "total": len(active)}, "context": trace,
+                "controls": self.store.privacy(owner), "context": trace, "quota": self.store.quota(owner),
+                "history": {"summary": digest["summary"], "topics": digest["topics"], "updated_at": digest["updated_at"],
+                            "updating": bool(digest["dirty"])},
                 "progress": {key: session[key] for key in ("analyzed_seq", "memory_seq")} if session else None}
 
     def career_context(self, owner, *, disputed=()):
-        """Expose confirmed facts and preferences to report Agents, without transcripts."""
+        """Expose confirmed facts and preferences to report Agents, without transcripts or reference history."""
+        if not self.store.privacy(owner)["saved_enabled"]:
+            return {"preferences": "", "evidence": ""}
         _, memories = self.store.memory_snapshot(owner)
         active = [row for row in self.confirmed(memories) if (row["key"], normalized(row["subject"])) not in disputed]
         preferences = "；".join(row["value"] for row in active if row["kind"] == "preference")[:4000]
         facts = [row["value"] for row in active if row["kind"] == "fact"]
         return {"preferences": preferences, "evidence": "\n".join(dict.fromkeys(facts))[:6000]}
-
-    def invalidate(self, owner, session_id):
-        self.cache.delete(owner, session_id)
 
     def delete_session(self, owner, session_id):
         identifier = self.store.request_session_deletion(owner, session_id)
@@ -201,23 +221,23 @@ class MemoryManager:
         self.start()
         return identifier
 
+    # ---- 后台分析 ----
+
     def analyze(self, job):
         messages = self.store.analysis_messages(job)
         if not messages:
             raise ValueError("Analysis job has no messages")
         if job["kind"] == "summary":
-            summary = job["summary"]
-            for window in message_windows(messages, self.policy.batch_tokens):
-                result = self._request_summary({"previous_summary": summary, "messages": window}, job)
-                summary = result.get("summary")
-                if not isinstance(summary, str) or not summary.strip() or len(summary) > 2500:
-                    raise ValueError("Invalid conversation summary")
-            return self.store.apply_summary(job, messages, summary)
+            return self._write_note(job, messages)
+        if job.get("incognito") or not self.store.privacy(job["owner"])["saved_enabled"]:
+            return self.store.skip_memory(job, messages)
+        _, snapshot = self.store.memory_snapshot(job["owner"])
+        existing = [{key: row[key] for key in ("kind", "key", "subject", "value")} for row in self.confirmed(snapshot)][:32]
         collected = {}
         for window in message_windows(messages, self.policy.batch_tokens):
             if not any(row["role"] == "user" for row in window):
                 continue
-            result = self._request_json(EXTRACTION_PROMPT, {"messages": window}, job)
+            result = self._request_json(EXTRACTION_PROMPT, {"messages": window, "existing": existing}, job)
             for candidate in validate_candidates(result, window):
                 slot = candidate["kind"], candidate["key"], normalized(candidate["subject"])
                 previous = collected.get(slot)
@@ -230,54 +250,55 @@ class MemoryManager:
         candidates = validate_candidates({"memories": list(collected.values())}, messages)
         return self.commit_candidates(job, messages, candidates)
 
-    def _request_summary(self, payload, job):
-        try:
-            return self._request_json(SUMMARY_PROMPT, payload, job)
-        except json.JSONDecodeError:
-            # Some compatible providers ignore JSON mode or fail to escape prose.
-            # Generate afresh from the original input; never repair partial JSON
-            # into a potentially incomplete summary or apply this to user facts.
-            logger.info("助手会话摘要JSON格式无效，立即尝试纯文本摘要")
-        content = json.dumps(payload, ensure_ascii=False)
-        if estimate_tokens(SUMMARY_TEXT_PROMPT) + estimate_tokens(content) > self.policy.input_tokens:
-            raise ValueError("Extraction request exceeds the configured input token budget")
-        self.store.renew_job(job)
-        runtime = self.runtime(json.loads(job["selection"]))
-        client = self.client_factory(runtime)
-        try:
-            response = client.chat.completions.create(model=runtime[2],
-                messages=[{"role": "system", "content": SUMMARY_TEXT_PROMPT},
-                          {"role": "user", "content": content}], max_tokens=6000)
-            choice = response.choices[0]
-            if getattr(choice, "finish_reason", None) in {"length", "content_filter"} or getattr(choice.message, "refusal", None):
-                raise ValueError("Incomplete or refused memory output")
-            summary = choice.message.content
-            if not isinstance(summary, str) or not summary.strip() or summary.lstrip().startswith(("{", "[", "```")):
-                raise ValueError("Invalid conversation summary")
-            return SummaryOutput.model_validate({"summary": summary.strip()}).model_dump()
-        finally:
-            client.close()
+    def _write_note(self, job, messages):
+        previous = json.loads(job["notes"]) if job.get("notes") else {}
+        legacy = job["summary"] if job.get("summary") and not previous else ""
+        note = None
+        for window in message_windows(messages, self.policy.batch_tokens):
+            result = self._request_json(NOTE_PROMPT, {"previous_notes": previous, "legacy_summary": legacy, "messages": window}, job)
+            note = merge_note(result, previous)
+            previous, legacy = note["notes"], ""
+        return self.store.apply_note(job, messages, note)
+
+    def rebuild_digest(self, claim):
+        """Regenerate the user-level background digest from the current (non-incognito) session notes."""
+        owner = claim["owner"]
+        sessions = self.store.digest_sessions(owner)
+        if not sessions:
+            return self.store.finish_digest(owner, claim["version"], "", [])
+        topics = [{"id": row["id"], "title": row["note_title"], "date": date_of(row["updated_at"])} for row in sessions]
+        _, snapshot = self.store.memory_snapshot(owner)
+        payload = {"previous_digest": claim["previous"],
+                   "saved_memories": [{"key": row["key"], "value": row["value"]} for row in self.confirmed(snapshot)],
+                   "sessions": [{"date": date_of(row["updated_at"]), "title": row["note_title"], "gist": row["note_gist"],
+                                 "goal": (json.loads(row["notes"]).get("goal", "") if row["notes"] else "")} for row in sessions]}
+        result = self._complete(DIGEST_PROMPT, DigestOutput, payload, json.loads(claim["selection"] or "{}"), owner=owner, max_tokens=900)
+        self.store.finish_digest(owner, claim["version"], render_digest(result["goals"], result["focus"], topics), topics)
 
     def _request_json(self, prompt, payload, job):
+        return self._complete(prompt, MODEL_OUTPUTS[prompt], payload, json.loads(job["selection"]), owner=job["owner"],
+                              max_tokens=6000 if prompt == NOTE_PROMPT else 4500, job=job)
+
+    def _complete(self, prompt, output_model, payload, selection, *, owner, max_tokens, job=None):
         content = json.dumps(payload, ensure_ascii=False)
-        output_model = {EXTRACTION_PROMPT: ExtractionOutput, SUMMARY_PROMPT: SummaryOutput,
-                        RELATION_PROMPT: DecisionOutput}[prompt]
         output_format = response_format(output_model)
         schema_tokens = estimate_tokens(json.dumps(output_format, ensure_ascii=False)) if output_format["type"] == "json_schema" else 0
         if estimate_tokens(prompt) + estimate_tokens(content) + schema_tokens > self.policy.input_tokens:
             raise ValueError("Extraction request exceeds the configured input token budget")
-        self.store.renew_job(job)
-        runtime = self.runtime(json.loads(job["selection"]))
+        if job:
+            self.store.renew_job(job)
+        runtime = self.runtime(selection)
         client = self.client_factory(runtime)
         try:
             response = client.chat.completions.create(model=runtime[2], response_format=output_format,
-                messages=[{"role": "system", "content": prompt}, {"role": "user", "content": content}],
-                max_tokens=6000 if prompt == SUMMARY_PROMPT else 4500)
+                messages=[{"role": "system", "content": prompt}, {"role": "user", "content": content}], max_tokens=max_tokens)
             choice = response.choices[0]
+            used = getattr(getattr(response, "usage", None), "total_tokens", None)
+            self.store.add_usage(owner, used if type(used) is int else
+                                 estimate_tokens(prompt) + estimate_tokens(content) + estimate_tokens(str(choice.message.content or "")))
             if getattr(choice, "finish_reason", None) in {"length", "content_filter"} or getattr(choice.message, "refusal", None):
                 raise ValueError("Incomplete or refused memory output")
-            result = json.loads(choice.message.content)
-            return output_model.model_validate(result).model_dump()
+            return output_model.model_validate(json.loads(choice.message.content)).model_dump()
         finally:
             client.close()
 
@@ -289,88 +310,111 @@ class MemoryManager:
             if not self.store.candidate_allowed(job["owner"], candidate, messages):
                 continue
             matches = self.store.slot_memories(job["owner"], candidate)
-            if not matches and candidate["key"] == "experience":
-                ids = self.vector.search(job["owner"], candidate["subject"] + ": " + candidate["value"], epoch=self.store.privacy(job["owner"])["epoch"])
-                matches = self.store.memories_by_ids(job["owner"], ids, kind="fact", key="experience")
             decision = automatic_decision(candidate, matches)
             if decision is None:
-                existing = [{key: row[key] for key in ("id", "kind", "key", "subject", "value", "status", "revision")} for row in matches[:5]]
-                decision = self._request_json(RELATION_PROMPT, {"candidate": candidate, "existing": existing}, job)
-            decisions.append(validate_decision(decision, candidate, matches))
+                logger.info("该属性存在未解决的冲突，暂不写入：%s", candidate["key"])
+                continue
+            try:
+                decisions.append(validate_decision(decision, candidate, matches))
+            except ValueError:
+                # 宁可不记，也不让一条无法判定的候选拖垮整批任务。
+                logger.info("无法安全判定该候选与旧记忆的关系，已忽略：%s", candidate["key"])
+                continue
             accepted.append(candidate)
         return self.store.apply_memory_plan(job, messages, accepted, decisions, revision)
 
-    def run_once(self):
-        """Process one persisted job or synchronize the index; return whether a job ran."""
-        cleanup = self.store.claim_cleanup()
-        if cleanup:
-            try:
-                if self.store.cleanup_blocked(cleanup["owner"], exclude_token=cleanup["token"]):
-                    raise CleanupBusy()
-                payload = cleanup["payload"]
-                if payload.get("vector_owner"):
-                    self.vector.delete_owner(cleanup["owner"])
-                self.cache.cleanup(cleanup["owner"], payload.get("cache_sessions", []), entire_owner=payload.get("cache_owner", False))
-                self.store.checkpoint_cleanup()
-            except Exception as error:
-                self.store.finish_cleanup(cleanup, error=error)
-            else:
-                self.store.finish_cleanup(cleanup)
-            return True
-        job = self.store.claim_job()
+    # ---- 工作线程 ----
+
+    def _claim(self, lane):
+        if lane == "urgent":
+            return self.store.claim_job(min_priority=self.policy.urgent_priority)
+        return self.store.claim_job(max_priority=self.policy.urgent_priority)
+
+    def run_once(self, lane="urgent"):
+        """Process one persisted task for a lane; return whether anything ran."""
+        if lane == "urgent":
+            cleanup = self.store.claim_cleanup()
+            if cleanup:
+                try:
+                    if self.store.cleanup_blocked(cleanup["owner"], exclude_token=cleanup["token"]):
+                        raise CleanupBusy()
+                    self.store.checkpoint_cleanup()
+                except Exception as error:
+                    self.store.finish_cleanup(cleanup, error=error)
+                else:
+                    self.store.finish_cleanup(cleanup)
+                return True
+        job = self._claim(lane)
         if not job:
-            self.vector.sync(self.store)
-            return False
+            return self._idle(lane)
+        if self.store.quota(job["owner"])["state"] != "ok":
+            self.store.defer_job(job, 3600)
+            logger.info("用户今日额度已用尽，后台%s任务推迟一小时", job["kind"])
+            return True
+        started, outcome = time.monotonic(), "ok"
         try:
             self.analyze(job)
         except Exception as error:
+            outcome = "failed"
             action = "已达上限，停止自动重试" if job["attempts"] >= 3 else f"约{60 * job['attempts']}秒后重试"
             logger.warning("助手%s失败：%s；异常=%s；尝试=%d/3；%s",
-                           "会话摘要" if job["kind"] == "summary" else "长期记忆提取",
+                           "会话笔记" if job["kind"] == "summary" else "长期记忆提取",
                            analysis_error_detail(error), type(error).__name__, job["attempts"], action)
             self.store.fail_job(job)
+        logger.info("memory_job %s", json.dumps({"lane": lane, "kind": job["kind"], "reason": job["reason"], "priority": job["priority"],
+                                                  "wait_s": round(job["wait_seconds"], 1), "run_s": round(time.monotonic() - started, 2),
+                                                  "attempt": job["attempts"], "outcome": outcome}, ensure_ascii=False))
         return True
+
+    def _idle(self, lane):
+        """No job in this lane: refresh the background digest (bulk) or run retention housekeeping."""
+        if lane != "bulk":
+            return False
+        claim = self.store.claim_digest()
+        if claim:
+            try:
+                if self.store.quota(claim["owner"])["state"] != "ok":
+                    self.store.release_digest(claim["owner"])
+                else:
+                    self.rebuild_digest(claim)
+            except Exception as error:
+                self.store.release_digest(claim["owner"])
+                logger.warning("用户背景摘要更新失败：%s；异常=%s", analysis_error_detail(error), type(error).__name__)
+            return True
+        if time.monotonic() - self._last_maintenance > MAINTENANCE_INTERVAL or not self._last_maintenance:
+            self._last_maintenance = time.monotonic() or 1.0
+            result = self.store.maintenance()
+            logger.info("retention %s", json.dumps(result))
+        return False
 
     def start(self):
         with self._worker_lock:
             if self._stopping.is_set():
                 return
-            if self._worker and self._worker.is_alive():
-                self._wakeup.set()
-                return
-            self._worker = threading.Thread(target=self._work, name="assistant-memory", daemon=True)
-            self._worker.start()
+            for lane in self.LANES:
+                worker = self._workers.get(lane)
+                if worker and worker.is_alive():
+                    self._wakeups[lane].set()
+                    continue
+                self._workers[lane] = threading.Thread(target=self._work, args=(lane,), name=f"assistant-memory-{lane}", daemon=True)
+                self._workers[lane].start()
 
-    def _work(self):
-        try:
-            while not self._stopping.is_set():
-                try:
-                    if self.run_once():
-                        continue
-                except Exception:
-                    logger.warning("助手记忆后台任务暂不可用", exc_info=False)
-                self._wakeup.wait(30)
-                self._wakeup.clear()
-        finally:
-            self._close_resources()
-
-    def _close_resources(self):
-        with self._worker_lock:
-            if self._resources_closed:
-                return
-            self._resources_closed = True
-        try:
-            self.cache.close()
-        finally:
-            self.vector.close()
+    def _work(self, lane):
+        wakeup = self._wakeups[lane]
+        while not self._stopping.is_set():
+            try:
+                if self.run_once(lane):
+                    continue
+            except Exception:
+                logger.warning("助手记忆后台任务暂不可用", exc_info=False)
+            wakeup.wait(30)
+            wakeup.clear()
 
     def close(self):
         with self._worker_lock:
             self._stopping.set()
-            self._wakeup.set()
-            worker = self._worker
-        if worker:
+            workers = list(self._workers.values())
+            for wakeup in self._wakeups.values():
+                wakeup.set()
+        for worker in workers:
             worker.join(timeout=5)
-        if not worker or not worker.is_alive():
-            self._close_resources()
-        # A running model call releases resources in _work's finally when it exits.

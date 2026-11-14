@@ -5,7 +5,7 @@ import re
 import threading
 
 from .repository import ResumeRepository
-from .facts import facts_from_structured
+from .facts import basic_facts, facts_from_structured
 
 
 def redact_contacts(text):
@@ -105,7 +105,8 @@ class ResumeDocuments:
                 }.get(status, ""),
                 "preview": preview[:16000], "truncated": partial,
                 "fingerprint": fingerprint, "document_id": source.get("document_id", ""),
-                "facts": facts_from_structured(source.get("structured_profile")) or (json.loads(row["facts"]) if row else []),
+                "facts": basic_facts(facts_from_structured(source.get("structured_profile")) or (json.loads(row["facts"]) if row else []),
+                                     source.get("structured_profile")),
                 "profile_status": row["profile_status"] if row else "pending",
                 "profile_error": row["profile_error"] if row else "",
                 "warnings": metadata.get("warnings", [])}
