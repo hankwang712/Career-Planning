@@ -293,7 +293,7 @@ flowchart LR
 | 配置 | 何时需要 | 配置方式 |
 | --- | --- | --- |
 | 对话模型 | 聊天、简历分析、职业规划报告、职业访谈 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。修改后重启服务。 |
-| 图片模型 | 画像海报、文生图 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`、`TEXT_TO_IMAGE_MODEL`。 |
+| 图片模型 | 画像海报 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`。 |
 | 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
 
 配置统一放在根目录 `.env`，完整示例见 [.env.example](.env.example)。进程环境变量优先于文件配置。从旧版本升级时，数据库里遗留的 API 配置会在 `.env` 配好后的首次启动自动清除。

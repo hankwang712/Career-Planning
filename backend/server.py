@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import random
 
-from flask import Flask, has_request_context, jsonify, redirect, render_template, request, send_file, send_from_directory, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from markupsafe import Markup, escape
 from openai import OpenAI
 from werkzeug.utils import secure_filename
@@ -89,7 +89,6 @@ from services.resume.diagnosis_ui import (
     diagnosis_ui_non_empty,
     normalize_diagnosis_ui,
 )
-from services.tools import generate_text_to_image, get_text_to_image_runtime
 from services import db as _app_db
 from services import llm_env
 from services.job_registry import JobRegistry
@@ -131,8 +130,6 @@ CAREER_REPORT_DIR = os.path.join(APP_DATA_DIR, "career_reports")
 COMMUNITY_FORUM_FILE = os.path.join(APP_DATA_DIR, "community_forum.json")
 PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3-pro-image-preview").strip() or "google/gemini-3-pro-image-preview"
 TEXT_TO_IMAGE_BASE_URL = os.environ.get("TEXT_TO_IMAGE_BASE_URL", "https://openrouter.ai/api/v1").strip() or "https://openrouter.ai/api/v1"
-TEXT_TO_IMAGE_MODEL = os.environ.get("TEXT_TO_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview").strip() or "google/gemini-3.1-flash-image-preview"
-TEXT_TO_IMAGE_API_KEY = os.environ.get("TEXT_TO_IMAGE_API_KEY", "").strip()
 ASSESSMENT_DATA_FILE = os.path.join(PUBLIC_DATA_DIR, "assessment-data.json")
 JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
@@ -571,17 +568,6 @@ def _get_profile_portrait_runtime():
     if not api_key:
         return None, None, PROFILE_PORTRAIT_MODEL
     return base_url, api_key, PROFILE_PORTRAIT_MODEL
-
-
-def _get_text_to_image_runtime(payload=None):
-    # 请求体里的 base_url / api_key 不再生效，避免让调用方指定服务端要访问的地址。
-    return get_text_to_image_runtime(
-        payload=None,
-        env_api_key=TEXT_TO_IMAGE_API_KEY,
-        default_base_url=TEXT_TO_IMAGE_BASE_URL,
-        default_model=TEXT_TO_IMAGE_MODEL,
-        providers=[],
-    )
 
 
 def _ensure_app_storage():
@@ -5768,47 +5754,6 @@ def api_community_feed_view(post_id):
     store = _save_community_forum_store(store)
     refreshed = _find_community_forum_post(store, post_id)
     return jsonify({"message": "浏览次数已记录。", "post": _public_community_forum_post(refreshed, user)})
-
-
-@app.route("/api/tools/text-to-image", methods=["POST"])
-@_login_required
-def api_tools_text_to_image():
-    payload = request.get_json(silent=True) or {}
-    prompt = str(payload.get("prompt") or payload.get("text") or "").strip()
-    if not prompt:
-        return jsonify({"message": "请传入 prompt。"}), 400
-
-    aspect_ratio = str(payload.get("aspect_ratio") or "").strip()
-    base_url, api_key, model = _get_text_to_image_runtime(payload)
-    if not api_key:
-        return jsonify({
-            "message": "未找到可用的 OpenRouter key。你可以在请求体中传 api_key，或配置 TEXT_TO_IMAGE_API_KEY / 系统 OpenRouter Provider。"
-        }), 400
-
-    try:
-        result = generate_text_to_image(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            prompt=prompt,
-            aspect_ratio=aspect_ratio,
-        )
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 502
-    except Exception:
-        app.logger.exception("text to image generation failed")
-        return jsonify({"message": "图片生成失败，请稍后再试。"}), 502
-
-    return jsonify({
-        "message": "图片已生成。",
-        "data": {
-            "prompt": prompt,
-            "model": model,
-            "base_url": _normalize_sdk_base_url(base_url),
-            "aspect_ratio": aspect_ratio,
-            **result,
-        },
-    })
 
 
 @app.route("/api/profile-portrait/generate", methods=["POST"])
