@@ -13,6 +13,13 @@ def apply_report_memory(request, memory):
         remaining = 20000 - len(evidence) - len(prefix)
         if remaining > 0:
             request["additional_evidence"] = evidence + prefix + facts[:remaining]
+    # 用户做过的测评（没做的不出现）：自评结果，只用于理解动机与风格，不当作经历或能力证据。
+    personality = memory.get("personality", "")
+    if personality:
+        evidence = str(request.get("additional_evidence") or "")
+        remaining = 20000 - len(evidence) - 1
+        if remaining > 0:
+            request["additional_evidence"] = evidence + "\n" + personality[:remaining]
     return request
 
 

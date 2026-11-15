@@ -49,6 +49,7 @@ from services.report.workflow import (
 )
 from services.report.review import apply_availability
 from services.report.context import apply_report_memory, explicit_report_cities
+from services import personality
 from services.report.legacy_report import (
     _build_dashboard_summary,
     _build_role_cards,
@@ -535,6 +536,7 @@ DEFAULT_CAREER_DIMENSIONS = [
 VALID_USER_STATE_SCOPES = {
     "career_interview",
     "assessment_hub",
+    "deep_tests",
     "resume_profile",
     "career_report",
     "career_plans",
@@ -6353,7 +6355,8 @@ def api_career_report_generate_start():
             workflow_request = dict(payload.get("workflow") or {})
             profile_payload["report_user_inputs"] = {key: workflow_request.get(key, "")
                 for key in ("preferences", "additional_evidence")}
-            shared_memory = app.extensions["chat_service"].career_context(username)
+            shared_memory = dict(app.extensions["chat_service"].career_context(username))
+            shared_memory["personality"] = personality.describe(personality.collect(state))
             workflow_request = apply_report_memory(workflow_request, shared_memory)
             profile_payload["report_city_memory"] = [
                 {"id": row["id"], "value": row["value"]}
@@ -7325,7 +7328,7 @@ def api_career_interview():
     base_url, api_key, model = _get_active_provider_and_model()
 
     if not base_url or not api_key:
-        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
+        return jsonify({"message": "模型尚未配置，请在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。"}), 400
 
     normalized_messages = []
     for item in messages[-10:]:
@@ -7614,6 +7617,10 @@ def _career_chat_background(username):
              for row in data["goals"] if row["status"] == "active"][:10]
     if basics or education or goals:
         background["用户维护的基础档案"] = {"基本信息": basics, "教育": education, "目标": goals}
+    # 做过哪些测评就带哪些；一个都没做就不出现这一项。
+    assessments = personality.for_chat(personality.collect(_load_user_state(username)))
+    if assessments:
+        background["性格与兴趣测评（用户自测的自评结果）"] = assessments
     return background
 
 

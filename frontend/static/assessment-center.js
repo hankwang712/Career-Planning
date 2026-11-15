@@ -58,6 +58,53 @@
     }
     record(items);
   }
+  // 深层 MBTI、老友记、情绪主导、SBTI 的结果原本只存在浏览器里。同步一份精简结果到服务器，
+  // 聊天助手和报告 Agent 才能把"用户做过哪些测评"当作画像的一部分；没做过的测评不会出现。
+  const synced = new Set();
+  let syncQueue = Promise.resolve();
+  function compactExtended(type, stored) {
+    const completedAt = Number(stored?.completedAt);
+    if (!Number.isFinite(completedAt) || completedAt <= 0) return null;
+    let result = "";
+    let summary = "";
+    if (type === "deep") {
+      result = stored.result?.type || "";
+    } else if (type === "sbti") {
+      result = stored.title || stored.code || "";
+      summary = stored.summary || "";
+    } else {
+      const detail = stored.detail || {};
+      result = detail.name || stored.winner || "";
+      summary = [detail.tagline, detail.synopsis, (detail.traits || []).slice(0, 5).join("、")].filter(Boolean).join("；");
+    }
+    result = String(result).trim().slice(0, 60);
+    return result ? { result, summary: String(summary).trim().slice(0, 200), completed_at: completedAt } : null;
+  }
+  function syncExtended(type, stored) {
+    const user = username();
+    const entry = compactExtended(type, stored);
+    if (!entry || user === "guest") return;
+    const key = `${user}:${type}:${entry.completed_at}`;
+    if (synced.has(key)) return;
+    synced.add(key);
+    syncQueue = syncQueue.then(async () => {
+      const base = String(window.__API_BASE__ || "").replace(/\/+$/, "");
+      try {
+        const current = await fetch(`${base}/api/user-state/deep_tests`, { credentials: "same-origin" });
+        if (!current.ok) { synced.delete(key); return; }
+        const existing = (await current.json()).data || {};
+        const known = existing[type];
+        if (known && Number(known.completed_at) >= entry.completed_at && known.result === entry.result) return;
+        const security = await (await fetch(`${base}/api/auth/security`, { credentials: "same-origin" })).json();
+        const saved = await fetch(`${base}/api/user-state/deep_tests`, {
+          method: "PUT", credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": security.csrf_token },
+          body: JSON.stringify({ data: { ...existing, [type]: entry } })
+        });
+        if (!saved.ok) synced.delete(key);
+      } catch (_) { synced.delete(key); }
+    });
+  }
   function recordExtended(type, stored) {
     if (!stored) return;
     let result;
@@ -65,6 +112,7 @@
     else if (type === "sbti") result = stored.title || stored.code;
     else result = stored.detail?.name || stored.winner;
     record([{ test: type, completedAt: stored.completedAt, result }]);
+    syncExtended(type, stored);
   }
   function currentResults() {
     const current = window.getAssessmentHubSnapshot?.();
