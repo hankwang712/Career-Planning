@@ -1117,10 +1117,7 @@
                     <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v2"/></svg></span>
                     <span>账户设置</span>
                 </button>
-                <button type="button" class="uc-nav-link hidden" id="userCenterAdminNavBtn" data-target="account-admin">
-                    <span class="uc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6zM9 12l2 2 4-4"/></svg></span>
-                    <span>账号管理</span>
-                </button>
+
             </nav>
 
             <div class="uc-sidebar-footer">
@@ -1451,97 +1448,9 @@
                             </section>
                         </div>
 
-                        <section id="ucApiAdminCard" class="uc-surface uc-account-card uc-admin-card hidden">
-                            <div class="uc-account-card-head">
-                                <div>
-                                    <h3>系统 API 配置</h3>
-                                    <p id="upAccountPermissionHint" class="uc-muted-copy">在这里直接管理 API Provider，添加或删除 Base URL 与 API Key。</p>
-                                </div>
-                                <button type="button" class="career-report-primary-btn" id="ucApiToggleBtn" onclick="ucApiTogglePanel()">打开配置</button>
-                            </div>
-
-                            <!-- 内联 API 配置面板 -->
-                            <div id="ucApiInlinePanel" class="uc-api-inline-panel hidden">
-                                <!-- 已配置列表 -->
-                                <div class="uc-api-section-head">
-                                    <span class="uc-api-section-label">已配置的 API Provider</span>
-                                    <button type="button" class="uc-api-add-btn" id="ucApiShowAddBtn" onclick="ucApiShowAdd()">＋ 添加新 API</button>
-                                </div>
-                                <div id="ucApiProviderList" class="uc-api-provider-list">
-                                    <p class="uc-api-loading">正在加载…</p>
-                                </div>
-
-                                <!-- 添加表单（默认折叠） -->
-                                <div id="ucApiAddForm" class="uc-api-add-form hidden">
-                                    <p class="uc-api-add-form-title">添加新 API</p>
-                                    <div class="uc-api-form-grid">
-                                        <label>名称
-                                            <input id="ucApiName" type="text" placeholder="如：DeepSeek / OpenRouter">
-                                        </label>
-                                        <label>Base URL
-                                            <input id="ucApiBaseUrl" type="text" placeholder="https://api.deepseek.com/v1">
-                                        </label>
-                                        <label>API Key
-                                            <input id="ucApiKey" type="password" placeholder="sk-...">
-                                        </label>
-                                    </div>
-                                    <div class="uc-api-form-actions">
-                                        <button type="button" class="career-report-primary-btn" onclick="ucApiSubmitAdd()">确认添加</button>
-                                        <button type="button" class="career-report-secondary-btn" onclick="ucApiHideAdd()">取消</button>
-                                    </div>
-                                </div>
-
-                                <p class="uc-api-hint">在各功能页面点击「选择模型」，选择对应 Provider 和模型后生效。</p>
-                            </div>
-                        </section>
                     </div>
                 </section>
 
-                <section id="account-admin" class="uc-section">
-                    <div class="uc-section-shell">
-                        <section class="uc-surface">
-                            <div class="uc-section-head">
-                                <div>
-                                    <p class="uc-section-kicker">Admin Console</p>
-                                    <h2 class="uc-section-title">账号管理</h2>
-                                    <p class="uc-section-copy">这里只对 system 开放。可以查看当前账号完成度、识别残留数据账号，并手动删除不再需要的账号数据。</p>
-                                </div>
-                                <div class="uc-admin-actions">
-                                    <button type="button" class="career-report-secondary-btn" onclick="window.reloadUserCenterAdminAccounts?.(true)">刷新列表</button>
-                                </div>
-                            </div>
-                        </section>
-
-                        <div class="uc-admin-summary-grid">
-                            <article class="uc-surface uc-admin-summary-card">
-                                <span>当前账号</span>
-                                <strong id="userCenterAdminSummaryTotal">0</strong>
-                            </article>
-                            <article class="uc-surface uc-admin-summary-card">
-                                <span>已注册账号</span>
-                                <strong id="userCenterAdminSummaryRegistered">0</strong>
-                            </article>
-                            <article class="uc-surface uc-admin-summary-card">
-                                <span>残留数据</span>
-                                <strong id="userCenterAdminSummaryDataOnly">0</strong>
-                            </article>
-                            <article class="uc-surface uc-admin-summary-card">
-                                <span>已出正式报告</span>
-                                <strong id="userCenterAdminSummaryCompleted">0</strong>
-                            </article>
-                        </div>
-
-                        <section class="uc-surface uc-admin-account-surface">
-                            <div class="uc-account-card-head">
-                                <div>
-                                    <h3>账号列表</h3>
-                                    <p id="userCenterAdminStatus" class="uc-muted-copy">正在整理账号数据...</p>
-                                </div>
-                            </div>
-                            <div id="userCenterAdminAccounts" class="uc-admin-account-list" aria-live="polite"></div>
-                        </section>
-                    </div>
-                </section>
             </main>
         </div>
     </div>
@@ -1617,8 +1526,6 @@
 
     {% set report_editor_overlay_class = "report-editor-overlay hidden" %}
     {% include "partials/career_report_editor_shell.html" %}
-
-    {% include "partials/settings_panel.html" %}
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
@@ -3596,114 +3503,6 @@
       }
     })();
 
-    /* ═══════════════════════════════════
-       Fix3: 内联 API 配置面板
-       ═══════════════════════════════════ */
-
-    var _ucApiOpen = false;
-
-    function ucApiTogglePanel() {
-      _ucApiOpen = !_ucApiOpen;
-      var panel = document.getElementById('ucApiInlinePanel');
-      var btn = document.getElementById('ucApiToggleBtn');
-      if (panel) panel.classList.toggle('hidden', !_ucApiOpen);
-      if (btn) btn.textContent = _ucApiOpen ? '收起配置' : '打开配置';
-      if (_ucApiOpen) ucApiLoadProviders();
-    }
-
-    function ucApiShowAdd() {
-      var form = document.getElementById('ucApiAddForm');
-      if (form) { form.classList.remove('hidden'); document.getElementById('ucApiName') && document.getElementById('ucApiName').focus(); }
-    }
-
-    function ucApiHideAdd() {
-      var form = document.getElementById('ucApiAddForm');
-      if (form) form.classList.add('hidden');
-      ['ucApiName','ucApiBaseUrl','ucApiKey'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-    }
-
-    async function ucApiLoadProviders() {
-      var listEl = document.getElementById('ucApiProviderList');
-      if (!listEl) return;
-      listEl.innerHTML = '<p class="uc-api-loading">正在加载…</p>';
-      try {
-        var data = await requestJson('/api/llm-providers');
-        var providers = data.providers || [];
-        var selection = data.selection || {};
-        ucApiRenderProviders(providers, selection);
-      } catch(e) {
-        listEl.innerHTML = '<p class="uc-api-loading" style="color:#dc2626">加载失败：' + (e.message || '网络错误') + '</p>';
-      }
-    }
-
-    function ucApiRenderProviders(providers, selection) {
-      var listEl = document.getElementById('ucApiProviderList');
-      if (!listEl) return;
-      var isSuperAdmin = typeof isSuperAdminUser === 'function' ? isSuperAdminUser() : false;
-
-      if (!providers.length) {
-        listEl.innerHTML = '<p class="uc-api-empty-hint">尚未添加任何 API Provider。' + (isSuperAdmin ? '点击右上角「+ 添加新 API」开始配置。' : '请联系管理员配置。') + '</p>';
-        return;
-      }
-
-      var addBtn = document.getElementById('ucApiShowAddBtn');
-      if (addBtn) addBtn.style.display = isSuperAdmin ? '' : 'none';
-
-      var icons = { deepseek: '🐋', openai: '🤖', openrouter: '🔀', claude: '🌟', qwen: '☁️', zhipu: '⚡' };
-      function getIcon(name) {
-        var n = String(name || '').toLowerCase();
-        for (var k in icons) { if (n.includes(k)) return icons[k]; }
-        return '🔌';
-      }
-
-      listEl.innerHTML = providers.map(function(p) {
-        var isSel = selection.provider_id === p.id;
-        var delBtn = isSuperAdmin ? '<button class="uc-api-provider-del" title="删除" onclick="ucApiDeleteProvider(\'' + p.id + '\')">✕</button>' : '';
-        return '<div class="uc-api-provider-row' + (isSel ? ' selected' : '') + '">' +
-          '<div class="uc-api-provider-icon">' + getIcon(p.name) + '</div>' +
-          '<div class="uc-api-provider-info">' +
-            '<div class="uc-api-provider-name">' + (p.name || '未命名') +
-              (isSel ? '<span class="uc-api-provider-badge sel">✓ 当前使用</span>' : '') +
-            '</div>' +
-            '<div class="uc-api-provider-url">' + (p.base_url || '--') + '</div>' +
-            '<div class="uc-api-provider-key">Key: ' + (p.api_key_masked || '未配置') + '</div>' +
-          '</div>' +
-          delBtn +
-        '</div>';
-      }).join('');
-    }
-
-    async function ucApiSubmitAdd() {
-      var name = (document.getElementById('ucApiName') && document.getElementById('ucApiName').value || '').trim();
-      var base_url = (document.getElementById('ucApiBaseUrl') && document.getElementById('ucApiBaseUrl').value || '').trim();
-      var api_key = (document.getElementById('ucApiKey') && document.getElementById('ucApiKey').value || '').trim();
-      if (!base_url || !api_key) {
-        if (typeof showToast === 'function') showToast('填写不完整', '请填写 Base URL 和 API Key', 'warning', 2000);
-        return;
-      }
-      try {
-        await requestJson('/api/llm-providers', { method: 'POST', body: { name: name || '未命名', base_url, api_key } });
-        if (typeof showToast === 'function') showToast('API 已添加', name || '未命名', 'success', 1600);
-        ucApiHideAdd();
-        await ucApiLoadProviders();
-      } catch(e) {
-        if (typeof showToast === 'function') showToast('添加失败', e.message, 'error', 2400);
-      }
-    }
-
-    async function ucApiDeleteProvider(providerId) {
-      if (!confirm('确认删除此 API 配置？')) return;
-      try {
-        await requestJson('/api/llm-providers/' + providerId, { method: 'DELETE' });
-        if (typeof showToast === 'function') showToast('已删除', '', 'success', 1400);
-        await ucApiLoadProviders();
-      } catch(e) {
-        if (typeof showToast === 'function') showToast('删除失败', e.message, 'error', 2000);
-      }
-    }
     </script>
 </body>
 </html>

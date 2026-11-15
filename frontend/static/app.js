@@ -4624,67 +4624,35 @@ async function deleteResumeProfile() {
   }
 }
 
-async function fetchManagedLlmConfig(scope, force = false) {
-  if (!force && userWorkspaceState.llmConfigs[scope]) {
-    return userWorkspaceState.llmConfigs[scope];
-  }
-  if (!isAuthenticatedUser()) return getDefaultCareerInterviewConfig();
-  const payload = await requestJson(`/api/llm-config/${scope}`);
+// 模型由服务端 .env 统一配置：前端只读取"是否已配置"和模型名，拿不到任何密钥或接口地址。
+async function fetchLlmStatus() {
+  const payload = await requestJson("/api/llm-status");
   const config = {
-    base_url: String(payload.base_url || "").trim(),
-    api_key: String(payload.api_key || "").trim(),
-    model: String(payload.model || "gpt-4o-mini").trim() || "gpt-4o-mini",
-    configured: Boolean(payload.configured),
-    editable: Boolean(payload.editable),
-    api_key_masked: String(payload.api_key_masked || "")
-  };
-  userWorkspaceState.llmConfigs[scope] = config;
-  return config;
-}
-
-async function fetchActiveLlmRuntimeConfig(force = false) {
-  if (!isAuthenticatedUser()) return getDefaultCareerInterviewConfig();
-  if (!force && userWorkspaceState.llmConfigs.career_interview) {
-    const cached = userWorkspaceState.llmConfigs.career_interview;
-    if (cached && (cached.configured || cached.base_url || cached.api_key)) return cached;
-  }
-  const data = await requestJson("/api/llm-selection");
-  const providers = Array.isArray(data.providers) ? data.providers : [];
-  const selection = (data && typeof data.selection === "object" && data.selection) ? data.selection : {};
-  const selectedProvider = providers.find((p) => p.id === selection.provider_id && p.configured);
-  const fallbackProvider = providers.find((p) => p.configured);
-  const active = selectedProvider || fallbackProvider || null;
-  let model = String(selection.model || "").trim();
-  if (!model && active?.base_url) {
-    model = String(active.base_url).toLowerCase().includes("deepseek") ? "deepseek-chat" : "gpt-4o-mini";
-  }
-  const config = {
-    base_url: String(active?.base_url || "").trim(),
+    base_url: "",
     api_key: "",
-    model: model || "gpt-4o-mini",
-    configured: Boolean(active && model),
-    editable: isSuperAdminUser(),
-    api_key_masked: String(active?.api_key_masked || "")
+    model: String(payload.model || "").trim(),
+    configured: Boolean(payload.configured),
+    editable: false,
+    api_key_masked: ""
   };
   userWorkspaceState.llmConfigs.career_interview = config;
   userWorkspaceState.llmConfigs.assessment_hub = config;
   return config;
 }
 
-async function saveManagedLlmConfig(scope, config) {
-  const payload = await requestJson(`/api/llm-config/${scope}`, {
-    method: "PUT",
-    body: config
-  });
-  userWorkspaceState.llmConfigs[scope] = {
-    base_url: String(payload.base_url || "").trim(),
-    api_key: String(payload.api_key || "").trim(),
-    model: String(payload.model || "gpt-4o-mini").trim() || "gpt-4o-mini",
-    configured: Boolean(payload.configured),
-    editable: Boolean(payload.editable),
-    api_key_masked: String(payload.api_key_masked || "")
-  };
-  return userWorkspaceState.llmConfigs[scope];
+async function fetchManagedLlmConfig(scope, force = false) {
+  if (!force && userWorkspaceState.llmConfigs[scope]) {
+    return userWorkspaceState.llmConfigs[scope];
+  }
+  if (!isAuthenticatedUser()) return getDefaultCareerInterviewConfig();
+  return fetchLlmStatus();
+}
+
+async function fetchActiveLlmRuntimeConfig(force = false) {
+  if (!isAuthenticatedUser()) return getDefaultCareerInterviewConfig();
+  const cached = userWorkspaceState.llmConfigs.career_interview;
+  if (!force && cached && cached.configured) return cached;
+  return fetchLlmStatus();
 }
 
 window.getCurrentUser = getCurrentUser;
@@ -4695,7 +4663,6 @@ window.saveScopedUserState = saveScopedUserState;
 window.mergeScopedUserState = mergeScopedUserState;
 window.fetchManagedLlmConfig = fetchManagedLlmConfig;
 window.fetchActiveLlmRuntimeConfig = fetchActiveLlmRuntimeConfig;
-window.saveManagedLlmConfig = saveManagedLlmConfig;
 window.appState = appState;
 window.userWorkspaceState = userWorkspaceState;
 window.resolveApiUrl = resolveApiUrl;
@@ -5320,7 +5287,7 @@ function maskApiKey(apiKey) {
 function updateCareerInterviewConfigStatus() {
   const config = getStoredCareerInterviewConfig();
   const statusEl = document.getElementById("careerInterviewConfigStatus");
-  const notConfiguredText = isSuperAdminUser() ? "未配置" : "等待系统管理员配置";
+  const notConfiguredText = "服务端未配置模型";
 
   if (!statusEl) return;
   if (!config.configured) {
@@ -5333,40 +5300,22 @@ function updateCareerInterviewConfigStatus() {
 async function updateProfileFlowModelStatus(force = false) {
   const statusEl = document.getElementById("profileFlowModelStatus");
   if (!statusEl) return;
-
+  const show = (text, ready) => {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("bg-emerald-100", ready);
+    statusEl.classList.toggle("text-emerald-700", ready);
+    statusEl.classList.toggle("bg-slate-100", !ready);
+    statusEl.classList.toggle("text-slate-600", !ready);
+  };
   if (!isAuthenticatedUser()) {
-    statusEl.textContent = "模型：未登录";
-    statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
-    statusEl.classList.add("bg-slate-100", "text-slate-600");
+    show("模型：未登录", false);
     return;
   }
-
   try {
-    const data = await requestJson("/api/llm-selection");
-    const providers = Array.isArray(data.providers) ? data.providers : [];
-    const selection = (data && typeof data.selection === "object" && data.selection) ? data.selection : {};
-    const selectedProvider = providers.find((p) => p.id === selection.provider_id && p.configured);
-    const fallbackProvider = providers.find((p) => p.configured);
-    const activeProvider = selectedProvider || fallbackProvider || null;
-    const model = String(selection.model || "").trim();
-
-    if (!activeProvider || !model) {
-      statusEl.textContent = "模型：未选择";
-      statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
-      statusEl.classList.add("bg-slate-100", "text-slate-600");
-      return;
-    }
-
-    const brand = getProviderBrandMeta(activeProvider);
-    statusEl.textContent = `模型：${brand.icon} ${activeProvider.name} · ${model}`;
-    statusEl.classList.remove("bg-slate-100", "text-slate-600");
-    statusEl.classList.add("bg-emerald-100", "text-emerald-700");
+    const config = await fetchLlmStatus();
+    show(config.configured ? `模型：${config.model}` : "模型：服务端未配置", config.configured);
   } catch (error) {
-    if (!force) {
-      statusEl.textContent = "模型：读取失败";
-      statusEl.classList.remove("bg-emerald-100", "text-emerald-700");
-      statusEl.classList.add("bg-slate-100", "text-slate-600");
-    }
+    if (!force) show("模型：读取失败", false);
   }
 }
 
@@ -5438,10 +5387,8 @@ function updateCareerInterviewHero(result = null) {
   const ratioText = focusProgress ? `${Math.min(focusProgress.answered, focusProgress.target)}/${focusProgress.target}` : "0/0";
 
   if (!careerInterviewState.started && !result) {
-    statusEl.textContent = getStoredCareerInterviewConfig().configured ? "可开始访谈" : "等待系统模型配置";
-    hintEl.textContent = isSuperAdminUser()
-      ? "请先保存系统模型配置，再启动访谈。启动后会按维度同步推进职业兴趣画像。"
-      : "当前模型由系统管理员统一配置。配置完成后即可启动访谈，并按维度同步推进职业兴趣画像。";
+    statusEl.textContent = getStoredCareerInterviewConfig().configured ? "可开始访谈" : "模型尚未配置";
+    hintEl.textContent = "模型由服务端统一配置。配置完成后即可启动访谈，并按维度同步推进职业兴趣画像。";
     return;
   }
 
@@ -5662,7 +5609,7 @@ function renderCareerInterviewMessages() {
     thread.innerHTML = `
       <div class="career-chat-empty">
         <p class="career-chat-empty-title">从上面的场景卡或快捷标签开始，会更容易开口。</p>
-        <p class="career-chat-empty-copy">${isSuperAdminUser() ? "请先确认模型配置，然后选一条线索开始第一轮访谈。" : "当前模型由系统管理员统一配置。你可以先点场景卡，系统会自动带着这条线索进入第一轮访谈。"}</p>
+        <p class="career-chat-empty-copy">你可以先点场景卡，系统会自动带着这条线索进入第一轮访谈。</p>
       </div>
     `;
   } else {
@@ -5963,12 +5910,7 @@ async function startCareerInterview(options = {}) {
     await loadCareerInterviewConfig(true);
     const config = getStoredCareerInterviewConfig();
     if (!config.configured) {
-      showToast("缺少模型配置", isSuperAdminUser() ? "请先保存系统模型配置。" : "当前模型由系统管理员统一配置，请联系管理员。", "warning", 2200);
-      if (typeof openModelPicker === "function") {
-        openModelPicker();
-      } else {
-        openCareerInterviewModal("config");
-      }
+      showToast("模型尚未配置", "请联系部署人员在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL。", "warning", 3200);
       return;
     }
 
@@ -10697,16 +10639,10 @@ async function initAuth() {
         unlockAppForUser(payload.user);
         const llm = payload.llm || {};
         const scoped = payload.scoped_data || {};
-        const ciConfig = llm.configs?.career_interview;
-        if (ciConfig && typeof ciConfig === "object") {
-          userWorkspaceState.llmConfigs.career_interview = {
-            base_url: String(ciConfig.base_url || "").trim(),
-            api_key: String(ciConfig.api_key || "").trim(),
-            model: String(ciConfig.model || "gpt-4o-mini").trim() || "gpt-4o-mini",
-            configured: Boolean(ciConfig.configured),
-            editable: Boolean(ciConfig.editable),
-            api_key_masked: String(ciConfig.api_key_masked || "")
-          };
+        if (typeof llm.configured === "boolean") {
+          const config = { base_url: "", api_key: "", model: String(llm.model || "").trim(), configured: llm.configured, editable: false, api_key_masked: "" };
+          userWorkspaceState.llmConfigs.career_interview = config;
+          userWorkspaceState.llmConfigs.assessment_hub = config;
         }
         if (Object.prototype.hasOwnProperty.call(scoped, "career_interview")) {
           userWorkspaceState.scopedData.career_interview = scoped.career_interview ?? null;
@@ -11525,15 +11461,6 @@ function bindGlobalEvents() {
     cityFilter.addEventListener("change", () => filterJobs());
   }
 
-  const profileFlowModelStatus = document.getElementById("profileFlowModelStatus");
-  if (profileFlowModelStatus && !profileFlowModelStatus.dataset.boundClick) {
-    profileFlowModelStatus.addEventListener("click", () => {
-      openModelPicker(() => {
-        void updateProfileFlowModelStatus(true);
-      });
-    });
-    profileFlowModelStatus.dataset.boundClick = "1";
-  }
 }
 
 function startRealtimeEngine() {
@@ -11772,7 +11699,7 @@ function renderCommunityForumDetail() {
   const replies = Array.isArray(post.replies) ? post.replies : [];
   container.innerHTML = `<h3 class="forum-detail-title">${escHtml(post.title || '')}</h3><div class="forum-detail-meta">${escHtml(post.author?.display_name || '匿名同学')} · ${escHtml(formatRelativeTimeCN(post.created_at))} · ${Number(post.views || 0)} 浏览</div>
     <div class="forum-tags">${(post.tags || []).map(tag => `<button type="button" class="forum-tag" data-forum-action="tag" data-forum-value="${escHtml(tag)}">#${escHtml(tag)}</button>`).join('')}</div>
-    <div class="forum-detail-content">${escHtml(post.content || '')}</div><div class="forum-thread-footer"><span class="forum-detail-meta">${replies.length} 条回复</span>${communityForumLikeButton(post)}</div>
+    <div class="forum-detail-content">${escHtml(post.content || '')}</div><div class="forum-thread-footer"><span class="forum-detail-meta">${replies.length} 条回复</span>${communityForumLikeButton(post)}${isSuperAdminUser() ? `<button type="button" class="forum-tag" style="color:#b91c1c" data-forum-action="delete" data-forum-value="${escHtml(post.id)}">删除帖子</button>` : ""}</div>
     <h4 class="forum-replies-title">一起聊聊</h4>
     ${replies.length ? replies.map(reply => `<article class="forum-reply"><span class="forum-avatar" aria-hidden="true">${escHtml(Array.from(reply.author?.display_name || '同')[0])}</span><div class="forum-reply-body"><div class="forum-thread-author"><strong>${escHtml(reply.author?.display_name || '匿名同学')}</strong><span>${escHtml(formatRelativeTimeCN(reply.created_at))}</span></div><p>${escHtml(reply.content || '')}</p></div></article>`).join('') : '<p class="forum-reply-empty">还没有回复，你的经验可能正好能帮上忙。</p>'}
     <form class="forum-reply-form" data-forum-reply-id="${escHtml(post.id)}"><label for="forumReplyInput">留下你的建议<textarea id="forumReplyInput" rows="4" maxlength="1200" minlength="4" required placeholder="分享一个思路，或者追问你想进一步了解的地方。"></textarea></label><button type="submit" class="forum-primary-button">发送回复</button></form>`;
@@ -11949,6 +11876,21 @@ async function toggleCommunityPostLike(postId) {
   }
 }
 
+async function deleteCommunityPost(postId) {
+  if (!isSuperAdminUser()) return;
+  if (!confirm("确认删除这篇帖子及其全部回复？删除后无法恢复。")) return;
+  try {
+    const payload = await requestJson(`/api/community-feed/posts/${encodeURIComponent(postId)}`, { method: "DELETE" });
+    applyCommunityForumFeed(payload?.feed || payload);
+    communityForumState.selectedPostId = "";
+    showForumView("list");
+    renderCommunityForum();
+    showToast("已删除", "帖子已移除。", "success", 1600);
+  } catch (error) {
+    showToast("删除失败", error.message, "error", 2200);
+  }
+}
+
 function scrollToForumComposer() {
   showForumView("compose");
   const target = document.getElementById("forumComposerCard");
@@ -11968,6 +11910,7 @@ function initCommunityForumEvents() {
       else if (action === "tag") applyCommunityForumTag(value);
       else if (action === "post") void selectCommunityPost(value);
       else if (action === "like") void toggleCommunityPostLike(value);
+      else if (action === "delete") void deleteCommunityPost(value);
     });
     root.addEventListener("submit", event => {
       const form = event.target.closest("[data-forum-reply-id]");
@@ -11988,295 +11931,33 @@ function initCommunityForumEvents() {
 }
 
 
-// ── 设置面板（头像点击） ────────────────────────────────────────────────────────
-
-let _settingsPanelOpen = false;
-let _settingsOutsideListener = null;
-let _cachedAvailableModels = [];   // 全局缓存：拉取到的模型列表，切换板块后不需重新获取
-let _pickerModelsCache = {};        // provider_id -> { models: [], ts: number }
-
-function getProviderBrandMeta(provider) {
-  const text = `${provider?.name || ""} ${provider?.base_url || ""}`.toLowerCase();
-  if (text.includes("deepseek")) return { icon: "🐋", company: "DeepSeek" };
-  if (text.includes("openrouter")) return { icon: "🧭", company: "OpenRouter" };
-  if (text.includes("openai")) return { icon: "🌀", company: "OpenAI" };
-  if (text.includes("anthropic") || text.includes("claude")) return { icon: "🧠", company: "Anthropic" };
-  if (text.includes("google") || text.includes("gemini")) return { icon: "🔷", company: "Google" };
-  if (text.includes("qwen") || text.includes("dashscope") || text.includes("aliyun") || text.includes("alibaba")) return { icon: "☁️", company: "Qwen" };
-  if (text.includes("zhipu") || text.includes("glm")) return { icon: "🟣", company: "智谱" };
-  if (text.includes("moonshot") || text.includes("kimi")) return { icon: "🌙", company: "Moonshot" };
-  if (text.includes("groq")) return { icon: "⚡", company: "Groq" };
-  return { icon: "🔌", company: "API" };
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-//  设置面板 — 多 Provider 管理
-// ══════════════════════════════════════════════════════════════════════════
+// ── 模型配置 ────────────────────────────────────────────────────────────────────
+// 模型只在服务器 .env 里配置（AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL），页面里没有设置面板，
+// 也不能选择模型。下面这些函数保留旧名字，是因为别的脚本仍会调用它们。
 
 function toggleSettingsPanel(event) {
   if (event) event.stopPropagation();
-  if (_settingsPanelOpen) { closeSettingsPanel(); } else { openSettingsPanel(); }
 }
 
-function openSettingsPanel() {
-  if (!isSuperAdminUser()) {
-    showToast("已使用管理员配置", "普通用户无需配置 API，可直接在功能区选择模型。", "info", 1800);
+function openSettingsPanel() {}
+
+function closeSettingsPanel() {}
+
+async function openModelPicker(onReady) {
+  let config = null;
+  try {
+    config = await fetchLlmStatus();
+  } catch (error) {
+    console.error("read model status failed", error);
+  }
+  if (config && config.configured) {
+    if (typeof onReady === "function") onReady();
     return;
   }
-  const panel = document.getElementById("settingsPanel");
-  if (!panel) return;
-  panel.classList.remove("hidden");
-  _settingsPanelOpen = true;
-  loadSettingsPanelData();
-  setTimeout(() => {
-    _settingsOutsideListener = (e) => { if (!panel.contains(e.target)) closeSettingsPanel(); };
-    document.addEventListener("click", _settingsOutsideListener);
-  }, 30);
+  showToast("模型尚未配置", "请联系部署人员在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。", "warning", 3200);
 }
 
-function closeSettingsPanel() {
-  const panel = document.getElementById("settingsPanel");
-  if (panel) panel.classList.add("hidden");
-  _settingsPanelOpen = false;
-  closeAddProviderForm();
-  if (_settingsOutsideListener) {
-    document.removeEventListener("click", _settingsOutsideListener);
-    _settingsOutsideListener = null;
-  }
-}
-
-async function loadSettingsPanelData() {
-  const user = getCurrentUser();
-  const labelEl = document.getElementById("settingsPanelUserLabel");
-  if (labelEl && user) {
-    labelEl.textContent = `${user.display_name || user.username}  ·  ${user.role === "super_admin" ? "系统管理员" : "普通用户"}`;
-  }
-
-  const isAdmin = isSuperAdminUser();
-  const addBtn = document.getElementById("settingsAdminAddBtn");
-  if (addBtn) addBtn.classList.toggle("hidden", !isAdmin);
-
-  const listEl = document.getElementById("settingsProviderList");
-  if (listEl) listEl.innerHTML = `<p class="text-xs text-gray-400 text-center py-3">正在加载…</p>`;
-
-  try {
-    const data = await requestJson("/api/llm-providers");
-    const providers = data.providers || [];
-    const selection = data.selection || {};
-    _renderProviderList(providers, selection, isAdmin);
-  } catch (err) {
-    if (listEl) listEl.innerHTML = `<p class="text-xs text-red-400 text-center py-3">加载失败：${escHtml(err.message)}</p>`;
-  }
-}
-
-function _renderProviderList(providers, selection, isAdmin) {
-  const listEl = document.getElementById("settingsProviderList");
-  if (!listEl) return;
-  if (!providers.length) {
-    listEl.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">${isAdmin ? "尚未添加任何 API，点击右上角＋添加" : "系统管理员尚未配置 API"}</p>`;
-    return;
-  }
-  listEl.innerHTML = providers.map(p => {
-    const brand = getProviderBrandMeta(p);
-    const isSel = selection.provider_id === p.id;
-    const badgeCls = isSel ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500";
-    const badge = isSel ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full ${badgeCls}">✓ 已选</span>` : "";
-    const deleteBtn = isAdmin ? `<button onclick="deleteProvider('${escHtml(p.id)}')" class="text-[10px] text-red-400 hover:text-red-600 transition-all ml-1" title="删除">✕</button>` : "";
-    return `
-      <div class="flex items-center gap-2 p-2.5 rounded-xl border ${isSel ? "border-green-200 bg-green-50" : "border-gray-100 bg-gray-50"} transition-all">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-semibold text-gray-800 truncate">${escHtml(brand.icon)} ${escHtml(p.name)}</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">${escHtml(brand.company)}</span>
-            ${badge}
-          </div>
-          <p class="text-[10px] text-gray-400 truncate mt-0.5">${escHtml(p.base_url)}</p>
-          <p class="text-[10px] text-gray-400">${escHtml(p.api_key_masked || "未配置")}</p>
-        </div>
-        <div class="flex-shrink-0">${deleteBtn}</div>
-      </div>`;
-  }).join("");
-}
-
-function openAddProviderForm() {
-  const form = document.getElementById("settingsAddProviderForm");
-  if (form) { form.classList.remove("hidden"); document.getElementById("spfName")?.focus(); }
-}
-function closeAddProviderForm() {
-  const form = document.getElementById("settingsAddProviderForm");
-  if (form) {
-    form.classList.add("hidden");
-    ["spfName","spfBaseUrl","spfApiKey"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-  }
-}
-
-async function submitAddProvider() {
-  const name = (document.getElementById("spfName")?.value || "").trim();
-  const base_url = (document.getElementById("spfBaseUrl")?.value || "").trim();
-  const api_key = (document.getElementById("spfApiKey")?.value || "").trim();
-  if (!base_url || !api_key) { showToast("填写不完整", "请填写 Base URL 和 API Key", "warning", 2000); return; }
-  try {
-    await requestJson("/api/llm-providers", { method: "POST", body: { name: name || "未命名", base_url, api_key } });
-    _pickerModelsCache = {};
-    showToast("API 已添加", name || "未命名", "success", 1600);
-    closeAddProviderForm();
-    await loadSettingsPanelData();
-  } catch (err) { showToast("添加失败", err.message, "error", 2400); }
-}
-
-async function deleteProvider(providerId) {
-  if (!confirm("确认删除此 API 配置？")) return;
-  try {
-    await requestJson(`/api/llm-providers/${providerId}`, { method: "DELETE" });
-    _pickerModelsCache = {};
-    showToast("已删除", "", "success", 1400);
-    await loadSettingsPanelData();
-  } catch (err) { showToast("删除失败", err.message, "error", 2400); }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-//  模型选择器弹窗（使用点触发）
-// ══════════════════════════════════════════════════════════════════════════
-
-let _mpCallback = null;   // 确认后回调
-
-async function openModelPicker(onConfirm) {
-  _mpCallback = onConfirm || null;
-  const overlay = document.getElementById("modelPickerOverlay");
-  if (!overlay) return;
-  overlay.classList.remove("hidden");
-
-  // 初始化 Provider 下拉
-  const provSel = document.getElementById("mpProviderSelect");
-  const modelSel = document.getElementById("mpModelSelect");
-  const hintEl = document.getElementById("mpCurrentHint");
-  if (provSel) provSel.innerHTML = `<option value="">加载中…</option>`;
-  if (modelSel) modelSel.innerHTML = `<option value="">-- 请先选择 API --</option>`;
-
-  try {
-    // 使用更轻量的 providers 接口，避免在高频状态写入时被用户态读取拖慢。
-    const data = await requestJson("/api/llm-providers");
-    const providers = data.providers || [];
-    const selection = data.selection || {};
-
-    if (!providers.length) {
-      if (provSel) provSel.innerHTML = `<option value="">-- 系统管理员尚未配置 API --</option>`;
-      if (hintEl) hintEl.textContent = "请让系统管理员先在「API 配置」中添加 API";
-      return;
-    }
-
-    if (provSel) {
-      provSel.innerHTML = providers.map(p => {
-        const brand = getProviderBrandMeta(p);
-        return `<option value="${escHtml(p.id)}" ${p.id === selection.provider_id ? "selected" : ""}>${escHtml(brand.icon)} ${escHtml(p.name)} (${escHtml(brand.company)})</option>`;
-      }).join("");
-    }
-
-    if (hintEl && selection.provider_id) {
-      const prov = providers.find(p => p.id === selection.provider_id);
-      if (prov) {
-        const brand = getProviderBrandMeta(prov);
-        hintEl.textContent = `当前：${brand.icon} ${prov.name} · ${selection.model || "未选模型"}`;
-      } else {
-        hintEl.textContent = "";
-      }
-    }
-
-    // 若已有已选 provider，自动加载其模型
-    if (selection.provider_id) {
-      await fetchPickerModels(selection.model, false);
-    }
-  } catch (err) {
-    if (provSel) provSel.innerHTML = `<option value="">加载失败：${escHtml(err.message)}</option>`;
-  }
-}
-
-function closeModelPicker() {
-  const overlay = document.getElementById("modelPickerOverlay");
-  if (overlay) overlay.classList.add("hidden");
-  _mpCallback = null;
-}
-
-async function onPickerProviderChange() {
-  const provSel = document.getElementById("mpProviderSelect");
-  const modelSel = document.getElementById("mpModelSelect");
-  const providerId = (provSel?.value || "").trim();
-  if (providerId && _pickerModelsCache[providerId]?.models?.length) {
-    const models = _pickerModelsCache[providerId].models;
-    if (modelSel) {
-      modelSel.innerHTML = models.map((m) => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join("");
-    }
-    const btn = document.getElementById("mpFetchBtn");
-    if (btn) btn.textContent = `✓ 缓存 ${models.length} 个`;
-    return;
-  }
-  if (modelSel) modelSel.innerHTML = `<option value="">-- 点击「获取列表」加载模型 --</option>`;
-}
-
-async function fetchPickerModels(preselect, forceRefresh = false) {
-  const provSel = document.getElementById("mpProviderSelect");
-  const modelSel = document.getElementById("mpModelSelect");
-  const btn = document.getElementById("mpFetchBtn");
-  const providerId = provSel?.value;
-  if (!providerId) { showToast("请先选择 API", "", "warning", 1800); return; }
-  if (!forceRefresh && _pickerModelsCache[providerId]?.models?.length) {
-    const models = _pickerModelsCache[providerId].models;
-    if (modelSel) {
-      modelSel.innerHTML = models.map(m =>
-        `<option value="${escHtml(m)}" ${m === preselect ? "selected" : ""}>${escHtml(m)}</option>`
-      ).join("");
-    }
-    if (btn) btn.textContent = `✓ 缓存 ${models.length} 个`;
-    return;
-  }
-  if (btn) btn.textContent = "⏳ 获取中…";
-  try {
-    const data = await requestJson(`/api/llm-providers/${providerId}/models`);
-    const models = data.models || [];
-    if (models.length) {
-      _pickerModelsCache[providerId] = { models: [...models], ts: Date.now() };
-      if (modelSel) {
-        modelSel.innerHTML = models.map(m =>
-          `<option value="${escHtml(m)}" ${m === preselect ? "selected" : ""}>${escHtml(m)}</option>`
-        ).join("");
-      }
-      if (btn) btn.textContent = `✓ ${models.length} 个`;
-    } else {
-      showToast("获取模型", data.message || "未获取到模型列表", "warning", 2400);
-      if (btn) btn.textContent = "🔄 获取列表";
-    }
-  } catch (err) {
-    showToast("获取失败", err.message, "error", 2400);
-    if (btn) btn.textContent = "🔄 获取列表";
-  }
-}
-
-async function confirmModelPicker() {
-  const provSel = document.getElementById("mpProviderSelect");
-  const modelSel = document.getElementById("mpModelSelect");
-  const providerId = (provSel?.value || "").trim();
-  const model = (modelSel?.value || "").trim();
-  if (!providerId) { showToast("请选择 API", "", "warning", 1800); return; }
-  if (!model) { showToast("请选择模型", "先点击「获取列表」再选择", "warning", 2000); return; }
-  try {
-    const data = await requestJson("/api/llm-selection", {
-      method: "PUT", body: { provider_id: providerId, model }
-    });
-    await fetchActiveLlmRuntimeConfig(true);
-    showToast("已选择", data.message || `${model}`, "success", 1600);
-    closeModelPicker();
-    if (typeof _mpCallback === "function") _mpCallback({ provider_id: providerId, model });
-    _cachedAvailableModels = [];
-    updateCareerInterviewConfigStatus();
-    void updateProfileFlowModelStatus(true);
-    if (typeof window.assessmentHubUpdateConfigStatus === "function") window.assessmentHubUpdateConfigStatus();
-  } catch (err) { showToast("保存失败", err.message, "error", 2400); }
-}
-
-// 兼容旧代码调用
-function saveSettingsAdmin() { openAddProviderForm(); }
-function saveSettingsModel() { openModelPicker(); }
-function fetchSettingsModels() { fetchPickerModels(undefined, true); }
+function closeModelPicker() {}
 
 if (typeof window !== "undefined") {
   window.__resumeDeepAuditRenderer = {

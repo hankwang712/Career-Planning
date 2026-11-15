@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -6,6 +7,8 @@ import time
 
 from .paths import APP_DATA_DIR
 DB_PATH = os.path.join(APP_DATA_DIR, "app.db")
+
+logger = logging.getLogger(__name__)
 
 _local = threading.local()
 
@@ -41,46 +44,30 @@ def init_db():
 
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS user_states (
-            username TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS user_state_sections (
+            username TEXT NOT NULL,
+            section TEXT NOT NULL,
             payload TEXT NOT NULL,
-            updated_at REAL DEFAULT 0
+            version INTEGER NOT NULL DEFAULT 1,
+            updated_at REAL NOT NULL DEFAULT 0,
+            PRIMARY KEY (username, section)
         )
         """
     )
 
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS llm_configs (
-            scope TEXT PRIMARY KEY,
-            base_url TEXT,
-            api_key TEXT,
-            model TEXT
+        CREATE TABLE IF NOT EXISTS background_jobs (
+            job_id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            username TEXT NOT NULL,
+            status TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            updated_at REAL NOT NULL
         )
         """
     )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS llm_providers (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            base_url TEXT,
-            api_key TEXT
-        )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS resume_llm_config (
-            id INTEGER PRIMARY KEY CHECK(id = 1),
-            base_url TEXT,
-            api_key TEXT,
-            model TEXT
-        )
-        """
-    )
+    cur.execute("CREATE INDEX IF NOT EXISTS background_jobs_kind ON background_jobs(kind, status, updated_at)")
 
     cur.execute(
         """
@@ -127,6 +114,8 @@ def init_db():
     """)
     from .career import init_schema
     init_schema(conn)
+    _split_legacy_user_states(conn)
+    _scrub_legacy_llm_secrets(conn)
     migrated = cur.execute("SELECT 1 FROM auth_settings WHERE name = 'legacy_json_imported'").fetchone()
     conn.commit()
     conn.close()
@@ -180,99 +169,19 @@ def _migrate_from_json():
                 with open(path, "r", encoding="utf-8") as fh:
                     payload = json.load(fh)
                 username = os.path.splitext(os.path.basename(path))[0]
-                cur.execute(
-                    """
-                    INSERT OR IGNORE INTO user_states (username, payload, updated_at)
-                    VALUES (?, ?, ?)
-                    """,
-                    (username, json.dumps(payload, ensure_ascii=False), time.time()),
-                )
+                if isinstance(payload, dict):
+                    for section, value in payload.items():
+                        cur.execute(
+                            """
+                            INSERT OR IGNORE INTO user_state_sections (username, section, payload, version, updated_at)
+                            VALUES (?, ?, ?, 1, ?)
+                            """,
+                            (username, str(section), _dump(value), time.time()),
+                        )
             except Exception:
                 pass
         conn.commit()
         conn.close()
-
-    # llm_configs.json
-    llm_file = os.path.join(APP_DATA_DIR, "llm_configs.json")
-    if os.path.exists(llm_file):
-        try:
-            with open(llm_file, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            if isinstance(data, dict):
-                conn = sqlite3.connect(DB_PATH)
-                cur = conn.cursor()
-                for scope in ("career_interview", "assessment_hub"):
-                    cfg = data.get(scope) or {}
-                    cur.execute(
-                        """
-                        INSERT OR IGNORE INTO llm_configs (scope, base_url, api_key, model)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (
-                            scope,
-                            str(cfg.get("base_url") or cfg.get("baseUrl") or "").strip(),
-                            str(cfg.get("api_key") or cfg.get("apiKey") or "").strip(),
-                            str(cfg.get("model") or "gpt-4o-mini").strip(),
-                        ),
-                    )
-                conn.commit()
-                conn.close()
-        except Exception:
-            pass
-
-    # llm_providers.json
-    providers_file = os.path.join(APP_DATA_DIR, "llm_providers.json")
-    if os.path.exists(providers_file):
-        try:
-            with open(providers_file, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            providers = data.get("providers") if isinstance(data, dict) else []
-            if isinstance(providers, list):
-                conn = sqlite3.connect(DB_PATH)
-                cur = conn.cursor()
-                for p in providers:
-                    if not isinstance(p, dict):
-                        continue
-                    cur.execute(
-                        """
-                        INSERT OR IGNORE INTO llm_providers (id, name, base_url, api_key)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (
-                            str(p.get("id") or "").strip(),
-                            str(p.get("name") or "未命名").strip(),
-                            str(p.get("base_url") or p.get("baseUrl") or "").strip(),
-                            str(p.get("api_key") or p.get("apiKey") or "").strip(),
-                        ),
-                    )
-                conn.commit()
-                conn.close()
-        except Exception:
-            pass
-
-    # resume_llm_config.json
-    resume_file = os.path.join(APP_DATA_DIR, "resume_llm_config.json")
-    if os.path.exists(resume_file):
-        try:
-            with open(resume_file, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT OR IGNORE INTO resume_llm_config (id, base_url, api_key, model)
-                VALUES (1, ?, ?, ?)
-                """,
-                (
-                    str(data.get("base_url") or data.get("baseUrl") or "").strip(),
-                    str(data.get("api_key") or data.get("apiKey") or "").strip(),
-                    str(data.get("model") or "gpt-4o-mini").strip(),
-                ),
-            )
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
 
     # community_forum.json
     forum_file = os.path.join(APP_DATA_DIR, "community_forum.json")
@@ -322,7 +231,8 @@ def find_user(username):
 
 def delete_user(username):
     with _get_conn() as conn:
-        conn.execute("DELETE FROM user_states WHERE username = ?", (username,))
+        conn.execute("DELETE FROM user_state_sections WHERE username = ?", (username,))
+        conn.execute("DELETE FROM background_jobs WHERE username = ?", (username,))
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
 
 
@@ -330,151 +240,158 @@ def delete_user(username):
 # User state
 # ---------------------------------------------------------------------------
 
+def _dump(value):
+    """Stable serialisation so "did this section change" is a plain string comparison."""
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except TypeError:  # mixed-type keys cannot be sorted
+        return json.dumps(value, ensure_ascii=False, default=str)
+
+
+class TrackedState(dict):
+    """A user's state as loaded, remembering each section so a save writes only what this caller changed.
+
+    Callers read the whole state, change one scope and save it back. Storing one row per scope means a save
+    touches only the scopes that actually changed, and a concurrent request that changed another scope in
+    the meantime is no longer overwritten by this caller's stale copy.
+    """
+
+    loaded = None
+
+
 def load_user_state(username):
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT payload FROM user_states WHERE username = ?",
-        (str(username or "").strip(),),
-    )
-    row = cur.fetchone()
-    if row:
+    name = str(username or "").strip()
+    rows = _get_conn().execute(
+        "SELECT section, payload FROM user_state_sections WHERE username = ?", (name,)
+    ).fetchall()
+    state, snapshot = TrackedState(), {}
+    for row in rows:
         try:
-            return json.loads(row["payload"])
+            state[row["section"]] = json.loads(row["payload"])
         except json.JSONDecodeError:
-            return {}
-    return {}
+            continue
+        snapshot[row["section"]] = row["payload"]
+    state.loaded = snapshot
+    return state
 
 
 def save_user_state(username, payload):
+    name = str(username or "").strip()
+    new = payload if isinstance(payload, dict) else {}
+    serialized = {str(section): _dump(value) for section, value in new.items()}
+    baseline = payload.loaded if isinstance(payload, TrackedState) else None
     conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO user_states (username, payload, updated_at)
-        VALUES (?, ?, ?)
-        """,
-        (
-            str(username or "").strip(),
-            json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False),
-            time.time(),
-        ),
-    )
-    conn.commit()
+    now = time.time()
+    with conn:
+        if baseline is None:
+            # A freshly built dict replaces the user's state, as before.
+            baseline = {row["section"]: row["payload"] for row in conn.execute(
+                "SELECT section, payload FROM user_state_sections WHERE username = ?", (name,))}
+        changed = {section: text for section, text in serialized.items() if baseline.get(section) != text}
+        removed = [section for section in baseline if section not in serialized]
+        for section, text in changed.items():
+            conn.execute(
+                """
+                INSERT INTO user_state_sections (username, section, payload, version, updated_at)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(username, section) DO UPDATE SET
+                    payload = excluded.payload, version = version + 1, updated_at = excluded.updated_at
+                """,
+                (name, section, text, now),
+            )
+        for section in removed:
+            conn.execute("DELETE FROM user_state_sections WHERE username = ? AND section = ?", (name, section))
+    if isinstance(payload, TrackedState):
+        known = {**payload.loaded, **changed}
+        for section in removed:
+            known.pop(section, None)
+        payload.loaded = known
 
 
-# ---------------------------------------------------------------------------
-# LLM configs
-# ---------------------------------------------------------------------------
-
-def load_llm_configs():
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT scope, base_url, api_key, model FROM llm_configs")
-    rows = cur.fetchall()
-    return {row["scope"]: dict(row) for row in rows}
-
-
-def save_llm_configs(configs):
-    conn = _get_conn()
-    cur = conn.cursor()
-    for scope, cfg in (configs or {}).items():
-        if not isinstance(cfg, dict):
+def _split_legacy_user_states(conn):
+    """Move the old one-row-per-user JSON blob into per-scope rows, keeping the old table as a backup."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_states'").fetchone():
+        return
+    for row in conn.execute("SELECT username, payload, updated_at FROM user_states").fetchall():
+        try:
+            data = json.loads(row[1])
+        except (TypeError, json.JSONDecodeError):
+            logger.warning("用户数据无法解析，保留在 user_states_legacy 中：%s", row[0])
             continue
-        cur.execute(
-            """
-            INSERT OR REPLACE INTO llm_configs (scope, base_url, api_key, model)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                scope,
-                str(cfg.get("base_url") or "").strip(),
-                str(cfg.get("api_key") or "").strip(),
-                str(cfg.get("model") or "").strip(),
-            ),
-        )
-    conn.commit()
-
-
-# ---------------------------------------------------------------------------
-# LLM providers
-# ---------------------------------------------------------------------------
-
-def load_providers():
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, base_url, api_key FROM llm_providers")
-    rows = cur.fetchall()
-    return [
-        {
-            "id": r["id"],
-            "name": r["name"],
-            "base_url": r["base_url"],
-            "api_key": r["api_key"],
-        }
-        for r in rows
-    ]
-
-
-def save_providers(providers):
-    conn = _get_conn()
-    cur = conn.cursor()
-    for p in providers:
-        if not isinstance(p, dict):
+        if not isinstance(data, dict):
             continue
-        cur.execute(
+        for section, value in data.items():
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO user_state_sections (username, section, payload, version, updated_at)
+                VALUES (?, ?, ?, 1, ?)
+                """,
+                (row[0], str(section), _dump(value), row[2] or time.time()),
+            )
+    conn.execute("ALTER TABLE user_states RENAME TO user_states_legacy")
+
+
+def _scrub_legacy_llm_secrets(conn):
+    """Credentials now live only in .env. Remove the old plaintext copies once .env can replace them."""
+    legacy = [name for name in ("llm_configs", "llm_providers", "resume_llm_config")
+              if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()]
+    if not legacy:
+        return
+    from . import llm_env
+    if not llm_env.chat_configured():
+        logger.warning("数据库里还留有旧的 API 配置，但 .env 尚未配置 AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL；"
+                       "请先补全 .env 并重启，旧的明文密钥会在那时自动清除。")
+        return
+    conn.execute("PRAGMA secure_delete = ON")
+    for name in legacy:
+        conn.execute(f"DROP TABLE {name}")
+    conn.commit()
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    logger.warning("已清除数据库中旧的 API 配置（%s）；模型接口现在只从 .env 读取。", "、".join(legacy))
+
+
+# ---------------------------------------------------------------------------
+# Background jobs (long-running report / resume tasks)
+# ---------------------------------------------------------------------------
+
+def save_job(job_id, kind, username, status, payload):
+    conn = _get_conn()
+    with conn:
+        conn.execute(
             """
-            INSERT OR REPLACE INTO llm_providers (id, name, base_url, api_key)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO background_jobs (job_id, kind, username, status, payload, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+                status = excluded.status, payload = excluded.payload, updated_at = excluded.updated_at
             """,
-            (
-                str(p.get("id") or "").strip(),
-                str(p.get("name") or "未命名").strip(),
-                str(p.get("base_url") or "").strip(),
-                str(p.get("api_key") or "").strip(),
-            ),
+            (job_id, kind, username, status, json.dumps(payload, ensure_ascii=False, default=str), time.time()),
         )
-    ids = [p["id"] for p in providers if isinstance(p, dict) and p.get("id")]
-    if ids:
-        placeholders = ",".join("?" * len(ids))
-        cur.execute(
-            f"DELETE FROM llm_providers WHERE id NOT IN ({placeholders})",
-            ids,
-        )
-    else:
-        cur.execute("DELETE FROM llm_providers")
-    conn.commit()
 
 
-# ---------------------------------------------------------------------------
-# Resume LLM config
-# ---------------------------------------------------------------------------
-
-def load_resume_llm_config():
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT base_url, api_key, model FROM resume_llm_config WHERE id = 1")
-    row = cur.fetchone()
-    if row:
-        return dict(row)
-    return {}
+def delete_job(job_id):
+    with _get_conn() as conn:
+        conn.execute("DELETE FROM background_jobs WHERE job_id = ?", (job_id,))
 
 
-def save_resume_llm_config(config):
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO resume_llm_config (id, base_url, api_key, model)
-        VALUES (1, ?, ?, ?)
-        """,
-        (
-            str(config.get("base_url") or "").strip(),
-            str(config.get("api_key") or "").strip(),
-            str(config.get("model") or "").strip(),
-        ),
-    )
-    conn.commit()
+def load_jobs(kind, since):
+    rows = _get_conn().execute(
+        "SELECT payload FROM background_jobs WHERE kind = ? AND updated_at >= ? ORDER BY updated_at",
+        (kind, since),
+    ).fetchall()
+    jobs = []
+    for row in rows:
+        try:
+            job = json.loads(row["payload"])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(job, dict) and job.get("job_id"):
+            jobs.append(job)
+    return jobs
+
+
+def prune_jobs(before):
+    with _get_conn() as conn:
+        conn.execute("DELETE FROM background_jobs WHERE updated_at < ? AND status NOT IN ('queued', 'running')", (before,))
 
 
 # ---------------------------------------------------------------------------

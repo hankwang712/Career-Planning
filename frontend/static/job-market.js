@@ -67,11 +67,6 @@
     const running = data.runs.find(run => run.status === "running");
     const next = settings.enabled ? `每 ${settings.interval_hours} 小时更新 · 下次计划 ${time(settings.next_run_at, true)}` : "自动采集已暂停";
     el("lmScheduleLine").textContent = running ? `${running.cancel_requested ? "正在停止采集" : "正在采集"} · ${running.message || "岗位将分批更新"}` : next;
-    root.querySelectorAll(".lm-admin-only").forEach(item => { item.hidden = !data.can_manage; });
-    const collect = root.querySelector('[data-lm-action="collect"]');
-    const cancel = root.querySelector('[data-lm-action="cancel"]');
-    collect.disabled = Boolean(running);
-    cancel.disabled = !running || Boolean(running.cancel_requested);
     el("lmSourceStatus").innerHTML = Object.entries(data.sources).map(([key, label]) => {
       const run = data.runs.find(run => run.sources.some(source => source.source === key));
       const source = run?.sources.find(source => source.source === key);
@@ -209,15 +204,6 @@
       if (dialog.open && ticket === detailRequest) el("lmDetailContent").innerHTML = `<div class="lm-detail-loading"><h3 id="lmDetailTitle">岗位详情暂时无法读取</h3><p>${esc(error.message)}</p></div>`;
     }
   }
-  function openSettings() {
-    if (!statusData?.can_manage) return;
-    toggleSources(false);
-    const settings = statusData.settings;
-    const input = (name, label, min, max) => `<label>${label}<input name="${name}" type="number" min="${min}" max="${max}" value="${settings[name]}" required></label>`;
-    el("lmSettingsFields").innerHTML = `<label class="lm-setting-source"><span><input name="enabled" type="checkbox" ${settings.enabled ? "checked" : ""}>启用自动定时采集</span></label><fieldset><legend class="lm-muted">采集来源</legend><div class="lm-setting-source">${Object.entries(statusData.sources).map(([key, label]) => `<label><input type="checkbox" name="sources" value="${key}" ${settings.sources.includes(key) ? "checked" : ""}>${esc(label)}</label>`).join("")}</div></fieldset><div class="lm-settings-grid">${input("interval_hours", "更新间隔（小时）", 1, 168)}${input("max_pages", "每个来源 / 企业的最大页数", 1, 10)}${input("max_jobs", "每类来源最多岗位数", 20, 2000)}${input("timeout_seconds", "每类来源采集时限（秒）", 30, 1800)}<label>采集企业（可选，以逗号分隔）<input name="companies" list="lmCompanyOptions" maxlength="1500" value="${esc(settings.companies.join("，"))}" placeholder="留空采集来源内的企业"></label><label>地点（可选，以逗号分隔）<input name="locations" maxlength="800" value="${esc(settings.locations.join("，"))}" placeholder="例如：北京，上海"></label><label>行业（可选，以逗号分隔）<input name="industries" maxlength="800" value="${esc(settings.industries.join("，"))}" placeholder="例如：互联网/科技"></label></div><datalist id="lmCompanyOptions">${statusData.companies.map(company => `<option value="${esc(company.name)}">${esc(company.industry)}</option>`).join("")}</datalist><p class="lm-muted">企业 API 与国家平台优先；通用官网采集可能无法取得数据。不同来源支持的定向条件不同，国家平台和实习僧主要使用首个城市条件。保存后可点击“立即采集”验证来源。</p>`;
-    el("lmSettingsFeedback").textContent = "";
-    el("lmSettingsDialog").showModal();
-  }
   el("lmSearchForm").addEventListener("submit", event => {
     event.preventDefault();
     [...filters.keys()].forEach(key => filters.delete(key));
@@ -228,23 +214,6 @@
     void load();
   });
   el("lmSearchForm").addEventListener("reset", () => { setTimeout(() => { [...filters.keys()].forEach(key => filters.delete(key)); filters.set("days", "30"); filters.set("sort", "recent"); page = 1; void load(); }, 0); });
-  el("lmSettingsForm").addEventListener("submit", async event => {
-    event.preventDefault();
-    if (!statusData?.can_manage) return;
-    const form = new FormData(event.currentTarget);
-    const payload = { enabled: form.has("enabled"), sources: form.getAll("sources") };
-    for (const key of ["interval_hours", "max_pages", "max_jobs", "timeout_seconds"]) payload[key] = Number(form.get(key));
-    for (const key of ["companies", "locations", "industries"]) payload[key] = String(form.get(key) || "").split(/[,，\n]/).map(text => text.trim()).filter(Boolean);
-    const submit = event.currentTarget.querySelector('[type="submit"]');
-    submit.disabled = true;
-    try {
-      await window.requestJson(`${API}/settings`, { method: "PUT", body: payload });
-      el("lmSettingsDialog").close();
-      await load(true);
-      feedback("采集计划已保存。");
-    } catch (error) { el("lmSettingsFeedback").textContent = error.message; }
-    finally { submit.disabled = false; }
-  });
   document.addEventListener("click", async event => {
     const target = event.target.closest("[data-lm-action]");
     if (!target) return;
@@ -253,20 +222,10 @@
     if (action === "toggle-sources") return toggleSources(!el("lmSourceDrawer").open, el("lmSourceDrawer").open);
     if (action === "close-sources") return toggleSources(false, true);
     if (action === "close-detail") return el("lmDetailDialog").close();
-    if (action === "close-settings") return el("lmSettingsDialog").close();
     if (action === "detail") return void detail(target.dataset.id);
-    if (action === "settings") return openSettings();
     if (action === "refresh") return void load();
     if (action === "previous" && !busy && page > 1) { page--; return void load(); }
     if (action === "next" && !busy && page < pages) { page++; return void load(); }
-    if (action === "collect" || action === "cancel") {
-      if (!statusData?.can_manage) return;
-      target.disabled = true;
-      try {
-        await window.requestJson(`${API}/collect`, { method: action === "collect" ? "POST" : "DELETE", body: {} });
-        await load(true);
-      } catch (error) { feedback(error.message, true); target.disabled = false; }
-    }
   });
   window.addEventListener("jobs:view-changed", event => {
     active = event.detail.view === "live";
@@ -286,5 +245,5 @@
     if (!el("lmSourceDrawer").open) toggleSources(false);
   });
   document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(timer); else if (active) void load(true); });
-  window.JobMarket = { open() { active = true; return load(); }, pause() { active = false; clearTimeout(timer); toggleSources(false); el("lmDetailDialog").close(); el("lmSettingsDialog").close(); } };
+  window.JobMarket = { open() { active = true; return load(); }, pause() { active = false; clearTimeout(timer); toggleSources(false); el("lmDetailDialog").close(); } };
 })();

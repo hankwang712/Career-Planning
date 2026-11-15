@@ -36,7 +36,7 @@
 | ✅ 行动与学习计划 | 根据阶段、目标和可投入时间安排近期任务，延伸到中长期成长路线。为准备事项提供交付成果与验收标准。 |
 | 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话。聊天只读取基础画像（学校、专业、学历、毕业时间、求职偏好）与已确认的记忆，相关时才参考过往对话；支持无痕对话和图片输入。 |
 | 📰 资讯与社区 | 查看职业资讯、相关新闻，发布求职经验、岗位讨论及回复。 |
-| 👤 个人与管理中心 | 统一维护职业画像、技能证据、职业目标、测评和简历版本，追溯资料来源与修改历史。管理员管理账户及模型接口。 |
+| 👤 个人与管理中心 | 统一维护职业画像、技能证据、职业目标、测评和简历版本，追溯资料来源与修改历史。管理员只有一项权限：删除社区帖子。 |
 
 ```mermaid
 flowchart LR
@@ -215,7 +215,7 @@ npm start
 uv run --no-project python backend/scripts/create_admin.py
 ```
 
-按提示设置管理员邮箱和密码，登录后在工作台模型设置中填写 **接口地址、API Key、模型名称**，再选择模型。普通账户使用管理员提供的配置。
+按提示设置管理员邮箱和密码，模型在服务器根目录的 `.env` 里配置（`AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`），页面里没有模型设置入口，数据库也不保存任何密钥。
 
 ### 6. 修改前端时启用开发模式
 
@@ -292,11 +292,11 @@ flowchart LR
 
 | 配置 | 何时需要 | 配置方式 |
 | --- | --- | --- |
-| 主站对话模型 | AI 分析、对话与报告 | 管理员工作台模型设置。 |
-| 聊天备用模型 | 没有主站模型配置时供聊天使用 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
+| 对话模型 | 聊天、简历分析、职业规划报告、职业访谈 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。修改后重启服务。 |
+| 图片模型 | 画像海报、文生图 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`、`TEXT_TO_IMAGE_MODEL`。 |
 | 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
 
-配置统一放在根目录 `.env`，完整示例见 [.env.example](.env.example)。进程环境变量优先于文件配置，主站选定的模型优先于聊天备用模型。
+配置统一放在根目录 `.env`，完整示例见 [.env.example](.env.example)。进程环境变量优先于文件配置。从旧版本升级时，数据库里遗留的 API 配置会在 `.env` 配好后的首次启动自动清除。
 
 ### 聊天记忆参数
 
@@ -374,7 +374,7 @@ cd ../../../..
 | `EMBEDDING_DIM`、`EMBEDDING_TOKEN_LIMIT` | 与所选 embedding 模型的实际维度、输入上限保持一致。 |
 | `POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DATABASE` | 与 Compose 启动的数据库一致。宿主机默认使用 `127.0.0.1:5432`。 |
 
-管理员工作台的主站模型配置不会自动替代这里的 `LLM_*` / `EMBEDDING_*`。确认 PostgreSQL 服务健康。以下命令显式指定 `--workspace career_jd`，导入、查询和网页使用同一空间。
+主站的 `AI_CHAT_*` 不会自动替代这里的 `LLM_*` / `EMBEDDING_*`。确认 PostgreSQL 服务健康。以下命令显式指定 `--workspace career_jd`，导入、查询和网页使用同一空间。
 
 ### 3. 准备 UTF-8 岗位文件
 

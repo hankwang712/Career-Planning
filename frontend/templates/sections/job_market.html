@@ -1,14 +1,13 @@
 <div id="liveJobMarket" class="lm-panel" aria-labelledby="lmTitle">
     <header class="lm-hero">
         <div id="lmScheduleLine" class="lm-schedule">正在读取更新计划…</div>
-        <div class="lm-hero-actions"><button type="button" class="lm-btn lm-btn-primary" data-lm-action="refresh">刷新岗位 <span aria-hidden="true">↻</span></button><a id="lmExport" class="lm-btn" href="/api/job-market/export">导出 Excel ↗</a><button type="button" class="lm-btn lm-admin-only" data-lm-action="settings" hidden>采集管理</button></div>
+        <div class="lm-hero-actions"><button type="button" class="lm-btn lm-btn-primary" data-lm-action="refresh">刷新岗位 <span aria-hidden="true">↻</span></button><a id="lmExport" class="lm-btn" href="/api/job-market/export">导出 Excel ↗</a></div>
     </header>
     <p id="lmFeedback" class="lm-feedback" role="status" aria-live="polite"></p>
     <button id="lmSourceToggle" type="button" class="lm-source-tab" data-lm-action="toggle-sources" aria-label="打开数据更新" aria-expanded="false" aria-controls="lmSourceDrawer" title="数据更新"><svg viewBox="0 0 26 68" aria-hidden="true"><path class="lm-source-tab-shape" d="M26 1 2 34l24 33Z"/><path class="lm-source-tab-chevron" d="m20 27-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <dialog id="lmSourceDrawer" class="lm-source-drawer" aria-labelledby="lmSourceTitle">
         <div class="lm-source-drawer-head"><div><h4 id="lmSourceTitle"><span class="lm-live-dot" aria-hidden="true"></span>数据更新</h4><p id="lmSourceSummary">正在同步</p></div><button type="button" class="lm-source-close" data-lm-action="close-sources" aria-label="收起数据更新">×</button></div>
         <div id="lmSourceStatus"></div>
-        <div class="lm-admin-actions lm-admin-only" hidden><button type="button" class="lm-btn lm-btn-primary" data-lm-action="collect">立即采集</button><button type="button" class="lm-btn" data-lm-action="cancel">停止任务</button></div>
     </dialog>
     <div class="lm-content-grid"><div class="lm-main-column">
     <div id="lmStats" class="lm-stats" aria-live="polite"></div>
@@ -45,4 +44,3 @@
     </aside></div>
 </div>
 <dialog id="lmDetailDialog" class="lm-dialog lm-job-dialog" aria-labelledby="lmDetailTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-detail" aria-label="关闭岗位详情">×</button><div id="lmDetailContent" aria-live="polite"></div></dialog>
-<dialog id="lmSettingsDialog" class="lm-dialog lm-settings-dialog" aria-labelledby="lmSettingsTitle"><button type="button" class="lm-dialog-close" data-lm-action="close-settings" aria-label="关闭采集管理">×</button><p class="lm-eyebrow">COLLECTION SETTINGS</p><h3 id="lmSettingsTitle">岗位采集计划</h3><p class="lm-muted">计划供全站共用，修改后按新间隔安排下一次采集。</p><form id="lmSettingsForm"><div id="lmSettingsFields"></div><p id="lmSettingsFeedback" role="status"></p><button type="submit" class="lm-btn lm-btn-primary">保存采集计划</button></form></dialog>

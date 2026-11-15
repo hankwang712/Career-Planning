@@ -1,5 +1,7 @@
 # Application, Agents, recruitment collectors and graph CLI helpers.
-# Versions intentionally omitted; keep the Windows-only platform marker.
+# Versions are omitted except where the code needs a newer API: the report workflow uses
+# langchain.agents.create_agent (langchain 1.x), and an older langgraph-checkpoint breaks
+# langgraph-checkpoint-sqlite. Keep the Windows-only platform marker.
 # The separately maintained, patched LightRAG checkout installs its own extras.
 anyio
 bleach
@@ -9,11 +11,11 @@ feedparser
 Flask
 fonttools
 httpx
-langchain
-langchain-core
-langchain-openai
-langgraph
-langgraph-checkpoint-sqlite
+langchain>=1.0
+langchain-core>=1.0
+langchain-openai>=1.0
+langgraph>=1.0
+langgraph-checkpoint-sqlite>=3.0
 lxml
 Markdown
 MarkupSafe
@@ -40,3 +42,4 @@ trafilatura
 tzdata
 uvicorn
 Werkzeug
+tzdata; sys_platform == "win32"  # zoneinfo needs the IANA database on Windows

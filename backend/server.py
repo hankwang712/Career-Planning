@@ -91,6 +91,8 @@ from services.resume.diagnosis_ui import (
 )
 from services.tools import generate_text_to_image, get_text_to_image_runtime
 from services import db as _app_db
+from services import llm_env
+from services.job_registry import JobRegistry
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
 from services.career import create_blueprint as create_career_blueprint, snapshot as career_snapshot, sync_sources as sync_career_sources
@@ -140,9 +142,9 @@ JOB_FILE_CACHE = {}
 SUPPLEMENT_JOBS_CACHE = {"signature": None, "by_city": None}
 ASSESSMENT_DATA_CACHE = {"signature": None, "payload": {}}
 RESUME_ANALYSIS_LOCK = threading.Lock()
-RESUME_ANALYSIS_JOBS = {}
+RESUME_ANALYSIS_JOBS = JobRegistry("resume")
 CAREER_REPORT_LOCK = threading.Lock()
-CAREER_REPORT_JOBS = {}
+CAREER_REPORT_JOBS = JobRegistry("career_report")
 COMMUNITY_FORUM_LOCK = threading.Lock()
 JOB_CACHE_MAX_AGE_SECONDS = 900
 RESUME_MAX_FILE_SIZE = 12 * 1024 * 1024
@@ -545,171 +547,40 @@ VALID_USER_STATE_SCOPES = {
     "career_matching",
     "news_context",
 }
-VALID_LLM_CONFIG_SCOPES = {"career_interview", "assessment_hub"}
 COMMUNITY_FORUM_BOARD_OPTIONS = ("面经互助", "简历门诊", "实习内推", "选岗热议", "职场日常")
 EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 
 
-def _default_llm_configs():
-    return {
-        "career_interview": {"base_url": "", "api_key": "", "model": "gpt-4o-mini"},
-        "assessment_hub": {"base_url": "", "api_key": "", "model": "gpt-4o-mini"},
-    }
 
-
-def _default_resume_llm_config():
-    return {"base_url": "", "api_key": "", "model": "gpt-4o-mini"}
-
-
-def _normalized_resume_llm_config(raw_config):
-    raw = raw_config if isinstance(raw_config, dict) else {}
-    return {
-        "base_url": str(raw.get("base_url") or raw.get("baseUrl") or "").strip(),
-        "api_key": str(raw.get("api_key") or raw.get("apiKey") or "").strip(),
-        "model": str(raw.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini",
-    }
-
-
-def _load_resume_llm_config():
-    raw = _app_db.load_resume_llm_config()
-    if not raw:
-        raw = _default_resume_llm_config()
-    return _normalized_resume_llm_config(raw)
-
-
-def _save_resume_llm_config(config):
-    normalized = _normalized_resume_llm_config(config)
-    _app_db.save_resume_llm_config(normalized)
-    return normalized
-
-
-def _public_resume_llm_config(user):
-    config = _load_resume_llm_config()
-    api_key = str(config.get("api_key") or "")
-    masked = (api_key[:4] + "****" + api_key[-4:]) if len(api_key) > 8 else ("已配置" if api_key else "")
-    payload = {
-        "editable": bool(user and user.get("role") == "super_admin"),
-        "configured": bool(config.get("base_url") and api_key),
-        "base_url": config.get("base_url") or "",
-        "api_key_masked": masked,
-        "model": config.get("model") or "gpt-4o-mini",
-    }
-    if user and user.get("role") == "super_admin":
-        payload["api_key"] = api_key
-    return payload
-
-
-def _get_resume_provider_and_model():
-    # 优先复用全局“API + 模型选择”，保证与其它模块一致。
-    base_url, api_key, model = _get_active_provider_and_model()
-    if base_url and api_key and model:
-        return base_url, api_key, model
-
-    # 兼容旧版独立简历配置，作为迁移兜底。
-    config = _load_resume_llm_config()
-    base_url = str(config.get("base_url") or "").strip()
-    api_key = str(config.get("api_key") or "").strip()
-    model = str(config.get("model") or "").strip() or "gpt-4o-mini"
-    return base_url, api_key, model
-
-
-# 新的多 Provider 数据层
-
-def _normalized_provider(raw):
-    raw = raw if isinstance(raw, dict) else {}
-    return {
-        "id": str(raw.get("id") or "").strip(),
-        "name": str(raw.get("name") or "未命名").strip() or "未命名",
-        "base_url": str(raw.get("base_url") or raw.get("baseUrl") or "").strip(),
-        "api_key": str(raw.get("api_key") or raw.get("apiKey") or "").strip(),
-    }
-
-
-def _public_provider(provider, is_admin=False):
-    api_key = str(provider.get("api_key") or "")
-    masked = (api_key[:4] + "****" + api_key[-4:]) if len(api_key) > 8 else ("已配置" if api_key else "")
-    result = {
-        "id": provider.get("id"),
-        "name": provider.get("name"),
-        "base_url": provider.get("base_url"),
-        "api_key_masked": masked,
-        "configured": bool(provider.get("base_url") and api_key),
-    }
-    if is_admin:
-        result["api_key"] = api_key
-    return result
-
-
-def _load_providers():
-    providers = _app_db.load_providers()
-    return [_normalized_provider(p) for p in providers if isinstance(p, dict) and p.get("id")]
-
-
-def _save_providers(providers):
-    normalized = [_normalized_provider(p) for p in providers if isinstance(p, dict) and p.get("id")]
-    _app_db.save_providers(normalized)
-    return normalized
+# 模型接口只从 .env 读取（AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL），数据库不保存密钥，
+# 用户也不能选择或配置模型；下面这些函数保留旧名字，只是为了让原有调用点不用改。
 def _get_active_provider_and_model(selection=None):
-    """Read provider/model from an explicit selection or the current session."""
-    if isinstance(selection, dict):
-        active_selection = selection
-    elif has_request_context():
-        active_selection = session.get("llm_selection") or {}
-    else:
-        active_selection = {}
-    provider_id = str(active_selection.get("provider_id") or "").strip()
-    model = str(active_selection.get("model") or "").strip()
-
-    providers = _load_providers()
-    provider = None
-    if provider_id:
-        provider = next((p for p in providers if p.get("id") == provider_id), None)
-    if not provider:
-        provider = next((p for p in providers if p.get("base_url") and p.get("api_key")), None)
-    if not provider:
-        return None, None, None
-
-    base_url = str(provider.get("base_url") or "").strip()
-    api_key = str(provider.get("api_key") or "").strip()
-    if not model:
-        model = "deepseek-chat" if "deepseek" in base_url.lower() else "gpt-4o-mini"
-    return base_url, api_key, model
+    return llm_env.chat_runtime()
 
 
 def _get_chat_runtime(selection=None):
-    runtime = _get_active_provider_and_model(selection)
-    if all(runtime):
-        return runtime
-    from services.chat.config import fallback_chat_runtime
-    return fallback_chat_runtime()
+    return llm_env.chat_runtime()
+
+
+def _get_resume_provider_and_model():
+    return llm_env.chat_runtime()
 
 
 def _get_profile_portrait_runtime():
-    providers = _load_providers()
-    provider = next(
-        (
-            item for item in providers
-            if "openrouter.ai" in str(item.get("base_url") or "").strip().lower()
-            and str(item.get("api_key") or "").strip()
-        ),
-        None,
-    )
-    if not provider:
+    base_url, api_key, _ = llm_env.image_runtime(TEXT_TO_IMAGE_BASE_URL, PROFILE_PORTRAIT_MODEL)
+    if not api_key:
         return None, None, PROFILE_PORTRAIT_MODEL
-    return (
-        str(provider.get("base_url") or "").strip(),
-        str(provider.get("api_key") or "").strip(),
-        PROFILE_PORTRAIT_MODEL,
-    )
+    return base_url, api_key, PROFILE_PORTRAIT_MODEL
 
 
 def _get_text_to_image_runtime(payload=None):
+    # 请求体里的 base_url / api_key 不再生效，避免让调用方指定服务端要访问的地址。
     return get_text_to_image_runtime(
-        payload=payload,
+        payload=None,
         env_api_key=TEXT_TO_IMAGE_API_KEY,
         default_base_url=TEXT_TO_IMAGE_BASE_URL,
         default_model=TEXT_TO_IMAGE_MODEL,
-        providers=_load_providers(),
+        providers=[],
     )
 
 
@@ -756,53 +627,6 @@ def _write_json_file(path, payload):
     with open(temp_path, "w", encoding="utf-8") as fp:
         json.dump(payload, fp, ensure_ascii=False, indent=2)
     os.replace(temp_path, path)
-
-
-def _normalized_llm_config(raw_config):
-    raw = raw_config if isinstance(raw_config, dict) else {}
-    return {
-        "base_url": str(raw.get("base_url") or raw.get("baseUrl") or "").strip(),
-        "api_key": str(raw.get("api_key") or raw.get("apiKey") or "").strip(),
-        "model": str(raw.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini",
-    }
-
-
-def _load_llm_configs():
-    stored = _app_db.load_llm_configs()
-    configs = _default_llm_configs()
-    if isinstance(stored, dict):
-        for scope in VALID_LLM_CONFIG_SCOPES:
-            configs[scope] = _normalized_llm_config(stored.get(scope))
-
-    # If one scope is configured and the other is empty, keep them aligned.
-    reference = next(
-        (c for c in configs.values() if c.get("base_url") and c.get("api_key")),
-        None,
-    )
-    if reference:
-        changed = False
-        for scope in VALID_LLM_CONFIG_SCOPES:
-            c = configs[scope]
-            if not (c.get("base_url") and c.get("api_key")):
-                c["base_url"] = reference["base_url"]
-                c["api_key"] = reference["api_key"]
-                if not c.get("model") or c["model"] in ("gpt-4o-mini",):
-                    c["model"] = reference["model"]
-                changed = True
-        if changed:
-            _app_db.save_llm_configs(configs)
-
-    if stored != configs:
-        _app_db.save_llm_configs(configs)
-    return configs
-
-
-def _save_llm_configs(configs):
-    normalized = _default_llm_configs()
-    for scope in VALID_LLM_CONFIG_SCOPES:
-        normalized[scope] = _normalized_llm_config(configs.get(scope))
-    _app_db.save_llm_configs(normalized)
-    return normalized
 
 
 def _normalize_login_identifier(value):
@@ -906,16 +730,6 @@ def _legacy_storage_key(username):
     return re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
 
 
-def _admin_storage_key(value):
-    raw = str(value or "").strip()
-    for user in _load_users():
-        if raw in {user.get("username"), _user_storage_key(user.get("username"))}:
-            return _user_storage_key(user.get("username"))
-        if raw == _legacy_storage_key(user.get("username")) and _unique_legacy_owner(user.get("username")):
-            return _user_storage_key(user.get("username"))
-    return _legacy_storage_key(raw)
-
-
 def _unique_legacy_owner(username):
     legacy = _legacy_storage_key(username)
     owners = [str(user.get("username") or "") for user in _load_users()
@@ -954,7 +768,7 @@ def _chat_resume_source(username):
     path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
     if not path or not os.path.isfile(path):
         return {}
-    return {"structured_profile": resume.get("structured_resume") or {}, "selection": state.get("llm_selection") or {},
+    return {"structured_profile": resume.get("structured_resume") or {}, "selection": {},
             "path": path, "document_id": str(resume.get("document_id") or ""),
             "name": str(resume.get("original_file_name") or resume.get("file_name") or "简历"),
             "text": str(resume.get("resume_source_text") or "")}
@@ -970,278 +784,6 @@ def _save_user_state(username, payload):
     _app_db.save_user_state(username, normalized)
     return normalized
 
-
-def _account_storage_paths(storage_key):
-    safe_key = _admin_storage_key(storage_key)
-    owner = next((item.get("username") for item in _load_users()
-                  if _user_storage_key(item.get("username")) == safe_key), None)
-    return {
-        "storage_key": safe_key,
-        "state": os.path.join(USER_STATE_DIR, f"{safe_key}.json"),
-        "reports": _private_account_directory(CAREER_REPORT_DIR, owner) if owner else os.path.join(CAREER_REPORT_DIR, safe_key),
-        "uploads": _private_account_directory(RESUME_UPLOAD_DIR, owner) if owner else os.path.join(RESUME_UPLOAD_DIR, safe_key),
-    }
-
-
-def _iter_known_account_storage_keys():
-    keys = set()
-    for user in _load_users():
-        keys.add(_user_storage_key(user.get("username")))
-
-    if os.path.isdir(USER_STATE_DIR):
-        for name in os.listdir(USER_STATE_DIR):
-            if not name.lower().endswith(".json"):
-                continue
-            keys.add(_admin_storage_key(os.path.splitext(name)[0]))
-
-    for base_dir in (CAREER_REPORT_DIR, RESUME_UPLOAD_DIR):
-        if not os.path.isdir(base_dir):
-            continue
-        for name in os.listdir(base_dir):
-            if not name:
-                continue
-            full_path = os.path.join(base_dir, name)
-            if os.path.isdir(full_path):
-                keys.add(_admin_storage_key(name))
-
-    return sorted(key for key in keys if key)
-
-
-def _safe_int_values(*values):
-    result = []
-    for value in values:
-        try:
-            parsed = int(float(value))
-        except (TypeError, ValueError):
-            continue
-        if parsed > 0:
-            result.append(parsed)
-    return result
-
-
-def _max_timestamp_label(*values):
-    candidates = _safe_int_values(*values)
-    if not candidates:
-        return ""
-    try:
-        return datetime.fromtimestamp(max(candidates)).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        return ""
-
-
-def _build_admin_account_completion(user=None, storage_key=""):
-    registered_user = user if isinstance(user, dict) else None
-    safe_storage_key = _admin_storage_key(storage_key or (registered_user or {}).get("username"))
-    lookup_name = (registered_user or {}).get("username") or safe_storage_key
-
-    state = _load_user_state(lookup_name)
-    bundle = _read_career_report_bundle(lookup_name)
-    report_state, _ = _sanitize_transient_career_report_state(
-        lookup_name,
-        state.get("career_report"),
-        bundle,
-    )
-    report_versions = _list_career_report_version_summaries(lookup_name, include_latest=True)
-    upload_dir = _user_upload_dir(lookup_name)
-
-    profile_scope = state.get("profile_snapshot") if isinstance(state.get("profile_snapshot"), dict) else {}
-    profile_payload = _saved_profile_snapshot_payload(profile_scope)
-    profile_ready = bool(profile_payload)
-
-    resume_scope = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
-    resume_status = str(resume_scope.get("status") or "").strip().lower()
-    resume_ready = resume_status in {"analyzed", "ready", "completed"}
-
-    matching_scope = state.get("career_matching") if isinstance(state.get("career_matching"), dict) else {}
-    matching_roles = _saved_matching_role_payload(matching_scope)
-    matching_ready = bool(matching_roles or bundle.get("match_output"))
-
-    report_meta = bundle.get("meta") if isinstance(bundle.get("meta"), dict) else {}
-    report_document = bundle.get("report_document") if isinstance(bundle.get("report_document"), dict) else {}
-    report_generated = bool(str(report_meta.get("report_id") or "").strip() and report_document)
-    report_runtime_status = str(report_state.get("status") or "").strip().lower()
-    report_running = report_runtime_status in {"queued", "running"}
-    report_failed = report_runtime_status in {"failed", "error"}
-
-    uploads_count = 0
-    if os.path.isdir(upload_dir):
-        try:
-            uploads_count = sum(1 for name in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, name)))
-        except OSError:
-            uploads_count = 0
-
-    milestones = [
-        {
-            "key": "profile",
-            "label": "档案画像",
-            "done": profile_ready,
-            "status": "completed" if profile_ready else "empty",
-        },
-        {
-            "key": "resume",
-            "label": "简历解析",
-            "done": resume_ready,
-            "status": resume_status or ("uploaded" if uploads_count else "empty"),
-        },
-        {
-            "key": "matching",
-            "label": "岗位匹配",
-            "done": matching_ready,
-            "status": "completed" if matching_ready else "empty",
-        },
-        {
-            "key": "report",
-            "label": "正式报告",
-            "done": report_generated,
-            "status": "running" if report_running else "failed" if report_failed else "completed" if report_generated else report_runtime_status or "empty",
-        },
-    ]
-
-    completed_count = sum(1 for item in milestones if item["done"])
-    completion_percent = int(round((completed_count / max(len(milestones), 1)) * 100))
-    if report_running:
-        overall_status = "running"
-    elif report_failed:
-        overall_status = "failed"
-    elif completion_percent >= 100:
-        overall_status = "completed"
-    elif completion_percent <= 0:
-        overall_status = "empty"
-    else:
-        overall_status = "partial"
-
-    last_activity_at = _max_timestamp_label(
-        profile_scope.get("updated_at"),
-        resume_scope.get("uploaded_at"),
-        resume_scope.get("analyzed_at"),
-        matching_scope.get("updated_at"),
-        report_state.get("updated_at"),
-        report_meta.get("generated_at"),
-    )
-
-    data_paths = _account_storage_paths(safe_storage_key)
-    has_state = os.path.isfile(data_paths["state"])
-    has_reports = os.path.isdir(data_paths["reports"]) and any(os.scandir(data_paths["reports"]))
-    has_uploads = os.path.isdir(data_paths["uploads"]) and any(os.scandir(data_paths["uploads"]))
-
-    return {
-        "account_key": safe_storage_key,
-        "username": str((registered_user or {}).get("username") or "").strip(),
-        "display_name": str((registered_user or {}).get("display_name") or safe_storage_key).strip() or safe_storage_key,
-        "role": str((registered_user or {}).get("role") or "data_only").strip() or "data_only",
-        "registered": bool(registered_user),
-        "data_only": not bool(registered_user),
-        "data_flags": {
-            "has_state": bool(has_state),
-            "has_reports": bool(has_reports),
-            "has_uploads": bool(has_uploads),
-            "uploads_count": uploads_count,
-            "report_versions": len(report_versions),
-        },
-        "completion": {
-            "percent": completion_percent,
-            "completed_count": completed_count,
-            "total_count": len(milestones),
-            "status": overall_status,
-            "milestones": milestones,
-        },
-        "report_status": {
-            "status": report_runtime_status or ("completed" if report_generated else "empty"),
-            "stage": str(report_state.get("stage") or "").strip(),
-            "detail": str(report_state.get("stage_detail") or report_state.get("detail") or "").strip(),
-            "generated": report_generated,
-            "generated_at": str(report_meta.get("generated_at") or "").strip(),
-            "report_id": str(report_meta.get("report_id") or "").strip(),
-        },
-        "last_activity_at": last_activity_at,
-    }
-
-
-def _list_admin_accounts():
-    users_by_key = {
-        _user_storage_key(item.get("username")): item
-        for item in _load_users()
-        if isinstance(item, dict)
-    }
-    accounts = []
-    for storage_key in _iter_known_account_storage_keys():
-        entry = _build_admin_account_completion(users_by_key.get(storage_key), storage_key)
-        accounts.append(entry)
-
-    def _sort_key(item):
-        return (
-            item.get("role") != "super_admin",
-            item.get("data_only"),
-            -(item.get("completion", {}) or {}).get("percent", 0),
-            str(item.get("username") or item.get("account_key") or ""),
-        )
-
-    accounts.sort(key=_sort_key)
-    summary = {
-        "total_accounts": len(accounts),
-        "registered_accounts": sum(1 for item in accounts if item.get("registered")),
-        "data_only_accounts": sum(1 for item in accounts if item.get("data_only")),
-        "completed_reports": sum(1 for item in accounts if (item.get("report_status") or {}).get("generated")),
-        "running_reports": sum(1 for item in accounts if (item.get("report_status") or {}).get("status") in {"queued", "running"}),
-    }
-    return {"accounts": accounts, "summary": summary}
-
-
-def _remove_account_runtime_jobs(lookup_name):
-    lookup_names = {str(lookup_name or "").strip(), _user_storage_key(lookup_name)}
-    lookup_names.discard("")
-
-    with RESUME_ANALYSIS_LOCK:
-        stale_resume_jobs = [
-            job_id
-            for job_id, job in RESUME_ANALYSIS_JOBS.items()
-            if str((job or {}).get("username") or "").strip() in lookup_names
-        ]
-        for job_id in stale_resume_jobs:
-            RESUME_ANALYSIS_JOBS.pop(job_id, None)
-
-    with CAREER_REPORT_LOCK:
-        stale_report_jobs = [
-            job_id
-            for job_id, job in CAREER_REPORT_JOBS.items()
-            if str((job or {}).get("username") or "").strip() in lookup_names
-        ]
-        for job_id in stale_report_jobs:
-            CAREER_REPORT_JOBS.pop(job_id, None)
-
-
-def _delete_admin_account(account_key, acting_username=""):
-    safe_key = _admin_storage_key(account_key)
-    if not safe_key:
-        raise ValueError("缺少账号标识")
-
-    users = list(_load_users())
-    registered_user = next((item for item in users if _user_storage_key(item.get("username")) == safe_key), None)
-    registered_username = str((registered_user or {}).get("username") or "").strip()
-
-    if registered_username == "system":
-        raise PermissionError("system 账号不能删除")
-    if registered_username and registered_username == str(acting_username or "").strip():
-        raise PermissionError("不能删除当前登录账号")
-
-    if registered_user:
-        chat_service = app.extensions.get("chat_service")
-        if chat_service:
-            chat_service.memory.delete_owner(registered_username)
-            chat_service.documents.forget(registered_username)
-        _app_db.delete_user(registered_username)
-
-    lookup_name = registered_username or safe_key
-    paths = _account_storage_paths(safe_key)
-    for target in (paths["state"],):
-        if os.path.isfile(target):
-            os.remove(target)
-    for target in (paths["reports"], paths["uploads"]):
-        if os.path.isdir(target):
-            shutil.rmtree(target, ignore_errors=True)
-
-    _remove_account_runtime_jobs(lookup_name)
-    return _build_admin_account_completion(None, safe_key)
 
 def _saved_profile_snapshot_payload(raw_scope):
     scope = raw_scope if isinstance(raw_scope, dict) else {}
@@ -4609,7 +4151,7 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
     else:
         base_url, api_key, model = _get_resume_provider_and_model()
     if not base_url or not api_key:
-        raise ValueError("模型尚未就绪，请先完成接口配置和模型选择。")
+        raise ValueError("模型尚未配置，请在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。")
     if not model:
         model = "gpt-4o-mini"
 
@@ -4925,25 +4467,6 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_de
             finished_at=int(time.time()),
         )
 
-
-def _public_llm_config(scope, user):
-    configs = _load_llm_configs()
-    config = configs.get(scope) or {}
-    configured = bool(config.get("base_url") and config.get("api_key"))
-    payload = {
-        "scope": scope,
-        "editable": bool(user and user.get("role") == "super_admin"),
-        "configured": configured,
-        "model": config.get("model") or "gpt-4o-mini",
-        "api_key_masked": "",
-    }
-    api_key = str(config.get("api_key") or "")
-    if api_key:
-        payload["api_key_masked"] = api_key[:4] + "****" + api_key[-4:] if len(api_key) > 8 else "已配置"
-    if user and user.get("role") == "super_admin":
-        payload["base_url"] = config.get("base_url") or ""
-        payload["api_key"] = api_key
-    return payload
 
 def _list_city_files():
     if not os.path.isdir(BOSS_INFO_DIR):
@@ -5979,18 +5502,6 @@ def api_auth_status():
     }
     bootstrap_mode = str(request.args.get("bootstrap", "") or "").strip().lower() in {"1", "true", "yes"}
     if bootstrap_mode and user:
-        providers = _load_providers()
-        is_admin = user.get("role") == "super_admin"
-        selection = session.get("llm_selection") or {}
-        if not selection:
-            state_for_selection = _load_user_state(user["username"])
-            persisted = state_for_selection.get("llm_selection") if isinstance(state_for_selection.get("llm_selection"), dict) else {}
-            selection = persisted or {}
-        if selection.get("provider_id") and not any(p.get("id") == selection["provider_id"] for p in providers):
-            selection = {}
-        session["llm_selection"] = selection
-        session.modified = True
-
         state = _load_user_state(user["username"])
         resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
         career_report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
@@ -6003,13 +5514,7 @@ def api_auth_status():
         if career_report_state_changed:
             state["career_report"] = career_report_state
             _save_user_state(user["username"], state)
-        payload["llm"] = {
-            "selection": selection,
-            "providers": [_public_provider(p, is_admin) for p in providers],
-            "configs": {
-                "career_interview": _public_llm_config("career_interview", user),
-            },
-        }
+        payload["llm"] = llm_env.status()
         payload["scoped_data"] = {
             "career_interview": state.get("career_interview"),
             "assessment_hub": state.get("assessment_hub"),
@@ -6024,24 +5529,19 @@ def api_auth_status():
     return jsonify(payload)
 
 
+@app.route("/api/llm-status")
+@_login_required
+def api_llm_status():
+    """是否已配置模型以及模型名；不含任何密钥或接口地址。"""
+    return jsonify(llm_env.status())
+
+
 @app.route("/api/bootstrap")
 def api_bootstrap():
     """Bootstrap current user, providers, and cached scoped data for the frontend."""
     user = _current_user()
     if not user:
         return jsonify({"authenticated": False, "user": None})
-
-    providers = _load_providers()
-    is_admin = user.get("role") == "super_admin"
-    selection = session.get("llm_selection") or {}
-    if not selection:
-        state_for_selection = _load_user_state(user["username"])
-        persisted = state_for_selection.get("llm_selection") if isinstance(state_for_selection.get("llm_selection"), dict) else {}
-        selection = persisted or {}
-    if selection.get("provider_id") and not any(p.get("id") == selection["provider_id"] for p in providers):
-        selection = {}
-    session["llm_selection"] = selection
-    session.modified = True
 
     state = _load_user_state(user["username"])
     resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
@@ -6059,13 +5559,7 @@ def api_bootstrap():
     return jsonify({
         "authenticated": True,
         "user": _public_user(user),
-        "llm": {
-            "selection": selection,
-            "providers": [_public_provider(p, is_admin) for p in providers],
-            "configs": {
-                "career_interview": _public_llm_config("career_interview", user),
-            },
-        },
+        "llm": llm_env.status(),
         "scoped_data": {
             "career_interview": state.get("career_interview"),
             "assessment_hub": state.get("assessment_hub"),
@@ -6108,31 +5602,6 @@ def api_news_kb_search():
         return jsonify({"error": str(exc)}), 500
 
 
-
-
-@app.route("/api/admin/accounts", methods=["GET"])
-@_super_admin_required
-def api_admin_accounts():
-    return jsonify(_list_admin_accounts())
-
-
-@app.route("/api/admin/accounts/<path:account_key>", methods=["DELETE"])
-@_super_admin_required
-def api_admin_account_delete(account_key):
-    acting_user = _current_user() or {}
-    try:
-        deleted = _delete_admin_account(account_key, acting_username=acting_user.get("username"))
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except PermissionError as exc:
-        return jsonify({"message": str(exc)}), 403
-    return jsonify(
-        {
-            "message": "账号及关联数据已删除。",
-            "deleted": deleted,
-            **_list_admin_accounts(),
-        }
-    )
 
 
 @app.route("/api/user-state/<scope>", methods=["GET", "PUT"])
@@ -6207,6 +5676,23 @@ def api_community_feed_create_post():
     store = _save_community_forum_store(store)
     created_post = _public_community_forum_post(store["posts"][0], user)
     return jsonify({"message": "帖子已发布。", "post": created_post, "feed": _community_forum_payload(user)})
+
+
+@app.route("/api/community-feed/posts/<post_id>", methods=["DELETE"])
+@_super_admin_required
+@_forum_transaction
+def api_community_feed_delete_post(post_id):
+    """The one thing an administrator can do: remove a post (and its replies)."""
+    user = _current_user()
+    store = _load_community_forum_store()
+    posts = store.get("posts") if isinstance(store.get("posts"), list) else []
+    remaining = [post for post in posts if str((post or {}).get("id") or "") != str(post_id)]
+    if len(remaining) == len(posts):
+        return jsonify({"message": "未找到对应帖子。"}), 404
+    store["posts"] = remaining
+    _save_community_forum_store(store)
+    app.logger.info("administrator %s deleted community post %s", user["username"], post_id)
+    return jsonify({"message": "帖子已删除。", "feed": _community_forum_payload(user)})
 
 
 @app.route("/api/community-feed/posts/<post_id>/reply", methods=["POST"])
@@ -6406,232 +5892,6 @@ def api_profile_portrait_generate():
     })
 
 
-@app.route("/api/llm-config/<scope>", methods=["GET"])
-@_login_required
-def api_llm_config(scope):
-    normalized_scope = str(scope or "").strip()
-    if normalized_scope not in VALID_LLM_CONFIG_SCOPES:
-        return jsonify({"message": "未知的模型配置类型。"}), 404
-    return jsonify(_public_llm_config(normalized_scope, _current_user()))
-
-
-@app.route("/api/llm-config/<scope>", methods=["PUT"])
-@_super_admin_required
-def api_update_llm_config(scope):
-    normalized_scope = str(scope or "").strip()
-    if normalized_scope not in VALID_LLM_CONFIG_SCOPES:
-        return jsonify({"message": "未知的模型配置类型。"}), 404
-
-    payload = request.get_json(silent=True) or {}
-    configs = _load_llm_configs()
-    configs[normalized_scope] = _normalized_llm_config(payload)
-    _save_llm_configs(configs)
-    return jsonify(_public_llm_config(normalized_scope, _current_user()))
-
-
-@app.route("/api/llm-config/model", methods=["PUT"])
-@_login_required
-def api_update_llm_model():
-    """Update the selected model for all editable LLM config scopes."""
-    payload = request.get_json(silent=True) or {}
-    model = str(payload.get("model") or "").strip()
-    if not model:
-        return jsonify({"message": "请指定模型名称。"}), 400
-    configs = _load_llm_configs()
-    for scope in VALID_LLM_CONFIG_SCOPES:
-        configs[scope]["model"] = model
-    _save_llm_configs(configs)
-    return jsonify({"model": model, "message": "模型已更新。"})
-
-
-def _do_fetch_models(base_url, api_key):
-    try:
-        base = _normalize_sdk_base_url(base_url)
-    except ValueError as exc:
-        return jsonify({"models": [], "message": str(exc)}), 200
-
-    try:
-        client = OpenAI(api_key=api_key, base_url=base)
-        data = client.models.list()
-        models = [str(item.id) for item in getattr(data, "data", []) if getattr(item, "id", None)]
-        return jsonify({"models": sorted(set(m for m in models if m))})
-    except Exception as exc:
-        return jsonify({"models": [], "message": f"获取模型列表失败: {str(exc)[:300]}"}), 200
-
-
-@app.route("/api/llm-models", methods=["GET"])
-@_login_required
-def api_llm_models():
-    """Fetch models using the currently stored provider credentials."""
-    configs = _load_llm_configs()
-    config = configs.get("career_interview") or {}
-    base_url = str(config.get("base_url") or "").strip()
-    api_key = str(config.get("api_key") or "").strip()
-    if not base_url or not api_key:
-        return jsonify({"models": [], "message": "API 尚未配置，请先填写 Base URL 和 API Key。"}), 200
-    return _do_fetch_models(base_url, api_key)
-
-
-@app.route("/api/llm-models/preview", methods=["POST"])
-@_super_admin_required
-def api_llm_models_preview():
-    """Preview models for a temporary provider config without saving it."""
-    payload = request.get_json(silent=True) or {}
-    base_url = str(payload.get("base_url") or "").strip()
-    api_key = str(payload.get("api_key") or "").strip()
-    if not base_url or not api_key:
-        return jsonify({"message": "请先填写 Base URL 和 API Key。"}), 400
-    return _do_fetch_models(base_url, api_key)
-
-
-# API：Provider 管理
-
-@app.route("/api/llm-providers", methods=["GET"])
-@_login_required
-def api_list_providers():
-    providers = _load_providers()
-    is_admin = (_current_user() or {}).get("role") == "super_admin"
-    return jsonify({
-        "providers": [_public_provider(p, is_admin) for p in providers],
-        "selection": session.get("llm_selection") or {}
-    })
-
-
-@app.route("/api/llm-providers", methods=["POST"])
-@_super_admin_required
-def api_add_provider():
-    payload = request.get_json(silent=True) or {}
-    name = str(payload.get("name") or "未命名").strip() or "未命名"
-    base_url = str(payload.get("base_url") or "").strip()
-    api_key = str(payload.get("api_key") or "").strip()
-    if not base_url or not api_key:
-        return jsonify({"message": "请先填写 Base URL 和 API Key。"}), 400
-    providers = _load_providers()
-    new_p = {"id": str(uuid.uuid4())[:8], "name": name, "base_url": base_url, "api_key": api_key}
-    providers.append(new_p)
-    _save_providers(providers)
-    is_admin = (_current_user() or {}).get("role") == "super_admin"
-    return jsonify({"provider": _public_provider(new_p, is_admin), "message": "API 已添加。"})
-
-
-@app.route("/api/llm-providers/<provider_id>", methods=["PUT"])
-@_super_admin_required
-def api_update_provider(provider_id):
-    payload = request.get_json(silent=True) or {}
-    providers = _load_providers()
-    idx = next((i for i, p in enumerate(providers) if p.get("id") == provider_id), None)
-    if idx is None:
-        return jsonify({"message": "未找到该 API 配置。"}), 404
-    p = dict(providers[idx])
-    for key in ("name", "base_url", "api_key"):
-        if payload.get(key):
-            p[key] = str(payload[key]).strip()
-    providers[idx] = p
-    _save_providers(providers)
-    is_admin = (_current_user() or {}).get("role") == "super_admin"
-    return jsonify({"provider": _public_provider(p, is_admin), "message": "API 已更新。"})
-
-
-@app.route("/api/llm-providers/<provider_id>", methods=["DELETE"])
-@_super_admin_required
-def api_delete_provider(provider_id):
-    providers = _load_providers()
-    providers = [p for p in providers if p.get("id") != provider_id]
-    _save_providers(providers)
-    return jsonify({"message": "API 已删除。"})
-
-
-@app.route("/api/llm-providers/<provider_id>/models", methods=["GET"])
-@_login_required
-def api_provider_models(provider_id):
-    providers = _load_providers()
-    provider = next((p for p in providers if p.get("id") == provider_id), None)
-    if not provider:
-        return jsonify({"models": [], "message": "未找到该 API 配置。"}), 404
-    base_url = str(provider.get("base_url") or "").strip()
-    api_key = str(provider.get("api_key") or "").strip()
-    if not base_url or not api_key:
-        return jsonify({"models": [], "message": "该 API 配置不完整。"}), 200
-    return _do_fetch_models(base_url, api_key)
-
-
-@app.route("/api/llm-selection", methods=["GET"])
-@_login_required
-def api_get_llm_selection():
-    providers = _load_providers()
-    is_admin = (_current_user() or {}).get("role") == "super_admin"
-    selection = session.get("llm_selection") or {}
-    if not selection:
-        user = _current_user()
-        state = _load_user_state(user["username"]) if user else {}
-        persisted = state.get("llm_selection") if isinstance(state.get("llm_selection"), dict) else {}
-        selection = persisted or {}
-    if selection.get("provider_id"):
-        if not any(p.get("id") == selection["provider_id"] for p in providers):
-            selection = {}
-    # 回写 session，保证后续请求一致。
-    session["llm_selection"] = selection
-    session.modified = True
-    return jsonify({
-        "selection": selection,
-        "providers": [_public_provider(p, is_admin) for p in providers]
-    })
-
-
-@app.route("/api/llm-selection", methods=["PUT"])
-@_login_required
-def api_set_llm_selection():
-    payload = request.get_json(silent=True) or {}
-    provider_id = str(payload.get("provider_id") or "").strip()
-    model = str(payload.get("model") or "").strip()
-    if not provider_id or not model:
-        return jsonify({"message": "请指定 provider_id 和 model。"}), 400
-    providers = _load_providers()
-    provider = next((p for p in providers if p.get("id") == provider_id), None)
-    if not provider:
-        return jsonify({"message": "未找到该 API 配置。"}), 404
-    selection = {"provider_id": provider_id, "model": model}
-    session["llm_selection"] = selection
-    session.modified = True
-    user = _current_user()
-    if user:
-        state = _load_user_state(user["username"])
-        state["llm_selection"] = selection
-        _save_user_state(user["username"], state)
-    return jsonify({
-        "selection": selection,
-        "provider_name": provider.get("name"),
-        "message": f"已选择：{provider.get('name')} · {model}"
-    })
-
-
-@app.route("/api/resume-llm-config", methods=["GET", "PUT"])
-@_super_admin_required
-def api_resume_llm_config():
-    if request.method == "GET":
-        return jsonify(_public_resume_llm_config(_current_user()))
-
-    payload = request.get_json(silent=True) or {}
-    current = _load_resume_llm_config()
-    current["base_url"] = str(payload.get("base_url") or current.get("base_url") or "").strip()
-    current["api_key"] = str(payload.get("api_key") or current.get("api_key") or "").strip()
-    current["model"] = str(payload.get("model") or current.get("model") or "gpt-4o-mini").strip() or "gpt-4o-mini"
-    if not current["base_url"] or not current["api_key"]:
-        return jsonify({"message": "请填写 base_url 和 api_key。"}), 400
-    _save_resume_llm_config(current)
-    return jsonify(_public_resume_llm_config(_current_user()))
-
-
-@app.route("/api/resume-llm-models", methods=["GET"])
-@_super_admin_required
-def api_resume_llm_models():
-    config = _load_resume_llm_config()
-    base_url = str(config.get("base_url") or "").strip()
-    api_key = str(config.get("api_key") or "").strip()
-    if not base_url or not api_key:
-        return jsonify({"models": [], "message": "请先配置简历模型的 base_url 和 api_key。"}), 200
-    return _do_fetch_models(base_url, api_key)
-
 
 @app.route("/api/resume/upload", methods=["POST"])
 @_login_required
@@ -6756,7 +6016,7 @@ def api_resume_analyze_start():
 
     base_url, api_key, model = _get_resume_provider_and_model()
     if not base_url or not api_key:
-        return jsonify({"message": "模型尚未就绪，请先完成接口配置和模型选择。"}), 400
+        return jsonify({"message": "模型尚未配置，请在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。"}), 400
     runtime_llm = (base_url, api_key, model or "gpt-4o-mini")
 
     running = _find_running_resume_job(username)
@@ -7169,12 +6429,11 @@ def api_career_report_generate_start():
     except ImportError:
         return jsonify({"message": "请先安装 requirements.txt 中的 Agent 依赖。"}), 503
 
-    selection_snapshot = session.get("llm_selection") if isinstance(session.get("llm_selection"), dict) else {}
-    # The report and assistant both reuse .env when no UI provider is configured.
-    base_url, api_key, model = _get_chat_runtime(selection_snapshot)
+    selection_snapshot = {}
+    base_url, api_key, model = _get_chat_runtime()
     if not (base_url and api_key and model):
         _career_report_console_log(report_id, "启动请求被拒绝", reason="model_not_configured")
-        return jsonify({"message": "未找到可用的对话模型，请在主系统配置模型，或补全 .env 中的 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL。"}), 400
+        return jsonify({"message": "模型尚未配置，请在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。"}), 400
     runtime_llm = {"model": model, "base_url": base_url, "api_key": api_key,
                    "selection": dict(selection_snapshot), "continuation": continuation}
 
@@ -7296,6 +6555,7 @@ def api_career_report_generate_cancel():
             })
 
         selected["status"] = "canceled"
+        CAREER_REPORT_JOBS.touch(str(selected.get("job_id") or ""))
         selected["cancel_requested"] = True
         selected["finished_at"] = int(time.time())
         selected["message"] = "用户已停止本次生成。"
@@ -8331,8 +7591,49 @@ def _prewarm_caches():
     threading.Thread(target=_warm_news, daemon=True, name="prewarm-news").start()
 
 
+def _fail_interrupted_resume(job):
+    username = str(job.get("username") or "")
+    state = _load_user_state(username)
+    resume_state = state.get("resume_profile") if isinstance(state.get("resume_profile"), dict) else {}
+    if resume_state.get("status") != "analyzing":
+        return
+    resume_state["status"] = "failed"
+    resume_state["error_message"] = str(job.get("message") or "")
+    meta = resume_state.get("analysis_meta") if isinstance(resume_state.get("analysis_meta"), dict) else {}
+    meta.update({"running": False, "stage": "failed", "stage_detail": str(job.get("message") or ""),
+                 "stage_updated_at": int(time.time())})
+    resume_state["analysis_meta"] = meta
+    state["resume_profile"] = resume_state
+    _save_user_state(username, state)
+
+
+def _fail_interrupted_report(job):
+    username = str(job.get("username") or "")
+    state = _load_user_state(username)
+    report_state = state.get("career_report") if isinstance(state.get("career_report"), dict) else {}
+    if str(report_state.get("status") or "").lower() not in {"queued", "running"}:
+        return
+    _save_career_report_progress(
+        username, str(job.get("job_id") or ""), str(job.get("stage") or "resume_analysis"),
+        str(job.get("stage_label") or "工作流执行"), "报告生成被服务重启中断", status="failed",
+        error_message=str(job.get("message") or ""), model=str(job.get("model") or ""),
+        generation_mode=str(job.get("generation_mode") or ""), report_id=str(job.get("report_id") or ""))
+
+
+def _restore_background_jobs():
+    """Bring back recent jobs after a restart and fail the ones the restart interrupted, in the registry and in
+    the user's saved state, so nobody waits on a task that no longer exists."""
+    for registry, fail_state in ((RESUME_ANALYSIS_JOBS, _fail_interrupted_resume), (CAREER_REPORT_JOBS, _fail_interrupted_report)):
+        for job in registry.restore():
+            try:
+                fail_state(job)
+            except Exception:
+                app.logger.exception("could not mark interrupted job %s", job.get("job_id"))
+
+
 _ensure_app_storage()
 _app_db.init_db()
+_restore_background_jobs()
 _auth.init_app(app)
 app.register_blueprint(create_datasets_blueprint(_login_required))
 _chat_blueprint = create_chat_blueprint(
@@ -8369,7 +7670,7 @@ _chat_blueprint.chat_service.profile_provider = _career_chat_background
 app.register_blueprint(create_career_blueprint(_login_required, _current_user, _load_user_state, _career_memory_records))
 _job_market_collector = JobMarketCollector()
 app.extensions["job_market"] = _job_market_collector
-app.register_blueprint(create_job_market_blueprint(_job_market_collector, _login_required, _super_admin_required, _current_user))
+app.register_blueprint(create_job_market_blueprint(_job_market_collector, _login_required, _current_user))
 if os.environ.get("JOB_MARKET_SCHEDULER", "1").lower() not in {"0", "false", "no"}:
     _job_market_collector.start_scheduler()
 _load_users()

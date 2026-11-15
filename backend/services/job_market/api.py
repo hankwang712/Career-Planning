@@ -7,7 +7,6 @@ from flask import Blueprint, jsonify, request, send_file
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ..paths import PROJECT_ROOT
-from .collector import CollectionSettings
 from .store import SOURCES
 
 
@@ -47,7 +46,7 @@ class JobQuery(BaseModel):
         return self.model_dump(mode="json", exclude={"page", "page_size", "sort"})
 
 
-def create_blueprint(collector, login_required, admin_required, current_user):
+def create_blueprint(collector, login_required, current_user):
     bp = Blueprint("job_market", __name__, url_prefix="/api/job-market")
     store = collector.store
 
@@ -83,30 +82,9 @@ def create_blueprint(collector, login_required, admin_required, current_user):
         companies_path = PROJECT_ROOT / "backend/integrations/jobhunter/vendor/config/company_urls.json"
         companies = json.loads(companies_path.read_text(encoding="utf-8"))
         return jsonify(settings=store.settings(), runs=store.runs(), sources=SOURCES,
-            can_manage=current_user()["role"] == "super_admin",
+            can_manage=False,
             companies=[{"name": row["name"], "industry": row.get("industry", "")} for row in companies],
             upstream="https://github.com/Bynlk/JobHunter")
-
-    @bp.put("/settings")
-    @admin_required
-    def settings():
-        config = CollectionSettings.model_validate(request.get_json(silent=True)).model_dump()
-        store.save_settings(config)
-        return jsonify(message="采集计划已保存。", settings=store.settings())
-
-    @bp.post("/collect")
-    @admin_required
-    def collect():
-        run_id = collector.start()
-        if not run_id:
-            return jsonify(message="已有采集任务正在运行。"), 409
-        return jsonify(message="采集已开始，岗位会分批入库。", run_id=run_id), 202
-
-    @bp.delete("/collect")
-    @admin_required
-    def cancel():
-        store.cancel()
-        return jsonify(message="已请求停止，已获取的记录会保留。"), 202
 
     @bp.get("/export")
     @login_required
