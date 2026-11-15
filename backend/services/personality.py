@@ -15,6 +15,9 @@ NAMES = {
     "sbti": "SBTI 人格扩展",
 }
 EXTENDED = ("deep", "friends", "insideout", "sbti")
+# 趣味测评（老友记、情绪主导、SBTI）的角色名和类型名不进入画像，只保留分析文字。
+NAMELESS = {"friends", "insideout", "sbti"}
+SUMMARY_LIMIT = 450
 DISCLAIMER = "用户自己完成的性格与兴趣测评（自评结果，只反映作答时的自我认知；不是诊断，也不能证明能力）"
 
 
@@ -59,24 +62,21 @@ def collect(state):
     extended = state.get("deep_tests") if isinstance(state.get("deep_tests"), dict) else {}
     for test in EXTENDED:
         item = extended.get(test) if isinstance(extended.get(test), dict) else {}
-        result = _text(item.get("result"), 60)
-        if result:
-            entries.append({"test": test, "result": result, "summary": _text(item.get("summary"), 200),
-                            "date": _date(item.get("completed_at"))})
+        result = "" if test in NAMELESS else _text(item.get("result"), 60)
+        summary = _text(item.get("summary"), SUMMARY_LIMIT)
+        if result or (test in NAMELESS and summary):
+            entries.append({"test": test, "result": result, "summary": summary, "date": _date(item.get("completed_at"))})
     return [{**entry, "name": NAMES[entry["test"]]} for entry in entries]
 
 
-def describe(entries, limit=1800):
+def describe(entries, limit=2600):
     """Plain text for prompts. Empty when no test was taken, so callers can skip the block entirely."""
     if not entries:
         return ""
     lines = [DISCLAIMER + "："]
     for entry in entries:
         when = f"（{entry['date']}）" if entry["date"] else ""
-        line = f"- {entry['name']}{when}：{entry['result']}"
-        if entry["summary"]:
-            line += "。" + entry["summary"]
-        lines.append(line)
+        lines.append(f"- {entry['name']}{when}：" + "。".join(part for part in (entry["result"], entry["summary"]) if part))
     return "\n".join(lines)[:limit]
 
 
@@ -85,5 +85,6 @@ def for_chat(entries):
     if not entries:
         return None
     return {"说明": DISCLAIMER + "。只作为沟通方式和职业兴趣的参考，不要当作事实性经历或能力证据。",
-            "结果": [{"测评": entry["name"], "结果": entry["result"], **({"概述": entry["summary"]} if entry["summary"] else {}),
+            "结果": [{"测评": entry["name"], **({"结果": entry["result"]} if entry["result"] else {}),
+                      **({"分析": entry["summary"]} if entry["summary"] else {}),
                       **({"完成日期": entry["date"]} if entry["date"] else {})} for entry in entries]}

@@ -62,23 +62,14 @@
   // 聊天助手和报告 Agent 才能把"用户做过哪些测评"当作画像的一部分；没做过的测评不会出现。
   const synced = new Set();
   let syncQueue = Promise.resolve();
+  // 趣味测评的角色名/类型名不同步，只同步分析文字（由 deep-test-hub 去掉名字后生成）。
   function compactExtended(type, stored) {
     const completedAt = Number(stored?.completedAt);
-    if (!Number.isFinite(completedAt) || completedAt <= 0) return null;
-    let result = "";
-    let summary = "";
-    if (type === "deep") {
-      result = stored.result?.type || "";
-    } else if (type === "sbti") {
-      result = stored.title || stored.code || "";
-      summary = stored.summary || "";
-    } else {
-      const detail = stored.detail || {};
-      result = detail.name || stored.winner || "";
-      summary = [detail.tagline, detail.synopsis, (detail.traits || []).slice(0, 5).join("、")].filter(Boolean).join("；");
-    }
-    result = String(result).trim().slice(0, 60);
-    return result ? { result, summary: String(summary).trim().slice(0, 200), completed_at: completedAt } : null;
+    const core = window.__DeepTestHubCore__;
+    if (!Number.isFinite(completedAt) || completedAt <= 0 || typeof core?.describeStored !== "function") return null;
+    const described = core.describeStored(type, stored);
+    if (!described || (!described.result && !described.summary)) return null;
+    return { result: String(described.result || ""), summary: String(described.summary || ""), completed_at: completedAt };
   }
   function syncExtended(type, stored) {
     const user = username();
@@ -94,7 +85,7 @@
         if (!current.ok) { synced.delete(key); return; }
         const existing = (await current.json()).data || {};
         const known = existing[type];
-        if (known && Number(known.completed_at) >= entry.completed_at && known.result === entry.result) return;
+        if (known && Number(known.completed_at) >= entry.completed_at && known.result === entry.result && known.summary === entry.summary) return;
         const security = await (await fetch(`${base}/api/auth/security`, { credentials: "same-origin" })).json();
         const saved = await fetch(`${base}/api/user-state/deep_tests`, {
           method: "PUT", credentials: "same-origin",

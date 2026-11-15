@@ -1405,6 +1405,43 @@
     return deepClone(st.store[safeType]) || null;
   }
 
+  /* 提供给聊天助手和报告 Agent 的"分析文字"：趣味测评的角色名、类型名和口号都不带，只保留阐述；
+   * 原文把角色称作"他/她"，这里改写成"你"。深层 MBTI 保留类型代码和 AI 分析，SBTI 取各维度的反馈句。 */
+  const PRONOUN = /(?<!其)[他她](?![人们方处乡国日])/g;
+  function anonymizeAnalysis(name, text) {
+    let out = String(text || "").trim();
+    const label = String(name || "");
+    if (label && out.startsWith(label)) out = "你" + out.slice(label.length);
+    return out.replace(PRONOUN, "你");
+  }
+
+  function describeStored(type, stored) {
+    const safeType = sanitizeTestType(type);
+    if (!stored || typeof stored !== "object") return null;
+    if (safeType === "deep") {
+      const code = String(stored.result?.type || "").trim();
+      return code ? { result: code, summary: String(stored.aiText || "").trim().slice(0, 450) } : null;
+    }
+    if (safeType === "friends" || safeType === "insideout") {
+      const detail = stored.detail && typeof stored.detail === "object" ? stored.detail : {};
+      const name = String(detail.name || "");
+      const traits = (Array.isArray(detail.traits) ? detail.traits : []).slice(0, 4).map((item) => anonymizeAnalysis(name, item)).filter(Boolean);
+      const parts = [anonymizeAnalysis(name, detail.synopsis), traits.length ? `具体表现：${traits.join("；")}` : ""].filter(Boolean);
+      return parts.length ? { result: "", summary: parts.join(" ").slice(0, 450) } : null;
+    }
+    if (safeType === "sbti") {
+      const levels = stored.levels && typeof stored.levels === "object" ? stored.levels : {};
+      const lines = SBTI_DIMENSION_ORDER
+        .map((key) => ({ key, level: String(levels[key] || "").toUpperCase() }))
+        .filter((item) => item.level === "L" || item.level === "H")
+        .map((item) => SBTI_DIMENSION_FEEDBACK[item.key]?.[item.level])
+        .filter(Boolean)
+        .slice(0, 6);
+      return lines.length ? { result: "", summary: lines.join("").slice(0, 450) } : null;
+    }
+    return null;
+  }
+
   function getHistoryRunsSnapshot() {
     return [];
   }
@@ -1467,6 +1504,7 @@
     getResultPageUrl: afterSubmitLandingUrl,
     getRunnerPageUrl: runnerPageUrl,
     getStoredResultByType,
+    describeStored,
     getHistoryRunsSnapshot,
     computeResultByType,
     saveResultByType,
