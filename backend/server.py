@@ -7599,15 +7599,21 @@ def _career_memory_records(username):
 
 
 def _career_chat_background(username):
+    """聊天只读基础画像：求职偏好、学校/专业/学历/毕业时间、所在城市与阶段、在进行的目标。
+
+    职业档案里的经历、技能、证书、证据属于报告与岗位匹配，不进入聊天上下文。"""
     background = build_chat_background(_load_user_state(username), _read_career_report_bundle(username))
     data = career_snapshot(username)
     resume_enabled = _chat_blueprint.chat_service.store.privacy(username)["resume_enabled"]
-    background["用户维护的职业档案（自述与证据分级）"] = {
-        "profile": {key: value for key, value in (data["profile"] or {}).items() if key != "owner"},
-        **{key: [{field: value[:1200] if isinstance(value, str) else value for field, value in row.items()
-                  if field not in {"owner", "created_at"}} for row in data[key]
-                 if resume_enabled or row["source_type"] != "resume"][:30]
-           for key in ("entries", "skills", "evidence", "goals")}}
+    profile = data["profile"] or {}
+    basics = {key: profile[key] for key in ("city", "stage", "headline") if profile.get(key)}
+    education = [{"title": row["title"], "description": str(row.get("description") or "")[:200]}
+                 for row in data["entries"]
+                 if row["kind"] == "education" and (resume_enabled or row["source_type"] != "resume")][:10]
+    goals = [{"title": row["title"], "status": row["status"], "target_date": row.get("target_date") or ""}
+             for row in data["goals"] if row["status"] == "active"][:10]
+    if basics or education or goals:
+        background["用户维护的基础档案"] = {"基本信息": basics, "教育": education, "目标": goals}
     return background
 
 
