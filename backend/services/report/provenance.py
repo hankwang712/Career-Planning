@@ -19,6 +19,17 @@ def freeze_profile(profile):
                      if key not in {"agent_memory", "agent_workflow"}})
 
 
+def execution_context(runtime):
+    """Invalidate reusable operations when model/provider or relevant code changes."""
+    sources = {}
+    for directory in (PROJECT_ROOT / "backend/advisor", PROJECT_ROOT / "backend/services/report"):
+        for path in sorted(directory.rglob("*.py")):
+            sources[path.relative_to(PROJECT_ROOT).as_posix()] = sha256(path.read_bytes()).hexdigest()
+    return {"version": "report-operations-v1", "model": (runtime or {}).get("model", ""),
+            "base_url": str((runtime or {}).get("base_url", "")).rstrip("/"),
+            "code_revision": content_revision(sources)}
+
+
 def capture_provenance(inputs, profile, model_name):
     prompt_dir = PROJECT_ROOT / "backend" / "advisor" / "prompt"
     prompts = {path.stem: sha256(path.read_bytes()).hexdigest()

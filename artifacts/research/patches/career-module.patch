@@ -395,7 +395,7 @@ diff --git a/lightrag/career/api.py b/lightrag/career/api.py
 new file mode 100644
 --- /dev/null
 +++ b/lightrag/career/api.py
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,147 @@
 +from pathlib import Path
 +
 +from fastapi import APIRouter, Depends, HTTPException
@@ -406,6 +406,7 @@ new file mode 100644
 +from .models import StrictModel
 +from .service import CareerService
 +from .store import CareerStore
++from .evidence import EvidenceQuery, retrieve_evidence
 +
 +
 +class Comparison(StrictModel):
@@ -441,6 +442,10 @@ new file mode 100644
 +    @router.get("/status")
 +    def status():
 +        return run(lambda service: service.store.summary())
++
++    @router.post("/evidence")
++    def evidence(request: EvidenceQuery):
++        return run(lambda service: retrieve_evidence(service.store, request))
 +
 +    @router.get("/entities")
 +    def entities():
@@ -1254,7 +1259,7 @@ diff --git a/lightrag/career/models.py b/lightrag/career/models.py
 new file mode 100644
 --- /dev/null
 +++ b/lightrag/career/models.py
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,261 @@
 +from __future__ import annotations
 +
 +import hashlib
@@ -1300,6 +1305,7 @@ new file mode 100644
 +    company: str
 +    city: str
 +    education: str
++    salary: str = ""
 +    published_at: str | None = None
 +
 +    @model_validator(mode="after")
@@ -2688,7 +2694,7 @@ diff --git a/lightrag/career/store.py b/lightrag/career/store.py
 new file mode 100644
 --- /dev/null
 +++ b/lightrag/career/store.py
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,273 @@
 +from __future__ import annotations
 +
 +from contextlib import contextmanager
@@ -2802,7 +2808,11 @@ new file mode 100644
 +        row = self.get(job.jd_id)
 +        payload = job.model_dump_json()
 +        if row:
-+            if row["record_json"] != payload:
++            previous = JobRecord.model_validate_json(row["record_json"])
++            if "salary" not in json.loads(row["record_json"]):
++                from .evidence import job_metadata
++                previous = previous.model_copy(update={"salary": job_metadata(previous)["salary"]})
++            if previous.model_dump_json() != payload:
 +                raise ValueError(
 +                    "An existing JD identity cannot be reused with changed text or metadata"
 +                )
@@ -3021,3 +3031,134 @@ new file mode 100644
 +
 +    expand(data)
 +    return CareerExtraction.model_validate(data)
+diff --git a/lightrag/career/evidence.py b/lightrag/career/evidence.py
+new file mode 100644
+--- /dev/null
++++ b/lightrag/career/evidence.py
+@@ -0,0 +1,126 @@
++"""Metadata-first evidence recall from the successful JD ledger."""
++import re
++
++from pydantic import Field, model_validator
++
++from .models import StrictModel
++from .aggregate import chunk_id
++
++
++class EvidenceQuery(StrictModel):
++    target_role: str = Field(min_length=1, max_length=300)
++    question: str = Field(default="", max_length=2000)
++    cities: list[str] = Field(default_factory=list, max_length=10)
++    candidate_education: str | None = None
++    min_monthly_salary: int | None = Field(default=None, ge=0, le=1000000)
++    max_monthly_salary: int | None = Field(default=None, ge=0, le=1000000)
++    include_unknown: bool = True
++    semantic_ids: list[str] = Field(default_factory=list, max_length=100)
++    limit: int = Field(default=10, ge=1, le=30)
++
++    @model_validator(mode="after")
++    def valid_filters(self):
++        if self.candidate_education is not None and self.candidate_education not in DEGREES:
++            raise ValueError("Unsupported candidate education")
++        if (self.min_monthly_salary is not None and self.max_monthly_salary is not None
++                and self.min_monthly_salary > self.max_monthly_salary):
++            raise ValueError("Invalid salary range")
++        return self
++
++
++DEGREES = {"中专": 0, "高中": 0, "大专": 1, "本科": 2, "硕士": 3, "博士": 4}
++UNKNOWN = re.compile(r"未知|不限|未注明|未说明|面议|多地|全国|远程|^\s*$")
++
++
++def monthly_salary(text):
++    """Only explicit CNY monthly pay; never guess daily/annual/net conversions."""
++    if re.search(r"[／/]天|元[／/]日|日薪|年薪|[／/]年|[／/]小时|时薪|税后|美元|美金|USD", text, re.I):
++        return None
++    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([kK千万]?)\s*(?:[-~～—–至]\s*(\d+(?:\.\d+)?)\s*([kK千万]?))?\s*(?:元)?\s*(?:[/／]月|每月|月薪)?\s*(?:[·*×]\s*\d+薪)?\s*", text)
++    if not match:
++        return None
++    scales = {"k": 1000, "千": 1000, "万": 10000, "": 1}
++    low_unit, high_unit = match[2] or match[4] or "", match[4] or match[2] or ""
++    low = float(match[1]) * scales[low_unit.lower()]
++    high = float(match[3] or match[1]) * scales[high_unit.lower()]
++    # Bare numbers have no period and cannot safely be interpreted as monthly.
++    if not low_unit and not re.search(r"月", text):
++        return None
++    return (int(low), int(high)) if low <= high else None
++
++
++def job_metadata(job):
++    salary = job.salary
++    if not salary:
++        match = re.search(r"^(?:薪资|薪酬|月薪|薪资范围)[：:]\s*([^\n]+)", job.text, re.M)
++        salary = match[1].strip() if match else ""
++    locations = re.findall(r"(?:工作|实习|办公)地点\s*[：:]\s*([^\n。；;|]{2,100})", job.text)
++    cities = [part.removesuffix("市") for part in re.split(r"[、/,，\s]+", job.city) if part]
++    conflict = bool(locations and cities and not UNKNOWN.search(job.city)
++                    and any(not any(city in location for city in cities) for location in locations))
++    return {"city": job.city, "education": job.education, "salary": salary,
++            "body_locations": locations, "city_conflict": conflict,
++            "monthly_salary_range": monthly_salary(salary)}
++
++
++def matches(metadata, query):
++    unknown = []
++    if query.cities:
++        city = metadata["city"]
++        if UNKNOWN.search(city) or metadata.get("city_conflict"):
++            unknown.append("city")
++        elif not any(re.search(r"(?:^|[、/,，\s])" + re.escape(wanted.removesuffix("市")) + r"市?(?:区|$|[、/,，\s])", city)
++                     for wanted in query.cities):
++            return False, []
++    if query.candidate_education:
++        education = metadata["education"]
++        levels = [level for degree, level in DEGREES.items() if degree in education]
++        # Preferred, ambiguous or missing degrees cannot establish a mandatory bar.
++        if education.strip() in {"不限", "学历不限", "无学历要求"}:
++            pass
++        elif not levels or re.search(r"优先|不限|未知|未注明|及以下|以下", education):
++            unknown.append("education")
++        elif DEGREES[query.candidate_education] < min(levels):
++            return False, []
++    if query.min_monthly_salary is not None or query.max_monthly_salary is not None:
++        salary_range = metadata["monthly_salary_range"]
++        if salary_range is None:
++            unknown.append("salary")
++        elif ((query.min_monthly_salary is not None and salary_range[1] < query.min_monthly_salary)
++              or (query.max_monthly_salary is not None and salary_range[0] > query.max_monthly_salary)):
++            return False, []
++    return query.include_unknown or not unknown, unknown
++
++
++def retrieve_evidence(store, query):
++    target = re.sub(r"工程师|实习生|开发|方向|高级|资深|招聘|算法|[（）()、，,与和]", " ", query.target_role)
++    terms = list(dict.fromkeys(re.findall(r"[a-z][a-z0-9.+-]*|[\u4e00-\u9fff]{2,}", target.casefold())))
++    questions = re.findall(r"[a-z][a-z0-9.+-]*|硕士|本科|学历|薪资|薪酬|必需|优先|经验", query.question.casefold())
++    semantic = {identifier: index for index, identifier in enumerate(query.semantic_ids)}
++    candidates, scanned, excluded = [], 0, 0
++    for doc in store.documents(raw=True):
++        job = doc["job"]
++        scanned += 1
++        metadata = job_metadata(job)
++        allowed, unknown = matches(metadata, query)
++        if not allowed:
++            excluded += 1
++            continue
++        identifier = chunk_id(job)
++        title, body = job.title.casefold(), job.text.casefold()
++        title_hits, body_hits = sum(term in title for term in terms), sum(term in body for term in terms)
++        if identifier not in semantic and not title_hits and (not terms or body_hits < min(2, len(terms))):
++            continue
++        score = title_hits * 12 + body_hits + sum(term in body for term in questions) * 3
++        if identifier in semantic:
++            score += 4 + 1 / (1 + semantic[identifier])
++        metadata.update(unverified_conditions=unknown)
++        candidates.append((bool(unknown), -score, job.record, {
++            "chunk_id": identifier, "file_path": job.file_path, "reference_id": "career_ledger",
++            "content": job.chunk_text, "metadata": metadata,
++        }))
++    candidates.sort(key=lambda item: item[:3])
++    return {"sources": [item[3] for item in candidates[:query.limit]],
++            "scope": {"scanned_jd_count": scanned, "metadata_excluded_count": excluded,
++                      "eligible_candidate_count": len(candidates), "metadata_filters_applied": True,
++                      "salary_matching": "monthly_range_overlap; unknown retained when include_unknown=true"}}

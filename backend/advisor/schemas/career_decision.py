@@ -77,11 +77,27 @@ class RequirementCheck(DecisionRecord):
         return self
 
 
+class ExplorationStep(DecisionRecord):
+    check_id: Text = Field(description="同一目标下真实的能力要求检查项，不能引用硬条件")
+    if_already_done: Text = Field(description="如已做过相关工作，应补充什么已有证据；是假设分支，不声称已经做过")
+    if_not_done: Text = Field(description="如尚未做过，先尝试什么小规模任务验证并练习该能力，不保证学完胜任")
+    deliverable: Text = Field(description="可核对的代码、操作记录、作品或说明等成果，不编造用户现有成果")
+    acceptance_criteria: Text = Field(description="能观察和核对的验证标准，不把完成练习等同于被录用")
+
+
+class CareerExploration(DecisionRecord):
+    summary: Text = Field(description="解释达到哪些要求后值得进一步尝试；与当前是否能投递分开，不承诺胜任或录用")
+    steps: list[ExplorationStep] = Field(min_length=1, max_length=3,
+        description="优先列出最多3项有岗位依据的待验证/待发展的关键能力")
+
+
 class TargetAssessment(DecisionRecord):
     target_id: Text
     decision: Literal["recommended", "conditional", "not_recommended", "insufficient_information"]
     conclusion: Text
     checks: list[RequirementCheck] = Field(default_factory=list, description="仅对有目标相关岗位证据的要求作检查；没有相关证据时为空并使用insufficient_information")
+    exploration: CareerExploration | None = Field(default=None,
+        description="材料少或能力待发展时提供有条件的职业探索路径；旧结果可为空，无岗位要求或具体岗位有硬条件冲突时为空")
 
 
 class DecisionAction(DecisionRecord):

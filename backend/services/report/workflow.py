@@ -7,7 +7,7 @@ import threading
 from weakref import WeakValueDictionary
 
 from ..paths import APP_DATA_DIR, PROJECT_ROOT
-from .provenance import capture_provenance, freeze_profile
+from .provenance import capture_provenance, freeze_profile, execution_context
 from .review import REVIEW_POLICY, build_review_ui
 
 if str(PROJECT_ROOT) not in sys.path:
@@ -38,12 +38,13 @@ def _lock_for(thread_id):
 
 
 @asynccontextmanager
-async def _graph(runtime=None, stage_callback=None, agent_status_callback=None):
+async def _graph(runtime=None, stage_callback=None, agent_status_callback=None, *, operation_store=None):
     from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     from backend.advisor.report_workflow import build_report_graph
     from backend.advisor.agents import CareerDecisionAgent, RecruitmentSearchAgent, ResumeAnalysisAgent
     from backend.advisor.agents.job import JobAnalysisAgent
+    from backend.advisor.agents.job_constraints import JobConstraintsAgent
     from .planning import ReportActionPlanningAgent
 
     def model_provider():
@@ -62,7 +63,7 @@ async def _graph(runtime=None, stage_callback=None, agent_status_callback=None):
                           # Own clients preserve the SDK's default system/environment proxy handling.
                           http_async_client=async_client, http_socket_options=(), **options)
 
-    classes = {"resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
+    classes = {"job_constraints": JobConstraintsAgent, "resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
                "recruitment_search": RecruitmentSearchAgent, "career_decision": CareerDecisionAgent}
 
     def agent_factory(name):
@@ -80,7 +81,9 @@ async def _graph(runtime=None, stage_callback=None, agent_status_callback=None):
         async with DefaultAsyncHttpxClient() as async_client:
             async with AsyncSqliteSaver.from_conn_string(str(APP_DATA_DIR / "agent_checkpoints.sqlite3")) as saver:
                 yield build_report_graph(model_provider, checkpointer=saver, stage_callback=stage_callback,
-                                         agent_factory=agent_factory, agent_status_callback=agent_status_callback)
+                                         agent_factory=agent_factory, agent_status_callback=agent_status_callback,
+                                         operation_store=operation_store,
+                                         operation_context=execution_context(runtime) if operation_store is not None else None)
 
 
 def _snapshot(snapshot):
@@ -139,7 +142,7 @@ def validate_report_continuation(payload, snapshot):
     return None
 
 
-async def _execute(username, report_id, inputs, runtime, callback, profile=None, agent_status_callback=None):
+async def _execute(username, report_id, inputs, runtime, callback, profile=None, agent_status_callback=None, *, operation_store=None):
     from langgraph.types import Command
 
     document_metadata = None
@@ -163,7 +166,7 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None,
 
     config = {"configurable": {"thread_id": _thread_id(username, report_id)}, "recursion_limit": 100}
     activity_options = {"agent_status_callback": agent_status_callback} if agent_status_callback else {}
-    async with _graph(runtime, callback, **activity_options) as graph:
+    async with _graph(runtime, callback, operation_store=operation_store, **activity_options) as graph:
         continuation = runtime.get("continuation")
         if continuation is not None:
             current = _snapshot(await graph.aget_state(config))
@@ -196,11 +199,21 @@ def generate_career_report_bundle(*, username, report_id, profile_payload, runti
     if not lock.acquire(blocking=False):
         raise ValueError("此报告正在执行，请等待当前任务完成")
     try:
-        state = asyncio.run(_execute(username, report_id, profile_payload.get("agent_workflow"), runtime_llm,
-                                     stage_callback, profile_payload, agent_status_callback))
-        if stage_callback:
-            stage_callback("report_writer", "报告合成", "正在将已校验的 Agent 结果整理为报告")
-        from .workflow_report import build_report_bundle
-        return build_report_bundle(username, report_id, state.get("profile_snapshot", {}), state, model_name)
+        from backend.advisor.operations import OperationStore
+        operations = OperationStore(APP_DATA_DIR / "report_operations.sqlite3")
+        scope = _thread_id(username, report_id)
+        # Unlike the in-process lock above, the OS lock excludes other workers and
+        # is released automatically on process exit, including an abrupt crash.
+        with operations.workflow_lock(scope):
+            state = asyncio.run(_execute(username, report_id, profile_payload.get("agent_workflow"), runtime_llm,
+                                         stage_callback, profile_payload, agent_status_callback,
+                                         operation_store=operations))
+            if stage_callback:
+                stage_callback("report_writer", "报告合成", "正在将已校验的 Agent 结果整理为报告")
+            from .workflow_report import build_report_bundle
+            outcome = operations.call_sync(scope, "report_writer", {"state": state, "model_name": model_name},
+                execution_context(runtime_llm),
+                lambda: build_report_bundle(username, report_id, state.get("profile_snapshot", {}), state, model_name))
+            return outcome.result
     finally:
         lock.release()

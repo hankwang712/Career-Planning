@@ -241,6 +241,17 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
                         "**对照判断：**" + sentence(item["reasoning"])])
     if len(presentation.targets) > 1 and decision.get("comparison"):
         fit.append(decision["comparison"])
+    exploration = assessment.get("exploration") or {}
+    if exploration:
+        fit.extend(["### 这个方向可以怎样准备", sentence(exploration["summary"]),
+                    "以下是需要验证或逐步发展的能力，不代表你已经具备，也不保证完成练习后就能入职。"])
+        for step in exploration.get("steps", []):
+            check = checks.get(step["check_id"], {})
+            fit.extend(["#### " + short_heading(check.get("requirement", "待验证的能力")),
+                        "**如果已经做过：**" + sentence(step["if_already_done"]),
+                        "**如果还没做过：**" + sentence(step["if_not_done"]),
+                        "**留下的成果：**" + sentence(step["deliverable"]),
+                        "**验证标准：**" + sentence(step["acceptance_criteria"])])
     for target in presentation.targets:
         if target["target_id"] != selected["target_id"]:
             continue
@@ -254,7 +265,8 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
 
     # The reading edition cites the judgments it actually develops, not every retrieved requirement.
     sources = {source["source_id"]: source for source in results["career_decision"].get("sources", [])}
-    for check in strengths + gaps:
+    exploration_checks = [checks[step["check_id"]] for step in exploration.get("steps", []) if step["check_id"] in checks]
+    for check in strengths + gaps + exploration_checks:
         for evidence in check.get("job_evidence", []):
             source = sources.get(evidence["source_id"], {})
             if source.get("kind") == "job":
@@ -313,6 +325,8 @@ def build_reader_sections(state, profile, presentation, selected, assessment, ch
         growth.append("暂缓的事项及原因：" + "；".join(plan["deferred_actions"]))
     add("gap_action_plan", "\n\n".join(filter(None, [plan.get("summary", ""), action_text if tasks else "", *growth])))
     verdict = {"recommended": "目前值得优先尝试", "conditional": "核实关键条件后再推进", "not_recommended": "目前暂不建议推进", "insufficient_information": "还需要补充关键信息"}.get(assessment.get("decision"), "继续依据新材料调整")
+    if exploration and assessment.get("decision") == "conditional":
+        verdict = "可以先验证能力、逐步准备，投递前另行核实关键条件"
     conclusion = [f"对于你选择的“{selected['title']}”，本次建议是{verdict}。"]
     if tasks:
         conclusion.append("下一步先完成“" + tasks[0]["title"] + "”，交付“" + tasks[0]["deliverable"] + "”。")

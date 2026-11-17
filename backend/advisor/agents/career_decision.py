@@ -66,7 +66,11 @@ def recruitment_context(result: dict) -> dict:
 def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]:
     """复用上游数据结构，隔离各目标的来源编号；不重复验证上游分析引文。"""
     result = target.job_analysis
-    job = JobAnalysis.model_validate(result.get("data")).model_dump()
+    if result.get("status") == "insufficient_evidence" and not result.get("sources"):
+        job = {"summary": "本次筛选条件下岗位证据不足，要求待核实。", "findings": [],
+               "related_roles": [], "source_assessments": [], "limitations": ["不能据此断言没有合适岗位。"]}
+    else:
+        job = JobAnalysis.model_validate(result.get("data")).model_dump()
     originals = [JobSource.model_validate(source) for source in result["sources"]]
     source_map = {source.chunk_id: f"T{index}JD{number}" for number, source in enumerate(originals, 1)}
     if len(source_map) != len(originals):
@@ -98,6 +102,7 @@ def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]
     sources = [{
         "source_id": source_map[source.chunk_id], "kind": "job", "target_id": target.target_id,
         "content": source.content, "chunk_id": source.chunk_id, "file_path": source.file_path,
+        "metadata": source.metadata,
         "usable_for_requirements": bool(core_evidence.get(source_map[source.chunk_id])),
         "requirement_evidence": core_evidence.get(source_map[source.chunk_id], []),
     } for source in originals]
@@ -105,6 +110,7 @@ def _prepare_target(target: CareerTarget, index: int) -> tuple[dict, list[dict]]
         "target_id": target.target_id, "title": target.title, "target_type": target.target_type,
         "job_analysis": job, "source_ids": list(source_map.values()),
         "requirement_source_ids": list(core_evidence),
+        "retrieval_scope": result.get("scope", {}),
     }, sources
 
 
@@ -137,6 +143,8 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
                 errors.append(f"目标 {assessment.target_id} 没有相关核心岗位要求，checks应为空且结论为insufficient_information，不能用相邻岗位凑门槛")
         elif not assessment.checks:
             errors.append(f"目标 {assessment.target_id} 已有相关要求，应逐项对照，不可用空检查绕过证据校验")
+        if assessment.exploration:
+            errors.extend(verify_exploration(assessment, target))
         for check in assessment.checks:
             if check.status == "confirmed_gap" and check.kind == "hard_condition" and re.search(r"学历|学位|硕士|博士|本科|工作经验|研发经验|年.{0,6}经验", check.requirement):
                 quoted = "\n".join(item.quote for item in check.candidate_evidence)
@@ -203,7 +211,49 @@ def verify_career_decision(data: dict, prepared: dict) -> list[str]:
     for request in analysis.evidence_requests:
         if request.target_id not in targets:
             errors.append(f"补查请求引用了不可用的 target_id：{request.target_id}")
+        if re.search(r"用户|候选人|求职者|你的|你是否|我是否|简历|学生是否具备|有没有做过|会不会", request.question):
+            errors.append("岗位补查只能查询公开岗位要求，不能查询用户是否会某项能力；个人材料不足时给追问或分支式能力验证路径")
     return list(dict.fromkeys(errors))
+
+
+def verify_exploration(assessment, target):
+    """Development opportunities are hypotheses tied to approved capability checks."""
+    path = assessment.exploration
+    if path is None:
+        return []
+    errors, seen = [], set()
+    checks = {item.check_id: item for item in assessment.checks}
+    blocked = target.get("target_type") == "job" and any(
+        item.kind == "hard_condition" and item.importance == "required" and item.status == "confirmed_gap"
+        for item in assessment.checks)
+    if blocked:
+        errors.append("具体岗位有明确硬条件冲突，不能用能力探索路径绕过资格要求")
+    for step in path.steps:
+        check = checks.get(step.check_id)
+        if check is None or check.kind != "capability":
+            errors.append("职业探索步骤必须关联同一目标下有岗位依据的能力要求，不能用练习解决学历、地点或到岗条件")
+        elif check.status == "supported":
+            errors.append("职业探索应优先验证或发展尚未支持的能力，不要求已充分支持的能力重新从零练习")
+        if step.check_id in seen:
+            errors.append("职业探索能力要求不能重复")
+        seen.add(step.check_id)
+    text = path.summary + "\n" + "\n".join(
+        "\n".join((step.if_already_done, step.if_not_done, step.deliverable, step.acceptance_criteria)) for step in path.steps)
+    for promise in re.finditer(r"(?:就能|就可以|即可|便能|一定能|必定能|保证)(?:胜任|入职|录用|拿到.{0,6}offer)|保证.{0,6}录用", text, re.I):
+        prefix = text[max(0, promise.start() - 18):promise.start()]
+        if re.search(r"(?:(?:不|不能|无法)(?:据此|就此|直接)?|并非|不等于|不代表|不意味着)(?:完成(?:练习|任务|项目)(?:后)?)?$", prefix):
+            continue
+        errors.append("职业探索不能承诺完成练习就能胜任或保证录用，应在成果验证后重新对照岗位")
+        break
+    return errors
+
+
+def exploration_required(assessment, target):
+    if target.get("target_type") == "job" and any(
+        item.kind == "hard_condition" and item.importance == "required" and item.status == "confirmed_gap"
+        for item in assessment.checks):
+        return False
+    return any(item.kind == "capability" and item.status != "supported" for item in assessment.checks)
 
 
 class CareerDecisionAgent(BaseAgent):
@@ -244,6 +294,11 @@ class CareerDecisionAgent(BaseAgent):
 
         for index, target in enumerate(request.targets, 1):
             result = target.job_analysis
+            if result.get("status") == "insufficient_evidence" and not result.get("sources"):
+                prepared_target, _ = _prepare_target(target, index)
+                targets.append(prepared_target)
+                limitations.append(f"目标 {target.target_id} 在本次筛选条件下缺少岗位证据，应保留未知，可在预算内补查，不能断言没有岗位。")
+                continue
             if result.get("status") != "ok" or not result.get("sources"):
                 limitations.append(f"目标 {target.target_id} 的岗位分析未成功或缺少原文，本次不形成匹配结论。")
                 continue
@@ -298,6 +353,15 @@ class CareerDecisionAgent(BaseAgent):
                             if copied is not None:
                                 evidence.quote = copied
                 errors = verify_career_decision(self.model_dump(), prepared)
+                targets = {target["target_id"]: target for target in prepared["targets"]}
+                for assessment in self.assessments:
+                    if exploration_required(assessment, targets.get(assessment.target_id, {})):
+                        if assessment.exploration is None:
+                            errors.append("能力证据不足时不能只要求补简历：请给出基于岗位要求的exploration，包含已有成果与尚未做过两条路径")
+                        capabilities = [item for item in assessment.checks if item.kind == "capability"]
+                        if capabilities and all(item.status in {"evidence_missing", "unknown"} for item in capabilities):
+                            if assessment.decision != "conditional":
+                                errors.append("已有岗位要求而个人能力材料不足时，应使用conditional给出探索前提，不因缺少简历证据停止分析或直接认定已胜任")
                 if errors:
                     raise ValueError("；".join(errors))
                 return self

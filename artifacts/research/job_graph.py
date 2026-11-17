@@ -679,9 +679,11 @@ def career_job_records(args):
     for document in selected_documents(args):
         header = document.text.split(DESCRIPTION_LABEL, 1)[0].splitlines()
         values = [line.split("：", 1)[1] for line in header[:4]]
+        salary = re.search(r"^(?:薪资|薪酬|月薪|薪资范围)[：:]\s*([^\n]+)", document.text, re.M)
         yield JobRecord(jd_id=document.document_id, record=document.index, text=document.text,
                         file_path=f"{args.input.resolve().as_posix()}#record={document.index}",
-                        title=values[0], company=values[1], city=values[2], education=values[3])
+                        title=values[0], company=values[1], city=values[2], education=values[3],
+                        salary=salary[1].strip() if salary else "")
 
 
 async def import_career_documents(args):

@@ -59,6 +59,16 @@ def verify_action_plan(plan: ActionPlan, prepared: dict) -> list[str]:
     for week, total in hours.items():
         if week in weeks and total > weeks[week]["hours_capacity"] + 1e-6:
             errors.append(f"第 {week} 周工时超出可用时间")
+    exploration = prepared.get("assessment", {}).get("exploration") or {}
+    exploration_ids = {step["check_id"] for step in exploration.get("steps", [])}
+    if exploration_ids and not any(task.check_id in exploration_ids and task.kind in {"practice", "document"} for task in plan.tasks):
+        errors.append("职业探索路径必须在本阶段落实至少一项能力验证或已有成果整理，不能只追问或核实岗位信息")
+    for task in plan.tasks:
+        check = checks.get(task.check_id, {})
+        if task.check_id in exploration_ids and task.kind in {"practice", "document"} and check.get("status") in {"evidence_missing", "unknown", "partial"}:
+            text = "\n".join((task.title, task.deliverable, task.acceptance_criteria))
+            if not re.search(r"已有|现有|做过|若有|如果有", text) or not re.search(r"没有|未做|缺少|尚未|否则", text):
+                errors.append("能力尚未确认的探索任务必须同时给出已有成果时的处理和没有成果时的最小验证路径，不等待补充信息才继续")
     budget = prepared["constraints"]["budget"]
     if budget is not None and sum(task.cost for task in plan.tasks) > budget + 1e-6:
         errors.append("任务支出超出本阶段预算")

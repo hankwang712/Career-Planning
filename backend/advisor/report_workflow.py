@@ -18,6 +18,8 @@ from .schemas.action_planning import PlanningConstraints
 from .schemas.followup import Clarification
 from .schemas.recruitment_search import RecruitmentSearchInput
 from .activity import AgentActivity
+from .agents.job_constraints import JobConstraintsAgent
+from .schemas.job_filters import JobFilters
 
 
 class AgentExecutionError(RuntimeError):
@@ -45,6 +47,7 @@ class ReportInput(BaseModel):
     preferences: str = Field(default="", max_length=5000)
     additional_evidence: str = Field(default="", max_length=20000)
     recruitment: RecruitmentSearchInput | None = None
+    job_filters: JobFilters | None = None
 
     @model_validator(mode="after")
     def unique_targets(self):
@@ -79,6 +82,7 @@ def merge_results(current: dict, updates: dict) -> dict:
 class JobTask(TypedDict):
     target_id: str
     title: str
+    filters: dict
 
 
 class ReportState(TypedDict, total=False):
@@ -91,6 +95,7 @@ class ReportState(TypedDict, total=False):
     provenance: dict
     evidence_rounds: int
     evidence_attempts: list[dict]
+    job_filters: dict
 
 
 def review_request(state: ReportState) -> dict:
@@ -130,16 +135,16 @@ async def gather_results(*operations):
 
 
 def build_report_graph(model_provider, *, checkpointer, stage_callback=None, agent_factory=None, agent_status_callback=None,
-                       max_parallel_agents=3):
+                       max_parallel_agents=3, operation_store=None, operation_context=None):
     if not 1 <= max_parallel_agents <= 10:
         raise ValueError("并发 Agent 数量必须在 1~10 之间")
     slots = asyncio.Semaphore(max_parallel_agents)
     activities = {}
     activity_failures = {}
-    classes = {"resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
+    classes = {"job_constraints": JobConstraintsAgent, "resume_analysis": ResumeAnalysisAgent, "job_analysis": JobAnalysisAgent,
                "recruitment_search": RecruitmentSearchAgent, "career_decision": CareerDecisionAgent,
                "action_planning": ActionPlanningAgent}
-    labels = {"resume_analysis": "简历分析", "job_analysis": "岗位分析", "recruitment_search": "招聘雷达",
+    labels = {"job_constraints": "岗位筛选条件", "resume_analysis": "简历分析", "job_analysis": "岗位分析", "recruitment_search": "招聘雷达",
               "career_decision": "职业决策", "review": "补充与确认", "action_planning": "行动规划",
               "parallel_analysis": "并行分析"}
 
@@ -179,13 +184,32 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
                 notify("parallel_analysis" if parallel else name, message)
                 activity(name, token, "active", message)
                 started = perf_counter()
-                agent = agent_factory(name) if agent_factory else classes[name](model_provider())
-                monitor = AgentActivity(lambda text: activity(name, token, "active", text))
-                result = await agent.arun(deepcopy(payload), config=merge_configs(config, {"callbacks": [monitor]}))
-                result.setdefault("execution", {})["stage_elapsed_seconds"] = round(perf_counter() - started, 3)
-                allowed = {"ok", "insufficient_evidence"} if name == "recruitment_search" else {"ok"}
-                if result["status"] not in allowed:
-                    raise AgentExecutionError(result)
+                async def execute():
+                    agent = agent_factory(name) if agent_factory else classes[name](model_provider())
+                    monitor = AgentActivity(lambda text: activity(name, token, "active", text))
+                    result = await agent.arun(deepcopy(payload), config=merge_configs(config, {"callbacks": [monitor]}))
+                    result.setdefault("execution", {})["stage_elapsed_seconds"] = round(perf_counter() - started, 3)
+                    allowed = {"ok", "insufficient_evidence"} if name in {"recruitment_search", "job_analysis"} else {"ok"}
+                    if result["status"] not in allowed:
+                        raise AgentExecutionError(result)
+                    return result
+
+                if operation_store is None:
+                    result = await execute()
+                else:
+                    context = dict(operation_context or {})
+                    if name in {"resume_analysis", "career_decision", "action_planning", "recruitment_search"}:
+                        context["analysis_date"] = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+                    outcome = await operation_store.call((config or {}).get("configurable", {}).get("thread_id", ""),
+                                                         name, payload, context, execute,
+                                                         cache_if=lambda item: item["status"] == "ok")
+                    result = outcome.result
+                    result.setdefault("execution", {}).update(
+                        operation_id=outcome.operation_id, operation_reused=outcome.reused,
+                        operation_attempts=outcome.attempts,
+                        invocation_model_calls=0 if outcome.reused else result["execution"].get("model_calls"))
+                    if outcome.reused:
+                        notify("parallel_analysis" if parallel else name, "已复用此步骤保存的成功结果，无需重复调用模型")
                 activity(name, token, "done", "分析已完成，结果已交给后续步骤")
                 return result
         except asyncio.CancelledError:
@@ -204,8 +228,21 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         }, config, parallel=parallel)
         return {"results": {"resume_analysis": result}}
 
+    async def constraints(state, config: RunnableConfig):
+        inputs = ReportInput.model_validate(state["input"])
+        if inputs.job_filters is not None:
+            return {"job_filters": inputs.job_filters.model_dump()}
+        if not inputs.preferences:
+            return {"job_filters": JobFilters().model_dump()}
+        result = await run("job_constraints", {"preferences": inputs.preferences}, config,
+                           detail="正在从本次求职偏好确认城市、学历和薪资筛选条件")
+        data = {key: value for key, value in result["data"].items() if key != "evidence"}
+        return {"job_filters": JobFilters.model_validate(data).model_dump(),
+                "results": {"job_constraints": result}}
+
     def dispatch_jobs(state):
-        return [Send("analyze_target", {"target_id": f"T{index}", "title": title})
+        return [Send("analyze_target", {"target_id": f"T{index}", "title": title,
+                                       "filters": state.get("job_filters", state["input"].get("job_filters") or {})})
                 for index, title in enumerate(ReportInput.model_validate(state["input"]).targets, 1)]
 
     def dispatch_analyses(state):
@@ -215,7 +252,7 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
                 Send("parallel_recruitment", {"input": state["input"]}), *targets]
 
     async def analyze_target(state: JobTask, config: RunnableConfig):
-        result = await run("job_analysis", {"target_role": state["title"]}, config, parallel=True,
+        result = await run("job_analysis", {"target_role": state["title"], "filters": state.get("filters", {})}, config, parallel=True,
                            detail=f"正在分析目标岗位：{state['title']}")
         return {"job_targets": {state["target_id"]: result}}
 
@@ -295,7 +332,8 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         async def lookup(request):
             target = targets[request["target_id"]]
             try:
-                return await run("job_analysis", {"target_role": target["title"], "question": request["question"]}, config,
+                return await run("job_analysis", {"target_role": target["title"], "question": request["question"],
+                                                  "filters": state.get("job_filters", state["input"].get("job_filters") or {})}, config,
                     detail=f"正在为{target['title']}补查影响决策的岗位要求（第 {round_number}/{MAX_EVIDENCE_ROUNDS} 轮）")
             except AgentExecutionError as error:
                 return error.result
@@ -374,11 +412,13 @@ def build_report_graph(model_provider, *, checkpointer, stage_callback=None, age
         return await recruitment(state, config, parallel=True)
 
     graph = StateGraph(ReportState)
+    graph.add_node("job_constraints", constraints)
     graph.add_node("parallel_resume", parallel_resume)
     graph.add_node("parallel_recruitment", parallel_recruitment)
     graph.add_node("analyze_target", analyze_target)
     graph.add_node("collect_jobs", collect_jobs)
-    graph.add_conditional_edges(START, dispatch_analyses,
+    graph.add_edge(START, "job_constraints")
+    graph.add_conditional_edges("job_constraints", dispatch_analyses,
                                 ["parallel_resume", "parallel_recruitment", "analyze_target"])
     graph.add_edge("analyze_target", "collect_jobs")
     for name, node in [("resume_analysis", resume), ("job_analysis", legacy_jobs), ("recruitment_search", recruitment),

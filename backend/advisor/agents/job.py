@@ -139,6 +139,9 @@ class JobAnalysisAgent(BaseAgent):
             return {"agent": self.name, "status": "retrieval_error", "data": {}, "error": str(error)}
         if not retrieval["sources"]:
             result = self.format_result()
+            result["data"] = {"summary": "本次条件下未检索到可用岗位证据，相关要求仍待核实。",
+                              "findings": [], "related_roles": [], "source_assessments": [],
+                              "limitations": ["未检索到样本不代表没有符合条件的岗位。"]}
         else:
             result = await super().arun({**request.model_dump(), "_retrieval": retrieval}, config=config)
             if result["status"] == "ok":
@@ -157,6 +160,13 @@ class JobAnalysisAgent(BaseAgent):
         # 保存于本次返回值，不写实例状态，避免并发请求混用证据。
         result.update(sources=retrieval["sources"], scope=retrieval["scope"])
         if result["status"] == "ok":
+            for source in retrieval["sources"]:
+                unknown = source.get("metadata", {}).get("unverified_conditions", [])
+                if unknown:
+                    names = {"city": "城市", "education": "学历", "salary": "薪资"}
+                    note = "岗位样本 " + source["file_path"] + " 的筛选条件仍待核实：" + "、".join(names.get(key, key) for key in unknown)
+                    if note not in result["data"]["limitations"]:
+                        result["data"]["limitations"].append(note)
             usable = requirement_source_ids(result["data"])
             result["scope"].update(requirement_source_ids=usable,
                                   relevant_requirement_source_count=len(usable),

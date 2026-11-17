@@ -82,6 +82,31 @@ class LightRAGJobRetriever:
                 })
                 response.raise_for_status()
                 raw = response.json()
+                filters = request.filters.model_dump()
+                constrained = bool(filters["cities"] or filters["candidate_education"]
+                                   or filters["min_monthly_salary"] is not None
+                                   or filters["max_monthly_salary"] is not None or not filters["include_unknown"])
+                ledger = None
+                if constrained:
+                    # Filter the full successful ledger before selecting the final evidence.
+                    # Semantic hits add recall/ranking signals, never override user constraints.
+                    if raw.get("status") not in {"success", "failure"}:
+                        raise JobRetrievalError("LightRAG 未成功完成检索")
+                    if raw.get("status") == "failure" and raw.get("metadata", {}).get("failure_reason") != "no_results":
+                        raise JobRetrievalError("LightRAG 未成功完成检索")
+                    evidence_response = await client.post("career/evidence", json={
+                        "target_role": request.target_role or request.question, "question": request.question,
+                        **filters, "limit": request.chunk_top_k,
+                        "semantic_ids": [chunk["chunk_id"] for chunk in raw.get("data", {}).get("chunks", [])
+                                         if chunk.get("chunk_id")][:100],
+                    })
+                    if evidence_response.status_code == 404:
+                        raise JobRetrievalError("岗位服务尚未支持条件筛选，请更新职业模块补丁并重启 LightRAG")
+                    evidence_response.raise_for_status()
+                    envelope = evidence_response.json()
+                    if envelope.get("workspace") != self.settings.workspace:
+                        raise JobRetrievalError("岗位事实库工作空间与报告配置不一致")
+                    ledger = envelope["data"]
             no_results = (
                 raw.get("status") == "failure"
                 and raw.get("metadata", {}).get("failure_reason") == "no_results"
@@ -90,7 +115,7 @@ class LightRAGJobRetriever:
                 raise JobRetrievalError("LightRAG 未成功完成检索，请查看 LightRAG 服务日志")
             data = raw["data"]
             sources, seen = [], set()
-            for chunk in data.get("chunks", []):
+            for chunk in ledger["sources"] if ledger is not None else data.get("chunks", []):
                 if not chunk.get("content", "").strip():
                     continue
                 source = JobSource.model_validate(chunk)
@@ -99,7 +124,7 @@ class LightRAGJobRetriever:
                     sources.append(source.model_dump())
             # Supplement semantic misses with a few original records, then let the Agent
             # assess actual responsibilities. This is recall, not a relevance verdict.
-            local = await asyncio.to_thread(local_job_candidates, request, min(3, request.chunk_top_k))
+            local = [] if constrained else await asyncio.to_thread(local_job_candidates, request, min(3, request.chunk_top_k))
             graph_paths = {source["file_path"] for source in sources}
             local = [source for source in local if source["file_path"] not in graph_paths]
             sources = [*local, *sources]
@@ -115,13 +140,16 @@ class LightRAGJobRetriever:
                 "sources": sources,
                 "scope": {
                     "workspace": self.settings.workspace, "mode": request.mode,
+                    "filters": filters,
+                    **(ledger["scope"] if ledger is not None else {"metadata_filters_applied": False}),
                     "chunk_count": len(sources), "retrieved_chunk_count": returned_count,
                     "jd_record_count": len(record_paths),
                     "unidentified_source_count": sum(
                         source["file_path"] not in record_paths for source in sources
                     ),
                     "local_export_candidates": sum(source["reference_id"] == "local_export" for source in sources),
-                    "retrieval_methods": ["lightrag", "bounded_local_export"] if local else ["lightrag"],
+                    "retrieval_methods": ["lightrag", "metadata_filtered_ledger"] if constrained else (
+                        ["lightrag", "bounded_local_export"] if local else ["lightrag"]),
                     "entity_count": len(data.get("entities", [])),
                     "relationship_count": len(data.get("relationships", [])),
                     "description": "仅本次检索样本；JD 数按 record 来源去重，不代表全库或招聘市场统计。",

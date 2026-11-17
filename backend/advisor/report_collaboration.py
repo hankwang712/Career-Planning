@@ -48,7 +48,7 @@ def merge_job_evidence(current, supplement):
             merged.setdefault("sources", []).append(deepcopy(source))
             sources[source["chunk_id"]] = source
             added = True
-    for key in ("findings", "related_roles"):
+    for key in ("findings", "related_roles", "source_assessments"):
         existing = merged["data"].setdefault(key, [])
         seen = {json.dumps(item, ensure_ascii=False, sort_keys=True) for item in existing}
         for item in supplement["data"].get(key, []):
@@ -59,12 +59,18 @@ def merge_job_evidence(current, supplement):
                 added = True
     if not added:
         return current, "no_new_evidence"
+    merged["status"] = "ok"
     merged["data"]["summary"] = current["data"]["summary"] + "\n补查：" + supplement["data"]["summary"]
     merged["data"]["limitations"] = list(dict.fromkeys(
         current["data"].get("limitations", []) + supplement["data"].get("limitations", [])))
     paths = {source.get("file_path", "") for source in merged["sources"]
              if re.fullmatch(r".+\.txt#record=\d+", source.get("file_path", ""), flags=re.IGNORECASE)}
     scope = deepcopy(current.get("scope", {}))
+    if "requirement_source_ids" in scope or "requirement_source_ids" in supplement.get("scope", {}):
+        scope["requirement_source_ids"] = list(dict.fromkeys(
+            scope.get("requirement_source_ids", []) + supplement.get("scope", {}).get("requirement_source_ids", [])))
+        scope["relevant_requirement_source_count"] = len(scope["requirement_source_ids"])
+        scope["evidence_status"] = "available" if scope["requirement_source_ids"] else "insufficient_related_evidence"
     # 初次查询的统计不能继续表示合并后的查询范围。
     for key in ("retrieved_chunk_count", "entity_count", "relationship_count"):
         scope.pop(key, None)

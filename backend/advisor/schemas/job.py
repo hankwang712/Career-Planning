@@ -1,6 +1,7 @@
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .job_filters import JobFilters
 
 
 class JobRecord(BaseModel):
@@ -8,6 +9,7 @@ class JobRecord(BaseModel):
 
 
 class JobAnalysisInput(JobRecord):
+    filters: JobFilters = Field(default_factory=JobFilters)
     target_role: str = Field(default="", max_length=300)
     question: str = Field(default="", max_length=2000)
     mode: Literal["mix", "hybrid", "local", "global", "naive"] = "mix"
@@ -26,6 +28,7 @@ class JobAnalysisInput(JobRecord):
 
 
 class JobSource(JobRecord):
+    metadata: dict = Field(default_factory=dict)
     chunk_id: str = Field(min_length=1)
     file_path: str = "unknown_source"
     reference_id: str = ""
