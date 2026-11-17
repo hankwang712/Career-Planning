@@ -7,6 +7,11 @@ from .paths import STATIC_DIR
 def create_blueprint(current_user):
     blueprint = Blueprint("pages", __name__)
 
+    @blueprint.route("/healthz")
+    def healthz():
+        """存活探针：不访问数据库也不要求登录，供容器和反向代理使用。"""
+        return {"status": "ok"}
+
     @blueprint.route("/multi-agent-workflow")
     @blueprint.route("/multi-agent-workflow.html")
     def multi_agent_workflow_page():

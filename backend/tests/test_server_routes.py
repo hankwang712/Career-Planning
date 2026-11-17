@@ -45,6 +45,11 @@ def test_public_pages_and_data_are_reachable_without_login(client, path):
     assert client.get(path).status_code == 200
 
 
+def test_healthz_is_a_login_free_liveness_probe(client):
+    response = client.get("/healthz")
+    assert response.status_code == 200 and response.get_json() == {"status": "ok"}
+
+
 @pytest.mark.parametrize("path", [
     "/user-center", "/resume-report", "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow",
     "/user-center/career-report/polish",

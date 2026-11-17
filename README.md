@@ -163,7 +163,7 @@ cd Career-Planning
 ```bash
 uv python install 3.12
 uv venv --python 3.12
-uv pip install -r requirements.txt
+uv pip install -r requirements.txt   # 已锁定版本
 npm ci
 ```
 
@@ -450,13 +450,15 @@ uv run --no-project python artifacts/research/job_graph.py import --schema caree
 ## 🧪 开发与测试
 
 ```bash
-uv pip install pytest                 # 测试依赖，不在 requirements.txt 里
+uv pip install -r requirements-dev.txt   # 在锁定的运行依赖之上加 pytest、pyflakes
 uv run --no-project python -m pytest  # 后端测试（约 30 秒）
 npm run check                         # 前端静态检查：脚本语法、重复函数、模板引用的文件是否存在
 npm run test:unit                     # 前端单元测试
 npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwright 的 Chromium
 ```
 
+- **依赖版本**：`requirements.in` 是手写的直接依赖清单，`requirements.txt` 是由它生成的锁定版本（含传递依赖，Windows / Linux 通用）。升级依赖时修改 `requirements.in`，再执行 `uv pip compile requirements.in --universal --python-version 3.11 -o requirements.txt`，跑完测试后一起提交。
+- **容器部署**：`docker compose -f compose.app.yml up --build -d` 构建镜像（前端在构建阶段编译，Python 依赖按锁定版本安装，含 tesseract 中文 OCR）并启动主站，访问 `http://127.0.0.1:8080`，存活探针为 `/healthz`；账号、报告、聊天记录保存在命名卷 `career_appdata`。模型密钥读取根目录 `.env`。PostgreSQL / pgvector 仍由 `compose.yml` 单独提供，只有需要 LightRAG 时才用。
 - 后端测试使用临时数据目录并关闭后台采集与资讯预热，不会读写 `data/app_data`，也不访问外网或使用 `.env` 里的模型密钥。
 - 手动试跑时可设置 `CAREER_APP_DATA_DIR` 指向独立目录，避免动到真实数据；`CAREER_PREWARM=0` 跳过资讯预热，`JOB_MARKET_SCHEDULER=0` 关闭岗位定时采集。
 - Word 导出优先使用外部的 `docx_mcp`（环境变量 `CAREER_REPORT_DOCX_PYTHON` 指定解释器），不可用或失败时自动改用内置的 python-docx 转换，所以全新环境也能导出。
@@ -503,7 +505,11 @@ career-agent/
 ├── asserts/                      # README 页面截图
 ├── deploy/                       # Nginx 示例与静态导出目录
 ├── .github/workflows/ci.yml      # 持续集成配置（本地文件，被 .gitignore 排除）
-├── requirements.txt              # Python 依赖
+├── requirements.in               # Python 直接依赖（手写）
+├── requirements.txt              # 锁定版本的 Python 依赖（由 requirements.in 生成）
+├── requirements-dev.txt          # 开发与 CI 工具（pytest、pyflakes）
+├── Dockerfile                    # 主站镜像（前端构建 + Python 运行）
+├── compose.app.yml               # 主站容器部署
 ├── .env.example                  # 环境配置模板
 └── compose.yml                   # PostgreSQL / pgvector
 ```

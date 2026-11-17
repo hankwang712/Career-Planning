@@ -1,0 +1,20 @@
+# 应用本体的容器部署：docker compose -f compose.app.yml up --build -d
+# 模型密钥与其他配置来自根目录 .env（参考 .env.example）；账号、报告和聊天记录保存在命名卷中。
+# 向量库（compose.yml 里的 postgres）是可选的，不影响这里的启动。
+name: career-app
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - career_appdata:/var/lib/career/app_data
+
+volumes:
+  career_appdata:
