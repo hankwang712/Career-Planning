@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-import os
+import importlib.util
 import json
+import logging
+import os
 import re
-import shutil
 import subprocess
+import sys
 import tempfile
 from html import escape
 from pathlib import Path
 from typing import Any, Optional
 
 from ..paths import REPORT_IMAGE_DIR
+from .docx_fallback import convert_markdown_to_docx
+from .docx_layout import format_report_docx
 from .reading_format import readable_markdown, number_report_headings, structure_report_markdown
 from .html_layout import EXPORT_CSS, decorate_export_html, BACKGROUND_ROLES
 from .html_layout import typography_css, normalize_typography
@@ -171,14 +175,20 @@ def docx_prepare_markdown(text: str) -> str:
     return result
 
 
+logger = logging.getLogger(__name__)
+
 DOCX_MCP_CONDA_ENV = os.environ.get("CAREER_REPORT_DOCX_CONDA_ENV", "yolov11").strip() or "yolov11"
 DOCX_MCP_PYTHON = os.environ.get("CAREER_REPORT_DOCX_PYTHON", "").strip()
 
 
-def _resolve_docx_python(conda_env: str) -> str:
+def _resolve_docx_python(conda_env: str) -> Optional[str]:
+    """能 import docx_mcp 的解释器；找不到时返回 None，由进程内的 python-docx 转换兜底。"""
     override = DOCX_MCP_PYTHON
     if override and Path(override).exists():
         return override
+
+    if importlib.util.find_spec("docx_mcp") is not None:
+        return sys.executable
 
     conda_exe = Path(os.environ.get("CONDA_EXE") or "conda")
     if conda_exe.name.lower() == "conda.exe":
@@ -186,11 +196,7 @@ def _resolve_docx_python(conda_env: str) -> str:
         env_python = conda_root / "envs" / conda_env / "python.exe"
         if env_python.exists():
             return str(env_python)
-
-    candidate = shutil.which("python")
-    if candidate:
-        return candidate
-    raise RuntimeError(f"Unable to locate Python interpreter for conda env '{conda_env}'")
+    return None
 
 
 def _iter_document_sections(report: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -515,18 +521,24 @@ format_report_docx(docx_path, typography=json.loads(sys.argv[4]))
 
         md_content = docx_prepare_markdown(md_content)
         md_path.write_text(md_content, encoding="utf-8")
-        process = subprocess.run(
-            [python_exe, "-c", script, str(md_path), str(docx_path), str(Path(__file__).resolve().parents[3]), json.dumps(normalize_typography(typography))],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
-            timeout=180,
-        )
-        if process.returncode != 0:
-            error = (process.stderr or process.stdout or "").strip()
-            raise RuntimeError(error or f"Docx_MCP export failed in conda env '{conda_env}'")
+        converted = False
+        if python_exe:
+            process = subprocess.run(
+                [python_exe, "-c", script, str(md_path), str(docx_path), str(Path(__file__).resolve().parents[3]), json.dumps(normalize_typography(typography))],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
+                timeout=180,
+            )
+            converted = process.returncode == 0 and docx_path.exists()
+            if not converted:
+                logger.warning("docx_mcp 转换失败，改用内置 python-docx 转换：%s",
+                               (process.stderr or process.stdout or "").strip()[:300])
+        if not converted:
+            convert_markdown_to_docx(md_content, docx_path, base_dir=temp_path)
+            format_report_docx(docx_path, typography=normalize_typography(typography))
         if not docx_path.exists():
-            raise RuntimeError("Docx_MCP did not produce a .docx file")
+            raise RuntimeError("Word 文档生成失败")
         return docx_path.read_bytes()

@@ -26,17 +26,13 @@ import uuid
 import webbrowser
 from datetime import datetime, timedelta
 from functools import wraps
-import random
 
-from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, url_for
 from markupsafe import Markup, escape
-from openai import OpenAI
 from werkzeug.utils import secure_filename
-from services.news import (
-    get_career_news_payload,
-    get_kb_stats,
-    search_news_kb,
-)
+from services.news import get_career_news_payload
+from services.news.api import create_blueprint as create_news_blueprint
+from services.pages import create_blueprint as create_pages_blueprint
 from services.report import (
     CAREER_REPORT_STAGE_DEFS,
     build_stage_progress,
@@ -69,9 +65,6 @@ from services.report.exporters import (
 from services.report.enhancements import (
     CAREER_FEEDBACK_VERSION,
     PORTRAIT_PROMPT_PIPELINE_VERSION,
-    PORTRAIT_TEMPLATE_VERSION,
-    build_portrait_prompt_layers,
-    evaluate_portrait_prompt_packet,
     normalize_feedback_memory,
 )
 from services.resume import (
@@ -92,19 +85,27 @@ from services.resume.diagnosis_ui import (
 )
 from services import db as _app_db
 from services import llm_env
+from services.cors import cors_headers, normalize_origins
 from services.job_registry import JobRegistry
 from services import auth as _auth
 from services.datasets import create_blueprint as create_datasets_blueprint
 from services.career import create_blueprint as create_career_blueprint, snapshot as career_snapshot, sync_sources as sync_career_sources
 from services.job_market.api import create_blueprint as create_job_market_blueprint
+from services.community import create_blueprint as create_community_blueprint
+from services.portrait import (
+    create_blueprint as create_portrait_blueprint,
+    normalize_profile_portrait_context,
+    public_profile_portrait_state,
+)
+from services.llm_calls import call_markdown_chat, call_structured_chat
+from services.interview import create_blueprint as create_interview_blueprint
+from services.job_data import BOSS_INFO_DIR, create_blueprint as create_job_data_blueprint
 from services.job_market.collector import Collector as JobMarketCollector
 from services.chat import create_blueprint as create_chat_blueprint
 from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
 from services.paths import (
     APP_DATA_DIR,
-    DATA_DIR,
-    PROJECT_ROOT,
     PUBLIC_DATA_DIR,
     STATIC_DIR,
     TEMPLATE_DIR,
@@ -116,48 +117,21 @@ mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("application/json", ".json")
 
 # 路径配置
-BASE_DIR = str(PROJECT_ROOT)
-BOSS_INFO_DIR = os.path.join(DATA_DIR, "jobs")
-OTHER_CITY_BOSS_JOBS_FILE = os.path.join(DATA_DIR, "cleaned", "other_city_boss_format.json")
-# 仅出现在补充数据中的城市：样本数低于该阈值的不进入下拉列表，避免一次性加载过多城市拖慢 bootstrap。
-SUPPLEMENT_EXTRA_CITY_MIN_JOBS = int(os.environ.get("SUPPLEMENT_EXTRA_CITY_MIN_JOBS", "5"))
 USER_STATE_DIR = os.path.join(APP_DATA_DIR, "user_state")
-USERS_FILE = os.path.join(APP_DATA_DIR, "users.json")
-LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "llm_configs.json")
-LLM_PROVIDERS_FILE = os.path.join(APP_DATA_DIR, "llm_providers.json")
-RESUME_LLM_CONFIG_FILE = os.path.join(APP_DATA_DIR, "resume_llm_config.json")
 RESUME_UPLOAD_DIR = os.path.join(APP_DATA_DIR, "user_uploads")
 CAREER_REPORT_DIR = os.path.join(APP_DATA_DIR, "career_reports")
-COMMUNITY_FORUM_FILE = os.path.join(APP_DATA_DIR, "community_forum.json")
-PROFILE_PORTRAIT_MODEL = os.environ.get("PROFILE_PORTRAIT_MODEL", "google/gemini-3-pro-image-preview").strip() or "google/gemini-3-pro-image-preview"
-TEXT_TO_IMAGE_BASE_URL = os.environ.get("TEXT_TO_IMAGE_BASE_URL", "https://openrouter.ai/api/v1").strip() or "https://openrouter.ai/api/v1"
 ASSESSMENT_DATA_FILE = os.path.join(PUBLIC_DATA_DIR, "assessment-data.json")
-JOB_CACHE_LOCK = threading.Lock()
 APP_DATA_LOCK = threading.Lock()
-USER_STATE_LOCK = threading.Lock()
 ASSESSMENT_DATA_LOCK = threading.Lock()
-JOB_FILE_CACHE = {}
-SUPPLEMENT_JOBS_CACHE = {"signature": None, "by_city": None}
 ASSESSMENT_DATA_CACHE = {"signature": None, "payload": {}}
 RESUME_ANALYSIS_LOCK = threading.Lock()
 RESUME_ANALYSIS_JOBS = JobRegistry("resume")
 CAREER_REPORT_LOCK = threading.Lock()
 CAREER_REPORT_JOBS = JobRegistry("career_report")
-COMMUNITY_FORUM_LOCK = threading.Lock()
-JOB_CACHE_MAX_AGE_SECONDS = 900
 RESUME_MAX_FILE_SIZE = 12 * 1024 * 1024
 RESUME_MAX_PAGES = 20
 RESUME_OCR_TIMEOUT_SECONDS = 35
 RESUME_MAX_TEXT_CHARS = 24000
-CAREER_REPORT_LLM_TIMEOUT_SECONDS = max(
-    30,
-    int(os.environ.get("CAREER_REPORT_LLM_TIMEOUT_SECONDS", "180")),
-)
-JOB_DETAIL_ONLY_FIELDS = {
-    "岗位描述",
-    "公司简介",
-    "公司福利",
-}
 
 
 class CareerReportCanceled(RuntimeError):
@@ -170,7 +144,7 @@ except Exception:  # pragma: no cover - optional dependency
     PdfReader = None
 
 try:
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF
 except Exception:  # pragma: no cover - optional dependency
     fitz = None
 
@@ -190,6 +164,8 @@ try:
     import pytesseract
 except Exception:  # pragma: no cover - optional dependency
     pytesseract = None
+
+logger = logging.getLogger(__name__)
 
 app = Flask(
     __name__,
@@ -342,17 +318,12 @@ def inject_vite_asset_tags():
 def _inject_api_cors_headers(response):
     if not request.path.startswith("/api/"):
         return response
-    origin = str(request.headers.get("Origin") or "").strip()
-    allowed_origins = {request.host_url.rstrip("/"), FRONTEND_ORIGIN.rstrip("/"), VITE_DEV_SERVER_URL}
-    if not origin or origin not in allowed_origins:
+    allowed = normalize_origins([request.host_url, FRONTEND_ORIGIN, VITE_DEV_SERVER_URL])
+    headers = cors_headers(request.headers.get("Origin"), allowed)
+    if not headers:
         return response
-    allow_origin = origin
-    response.headers["Access-Control-Allow-Origin"] = allow_origin
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token"
+    response.headers.update(headers)
     response.vary.add("Origin")
-    if allow_origin != "*":
-        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 
@@ -406,132 +377,8 @@ def _static_headers_and_gzip(response):
 
     return response
 
-CAREER_INTERVIEW_SYSTEM_PROMPT = """
-你是一名中文职业规划咨询师，正在进行一对一深度访谈。
 
-【你的风格】
-- 像一位温和但专业的心理咨询师，引导用户探索自我
-- 每次只问一个开放性问题，不连续追问
-- 尊重用户的节奏，用户可以随时说"够了"或"我想停下来"
-- 当用户给出模糊回答时，用具体例子引导；当用户给出具体例子时，深挖感受和收获
 
-【四大探索主题】（不需要全部覆盖，用户聊到哪算哪）
-
-1. 角色模型（Role Model）
-   - 你从小到大有没有特别崇拜的人？可以是名人、老师、家长、朋友
-   - 这个人做了什么让你如此钦佩？
-   - 有没有在生活中尝试学习他/她的某种做法？结果怎样了？
-
-2. 生活故事（Life Story）
-   - 回想一下，有没有一件事你做得比大多数人都好？（即使很小）
-   - 那件事是什么情况下发生的？你当时做了什么？
-   - 有没有一段经历，虽然结果不太好，但你学到了很多？
-
-3. 工作价值观（Work Values）
-   - 假设三年后你找到了理想工作，典型的一天你会做什么？
-   - 那份工作最吸引你的是什么？
-   - 有什么样的工作内容会让你觉得"这不值得我做"？
-
-4. 情境应对（Situational Response）
-   - 如果你在团队项目中遇到意见分歧，你会怎么处理？
-   - 如果 deadline 很紧但任务很重，你会怎么安排？
-   - 当你不确定该怎么做时，你通常会怎么做？
-
-【访谈规则】
-- 用户没说"够了"或"完成了"之前，不要主动结束访谈
-- 至少完成 3 轮对话后再考虑收尾
-- 如果某个主题已经探索充分，可以自然转向其他主题
-- 用自然对话的方式，不要像机器人一样列问题清单
-
-【输出格式】（严格 JSON）
-{
-  "next_question": "下一轮问题，如果用户说完成了就填'__FINISH__'",
-  "focus_dimension": "必须是以下之一（一字不差）：职业兴趣、工作价值观、学习方式、沟通风格、行动证据、职业成熟度。表示下一轮主要在为哪一维度收集信息。若系统消息里给出了各维度已答/目标数，已答满的维度不得再作为 focus_dimension，必须切换到下一个未答满的维度。",
-  "completion_score": 0,
-  "readiness_score": 0,
-  "topic": "当前主题，如'角色模型'或'生活故事'等",
-  "topic_progress": "当前主题的探索进度描述",
-  "next_question_policy": {
-    "strategy": "fact_example | motive_reason | value_tradeoff | behavior_pref | conflict_clarify | micro_scenario",
-    "target_dimension": "职业兴趣",
-    "rationale": "为何现在优先追问这一维度（一句话）",
-    "expected_information_gain": 0.0
-  },
-  "dimension_metrics": {
-    "职业兴趣": {
-      "coverage": 0.0,
-      "specificity": 0.0,
-      "confidence": 0.0,
-      "evidence_count": 0,
-      "consistency": 0.0,
-      "saturated": false,
-      "missing_slots": ["仍缺的具体证据槽位，可为空数组"]
-    }
-  },
-  "profile_hypothesis": {
-    "top_roles": [{"name": "产品经理", "score": 0.35}],
-    "stable_traits": ["结构化表达强"],
-    "unresolved_conflicts": ["若用户既强调自由又强调流程稳定，可写一条待澄清张力"]
-  },
-  "evidence_cards": [
-    {"category": "偏好证据", "bullets": ["从对话可支撑的判断1", "判断2"]},
-    {"category": "能力证据", "bullets": []}
-  ],
-  "conflict_points": [
-    {"summary": "自由探索 vs 稳定流程", "clarify_prompt": "可选：用于反证追问的一句话"}
-  ],
-  "profile": {
-    "summary": "一段50字左右的叙事性画像描述",
-    "role_model": "用户钦佩的人及原因（从对话中提取）",
-    "work_values": ["价值观1", "价值观2", "价值观3"],
-    "key_experience": "用户提到的最具体的经历（用于证据）",
-    "leadership_style": "从对话推断的领导/协作风格",
-    "growth_mindset": "成长型思维的体现",
-    "recommended_exploration": ["还可以探索的方向1", "还可以探索的方向2"],
-    "missing_followups": ["若继续访谈，最影响职业判断的分歧点还没澄清的一句话（不要只说缺字段）"]
-  }
-}
-规则补充：
-- completion_score：仍表示「对话覆盖度」0-100；readiness_score 表示「职业建议可决策度」0-100（证据够具体、冲突已澄清、方向可区分时更高）。
-- dimension_metrics：必须为六个维度键各给一份对象；coverage/specificity/confidence/consistency 为 0-1 小数；saturated=true 表示该维证据已够，不必再为凑题数追问。
-- 若用户一句话里已同时暴露多维度信息，应同步提高相关维度的 coverage/evidence_count，并在 next_question_policy 里选择「信息增益最大」的追问，而不是死板按顺序。
-- conflict_points：当检测到表述张力时填写，用于后续反证追问。
-- evidence_cards：用短句沉淀可引用证据，便于前端展示与推荐解释。
-"""
-
-MBTI_CLARIFIER_SYSTEM_PROMPT = """
-你是一名中文 MBTI 澄清测评助手。请根据用户主测结果中的 close_pairs 生成少量高区分度补充题，帮助确认临界维度。
-规则：
-- 只使用简洁自然的中文。
-- 每道题只对应 EI、SN、TF、JP 之一。
-- 题目贴近日常学习、社交、任务推进和决策场景。
-- 每道题都要提供鲜明对立的 option_a / option_b。
-- 一次返回 2-6 题。
-- 只输出 JSON。
-JSON 结构必须如下：
-{
-  "summary": "本轮主要澄清的维度说明",
-  "questions": [
-    {
-      "id": "q1",
-      "pair": "EI",
-      "question": "题目正文",
-      "option_a": "偏向左侧字母的描述",
-      "option_b": "偏向右侧字母的描述",
-      "weight": 2
-    }
-  ]
-}
-"""
-
-DEFAULT_CAREER_DIMENSIONS = [
-    "职业兴趣",
-    "工作价值观",
-    "学习方式",
-    "沟通风格",
-    "行动证据",
-    "职业成熟度",
-]
 
 VALID_USER_STATE_SCOPES = {
     "career_interview",
@@ -546,7 +393,6 @@ VALID_USER_STATE_SCOPES = {
     "career_matching",
     "news_context",
 }
-COMMUNITY_FORUM_BOARD_OPTIONS = ("面经互助", "简历门诊", "实习内推", "选岗热议", "职场日常")
 EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 
 
@@ -563,13 +409,6 @@ def _get_chat_runtime(selection=None):
 
 def _get_resume_provider_and_model():
     return llm_env.chat_runtime()
-
-
-def _get_profile_portrait_runtime():
-    base_url, api_key, _ = llm_env.image_runtime(TEXT_TO_IMAGE_BASE_URL, PROFILE_PORTRAIT_MODEL)
-    if not api_key:
-        return None, None, PROFILE_PORTRAIT_MODEL
-    return base_url, api_key, PROFILE_PORTRAIT_MODEL
 
 
 def _ensure_app_storage():
@@ -817,1324 +656,71 @@ def _build_career_report_agent_memory(state, profile_payload=None, role_payload=
         "portrait_memory": {
             "status": str(portrait_scope.get("status") or "").strip(),
             "brief": portrait_scope.get("brief") if isinstance(portrait_scope.get("brief"), dict) else {},
-            "context_snapshot": _normalize_profile_portrait_context(portrait_scope.get("context_snapshot")),
+            "context_snapshot": normalize_profile_portrait_context(portrait_scope.get("context_snapshot")),
             "prompt_summary": str(portrait_scope.get("prompt_summary") or "").strip(),
         },
         "news_memory": news_scope,
     }
 
 
-def _forum_clean_text(value, limit=800):
-    return re.sub(r"\s+", " ", str(value or "").strip())[:limit]
-
-
-def _forum_clean_content(value, limit):
-    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(value or "").replace("\r\n", "\n").replace("\r", "\n")).strip()[:limit]
-
-
-def _forum_transaction(view_func):
-    @wraps(view_func)
-    def wrapped(*args, **kwargs):
-        with COMMUNITY_FORUM_LOCK:
-            return view_func(*args, **kwargs)
-    return wrapped
-
-
-def _public_forum_author(author):
-    author = author if isinstance(author, dict) else {}
-    display = str(author.get("display_name") or "匿名同学")
-    if "@" in display and display == author.get("username"):
-        display = "同学"
-    return {"display_name": display,
-            "is_system": author.get("username") == "system"}
-
-
-def _forum_slug(seed):
-    safe = re.sub(r"[^0-9A-Za-z_-]", "", str(seed or "").lower())
-    return safe[:24] or uuid.uuid4().hex[:10]
-
-
-def _forum_normalize_tags(raw_tags, limit=4):
-    values = raw_tags if isinstance(raw_tags, list) else re.split(r"[#，,、/\s]+", str(raw_tags or ""))
-    result = []
-    for item in values:
-        tag = _forum_clean_text(item, 16)
-        if not tag or tag in result:
-            continue
-        result.append(tag)
-        if len(result) >= limit:
-            break
-    return result
-
-
-def _forum_normalize_author(raw_author, fallback_username="", fallback_display="匿名同学"):
-    author = raw_author if isinstance(raw_author, dict) else {}
-    username = _forum_clean_text(author.get("username") or fallback_username, 256) or "guest"
-    display_name = _forum_clean_text(author.get("display_name") or author.get("displayName") or fallback_display, 32) or "匿名同学"
-    return {
-        "username": username,
-        "display_name": display_name,
-    }
-
-
-def _forum_normalize_reply(raw_reply):
-    reply = raw_reply if isinstance(raw_reply, dict) else {}
-    content = _forum_clean_content(reply.get("content"), 1200)
-    if not content:
-        return None
-    created_at = int(reply.get("created_at") or time.time())
-    return {
-        "id": _forum_clean_text(reply.get("id") or f"reply_{uuid.uuid4().hex[:10]}", 32),
-        "content": content,
-        "created_at": created_at,
-        "author": _forum_normalize_author(reply.get("author")),
-    }
-
-
-def _forum_normalize_post(raw_post):
-    post = raw_post if isinstance(raw_post, dict) else {}
-    title = _forum_clean_text(post.get("title"), 80)
-    content = _forum_clean_content(post.get("content"), 2400)
-    if not title or not content:
-        return None
-    board = _forum_clean_text(post.get("board"), 16)
-    if board not in COMMUNITY_FORUM_BOARD_OPTIONS:
-        board = "选岗热议"
-    replies = []
-    for item in post.get("replies") or []:
-        normalized_reply = _forum_normalize_reply(item)
-        if normalized_reply:
-            replies.append(normalized_reply)
-    replies.sort(key=lambda item: int(item.get("created_at") or 0))
-    liked_by = []
-    for value in post.get("liked_by") or []:
-        username = _forum_clean_text(value, 256)
-        if username and username not in liked_by:
-            liked_by.append(username)
-    created_at = int(post.get("created_at") or time.time())
-    updated_at = int(post.get("updated_at") or created_at)
-    last_reply_at = int(replies[-1]["created_at"]) if replies else int(post.get("last_reply_at") or updated_at)
-    last_reply_user = ""
-    if replies:
-        last_reply_user = _forum_clean_text(replies[-1].get("author", {}).get("display_name"), 32)
-    elif post.get("last_reply_user"):
-        last_reply_user = _forum_clean_text(post.get("last_reply_user"), 32)
-    return {
-        "id": _forum_clean_text(post.get("id") or f"post_{uuid.uuid4().hex[:10]}", 32),
-        "title": title,
-        "content": content,
-        "board": board,
-        "tags": _forum_normalize_tags(post.get("tags") or []),
-        "author": _forum_normalize_author(post.get("author")),
-        "created_at": created_at,
-        "updated_at": updated_at,
-        "pinned": bool(post.get("pinned")),
-        "views": max(0, int(post.get("views") or 0)),
-        "liked_by": liked_by,
-        "replies": replies,
-        "last_reply_at": last_reply_at,
-        "last_reply_user": last_reply_user,
-    }
-
-
-def _default_community_forum_payload():
-    now = int(time.time())
-
-    def reply(seed, content, author_name, minutes_ago):
-        return {
-            "id": f"reply_{_forum_slug(seed)}",
-            "content": content,
-            "created_at": now - minutes_ago * 60,
-            "author": {"username": _forum_slug(author_name), "display_name": author_name},
-        }
-
-    posts = [
-        {
-            "id": "post_offer_schedule",
-            "title": "暑期实习太晚准备还来得及吗？现在补项目和刷题应该怎么排优先级",
-            "content": "我现在大三，前面主要把课上项目做完了，算法和面试准备比较弱。想请教大家，如果目标是暑期实习，接下来两个月应该先补项目包装、刷算法题，还是先把简历改到能投的状态？",
-            "board": "面经互助",
-            "tags": ["暑期实习", "投递节奏", "项目包装"],
-            "author": {"username": "offer_lab", "display_name": "上岸学长"},
-            "created_at": now - 5 * 3600,
-            "updated_at": now - 35 * 60,
-            "pinned": True,
-            "views": 286,
-            "liked_by": ["system", "23030134", "24110403", "24151007"],
-            "replies": [
-                reply("offer_schedule_1", "先把简历打磨到可投，再并行补一个能讲清楚指标的项目，这样反馈会更快。", "求职教练", 52),
-                reply("offer_schedule_2", "如果算法很薄弱，建议每天固定一小时刷高频题，不要等项目全部做完才开始。", "后端实习生", 35),
-            ],
-        },
-        {
-            "id": "post_resume_story",
-            "title": "简历里的项目经历怎么写，才能让面试官一眼看到亮点",
-            "content": "我发现自己写项目时总是堆技术栈，结果看起来像流水账。有没有比较好的表达结构，比如背景、动作、结果怎么分配篇幅，尤其是实习和课程项目混合在一起的时候。",
-            "board": "简历门诊",
-            "tags": ["简历修改", "项目经历", "STAR"],
-            "author": {"username": "resume_clinic", "display_name": "简历门诊官"},
-            "created_at": now - 9 * 3600,
-            "updated_at": now - 68 * 60,
-            "pinned": False,
-            "views": 198,
-            "liked_by": ["system", "24110403"],
-            "replies": [
-                reply("resume_story_1", "把“做了什么”改成“解决了什么问题、怎么做、结果如何”，项目自然就立起来了。", "产品转码同学", 102),
-            ],
-        },
-        {
-            "id": "post_city_choice",
-            "title": "同样是 AI 产品岗，留在新一线还是去上海北京更合适",
-            "content": "目前拿到了两个方向接近的机会，一个在杭州，一个在上海。薪资差距不算特别大，但我更纠结成长密度、导师带教和岗位后续发展空间，想听听大家怎么判断。",
-            "board": "选岗热议",
-            "tags": ["城市选择", "AI产品", "offer对比"],
-            "author": {"username": "decision_lab", "display_name": "Offer 观察员"},
-            "created_at": now - 18 * 3600,
-            "updated_at": now - 2 * 3600,
-            "pinned": False,
-            "views": 324,
-            "liked_by": ["system", "23030134", "24030115"],
-            "replies": [
-                reply("city_choice_1", "如果你现在更缺方法论，优先看团队带教和业务密度；城市本身反而是第二层因素。", "AI产品新人", 205),
-                reply("city_choice_2", "同薪资区间下，先比较岗位能不能让你讲出更强的成长故事。", "运营转产品", 126),
-            ],
-        },
-        {
-            "id": "post_referral_tips",
-            "title": "找内推时，私信应该怎么写才不会让人觉得唐突",
-            "content": "最近想主动联系校友和脉脉上的前辈争取内推，但总担心表达太生硬。大家一般会怎么写第一条消息，既礼貌又能让对方快速判断是否愿意帮忙？",
-            "board": "实习内推",
-            "tags": ["内推", "私信模板", "校友"],
-            "author": {"username": "network_helper", "display_name": "求职小助手"},
-            "created_at": now - 27 * 3600,
-            "updated_at": now - 11 * 3600,
-            "pinned": False,
-            "views": 154,
-            "liked_by": ["system"],
-            "replies": [],
-        },
-    ]
-    return {"posts": posts}
-
-
-def _load_community_forum_store():
-    stored = _app_db.load_community_forum()
-    created = not isinstance(stored, dict)
-    payload = stored if isinstance(stored, dict) else _default_community_forum_payload()
-    posts = []
-    for item in payload.get("posts") or []:
-        normalized_post = _forum_normalize_post(item)
-        if normalized_post:
-            posts.append(normalized_post)
-    normalized = {"posts": posts}
-    if created:
-        _app_db.save_community_forum(normalized)
-    return normalized
-
-
-def _save_community_forum_store(payload):
-    normalized = {"posts": []}
-    for item in (payload or {}).get("posts") or []:
-        normalized_post = _forum_normalize_post(item)
-        if normalized_post:
-            normalized["posts"].append(normalized_post)
-    _app_db.save_community_forum(normalized)
-    return normalized
-
-
-def _find_community_forum_post(payload, post_id):
-    normalized_id = _forum_clean_text(post_id, 32)
-    for item in (payload or {}).get("posts") or []:
-        if item.get("id") == normalized_id:
-            return item
-    return None
-
-
-def _public_community_forum_reply(raw_reply):
-    reply = _forum_normalize_reply(raw_reply) or {}
-    return {
-        "id": str(reply.get("id") or ""),
-        "content": str(reply.get("content") or ""),
-        "created_at": int(reply.get("created_at") or 0),
-        "author": _public_forum_author(reply.get("author")),
-    }
-
-
-def _public_community_forum_post(raw_post, user=None):
-    post = _forum_normalize_post(raw_post) or {}
-    replies = [_public_community_forum_reply(item) for item in post.get("replies") or []]
-    current_username = str((user or {}).get("username") or "").strip()
-    liked_by = post.get("liked_by") or []
-    return {
-        "id": str(post.get("id") or ""),
-        "title": str(post.get("title") or ""),
-        "content": str(post.get("content") or ""),
-        "board": str(post.get("board") or ""),
-        "tags": post.get("tags") or [],
-        "author": _public_forum_author(post.get("author")),
-        "created_at": int(post.get("created_at") or 0),
-        "updated_at": int(post.get("updated_at") or 0),
-        "pinned": bool(post.get("pinned")),
-        "views": int(post.get("views") or 0),
-        "likes": len(liked_by),
-        "liked": bool(current_username and current_username in liked_by),
-        "reply_count": len(replies),
-        "replies": replies,
-        "last_reply_at": int(post.get("last_reply_at") or post.get("updated_at") or 0),
-        "last_reply_user": replies[-1]["author"]["display_name"] if replies else "",
-    }
-
-
-def _community_forum_payload(user=None):
-    store = _load_community_forum_store()
-    posts = [_public_community_forum_post(item, user) for item in store.get("posts") or []]
-    posts.sort(key=lambda item: (not item.get("pinned"), -int(item.get("updated_at") or 0), -int(item.get("created_at") or 0)))
-    board_counts = {"all": len(posts)}
-    tag_counts = {}
-    for post in posts:
-        board = str(post.get("board") or "选岗热议")
-        board_counts[board] = board_counts.get(board, 0) + 1
-        for tag in post.get("tags") or []:
-            if tag:
-                tag_counts[tag] = tag_counts.get(tag, 0) + 1
-    hot_tags = [
-        {"tag": key, "count": value}
-        for key, value in sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))[:8]
-    ]
-    now = int(time.time())
-    stats = {
-        "threads": len(posts),
-        "today_posts": sum(1 for item in posts if now - int(item.get("created_at") or 0) <= 24 * 3600),
-        "active_users": len({str(item["author"]["username"]) for post in store.get("posts", [])
-                             for item in [post, *(post.get("replies") or [])]
-                             if (item.get("author") or {}).get("username")}),
-        "unanswered": sum(1 for item in posts if not int(item.get("reply_count") or 0)),
-    }
-    boards = [{"key": "all", "label": "全部", "count": board_counts.get("all", 0)}]
-    for board in COMMUNITY_FORUM_BOARD_OPTIONS:
-        boards.append({"key": board, "label": board, "count": board_counts.get(board, 0)})
-    return {
-        "boards": boards,
-        "hot_tags": hot_tags,
-        "stats": stats,
-        "posts": posts,
-    }
-
-
-def _public_profile_portrait_state(raw_state):
-    state = raw_state if isinstance(raw_state, dict) else {}
-    image_url = str(state.get("image_url") or "").strip()
-    brief = _normalize_profile_portrait_brief(state.get("brief"))
-    context_snapshot = _normalize_profile_portrait_context(state.get("context_snapshot"))
-    if not image_url and not brief:
-        return None
-    return {
-        "status": str(state.get("status") or ("ready" if image_url else "brief_ready")).strip() or "ready",
-        "image_url": image_url,
-        "created_at": int(state.get("created_at") or 0),
-        "model": str(state.get("model") or PROFILE_PORTRAIT_MODEL).strip() or PROFILE_PORTRAIT_MODEL,
-        "archetype_name": str(state.get("archetype_name") or "").strip(),
-        "prompt_summary": str(state.get("prompt_summary") or "").strip(),
-        # 完整图像渲染提示词：供「输入输出链路」折叠区展示完整叙事，不再只显示摘要句
-        "prompt_text": str(state.get("prompt_text") or "").strip(),
-        "prompt_mode": str(state.get("prompt_mode") or "").strip(),
-        "prompt_writer_mode": str(state.get("prompt_writer_mode") or "").strip(),
-        "prompt_writer_model": str(state.get("prompt_writer_model") or "").strip(),
-        "brief_version": str(state.get("brief_version") or "").strip(),
-        "prompt_pipeline": state.get("prompt_pipeline") if isinstance(state.get("prompt_pipeline"), dict) else None,
-        "prompt_evaluation": state.get("prompt_evaluation") if isinstance(state.get("prompt_evaluation"), dict) else None,
-        "image_error": str(state.get("image_error") or "").strip(),
-        "brief": brief,
-        "context_snapshot": context_snapshot,
-    }
-
-
-def _normalize_profile_portrait_context(raw_context):
-    context = raw_context if isinstance(raw_context, dict) else {}
-    def _clean_text(value, limit=220):
-        return str(value or "").strip()[:limit]
-
-    def _clean_list(values, limit=5, item_limit=48):
-        if isinstance(values, str):
-            values = [values]
-        if not isinstance(values, list):
-            return []
-        result = []
-        for item in values:
-            text = _clean_text(item, item_limit)
-            if text:
-                result.append(text)
-            if len(result) >= limit:
-                break
-        return result
-
-    module_outputs = context.get("module_outputs") if isinstance(context.get("module_outputs"), dict) else {}
-    assessment_output = module_outputs.get("assessment") if isinstance(module_outputs.get("assessment"), dict) else {}
-    resume_output = module_outputs.get("resume") if isinstance(module_outputs.get("resume"), dict) else {}
-    interview_output = module_outputs.get("interview") if isinstance(module_outputs.get("interview"), dict) else {}
-    prompt_request = context.get("prompt_request") if isinstance(context.get("prompt_request"), dict) else {}
-
-    return {
-        "gender": _clean_text(context.get("gender"), 16),
-        "archetype_name": _clean_text(context.get("archetype_name"), 64),
-        "archetype_scene": _clean_text(context.get("archetype_scene"), 64),
-        "summary": _clean_text(context.get("summary"), 420),
-        "mbti": _clean_text(context.get("mbti"), 32),
-        "holland": _clean_text(context.get("holland"), 32),
-        "holland_top_codes": _clean_list(context.get("holland_top_codes"), limit=3, item_limit=8),
-        "major": _clean_text(context.get("major"), 64),
-        "grade": _clean_text(context.get("grade"), 32),
-        "target_city": _clean_text(context.get("target_city"), 32),
-        "target_direction": _clean_text(context.get("target_direction"), 64),
-        "role_cluster": _clean_list(context.get("role_cluster"), limit=4),
-        "top_roles": _clean_list(context.get("top_roles"), limit=3),
-        "work_values": _clean_list(context.get("work_values"), limit=4),
-        "axis_traits": _clean_list(context.get("axis_traits"), limit=4, item_limit=48),
-        "workstyle_traits": _clean_list(context.get("workstyle_traits"), limit=4, item_limit=48),
-        "interview_summary": _clean_text(context.get("interview_summary"), 320),
-        "interview_roles": _clean_list(context.get("interview_roles"), limit=4, item_limit=48),
-        "interview_values": _clean_list(context.get("interview_values"), limit=5, item_limit=48),
-        "interview_evidence": _clean_list(context.get("interview_evidence"), limit=4, item_limit=96),
-        "resume_summary": _clean_text(context.get("resume_summary"), 320),
-        "resume_roles": _clean_list(context.get("resume_roles"), limit=5, item_limit=48),
-        "resume_signals": _clean_list(context.get("resume_signals"), limit=5, item_limit=48),
-        "resume_projects": _clean_list(context.get("resume_projects"), limit=4, item_limit=120),
-        "resume_experiences": _clean_list(context.get("resume_experiences"), limit=3, item_limit=96),
-        "resume_skills": _clean_list(context.get("resume_skills"), limit=8, item_limit=32),
-        "resume_competitions": _clean_list(context.get("resume_competitions"), limit=3, item_limit=64),
-        "next_steps": _clean_list(context.get("next_steps"), limit=4, item_limit=72),
-        "missing_items": _clean_list(context.get("missing_items"), limit=4, item_limit=72),
-        "uncertainty": _clean_list(context.get("uncertainty"), limit=4, item_limit=72),
-        "identity_narrative": _clean_text(context.get("identity_narrative"), 3600),
-        "assessment_prose": _clean_text(context.get("assessment_prose"), 3600),
-        "extended_tests_prose": _clean_text(context.get("extended_tests_prose"), 3600),
-        "module_outputs": {
-            "assessment": {
-                "status": _clean_text(assessment_output.get("status"), 16),
-                "summary": _clean_text(assessment_output.get("summary"), 520),
-                "chips": _clean_list(assessment_output.get("chips"), limit=8, item_limit=48),
-                "note": _clean_text(assessment_output.get("note"), 320),
-                "detail_prose": _clean_text(assessment_output.get("detail_prose"), 3800),
-            },
-            "resume": {
-                "status": _clean_text(resume_output.get("status"), 16),
-                "summary": _clean_text(resume_output.get("summary"), 480),
-                "chips": _clean_list(resume_output.get("chips"), limit=8, item_limit=64),
-                "note": _clean_text(resume_output.get("note"), 220),
-            },
-            "interview": {
-                "status": _clean_text(interview_output.get("status"), 16),
-                "summary": _clean_text(interview_output.get("summary"), 2400),
-                "chips": _clean_list(interview_output.get("chips"), limit=8, item_limit=64),
-                "note": _clean_text(interview_output.get("note"), 420),
-                "completion_score": _safe_score(interview_output.get("completion_score"), 0),
-                "usable_for_portrait": bool(interview_output.get("usable_for_portrait")),
-                "missing_followups": _clean_list(interview_output.get("missing_followups"), limit=4, item_limit=72),
-                "forced_supplement": _clean_text(interview_output.get("forced_supplement"), 2400),
-            },
-        },
-        "prompt_request": {
-            "card_style": _clean_text(prompt_request.get("card_style"), 48),
-            "card_goal": _clean_text(prompt_request.get("card_goal"), 180),
-            "visual_direction": _clean_text(prompt_request.get("visual_direction"), 180),
-            "required_fields": _clean_list(prompt_request.get("required_fields"), limit=6, item_limit=40),
-        },
-    }
-
-
-def _normalize_profile_portrait_brief(raw_brief):
-    brief = raw_brief if isinstance(raw_brief, dict) else {}
-
-    def _clean_text(value, limit=220):
-        return str(value or "").strip()[:limit]
-
-    def _clean_list(values, limit=5, item_limit=48):
-        if isinstance(values, str):
-            values = [values]
-        if not isinstance(values, list):
-            return []
-        result = []
-        for item in values:
-            text = _clean_text(item, item_limit)
-            if text:
-                result.append(text)
-            if len(result) >= limit:
-                break
-        return result
-
-    visual_spec = brief.get("visual_spec") if isinstance(brief.get("visual_spec"), dict) else {}
-    normalized = {
-        "title": _clean_text(brief.get("title"), 40),
-        "subtitle": _clean_text(brief.get("subtitle"), 96),
-        "positioning": _clean_text(brief.get("positioning"), 180),
-        "primary_role": _clean_text(brief.get("primary_role"), 48),
-        "support_roles": _clean_list(brief.get("support_roles"), limit=2, item_limit=32),
-        "mission_line": _clean_text(brief.get("mission_line"), 120),
-        "evidence_tags": _clean_list(brief.get("evidence_tags"), limit=3, item_limit=40),
-        "value_tags": _clean_list(brief.get("value_tags"), limit=3, item_limit=24),
-        "risk_note": _clean_text(brief.get("risk_note"), 88),
-        "next_action": _clean_text(brief.get("next_action"), 88),
-        "confidence_band": _clean_text(brief.get("confidence_band"), 16),
-        "visual_spec": {
-            "style": _clean_text(visual_spec.get("style"), 72),
-            "subject_age_hint": _clean_text(visual_spec.get("subject_age_hint"), 32),
-            "subject_gender_hint": _clean_text(visual_spec.get("subject_gender_hint"), 16),
-            "outfit": _clean_text(visual_spec.get("outfit"), 88),
-            "props": _clean_text(visual_spec.get("props"), 88),
-            "scene": _clean_text(visual_spec.get("scene"), 120),
-            "mood": _clean_text(visual_spec.get("mood"), 48),
-            "composition": _clean_text(visual_spec.get("composition"), 88),
-            "palette": _clean_text(visual_spec.get("palette"), 56),
-        },
-    }
-    return normalized if any(
-        [
-            normalized["title"],
-            normalized["subtitle"],
-            normalized["primary_role"],
-            normalized["mission_line"],
-        ]
-    ) else None
-
-
-def _normalize_profile_gender(value):
-    text = str(value or "").strip().lower()
-    if not text:
-        return ""
-    mapping = {
-        "男": "男性",
-        "男性": "男性",
-        "male": "男性",
-        "man": "男性",
-        "m": "男性",
-        "女": "女性",
-        "女性": "女性",
-        "female": "女性",
-        "woman": "女性",
-        "f": "女性",
-    }
-    return mapping.get(text, str(value or "").strip())
-
-
-def _join_unique_text(items, sep="、", limit=None):
-    result = []
-    seen = set()
-    for item in items or []:
-        text = str(item or "").strip()
-        if not text:
-            continue
-        marker = text.lower()
-        if marker in seen:
-            continue
-        seen.add(marker)
-        result.append(text)
-        if limit and len(result) >= limit:
-            break
-    return sep.join(result)
-
-
-def _infer_profile_portrait_age_hint(context):
-    grade = str(context.get("grade") or "")
-    if re.search(r"博士|phd", grade, re.IGNORECASE):
-        return "24-30 岁"
-    if re.search(r"硕士|研究生|研一|研二|研三|master", grade, re.IGNORECASE):
-        return "23-27 岁"
-    if re.search(r"大四|四年级|本科|本一|本二|本三|本四|senior", grade, re.IGNORECASE):
-        return "21-25 岁"
-    if re.search(r"大一|大二|大三|一年级|二年级|三年级|freshman|sophomore|junior", grade, re.IGNORECASE):
-        return "18-23 岁"
-    if context.get("resume_experiences") or context.get("resume_projects"):
-        return "22-28 岁"
-    return "20-26 岁"
-
-
-def _describe_mbti_tendency(value):
-    token = "".join(re.findall(r"[A-Za-z]", str(value or "").upper()))[:4]
-    if len(token) != 4:
-        return ""
-    trait_map = {
-        "E": "外向主动",
-        "I": "内敛专注",
-        "S": "务实细致",
-        "N": "抽象探索",
-        "T": "理性判断",
-        "F": "共情敏锐",
-        "J": "结构规划",
-        "P": "灵活应变",
-    }
-    traits = [trait_map.get(letter, "") for letter in token if trait_map.get(letter)]
-    if not traits:
-        return token
-    return f"{token} 倾向，整体更偏{_join_unique_text(traits, '、', 4)}"
-
-
-def _describe_holland_tendency(code, top_codes=None):
-    letters = []
-    raw = "".join(re.findall(r"[A-Za-z]", str(code or "").upper()))
-    for letter in raw:
-        if letter not in letters:
-            letters.append(letter)
-    for item in top_codes or []:
-        text = "".join(re.findall(r"[A-Za-z]", str(item or "").upper()))
-        if text and text[0] not in letters:
-            letters.append(text[0])
-    letters = letters[:3]
-    label_map = {
-        "R": "动手实践",
-        "I": "分析研究",
-        "A": "创意表达",
-        "S": "协作助人",
-        "E": "组织推动",
-        "C": "秩序执行",
-    }
-    labels = [label_map.get(letter, "") for letter in letters if label_map.get(letter)]
-    if not letters and not labels:
-        return ""
-    joined_letters = "".join(letters)
-    if not labels:
-        return joined_letters
-    return f"{joined_letters} 倾向，兴趣上更偏{_join_unique_text(labels, '、', 3)}"
-
-
-def _infer_profile_portrait_visual_cues(context):
-    combined = " ".join(
-        [
-            context.get("target_direction") or "",
-            context.get("archetype_name") or "",
-            context.get("archetype_scene") or "",
-            _join_unique_text(context.get("top_roles"), " "),
-            _join_unique_text(context.get("role_cluster"), " "),
-            _join_unique_text(context.get("resume_roles"), " "),
-            _join_unique_text(context.get("resume_skills"), " "),
-        ]
-    )
-    if re.search(r"产品|项目|运营|行政|助理|协调|hr|人力|pm", combined, re.IGNORECASE):
-        return {
-            "outfit": "商务休闲穿搭，利落西装外套或针织叠穿",
-            "props": "平板、笔记本、进度表或触控笔",
-            "scene": "现代办公室、协作面板、轻度科技感管理界面",
-            "mood": "沉稳、可靠、组织感强",
-        }
-    if re.search(r"数据|分析|财务|审计|研究|算法|开发|后端|测试|工程", combined, re.IGNORECASE):
-        return {
-            "outfit": "干净利落的职场穿搭，衬衫或简洁外套",
-            "props": "笔记本电脑、数据报表、分析界面",
-            "scene": "安静的办公桌面、数据图表屏幕、科技办公环境",
-            "mood": "理性、专注、可信赖",
-        }
-    if re.search(r"设计|内容|新媒体|编辑|品牌|创意", combined, re.IGNORECASE):
-        return {
-            "outfit": "更有设计感的都市职业穿搭，简洁但有创意细节",
-            "props": "数位板、便签、创意稿件或视觉素材",
-            "scene": "创意工作台、品牌墙、轻量工作界面",
-            "mood": "敏锐、清爽、有表达力",
-        }
-    if re.search(r"销售|客户|商务|市场", combined, re.IGNORECASE):
-        return {
-            "outfit": "偏正式的商务穿搭",
-            "props": "手机、文件夹、演示资料",
-            "scene": "会议室或商务洽谈空间",
-            "mood": "自信、利落、有推进感",
-        }
-    return {
-        "outfit": "清爽的职场青年穿搭，商务休闲风",
-        "props": "平板或笔记本、工作记录工具",
-        "scene": "现代办公空间与柔和科技感背景",
-        "mood": "专业、克制、可信赖",
-    }
-
-
-def _infer_profile_portrait_role_group_v2(*values):
-    combined = " ".join([str(value or "") for value in values])
-    if re.search(r"产品|项目|运营|行政|助理|协调|人力|hr|pm", combined, re.IGNORECASE):
-        return "coordination"
-    if re.search(r"数据|分析|财务|审计|研究|算法|开发|后端|测试|工程", combined, re.IGNORECASE):
-        return "analysis"
-    if re.search(r"内容|新媒体|编辑|策划|设计|品牌|创意", combined, re.IGNORECASE):
-        return "creative"
-    if re.search(r"销售|商务|市场|客户|增长|bd", combined, re.IGNORECASE):
-        return "growth"
-    return "general"
-
-
-def _build_profile_portrait_title_v2(group, archetype_name=""):
-    title_map = {
-        "coordination": "执行协调型推进者",
-        "analysis": "分析洞察型构建者",
-        "creative": "表达策划型连接者",
-        "growth": "增长拓展型连接者",
-        "general": "职业探索型支持者",
-    }
-    if archetype_name and archetype_name not in ("综合支持者", "职业探索中"):
-        return archetype_name
-    return title_map.get(group, title_map["general"])
-
-
-def _build_profile_portrait_positioning_v2(group, primary_role, context):
-    scene = primary_role or context.get("target_direction") or context.get("archetype_scene") or "当前职业方向"
-    if group == "coordination":
-        return f"你更像能在清晰目标下整合信息、推进协作并把任务落地到结果的人，最适合在 {scene} 相关场景发力。"
-    if group == "analysis":
-        return f"你更像能在高信息密度场景里建立判断、拆解问题并持续优化结果的人，最适合在 {scene} 相关场景发力。"
-    if group == "creative":
-        return f"你更像通过表达、内容和创意组织信息的人，适合在 {scene} 相关场景里承担策划与输出角色。"
-    if group == "growth":
-        return f"你更像能面向目标主动推进、连接资源并推动机会转化的人，适合在 {scene} 相关场景里承担前线角色。"
-    return f"你当前更像一个具备适配性与执行力的职业新人，正在围绕 {scene} 收敛更稳定的职业定位。"
-
-
-def _build_profile_portrait_mission_line_v2(group, primary_role):
-    role = primary_role or "当前目标方向"
-    if group == "coordination":
-        return f"最适合承担 {role} 场景中的信息统筹、进度推进、任务闭环与跨角色协作工作。"
-    if group == "analysis":
-        return f"最适合承担 {role} 场景中的问题拆解、分析判断、结构搭建与持续优化工作。"
-    if group == "creative":
-        return f"最适合承担 {role} 场景中的内容组织、表达策划、创意整合与产出打磨工作。"
-    if group == "growth":
-        return f"最适合承担 {role} 场景中的机会推进、客户沟通、目标跟进与结果转化工作。"
-    return f"最适合在 {role} 相关岗位中承担支持执行、快速学习与稳定交付类任务。"
-
-
-def _build_profile_portrait_evidence_tags_v2(context, primary_role):
-    evidence = []
-    if context.get("mbti"):
-        evidence.append(f"MBTI：{context.get('mbti')}")
-    if context.get("holland"):
-        evidence.append(f"霍兰德：{context.get('holland')}")
-    if primary_role:
-        evidence.append(f"岗位线索：{primary_role}")
-    if context.get("resume_roles"):
-        evidence.append(f"简历角色：{context['resume_roles'][0]}")
-    if context.get("resume_projects"):
-        evidence.append(f"项目经历：{context['resume_projects'][0][:22]}")
-    if context.get("interview_roles"):
-        evidence.append(f"访谈偏好：{context['interview_roles'][0]}")
-    if context.get("interview_values"):
-        evidence.append(f"价值观：{context['interview_values'][0]}")
-    if context.get("target_direction"):
-        evidence.append(f"目标方向：{context['target_direction']}")
-    cleaned = []
-    for item in evidence:
-        text = str(item or "").strip()[:40]
-        if text and text not in cleaned:
-            cleaned.append(text)
-        if len(cleaned) >= 3:
-            break
-    return cleaned
-
-
-def _estimate_profile_portrait_confidence_v2(context, primary_role):
-    signal_count = sum(
-        1
-        for item in [
-            context.get("mbti"),
-            context.get("holland"),
-            context.get("resume_summary"),
-            context.get("interview_summary"),
-            context.get("target_direction"),
-            context.get("resume_projects"),
-            context.get("resume_roles"),
-        ]
-        if item
-    )
-    target_direction = str(context.get("target_direction") or "").strip()
-    matches_target = bool(target_direction and primary_role and (target_direction in primary_role or primary_role in target_direction))
-    if signal_count >= 5 and (matches_target or context.get("resume_roles") or context.get("interview_roles")):
-        return "高"
-    if signal_count >= 3:
-        return "中"
-    return "待验证"
-
-
-def _infer_profile_portrait_risk_note_v2(context, primary_role):
-    for item in context.get("uncertainty") or []:
-        if str(item or "").strip():
-            return str(item).strip()
-    for item in context.get("missing_items") or []:
-        if str(item or "").strip():
-            return f"当前仍需补充：{str(item).strip()}"
-    target_direction = str(context.get("target_direction") or "").strip()
-    if target_direction and primary_role and target_direction not in primary_role and primary_role not in target_direction:
-        return "你填写的目标方向与当前最强证据并不完全一致，建议先以证据更强的角色做展示。"
-    return "当前画像已可用于展示，但主导特征仍建议继续用新经历补强。"
-
-
-def _infer_profile_portrait_next_action_v2(context, primary_role):
-    for item in context.get("next_steps") or []:
-        if str(item or "").strip():
-            return str(item).strip()
-    if context.get("missing_items"):
-        return f"优先补齐 {str(context['missing_items'][0]).strip()}，让这张名片的证据更完整。"
-    role = primary_role or context.get("target_direction") or "目标岗位"
-    return f"围绕 {role} 补一条可量化项目成果，用结果指标强化这张任务名片。"
-
-
-def _build_profile_portrait_palette_v2(group):
-    palette_map = {
-        "coordination": "雾蓝、深海军蓝、冰白",
-        "analysis": "深蓝、青灰、冷白",
-        "creative": "钴蓝、雾紫灰、纸白",
-        "growth": "墨蓝、青绿、银灰白",
-        "general": "石板蓝、雾灰、白色",
-    }
-    return palette_map.get(group, palette_map["general"])
-
-
-def _build_profile_portrait_brief(context):
-    primary_role = (
-        (context.get("top_roles") or [""])[0]
-        or (context.get("role_cluster") or [""])[0]
-        or str(context.get("target_direction") or "").strip()
-        or (context.get("resume_roles") or [""])[0]
-        or (context.get("interview_roles") or [""])[0]
-        or "职业探索中"
-    )
-    support_roles = []
-    for item in (
-        (context.get("top_roles") or [])[1:]
-        + (context.get("role_cluster") or [])
-        + (context.get("interview_roles") or [])
-        + (context.get("resume_roles") or [])
-    ):
-        text = str(item or "").strip()
-        if text and text != primary_role and text not in support_roles:
-            support_roles.append(text)
-        if len(support_roles) >= 2:
-            break
-
-    group = _infer_profile_portrait_role_group_v2(
-        primary_role,
-        context.get("target_direction"),
-        context.get("archetype_name"),
-        _join_unique_text(context.get("resume_roles"), " "),
-        _join_unique_text(context.get("top_roles"), " "),
-    )
-    visual_cues = _infer_profile_portrait_visual_cues(context)
-    title = _build_profile_portrait_title_v2(group, context.get("archetype_name") or "")
-    subtitle = _build_profile_portrait_positioning_v2(group, primary_role, context)
-    brief = {
-        "title": title,
-        "subtitle": subtitle[:88],
-        "positioning": subtitle,
-        "primary_role": primary_role,
-        "support_roles": support_roles[:2],
-        "mission_line": _build_profile_portrait_mission_line_v2(group, primary_role),
-        "evidence_tags": _build_profile_portrait_evidence_tags_v2(context, primary_role),
-        "value_tags": (context.get("work_values") or [])[:3] or ["稳定成长", "结果导向", "持续进步"],
-        "risk_note": _infer_profile_portrait_risk_note_v2(context, primary_role),
-        "next_action": _infer_profile_portrait_next_action_v2(context, primary_role),
-        "confidence_band": _estimate_profile_portrait_confidence_v2(context, primary_role),
-        "visual_spec": {
-            "style": "半写实职业插画，白底页面兼容，适合做任务名片主视觉",
-            "subject_age_hint": _infer_profile_portrait_age_hint(context),
-            "subject_gender_hint": _normalize_profile_gender(context.get("gender")) or "未指定",
-            "outfit": visual_cues["outfit"],
-            "props": visual_cues["props"],
-            "scene": visual_cues["scene"],
-            "mood": visual_cues["mood"],
-            "composition": "3:4 纵向构图，单人半身到 2/3 身，人物居中或略偏左，画面干净克制",
-            "palette": _build_profile_portrait_palette_v2(group),
-        },
-    }
-    return _normalize_profile_portrait_brief(brief)
-
-
-def _build_profile_portrait_summary_from_brief(brief):
-    normalized = _normalize_profile_portrait_brief(brief) or {}
-    return str(normalized.get("subtitle") or normalized.get("positioning") or "").strip()
-
-
-def _merge_profile_portrait_brief(primary, fallback):
-    primary_brief = _normalize_profile_portrait_brief(primary) or {}
-    fallback_brief = _normalize_profile_portrait_brief(fallback) or {}
-    merged_visual = {}
-    for key in ("style", "subject_age_hint", "subject_gender_hint", "outfit", "props", "scene", "mood", "composition", "palette"):
-        merged_visual[key] = (
-            (primary_brief.get("visual_spec") or {}).get(key)
-            or (fallback_brief.get("visual_spec") or {}).get(key)
-            or ""
-        )
-    merged = {
-        "title": primary_brief.get("title") or fallback_brief.get("title") or "",
-        "subtitle": primary_brief.get("subtitle") or fallback_brief.get("subtitle") or "",
-        "positioning": primary_brief.get("positioning") or fallback_brief.get("positioning") or "",
-        "primary_role": primary_brief.get("primary_role") or fallback_brief.get("primary_role") or "",
-        "support_roles": (primary_brief.get("support_roles") or fallback_brief.get("support_roles") or [])[:2],
-        "mission_line": primary_brief.get("mission_line") or fallback_brief.get("mission_line") or "",
-        "evidence_tags": (primary_brief.get("evidence_tags") or fallback_brief.get("evidence_tags") or [])[:3],
-        "value_tags": (primary_brief.get("value_tags") or fallback_brief.get("value_tags") or [])[:3],
-        "risk_note": primary_brief.get("risk_note") or fallback_brief.get("risk_note") or "",
-        "next_action": primary_brief.get("next_action") or fallback_brief.get("next_action") or "",
-        "confidence_band": primary_brief.get("confidence_band") or fallback_brief.get("confidence_band") or "",
-        "visual_spec": merged_visual,
-    }
-    return _normalize_profile_portrait_brief(merged) or fallback_brief or primary_brief or None
-
-
-def _pipeline_interview_supplement(context: dict) -> str:
-    """访谈弱信号时，用主画像与测评侧线索强制补一段可写入提示词的叙事。"""
-    parts = []
-    thesis = str(context.get("summary") or "").strip()
-    if thesis:
-        parts.append(f"主画像收敛：{thesis[:520]}")
-    roles = context.get("top_roles") or []
-    if roles:
-        parts.append(f"岗位线索：{'、'.join([str(r) for r in roles[:3] if r])}")
-    vals = context.get("work_values") or []
-    if vals:
-        parts.append(f"价值观：{'、'.join([str(v) for v in vals[:4] if v])}")
-    mbti = str(context.get("mbti") or "").strip()
-    hol = str(context.get("holland") or "").strip()
-    if mbti or hol:
-        parts.append(f"测评交叉：MBTI {mbti or '—'}；霍兰德 {hol or '—'}。")
-    return "\n".join(parts)
-
-
-def _build_profile_portrait_module_outputs(context):
-    raw_modules = context.get("module_outputs") if isinstance(context.get("module_outputs"), dict) else {}
-    assessment_raw = raw_modules.get("assessment") if isinstance(raw_modules.get("assessment"), dict) else {}
-    resume_raw = raw_modules.get("resume") if isinstance(raw_modules.get("resume"), dict) else {}
-    interview_raw = raw_modules.get("interview") if isinstance(raw_modules.get("interview"), dict) else {}
-
-    assessment = {
-        "status": str(assessment_raw.get("status") or ("complete" if (context.get("mbti") and context.get("holland")) else ("partial" if (context.get("mbti") or context.get("holland")) else "missing"))).strip(),
-        "summary": str(assessment_raw.get("summary") or "｜".join([item for item in [f"MBTI {context.get('mbti')}" if context.get("mbti") else "", f"霍兰德 {context.get('holland')}" if context.get("holland") else ""] if item]) or "尚未形成稳定测评输出").strip(),
-        "chips": (assessment_raw.get("chips") if isinstance(assessment_raw.get("chips"), list) else [item for item in [context.get("mbti"), context.get("holland")] if item])[:8],
-        "note": str(assessment_raw.get("note") or ("提供人格倾向与职业兴趣的基础锚点。" if (context.get("mbti") or context.get("holland")) else "测评未完成时，人物画像只使用其它模块做弱收敛。")).strip(),
-    }
-    detail_merge = str(assessment_raw.get("detail_prose") or context.get("assessment_prose") or "").strip()
-    if detail_merge:
-        assessment["summary"] = f"{assessment['summary']}\n\n【测评长文本与类型补述】\n{detail_merge[:2400]}".strip()
-
-    resume = {
-        "status": str(resume_raw.get("status") or ("complete" if (context.get("resume_summary") or context.get("resume_roles") or context.get("resume_projects")) else "missing")).strip(),
-        "summary": str(resume_raw.get("summary") or context.get("resume_summary") or "尚未形成可用的简历证据").strip(),
-        "chips": (resume_raw.get("chips") if isinstance(resume_raw.get("chips"), list) else ((context.get("resume_roles") or []) + (context.get("resume_skills") or [])[:3]))[:8],
-        "note": str(resume_raw.get("note") or ("提供角色线索、项目证据与技能关键词。" if (context.get("resume_summary") or context.get("resume_roles") or context.get("resume_projects")) else "没有简历时，人物画像缺少经历证据，只能更多依赖测评和访谈。")).strip(),
-    }
-    interview_completion_score = _safe_score(interview_raw.get("completion_score"), 0)
-    interview = {
-        "status": str(interview_raw.get("status") or ("complete" if interview_raw.get("usable_for_portrait") else ("partial" if (context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")) else "missing"))).strip(),
-        "summary": str(interview_raw.get("summary") or context.get("interview_summary") or "尚未形成访谈摘要").strip(),
-        "chips": (interview_raw.get("chips") if isinstance(interview_raw.get("chips"), list) else ((context.get("interview_values") or []) + (context.get("interview_roles") or []) + (context.get("interview_evidence") or [])))[:8],
-        "note": str(interview_raw.get("note") or ("即使提前结束，只要已经形成价值观、经历或协作风格信号，就可以进入首版画像。" if (context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")) else "没有访谈信号时，画像更像静态推断。")).strip(),
-        "completion_score": interview_completion_score,
-        "usable_for_portrait": bool(interview_raw.get("usable_for_portrait") or context.get("interview_summary") or context.get("interview_values") or context.get("interview_evidence")),
-        "missing_followups": (interview_raw.get("missing_followups") if isinstance(interview_raw.get("missing_followups"), list) else context.get("missing_items") or [])[:4],
-    }
-    forced = str(interview_raw.get("forced_supplement") or "").strip()
-    iv_note = str(interview_raw.get("note") or interview.get("note") or "")
-    weak_iv = len(interview["summary"]) < 36 or "弱信号" in iv_note
-    if weak_iv:
-        extra = forced or _pipeline_interview_supplement(context)
-        if extra:
-            interview["summary"] = f"{interview['summary']}\n\n【访谈强制补述】\n{extra}".strip()
-            interview["usable_for_portrait"] = True
-    return {"assessment": assessment, "resume": resume, "interview": interview}
-
-
-def _normalize_profile_portrait_prompt_packet(raw_payload):
-    payload = raw_payload if isinstance(raw_payload, dict) else {}
-
-    def _clean_text(value, limit=2600):
-        return str(value or "").strip()[:limit]
-
-    return {
-        "brief": _normalize_profile_portrait_brief(payload.get("brief")),
-        "prompt_summary": _clean_text(payload.get("prompt_summary"), 360),
-        "render_prompt": _clean_text(payload.get("render_prompt"), 8000),
-        "prompt_pipeline": payload.get("prompt_pipeline") if isinstance(payload.get("prompt_pipeline"), dict) else None,
-        "prompt_evaluation": payload.get("prompt_evaluation") if isinstance(payload.get("prompt_evaluation"), dict) else None,
-    }
-
-
-def _build_profile_portrait_prompt_packet(context, preset_brief=None):
-    fallback_brief = _normalize_profile_portrait_brief(preset_brief) or _build_profile_portrait_brief(context)
-    prompt_layers = build_portrait_prompt_layers(context, fallback_brief)
-    packet = {
-        "brief": fallback_brief,
-        "prompt_summary": _build_profile_portrait_summary_from_brief(fallback_brief) or context.get("summary") or "",
-        "render_prompt": _build_profile_portrait_render_prompt(context, fallback_brief),
-        "mode": "heuristic",
-        "writer_model": "",
-        "prompt_pipeline": prompt_layers,
-        "prompt_evaluation": None,
-    }
-
-    base_url, api_key, model = _get_active_provider_and_model()
-    if not base_url or not api_key or not model:
-        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
-        return packet
-
-    module_outputs = _build_profile_portrait_module_outputs(context)
-    prompt_request = context.get("prompt_request") if isinstance(context.get("prompt_request"), dict) else {}
-    system_prompt = """
-你是职业规划产品的画像提示词编辑器。请根据 3 个输入模块的标准化输出，生成一份“人物明信片 brief”和一段“给图像模型使用的渲染提示词”。
-
-要求：
-1. 先消化测评输出、简历输出、访谈输出，不要逐条机械复述，但要**把关键气质、岗位语境与证据写进叙事**。
-2. 若访谈为弱信号或已合并「强制补述」，必须把补述当作可画面化的线索写进 render_prompt（协作风格、价值取向、推断性神态），并标明哪些是推断。
-3. brief 必须用于白底产品页面，信息要清晰、克制、可展示；brief 本身不是长文，但 **render_prompt 必须是长而完整的叙事级提示词**（建议不少于 500 汉字），像美术指导写给插画师的分镜说明。
-4. render_prompt 必须是给图像模型的**完整中文**提示词：明确 3:4 纵向、单人、半写实偏写实比例、电影感自然光、无文字无水印、适合人物明信片主视觉；写出**具体场景、机位、服装材质、道具、微表情与体态**。
-5. 若输入不足，允许保守收敛，标注不确定性，但不要省略画面约束与气质描写。
-6. global_context.identity_narrative、assessment_prose、extended_tests_prose 含「你是谁」级叙事与主测/扩展测评的文字描述；生成 render_prompt 时必须把这些**具体气质、场景、专业语境**融入画面，**禁止**只写 MBTI/霍兰德四字代码或标签堆砌。
-7. 若 extended_tests_prose 非空，图像提示中应体现扩展测评里的角色气质或情绪隐喻（抽象转化为职业场景与光影），仍禁止在画面中出现文字。
-8. 画风：偏「高端出版物插画 + 写实肤质与布料」、柔和窗光或阴天柔光、浅景深、干净背景；避免廉价滤镜、过度磨皮、赛博霓虹与 Q 版大头。
-
-严格输出 JSON：
-{
-  "brief": {
-    "title": "人物卡标题",
-    "subtitle": "80字内副标题",
-    "positioning": "140字内定位说明",
-    "primary_role": "最像岗位",
-    "support_roles": ["辅助岗位1", "辅助岗位2"],
-    "mission_line": "一句任务描述",
-    "evidence_tags": ["证据1", "证据2", "证据3"],
-    "value_tags": ["价值观1", "价值观2", "价值观3"],
-    "risk_note": "当前仍需注意的地方",
-    "next_action": "下一步建议",
-    "confidence_band": "高/中/待验证",
-    "visual_spec": {
-      "style": "视觉风格",
-      "subject_age_hint": "年龄提示",
-      "subject_gender_hint": "性别提示",
-      "outfit": "穿搭",
-      "props": "道具",
-      "scene": "场景",
-      "mood": "气质",
-      "composition": "构图",
-      "palette": "配色"
-    }
-  },
-  "prompt_summary": "一句话说明 AI 最终如何收敛这个人物画像",
-  "render_prompt": "写给图像模型的完整中文提示词"
-}
-""".strip()
-
-    system_prompt += "如果 profile.target_cities 非空，必须优先选择这些城市内的候选；只有城市内候选不足时，才用其他城市补足。"
-    user_payload = {
-        "assessment_output": module_outputs.get("assessment") or {},
-        "resume_output": module_outputs.get("resume") or {},
-        "interview_output": module_outputs.get("interview") or {},
-        "prompt_pipeline": prompt_layers,
-        "global_context": {
-            "summary": context.get("summary") or "",
-            "archetype_name": context.get("archetype_name") or "",
-            "archetype_scene": context.get("archetype_scene") or "",
-            "top_roles": context.get("top_roles") or [],
-            "role_cluster": context.get("role_cluster") or [],
-            "work_values": context.get("work_values") or [],
-            "axis_traits": context.get("axis_traits") or [],
-            "workstyle_traits": context.get("workstyle_traits") or [],
-            "target_direction": context.get("target_direction") or "",
-            "target_city": context.get("target_city") or "",
-            "major": context.get("major") or "",
-            "grade": context.get("grade") or "",
-            "gender": context.get("gender") or "",
-            "uncertainty": context.get("uncertainty") or [],
-            "missing_items": context.get("missing_items") or [],
-            "identity_narrative": context.get("identity_narrative") or "",
-            "assessment_prose": context.get("assessment_prose") or "",
-            "extended_tests_prose": context.get("extended_tests_prose") or "",
-        },
-        "prompt_request": {
-            "card_style": str(prompt_request.get("card_style") or "人物明信片").strip(),
-            "card_goal": str(prompt_request.get("card_goal") or "美观清晰，一眼看懂这个人最像什么岗位、能做什么任务、下一步该补什么。").strip(),
-            "visual_direction": str(prompt_request.get("visual_direction") or "适合白底页面展示，职业感明确，信息克制，避免花哨宣传海报感。").strip(),
-            "required_fields": prompt_request.get("required_fields") or ["标题", "定位句", "主角色", "任务句", "证据标签", "下一步"],
-        },
-    }
-
-    try:
-        parsed = _call_structured_chat(
-            base_url,
-            api_key,
-            model,
-            [{"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}],
-            system_prompt=system_prompt,
-            max_tokens=4200,
-        )
-        normalized_packet = _normalize_profile_portrait_prompt_packet(parsed)
-        merged_brief = _merge_profile_portrait_brief(normalized_packet.get("brief"), fallback_brief)
-        packet["brief"] = merged_brief or fallback_brief
-        packet["prompt_summary"] = (
-            normalized_packet.get("prompt_summary")
-            or _build_profile_portrait_summary_from_brief(packet["brief"])
-            or packet["prompt_summary"]
-        )
-        packet["render_prompt"] = (
-            normalized_packet.get("render_prompt")
-            or _build_profile_portrait_render_prompt(context, packet["brief"])
-        )
-        packet["mode"] = "llm"
-        packet["writer_model"] = model
-        packet["prompt_pipeline"] = prompt_layers
-        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
-        if packet["prompt_evaluation"].get("needs_refinement"):
-            refiner_payload = {
-                "current_output": {
-                    "brief": packet.get("brief"),
-                    "prompt_summary": packet.get("prompt_summary"),
-                    "render_prompt": packet.get("render_prompt"),
-                },
-                "evaluation": packet.get("prompt_evaluation"),
-                "prompt_pipeline": prompt_layers,
-                "target": "补齐缺失字段，强化角色-证据一致性，并保留 3:4、单人、半写实、无文字等视觉硬约束。",
-            }
-            refined = _call_structured_chat(
-                base_url,
-                api_key,
-                model,
-                [{"role": "user", "content": json.dumps(refiner_payload, ensure_ascii=False)}],
-                system_prompt=(
-                    "你是职业画像提示词优化器。"
-                    "请根据上一版输出和自动评分结果，修复缺失字段、增强证据一致性，并输出同样结构的 JSON。"
-                    "尤其要把 render_prompt 扩写到叙事级完整度（画面、光影、道具、神态），不要删除已成立的角色判断。"
-                ),
-                max_tokens=3600,
-            )
-            refined_packet = _normalize_profile_portrait_prompt_packet(refined)
-            packet["brief"] = _merge_profile_portrait_brief(refined_packet.get("brief"), packet["brief"]) or packet["brief"]
-            packet["prompt_summary"] = (
-                refined_packet.get("prompt_summary")
-                or packet.get("prompt_summary")
-                or _build_profile_portrait_summary_from_brief(packet["brief"])
-            )
-            packet["render_prompt"] = (
-                refined_packet.get("render_prompt")
-                or packet.get("render_prompt")
-                or _build_profile_portrait_render_prompt(context, packet["brief"])
-            )
-            packet["mode"] = "llm_refined"
-            packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
-            if isinstance(packet.get("prompt_evaluation"), dict):
-                packet["prompt_evaluation"]["rewrite_used"] = True
-    except Exception:
-        app.logger.exception("profile portrait prompt writer failed")
-
-    if not isinstance(packet.get("prompt_evaluation"), dict):
-        packet["prompt_evaluation"] = evaluate_portrait_prompt_packet(context, packet)
-    if isinstance(packet.get("prompt_evaluation"), dict):
-        packet["prompt_evaluation"].setdefault("rewrite_used", False)
-    packet["prompt_pipeline"] = prompt_layers
-    return packet
-
-
-def _build_profile_portrait_render_prompt(context, brief=None):
-    normalized_brief = _normalize_profile_portrait_brief(brief) or _build_profile_portrait_brief(context)
-    visual_spec = normalized_brief.get("visual_spec") or {}
-    gender = _normalize_profile_gender(context.get("gender")) or "未指定"
-    title = normalized_brief.get("title") or context.get("archetype_name") or "职业任务名片"
-    subtitle = normalized_brief.get("subtitle") or context.get("summary") or ""
-    evidence_text = _join_unique_text(normalized_brief.get("evidence_tags"), "；", 3)
-    value_text = _join_unique_text(normalized_brief.get("value_tags"), "、", 3)
-    support_roles = _join_unique_text(normalized_brief.get("support_roles"), " / ", 2)
-    identity_narrative = str(context.get("identity_narrative") or "").strip()
-    assessment_prose = str(context.get("assessment_prose") or "").strip()
-    extended_prose = str(context.get("extended_tests_prose") or "").strip()
-    narrative_sections = []
-    if identity_narrative:
-        narrative_sections.append(f"【叙事·你是谁（访谈与收敛结论，用于气质与神态）】\n{identity_narrative}")
-    if assessment_prose:
-        narrative_sections.append(f"【主测评文字（MBTI/霍兰德的具体描述，勿仅当作四字代码）】\n{assessment_prose}")
-    if extended_prose:
-        narrative_sections.append(f"【扩展测评（深层 MBTI / 趣味测评 / SBTI 等详细描述）】\n{extended_prose}")
-    narrative_block = "\n\n".join(narrative_sections)
-    return (
-        "请为职业规划产品生成一张 3:4 纵向单人半写实插画海报，用于白底页面里的任务名片主视觉。"
-        "不要文字、不要水印、不要拼贴、不要多人、不要 UI 截图、不要夸张卡通。\n"
-        "以下「叙事依据」用于推断人物气质、微表情、肢体语言、工作环境与道具；画面中不得出现任何可读文字。\n"
-        + (f"{narrative_block}\n\n" if narrative_block else "")
-        + "人物身份（卡片字段）：\n"
-        f"- 标题：{title}\n"
-        f"- 职业定位：{subtitle}\n"
-        f"- 主角色：{normalized_brief.get('primary_role') or '职业探索中'}\n"
-        f"- 辅助角色：{support_roles or '不强调'}\n"
-        f"- 任务描述：{normalized_brief.get('mission_line') or ''}\n"
-        f"- 证据关键词：{evidence_text or '职业新人、方向收敛'}\n"
-        f"- 工作价值观：{value_text or '稳定成长、结果导向'}\n"
-        f"- 性别提示：{gender}\n"
-        f"- 年龄提示：{visual_spec.get('subject_age_hint') or _infer_profile_portrait_age_hint(context)}\n"
-        "视觉与画风（须严格遵守）：\n"
-        f"- 风格：{visual_spec.get('style') or '半写实职业插画，偏高端出版物/编辑插图质感，肤质与布料纹理清晰，避免塑料磨皮与廉价滤镜'}\n"
-        f"- 气质：{visual_spec.get('mood') or '专业、可信赖、沉稳；微表情自然，目光有焦点，肢体语言放松但不松散'}\n"
-        f"- 光效：自然窗光或阴天柔光，柔和体积光，适度 rim light；避免刺目顶光、霓虹赛博光、过度镜头光斑\n"
-        f"- 穿搭：{visual_spec.get('outfit') or '商务休闲或工程师风职业穿搭，材质可见（棉、针织、夹克），避免夸张 logo'}\n"
-        f"- 道具：{visual_spec.get('props') or '笔记本电脑、平板、记事本、中性水杯等职场道具，数量少而有序'}\n"
-        f"- 场景：{visual_spec.get('scene') or '明亮现代办公或实验室风工作台，背景干净略虚化（浅景深）'}\n"
-        f"- 构图：{visual_spec.get('composition') or '3:4 纵向，单人，胸像到 2/3 身，视线方向留白，主体居中偏三分线'}\n"
-        f"- 配色：{visual_spec.get('palette') or '雾蓝、燕麦白、板岩灰与少量暖木色点缀，整体低饱和'}\n"
-        "输出要求：人物主体明确，手部结构合理，画面信息密度适中，适合白底产品页左侧主视觉。"
-        "负面要求：低清晰度、杂乱背景、比例失调、畸形手部、Q 版大头、贴纸海报风、可读文字、水印、多人同框。"
-    )
-
-
-def _build_profile_portrait_subject_summary(context):
-    identity = []
-    gender = _normalize_profile_gender(context.get("gender"))
-    if gender:
-        identity.append(gender)
-    identity.append(_infer_profile_portrait_age_hint(context))
-    identity.append("中国青年职场形象")
-    role_focus = _join_unique_text(
-        context.get("top_roles") or context.get("role_cluster") or [context.get("target_direction") or context.get("archetype_name")],
-        " / ",
-        3,
-    )
-    trait_parts = []
-    if context.get("archetype_name"):
-        trait_parts.append(context.get("archetype_name"))
-    mbti_desc = _describe_mbti_tendency(context.get("mbti"))
-    holland_desc = _describe_holland_tendency(context.get("holland"), context.get("holland_top_codes"))
-    if mbti_desc:
-        trait_parts.append(mbti_desc)
-    if holland_desc:
-        trait_parts.append(holland_desc)
-    if context.get("work_values"):
-        trait_parts.append(f"工作中看重{_join_unique_text(context.get('work_values'), '、', 4)}")
-    if context.get("axis_traits"):
-        trait_parts.append(f"工作方式偏向{_join_unique_text(context.get('axis_traits'), '；', 2)}")
-    evidence_parts = []
-    resume_summary = str(context.get("resume_summary") or "").strip()
-    if resume_summary and resume_summary.lower() != "unknown":
-        evidence_parts.append(f"简历显示{resume_summary}")
-    if context.get("resume_projects"):
-        evidence_parts.append(f"项目经历集中在{_join_unique_text(context.get('resume_projects'), '；', 2)}")
-    if context.get("interview_summary"):
-        evidence_parts.append(f"访谈体现出{context.get('interview_summary')}")
-    elif context.get("interview_evidence"):
-        evidence_parts.append(f"访谈证据包括{_join_unique_text(context.get('interview_evidence'), '；', 2)}")
-    pieces = [
-        "，".join([part for part in identity if part]),
-        f"职业定位接近 {role_focus}" if role_focus else "",
-        "；".join([part for part in trait_parts if part]),
-        "；".join([part for part in evidence_parts if part]),
-    ]
-    return "。".join([piece for piece in pieces if piece])
-
-
-def _has_profile_portrait_signal(context):
-    return any(
-        [
-            context.get("summary"),
-            context.get("archetype_name"),
-            context.get("target_direction"),
-            context.get("resume_summary"),
-            context.get("interview_summary"),
-            context.get("resume_projects"),
-            context.get("resume_roles"),
-            context.get("work_values"),
-            context.get("identity_narrative"),
-            context.get("assessment_prose"),
-            context.get("extended_tests_prose"),
-        ]
-    )
-
-
-def _build_profile_portrait_prompt(context):
-    gender = _normalize_profile_gender(context.get("gender")) or "未指定"
-    age_hint = _infer_profile_portrait_age_hint(context)
-    archetype_name = context.get("archetype_name") or "综合支持者"
-    role_focus = _join_unique_text(
-        context.get("top_roles") or context.get("role_cluster") or [context.get("target_direction") or "职业探索方向"],
-        " / ",
-        3,
-    )
-    work_values = _join_unique_text(context.get("work_values"), "、", 4) or "成长、清晰感、执行落地"
-    subject_summary = _build_profile_portrait_subject_summary(context)
-    mbti_desc = _describe_mbti_tendency(context.get("mbti"))
-    holland_desc = _describe_holland_tendency(context.get("holland"), context.get("holland_top_codes"))
-    visual_cues = _infer_profile_portrait_visual_cues(context)
-    detail_lines = [
-        f"- 性别：{gender}",
-        f"- 年龄感：{age_hint}",
-        f"- 人物原型：{archetype_name}",
-        f"- 目标职业场景：{role_focus}",
-        f"- 综合摘要：{subject_summary or (context.get('summary') or '')}",
-        f"- MBTI 信息：{mbti_desc}" if mbti_desc else "",
-        f"- 霍兰德信息：{holland_desc}" if holland_desc else "",
-        f"- 工作价值观：{work_values}",
-        f"- 工作方式：{_join_unique_text(context.get('axis_traits'), '；', 3)}" if context.get("axis_traits") else "",
-        f"- 工作风格拼图：{_join_unique_text(context.get('workstyle_traits'), '；', 3)}" if context.get("workstyle_traits") else "",
-        f"- 访谈角色判断：{_join_unique_text(context.get('interview_roles'), '、', 3)}" if context.get("interview_roles") else "",
-        f"- 访谈价值观证据：{_join_unique_text(context.get('interview_values'), '、', 4)}" if context.get("interview_values") else "",
-        f"- 访谈关键证据：{_join_unique_text(context.get('interview_evidence'), '；', 2)}" if context.get("interview_evidence") else "",
-        f"- 简历角色线索：{_join_unique_text(context.get('resume_roles'), '、', 4)}" if context.get("resume_roles") else "",
-        f"- 简历项目线索：{_join_unique_text(context.get('resume_projects'), '；', 2)}" if context.get("resume_projects") else "",
-        f"- 简历经历线索：{_join_unique_text(context.get('resume_experiences'), '；', 2)}" if context.get("resume_experiences") else "",
-        f"- 简历技能关键词：{_join_unique_text(context.get('resume_skills'), '、', 6)}" if context.get("resume_skills") else "",
-        f"- 专业：{context.get('major')}" if context.get("major") else "",
-        f"- 学历：{context.get('grade')}" if context.get("grade") else "",
-        f"- 目标城市：{context.get('target_city')}" if context.get("target_city") else "",
-        f"- 目标方向：{context.get('target_direction')}" if context.get("target_direction") else "",
-    ]
-    detail_block = "\n".join([line for line in detail_lines if line])
-    return (
-        "请为职业规划仪表盘绘制一张 3:4 纵向人物画像插画，只出现 1 位人物，不要文字、不要水印、不要拼贴、不要重复面孔、不要多余手指。\n"
-        "先把下面的人物信息融合成一个统一角色，再作画，不要机械堆叠标签，也不要把 MBTI、霍兰德字母直接画在画面里。\n"
-        "人物信息：\n"
-        f"{detail_block}\n"
-        "视觉表达要求：\n"
-        f"- 整体定位：中国年轻学生或职场新人，气质 {visual_cues['mood']}。\n"
-        f"- 穿搭：{visual_cues['outfit']}。\n"
-        f"- 道具：{visual_cues['props']}。\n"
-        f"- 场景：{visual_cues['scene']}，可带轻度数据面板或协作界面氛围。\n"
-        "- 构图：半身到三分之二身，人物居中或略偏左，主体突出。\n"
-        "- 风格：精致数字插画，写实与动漫融合，光线柔和，高级企业海报质感，蓝白到青蓝渐变背景。\n"
-        "- 氛围：冷静、聪明、可信赖，同时能让人看出其职业方向和工作方式。\n"
-        "负面要求：低清晰度、背景杂乱、夸张卡通、过度赛博朋克、文字乱码、畸形手部、比例失衡。"
-    )
-
-
-def _generate_profile_portrait_image(base_url, api_key, model, prompt):
-    if not base_url or not api_key:
-        raise ValueError("系统中还没有可用的 OpenRouter 图片配置。")
-    endpoint = f"{_normalize_sdk_base_url(base_url)}/chat/completions"
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "modalities": ["image", "text"],
-        "image_config": {"aspect_ratio": "3:4"},
-    }
-    req = urllib.request.Request(
-        endpoint,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        try:
-            parsed = json.loads(detail or "{}")
-            message = str(parsed.get("error", {}).get("message") or parsed.get("message") or "").strip()
-        except Exception:
-            message = ""
-        raise ValueError(message or f"图片接口调用失败：HTTP {exc.code}") from exc
-    except Exception as exc:
-        raise ValueError(f"图片接口调用失败：{str(exc)[:240]}") from exc
-
-    try:
-        result = json.loads(raw.decode("utf-8"))
-    except Exception as exc:
-        raise ValueError("图片接口返回了无法解析的数据。") from exc
-
-    choices = result.get("choices") if isinstance(result, dict) else []
-    message = choices[0].get("message") if choices and isinstance(choices[0], dict) else {}
-    images = message.get("images") if isinstance(message, dict) else []
-    if not images:
-        raise ValueError("模型没有返回图片结果。")
-    image_url = str((((images[0] or {}).get("image_url") or {}).get("url")) or "").strip()
-    if not image_url:
-        raise ValueError("图片结果为空。")
-    return image_url
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def _career_report_user_dir(username):
@@ -3705,7 +2291,8 @@ def _available_tesseract_languages():
     _configure_tesseract_command()
     try:
         return [str(item or "").strip() for item in pytesseract.get_languages(config="") if str(item or "").strip()]
-    except Exception:
+    except Exception as exc:
+        logger.warning("无法读取 Tesseract 语言列表：%s", type(exc).__name__)
         return []
 
 
@@ -3738,7 +2325,8 @@ def _run_resume_ocr(image, lang):
     primary_text = ""
     try:
         primary_text = pytesseract.image_to_string(image, lang=lang, config="--oem 3 --psm 6")
-    except Exception:
+    except Exception as exc:
+        logger.warning("OCR 首次识别失败：%s", type(exc).__name__)
         primary_text = ""
     primary_score = _resume_text_quality_score(primary_text)
     if primary_score >= 900:
@@ -3750,7 +2338,8 @@ def _run_resume_ocr(image, lang):
 
     try:
         fallback_text = pytesseract.image_to_string(prepared_image, lang=lang, config="--oem 3 --psm 6")
-    except Exception:
+    except Exception as exc:
+        logger.warning("OCR 预处理后识别失败：%s", type(exc).__name__)
         fallback_text = ""
 
     if _resume_text_quality_score(fallback_text) > primary_score:
@@ -3767,8 +2356,8 @@ def _extract_pdf_text_pages(pdf_path):
                 text = _normalize_resume_text(page.extract_text() or "")
                 if text:
                     pypdf_pages.append({"page_no": idx, "source": "pypdf", "text": text})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("pypdf 读取简历失败，改用其他引擎：%s", type(exc).__name__)
 
     plumber_pages = []
     if pdfplumber is not None:
@@ -3781,14 +2370,15 @@ def _extract_pdf_text_pages(pdf_path):
                             variants.append(page.extract_text(**kwargs) or "")
                         except TypeError:
                             variants.append(page.extract_text() or "")
-                        except Exception:
+                        except Exception as exc:
+                            logger.debug("pdfplumber 页面解析失败：%s", type(exc).__name__)
                             continue
                     text = max(variants, key=_resume_text_quality_score, default="")
                     text = _normalize_resume_text(text)
                     if text:
                         plumber_pages.append({"page_no": idx, "source": "pdfplumber", "text": text})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("pdfplumber 读取简历失败，改用其他引擎：%s", type(exc).__name__)
 
     pymupdf_pages = []
     if fitz is not None:
@@ -3798,8 +2388,8 @@ def _extract_pdf_text_pages(pdf_path):
                     text = _normalize_resume_text(doc[idx].get_text("text") or "")
                     if text:
                         pymupdf_pages.append({"page_no": idx + 1, "source": "pymupdf", "text": text})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("PyMuPDF 读取简历失败：%s", type(exc).__name__)
 
     return _merge_resume_page_candidates(pypdf_pages, plumber_pages, pymupdf_pages)
 
@@ -3841,7 +2431,8 @@ def _ocr_pdf_pages(pdf_path):
                 text = _run_resume_ocr(image, ocr_lang)
                 if text:
                     pages.append({"page_no": idx + 1, "source": f"ocr:{ocr_lang}", "text": text})
-    except Exception:
+    except Exception as exc:
+        logger.warning("扫描件 OCR 中断，返回已识别的 %d 页：%s", len(pages), type(exc).__name__)
         return pages
     return pages
 
@@ -4098,7 +2689,7 @@ def _extract_resume_highlight_deck_llm(base_url, api_key, model, matcher_state, 
         + "\n\n【简历分析报告节选】\n"
         + excerpt
     )
-    return _call_structured_chat(
+    return call_structured_chat(
         base_url,
         api_key,
         model,
@@ -4113,8 +2704,8 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
         if callable(progress_callback):
             try:
                 progress_callback(stage, detail)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("简历分析进度回调失败：%s", type(exc).__name__)
 
     job_text = str(job_description or "").strip()
     analysis_mode = "job_match" if job_text else "resume_review"
@@ -4145,7 +2736,7 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
 
     _report("structured_resume", "正在提取结构化简历")
     resume_schema_json = json.dumps(STRUCTURED_RESUME_SCHEMA, ensure_ascii=False, indent=2)
-    structured_resume = _call_structured_chat(
+    structured_resume = call_structured_chat(
         base_url,
         api_key,
         model,
@@ -4159,7 +2750,7 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
         _report("job_context", "正在理解岗位文本")
         structured_job = build_job_payload_from_text(job_text)
         _report("hr_judge", "正在生成岗位匹配分析（深度五步审计）")
-        analysis_markdown = _call_markdown_chat(
+        analysis_markdown = call_markdown_chat(
             base_url,
             api_key,
             model,
@@ -4173,7 +2764,7 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
         )
     else:
         _report("resume_review", "正在生成简历诊断")
-        analysis_markdown = _call_markdown_chat(
+        analysis_markdown = call_markdown_chat(
             base_url,
             api_key,
             model,
@@ -4220,7 +2811,7 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
             analysis_mode,
             candidate_legal_name=canonical_resume_name,
         )
-        raw_diagnosis_ui = _call_structured_chat(
+        raw_diagnosis_ui = call_structured_chat(
             base_url,
             api_key,
             model,
@@ -4456,931 +3047,76 @@ def _run_resume_analysis_job(username, storage_path, job_id, runtime_llm, job_de
         )
 
 
-def _list_city_files():
-    if not os.path.isdir(BOSS_INFO_DIR):
-        return []
-    return sorted(f for f in os.listdir(BOSS_INFO_DIR) if f.endswith(".json"))
-
-
-def _other_city_jobs_file_signature():
-    """用于缓存失效：补充岗位文件不存在时返回稳定占位签名。"""
-    if not os.path.isfile(OTHER_CITY_BOSS_JOBS_FILE):
-        return ("missing", 0, 0)
-    stat = os.stat(OTHER_CITY_BOSS_JOBS_FILE)
-    return ("ok", stat.st_mtime_ns, stat.st_size)
-
-
-def _load_supplement_jobs_by_city():
-    """读取 other_city 清洗结果，按城市分组；整文件解析结果带签名缓存。"""
-    sig = _other_city_jobs_file_signature()
-    with JOB_CACHE_LOCK:
-        if SUPPLEMENT_JOBS_CACHE.get("signature") == sig and SUPPLEMENT_JOBS_CACHE.get("by_city") is not None:
-            return SUPPLEMENT_JOBS_CACHE["by_city"]
-    if sig[0] == "missing":
-        empty = {}
-        with JOB_CACHE_LOCK:
-            SUPPLEMENT_JOBS_CACHE["signature"] = sig
-            SUPPLEMENT_JOBS_CACHE["by_city"] = empty
-        return empty
-    try:
-        with open(OTHER_CITY_BOSS_JOBS_FILE, "r", encoding="utf-8") as fp:
-            all_jobs = json.load(fp)
-    except Exception as exc:
-        app.logger.warning("读取补充岗位文件失败 %s：%s", OTHER_CITY_BOSS_JOBS_FILE, exc)
-        empty = {}
-        with JOB_CACHE_LOCK:
-            SUPPLEMENT_JOBS_CACHE["signature"] = sig
-            SUPPLEMENT_JOBS_CACHE["by_city"] = empty
-        return empty
-    if not isinstance(all_jobs, list):
-        all_jobs = []
-    by_city = {}
-    for job in all_jobs:
-        if not isinstance(job, dict):
-            continue
-        c = str(job.get("城市") or job.get("采集城市") or "").strip()
-        if not c:
-            continue
-        by_city.setdefault(c, []).append(job)
-    with JOB_CACHE_LOCK:
-        SUPPLEMENT_JOBS_CACHE["signature"] = sig
-        SUPPLEMENT_JOBS_CACHE["by_city"] = by_city
-    return by_city
-
-
-def _merge_job_records_dedupe(base_jobs, extra_jobs):
-    """合并 boss 与补充数据，按公司与岗位等简单指纹去重。
-
-    返回值第二项为「来自补充文件且未被指纹判重剔除」的条数，用于前端标注热门城市。
-    """
-    seen = set()
-    out = []
-    supplement_appended = 0
-
-    def fingerprint(job):
-        if not isinstance(job, dict):
-            return None
-        return (
-            str(job.get("公司名称") or ""),
-            str(job.get("岗位名称") or ""),
-            str(job.get("薪资") or ""),
-            str(job.get("城市") or job.get("采集城市") or ""),
-        )
-
-    for job in base_jobs or []:
-        fp = fingerprint(job)
-        if fp is None or fp in seen:
-            continue
-        seen.add(fp)
-        out.append(job)
-    for job in extra_jobs or []:
-        fp = fingerprint(job)
-        if fp is None or fp in seen:
-            continue
-        seen.add(fp)
-        out.append(job)
-        supplement_appended += 1
-    return out, supplement_appended
-
-
-def _list_job_cities():
-    """岗位 API 使用的城市列表：boss_info 文件名 + 补充数据中样本足够的非重复城市。"""
-    base = [fname[:-5] for fname in _list_city_files()]
-    base_set = set(base)
-    try:
-        supplement = _load_supplement_jobs_by_city()
-    except Exception as exc:
-        app.logger.warning("分组补充岗位数据失败：%s", exc)
-        supplement = {}
-    extra = [
-        name
-        for name, rows in supplement.items()
-        if rows and name not in base_set and len(rows) >= SUPPLEMENT_EXTRA_CITY_MIN_JOBS
-    ]
-    return sorted(set(base) | set(extra))
-
-
-def _job_id(city, index):
-    return f"{city}:{index}"
-
-
-def _cache_json_response(payload, max_age=JOB_CACHE_MAX_AGE_SECONDS, status=200):
-    response = jsonify(payload)
-    response.status_code = status
-    response.headers["Cache-Control"] = f"public, max-age={max_age}"
-    return response
-
-
-def _get_city_cache_entry(city):
-    city_name = str(city or "").strip()
-    if not city_name:
-        raise FileNotFoundError("city is required")
-
-    fname = f"{city_name}.json"
-    fpath = os.path.join(BOSS_INFO_DIR, fname)
-    boss_exists = os.path.isfile(fpath)
-    supplement_sig = _other_city_jobs_file_signature()
-    supplement_by_city = _load_supplement_jobs_by_city()
-    supplement_rows = supplement_by_city.get(city_name, [])
-
-    if not boss_exists and not supplement_rows:
-        raise FileNotFoundError(fname)
-
-    boss_sig = None
-    if boss_exists:
-        stat = os.stat(fpath)
-        boss_sig = (stat.st_mtime_ns, stat.st_size)
-    combined_signature = (city_name, boss_sig, supplement_sig)
-
-    with JOB_CACHE_LOCK:
-        cached = JOB_FILE_CACHE.get(city_name)
-        if cached and cached.get("signature") == combined_signature:
-            return cached
-
-    jobs_boss = []
-    if boss_exists:
-        with open(fpath, "r", encoding="utf-8") as fp:
-            jobs_boss = json.load(fp)
-        if not isinstance(jobs_boss, list):
-            jobs_boss = []
-
-    jobs, supplement_added = _merge_job_records_dedupe(jobs_boss, supplement_rows)
-
-    entry = {
-        "signature": combined_signature,
-        "jobs": jobs,
-        "summaries": None,
-        "supplement_added_count": supplement_added,
-    }
-    with JOB_CACHE_LOCK:
-        JOB_FILE_CACHE[city_name] = entry
-    return entry
-
-
-def _summarize_job(job, city, index):
-    summary = {
-        key: value
-        for key, value in job.items()
-        if key not in JOB_DETAIL_ONLY_FIELDS
-    }
-    summary["job_id"] = _job_id(city, index)
-    return summary
-
-
-def _get_city_job_summaries(city):
-    entry = _get_city_cache_entry(city)
-    if entry.get("summaries") is None:
-        entry["summaries"] = [
-            _summarize_job(job, city, index)
-            for index, job in enumerate(entry["jobs"])
-        ]
-    return entry["summaries"]
-
-
-def _get_city_job_detail(city, index):
-    entry = _get_city_cache_entry(city)
-    if index < 0 or index >= len(entry["jobs"]):
-        raise IndexError(index)
-    detail = dict(entry["jobs"][index])
-    detail["job_id"] = _job_id(city, index)
-    return detail
-
-
-def _truncate_text(value, limit=140):
-    text = re.sub(r"\s+", " ", str(value or "").strip())
-    if not text:
-        return ""
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
-
-
-def _compact_list(items, limit=4, item_limit=60):
-    values = []
-    for item in items or []:
-        text = _truncate_text(item, item_limit)
-        if text and text not in values:
-            values.append(text)
-        if len(values) >= limit:
-            break
-    return values
-
-
-def _guess_mbti_type_from_scores(score_snapshot):
-    if not isinstance(score_snapshot, dict):
-        return ""
-    pairs = [("E", "I", "EI"), ("S", "N", "SN"), ("T", "F", "TF"), ("J", "P", "JP")]
-    decided = []
-    for left, right, pair_key in pairs:
-        left_score = float(score_snapshot.get(left) or 0)
-        right_score = float(score_snapshot.get(right) or 0)
-        if left_score > right_score:
-            decided.append(left)
-        elif right_score > left_score:
-            decided.append(right)
-        else:
-            decided.append({"EI": "I", "SN": "N", "TF": "F", "JP": "P"}[pair_key])
-    return "".join(decided)
-
-
-def _normalize_assessment_context(raw_context):
-    raw = raw_context if isinstance(raw_context, dict) else {}
-    mbti_raw = raw.get("mbti") if isinstance(raw.get("mbti"), dict) else {}
-    holland_raw = raw.get("holland") if isinstance(raw.get("holland"), dict) else {}
-    basics_raw = raw.get("basics") if isinstance(raw.get("basics"), dict) else {}
-    return {
-        "mbti": {
-            "raw_type": _truncate_text(mbti_raw.get("raw_type") or mbti_raw.get("rawType") or "", 16),
-            "final_type": _truncate_text(mbti_raw.get("final_type") or mbti_raw.get("finalType") or "", 16),
-            "summary": _truncate_text(mbti_raw.get("summary") or "", 160),
-            "top_strengths": _compact_list(mbti_raw.get("top_strengths") or mbti_raw.get("topStrengths"), limit=3, item_limit=40),
-            "top_risks": _compact_list(mbti_raw.get("top_risks") or mbti_raw.get("topRisks"), limit=3, item_limit=40),
-        },
-        "holland": {
-            "code": _truncate_text(holland_raw.get("code") or "", 12),
-            "top_codes": _compact_list(holland_raw.get("top_codes") or holland_raw.get("topCodes"), limit=3, item_limit=8),
-            "summary": _truncate_text(holland_raw.get("summary") or "", 160),
-            "interests": _compact_list(holland_raw.get("interests"), limit=4, item_limit=40),
-        },
-        "basics": {
-            "major": _truncate_text(basics_raw.get("major") or "", 40),
-            "grade": _truncate_text(basics_raw.get("grade") or basics_raw.get("education_level") or "", 20),
-            "target_city": _truncate_text(basics_raw.get("target_city") or basics_raw.get("targetCity") or "", 20),
-            "target_direction": _truncate_text(basics_raw.get("target_direction") or basics_raw.get("targetDirection") or "", 30),
-        },
-    }
-
-
-def _build_mbti_clarifier_prompt(close_pairs, score_snapshot):
-    base_prompt = MBTI_CLARIFIER_SYSTEM_PROMPT
-    pairs = close_pairs if isinstance(close_pairs, list) else []
-    notes = []
-    for item in pairs[:4]:
-        if not isinstance(item, dict):
-            continue
-        pair = str(item.get("pair") or "").upper().strip()
-        diff = item.get("diff")
-        if not pair:
-            continue
-        if diff is None:
-            notes.append(f"临界维度：{pair}")
-        else:
-            notes.append(f"临界维度：{pair}，当前差值 {diff}")
-    if not notes:
-        return base_prompt
-    return f"{base_prompt}\n\n补充上下文：\n- " + "\n- ".join(notes)
-
-
-def _build_career_interview_prompt(assessment_context):
-    base_prompt = CAREER_INTERVIEW_SYSTEM_PROMPT
-    context = _normalize_assessment_context(assessment_context)
-    mbti = context["mbti"]
-    holland = context["holland"]
-    basics = context["basics"]
-    notes = []
-
-    basics_parts = [
-        f"专业 {basics['major']}" if basics["major"] else "",
-        f"学历 {basics['grade']}" if basics["grade"] else "",
-        f"目标城市 {basics['target_city']}" if basics["target_city"] else "",
-        f"目标方向 {basics['target_direction']}" if basics["target_direction"] else "",
-    ]
-    basics_parts = [part for part in basics_parts if part]
-    if basics_parts:
-        notes.append("基础信息：" + "，".join(basics_parts))
-
-    mbti_type = mbti["final_type"] or mbti["raw_type"]
-    if mbti_type:
-        notes.append(f"MBTI：{mbti_type}")
-    if mbti.get("summary"):
-        notes.append(f"MBTI 摘要：{_truncate_text(mbti.get('summary'), 80)}")
-
-    holland_code = holland["code"] or ("".join(holland["top_codes"]) if holland["top_codes"] else "")
-    if holland_code:
-        notes.append(f"Holland：{holland_code}")
-    if holland.get("summary"):
-        notes.append(f"Holland 摘要：{_truncate_text(holland.get('summary'), 80)}")
-
-    if not notes:
-        return base_prompt
-    return f"{base_prompt}\n\n补充上下文：\n- " + "\n- ".join(notes)
-
-
-def _safe_score(value, default=0):
-    try:
-        return max(0, min(100, int(value)))
-    except (TypeError, ValueError):
-        return default
-
-
-def _normalize_sdk_base_url(base_url):
-    cleaned = (base_url or "").strip().rstrip("/")
-    parsed = urllib.parse.urlparse(cleaned)
-    if not parsed.scheme or not parsed.netloc:
-        raise ValueError("base_url 必须是完整的 http(s) 地址")
-    if cleaned.endswith("/chat/completions"):
-        cleaned = cleaned[: -len("/chat/completions")]
-    if cleaned.endswith("/v1"):
-        return cleaned
-    return f"{cleaned}/v1"
-
-
-def _extract_json_object(text):
-    if not text:
-        raise ValueError("模型没有返回可解析内容。")
-    cleaned = str(text).strip()
-    # 兼容 ```json ... ``` 包裹输出。
-    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned, flags=re.IGNORECASE)
-    if fence:
-        cleaned = fence.group(1).strip()
-    match = re.search(r"\{[\s\S]*\}", cleaned)
-    if not match:
-        raise ValueError("模型返回中没有可解析的 JSON 对象。")
-    return match.group(0)
-
-
-def _parse_structured_json(content):
-    raw = str(content or "").strip()
-    if not raw:
-        raise ValueError("模型没有返回可解析内容。")
-    # 1) 直接按 JSON 解析。
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
-    # 2) 提取 JSON 对象后再解析。
-    extracted = _extract_json_object(raw)
-    try:
-        return json.loads(extracted)
-    except json.JSONDecodeError:
-        # 3) 本地轻度修复：去掉对象/数组尾逗号后再试。
-        repaired = re.sub(r",(\s*[}\]])", r"\1", extracted)
-        return json.loads(repaired)
-
-
-# 网络级瞬态错误关键字，命中则触发重试（不含业务错误如鉴权失败）。
-_TRANSIENT_ERROR_KEYWORDS = (
-    "connection", "timeout", "timed out", "reset", "broken pipe",
-    "eof", "remote end closed", "server disconnected", "read timeout",
-    "connect timeout", "service unavailable", "502", "503", "504",
-    "overloaded", "rate limit", "too many requests", "429",
-)
-
-def _is_transient_error(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return any(kw in msg for kw in _TRANSIENT_ERROR_KEYWORDS)
-
-def _safe_create_chat_completion(
-    client, model, messages, temperature, max_tokens,
-    force_json=False,
-    max_retries=3,
-    base_delay=1.5,
-):
-    """
-    调用 chat.completions.create，对瞬态网络错误做指数退避重试。
-    - max_retries: 最多额外重试次数（首次调用不计）
-    - base_delay:  首次重试前的基础等待秒数，每次翻倍并加随机抖动
-    """
-    kwargs = {
-        "model": model,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "messages": messages,
-    }
-    if force_json:
-        kwargs["response_format"] = {"type": "json_object"}
-
-    last_exc = None
-    for attempt in range(max_retries + 1):
-        try:
-            return client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            last_exc = exc
-            msg = str(exc).lower()
-
-            # response_format 不兼容 — 只重试一次，不计入重试次数
-            if force_json and ("response_format" in msg or "json_object" in msg):
-                kwargs.pop("response_format", None)
-                try:
-                    return client.chat.completions.create(**kwargs)
-                except Exception as exc2:
-                    last_exc = exc2
-                    msg = str(exc2).lower()
-
-            # 非瞬态错误（如鉴权、模型不存在）直接抛出，不重试
-            if not _is_transient_error(last_exc):
-                raise
-
-            # 最后一次也失败了
-            if attempt >= max_retries:
-                break
-
-            delay = base_delay * (2 ** attempt) + random.uniform(0.1, 0.8)
-            time.sleep(delay)
-
-    raise last_exc
-
-
-def _infer_career_interview_focus_from_topic(topic: str) -> str:
-    """当模型未返回 focus_dimension 时，用 topic 粗映射到六维之一。"""
-    t = str(topic or "").strip()
-    if not t:
-        return ""
-    if "工作价值观" in t:
-        return "工作价值观"
-    if "角色模型" in t or "榜样" in t:
-        return "职业成熟度"
-    if "生活故事" in t:
-        return "行动证据"
-    if "情境应对" in t or t == "情境":
-        return "沟通风格"
-    if "学习方式" in t or "学习" in t and "风格" in t:
-        return "学习方式"
-    return ""
-
-
-def _coerce_career_interview_focus_dimension(payload: dict) -> str:
-    raw = str(payload.get("focus_dimension") or "").strip()
-    if raw in DEFAULT_CAREER_DIMENSIONS:
-        return raw
-    inferred = _infer_career_interview_focus_from_topic(payload.get("topic"))
-    if inferred in DEFAULT_CAREER_DIMENSIONS:
-        return inferred
-    for name in DEFAULT_CAREER_DIMENSIONS:
-        if name and name in raw:
-            return name
-    return "职业兴趣"
-
-
-def _career_interview_progress_system_suffix(focus_dimension: str, progress: list) -> str:
-    """把前端维度进度注入系统提示，避免模型永远在「职业兴趣」上打转。"""
-    if not isinstance(progress, list) or not progress:
-        return ""
-    lines = []
-    for item in progress:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        if not name:
-            continue
-        try:
-            answered = int(item.get("answered") or 0)
-            target = int(item.get("target") or 0)
-        except (TypeError, ValueError):
-            answered, target = 0, 0
-        lines.append(f"- {name}：已答 {answered} / 目标 {target}" + ("（已满，勿再作为 focus_dimension）" if target > 0 and answered >= target else ""))
-    if not lines:
-        return ""
-    fd = str(focus_dimension or "").strip() or "（请根据下表选择下一未完成维度）"
-    return (
-        "\n\n【维度进度快照】（必须遵守）\n"
-        "- 完成条件以「证据饱和」为主，不以凑满题数为目标：若某维已在对话中获得足够具体证据，可将 dimension_metrics 中该维 saturated 置为 true。\n"
-        "- 用户一句话可能同时覆盖多维：应同步提高相关维度的 coverage / evidence_count，并用 next_question_policy 选择信息增益最大的下一问。\n"
-        "- next_question 与 focus_dimension 应优先服务「最大缺口维度」或「冲突澄清」，而非死板按顺序；已答满 target 的维度不得再作为 focus_dimension。\n"
-        + "\n".join(lines)
-        + f"\n前端当前聚焦维度参考：{fd}"
-    )
-
-
-def _merge_career_interview_focus_with_progress(normalized: dict, client_progress: list) -> None:
-    """若模型仍把 focus 指到已答满维度，强制改为按顺序第一个未答满维度。"""
-    if not isinstance(normalized, dict):
-        return
-    if not isinstance(client_progress, list) or not client_progress:
-        return
-
-    def answered_target(dim_name: str) -> tuple[int, int]:
-        for item in client_progress:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("name") or "").strip() != dim_name:
-                continue
-            try:
-                return int(item.get("answered") or 0), int(item.get("target") or 0)
-            except (TypeError, ValueError):
-                return 0, 0
-        return 0, 0
-
-    focus = str(normalized.get("focus_dimension") or "").strip()
-    if focus in DEFAULT_CAREER_DIMENSIONS:
-        a, t = answered_target(focus)
-        if t <= 0 or a < t:
-            return
-
-    for name in DEFAULT_CAREER_DIMENSIONS:
-        a, t = answered_target(name)
-        if t > 0 and a < t:
-            normalized["focus_dimension"] = name
-            return
-
-
-def _career_interview_answered_target(client_progress: list, dim_name: str) -> tuple[int, int]:
-    for item in client_progress or []:
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("name") or "").strip() != dim_name:
-            continue
-        try:
-            return int(item.get("answered") or 0), int(item.get("target") or 0)
-        except (TypeError, ValueError):
-            return 0, 0
-    return 0, 0
-
-
-def _apply_next_question_policy_focus(normalized: dict, client_progress: list) -> None:
-    """在合法前提下，优先采用模型给出的 next_question_policy.target_dimension（动态选路）。"""
-    if not isinstance(normalized, dict):
-        return
-    pol = normalized.get("next_question_policy") if isinstance(normalized.get("next_question_policy"), dict) else {}
-    td = str(pol.get("target_dimension") or "").strip()
-    if td not in DEFAULT_CAREER_DIMENSIONS:
-        return
-    answered, target = _career_interview_answered_target(client_progress, td)
-    if target <= 0 or answered >= target:
-        return
-    normalized["focus_dimension"] = td
-
-
-def _clamp_unit_float(value, default=0.0):
-    try:
-        return max(0.0, min(1.0, float(value)))
-    except (TypeError, ValueError):
-        return default
-
-
-def _attach_career_interview_engine_fields(raw_payload: dict, normalized: dict) -> None:
-    """归一化访谈引擎扩展字段：证据指标、假设分布、证据卡与冲突点。"""
-    payload = raw_payload if isinstance(raw_payload, dict) else {}
-    rs = payload.get("readiness_score")
-    if rs is not None:
-        normalized["readiness_score"] = _safe_score(rs, 0)
-    else:
-        normalized["readiness_score"] = _safe_score(normalized.get("completion_score"), 0)
-
-    pol = payload.get("next_question_policy") if isinstance(payload.get("next_question_policy"), dict) else {}
-    normalized["next_question_policy"] = {
-        "strategy": str(pol.get("strategy") or "").strip()[:56],
-        "target_dimension": str(pol.get("target_dimension") or "").strip(),
-        "rationale": str(pol.get("rationale") or "").strip()[:320],
-        "expected_information_gain": _clamp_unit_float(pol.get("expected_information_gain"), 0.0),
-    }
-
-    raw_dm = payload.get("dimension_metrics") if isinstance(payload.get("dimension_metrics"), dict) else {}
-    dim_metrics = {}
-    for name in DEFAULT_CAREER_DIMENSIONS:
-        block = raw_dm.get(name) if isinstance(raw_dm.get(name), dict) else {}
-        slots = [str(x).strip() for x in (block.get("missing_slots") or []) if str(x).strip()][:6]
-        try:
-            evc = int(block.get("evidence_count") or 0)
-        except (TypeError, ValueError):
-            evc = 0
-        evc = max(0, min(12, evc))
-        dim_metrics[name] = {
-            "coverage": _clamp_unit_float(block.get("coverage")),
-            "specificity": _clamp_unit_float(block.get("specificity")),
-            "confidence": _clamp_unit_float(block.get("confidence")),
-            "consistency": _clamp_unit_float(block.get("consistency")),
-            "evidence_count": evc,
-            "saturated": bool(block.get("saturated")),
-            "missing_slots": slots,
-        }
-    normalized["dimension_metrics"] = dim_metrics
-
-    ph = payload.get("profile_hypothesis") if isinstance(payload.get("profile_hypothesis"), dict) else {}
-    top_roles = []
-    for r in ph.get("top_roles") or []:
-        if not isinstance(r, dict):
-            continue
-        nm = str(r.get("name") or "").strip()
-        if not nm:
-            continue
-        top_roles.append({"name": nm[:48], "score": _clamp_unit_float(r.get("score"))})
-    normalized["profile_hypothesis"] = {
-        "top_roles": top_roles[:8],
-        "stable_traits": [str(x).strip() for x in (ph.get("stable_traits") or []) if str(x).strip()][:8],
-        "unresolved_conflicts": [str(x).strip() for x in (ph.get("unresolved_conflicts") or []) if str(x).strip()][:6],
-    }
-
-    cards = []
-    for c in payload.get("evidence_cards") or []:
-        if not isinstance(c, dict):
-            continue
-        cat = str(c.get("category") or "").strip()[:36]
-        if not cat:
-            continue
-        bullets = [str(x).strip() for x in (c.get("bullets") or []) if str(x).strip()][:10]
-        if bullets:
-            cards.append({"category": cat, "bullets": bullets})
-    normalized["evidence_cards"] = cards[:12]
-
-    cps = []
-    for cp in payload.get("conflict_points") or []:
-        if not isinstance(cp, dict):
-            continue
-        sm = str(cp.get("summary") or "").strip()
-        cq = str(cp.get("clarify_prompt") or "").strip()
-        if not sm and not cq:
-            continue
-        cps.append({"summary": sm[:220], "clarify_prompt": cq[:320]})
-    normalized["conflict_points"] = cps[:8]
-
-
-def _normalize_profile(raw_payload):
-    payload = raw_payload if isinstance(raw_payload, dict) else {}
-    profile = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
-
-    dimension_map = {}
-    for item in profile.get("dimensions") or []:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        if not name:
-            continue
-        dimension_map[name] = {
-            "name": name,
-            "score": _safe_score(item.get("score"), 0),
-            "evidence": str(item.get("evidence") or "").strip(),
-        }
-
-    dimensions = []
-    for name in DEFAULT_CAREER_DIMENSIONS:
-        dimensions.append(
-            dimension_map.get(name)
-            or {
-                "name": name,
-                "score": 0,
-                "evidence": "",
-            }
-        )
-
-    riasec = profile.get("riasec") if isinstance(profile.get("riasec"), dict) else {}
-    normalized = {
-        "next_question": str(payload.get("next_question") or "").strip(),
-        "focus_dimension": _coerce_career_interview_focus_dimension(payload),
-        "is_complete": bool(payload.get("is_complete")),
-        "completion_score": _safe_score(payload.get("completion_score"), 0),
-        "profile": {
-            "summary": str(profile.get("summary") or "").strip(),
-            "role_model": str(profile.get("role_model") or "").strip(),
-            "key_experience": str(profile.get("key_experience") or "").strip(),
-            "leadership_style": str(profile.get("leadership_style") or "").strip(),
-            "growth_mindset": str(profile.get("growth_mindset") or "").strip(),
-            "career_interests": [str(item).strip() for item in (profile.get("career_interests") or []) if str(item).strip()][:6],
-            "work_values": [str(item).strip() for item in (profile.get("work_values") or []) if str(item).strip()][:6],
-            "recommended_roles": [str(item).strip() for item in (profile.get("recommended_roles") or []) if str(item).strip()][:6],
-            "recommended_exploration": [str(item).strip() for item in (profile.get("recommended_exploration") or []) if str(item).strip()][:6],
-            "evidence_highlights": [str(item).strip() for item in (profile.get("evidence_highlights") or []) if str(item).strip()][:6],
-            "next_steps": [str(item).strip() for item in (profile.get("next_steps") or []) if str(item).strip()][:6],
-            "missing_followups": [str(item).strip() for item in (profile.get("missing_followups") or []) if str(item).strip()][:4],
-            "portrait_ready": bool(profile.get("portrait_ready")),
-            "output_scope": str(profile.get("output_scope") or "").strip(),
-            "coverage_note": str(profile.get("coverage_note") or "").strip(),
-            "riasec": {
-                "realistic": _safe_score(riasec.get("realistic"), 0),
-                "investigative": _safe_score(riasec.get("investigative"), 0),
-                "artistic": _safe_score(riasec.get("artistic"), 0),
-                "social": _safe_score(riasec.get("social"), 0),
-                "enterprising": _safe_score(riasec.get("enterprising"), 0),
-                "conventional": _safe_score(riasec.get("conventional"), 0),
-            },
-            "dimensions": dimensions,
-        },
-    }
-
-    if not normalized["profile"]["summary"]:
-        normalized["profile"]["summary"] = "访谈已启动，系统正在根据回答逐步生成职业兴趣画像。"
-
-    if not normalized["profile"]["recommended_roles"]:
-        normalized["profile"]["recommended_roles"] = normalized["profile"]["career_interests"][:4]
-
-    if not normalized["profile"]["recommended_exploration"]:
-        normalized["profile"]["recommended_exploration"] = normalized["profile"]["next_steps"][:4]
-
-    if not normalized["profile"]["next_steps"]:
-        normalized["profile"]["next_steps"] = normalized["profile"]["recommended_exploration"][:4]
-
-    if not normalized["profile"]["evidence_highlights"]:
-        evidence_seed = [
-            normalized["profile"]["key_experience"],
-            normalized["profile"]["growth_mindset"],
-            normalized["profile"]["role_model"],
-        ]
-        normalized["profile"]["evidence_highlights"] = [item for item in evidence_seed if item][:4]
-
-    if not normalized["profile"]["missing_followups"]:
-        missing_followups = []
-        if not normalized["profile"]["key_experience"]:
-            missing_followups.append("补一个最能证明方向选择的真实经历")
-        if not normalized["profile"]["work_values"]:
-            missing_followups.append("补充你最看重的工作价值观")
-        if not normalized["profile"]["leadership_style"]:
-            missing_followups.append("补充你在协作中的自然角色")
-        normalized["profile"]["missing_followups"] = missing_followups[:4]
-
-    signal_count = sum(
-        1
-        for item in [
-            normalized["profile"]["summary"],
-            normalized["profile"]["role_model"],
-            normalized["profile"]["key_experience"],
-            normalized["profile"]["leadership_style"],
-            normalized["profile"]["work_values"],
-            normalized["profile"]["recommended_exploration"],
-        ]
-        if item
-    )
-
-    if not normalized["profile"]["output_scope"]:
-        if normalized["is_complete"] and signal_count >= 4:
-            normalized["profile"]["output_scope"] = "full"
-        elif signal_count >= 2:
-            normalized["profile"]["output_scope"] = "usable"
-        else:
-            normalized["profile"]["output_scope"] = "partial"
-
-    if not normalized["profile"]["coverage_note"]:
-        if normalized["profile"]["output_scope"] == "full":
-            normalized["profile"]["coverage_note"] = "访谈信息已经足够支持完整画像与人物明信片展示。"
-        elif normalized["profile"]["output_scope"] == "usable":
-            normalized["profile"]["coverage_note"] = "当前访谈基于有限对话已形成首版画像，可直接进入人物明信片生成。"
-        else:
-            normalized["profile"]["coverage_note"] = "当前访谈只形成了弱信号，适合继续追问后再强化画像。"
-
-    if not normalized["profile"]["portrait_ready"]:
-        normalized["profile"]["portrait_ready"] = normalized["profile"]["output_scope"] in {"full", "usable"}
-
-    if not normalized["next_question"] and not normalized["is_complete"]:
-        normalized["next_question"] = "请继续补充一个能体现你职业兴趣或偏好的真实经历。"
-
-    if normalized["is_complete"] and not normalized["completion_score"]:
-        normalized["completion_score"] = 100
-
-    _attach_career_interview_engine_fields(payload, normalized)
-
-    normalized["assistant_reply"] = (
-        normalized["next_question"]
-        if not normalized["is_complete"]
-        else "访谈完成，我已经整理出你的职业兴趣画像。"
-    )
-    return normalized
-
-
-def _call_structured_chat(base_url, api_key, model, messages, system_prompt, max_tokens=480,
-                          max_retries=3, base_delay=1.5):
-    base = _normalize_sdk_base_url(base_url)
-    client = OpenAI(
-        api_key=api_key,
-        base_url=base,
-        timeout=CAREER_REPORT_LLM_TIMEOUT_SECONDS,
-        max_retries=0,
-    )
-    try:
-        merged_messages = [{"role": "system", "content": system_prompt}] + messages
-        resp = _safe_create_chat_completion(
-            client=client,
-            model=model,
-            messages=merged_messages,
-            temperature=0.1,
-            max_tokens=max_tokens,
-            force_json=True,
-            max_retries=max_retries,
-            base_delay=base_delay,
-        )
-    except Exception as exc:
-        raise ValueError(f"LLM 接口调用失败: {str(exc)[:300]}") from exc
-
-    content = str((resp.choices[0].message.content or "") if resp.choices else "").strip()
-    if not content:
-        raise ValueError("模型没有返回可解析内容。")
-    try:
-        return _parse_structured_json(content)
-    except Exception:
-        # 第一次失败：让模型只做 JSON 修复，不做新推理。
-        repair_prompt = (
-            "你是 JSON 修复器。请把下面的文本修复为严格合法的 JSON 对象。"
-            "只能输出 JSON 对象本身，不要解释，不要 Markdown。"
-        )
-        repair_messages = [
-            {"role": "system", "content": repair_prompt},
-            {"role": "user", "content": content},
-        ]
-        try:
-            repair_resp = _safe_create_chat_completion(
-                client=client,
-                model=model,
-                messages=repair_messages,
-                temperature=0,
-                max_tokens=min(max_tokens + 600, 3800),
-                force_json=True,
-                max_retries=max_retries,
-                base_delay=base_delay,
-            )
-            repair_content = str((repair_resp.choices[0].message.content or "") if repair_resp.choices else "").strip()
-            return _parse_structured_json(repair_content)
-        except Exception:
-            pass
-
-        # 第二次失败：重新生成，并附加强约束和更高 token 上限。
-        strict_system = (
-            system_prompt
-            + "\n\n严格要求：必须返回合法 JSON 对象。"
-            + "不要输出注释、代码块、尾逗号或未转义换行。"
-        )
-        retry_messages = [{"role": "system", "content": strict_system}] + messages
-        try:
-            retry_resp = _safe_create_chat_completion(
-                client=client,
-                model=model,
-                messages=retry_messages,
-                temperature=0.05,
-                max_tokens=min(max_tokens + 800, 4096),
-                force_json=True,
-                max_retries=max_retries,
-                base_delay=base_delay,
-            )
-            retry_content = str((retry_resp.choices[0].message.content or "") if retry_resp.choices else "").strip()
-            return _parse_structured_json(retry_content)
-        except Exception as exc:
-            raise ValueError(f"结构化 JSON 解析失败: {str(exc)[:280]}") from exc
-
-
-def _call_markdown_chat(base_url, api_key, model, messages, system_prompt=None, max_tokens=3200,
-                        max_retries=3, base_delay=1.5):
-    base = _normalize_sdk_base_url(base_url)
-    client = OpenAI(
-        api_key=api_key,
-        base_url=base,
-        timeout=CAREER_REPORT_LLM_TIMEOUT_SECONDS,
-        max_retries=0,
-    )
-    merged_messages = list(messages or [])
-    if system_prompt:
-        merged_messages = [{"role": "system", "content": system_prompt}] + merged_messages
-    try:
-        resp = _safe_create_chat_completion(
-            client=client,
-            model=model,
-            messages=merged_messages,
-            temperature=0.2,
-            max_tokens=max_tokens,
-            force_json=False,
-            max_retries=max_retries,
-            base_delay=base_delay,
-        )
-    except Exception as exc:
-        raise ValueError(f"LLM 接口调用失败: {str(exc)[:300]}") from exc
-
-    content = str((resp.choices[0].message.content or "") if resp.choices else "").strip()
-    if not content:
-        raise ValueError("模型没有返回可解析内容。")
-    return content
-
-
-def _call_openai_compatible_chat(base_url, api_key, model, messages, system_prompt=None):
-    parsed = _call_structured_chat(
-        base_url,
-        api_key,
-        model,
-        messages,
-        system_prompt=system_prompt or CAREER_INTERVIEW_SYSTEM_PROMPT,
-        max_tokens=1400,
-    )
-    return _normalize_profile(parsed)
-
-
-def _normalize_mbti_clarifier_payload(raw_payload):
-    payload = raw_payload if isinstance(raw_payload, dict) else {}
-    questions = []
-    for index, item in enumerate(payload.get("questions") or [], start=1):
-        if not isinstance(item, dict):
-            continue
-        pair = str(item.get("pair") or "").upper().replace("/", "").strip()
-        if pair not in {"EI", "SN", "TF", "JP"}:
-            continue
-        question = str(item.get("question") or "").strip()
-        option_a = str(item.get("option_a") or "").strip()
-        option_b = str(item.get("option_b") or "").strip()
-        if not question or not option_a or not option_b:
-            continue
-        weight = _safe_score(item.get("weight"), 2)
-        weight = max(1, min(3, weight))
-        questions.append(
-            {
-                "id": str(item.get("id") or f"q{index}").strip() or f"q{index}",
-                "pair": pair,
-                "question": question,
-                "option_a": option_a,
-                "option_b": option_b,
-                "weight": weight,
-            }
-        )
-
-    if not questions:
-        raise ValueError("模型未返回可用的 MBTI 澄清题目。")
-
-    return {
-        "summary": str(payload.get("summary") or "本轮补充题将帮助确认临界维度。").strip()
-        or "本轮补充题将帮助确认临界维度。",
-        "questions": questions[:6],
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 页面与认证接口
 @app.route("/")
@@ -5421,64 +3157,18 @@ def app_data_asset(filename):
     return send_from_directory(directory, name, conditional=True)
 
 
-@app.route("/multi-agent-workflow")
-@app.route("/multi-agent-workflow.html")
-def multi_agent_workflow_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return send_from_directory(
-        STATIC_DIR,
-        "multi-agent-workflow.html",
-        mimetype="text/html"
-    )
 
 
-@app.route("/user-center")
-@app.route("/user-center.html")
-def user_center_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("user_center.html")
 
 
-@app.route("/user-center/career-report/polish")
-@app.route("/user-center/career-report/polish.html")
-def career_report_polish_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("career_report_polish.html")
 
 
-@app.route("/resume-report")
-@app.route("/resume-report.html")
-def resume_report_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("resume_report.html")
 
 
-@app.route("/test-result")
-@app.route("/test-result.html")
-def test_result_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("test_result.html")
 
 
-@app.route("/test-runner")
-@app.route("/test-runner.html")
-def test_runner_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("test_runner.html")
 
 
-@app.route("/sbti")
-@app.route("/sbti.html")
-def sbti_page():
-    if not _current_user():
-        return redirect(url_for("index"))
-    return render_template("sbti.html")
 
 
 @app.route("/api/auth/status")
@@ -5508,7 +3198,7 @@ def api_auth_status():
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
             "career_report": _public_career_report_state(career_report_state),
-            "profile_portrait": _public_profile_portrait_state(state.get("profile_portrait")),
+            "profile_portrait": public_profile_portrait_state(state.get("profile_portrait")),
             "account_avatar": state.get("account_avatar"),
             "profile_snapshot": state.get("profile_snapshot"),
             "career_matching": state.get("career_matching"),
@@ -5553,7 +3243,7 @@ def api_bootstrap():
             "assessment_hub": state.get("assessment_hub"),
             "resume_profile": _public_resume_state(resume_state),
             "career_report": _public_career_report_state(career_report_state),
-            "profile_portrait": _public_profile_portrait_state(state.get("profile_portrait")),
+            "profile_portrait": public_profile_portrait_state(state.get("profile_portrait")),
             "profile_snapshot": state.get("profile_snapshot"),
             "career_matching": state.get("career_matching"),
             "news_context": state.get("news_context"),
@@ -5561,33 +3251,10 @@ def api_bootstrap():
     })
 
 
-@app.route("/api/career-news")
-def api_career_news():
-    force_refresh = str(request.args.get("refresh", "") or "").strip().lower() in {"1", "true", "yes"}
-    payload = get_career_news_payload(force_refresh=force_refresh)
-    return _cache_json_response(payload, max_age=300)
 
 
-@app.route("/api/news-kb/stats")
-def api_news_kb_stats():
-    try:
-        stats = get_kb_stats()
-        return jsonify({"data": stats})
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
 
 
-@app.route("/api/news-kb/search")
-def api_news_kb_search():
-    query = str(request.args.get("q") or "").strip()
-    if not query:
-        return jsonify({"message": "请提供查询关键词 q"}), 400
-    top_k = min(int(request.args.get("k") or 8), 20)
-    try:
-        results = search_news_kb(query, top_k=top_k)
-        return jsonify({"data": results, "total": len(results)})
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
 
 
 
@@ -5616,227 +3283,6 @@ def api_user_state(scope):
     return jsonify({"message": "用户空间已保存。", "scope": normalized_scope})
 
 
-@app.route("/api/community-feed", methods=["GET"])
-@_login_required
-@_forum_transaction
-def api_community_feed():
-    return jsonify(_community_forum_payload(_current_user()))
-
-
-@app.route("/api/community-feed/posts", methods=["POST"])
-@_login_required
-@_forum_transaction
-def api_community_feed_create_post():
-    user = _current_user()
-    payload = request.get_json(silent=True) or {}
-    title = _forum_clean_text(payload.get("title"), 80)
-    content = _forum_clean_content(payload.get("content"), 2400)
-    board = _forum_clean_text(payload.get("board"), 16)
-    tags = _forum_normalize_tags(payload.get("tags") or [])
-    if len(title) < 4:
-        return jsonify({"message": "帖子标题至少需要 4 个字。"}), 400
-    if len(content) < 10:
-        return jsonify({"message": "帖子内容至少需要 10 个字。"}), 400
-    if board not in COMMUNITY_FORUM_BOARD_OPTIONS:
-        board = "选岗热议"
-
-    store = _load_community_forum_store()
-    now = int(time.time())
-    store.setdefault("posts", []).insert(0, {
-        "id": f"post_{uuid.uuid4().hex[:10]}",
-        "title": title,
-        "content": content,
-        "board": board,
-        "tags": tags,
-        "author": {
-            "username": user["username"],
-            "display_name": user.get("display_name") or user.get("displayName") or user["username"],
-        },
-        "created_at": now,
-        "updated_at": now,
-        "pinned": False,
-        "views": 1,
-        "liked_by": [],
-        "replies": [],
-        "last_reply_at": now,
-        "last_reply_user": "",
-    })
-    store = _save_community_forum_store(store)
-    created_post = _public_community_forum_post(store["posts"][0], user)
-    return jsonify({"message": "帖子已发布。", "post": created_post, "feed": _community_forum_payload(user)})
-
-
-@app.route("/api/community-feed/posts/<post_id>", methods=["DELETE"])
-@_super_admin_required
-@_forum_transaction
-def api_community_feed_delete_post(post_id):
-    """The one thing an administrator can do: remove a post (and its replies)."""
-    user = _current_user()
-    store = _load_community_forum_store()
-    posts = store.get("posts") if isinstance(store.get("posts"), list) else []
-    remaining = [post for post in posts if str((post or {}).get("id") or "") != str(post_id)]
-    if len(remaining) == len(posts):
-        return jsonify({"message": "未找到对应帖子。"}), 404
-    store["posts"] = remaining
-    _save_community_forum_store(store)
-    app.logger.info("administrator %s deleted community post %s", user["username"], post_id)
-    return jsonify({"message": "帖子已删除。", "feed": _community_forum_payload(user)})
-
-
-@app.route("/api/community-feed/posts/<post_id>/reply", methods=["POST"])
-@_login_required
-@_forum_transaction
-def api_community_feed_reply(post_id):
-    user = _current_user()
-    payload = request.get_json(silent=True) or {}
-    content = _forum_clean_content(payload.get("content"), 1200)
-    if len(content) < 4:
-        return jsonify({"message": "回复内容至少需要 4 个字。"}), 400
-
-    store = _load_community_forum_store()
-    post = _find_community_forum_post(store, post_id)
-    if not post:
-        return jsonify({"message": "未找到对应帖子。"}), 404
-
-    now = int(time.time())
-    post.setdefault("replies", []).append({
-        "id": f"reply_{uuid.uuid4().hex[:10]}",
-        "content": content,
-        "created_at": now,
-        "author": {
-            "username": user["username"],
-            "display_name": user.get("display_name") or user.get("displayName") or user["username"],
-        },
-    })
-    post["updated_at"] = now
-    post["last_reply_at"] = now
-    post["last_reply_user"] = user.get("display_name") or user.get("displayName") or user["username"]
-    store = _save_community_forum_store(store)
-    refreshed = _find_community_forum_post(store, post_id)
-    return jsonify({"message": "回复已发送。", "post": _public_community_forum_post(refreshed, user), "feed": _community_forum_payload(user)})
-
-
-@app.route("/api/community-feed/posts/<post_id>/like", methods=["POST"])
-@_login_required
-@_forum_transaction
-def api_community_feed_like(post_id):
-    user = _current_user()
-    store = _load_community_forum_store()
-    post = _find_community_forum_post(store, post_id)
-    if not post:
-        return jsonify({"message": "未找到对应帖子。"}), 404
-
-    username = user["username"]
-    liked_by = post.setdefault("liked_by", [])
-    if username in liked_by:
-        liked_by = [item for item in liked_by if item != username]
-        post["liked_by"] = liked_by
-        liked = False
-    else:
-        liked_by.append(username)
-        post["liked_by"] = liked_by
-        liked = True
-    post["updated_at"] = int(time.time())
-    store = _save_community_forum_store(store)
-    refreshed = _find_community_forum_post(store, post_id)
-    public_post = _public_community_forum_post(refreshed, user)
-    return jsonify({"message": "已更新点赞状态。", "liked": liked, "post": public_post})
-
-
-@app.route("/api/community-feed/posts/<post_id>/view", methods=["POST"])
-@_login_required
-@_forum_transaction
-def api_community_feed_view(post_id):
-    user = _current_user()
-    store = _load_community_forum_store()
-    post = _find_community_forum_post(store, post_id)
-    if not post:
-        return jsonify({"message": "未找到对应帖子。"}), 404
-    post["views"] = max(0, int(post.get("views") or 0)) + 1
-    store = _save_community_forum_store(store)
-    refreshed = _find_community_forum_post(store, post_id)
-    return jsonify({"message": "浏览次数已记录。", "post": _public_community_forum_post(refreshed, user)})
-
-
-@app.route("/api/profile-portrait/generate", methods=["POST"])
-@_login_required
-def api_profile_portrait_generate():
-    user = _current_user()
-    payload = request.get_json(silent=True) or {}
-    reuse_brief = bool(payload.get("reuse_brief"))
-    context = _normalize_profile_portrait_context(payload.get("context"))
-    state = _load_user_state(user["username"])
-    saved_portrait = state.get("profile_portrait") if isinstance(state.get("profile_portrait"), dict) else {}
-    saved_brief = _normalize_profile_portrait_brief(saved_portrait.get("brief"))
-    if not _has_profile_portrait_signal(context) and not saved_brief:
-        return jsonify({"message": "当前画像信息不足，先补充测评、简历或目标方向。"}), 400
-
-    base_url, api_key, model = _get_profile_portrait_runtime()
-    if not base_url or not api_key:
-        return jsonify({"message": "系统中未找到 OpenRouter 图片配置，请先在 system 账号里配置 OpenRouter Provider。"}), 400
-
-    try:
-        prompt_packet = _build_profile_portrait_prompt_packet(
-            context,
-            preset_brief=saved_brief if (reuse_brief and saved_brief) else None,
-        )
-        brief = prompt_packet.get("brief") or saved_brief or _build_profile_portrait_brief(context)
-        prompt_summary = prompt_packet.get("prompt_summary") or _build_profile_portrait_summary_from_brief(brief) or context.get("summary") or ""
-        prompt = prompt_packet.get("render_prompt") or _build_profile_portrait_render_prompt(context, brief)
-        prompt_writer_mode = str(prompt_packet.get("mode") or "heuristic").strip() or "heuristic"
-        prompt_writer_model = str(prompt_packet.get("writer_model") or "").strip()
-        prompt_pipeline = prompt_packet.get("prompt_pipeline") if isinstance(prompt_packet.get("prompt_pipeline"), dict) else None
-        prompt_evaluation = prompt_packet.get("prompt_evaluation") if isinstance(prompt_packet.get("prompt_evaluation"), dict) else None
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except Exception:
-        app.logger.exception("profile portrait brief generation failed")
-        return jsonify({"message": "用户画像生成失败，请稍后重试。"}), 502
-
-    image_url = str(saved_portrait.get("image_url") or "").strip() if reuse_brief else ""
-    image_error = ""
-    status = "ready"
-    try:
-        image_url = _generate_profile_portrait_image(base_url, api_key, model, prompt)
-    except ValueError as exc:
-        image_error = str(exc)
-        status = "ready" if image_url else "brief_ready"
-    except Exception:
-        image_error = "鐢诲儚娴锋姤娓叉煋澶辫触锛岃绋嶅悗閲嶈瘯銆?"
-        app.logger.exception("profile portrait generation failed")
-        status = "ready" if image_url else "brief_ready"
-
-    portrait_state = {
-        "status": status,
-        "image_url": image_url,
-        "created_at": int(time.time()),
-        "model": model,
-        "archetype_name": context.get("archetype_name") or "",
-        "prompt_summary": prompt_summary,
-        "prompt_text": prompt,
-        "prompt_mode": "reuse_brief" if (reuse_brief and saved_brief) else "rebuild_brief",
-        "prompt_writer_mode": prompt_writer_mode,
-        "prompt_writer_model": prompt_writer_model,
-        "brief_version": PORTRAIT_TEMPLATE_VERSION,
-        "prompt_pipeline": prompt_pipeline or {"pipeline_version": PORTRAIT_PROMPT_PIPELINE_VERSION},
-        "prompt_evaluation": prompt_evaluation,
-        "image_error": image_error,
-        "brief": brief,
-        "context_snapshot": context,
-    }
-    state["profile_portrait"] = portrait_state
-    _save_user_state(user["username"], state)
-    if image_error and image_url:
-        message = "已保留上一版海报，本次重绘失败，可稍后再试。"
-    elif image_error:
-        message = "职业定位已收敛，但海报渲染失败，可直接重试海报。"
-    else:
-        message = "用户画像已生成。"
-    return jsonify({
-        "message": "用户画像已生成。",
-        "message": message,
-        "data": _public_profile_portrait_state(portrait_state),
-    })
 
 
 
@@ -6772,7 +4218,7 @@ def api_career_report_polish():
             f"{text}"
         )
     try:
-        polished = _call_markdown_chat(
+        polished = call_markdown_chat(
             base_url,
             api_key,
             model,
@@ -7227,299 +4673,21 @@ def api_career_report_export():
     )
 
 
-@app.route("/api/cities")
-def api_cities():
-    cities = _list_job_cities()
-    return _cache_json_response(cities, max_age=3600)
 
 
-def _jobs_bootstrap_payload():
-    """聚合 bootstrap 岗位摘要，并附带 boss_info 城市列表与补充数据热度信息。"""
-    cities = _list_job_cities()
-    boss_cities = [fname[:-5] for fname in _list_city_files()]
-    jobs = []
-    city_supplement_extra_count = {}
-    boss_city_set = set(boss_cities)
-    for city_name in cities:
-        try:
-            summaries = _get_city_job_summaries(city_name)
-            jobs.extend(summaries)
-            if city_name in boss_city_set:
-                entry = _get_city_cache_entry(city_name)
-                n = int(entry.get("supplement_added_count") or 0)
-                if n > 0:
-                    city_supplement_extra_count[city_name] = n
-        except FileNotFoundError:
-            continue
-        except Exception as exc:
-            app.logger.warning("读取 %s 失败：%s", city_name, exc)
-    return {
-        "cities": cities,
-        "boss_cities": boss_cities,
-        "city_supplement_extra_count": city_supplement_extra_count,
-        "jobs": jobs,
-    }
 
 
-@app.route("/api/jobs/bootstrap")
-def api_jobs_bootstrap():
-    """Return cities and job summaries in one payload for bootstrap usage."""
-    return _cache_json_response(_jobs_bootstrap_payload())
 
 
-# API：岗位数据
-@app.route("/api/jobs")
-def api_jobs():
-    city = str(request.args.get("city", "all") or "all").strip() or "all"
-    view = str(request.args.get("view", "full") or "full").strip().lower()
-    if view == "bootstrap":
-        return _cache_json_response(_jobs_bootstrap_payload())
-    jobs = []
-
-    cities = _list_job_cities() if city == "all" else [city]
-
-    for city_name in cities:
-        try:
-            if view == "summary":
-                jobs.extend(_get_city_job_summaries(city_name))
-            else:
-                city_jobs = _get_city_cache_entry(city_name)["jobs"]
-                jobs.extend(
-                    {
-                        **job,
-                        "job_id": _job_id(city_name, index),
-                    }
-                    for index, job in enumerate(city_jobs)
-                )
-        except FileNotFoundError:
-            continue
-        except Exception as exc:
-            app.logger.warning("读取 %s 失败：%s", city_name, exc)
-
-    return _cache_json_response(jobs)
 
 
-@app.route("/api/job-detail")
-def api_job_detail():
-    raw_job_id = str(request.args.get("id", "") or "").strip()
-    if ":" not in raw_job_id:
-        return _cache_json_response({"message": "job id 缺失或格式错误"}, status=400)
-
-    city_name, index_text = raw_job_id.split(":", 1)
-    try:
-        detail = _get_city_job_detail(city_name, int(index_text))
-    except (TypeError, ValueError):
-        return _cache_json_response({"message": "job id 参数格式错误"}, status=400)
-    except FileNotFoundError:
-        return _cache_json_response({"message": "未找到对应城市数据"}, status=404)
-    except IndexError:
-        return _cache_json_response({"message": "未找到对应岗位记录"}, status=404)
-
-    return _cache_json_response(detail)
-
-@app.route("/api/career-interview", methods=["POST"])
-@_login_required
-def api_career_interview():
-    payload = request.get_json(silent=True) or {}
-    messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
-    assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
-    client_focus = str(payload.get("focus_dimension") or "").strip()
-    client_progress = payload.get("progress") if isinstance(payload.get("progress"), list) else []
-    base_url, api_key, model = _get_active_provider_and_model()
-
-    if not base_url or not api_key:
-        return jsonify({"message": "模型尚未配置，请在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。"}), 400
-
-    normalized_messages = []
-    for item in messages[-10:]:
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role") or "").strip().lower()
-        content = str(item.get("content") or "").strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        normalized_messages.append({"role": role, "content": content[:1600]})
-
-    system_prompt = _build_career_interview_prompt(assessment_context) + _career_interview_progress_system_suffix(
-        client_focus, client_progress
-    )
-
-    try:
-        result = _call_openai_compatible_chat(
-            base_url,
-            api_key,
-            model,
-            normalized_messages,
-            system_prompt=system_prompt,
-        )
-        _merge_career_interview_focus_with_progress(result, client_progress)
-        _apply_next_question_policy_focus(result, client_progress)
-        return jsonify(result)
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("career interview failed")
-        return jsonify({"message": f"职业访谈生成失败: {exc}"}), 502
 
 
-@app.route("/api/career-interview/finish", methods=["POST"])
-@_login_required
-def api_career_interview_finish():
-    """用户点击'完成访谈'按钮时调用，生成最终叙事性摘要"""
-    payload = request.get_json(silent=True) or {}
-    messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
-    assessment_context = payload.get("assessment_context") if isinstance(payload.get("assessment_context"), dict) else {}
-    base_url, api_key, model = _get_active_provider_and_model()
-
-    if not base_url or not api_key:
-        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
-
-    normalized_messages = []
-    for item in messages[-20:]:  # 保留更多历史用于生成摘要
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role") or "").strip().lower()
-        content = str(item.get("content") or "").strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        normalized_messages.append({"role": role, "content": content[:1600]})
-
-    # 生成叙事性摘要的系统提示词
-    finish_prompt = """你是一名职业规划咨询师。用户已点击完成访谈，请根据对话历史生成一份可直接进入统一画像与人物明信片的结构化摘要。
-
-【输出要求】（严格 JSON 格式）
-{
-  "summary": "一段80字左右的叙事性画像，用第一人称描述用户的职业特征、价值观和潜在优势",
-  "role_model": "用户钦佩的人及其原因（从对话提取）",
-  "work_values": ["价值观1", "价值观2", "价值观3"],
-  "key_experience": "用户提到的最具体的经历或成就",
-  "leadership_style": "从对话推断的协作/领导风格",
-  "growth_mindset": "成长型思维的体现",
-  "recommended_roles": ["最像岗位1", "最像岗位2"],
-  "recommended_exploration": ["还可以进一步探索的方向1", "还可以进一步探索的方向2"],
-  "evidence_highlights": ["证据1", "证据2", "证据3"],
-  "next_steps": ["下一步动作1", "下一步动作2"],
-  "missing_followups": ["如果继续访谈，最值得补问的问题1", "问题2"],
-  "portrait_ready": true,
-  "output_scope": "full 或 usable 或 partial",
-  "coverage_note": "说明当前结果是否足够支持首版人物明信片"
-}
-
-规则：
-1. 如果用户提前结束，但已经形成稳定价值观、经历证据或协作风格，也要给出 usable 级输出。
-2. 只有在信号非常少时，才给 partial。
-3. 不要泛泛而谈，尽量把摘要压缩成可以直接进入人物画像的材料。
-4. 如果某些信息未涉及，可以基于已有内容保守推断，但不要编造。"""
-
-    try:
-        result = _call_openai_compatible_chat(
-            base_url,
-            api_key,
-            model,
-            normalized_messages,
-            system_prompt=_build_career_interview_prompt(assessment_context) + "\n\n" + finish_prompt,
-        )
-        return jsonify(result)
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("career interview finish failed")
-        return jsonify({"message": f"生成访谈摘要失败: {exc}"}), 502
 
 
-@app.route("/api/mbti-clarifier", methods=["POST"])
-@_login_required
-def api_mbti_clarifier():
-    payload = request.get_json(silent=True) or {}
-    base_url, api_key, model = _get_active_provider_and_model()
-
-    if not base_url or not api_key:
-        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
-
-    close_pairs = payload.get("close_pairs") if isinstance(payload.get("close_pairs"), list) else []
-    score_snapshot = payload.get("score_snapshot") if isinstance(payload.get("score_snapshot"), dict) else {}
-    answer_highlights = payload.get("answer_highlights") if isinstance(payload.get("answer_highlights"), list) else []
-
-    user_payload = {
-        "close_pairs": close_pairs[:4],
-        "score_snapshot": score_snapshot,
-        "answer_highlights": answer_highlights[:12],
-    }
-    messages = [
-        {
-            "role": "user",
-            "content": json.dumps(user_payload, ensure_ascii=False),
-        }
-    ]
-
-    try:
-        parsed = _call_structured_chat(
-            base_url,
-            api_key,
-            model,
-            messages,
-            system_prompt=_build_mbti_clarifier_prompt(close_pairs, score_snapshot),
-            max_tokens=700,
-        )
-        result = _normalize_mbti_clarifier_payload(parsed)
-        return jsonify(result)
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("mbti clarifier failed")
-        return jsonify({"message": f"MBTI 澄清题生成失败: {exc}"}), 502
 
 
-@app.route("/api/deep-test-analysis", methods=["POST"])
-@_login_required
-def api_deep_test_analysis():
-    payload = request.get_json(silent=True) or {}
-    base_url, api_key, model = _get_active_provider_and_model()
 
-    if not base_url or not api_key:
-        return jsonify({"message": "请先通过模型选择器选择要使用的 API 和模型。"}), 400
-
-    mbti_type = str(payload.get("mbti_type", "")).strip()
-    scores = payload.get("scores", {})
-    dimension_details = payload.get("dimension_details", [])
-
-    if not mbti_type:
-        return jsonify({"message": "请先完成深层测试。"}), 400
-
-    system_prompt = f"""你是一位经验丰富的心理咨询师和职业规划专家，擅长基于MBTI性格类型进行深度分析。
-请根据用户的深层MBTI测试结果，给出个性化的心理分析和成长建议。
-
-分析要求：
-1. 深入解读该性格类型的核心心理特征（约100字）
-2. 分析该类型在人际关系、工作、学习中的独特优势（约80字）
-3. 指出需要注意和成长的方向（约80字）
-4. 给出2-3条具体可操作的个人发展建议
-
-风格要求：
-- 语气温和、鼓励性，避免过于笼统
-- 结合用户具体的分数分布进行个性化分析
-- 用中文回答，语言流畅自然
-
-MBTI类型：{mbti_type}
-各维度原始得分：{json.dumps(scores, ensure_ascii=False)}"""
-
-    messages = [{"role": "user", "content": f"请分析我的深层MBTI测试结果。类型：{mbti_type}，维度分布：{json.dumps(dimension_details, ensure_ascii=False)}"}]
-
-    try:
-        analysis = _call_markdown_chat(
-            base_url,
-            api_key,
-            model,
-            messages,
-            system_prompt=system_prompt,
-            max_tokens=800,
-        )
-        return jsonify({"analysis": analysis, "mbti_type": mbti_type})
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("deep test analysis failed")
-        return jsonify({"message": f"AI 分析生成失败: {exc}"}), 502
 
 
 # 启动入口
@@ -7533,9 +4701,11 @@ def _prewarm_caches():
     def _warm_news():
         try:
             get_career_news_payload()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("资讯预热失败：%s", type(exc).__name__)
 
+    if os.environ.get("CAREER_PREWARM", "1").lower() in {"0", "false", "no"}:
+        return
     threading.Thread(target=_warm_news, daemon=True, name="prewarm-news").start()
 
 
@@ -7584,6 +4754,12 @@ _app_db.init_db()
 _restore_background_jobs()
 _auth.init_app(app)
 app.register_blueprint(create_datasets_blueprint(_login_required))
+app.register_blueprint(create_community_blueprint(_login_required, _super_admin_required, _current_user))
+app.register_blueprint(create_interview_blueprint(_login_required, _get_active_provider_and_model))
+app.register_blueprint(create_job_data_blueprint())
+app.register_blueprint(create_portrait_blueprint(_login_required, _current_user, _load_user_state, _save_user_state))
+app.register_blueprint(create_news_blueprint())
+app.register_blueprint(create_pages_blueprint(_current_user))
 _chat_blueprint = create_chat_blueprint(
     directory=APP_DATA_DIR / "assistant",
     current_user=_current_user,

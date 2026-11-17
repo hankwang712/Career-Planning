@@ -9078,7 +9078,8 @@ function reportAgentConsoleResult(key) {
   const report = appState.careerReport;
   const stored = report?.meta?.report_id === state?.report_id ? report?.agent_results : null;
   if (key === "review") return snapshot?.review || snapshot?.results?.action_planning?.data?.constraints || null;
-  if (key === "report_writer") return report?.meta?.report_id === state?.report_id ? report.report_document : null;
+  // 新账号还没有报告时 report 与 state 都为空，两个 report_id 同为 undefined 会判等，不能再取 report 的属性。
+  if (key === "report_writer") return report && report.meta?.report_id === state?.report_id ? report.report_document : null;
   return snapshot?.results?.[key] || stored?.[key] || null;
 }
 

@@ -8,14 +8,14 @@
     <script>
       window.__API_BASE__ = window.__API_BASE__ || "";
       window.__CAREER_REPORT_POLISH_PAGE__ = true;
-      window.__CAREER_REPORT_POLISH_RETURN__ = "{{ url_for('user_center_page') }}#report-workspace";
+      window.__CAREER_REPORT_POLISH_RETURN__ = "{{ url_for('pages.user_center_page') }}#report-workspace";
     </script>
     <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-editor-overlay.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
     {% include "partials/app_cursor.html" %}
@@ -26,11 +26,7 @@
     {% include "partials/career_report_editor_shell.html" %}
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app-hotfix.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='report-link-previews.js') }}" defer></script>
+    {% set scripts_defer = true %}
+    {% include "partials/report_workspace_scripts.html" %}
 </body>
 </html>

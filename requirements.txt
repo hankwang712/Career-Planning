@@ -3,6 +3,7 @@
 # langchain.agents.create_agent (langchain 1.x), and an older langgraph-checkpoint breaks
 # langgraph-checkpoint-sqlite. Keep the Windows-only platform marker.
 # The separately maintained, patched LightRAG checkout installs its own extras.
+a2wsgi
 anyio
 bleach
 brotli

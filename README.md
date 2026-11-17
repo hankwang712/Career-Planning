@@ -447,6 +447,21 @@ uv run --no-project python artifacts/research/job_graph.py import --schema caree
 
 安装与部署写法参考 [FastAPI 全栈模板](https://github.com/fastapi/full-stack-fastapi-template/blob/master/backend/README.md)、[LightRAG](https://github.com/HKUDS/LightRAG) 和 [Docker Compose 官方指南](https://docs.docker.com/compose/gettingstarted/)，命令按本仓库实际入口整理。
 
+## 🧪 开发与测试
+
+```bash
+uv pip install pytest                 # 测试依赖，不在 requirements.txt 里
+uv run --no-project python -m pytest  # 后端测试（约 30 秒）
+npm run check                         # 前端静态检查：脚本语法、重复函数、模板引用的文件是否存在
+npm run test:unit                     # 前端单元测试
+npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwright 的 Chromium
+```
+
+- 后端测试使用临时数据目录并关闭后台采集与资讯预热，不会读写 `data/app_data`，也不访问外网或使用 `.env` 里的模型密钥。
+- 手动试跑时可设置 `CAREER_APP_DATA_DIR` 指向独立目录，避免动到真实数据；`CAREER_PREWARM=0` 跳过资讯预热，`JOB_MARKET_SCHEDULER=0` 关闭岗位定时采集。
+- Word 导出优先使用外部的 `docx_mcp`（环境变量 `CAREER_REPORT_DOCX_PYTHON` 指定解释器），不可用或失败时自动改用内置的 python-docx 转换，所以全新环境也能导出。
+- `.github/workflows/ci.yml` 是一份持续集成配置（后端测试、前端检查与构建），但 `.gitignore` 默认排除 `/.github/workflows/`，所以它只留在本地；想在 GitHub 上启用，删掉那条忽略规则后提交即可。
+
 <a id="development"></a>
 
 ## 📁 项目目录
@@ -454,14 +469,26 @@ uv run --no-project python artifacts/research/job_graph.py import --schema caree
 ```text
 career-agent/
 ├── backend/
-│   ├── server.py                 # 主站入口、页面路由与业务接口
+│   ├── server.py                 # 主站入口：配置、认证装饰器、报告与简历接口，并注册各业务蓝图
 │   ├── advisor/                  # Agent、提示词、报告工作流与招聘雷达
-│   ├── services/                 # 聊天、简历、报告、岗位与资讯服务
+│   ├── services/                 # 业务服务
+│   │   ├── chat/                 #   聊天接口与三层记忆
+│   │   ├── report/ resume/       #   报告生成与导出、简历解析与匹配
+│   │   ├── community.py          #   社区（Offer 茶水间）
+│   │   ├── interview.py          #   职业访谈、MBTI 追问、深度测评分析
+│   │   ├── portrait.py           #   用户画像海报
+│   │   ├── job_data.py           #   各城市岗位样本数据
+│   │   ├── pages.py  news/       #   独立页面与资讯
+│   │   ├── llm_calls.py          #   大模型调用：重试与结构化 JSON 修复
+│   │   └── cors.py               #   Flask 与聊天接口共用的跨域策略
+│   ├── tests/                    # 后端测试（pytest）
 │   ├── tools/                    # 招聘测试台与数据工作台
 │   └── scripts/                  # 启动、管理员与数据构建脚本
 ├── frontend/
 │   ├── templates/                # 页面与可复用 Jinja2 片段
-│   ├── static/                   # 业务脚本、样式、媒体与构建资源
+│   ├── static/                   # 业务脚本、样式、媒体与构建资源（脚本加载顺序见 templates/partials/report_workspace_scripts.html）
+│   ├── scripts/                  # 前端静态检查与依赖同步
+│   ├── tests/                    # 前端单元与浏览器测试
 │   ├── src/entries/              # Vite 多页面入口
 │   └── src/styles/               # 页面样式入口及静态样式导入
 ├── artifacts/research/           # 岗位图谱导入、查询与维护
@@ -475,6 +502,7 @@ career-agent/
 │   └── app_data/                 # 数据库、上传文件、报告及对话
 ├── asserts/                      # README 页面截图
 ├── deploy/                       # Nginx 示例与静态导出目录
+├── .github/workflows/ci.yml      # 持续集成配置（本地文件，被 .gitignore 排除）
 ├── requirements.txt              # Python 依赖
 ├── .env.example                  # 环境配置模板
 └── compose.yml                   # PostgreSQL / pgvector

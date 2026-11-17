@@ -72,3 +72,7 @@ Thumbs.db
 
 # Local experiments; production agents live in backend/advisor
 /experiments/
+
+# Local agent instructions (kept on this machine only)
+/AGENTS.md
+/CLAUDE.md

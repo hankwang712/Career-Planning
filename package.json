@@ -9,6 +9,8 @@
     "collect:jobs": "python -B backend/scripts/collect_jobs.py --once",
     "dev": "npm run dev --workspace frontend",
     "build": "npm run build --workspace frontend",
+    "check": "npm run check --workspace frontend",
+    "test:unit": "npm run test:unit --workspace frontend",
     "sync:vendors": "npm run sync:vendors --workspace frontend",
     "preview": "npm run preview --workspace frontend"
   }

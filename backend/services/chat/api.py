@@ -14,8 +14,9 @@ from flask import session
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers, MutableHeaders
-from starlette.middleware.wsgi import WSGIMiddleware
+from a2wsgi import WSGIMiddleware
 
+from ..cors import cors_headers, normalize_origins
 from .storage import ChatError
 from .images import MAX_DATA_URL_LENGTH, MAX_IMAGES, MAX_MESSAGE_BODY, image_capability, prepare_images
 from .privacy import SCOPE as CLEANUP_SCOPE
@@ -77,7 +78,7 @@ class ChatTransport:
 
     def __init__(self, app, allowed_origins):
         self.app = app
-        self.allowed_origins = {origin.rstrip("/") for origin in allowed_origins if origin}
+        self.allowed_origins = normalize_origins(allowed_origins)
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
@@ -94,11 +95,8 @@ class ChatTransport:
                 outgoing["X-Content-Type-Options"] = "nosniff"
                 outgoing.add_vary_header("Cookie")
                 outgoing.add_vary_header("Origin")
-                if origin and origin in self.allowed_origins | {same_origin}:
-                    outgoing["Access-Control-Allow-Origin"] = origin
-                    outgoing["Access-Control-Allow-Credentials"] = "true"
-                    outgoing["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS"
-                    outgoing["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token"
+                for name, value in cors_headers(origin, self.allowed_origins | {same_origin}).items():
+                    outgoing[name] = value
             await send(message)
 
         if scope["method"] == "OPTIONS":

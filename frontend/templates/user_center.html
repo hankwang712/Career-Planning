@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ai-polish-parity.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report-editor-overlay.css') }}">
     <style>
       .career-report-shell {
         display: grid;
@@ -1530,12 +1530,7 @@
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='auth-security.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
-    <script src="{{ url_for('static', filename='app-hotfix.js') }}"></script>
-    <script src="{{ url_for('static', filename='report-reader-layout.js') }}"></script>
-    <script src="{{ url_for('static', filename='workspace-restoration.js') }}"></script>
-    <script src="{{ url_for('static', filename='report-link-previews.js') }}"></script>
+    {% include "partials/report_workspace_scripts.html" %}
     <script src="{{ url_for('static', filename='career-profile.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>
