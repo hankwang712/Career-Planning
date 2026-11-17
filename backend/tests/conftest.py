@@ -36,6 +36,7 @@ def pytest_sessionfinish(session, exitstatus):
 def server():
     """导入一次完整的站点（Flask 应用 + 全部蓝图）。"""
     import server as module
+    from services import site as site_module
     from services.news import api as news_api
 
     module.app.config.update(TESTING=True)
@@ -43,6 +44,7 @@ def server():
     offline_news = {"items": [], "updated_at": "", "source": "test"}
     patcher = pytest.MonkeyPatch()
     patcher.setattr(module, "get_career_news_payload", lambda force_refresh=False: dict(offline_news))
+    patcher.setattr(site_module, "get_career_news_payload", lambda force_refresh=False: dict(offline_news))
     patcher.setattr(news_api, "get_career_news_payload", lambda force_refresh=False: dict(offline_news))
     yield module
     patcher.undo()

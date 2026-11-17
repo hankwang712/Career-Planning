@@ -471,11 +471,15 @@ npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwrigh
 ```text
 career-agent/
 ├── backend/
-│   ├── server.py                 # 主站入口：配置、认证装饰器、报告与简历接口，并注册各业务蓝图
+│   ├── server.py                 # 主站入口：只做装配（创建应用、注册蓝图、启动），约 200 行
 │   ├── advisor/                  # Agent、提示词、报告工作流与招聘雷达
 │   ├── services/                 # 业务服务
 │   │   ├── chat/                 #   聊天接口与三层记忆
-│   │   ├── report/ resume/       #   报告生成与导出、简历解析与匹配
+│   │   ├── user_state.py         #   用户状态层：账号标识、登录装饰器、状态文件与私有目录
+│   │   ├── site.py  webshell.py  #   首页与启动数据；静态资源、Vite 标签、CORS 与压缩
+│   │   ├── report/               #   报告：store 存储、tracker 行动追踪、writer 写入、jobs 后台任务、api 接口、导出
+│   │   ├── resume/               #   简历：pipeline 提取与分析、jobs 后台任务、api 接口、岗位匹配
+│   │   ├── appctx.py             #   后台线程取 Flask 应用的入口
 │   │   ├── community.py          #   社区（Offer 茶水间）
 │   │   ├── interview.py          #   职业访谈、MBTI 追问、深度测评分析
 │   │   ├── portrait.py           #   用户画像海报

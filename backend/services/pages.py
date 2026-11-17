@@ -16,7 +16,7 @@ def create_blueprint(current_user):
     @blueprint.route("/multi-agent-workflow.html")
     def multi_agent_workflow_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return send_from_directory(
             STATIC_DIR,
             "multi-agent-workflow.html",
@@ -27,42 +27,42 @@ def create_blueprint(current_user):
     @blueprint.route("/user-center.html")
     def user_center_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("user_center.html")
 
     @blueprint.route("/user-center/career-report/polish")
     @blueprint.route("/user-center/career-report/polish.html")
     def career_report_polish_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("career_report_polish.html")
 
     @blueprint.route("/resume-report")
     @blueprint.route("/resume-report.html")
     def resume_report_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("resume_report.html")
 
     @blueprint.route("/test-result")
     @blueprint.route("/test-result.html")
     def test_result_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("test_result.html")
 
     @blueprint.route("/test-runner")
     @blueprint.route("/test-runner.html")
     def test_runner_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("test_runner.html")
 
     @blueprint.route("/sbti")
     @blueprint.route("/sbti.html")
     def sbti_page():
         if not current_user():
-            return redirect(url_for("index"))
+            return redirect(url_for("site.index"))
         return render_template("sbti.html")
 
     return blueprint

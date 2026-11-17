@@ -28,8 +28,9 @@ def test_wildcard_origin_is_never_reflected():
     assert cors_headers("*", {FRONT}) == {}
 
 
-def test_flask_api_adds_headers_for_configured_origin(server, client, monkeypatch):
-    monkeypatch.setattr(server, "FRONTEND_ORIGIN", FRONT)
+def test_flask_api_adds_headers_for_configured_origin(client, monkeypatch):
+    from services import webshell
+    monkeypatch.setattr(webshell, "FRONTEND_ORIGIN", FRONT)
     allowed = client.get("/api/auth/status", headers={"Origin": FRONT})
     assert allowed.headers["Access-Control-Allow-Origin"] == FRONT
     assert "Origin" in allowed.headers["Vary"]
