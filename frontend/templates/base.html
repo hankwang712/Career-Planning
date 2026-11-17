@@ -520,7 +520,7 @@
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-review.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    {% set defer_attr = " defer" %}{% include 'partials/app_scripts.html' %}
     <script src="{{ url_for('static', filename='job-market.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
     <script src="{{ url_for('static', filename='career-report-workspace.js') }}" defer></script>

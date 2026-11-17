@@ -41,7 +41,7 @@ userCenterState.roleBoard = null;
 
 // 报告中心主区域的生成报告按钮点击处理
 function handleUserCenterGenerateReport() {
-  // 直接调用主站 app.js 中暴露的 startCareerReportGeneration
+  // 直接调用主站 app-*.js 中暴露的 startCareerReportGeneration
   if (typeof window.startCareerReportGeneration === "function") {
     window.startCareerReportGeneration();
   } else {

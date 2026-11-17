@@ -1,0 +1,13 @@
+{#
+  工作台主脚本（原来的 app.js，已按功能拆开）。它们是普通脚本，共享全局作用域，加载顺序有依赖，不要调换：
+    app-state                全局状态与常量（只含加载时不会调用函数的声明）
+    app-core ... app-settings-motion
+                             按功能分组的函数声明，彼此只在运行时互相调用，所以组间顺序无关
+    app-boot                 加载时执行的语句（window 导出、事件监听、对 showSection 的包装），必须最后加载
+  新增函数放进对应功能的文件；新增的顶层常量放 app-state。npm run check 会检查跨文件的重名函数。
+  需要 defer_attr 变量（默认空）：为 " defer" 时所有脚本加 defer。
+#}
+{% set defer_attr = defer_attr|default("") %}
+{% for name in ["app-state", "app-core", "app-resume-blocks", "app-resume-report", "app-resume-panels", "app-resume-judge", "app-resume-profile", "app-career-interview", "app-career-news", "app-profile-portrait", "app-profile-capability", "app-report-workspace", "app-auth-shell", "app-jobs", "app-community", "app-settings-motion", "app-boot"] %}
+<script src="{{ url_for('static', filename=name ~ '.js') }}"{{ defer_attr }}></script>
+{% endfor %}

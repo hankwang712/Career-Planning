@@ -961,7 +961,7 @@ body.resume-deep-audit-standalone .main-content {
 </div>
 
 <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
-<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+{% set defer_attr = " defer" %}{% include 'partials/app_scripts.html' %}
 <script src="{{ url_for('static', filename='resume-deep-audit-page.js') }}" defer></script>
 </body>
 </html>

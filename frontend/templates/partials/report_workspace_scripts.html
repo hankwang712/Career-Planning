@@ -1,7 +1,7 @@
 {#
   用户中心与报告优化页共用的脚本。这些文件是普通脚本，共享全局作用域，加载顺序有依赖，不要调换：
     auth-security             登录态与 CSRF
-    app                       全局状态、接口封装与工作台主体
+    app-*                     全局状态、接口封装与工作台主体（partials/app_scripts.html，已按功能拆成多个文件）
     workspace-guide-overlay   新手引导与个人档案浮层
     report-reader-layout      报告阅读排版
     career-report-workspace   报告阅读器、编辑器、版本与任务追踪
@@ -10,7 +10,7 @@
 #}
 {% set defer_attr = " defer" if scripts_defer else "" %}
 <script src="{{ url_for('static', filename='auth-security.js') }}"{{ defer_attr }}></script>
-<script src="{{ url_for('static', filename='app.js') }}"{{ defer_attr }}></script>
+{% include 'partials/app_scripts.html' %}
 <script src="{{ url_for('static', filename='workspace-guide-overlay.js') }}"{{ defer_attr }}></script>
 <script src="{{ url_for('static', filename='report-reader-layout.js') }}"{{ defer_attr }}></script>
 <script src="{{ url_for('static', filename='career-report-workspace.js') }}"{{ defer_attr }}></script>

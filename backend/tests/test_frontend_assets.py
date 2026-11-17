@@ -9,8 +9,10 @@ import pytest
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 STATIC = FRONTEND / "static"
 
+# 工作台主脚本（原 app.js）已按功能拆开，列表以 partials/app_scripts.html 为准；app-state 在最前，app-boot 在最后。
+APP_SCRIPTS = [f"{name}.js" for name in re.findall(r'"(app-[a-z-]+)"', (FRONTEND / "templates/partials/app_scripts.html").read_text(encoding="utf-8"))]
 # 用户中心与报告优化页共用脚本，顺序有依赖（共享全局作用域）。
-WORKSPACE_SCRIPTS = ["auth-security.js", "app.js", "workspace-guide-overlay.js", "report-reader-layout.js",
+WORKSPACE_SCRIPTS = ["auth-security.js", *APP_SCRIPTS, "workspace-guide-overlay.js", "report-reader-layout.js",
                      "career-report-workspace.js", "report-link-previews.js"]
 RETIRED_NAMES = ("app-hotfix", "workspace-restoration", "ai-polish-parity.css")
 
@@ -58,7 +60,23 @@ def test_polish_page_loads_the_same_scripts_deferred(make_account):
 def test_main_page_loads_the_report_workspace_after_app(make_account):
     html = make_account().get("/").get_data(as_text=True)
     order = [name for name, _ in script_order(html, set(WORKSPACE_SCRIPTS))]
-    assert order.index("app.js") < order.index("report-reader-layout.js") < order.index("career-report-workspace.js")
+    assert order.index("app-boot.js") < order.index("report-reader-layout.js") < order.index("career-report-workspace.js")
+
+
+def test_app_scripts_are_listed_state_first_and_boot_last():
+    assert APP_SCRIPTS[0] == "app-state.js" and APP_SCRIPTS[-1] == "app-boot.js"
+    assert len(APP_SCRIPTS) == len(set(APP_SCRIPTS))
+    on_disk = {path.name for path in STATIC.glob("app-*.js")} - {"app-cursor.js"}
+    assert on_disk == set(APP_SCRIPTS), "static 目录里的 app-*.js 必须和 partials/app_scripts.html 一致"
+    assert not (STATIC / "app.js").exists(), "app.js 已拆分，不要再加回单个巨型脚本"
+
+
+def test_every_page_with_the_workspace_scripts_loads_the_same_app_scripts(make_account):
+    account = make_account()
+    for path in ("/", "/user-center", "/user-center/career-report/polish", "/resume-report"):
+        html = account.get(path).get_data(as_text=True)
+        loaded = [name for name, _ in script_order(html, set(APP_SCRIPTS))]
+        assert loaded == APP_SCRIPTS, path
 
 
 def test_retired_patch_layer_names_are_gone_from_templates_and_static():

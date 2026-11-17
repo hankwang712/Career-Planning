@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const { loadTopLevel } = require("./app-source.cjs");
 
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined });
@@ -10,8 +11,18 @@ const { chromium } = require("playwright");
     await page.route("**/*", route => route.abort());
     await page.setContent('<div id="reportAgentMap"></div>');
     await page.addStyleTag({ content: fs.readFileSync(path.join(__dirname, "../static/styles.css"), "utf8") });
-    const source = fs.readFileSync(path.join(__dirname, "../static/app.js"), "utf8");
-    const consoleCode = source.slice(source.indexOf("const REPORT_AGENT_IMAGE_URL"), source.indexOf("const CAREER_REPORT_POLL_MS"));
+    // 控制台相关的常量在 app-state.js，函数在 app-report-workspace.js；按名字取出，顺序保持原样。
+    const consoleCode = loadTopLevel([
+      "REPORT_AGENT_IMAGE_URL", "REPORT_AGENT_FLOW", "reportWizardUiState", "renderReportWizard", "showReportWizardStage",
+      "reportWizardPrimaryAction", "reportAgentCurrentMessage", "getReportRuntimeState", "getReportProgressMap",
+      "reportMaLegendStatusText", "reportAgentPortraitHtml", "reportAgentIconSvg", "getReportUserAvatarHtml",
+      "reportAgentConsoleState", "REPORT_AGENT_INPUTS", "reportAgentConsoleResult", "reportAgentConsoleSummary",
+      "reportAgentMetrics", "reportAgentNextStep", "reportAgentHoverHtml", "updateReportAgentInspectorLayout",
+      "renderReportAgentInspector", "loadReportAgentSnapshot", "reportAgentCamera", "applyReportAgentCamera",
+      "fitReportAgentBoard", "resizeReportAgentBoard", "zoomReportAgentBoard", "bindReportAgentBoard",
+      "bindReportAgentConsole", "renderReportAgentMap", "updateReportAgentMap", "drawReportAgentConnections",
+      "reportAgentMapResizeObserver", "observeReportAgentMap",
+    ]);
     await page.addScriptTag({ content: `
       let accountRequestEpoch = 1;
       const appState = {};

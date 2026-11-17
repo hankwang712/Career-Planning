@@ -103,6 +103,46 @@ for (const file of walk(staticDir, [".js"])) {
   }
 }
 
+// 工作台主脚本拆成了多个普通脚本（templates/partials/app_scripts.html），它们共享一个全局作用域：
+// 文件列表要和目录一致，app-state 在最前、app-boot 在最后；跨文件的重名函数或 const/let 重复声明
+// 会在运行时静默覆盖或直接抛 SyntaxError，所以在这里拦住。
+{
+  const partial = fs.readFileSync(path.join(templatesDir, "partials", "app_scripts.html"), "utf8");
+  const listed = [...partial.matchAll(/"(app-[a-z-]+)"/g)].map((match) => `${match[1]}.js`);
+  const onDisk = fs.readdirSync(staticDir).filter((name) => /^app-[a-z-]+\.js$/.test(name) && name !== "app-cursor.js");
+  for (const name of listed) if (!onDisk.includes(name)) problems.push(`partials/app_scripts.html: 列出的脚本不存在：${name}`);
+  for (const name of onDisk) if (!listed.includes(name)) problems.push(`static/${name}: 没有列入 partials/app_scripts.html，页面不会加载它`);
+  if (listed[0] !== "app-state.js") problems.push("partials/app_scripts.html: app-state 必须第一个加载");
+  if (listed.at(-1) !== "app-boot.js") problems.push("partials/app_scripts.html: app-boot 必须最后加载");
+
+  const declared = new Map(); // name -> [{ file, kind }]
+  for (const name of listed.filter((file) => onDisk.includes(file))) {
+    let program;
+    try {
+      program = parseAst(fs.readFileSync(path.join(staticDir, name), "utf8"));
+    } catch {
+      continue; // 语法错误已在上面报告
+    }
+    for (const statement of program.body) {
+      const entries = statement.type === "FunctionDeclaration" ? [[statement.id.name, "function"]]
+        : statement.type === "ClassDeclaration" ? [[statement.id.name, "class"]]
+        : statement.type === "VariableDeclaration"
+          ? statement.declarations.filter((item) => item.id.type === "Identifier").map((item) => [item.id.name, statement.kind])
+          : [];
+      for (const [declaredName, kind] of entries) {
+        if (!declared.has(declaredName)) declared.set(declaredName, []);
+        declared.get(declaredName).push({ file: name, kind });
+      }
+    }
+  }
+  for (const [declaredName, places] of declared) {
+    const files = [...new Set(places.map((place) => place.file))];
+    if (files.length < 2) continue;
+    const onlyFunctions = places.every((place) => place.kind === "function");
+    problems.push(`${declaredName}: 在 ${files.join("、")} 中重复声明${onlyFunctions ? "（后加载的函数会覆盖前面的）" : "（let/const/class 重复会让后加载的脚本直接报错）"}`);
+  }
+}
+
 // 模板里引用的静态文件必须存在（Flask 先找 data/public，再找 frontend/static）。
 const referenced = new Set();
 for (const file of walk(templatesDir, [".html"])) {

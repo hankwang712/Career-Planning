@@ -1,14 +1,10 @@
 // 回归测试：还没有报告的新账号打开工作台时，报告智能体控制台不能因空数据抛错。
-// 不需要浏览器：从 app.js 截出函数，用桩对象在 vm 里执行。
+// 不需要浏览器：从拆开的 app-*.js 里取出函数，用桩对象在 vm 里执行。
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.join(__dirname, "../static/app.js"), "utf8");
-const start = source.indexOf("function reportAgentConsoleResult(key)");
-const end = source.indexOf("function reportAgentConsoleSummary(", start);
-assert.ok(start > 0 && end > start, "找不到 reportAgentConsoleResult");
+const { loadTopLevel } = require("./app-source.cjs");
+const source = loadTopLevel(["reportAgentConsoleResult"]);
 
 function load({ report, state, snapshot = null }) {
   const sandbox = {
@@ -17,7 +13,7 @@ function load({ report, state, snapshot = null }) {
     getReportRuntimeState: () => state,
   };
   vm.createContext(sandbox);
-  vm.runInContext(source.slice(start, end), sandbox);
+  vm.runInContext(source, sandbox);
   return sandbox.reportAgentConsoleResult;
 }
 

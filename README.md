@@ -455,10 +455,12 @@ uv run --no-project python -m pytest  # 后端测试（约 30 秒）
 npm run check                         # 前端静态检查：脚本语法、重复函数、模板引用的文件是否存在
 npm run test:unit                     # 前端单元测试
 npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwright 的 Chromium
+# backend/tests/test_browser_pages.py 也会用真实浏览器登录后打开各页面，检查脚本无报错；没有 Chromium 时自动跳过
 ```
 
 - **依赖版本**：`requirements.in` 是手写的直接依赖清单，`requirements.txt` 是由它生成的锁定版本（含传递依赖，Windows / Linux 通用）。升级依赖时修改 `requirements.in`，再执行 `uv pip compile requirements.in --universal --python-version 3.11 -o requirements.txt`，跑完测试后一起提交。
 - **容器部署**：`docker compose -f compose.app.yml up --build -d` 构建镜像（前端在构建阶段编译，Python 依赖按锁定版本安装，含 tesseract 中文 OCR）并启动主站，访问 `http://127.0.0.1:8080`，存活探针为 `/healthz`；账号、报告、聊天记录保存在命名卷 `career_appdata`。模型密钥读取根目录 `.env`。PostgreSQL / pgvector 仍由 `compose.yml` 单独提供，只有需要 LightRAG 时才用。
+- **前端脚本**：工作台主脚本是一组普通脚本（共享全局作用域），不是 ES 模块。`app-state.js` 放全局状态与常量并最先加载，`app-boot.js` 放加载时执行的语句并最后加载，中间各 `app-*.js` 按功能放函数声明。新增函数放进对应功能文件、新增顶层常量放 `app-state.js`；`npm run check` 会拦截跨文件的重名函数、重复的 `const`/`let` 和没列入加载列表的文件。
 - 后端测试使用临时数据目录并关闭后台采集与资讯预热，不会读写 `data/app_data`，也不访问外网或使用 `.env` 里的模型密钥。
 - 手动试跑时可设置 `CAREER_APP_DATA_DIR` 指向独立目录，避免动到真实数据；`CAREER_PREWARM=0` 跳过资讯预热，`JOB_MARKET_SCHEDULER=0` 关闭岗位定时采集。
 - Word 导出优先使用外部的 `docx_mcp`（环境变量 `CAREER_REPORT_DOCX_PYTHON` 指定解释器），不可用或失败时自动改用内置的 python-docx 转换，所以全新环境也能导出。
@@ -492,7 +494,7 @@ career-agent/
 │   └── scripts/                  # 启动、管理员与数据构建脚本
 ├── frontend/
 │   ├── templates/                # 页面与可复用 Jinja2 片段
-│   ├── static/                   # 业务脚本、样式、媒体与构建资源（脚本加载顺序见 templates/partials/report_workspace_scripts.html）
+│   ├── static/                   # 业务脚本、样式、媒体与构建资源；主脚本按功能拆成 app-*.js（顺序见 templates/partials/app_scripts.html），页面间共用顺序见 report_workspace_scripts.html
 │   ├── scripts/                  # 前端静态检查与依赖同步
 │   ├── tests/                    # 前端单元与浏览器测试
 │   ├── src/entries/              # Vite 多页面入口
