@@ -1,0 +1,5 @@
+[
+  {"query":"Python后端 API Django", "role":"Python后端", "relevance":{"fixture.txt#record=1":3,"fixture.txt#record=2":3,"fixture.txt#record=3":0,"fixture.txt#record=4":1,"fixture.txt#record=5":0,"fixture.txt#record=6":0,"fixture.txt#record=7":1,"fixture.txt#record=8":0,"fixture.txt#record=9":0,"fixture.txt#record=10":0,"fixture.txt#record=11":0,"fixture.txt#record=12":0}},
+  {"query":"React JavaScript 前端", "role":"React前端", "relevance":{"fixture.txt#record=1":0,"fixture.txt#record=2":0,"fixture.txt#record=3":0,"fixture.txt#record=4":0,"fixture.txt#record=5":3,"fixture.txt#record=6":0,"fixture.txt#record=7":0,"fixture.txt#record=8":0,"fixture.txt#record=9":0,"fixture.txt#record=10":0,"fixture.txt#record=11":0,"fixture.txt#record=12":3}},
+  {"query":"跨部门协作 项目协调", "role":"项目经理", "relevance":{"fixture.txt#record=1":0,"fixture.txt#record=2":0,"fixture.txt#record=3":0,"fixture.txt#record=4":0,"fixture.txt#record=5":0,"fixture.txt#record=6":0,"fixture.txt#record=7":0,"fixture.txt#record=8":2,"fixture.txt#record=9":3,"fixture.txt#record=10":0,"fixture.txt#record=11":0,"fixture.txt#record=12":0}}
+]

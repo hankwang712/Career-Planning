@@ -419,26 +419,40 @@ def _normalize_keyword(text):
     return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]+", "", str(text or "")).lower()
 
 
-def _keyword_overlap(left_items, right_items):
-    left_map = {}
-    for item in left_items or []:
-        key = _normalize_keyword(item)
-        if key and key not in left_map:
-            left_map[key] = _compact_text(item)
-    right_map = {}
-    for item in right_items or []:
-        key = _normalize_keyword(item)
-        if key and key not in right_map:
-            right_map[key] = _compact_text(item)
+def _keyword_overlap(left_items, right_items, aligner=None):
+    """简历与岗位的技能交集与缺口，比较的是对齐到标准技能表后的技能编号。
 
-    matched = []
-    missing = []
-    for key, value in right_map.items():
-        if key in left_map:
-            matched.append(value)
+    “Python3”和“python语言”、“K8s”和“Kubernetes”算同一项；岗位职责这类长句会先找出其中提到的技能。
+    标准表里没有的短语单列待核实，不直接计入技能缺口。长句未识别部分也不计入缺口。
+    返回 (matched, missing, detail)，前两项是展示用的技能名称。
+    """
+    from services.skills.aligner import _is_description, canonical_skills
+
+    resume_skills, resume_unmatched = canonical_skills(left_items, aligner)
+    job_skills, job_unmatched = canonical_skills(right_items, aligner)
+    matched, missing, detail = [], [], {"matched": [], "missing": [], "unmatched_job_terms": []}
+    for skill_id, (skill, job_terms) in job_skills.items():
+        if skill.category == "domain":
+            continue
+        if skill_id in resume_skills:
+            matched.append(skill.name)
+            detail["matched"].append({**skill.public(), "job_terms": job_terms[:3], "resume_terms": resume_skills[skill_id][1][:3]})
         else:
-            missing.append(value)
-    return matched[:16], missing[:16]
+            missing.append(skill.name)
+            detail["missing"].append({**skill.public(), "job_terms": job_terms[:3]})
+    resume_keys = {_normalize_keyword(item) for item in resume_unmatched}
+    for raw in job_unmatched:
+        if _is_description(raw):
+            continue
+        key = _normalize_keyword(raw)
+        if not key:
+            continue
+        detail["unmatched_job_terms"].append(raw)
+        # Unresolved requirements do not establish a skill gap.
+        if key in resume_keys:
+            detail.setdefault("literal_matches", []).append(raw)
+    detail["unmatched_resume_terms"] = resume_unmatched
+    return _unique_entries(matched), _unique_entries(missing), detail
 
 
 def _coerce_page_texts(items, max_pages):
@@ -966,6 +980,14 @@ def _collect_resume_keywords(resume):
     return _unique_entries(keywords, 24)
 
 
+def _collect_resume_skill_terms(resume):
+    """简历里全部的技能写法（不受展示用关键词 24 条的限制），只用于和岗位对齐。"""
+    terms = [skill.get("skill_name") for skill in resume.get("skills") or []]
+    for item in [*(resume.get("experiences") or []), *(resume.get("projects") or [])]:
+        terms.extend(item.get("technologies_used") or [])
+    return [term for term in terms if term]
+
+
 def _collect_job_keywords(job):
     keywords = list(job.get("extracted_keywords") or [])
     keywords.extend(job.get("qualifications", {}).get("required") or [])
@@ -1151,91 +1173,25 @@ def _build_uncertainty_layer(resume, missing_keywords, job, analysis_mode="job_m
 
 
 def _build_capability_scores(resume, matched_keywords, missing_keywords, analysis_mode="job_match"):
-    experiences = resume.get("experiences") or []
-    projects = resume.get("projects") or []
-    skills = resume.get("skills") or []
-    descriptions = []
-    for item in experiences:
-        descriptions.extend(item.get("description") or [])
-
-    quantified_hits = _count_text_matches(descriptions, r"\d+%|\d+\+?|\d+ms|\d+天|\d+周|\d+月")
-    collaboration_hits = _count_text_matches(descriptions, r"协作|协同|沟通|合作|cross-functional|cross functional|跨团队")
-    leadership_hits = _count_text_matches(descriptions, r"主导|带领|负责|推动|owner|lead|manage")
-
-    professional = min(95, 52 + len(matched_keywords) * 8 + len(experiences) * 5 + len(projects) * 3)
-    learning = min(95, 50 + len(skills) * 4 + len(projects) * 5 + len(resume.get("achievements") or []) * 2)
-    execution = min(95, 48 + quantified_hits * 10 + len(experiences) * 4)
-    communication = min(95, 45 + collaboration_hits * 10 + leadership_hits * 6)
-    if analysis_mode == "job_match":
-        gap_penalty = min(25, len(missing_keywords) * 4)
-        matching = max(40, min(95, 60 + len(matched_keywords) * 8 - gap_penalty))
-    else:
-        matching = max(48, min(92, 54 + len(experiences) * 6 + len(projects) * 5 + len(skills) * 2 + quantified_hits * 6))
-
-    return {
-        "professional": professional,
-        "learning": learning,
-        "execution": execution,
-        "communication": communication,
-        "matching": matching,
-    }
+    """Skill evidence coverage, not a measurement of latent personal abilities."""
+    total = len(set(matched_keywords) | set(missing_keywords))
+    coverage = round(100 * len(set(matched_keywords)) / total) if total and analysis_mode == "job_match" else None
+    return {"professional": None, "learning": None, "execution": None,
+            "communication": None, "matching": coverage}
 
 
 def _build_capability_layer(capability_scores, matched_keywords, missing_keywords, analysis_mode="job_match", recommended_directions=None):
-    if analysis_mode != "job_match":
-        direction_text = "、".join(recommended_directions or []) or "待进一步探索"
-        return [
-            {
-                "dimension": "执行与交付",
-                "conclusion": "经历与项目条目足以支撑基础执行力判断。",
-                "reasoning": "结合工作经历数量、项目数量与量化表达进行估计。",
-                "evidence": "已提取结构化经历与项目条目。",
-                "confidence": round(capability_scores.get("execution", 0) / 100, 2),
-                "boundary": "基于简历文本推断，未经过面试验证。",
-            },
-            {
-                "dimension": "方向建议",
-                "conclusion": f"当前更适合优先探索：{direction_text}。",
-                "reasoning": "综合经历标题、项目主题、技能栈和高频动作词进行归纳。",
-                "evidence": "来自简历中的角色、项目与技能关键词。",
-                "confidence": round(capability_scores.get("matching", 0) / 100, 2),
-                "boundary": "未结合具体 JD，因此这是方向性判断，不是定向录用结论。",
-            },
-            {
-                "dimension": "沟通协作",
-                "conclusion": f"沟通协作得分 {capability_scores.get('communication', 0)} / 100。",
-                "reasoning": "依据协作、沟通、跨团队等表述估算。",
-                "evidence": "简历中的协作性动作词与上下文。",
-                "confidence": round(capability_scores.get("communication", 0) / 100, 2),
-                "boundary": "若缺少行为案例，得分偏保守。",
-            },
-        ]
-    return [
-        {
-            "dimension": "执行与交付",
-            "conclusion": "经历与项目条目足以支撑基础执行力判断。",
-            "reasoning": "结合工作经历数量、项目数量与量化表达进行估计。",
-            "evidence": "已提取结构化经历与项目条目。",
-            "confidence": round(capability_scores.get("execution", 0) / 100, 2),
-            "boundary": "基于简历文本推断，未经过面试验证。",
-        },
-        {
-            "dimension": "岗位匹配度",
-            "conclusion": f"当前已命中 {len(matched_keywords)} 个岗位关键词，仍有 {len(missing_keywords)} 个待补强。",
-            "reasoning": "对结构化简历关键词与结构化 JD 关键词做归一化比对。",
-            "evidence": "关键词交集与缺口列表。",
-            "confidence": round(capability_scores.get("matching", 0) / 100, 2),
-            "boundary": "仅代表文本命中，不等于真实深度。",
-        },
-        {
-            "dimension": "沟通协作",
-            "conclusion": f"沟通协作得分 {capability_scores.get('communication', 0)} / 100。",
-            "reasoning": "依据协作、沟通、跨团队等表述估算。",
-            "evidence": "简历中的协作性动作词与上下文。",
-            "confidence": round(capability_scores.get("communication", 0) / 100, 2),
-            "boundary": "若缺少行为案例，得分偏保守。",
-        },
-    ]
+    coverage = capability_scores["matching"]
+    return [{"dimension": "技能证据覆盖", "conclusion": (
+                f"已识别的岗位标准技能中，简历体现 {len(matched_keywords)} 项，另有 {len(missing_keywords)} 项待补证据；覆盖率 {coverage}%。"
+                if coverage is not None else "缺少可比较的岗位技能要求，暂不计算覆盖率。"),
+             "reasoning": "双方先对齐标准技能 ID，覆盖率为简历已体现项数除以已识别岗位技能项数。未对齐短语另列待核实。",
+             "evidence": "标准技能对齐明细及对应原文。", "confidence": None,
+             "boundary": "文本体现不等于已掌握；未体现不等于不会；覆盖率不代表胜任或录用概率。"},
+            {"dimension": "能力验证", "conclusion": "学习力、执行力和沟通协作能力待验证。",
+             "reasoning": "经历条目数量与关键词不能测量能力，不据此生成分数。",
+             "evidence": "请通过具体成果、行为案例或任务验证补充证据。", "confidence": None,
+             "boundary": "材料不足保留未知，不记零分。"}]
 
 
 def _build_candidate_summary(name, resume, job, matched_keywords, missing_keywords, analysis_mode="job_match", recommended_directions=None):
@@ -1249,14 +1205,16 @@ def _build_candidate_summary(name, resume, job, matched_keywords, missing_keywor
             f"{name}，已提取 {len(experiences)} 段经历和 {len(projects)} 个项目，当前优势更偏向 {current_focus}，"
             f"如果你还没确定职业方向，可以优先尝试 {direction_text}。"
         )
+    if not matched_keywords and not missing_keywords:
+        return f"{name}，已提取简历材料，尚缺少可比较的标准岗位技能；请先核实岗位要求。"
     if not missing_keywords:
         return (
             f"{name}，已提取 {len(experiences)} 段经历，当前能力重点是 {current_focus}，"
-            f"与“{job_title}”岗位关键词基本对齐。"
+            f"与“{job_title}”已识别的标准技能在文本中有对应证据，实际能力仍待验证。"
         )
     return (
         f"{name}，已提取 {len(experiences)} 段经历，当前能力重点是 {current_focus}，"
-        f"与“{job_title}”岗位已命中 {len(matched_keywords)} 个关键词，仍有 {len(missing_keywords)} 个待补强。"
+        f"与“{job_title}”岗位已识别技能中，简历体现 {len(matched_keywords)} 项，另有 {len(missing_keywords)} 项待补证据。"
     )
 
 def _inline_markdown(text):
@@ -1322,7 +1280,7 @@ def markdown_to_safe_html(markdown_text):
         return '<div class="career-list-empty">等待生成简历分析结果</div>'
     return "".join(result)
 
-def build_matcher_state(structured_resume, structured_job, analysis_markdown, job_description):
+def build_matcher_state(structured_resume, structured_job, analysis_markdown, job_description, *, extracted_skills=None):
     resume = normalize_structured_resume(structured_resume)
     job = normalize_structured_job(structured_job)
     analysis_mode = "job_match" if _compact_text(job_description) else "resume_review"
@@ -1331,11 +1289,20 @@ def build_matcher_state(structured_resume, structured_job, analysis_markdown, jo
     recommended_directions = _infer_recommended_directions(resume)
     if analysis_mode == "job_match":
         job_keywords = _collect_job_keywords(job)
-        matched_keywords, missing_keywords = _keyword_overlap(resume_keywords, job_keywords)
+        # 岗位原文也参与技能识别：结构化抽取漏掉的要求，在原文里通常还能找到
+        resume_terms = [*resume_keywords, *_collect_resume_skill_terms(resume)]
+        job_terms = [*job_keywords, str(job_description or "")]
+        if extracted_skills is not None:
+            resume_terms = [item["phrase"] for item in extracted_skills["resume"]]
+            job_terms = [item["phrase"] for item in extracted_skills["job"]]
+        matched_keywords, missing_keywords, skill_alignment = _keyword_overlap(resume_terms, job_terms)
+        skill_alignment["extraction"] = extracted_skills
+        skill_alignment["extraction_status"] = "grounded_llm" if extracted_skills is not None else "dictionary_fallback"
     else:
         job_keywords = []
         matched_keywords = []
         missing_keywords = []
+        skill_alignment = {}
 
     capability_scores = _build_capability_scores(resume, matched_keywords, missing_keywords, analysis_mode=analysis_mode)
     name = _derive_candidate_name(resume)
@@ -1344,10 +1311,9 @@ def build_matcher_state(structured_resume, structured_job, analysis_markdown, jo
     job_overview = _build_job_overview(job)
 
     profile = {
-        "confidence": round(
-            max(0.55 if analysis_mode == "job_match" else 0.58, capability_scores.get("matching", 0) / 100),
-            2,
-        ),
+        "confidence": None,
+        "score_method": "canonical_skill_evidence_coverage",
+        "score_boundary": "Coverage of identified job skills, not ability or hiring probability.",
         "candidate_summary": _build_candidate_summary(
             name,
             resume,
@@ -1386,6 +1352,7 @@ def build_matcher_state(structured_resume, structured_job, analysis_markdown, jo
         "job_keywords": job_keywords,
         "matched_keywords": matched_keywords,
         "missing_keywords": missing_keywords,
+        "skill_alignment": skill_alignment,
         "recommended_directions": recommended_directions,
         "resume_overview": _build_resume_overview(resume),
         "job_overview": job_overview,

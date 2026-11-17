@@ -381,7 +381,7 @@ function resumeSixMetricCardsHtml(state) {
   const tech = resumeJudgeTechScore(profile);
   const cards = [
     { label: "学术背景评分", value: overall, cls: "a" },
-    { label: "技术栈匹配度", value: match, cls: "b" },
+    { label: "技能证据覆盖", value: match, cls: "b" },
     { label: "项目推进能力", value: story, cls: "c" },
     { label: "软技能展示", value: tech, cls: "d" }
   ];
@@ -390,7 +390,7 @@ function resumeSixMetricCardsHtml(state) {
     <div class="dashboard-grid fade-in fade-in-delay-1">
       ${cards.map((item) => `
         <div class="metric-card">
-          <div class="metric-value">${escHtml(String(item.value))}</div>
+          <div class="metric-value">${escHtml(resumeScoreLabel(item.value))}</div>
           <div class="metric-label">${escHtml(item.label)}</div>
           <div class="metric-bar"><div class="metric-bar-fill" style="width:${Math.max(0, Math.min(100, Number(item.value || 0)))}%"></div></div>
         </div>
@@ -421,37 +421,7 @@ function initResume6htmlScopeEffects(root) {
 }
 
 function resume6htmlRadarChartHtml() {
-  return `
-    <div class="liquid-card" style="margin-top: 8px;">
-      <h3 style="font-size: 1.1rem; margin-bottom: 20px; color: var(--text-primary);">能力维度雷达图</h3>
-      <div style="display: flex; justify-content: center;">
-        <svg width="320" height="320" viewBox="0 0 320 320" aria-hidden="true">
-          <polygon points="160,40 260,100 260,220 160,280 60,220 60,100" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"></polygon>
-          <polygon points="160,70 235,115 235,205 160,250 85,205 85,115" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"></polygon>
-          <polygon points="160,100 210,130 210,190 160,220 110,190 110,130" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"></polygon>
-          <line x1="160" y1="160" x2="160" y2="40" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <line x1="160" y1="160" x2="260" y2="100" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <line x1="160" y1="160" x2="260" y2="220" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <line x1="160" y1="160" x2="160" y2="280" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <line x1="160" y1="160" x2="60" y2="220" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <line x1="160" y1="160" x2="60" y2="100" stroke="rgba(0,0,0,0.08)" stroke-width="1"></line>
-          <polygon points="160,52 240,108 220,200 160,250 100,200 90,115" fill="rgba(14, 165, 233, 0.15)" stroke="var(--accent-cyan)" stroke-width="2"></polygon>
-          <circle cx="160" cy="52" r="4" fill="var(--accent-cyan)"></circle>
-          <circle cx="240" cy="108" r="4" fill="var(--accent-green)"></circle>
-          <circle cx="220" cy="200" r="4" fill="var(--accent-orange)"></circle>
-          <circle cx="160" cy="250" r="4" fill="var(--accent-purple)"></circle>
-          <circle cx="100" cy="200" r="4" fill="var(--accent-pink)"></circle>
-          <circle cx="90" cy="115" r="4" fill="var(--accent-red)"></circle>
-          <text x="160" y="28" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="600">学术背景</text>
-          <text x="275" y="100" text-anchor="start" font-size="11" fill="var(--text-secondary)" font-weight="600">技术匹配</text>
-          <text x="275" y="230" text-anchor="start" font-size="11" fill="var(--text-secondary)" font-weight="600">项目推进</text>
-          <text x="160" y="300" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="600">软技能</text>
-          <text x="45" y="230" text-anchor="end" font-size="11" fill="var(--text-secondary)" font-weight="600">一致性</text>
-          <text x="45" y="100" text-anchor="end" font-size="11" fill="var(--text-secondary)" font-weight="600">内容精炼</text>
-        </svg>
-      </div>
-    </div>
-  `;
+  return `<div class="liquid-card"><h3>能力验证</h3><p>学习力、沟通协作与项目推进能力待验证。技能证据覆盖率单独展示，不用固定雷达图代替能力测量。</p></div>`;
 }
 
 function switchResumeReportSectionTab(reportId, index) {

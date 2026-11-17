@@ -579,15 +579,15 @@ function resumeJudgeGapCompareHtml(analysisMode, profile, matcher, recommendedDi
   const resumeOv = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
   const jobOv = matcher?.job_overview && typeof matcher.job_overview === "object" ? matcher.job_overview : {};
   const mk = Array.isArray(matcher?.matched_keywords) ? matcher.matched_keywords.length : 0;
-  const jk = Array.isArray(matcher?.job_keywords) ? matcher.job_keywords.length : 0;
+  const jk = mk + (Array.isArray(matcher?.missing_keywords) ? matcher.missing_keywords.length : 0);
   const miss = Array.isArray(matcher?.missing_keywords) ? matcher.missing_keywords : [];
   const gapSummary = miss.length
     ? `最关键差距：与岗位强相关的「${miss.slice(0, 2).join("、")}」在简历中证据仍偏弱。`
-    : (matchScore < 60 ? "关键词命中一般，建议把经历写法向 JD 用语靠拢。" : "关键词层面暂无显著缺口，仍建议核对业务结果表达。");
+    : (matchScore == null ? "技能要求尚待核实。" : matchScore < 60 ? "关键词命中一般，建议把经历写法向 JD 用语靠拢。" : "关键词层面暂无显著缺口，仍建议核对业务结果表达。");
 
   const rows = [
     [resumeOv.headline || profile?.basics?.target_direction || "经历与项目呈现", jobOv.job_title || "目标岗位"],
-    [`结构化证据：约 ${resumeOv.skill_count || 0} 项技能 · ${resumeOv.project_count || 0} 个项目`, jk ? `JD 关键词约 ${jk} 项（当前命中 ${mk}）` : "JD 关键词解析偏少"],
+    [`结构化证据：约 ${resumeOv.skill_count || 0} 项技能 · ${resumeOv.project_count || 0} 个项目`, jk ? `已识别岗位技能 ${jk} 项（简历体现 ${mk}）` : "JD 关键词解析偏少"],
     [(recommendedDirections[0] || "叙事主线"), miss[0] ? `岗位强调：${miss[0]}` : "核心要求已有初步对应"]
   ];
 
@@ -611,47 +611,14 @@ function resumeJudgeGapCompareHtml(analysisMode, profile, matcher, recommendedDi
 }
 
 function resumeJudgeRiskRadarHtml(profile, matcher, analysisMode, deck, matchScore, recommendedDirections) {
-  const uncertainties = Array.isArray(profile?.uncertainty_layer) ? profile.uncertainty_layer : [];
   const missing = Array.isArray(matcher?.missing_keywords) ? matcher.missing_keywords : [];
-  const story = resumeJudgeStoryScore(profile, matcher);
-  const tech = resumeJudgeTechScore(profile);
-  const projectBlend = averageResumeScores([story, tech]);
-  const fmt = resumeJudgeFormatScore(profile, matcher);
-  const dirs = (recommendedDirections || []).filter(Boolean);
-
-  const dir = Math.min(100, Math.round(22 + uncertainties.length * 14 + (!String(deck?.identity_tag || "").trim() ? 10 : 0) + (dirs.length > 3 ? 14 : 0)));
-  const expr = Math.min(100, Math.round(30 + (100 - fmt) * 0.45));
-  const depth = Math.min(100, Math.round(100 - projectBlend + 8));
-  const jdGap = analysisMode === "job_match"
-    ? Math.min(100, Math.round(100 - matchScore + Math.min(22, missing.length * 6)))
-    : Math.min(84, Math.round(34 + missing.length * 8));
-
-  const items = [
-    ["方向主线（叙事是否集中）", dir],
-    ["成果与量化表达", expr],
-    ["项目与经历深度", depth],
-    [analysisMode === "job_match" ? "JD / 技能匹配落差" : "技能与叙事一致性", jdGap]
-  ];
-
-  return `
-    <div class="resume-risk-bars">
-      <p class="resume-risk-bars-legend">条形越长，该维度越容易在投递或面试中出问题；建议优先处理最长的 1～2 项。</p>
-      ${items.map(([label, score]) => {
-        const fillClass = score < 40 ? "low" : (score < 70 ? "medium" : "high");
-        return `
-        <div class="resume-risk-bar-row">
-          <div class="resume-risk-bar-head">
-            <span>${escHtml(label)}</span>
-            <strong>${score}%</strong>
-          </div>
-          <div class="resume-risk-bar-track">
-            <div class="resume-risk-bar-fill ${fillClass}" style="width:${score}%"></div>
-          </div>
-        </div>
-        `;
-      }).join("")}
-    </div>
-  `;
+  const unknown = matcher?.skill_alignment?.unmatched_job_terms || [];
+  return `<div class="resume-risk-bars">
+    <p class="resume-risk-bars-legend">未体现不等于不会；以下项目需要补充成果或核实，不能换算为风险概率。</p>
+    <p>待补技能证据：${escHtml(missing.join("、") || "已识别技能暂无未体现项")}</p>
+    <p>尚未对齐的岗位短语：${escHtml(unknown.join("、") || "暂无")}</p>
+    <p>执行力、沟通力及项目深度：待验证。</p>
+  </div>`;
 }
 
 function resumeJudgeExactEmptyDashboardHtml(state) {
@@ -685,8 +652,8 @@ function resumeJudgeExactEmptyDashboardHtml(state) {
         </div>
         <div class="resume-hj-score-grid">
           ${[
-            { label: "综合匹配", tone: "primary", desc: "整体进入下一轮潜力" },
-            { label: "岗位命中", tone: "warn", desc: "JD 关键词贴合程度" },
+            { label: "综合匹配", tone: "primary", desc: "需要成果与任务验证" },
+            { label: "技能证据覆盖", tone: "warn", desc: "已识别技能的文本证据比例" },
             { label: "项目相关性", tone: "brand", desc: "项目与目标方向一致性" },
             { label: "风险等级", tone: "success", desc: "风险可控，可直接推进" }
           ].map((item) => `
@@ -832,15 +799,11 @@ function resumeJudgeExactDashboardHtml(state, profile, matcher, analysisMode, re
   const overallScore = resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections);
   const matchScore = resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections);
   const projectScore = averageResumeScores([resumeJudgeStoryScore(profile, matcher), resumeJudgeTechScore(profile)]);
-  const riskLevel = (() => {
-    if (matchScore < 35 || overallScore < 65 || riskItems.length >= 4) return { label: "高", tone: "danger", desc: "建议先补强再推进" };
-    if (matchScore < 60 || overallScore < 78 || riskItems.length >= 2) return { label: "中", tone: "warn", desc: "可推进但需重点追问" };
-    return { label: "低", tone: "success", desc: "风险可控，可直接推进" };
-  })();
+  const riskLevel = { label: "待验证", tone: "muted", desc: "根据具体证据逐项核实，暂不量化风险" };
   const scoreCards = [
-    { label: "综合匹配", value: `${overallScore}%`, tone: "primary", desc: "整体进入下一轮潜力" },
-    { label: "岗位命中", value: `${matchScore}%`, tone: matchScore < 45 ? "danger" : (matchScore < 70 ? "warn" : "success"), desc: "JD 关键词贴合程度" },
-    { label: "项目相关性", value: `${projectScore}%`, tone: projectScore >= 75 ? "success" : "brand", desc: "项目与目标方向一致性" },
+    { label: "综合匹配", value: resumeScoreLabel(overallScore), tone: "primary", desc: "需要成果与任务验证" },
+    { label: "技能证据覆盖", value: resumeScoreLabel(matchScore), tone: matchScore < 45 ? "danger" : (matchScore < 70 ? "warn" : "success"), desc: "已识别技能的文本证据比例" },
+    { label: "项目相关性", value: resumeScoreLabel(projectScore), tone: projectScore >= 75 ? "success" : "brand", desc: "项目与目标方向一致性" },
     { label: "风险等级", value: riskLevel.label, tone: riskLevel.tone, desc: riskLevel.desc }
   ];
   const highlights = (resumeFlattenBlocks(strengthGroup?.blocks || []).slice(0, 4).length

@@ -123,3 +123,20 @@ def test_switching_sections_works(logged_in_page, live_server):
         logged_in_page.evaluate("section => window.showSection(section)", section)
         logged_in_page.wait_for_timeout(400)
     assert errors == [], "\n".join(errors)
+
+
+def test_resume_scores_preserve_unknown_in_actual_page(logged_in_page, live_server):
+    errors = collect_errors(logged_in_page)
+    logged_in_page.goto(live_server + "/resume-report", wait_until="load")
+    result = logged_in_page.evaluate("""() => {
+      const profile = {score_method:'canonical_skill_evidence_coverage',
+                       capability_scores:{matching:50, execution:null, communication:null}};
+      const matcher = {matched_keywords:['Python'], missing_keywords:['Java']};
+      const gauge = resumeGaugeCardHtml(profile, matcher, 'job_match', []);
+      const metrics = renderResumeReportHeroMetrics(profile, matcher, 'job_match', []);
+      return {gauge, metrics, zero:resumeScoreLabel(0), unknown:resumeScoreLabel(null)};
+    }""")
+    assert "50%" in result["gauge"] and "50%" in result["metrics"]
+    assert "待验证" in result["metrics"] and "null%" not in result["metrics"]
+    assert result["zero"] == "0%" and result["unknown"] == "待验证"
+    assert errors == [], "\n".join(errors)

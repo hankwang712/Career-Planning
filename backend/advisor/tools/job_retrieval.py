@@ -1,62 +1,63 @@
-import re
+"""Metadata-first hybrid retrieval; LightRAG is an optional additional channel."""
 import asyncio
-import hashlib
-import heapq
-import os
-from pathlib import Path
 from functools import lru_cache
+import hashlib
+import os
+import re
+from pathlib import Path
 
 import httpx
 
 from ..config import JobRAGConfig, get_job_rag_config
 from ..runtime import LightRAGStartupError, ensure_lightrag
 from ..schemas.job import JobAnalysisInput, JobSource
+from ...services.retrieval.filters import filter_sources
+from ...services.retrieval.hybrid import HybridIndex, identity
+from ...services.skills.embeddings import CachedEmbeddings, default_embedder
 
 
 class JobRetrievalError(RuntimeError):
-    """可安全展示给调用方的检索错误，不携带密钥或服务器原始错误正文。"""
+    """Safe retrieval failure without provider bodies or credentials."""
 
 
-@lru_cache(maxsize=16)
-def _local_candidates(path_text, modified, target, question, limit):
-    """Bounded lexical recall from the same original JD export; never classifies a requirement."""
+class JobWorkspaceError(JobRetrievalError):
+    """A workspace mismatch must not silently switch data sources."""
+
+
+def source_path():
+    return Path(os.environ.get("JOB_JD_SOURCE_PATH") or Path(__file__).resolve().parents[3] / "job_descriptions.txt")
+
+
+@lru_cache(maxsize=2)
+def _local_sources(path_text, modified):
     from artifacts.research.job_graph import iter_job_documents
+    return [{"chunk_id": "local-jd-" + hashlib.sha256(doc.text.encode()).hexdigest()[:32],
+             "file_path": Path(path_text).as_posix() + f"#record={doc.index}", "reference_id": "local_export",
+             "content": f"招聘记录内部键：{doc.document_id}\n{doc.text}"}
+            for doc in iter_job_documents(Path(path_text))]
 
-    target = re.sub(r"工程师|实习生|开发|方向|高级|资深|招聘|算法|[（）()、，,与和]", " ", target)
-    terms = list(dict.fromkeys(term.casefold() for term in re.findall(r"[A-Za-z][A-Za-z0-9.+-]*|[\u4e00-\u9fff]{2,}", target)))
-    if not terms:
+
+def local_sources():
+    path = source_path()
+    try:
+        return _local_sources(str(path.resolve()), path.stat().st_mtime_ns)
+    except (OSError, ValueError):
         return []
-    best = []
-    for document in iter_job_documents(Path(path_text)):
-        content = document.text
-        title = content.splitlines()[0].partition("：")[2].casefold()
-        body = content.casefold()
-        title_hits = sum(term in title for term in terms)
-        body_hits = sum(term in body for term in terms)
-        if not title_hits and body_hits < min(2, len(terms)):
-            continue
-        # A specific title match dominates incidental mentions in unrelated descriptions.
-        score = title_hits * 12 + body_hits
-        candidate = (score, -document.index, document.index, content, document.document_id)
-        if len(best) < limit:
-            heapq.heappush(best, candidate)
-        elif candidate[:2] > best[0][:2]:
-            heapq.heapreplace(best, candidate)
-    return [{"chunk_id": "local-jd-" + hashlib.sha256(content.encode("utf-8")).hexdigest()[:32],
-             "file_path": Path(path_text).as_posix() + f"#record={record}", "reference_id": "local_export",
-             "content": f"招聘记录内部键：{identifier}\n{content}"}
-            for _, _, record, content, identifier in sorted(best, reverse=True)]
+
+
+def _search(sources, request, graph_ranking=(), limit=None):
+    embedder = default_embedder()
+    index = HybridIndex(sources, embedder=embedder,
+                        vector_cache=CachedEmbeddings(embedder) if embedder else None)
+    role = re.sub(r"工程师|实习生|方向|高级|资深|招聘", " ", request.target_role)
+    query = "\n".join(part for part in (role, request.question) if part.strip())
+    return index.search(query or request.target_role, role=role,
+                        limit=limit or request.chunk_top_k, graph_ranking=graph_ranking)
 
 
 def local_job_candidates(request, limit=3):
-    path = Path(os.environ.get("JOB_JD_SOURCE_PATH") or Path(__file__).resolve().parents[3] / "job_descriptions.txt")
-    if not path.is_file():
-        return []
-    try:
-        return _local_candidates(str(path.resolve()), path.stat().st_mtime_ns, request.target_role, request.question, limit)
-    except (OSError, ValueError):
-        # An unavailable local export does not discard valid graph results.
-        return []
+    eligible, _ = filter_sources(local_sources(), request.filters.model_dump())
+    return _search(eligible, request, limit=limit)["sources"]
 
 
 class LightRAGJobRetriever:
@@ -64,107 +65,83 @@ class LightRAGJobRetriever:
         self.settings = settings or get_job_rag_config()
         self.transport = transport
 
-    async def retrieve(self, request: JobAnalysisInput) -> dict:
+    async def _graph(self, request):
         headers = {"X-API-Key": self.settings.api_key} if self.settings.api_key else {}
-        try:
-            async with httpx.AsyncClient(
-                base_url=self.settings.base_url + "/", headers=headers,
-                timeout=self.settings.timeout, trust_env=False, transport=self.transport,
-            ) as client:
-                # 放在检索入口：直接在其他 Python 代码里调用 Agent 也能自动启动。
-                await ensure_lightrag(client, self.settings)
-                response = await client.post("query/data", json={
-                    "query": request.retrieval_query(), "mode": request.mode,
-                    "top_k": request.top_k, "chunk_top_k": request.chunk_top_k,
-                    "max_entity_tokens": 2000, "max_relation_tokens": 2000,
-                    "max_total_tokens": 12000, "enable_rerank": False,
-                    "include_references": True,
-                })
+        async with httpx.AsyncClient(base_url=self.settings.base_url + "/", headers=headers,
+            timeout=self.settings.timeout, trust_env=False, transport=self.transport) as client:
+            await ensure_lightrag(client, self.settings)
+            response = await client.post("query/data", json={
+                "query": request.retrieval_query(), "mode": request.mode,
+                "top_k": request.top_k, "chunk_top_k": 100,
+                "max_entity_tokens": 2000, "max_relation_tokens": 2000,
+                "max_total_tokens": 12000, "enable_rerank": False, "include_references": True})
+            response.raise_for_status()
+            raw = response.json()
+            if raw.get("status") != "success" and not (
+                raw.get("status") == "failure" and raw.get("metadata", {}).get("failure_reason") == "no_results"):
+                raise JobRetrievalError("LightRAG 未成功完成检索")
+            data = raw.get("data") or {}
+            graph = [JobSource.model_validate(row).model_dump() for row in data.get("chunks", []) if row.get("content", "").strip()]
+            ledger, offset, seen = [], 0, set()
+            while True:
+                response = await client.post("career/evidence", json={
+                    "target_role": request.target_role or request.question,
+                    "question": request.question, **request.filters.model_dump(),
+                    "candidate_pool": True, "offset": offset, "limit": 1000})
+                if response.status_code in {404, 422}:
+                    return graph, data, {"ledger_status": "upgrade_required"}, graph
                 response.raise_for_status()
-                raw = response.json()
-                filters = request.filters.model_dump()
-                constrained = bool(filters["cities"] or filters["candidate_education"]
-                                   or filters["min_monthly_salary"] is not None
-                                   or filters["max_monthly_salary"] is not None or not filters["include_unknown"])
-                ledger = None
-                if constrained:
-                    # Filter the full successful ledger before selecting the final evidence.
-                    # Semantic hits add recall/ranking signals, never override user constraints.
-                    if raw.get("status") not in {"success", "failure"}:
-                        raise JobRetrievalError("LightRAG 未成功完成检索")
-                    if raw.get("status") == "failure" and raw.get("metadata", {}).get("failure_reason") != "no_results":
-                        raise JobRetrievalError("LightRAG 未成功完成检索")
-                    evidence_response = await client.post("career/evidence", json={
-                        "target_role": request.target_role or request.question, "question": request.question,
-                        **filters, "limit": request.chunk_top_k,
-                        "semantic_ids": [chunk["chunk_id"] for chunk in raw.get("data", {}).get("chunks", [])
-                                         if chunk.get("chunk_id")][:100],
-                    })
-                    if evidence_response.status_code == 404:
-                        raise JobRetrievalError("岗位服务尚未支持条件筛选，请更新职业模块补丁并重启 LightRAG")
-                    evidence_response.raise_for_status()
-                    envelope = evidence_response.json()
-                    if envelope.get("workspace") != self.settings.workspace:
-                        raise JobRetrievalError("岗位事实库工作空间与报告配置不一致")
-                    ledger = envelope["data"]
-            no_results = (
-                raw.get("status") == "failure"
-                and raw.get("metadata", {}).get("failure_reason") == "no_results"
-            )
-            if raw.get("status") != "success" and not no_results:
-                raise JobRetrievalError("LightRAG 未成功完成检索，请查看 LightRAG 服务日志")
-            data = raw["data"]
-            sources, seen = [], set()
-            for chunk in ledger["sources"] if ledger is not None else data.get("chunks", []):
-                if not chunk.get("content", "").strip():
-                    continue
-                source = JobSource.model_validate(chunk)
-                if source.chunk_id not in seen:
-                    seen.add(source.chunk_id)
-                    sources.append(source.model_dump())
-            # Supplement semantic misses with a few original records, then let the Agent
-            # assess actual responsibilities. This is recall, not a relevance verdict.
-            local = [] if constrained else await asyncio.to_thread(local_job_candidates, request, min(3, request.chunk_top_k))
-            graph_paths = {source["file_path"] for source in sources}
-            local = [source for source in local if source["file_path"] not in graph_paths]
-            sources = [*local, *sources]
-            # 限制条数时保留整个 chunk，避免在岗位要求中间硬切文本。
-            returned_count = len(sources)
-            sources = sources[:request.chunk_top_k]
-            record_paths = {
-                source["file_path"] for source in sources
-                # 后续导入可以使用绝对路径或另一份 TXT，不限定原始文件名。
-                if re.fullmatch(r".+\.txt#record=\d+", source["file_path"], flags=re.IGNORECASE)
-            }
-            return {
-                "sources": sources,
-                "scope": {
-                    "workspace": self.settings.workspace, "mode": request.mode,
-                    "filters": filters,
-                    **(ledger["scope"] if ledger is not None else {"metadata_filters_applied": False}),
-                    "chunk_count": len(sources), "retrieved_chunk_count": returned_count,
-                    "jd_record_count": len(record_paths),
-                    "unidentified_source_count": sum(
-                        source["file_path"] not in record_paths for source in sources
-                    ),
-                    "local_export_candidates": sum(source["reference_id"] == "local_export" for source in sources),
-                    "retrieval_methods": ["lightrag", "metadata_filtered_ledger"] if constrained else (
-                        ["lightrag", "bounded_local_export"] if local else ["lightrag"]),
-                    "entity_count": len(data.get("entities", [])),
-                    "relationship_count": len(data.get("relationships", [])),
-                    "description": "仅本次检索样本；JD 数按 record 来源去重，不代表全库或招聘市场统计。",
-                    "completeness": "保留接口返回的 chunk；是否覆盖某条完整 JD 取决于导入时的分块方式。",
-                },
-            }
-        except JobRetrievalError:
-            raise
-        except LightRAGStartupError as error:
-            raise JobRetrievalError(str(error)) from error
-        except httpx.HTTPStatusError as error:
-            raise JobRetrievalError(f"LightRAG 接口返回 HTTP {error.response.status_code}") from error
-        except httpx.TimeoutException as error:
-            raise JobRetrievalError("LightRAG 检索超时，请检查服务或调整 LIGHTRAG_TIMEOUT") from error
-        except httpx.RequestError as error:
-            raise JobRetrievalError("无法连接 LightRAG，请先启动 job_graph.py serve --background") from error
-        except (ValueError, KeyError, TypeError, AttributeError) as error:
-            raise JobRetrievalError("LightRAG 返回的数据格式不兼容，请检查 /health 与 /query/data 接口") from error
+                envelope = response.json()
+                if envelope.get("workspace") != self.settings.workspace:
+                    raise JobWorkspaceError("岗位事实库工作空间与报告配置不一致")
+                page = envelope["data"]
+                if not page.get("scope", {}).get("candidate_pool"):
+                    raise JobRetrievalError("岗位服务未返回完整候选，请更新职业模块补丁")
+                rows = [JobSource.model_validate(row).model_dump() for row in page["sources"]]
+                keys = {identity(row) for row in rows}
+                if seen & keys:
+                    raise JobRetrievalError("岗位事实库分页包含重复记录，请重试")
+                seen.update(keys)
+                ledger.extend(rows)
+                offset += len(rows)
+                if not page["scope"].get("has_more"):
+                    return ledger, data, page["scope"], graph
+                if not rows:
+                    raise JobRetrievalError("岗位事实库分页未前进")
+
+    async def retrieve(self, request: JobAnalysisInput) -> dict:
+        local = await asyncio.to_thread(local_sources)
+        graph, graph_hits, graph_rank, data, graph_scope, graph_error = [], [], [], {}, {}, None
+        enabled = os.environ.get("JOB_RETRIEVAL_GRAPH_ENABLED", "1").casefold() not in {"0", "false", "no"}
+        if enabled:
+            try:
+                graph, data, graph_scope, graph_hits = await self._graph(request)
+                graph_rank = [identity(source) for source in graph_hits]
+            except JobWorkspaceError:
+                raise
+            except (JobRetrievalError, LightRAGStartupError, httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+                graph_error = type(error).__name__
+                if not local:
+                    raise JobRetrievalError("岗位图检索不可用，且没有本地 JD 语料；请检查服务或 JOB_JD_SOURCE_PATH") from error
+        elif not local:
+            raise JobRetrievalError("已关闭岗位图检索，且没有本地 JD 语料；请配置 JOB_JD_SOURCE_PATH")
+        combined = {identity(source): source for source in [*graph_hits, *local, *graph]}
+        eligible, excluded = filter_sources(list(combined.values()), request.filters.model_dump())
+        result = await asyncio.to_thread(_search, eligible, request, graph_rank)
+        sources = result["sources"]
+        scope = {**graph_scope, **result["scope"], "workspace": self.settings.workspace,
+                 "mode": request.mode, "filters": request.filters.model_dump(),
+                 "chunk_count": len(sources), "retrieved_chunk_count": result["scope"]["candidate_count"],
+                 "jd_record_count": sum("#record=" in source["file_path"] for source in sources),
+                 "unidentified_source_count": sum("#record=" not in source["file_path"] for source in sources),
+                 "local_export_candidates": sum(source["reference_id"] == "local_export" for source in sources),
+                 "metadata_filters_applied": True, "metadata_excluded_count": excluded,
+                 "graph_status": "failed" if graph_error else ("active" if enabled else "disabled"),
+                 "graph_error_type": graph_error,
+                 "retrieval_methods": ["bm25", "rrf", "feature_rerank"]
+                      + (["dense"] if result["scope"].get("vector_status") == "active" else [])
+                      + (["lightrag"] if graph_rank else []),
+                 "entity_count": len(data.get("entities", [])), "relationship_count": len(data.get("relationships", [])),
+                 "description": "本次检索样本；排序分数不代表岗位匹配概率，未召回不代表市场不存在。",
+                 "completeness": "本地与事实库来源保留整条 JD；图来源可能为片段。"}
+        return {"sources": sources, "scope": scope}

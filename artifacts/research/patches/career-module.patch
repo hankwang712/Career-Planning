@@ -3035,7 +3035,7 @@ diff --git a/lightrag/career/evidence.py b/lightrag/career/evidence.py
 new file mode 100644
 --- /dev/null
 +++ b/lightrag/career/evidence.py
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,140 @@
 +"""Metadata-first evidence recall from the successful JD ledger."""
 +import re
 +
@@ -3054,7 +3054,9 @@ new file mode 100644
 +    max_monthly_salary: int | None = Field(default=None, ge=0, le=1000000)
 +    include_unknown: bool = True
 +    semantic_ids: list[str] = Field(default_factory=list, max_length=100)
-+    limit: int = Field(default=10, ge=1, le=30)
++    limit: int = Field(default=10, ge=1, le=1000)
++    candidate_pool: bool = False
++    offset: int = Field(default=0, ge=0)
 +
 +    @model_validator(mode="after")
 +    def valid_filters(self):
@@ -3145,6 +3147,11 @@ new file mode 100644
 +            excluded += 1
 +            continue
 +        identifier = chunk_id(job)
++        if query.candidate_pool:
++            metadata.update(unverified_conditions=unknown)
++            candidates.append({"chunk_id": identifier, "file_path": job.file_path,
++                               "reference_id": "career_ledger", "content": job.chunk_text, "metadata": metadata})
++            continue
 +        title, body = job.title.casefold(), job.text.casefold()
 +        title_hits, body_hits = sum(term in title for term in terms), sum(term in body for term in terms)
 +        if identifier not in semantic and not title_hits and (not terms or body_hits < min(2, len(terms))):
@@ -3157,6 +3164,13 @@ new file mode 100644
 +            "chunk_id": identifier, "file_path": job.file_path, "reference_id": "career_ledger",
 +            "content": job.chunk_text, "metadata": metadata,
 +        }))
++    if query.candidate_pool:
++        candidates.sort(key=lambda source: source["file_path"])
++        return {"sources": candidates[query.offset:query.offset + query.limit],
++                "scope": {"candidate_pool": True, "metadata_filters_applied": True,
++                          "scanned_jd_count": scanned, "metadata_excluded_count": excluded,
++                          "eligible_candidate_count": len(candidates),
++                          "has_more": query.offset + query.limit < len(candidates)}}
 +    candidates.sort(key=lambda item: item[:3])
 +    return {"sources": [item[3] for item in candidates[:query.limit]],
 +            "scope": {"scanned_jd_count": scanned, "metadata_excluded_count": excluded,

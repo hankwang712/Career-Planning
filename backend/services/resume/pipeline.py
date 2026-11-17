@@ -739,11 +739,19 @@ def _analyze_resume_matcher(storage_path, job_description, progress_callback=Non
             max_tokens=3200,
         )
 
+    extracted_skills = None
+    try:
+        from services.skills.extraction import SkillExtractor
+        _report("skill_alignment", "正在提取原文技能并对齐标准技能表")
+        extracted_skills = SkillExtractor((base_url, api_key, model)).extract(resume_text, job_text)
+    except Exception as exc:
+        get_app().logger.warning("技能抽取失败，保留词表可核对结果：%s", type(exc).__name__)
     matcher_state = build_matcher_state(
         structured_resume=structured_resume,
         structured_job=structured_job,
         analysis_markdown=analysis_markdown,
         job_description=job_text,
+        extracted_skills=extracted_skills,
     )
     _report("highlight_deck", "正在提炼核心结论与亮点")
     try:

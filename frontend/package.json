@@ -6,7 +6,7 @@
     "build": "node scripts/sync-vendors.mjs && vite build",
     "sync:vendors": "node scripts/sync-vendors.mjs",
     "check": "node scripts/check-static.mjs",
-    "test:unit": "node tests/report-agent-result.cjs",
+    "test:unit": "node tests/report-agent-result.cjs && node tests/resume-evidence-scores.cjs",
     "preview": "vite preview",
     "test:browser": "node tests/app-cursor.cjs && node tests/report-agent-console.cjs && node tests/career-profile.cjs"
   },

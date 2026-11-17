@@ -517,6 +517,10 @@ career-agent/
 └── compose.yml                   # PostgreSQL / pgvector
 ```
 
+## 技能匹配与检索
+
+技能对齐、岗位混合检索与双指标评估的配置及运行方式见 [检索说明](backend/services/retrieval/README.md)。
+
 ## 致谢
 
 本项目参考并使用了以下开源项目，感谢作者的分享：

@@ -23,7 +23,17 @@ function resumeModeMeta(analysisMode) {
 }
 
 function normalizeResumeScore(value) {
-  return Math.max(0, Math.min(100, Math.round(Number(value || 0))));
+  if (value == null || value === "" || !Number.isFinite(Number(value))) return null;
+  return Math.max(0, Math.min(100, Math.round(Number(value))));
+}
+
+function resumeEvidenceScore(profile) {
+  return normalizeResumeScore(profile?.capability_scores?.matching);
+}
+
+function resumeScoreLabel(value) {
+  const score = normalizeResumeScore(value);
+  return score == null ? "待验证" : `${score}%`;
 }
 
 function shortenResumeText(value, max = 92) {
@@ -198,39 +208,41 @@ function resumeEvidenceCardsHtml(profile) {
 
 function averageResumeScores(values) {
   const numbers = (Array.isArray(values) ? values : [])
-    .map((item) => Number(item || 0))
-    .filter((item) => Number.isFinite(item) && item > 0);
-  if (!numbers.length) return 0;
+    .filter((item) => item != null && item !== "")
+    .map(Number)
+    .filter(Number.isFinite);
+  if (!numbers.length) return null;
   return normalizeResumeScore(numbers.reduce((sum, item) => sum + item, 0) / numbers.length);
 }
 
 function resumeConfidenceTone(score) {
   const safeScore = normalizeResumeScore(score);
+  if (safeScore == null) return { tone: "muted", label: "待验证", note: "缺少可比较的岗位技能证据，暂不计算覆盖率。" };
   if (safeScore < 50) {
     return {
       tone: "danger",
-      label: "需补强",
-      note: "当前差距较大，建议先补足核心经历和岗位证据。"
+      label: "证据较少",
+      note: "已识别岗位技能的简历证据较少，未体现不等于不会。"
     };
   }
   if (safeScore < 70) {
     return {
       tone: "warning",
-      label: "中等匹配",
-      note: "已有一定基础，但还存在可以明确修复的缺口。"
+      label: "部分体现",
+      note: "部分技能已有文本证据，其余需要核实或补充成果。"
     };
   }
   if (safeScore < 85) {
     return {
       tone: "success",
-      label: "较强匹配",
-      note: "关键能力基本在线，适合继续优化后优先投递。"
+      label: "多数体现",
+      note: "多数已识别技能有文本证据，熟练程度仍需验证。"
     };
   }
   return {
     tone: "brand",
-    label: "高匹配",
-    note: "核心信号完整，可以直接进入重点投递或面试准备。"
+    label: "覆盖较全",
+    note: "已识别技能的文本覆盖较全，不代表胜任或录用概率。"
   };
 }
 
@@ -239,9 +251,9 @@ function resumeCapabilityMetrics(profile, analysisMode) {
   return [
     {
       key: "matching",
-      label: analysisMode === "resume_review" ? "方向适配" : "岗位匹配",
-      value: normalizeResumeScore(Number(profile?.confidence || 0) * 100),
-      note: analysisMode === "resume_review" ? "和建议方向的贴合度" : "和目标岗位的对齐度"
+      label: "技能证据覆盖",
+      value: resumeEvidenceScore(profile),
+      note: "已识别岗位技能中，简历有对应文本证据的比例"
     },
     {
       key: "execution",
@@ -277,32 +289,32 @@ function resumeCapabilityMetrics(profile, analysisMode) {
 }
 
 function resumeGaugeCardHtml(profile, matcher, analysisMode, recommendedDirections) {
-  const score = normalizeResumeScore(Number(profile?.confidence || 0) * 100);
+  const score = resumeEvidenceScore(profile);
   const tone = resumeConfidenceTone(score);
   const basics = profile?.basics && typeof profile.basics === "object" ? profile.basics : {};
   const jobOverview = matcher?.job_overview && typeof matcher.job_overview === "object" ? matcher.job_overview : {};
   const matchedCount = Array.isArray(matcher?.matched_keywords) ? matcher.matched_keywords.length : 0;
-  const jobCount = Array.isArray(matcher?.job_keywords) ? matcher.job_keywords.length : 0;
+  const jobCount = matchedCount + (Array.isArray(matcher?.missing_keywords) ? matcher.missing_keywords.length : 0);
   const focusValue = analysisMode === "resume_review"
     ? (recommendedDirections[0] || normalizeResumeBasicValue(basics.target_direction) || "待探索")
     : (jobOverview.job_title || normalizeResumeBasicValue(basics.target_direction) || "待识别");
   const subValue = analysisMode === "resume_review"
     ? (recommendedDirections.length ? `${recommendedDirections.length} 个建议方向` : "待生成建议方向")
-    : `${matchedCount}/${jobCount || 0} 关键词命中`;
+    : `${matchedCount}/${jobCount || 0} 已识别技能有文本证据`;
   return `
     <section class="resume-bento-card resume-bento-span-4 resume-gauge-card">
       <div class="resume-bento-head">
         <div>
           <p class="resume-bento-kicker">Match Gauge</p>
-          <p class="resume-bento-title">匹配度仪表盘</p>
+          <p class="resume-bento-title">技能证据覆盖</p>
         </div>
         <span class="resume-score-chip ${tone.tone}">${escHtml(tone.label)}</span>
       </div>
       <div class="resume-gauge-shell">
-        <div class="resume-gauge-ring ${tone.tone}" style="--score-angle:${(score * 3.6).toFixed(1)}deg;">
+        <div class="resume-gauge-ring ${tone.tone}" style="--score-angle:${((score || 0) * 3.6).toFixed(1)}deg;">
           <div class="resume-gauge-core">
-            <strong>${score}%</strong>
-            <span>${analysisMode === "resume_review" ? "综合判断" : "综合匹配度"}</span>
+            <strong>${resumeScoreLabel(score)}</strong>
+            <span>技能证据覆盖</span>
           </div>
         </div>
       </div>
@@ -366,7 +378,7 @@ function resumeTargetPanelHtml(profile, matcher, analysisMode, recommendedDirect
           <p class="resume-bento-kicker">Role Matching</p>
           <p class="resume-bento-title">岗位匹配要点</p>
         </div>
-        <span class="resume-score-chip brand">${matchedKeywords.length}/${jobKeywords.length || 0} 命中</span>
+        <span class="resume-score-chip brand">${matchedKeywords.length}/${matchedKeywords.length + missingKeywords.length} 已识别技能有证据</span>
       </div>
       <div class="resume-target-stats">
         <article class="resume-target-stat">
@@ -378,7 +390,7 @@ function resumeTargetPanelHtml(profile, matcher, analysisMode, recommendedDirect
           <strong>${escHtml(jobOverview.company_name || "--")} · ${escHtml(jobOverview.location || "--")}</strong>
         </article>
         <article class="resume-target-stat">
-          <span>缺口数量</span>
+          <span>待补技能证据</span>
           <strong>${missingKeywords.length} 项</strong>
         </article>
       </div>
@@ -389,9 +401,9 @@ function resumeTargetPanelHtml(profile, matcher, analysisMode, recommendedDirect
         </div>
       </div>
       <div class="resume-target-group">
-        <p class="resume-target-label">待补强关键词</p>
+        <p class="resume-target-label">简历未体现的技能（待补证据）</p>
         <div class="resume-target-tags">
-          ${previewMissing.length ? previewMissing.map((item) => `<span class="resume-radar-pill warning">${escHtml(item)}</span>`).join("") : `<span class="resume-radar-pill positive">暂无明显缺口</span>`}
+          ${previewMissing.length ? previewMissing.map((item) => `<span class="resume-radar-pill warning">${escHtml(item)}</span>`).join("") : `<span class="resume-radar-pill positive">已识别技能暂无未体现项，仍需验证</span>`}
         </div>
       </div>
       <details class="resume-target-details">
@@ -410,7 +422,7 @@ function resumeTargetPanelHtml(profile, matcher, analysisMode, recommendedDirect
             </div>
           </div>
           <div>
-            <p class="resume-target-label">待补强关键词（全部）</p>
+            <p class="resume-target-label">简历未体现的技能（待补证据）（全部）</p>
             <div class="resume-target-tags">
               ${fullMissing.length ? fullMissing.map((item) => `<span class="resume-radar-pill warning">${escHtml(item)}</span>`).join("") : `<span class="resume-radar-pill positive">暂无</span>`}
             </div>
@@ -490,10 +502,10 @@ function resumeScoreCardsHtml(profile, analysisMode) {
       <article class="resume-score-card ${toneClass}">
         <div class="resume-score-head">
           <p class="resume-score-label">${escHtml(item.label)}</p>
-          <span class="resume-score-value">${score}</span>
+          <span class="resume-score-value">${resumeScoreLabel(score)}</span>
         </div>
         <div class="resume-score-track">
-          <div class="resume-score-fill" style="width:${score}%"></div>
+          <div class="resume-score-fill" style="width:${score || 0}%"></div>
         </div>
         <p class="resume-score-note">${escHtml(item.note)}</p>
       </article>
@@ -636,7 +648,7 @@ function resumeInsightCardsHtml(profile) {
   return resumeStackDeckHtml("resume-insights", items.map((item, index) => ({
     tone: tones[index % tones.length],
     label: item.dimension || "重点判断",
-    badge: `${Math.round(Math.max(0, Math.min(1, Number(item.confidence || 0))) * 100)}%`,
+    badge: item.confidence == null ? "待验证" : `${Math.round(Math.max(0, Math.min(1, Number(item.confidence))) * 100)}%`,
     title: item.conclusion || "等待生成结论",
     copy: shortenResumeText(item.reasoning || item.evidence || "", 144),
     note: item.boundary ? `边界：${shortenResumeText(item.boundary, 84)}` : ""
@@ -703,7 +715,7 @@ function resumeGapPanelHtml(profile, matcher, analysisMode) {
     tone: "tone-mint",
     label: "当前状态",
     badge: "OK",
-    title: "当前没有明显待补强项",
+    title: "已识别技能暂无未体现项，仍需验证熟练度",
     copy: "系统暂时没有识别出高优先级缺口，可以把注意力放到投递和面试反馈上。"
   }];
   return `
@@ -711,12 +723,12 @@ function resumeGapPanelHtml(profile, matcher, analysisMode) {
       <div class="resume-bento-head">
         <div>
           <p class="resume-bento-kicker">Gap Focus</p>
-          <p class="resume-bento-title">待补强项</p>
+          <p class="resume-bento-title">待补技能证据</p>
         </div>
       </div>
       ${resumeStackDeckHtml("resume-gaps", deckItems, {
         variant: "compact",
-        emptyText: "当前没有明显待补强项"
+        emptyText: "已识别技能暂无未体现项，仍需验证熟练度"
       })}
     </section>
   `;
@@ -728,12 +740,12 @@ function resumeGapPlaceholderHtml() {
       <div class="resume-bento-head">
         <div>
           <p class="resume-bento-kicker">Gap Focus</p>
-          <p class="resume-bento-title">待补强项</p>
+          <p class="resume-bento-title">待补技能证据</p>
         </div>
       </div>
       ${resumeStackDeckHtml("resume-gaps", [{
         tone: "tone-warm",
-        label: "待补强项",
+        label: "待补技能证据",
         badge: "01",
         title: "等待分析",
         copy: "系统会把岗位缺口、简历信息空白和待确认风险拆成更直接的补强项。"

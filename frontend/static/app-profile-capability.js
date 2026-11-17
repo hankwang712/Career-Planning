@@ -22,6 +22,7 @@ function buildAssessmentContextPayload() {
 
 function addCapabilitySignal(bag, key, value, source) {
   if (!Object.prototype.hasOwnProperty.call(bag, key)) return;
+  if (value == null || value === "") return;
   const score = clampPercent(value, NaN);
   if (!Number.isFinite(score)) return;
   bag[key].push({ score, source });
@@ -151,12 +152,12 @@ function deriveCapabilityScores(assessment, interviewProfile, basics, resumeProf
 
   if (resumeProfile) {
     const cap = resumeProfile.capability_scores || {};
-    addCapabilitySignal(bag, "communication", Number(cap.communication || 0), "简历");
-    addCapabilitySignal(bag, "execution", Number(cap.execution || 0), "简历");
-    addCapabilitySignal(bag, "stress_tolerance", Number(cap.stress_resilience || 0), "简历");
-    addCapabilitySignal(bag, "innovation", Number(cap.innovation || 0), "简历");
-    addCapabilitySignal(bag, "professional", Number(cap.collaboration || 0), "简历");
-    addCapabilitySignal(bag, "internship", Number(cap.leadership || 0), "简历");
+    addCapabilitySignal(bag, "communication", cap.communication, "简历");
+    addCapabilitySignal(bag, "execution", cap.execution, "简历");
+    addCapabilitySignal(bag, "stress_tolerance", cap.stress_resilience, "简历");
+    addCapabilitySignal(bag, "innovation", cap.innovation, "简历");
+    addCapabilitySignal(bag, "professional", cap.collaboration, "简历");
+    addCapabilitySignal(bag, "internship", cap.leadership, "简历");
   }
 
   const capabilities = Object.fromEntries(Object.entries(bag).map(([key, items]) => {

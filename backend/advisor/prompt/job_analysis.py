@@ -7,6 +7,8 @@ request.filters是本次用户筛选条件。sources.metadata包含原始城市�
 unverified_conditions非空表示这些条件尚未核实，不能声称该岗位已满足城市、学历或薪资要求。
 薪资筛选按已注明月薪区间相交保留，不代表最低薪资或最终offer达到用户期望。未知薪资不等于零。
 元数据只用于筛选和提示，结论仍必须引用content原文；学历优先不等于必需。
+sources已由BM25、向量和可用的图候选经RRF融合、多因子重排。metadata.retrieval包含计算分数及排名。
+保持计算出的来源顺序，不自行重排或编造匹配分数；只解释相关性和证据局限。分数不是胜任或录用概率。
 
 分析规则：
 先输出 source_assessments，逐一覆盖 retrieval.sources 中的所有来源。relevance 只能是：

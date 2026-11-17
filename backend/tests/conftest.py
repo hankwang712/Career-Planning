@@ -21,7 +21,9 @@ os.environ["CAREER_APP_DATA_DIR"] = _DATA_DIR
 os.environ["JOB_MARKET_SCHEDULER"] = "0"
 os.environ["CAREER_PREWARM"] = "0"
 os.environ["SESSION_COOKIE_SECURE"] = ""
-for _name in ("AI_CHAT_BASE_URL", "AI_CHAT_API_KEY", "AI_CHAT_MODEL", "AI_OCR_BASE_URL", "AI_OCR_API_KEY", "AI_OCR_MODEL"):
+for _name in ("AI_CHAT_BASE_URL", "AI_CHAT_API_KEY", "AI_CHAT_MODEL", "AI_OCR_BASE_URL", "AI_OCR_API_KEY", "AI_OCR_MODEL",
+              "AI_EMBEDDING_BASE_URL", "AI_EMBEDDING_API_KEY", "AI_EMBEDDING_MODEL",
+              "EMBEDDING_BINDING_HOST", "EMBEDDING_BINDING_API_KEY", "EMBEDDING_MODEL"):
     os.environ[_name] = ""
 
 if str(BACKEND_DIR) not in sys.path:

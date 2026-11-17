@@ -384,7 +384,7 @@ function resumeReportLauncherHtml(state, profile, matcher, analysisMode, recomme
           <div class="resume-report-entry-metrics">
             <article class="resume-report-entry-metric">
               <span>综合判断</span>
-              <strong>${profile ? `${Math.round(Number(profile.confidence || 0) * 100)}%` : "--"}</strong>
+              <strong>${resumeScoreLabel(resumeEvidenceScore(profile))}</strong>
             </article>
             <article class="resume-report-entry-metric">
               <span>阅读模式</span>
@@ -414,63 +414,17 @@ function resumeReportLauncherHtml(state, profile, matcher, analysisMode, recomme
 }
 
 function resolveResumeCapabilityScore(profile, key) {
-  const scores = profile?.capability_scores && typeof profile.capability_scores === "object"
-    ? profile.capability_scores
-    : {};
-  const raw = scores[key];
-  const num = Number(raw);
-  return Number.isFinite(num) ? normalizeResumeScore(num) : 0;
+  return normalizeResumeScore(profile?.capability_scores?.[key]);
 }
 
-function resumeJudgeStoryScore(profile, matcher) {
-  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
-  const experienceCount = Number(overview.experience_count || 0);
-  const projectCount = Number(overview.project_count || 0);
-  const evidenceCount = Array.isArray(profile?.evidence_spans) ? profile.evidence_spans.length : 0;
-  const summaryBonus = profile?.candidate_summary ? 10 : 0;
-  return normalizeResumeScore(42 + experienceCount * 14 + projectCount * 9 + evidenceCount * 4 + summaryBonus);
-}
-
-function resumeJudgeTechScore(profile) {
-  const professional = resolveResumeCapabilityScore(profile, "professional");
-  const learning = resolveResumeCapabilityScore(profile, "learning");
-  const execution = resolveResumeCapabilityScore(profile, "execution");
-  return averageResumeScores([professional, learning, execution]);
-}
-
-function resumeJudgeFormatScore(profile, matcher) {
-  const basics = profile?.basics && typeof profile.basics === "object" ? profile.basics : {};
-  const overview = matcher?.resume_overview && typeof matcher.resume_overview === "object" ? matcher.resume_overview : {};
-  const baseScore = 44
-    + (basics.major ? 10 : 0)
-    + (basics.grade ? 10 : 0)
-    + (profile?.candidate_summary ? 10 : 0)
-    + Math.min(Number(overview.skill_count || 0) * 3, 16)
-    + Math.min(Number(overview.project_count || 0) * 3, 10);
-  return normalizeResumeScore(baseScore);
-}
-
+function resumeJudgeStoryScore(profile, matcher) { return null; }
+function resumeJudgeTechScore(profile) { return null; }
+function resumeJudgeFormatScore(profile, matcher) { return null; }
 function resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections) {
-  const matchedCount = Array.isArray(matcher?.matched_keywords) ? matcher.matched_keywords.length : 0;
-  const jobCount = Array.isArray(matcher?.job_keywords) ? matcher.job_keywords.length : 0;
-  if (analysisMode === "resume_review") {
-    const matching = resolveResumeCapabilityScore(profile, "matching");
-    return matching || normalizeResumeScore((recommendedDirections.length ? 72 : 58) + Math.min(recommendedDirections.length * 6, 18));
-  }
-  if (jobCount > 0) {
-    return normalizeResumeScore((matchedCount / jobCount) * 100);
-  }
-  return resolveResumeCapabilityScore(profile, "matching") || normalizeResumeScore(Number(profile?.confidence || 0) * 100);
+  return resumeEvidenceScore(profile);
 }
-
 function resumeJudgeOverallScore(profile, matcher, analysisMode, recommendedDirections) {
-  return averageResumeScores([
-    normalizeResumeScore(Number(profile?.confidence || 0) * 100),
-    resumeJudgeMatchScore(profile, matcher, analysisMode, recommendedDirections),
-    resumeJudgeStoryScore(profile, matcher),
-    resumeJudgeTechScore(profile),
-    resumeJudgeFormatScore(profile, matcher)
-  ]);
+  return null;
 }
 
 function switchResumeJudgeTab(index) {
@@ -514,10 +468,10 @@ function renderResumeReportHeroMetrics(profile, matcher, analysisMode, recommend
   const story = resumeJudgeStoryScore(profile, matcher);
   const tech = resumeJudgeTechScore(profile);
   const cards = [
-    { label: "综合判断", value: `${overall}%`, tone: "primary" },
-    { label: analysisMode === "resume_review" ? "方向命中" : "岗位命中", value: `${match}%`, tone: "warm" },
-    { label: "叙事完成度", value: `${story}%`, tone: "danger" },
-    { label: "技术证据", value: `${tech}%`, tone: "positive" }
+    { label: "综合判断", value: resumeScoreLabel(overall), tone: "primary" },
+    { label: "技能证据覆盖", value: resumeScoreLabel(match), tone: "warm" },
+    { label: "叙事完成度", value: resumeScoreLabel(story), tone: "danger" },
+    { label: "技术证据", value: resumeScoreLabel(tech), tone: "positive" }
   ];
   return `
     <div class="resume-report-hero-metrics">
@@ -558,7 +512,7 @@ function renderResumeReportModal(state, profile, matcher, analysisMode, recommen
   const hasReport = state?.status === "analyzed" && (String(state?.analysis_result || "").trim() || String(state?.analysis_html || "").trim());
   const reportHtml = hasReport ? resumeDetailedReportHtml(state) : "";
   const titles = hasReport ? extractResumeReportTitles(reportHtml) : [];
-  const score = profile ? `${Math.round(Number(profile.confidence || 0) * 100)}%` : "--";
+  const score = resumeScoreLabel(resumeEvidenceScore(profile));
   const modeLabel = analysisMode === "resume_review" ? "简历诊断" : "岗位匹配";
   const docTitle = analysisMode === "resume_review" ? "完整诊断报告" : "完整匹配报告";
   const jobOverview = matcher?.job_overview && typeof matcher.job_overview === "object" ? matcher.job_overview : {};

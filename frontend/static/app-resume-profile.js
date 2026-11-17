@@ -59,7 +59,7 @@ function renderResumeProfileSection(data) {
     }
   }
 
-  if (confidence) confidence.textContent = profile ? `${Math.round(Number(profile.confidence || 0) * 100)}%` : "--";
+  if (confidence) confidence.textContent = resumeScoreLabel(resumeEvidenceScore(profile));
   if (modelHint) {
     const model = String(state.analysis_meta?.model || "").trim();
     modelHint.textContent = profile
@@ -89,8 +89,8 @@ function renderResumeProfileSection(data) {
   }
   if (missingTags) {
     missingTags.innerHTML = analysisMode === "resume_review"
-      ? careerTagHtml([], "未提供 JD，无待补强项", "soft")
-      : careerTagHtml(previewTagValues(matcher.missing_keywords || [], 8), "暂无待补强项", "soft");
+      ? careerTagHtml([], "未提供 JD，技能要求待核实", "soft")
+      : careerTagHtml(previewTagValues(matcher.missing_keywords || [], 8), "已识别技能暂无未体现项，仍需验证熟练度", "soft");
   }
   if (jobTags) {
     jobTags.innerHTML = analysisMode === "resume_review"
