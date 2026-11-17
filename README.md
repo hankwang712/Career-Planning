@@ -519,7 +519,11 @@ career-agent/
 
 ## 技能匹配与检索
 
-技能对齐、岗位混合检索与双指标评估的配置及运行方式见 [检索说明](backend/services/retrieval/README.md)。
+简历与岗位先抽取有原文依据的技能，再通过标准词表、向量候选和模型确认对齐。技能覆盖率只表示简历文本体现的比例，不代表胜任概率；未对齐短语与未知能力保留待核实。
+
+岗位检索使用 BM25、向量及可用的 LightRAG 候选，经 RRF 融合与多因子重排。默认复用 `.env` 中的 `EMBEDDING_*` 配置；`JOB_RETRIEVAL_GRAPH_ENABLED=0` 可关闭图通道，`JOB_JD_SOURCE_PATH` 可指定本地 JD 导出。
+
+使用 `python backend/scripts/evaluate_job_retrieval.py --cases judgments.json --dense` 对配置的本地语料评估。标注文件由调用者提供，格式为 `[{"query":"查询", "relevance":{"来源路径#record=1":3}}]`，相关性等级为 0–4；工具同时检查 NDCG@10、Recall@100，出现排序或召回回退时返回非零退出码。评估输出和向量缓存属于本地生成内容，不纳入仓库。
 
 ## 致谢
 

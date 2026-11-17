@@ -191,7 +191,7 @@ flowchart LR
 
 报告输入可提供 `job_filters`；未提供时只从本次 `preferences` 提取有原文依据的条件。首次查询与定向补查共用条件。空结果只表示本次证据不足。
 
-配置、标准技能对齐、各排序因子及 NDCG@10 / Recall@100 双指标评估见 [混合检索说明](../../backend/services/retrieval/README.md)。
+配置、标准技能对齐及 NDCG@10 / Recall@100 双指标评估见[项目说明](../../README.md#技能匹配与检索)。
 
 ### 6.3 metadata 筛选范围
 
