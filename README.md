@@ -188,13 +188,13 @@ cp .env.example .env
 
 ```bash
 docker --version
-docker-compose version
+docker compose version
 
 # 创建 PostgreSQL 数据卷，用于持久化保存数据库数据
 docker volume create research_career_pgdata
 
-docker-compose up -d --wait postgres
-docker-compose ps
+docker compose --profile graph up -d --wait postgres
+docker compose --profile graph ps
 ```
 
 
@@ -323,10 +323,10 @@ flowchart LR
 **服务维护**（首次创建环境见[快速启动](#quickstart)）：
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 postgres
-docker compose stop
-docker compose up -d --wait postgres
+docker compose --profile graph ps
+docker compose --profile graph logs --tail=100 postgres
+docker compose --profile graph stop
+docker compose --profile graph up -d --wait postgres
 ```
 
 `stop` 停止服务，`up` 重新启动并复用数据卷。已有数据库中修改用户、密码或库名时，仅编辑 `.env` 不会修改已初始化的数据，需同步调整数据库。备份时同时保留 PostgreSQL 数据和下方职业事实库。
@@ -458,7 +458,8 @@ npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwrigh
 # backend/tests/test_browser_pages.py 也会用真实浏览器登录后打开各页面，检查脚本无报错；没有 Chromium 时自动跳过
 ```
 
-- **容器部署**：`docker compose -f compose.app.yml up --build -d` 构建镜像（前端在构建阶段编译，Python 依赖按 requirements.txt 安装，含 tesseract 中文 OCR）并启动主站，访问 `http://127.0.0.1:8080`，存活探针为 `/healthz`；账号、报告、聊天记录保存在命名卷 `career_appdata`。模型密钥读取根目录 `.env`。PostgreSQL / pgvector 仍由 `compose.yml` 单独提供，只有需要 LightRAG 时才用。
+- **容器部署**：`docker compose up --build -d` 构建镜像并只启动主站，访问 `http://127.0.0.1:8080`，存活探针为 `/healthz`。前端在构建阶段编译，镜像包含 Python 依赖和 Tesseract 中文 OCR；模型密钥读取根目录 `.env`。需要 PostgreSQL / pgvector 时，先填写 `POSTGRES_PASSWORD` 并创建外部卷 `research_career_pgdata`，再用 `docker compose --profile graph up --build -d` 同时启动应用与数据库；也可用 `docker compose --profile graph up -d --wait postgres` 只启动数据库。
+- **已有容器迁移**：应用数据卷固定复用旧名称 `career-app_career_appdata`，数据库继续复用 `research_career_pgdata`。如果此前用旧应用配置启动过容器，先执行 `docker compose -p career-app stop app` 停止旧应用，再执行新的启动命令，避免端口冲突；不要删除数据卷。
 - **前端脚本**：工作台主脚本是一组普通脚本（共享全局作用域），不是 ES 模块。`app-state.js` 放全局状态与常量并最先加载，`app-boot.js` 放加载时执行的语句并最后加载，中间各 `app-*.js` 按功能放函数声明。新增函数放进对应功能文件、新增顶层常量放 `app-state.js`；`npm run check` 会拦截跨文件的重名函数、重复的 `const`/`let` 和没列入加载列表的文件。
 - 后端测试使用临时数据目录并关闭后台采集与资讯预热，不会读写 `data/app_data`，也不访问外网或使用 `.env` 里的模型密钥。
 - 手动试跑时可设置 `CAREER_APP_DATA_DIR` 指向独立目录，避免动到真实数据；`CAREER_PREWARM=0` 跳过资讯预热，`JOB_MARKET_SCHEDULER=0` 关闭岗位定时采集。
@@ -512,9 +513,8 @@ career-agent/
 ├── .github/workflows/ci.yml      # 持续集成配置（本地文件，被 .gitignore 排除）
 ├── requirements.txt              # Python 依赖（只列库名，不锁版本）
 ├── Dockerfile                    # 主站镜像（前端构建 + Python 运行）
-├── compose.app.yml               # 主站容器部署
 ├── .env.example                  # 环境配置模板
-└── compose.yml                   # PostgreSQL / pgvector
+└── compose.yml                   # 主站容器部署及可选 PostgreSQL / pgvector
 ```
 
 ## 技能匹配与检索

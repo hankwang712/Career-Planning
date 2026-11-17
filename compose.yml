@@ -1,12 +1,27 @@
 name: career
 
 services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - career_appdata:/var/lib/career/app_data
+
   postgres:
+    profiles: [graph]
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-career}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在根目录.env中填写数据库密码}
+      # Keep app-only startup independent of the optional database configuration.
+      # PostgreSQL rejects an empty password when initializing a new database.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: ${POSTGRES_DATABASE:-career_rag}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
@@ -19,6 +34,9 @@ services:
       retries: 12
 
 volumes:
+  # Reuse the app volume created by the former career-app Compose project.
+  career_appdata:
+    name: career-app_career_appdata
   # Preserve the existing external database volumes.
   career_pgdata:
     external: true
