@@ -7,7 +7,7 @@ RUN npm ci
 COPY frontend frontend
 RUN npm run build
 
-# ---- 运行镜像：Python 依赖按 requirements.txt 的锁定版本安装 ----
+# ---- 运行镜像：Python 依赖按 requirements.txt 安装 ----
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
