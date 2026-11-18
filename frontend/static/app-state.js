@@ -12,7 +12,6 @@ const appState = {
   careerReportVersions: [],
   careerReportCanonicalId: "",
   careerReportViewingHistorical: false,
-  notifications: 3,
   baseExploredJobs: 0,
   score: 0,
   profileCompletion: 0,

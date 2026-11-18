@@ -147,7 +147,7 @@ function clearPrivateWorkspace() {
   Object.assign(appState, { careerReport: null, careerReportState: null, careerReportTracker: null,
     careerReportVersions: [], careerReportCanonicalId: "", careerReportViewingHistorical: false,
     reportGenerated: false, reportReady: false, derivedProfile: null, matchingRoles: [], focusedRoleId: "",
-    selectedJobs: [], profileComplete: false, profileCompletion: 0, baseExploredJobs: 0, score: 0, notifications: 0, lastGreetingKey: "" });
+    selectedJobs: [], profileComplete: false, profileCompletion: 0, baseExploredJobs: 0, score: 0, lastGreetingKey: "" });
   Object.assign(resumeTaskState, { uploadInFlight: false, analyzeInFlight: false, forceInputView: false, deckIndices: {} });
   reportWorkflowSnapshot = null;
   resetCareerInterviewState({ preserveBasics: false });
@@ -428,12 +428,6 @@ function setTagState(el, state) {
   else { el.classList.add("text-red-600"); el.textContent = "待完成"; }
 }
 
-function updateNotificationCount(count = null) {
-  if (typeof count === "number") appState.notifications = Math.max(0, count);
-  const el = document.getElementById("notificationCount");
-  if (el) el.textContent = String(appState.notifications);
-}
-
 function updateReportDates(baseDate = new Date()) {
   const validDate = addMonths(baseDate, 6);
   const generatedTime = document.getElementById("reportGeneratedTime");
@@ -645,8 +639,6 @@ function selectTargetJob(jobType) {
   const name = jobNameMap[jobType] || jobType;
   showToast("Target updated", `${name} added to target list.`, "success", 1800);
   addLiveActivity(`Target selected: ${name}`);
-  if (isNew) appState.notifications += 1;
-  updateNotificationCount();
   updateDashboardMetrics();
 }
 
@@ -656,8 +648,6 @@ function addToReport(jobType) {
   const name = jobNameMap[jobType] || jobType;
   showToast("Synced to report", `${name} added to report targets.`, "success", 1800);
   addLiveActivity(`Synced to report: ${name}`);
-  if (isNew) appState.notifications += 1;
-  updateNotificationCount();
   updateDashboardMetrics();
 }
 

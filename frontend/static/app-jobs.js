@@ -360,21 +360,6 @@ function initAnimations() {
 
 function bindGlobalEvents() {
   initNavWorkspaceMenu();
-  const notificationBtn = document.getElementById("notificationBtn");
-  if (notificationBtn) {
-    notificationBtn.addEventListener("click", () => {
-      closeNavWorkspaceMenu();
-      const unread = appState.notifications;
-      if (unread > 0) {
-        showToast("Notifications", `You have ${unread} new update(s).`, "info", 1600);
-        addLiveActivity(`Notification center opened (${unread})`);
-      } else {
-        showToast("Notifications", "No new updates.", "info", 1400);
-      }
-      appState.notifications = Math.max(0, unread - 1);
-      updateNotificationCount();
-    });
-  }
 
   const searchInput = document.getElementById("jobSearch");
   if (searchInput) {
@@ -407,7 +392,5 @@ function startRealtimeEngine() {
   setInterval(() => {
     const msg = liveActivityTemplates[Math.floor(Math.random() * liveActivityTemplates.length)];
     addLiveActivity(msg);
-    appState.notifications = Math.min(9, appState.notifications + 1);
-    updateNotificationCount();
   }, 20000);
 }

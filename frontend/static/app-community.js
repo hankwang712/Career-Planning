@@ -290,8 +290,6 @@ async function submitCommunityPost() {
     showForumView("detail");
     renderCommunityForumDetail();
     addLiveActivity(`Community post published: ${title}`);
-    appState.notifications = Math.min(9, appState.notifications + 1);
-    updateNotificationCount();
     showToast("发帖成功", "新的讨论已经进入 Offer 茶水间。", "success", 1800);
   } catch (error) {
     showToast("发帖失败", error.message, "error", 2200);
@@ -318,8 +316,6 @@ async function submitCommunityReply(postId) {
     if (replyEl) replyEl.value = "";
     renderCommunityForumDetail();
     addLiveActivity("Community reply sent");
-    appState.notifications = Math.min(9, appState.notifications + 1);
-    updateNotificationCount();
     showToast("回复已发送", "你的建议已经出现在帖子详情里。", "success", 1800);
   } catch (error) {
     showToast("回复失败", error.message, "error", 2200);

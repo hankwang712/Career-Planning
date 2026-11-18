@@ -77,7 +77,6 @@ nav.gradient-bg .nav-item.active::after {
 
 nav.gradient-bg #liveClock,
 nav.gradient-bg #currentUserLabel:not(.nav-workspace-menu-label),
-nav.gradient-bg #notificationBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg #logoutBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
   background: rgba(255, 255, 255, 0.82) !important;
@@ -931,7 +930,6 @@ nav.gradient-bg .nav-item.active {
 
 nav.gradient-bg #liveClock,
 nav.gradient-bg #currentUserLabel:not(.nav-workspace-menu-label),
-nav.gradient-bg #notificationBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg #logoutBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
   background: rgba(250, 252, 255, 0.86) !important;

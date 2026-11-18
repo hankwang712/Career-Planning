@@ -109,7 +109,6 @@ document.addEventListener("DOMContentLoaded", function () {
   initCareerNewsBoard();
   startRealtimeEngine();
   updateReportDates(new Date());
-  updateNotificationCount();
   syncProfileBasicsForm();
   refreshUnifiedExperience();
   addLiveActivity("System initialized. Dynamic monitoring is active.");

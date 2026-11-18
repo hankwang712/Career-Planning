@@ -182,7 +182,7 @@ body.user-center-page #report-workspace :is(button, a, summary):focus-visible { 
     body.user-center-page .uc-topbar h1 { font-size: 15px; }
     body.user-center-page .uc-topbar-left { flex: 0 0 auto; }
     body.user-center-page .uc-topbar h1 { white-space: nowrap; }
-    body.user-center-page .uc-topbar-kicker, body.user-center-page #notificationBtn { display: none; }
+    body.user-center-page .uc-topbar-kicker { display: none; }
     body.user-center-page .uc-topbar-actions { gap: 6px; width: auto; flex: 0 1 auto; justify-content: flex-end; margin-left: auto; }
     body.user-center-page #currentUserLabel { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     body.user-center-page .uc-content { padding: 16px 12px; }

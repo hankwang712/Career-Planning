@@ -14250,7 +14250,6 @@ nav.gradient-bg .nav-item.active .tab-icon {
 
 nav.gradient-bg #liveClock,
 nav.gradient-bg #currentUserLabel:not(.nav-workspace-menu-label),
-nav.gradient-bg #notificationBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg #logoutBtn:not(.nav-workspace-menu-row),
 nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
     background: var(--cs-surface-strong) !important;
@@ -14402,18 +14401,6 @@ nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
 
 :is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-row-text {
     flex: 1 1 auto;
-}
-
-:is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-badge {
-    margin-left: auto;
-    min-width: 1.35rem;
-    padding: 0.1rem 0.4rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-align: center;
-    background: rgba(239, 68, 68, 0.92);
-    color: #fff !important;
 }
 
 :is(nav.gradient-bg, .uc-topbar) .nav-workspace-menu-danger {
