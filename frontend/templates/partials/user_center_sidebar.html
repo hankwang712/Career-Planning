@@ -10,7 +10,7 @@
     {% if section and not resume_workshop %}</button>{% else %}</a>{% endif %}
 {%- endmacro %}
 <aside class="uc-sidebar uc-workspace-sidebar">
-    <a class="uc-brand" href="{{ url_for('site.index') }}">
+    <a class="uc-brand" href="{{ url_for('site.index', _anchor='dashboard') }}">
         <div class="uc-brand-mark app-brand-mark">
             <svg viewBox="0 0 32 32" aria-hidden="true">
                 <path d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"></path>
@@ -32,6 +32,6 @@
         {{ nav_item('账户设置', account_icon, 'account-center') }}
     </nav>
     <div class="uc-sidebar-footer">
-        <a class="uc-footer-link" href="{{ url_for('pages.user_center_page') if resume_workshop else url_for('site.index') }}" {% if not resume_workshop %}onclick="event.preventDefault();ucGoBack()"{% endif %}>← 返回上一界面</a>
+        <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='dashboard') }}">← 返回主工作台</a>
     </div>
 </aside>

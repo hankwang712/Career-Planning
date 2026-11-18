@@ -202,6 +202,9 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     assert downloaded.value.suggested_filename == "产品开发简历.pdf"
     page.get_by_role("link", name="账户设置").click()
     page.get_by_role("button", name="账户设置").and_(page.locator("[aria-current=page]")).wait_for()
+    page.get_by_role("link", name="返回主工作台").click()
+    page.wait_for_url("**/main.html#dashboard")
+    page.locator('button[data-section="dashboard"]').wait_for()
     assert errors == [], "\n".join(errors)
 
 

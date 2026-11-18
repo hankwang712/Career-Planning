@@ -36,7 +36,8 @@
 .uc-workspace-sidebar .uc-nav-icon { display: inline-grid; place-items: center; flex: none; width: 21px; height: 21px; padding: 0; border-radius: 0; background: none; color: #6a8cbd; }
 .uc-workspace-sidebar .uc-nav-icon svg { width: 21px; height: 21px; stroke-linecap: round; stroke-linejoin: round; }
 .uc-workspace-sidebar .uc-sidebar-footer { margin-top: auto; border-top: 1px solid #edf1f5; padding-top: 18px; }
-.uc-workspace-sidebar .uc-footer-link { color: #75869a; font-size: 12px; text-decoration: none; }
+.uc-workspace-sidebar .uc-footer-link { display: flex; align-items: center; min-height: 32px; padding: 0 8px; border-radius: 7px; color: #60738a; font-size: 12px; text-decoration: none; }
+.uc-workspace-sidebar .uc-footer-link:hover { color: #244e74; background: #edf4fb; }
 
 @media (max-width: 1240px) {
     :root { --uc-nav-width: 200px; }
@@ -44,7 +45,8 @@
 @media (max-width: 900px) {
     .uc-sidebar.uc-workspace-sidebar { position: relative; width: 100%; height: auto; padding: 16px 20px 12px; gap: 16px; border: 0; border-bottom: 1px solid #e2e8ef; }
     .uc-workspace-sidebar .uc-brand { padding: 0; }
-    .uc-workspace-sidebar .uc-brand-copy span, .uc-workspace-sidebar .uc-sidebar-footer { display: none; }
+    .uc-workspace-sidebar .uc-brand-copy span { display: none; }
+    .uc-workspace-sidebar .uc-sidebar-footer { position: absolute; top: 20px; right: 14px; padding: 0; border: 0; }
     .uc-workspace-sidebar .uc-nav { display: flex; flex-wrap: nowrap; overflow-x: auto; }
     .uc-workspace-sidebar .uc-nav-group { display: contents; }
     .uc-workspace-sidebar .uc-nav-link { width: auto; flex: none; min-height: 38px; padding: 8px 12px; font-size: 12px; }
