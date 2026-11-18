@@ -91,7 +91,6 @@ input:not([type=checkbox]), select {
 }
 .recruitment-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 13px 0; }
 .recruitment-card-body fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 0 14px; border: 0; padding: 0; }
-.recruitment-card-body fieldset .recruitment-source:last-child { grid-column: 1 / -1; }
 .recruitment-card-body legend { margin-bottom: 5px; padding: 0; font-size: 13px; }
 .recruitment-card-body .recruitment-source {
     display: flex;
@@ -111,7 +110,7 @@ input:not([type=checkbox]), select {
 .recruitment-browser-actions :is(a, button) { min-height: 30px; padding: 4px 7px; font-size: 12px; }
 .recruitment-browser-option p[data-state=ready] { color: #0c7358; }
 .recruitment-browser-option p:is([data-state=not_logged_in], [data-state=verification_required]),
-.recruitment-run-source p:is([data-status=waiting_user], [data-status=login_required]) { color: #8a5607; }
+.recruitment-run-source p:is([data-status=waiting_user], [data-status=login_required], [data-status=login_timeout]) { color: #8a5607; }
 .recruitment-primary { width: 100%; min-height: 39px; border-color: var(--blue); background: var(--blue); color: #fff; }
 .recruitment-primary:hover:not(:disabled) { background: #174fc4; }
 .recruitment-actions { display: flex; flex-wrap: wrap; gap: 8px; }

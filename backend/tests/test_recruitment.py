@@ -51,7 +51,9 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
                         collect(None, source, keyword, city, limit))
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
-    response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": list(LINKS), "limit": 10,
+    assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["liepin"]}).status_code == 400
+    active = [source for source in LINKS if source != "liepin"]
+    response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": active, "limit": 10,
                                                "chrome_local": True})
     assert response.status_code == 202
     deadline = time.monotonic() + 5
@@ -61,9 +63,9 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
             break
         time.sleep(.05)
     assert run["status"] == "complete"
-    assert set(run["progress"]) == set(LINKS)
+    assert set(run["progress"]) == set(active)
     assert owner.get(API + "/jobs?source=51job").get_json()["total"] == 1
-    assert owner.get(API + "/jobs").get_json()["total"] == 5
+    assert owner.get(API + "/jobs").get_json()["total"] == 4
     assert other.get(API + "/jobs").get_json()["total"] == 0
     assert other.get(API + "/runs").get_json()["items"] == []
 
@@ -174,6 +176,8 @@ def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_
      "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "ready"),
     ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
      "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "not_logged_in"),
+    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
+     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "after_login"),
 ])
 def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source, host, target, route_url, login):
     import json
@@ -191,14 +195,18 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source,
         if path == "/health":
             return httpx.Response(200, json={"connected": True})
         if path == "/new":
-            assert request.url.params["url"] == target
+            assert request.url.params["url"] == "about:blank"
             return httpx.Response(200, json={"targetId": tab_id})
         assert request.url.params["target"] == tab_id
+        if path == "/navigate":
+            assert request.url.params["url"] == target
+            return httpx.Response(200, json={})
         if path == "/close":
             return httpx.Response(200, json={"success": True})
         script = request.content.decode()
         if "verification:" in script:
-            value = {"url": route_url, "title": "岗位搜索", "verification": False, "zhilianLogin": login}
+            state = login if login != "after_login" else "ready" if requests.count("/eval") > 2 else "not_logged_in"
+            value = {"url": route_url, "title": "岗位搜索", "verification": False, "zhilianLogin": state, "bossLogin": "ready"}
         else:
             assert f"location.origin === 'https://{host}'" in script
             value = [{"title": "Agent 开发", "url": LINKS[source]}]
@@ -207,13 +215,20 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source,
     client = httpx.Client
     monkeypatch.setattr(recruitment_chrome.httpx, "Client",
                         lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(route)))
+    clock = [0]
+    monkeypatch.setattr(recruitment_chrome, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(recruitment_chrome, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
     state, _, rows = recruitment_chrome.collect_in_chrome(source, "Agent", "杭州", 20, lambda *_: None)
     if login == "not_logged_in":
-        assert state == "login_required" and rows == []
-        assert requests == ["/health", "/new", "/eval", "/close"]
+        assert state == "login_timeout" and rows == []
+        assert clock[0] == 120
+        assert requests == ["/health", "/new", "/navigate"] + ["/eval"] * 120 + ["/close"]
+    elif login == "after_login":
+        assert state == "succeeded" and len(rows) == 1
+        assert requests == ["/health", "/new", "/navigate"] + ["/eval"] * 4 + ["/close"]
     else:
         assert state == "succeeded" and len(rows) == 1
-        assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
+        assert requests == ["/health", "/new", "/navigate", "/eval", "/eval", "/close"]
 
 
 @pytest.mark.parametrize("state", ["not_logged_in", "ready", "verification_required"])

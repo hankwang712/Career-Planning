@@ -234,7 +234,8 @@ def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
 def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment")
-    assert page.locator("#recruitmentCollect input[name=source]").count() == 5
+    assert page.locator("#recruitmentCollect input[name=source]").count() == 4
+    assert page.locator('#recruitmentCollect input[value="liepin"]').count() == 0
     page.get_by_role("button", name="导入网页").click()
     dialog = page.get_by_role("dialog", name="导入已保存的搜索页")
     markup = '''<div class="job-card-wrap">

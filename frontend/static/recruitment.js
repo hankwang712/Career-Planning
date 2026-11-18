@@ -10,7 +10,7 @@
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
     partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
-    opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录"
+    opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时"
   };
   let page = 1;
   let filters = new URLSearchParams();
@@ -143,8 +143,9 @@
     card.append(title, node("p", new Date(run.started_at * 1000).toLocaleString("zh-CN"), "recruitment-run-date"));
     for (const [source, item] of Object.entries(run.progress)) {
       const line = node("div", "", "recruitment-run-source");
-      const link = node("a", "原站 ↗");
-      link.href = item.search_url;
+      const needsLogin = ["waiting_user", "login_required", "login_timeout"].includes(item.status) && item.login_url;
+      const link = node("a", needsLogin ? "去登录 ↗" : "原站 ↗");
+      link.href = needsLogin ? item.login_url : item.search_url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       line.append(node("strong", sources.get(source)), link);

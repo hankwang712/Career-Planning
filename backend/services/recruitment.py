@@ -1,6 +1,7 @@
 """Account-scoped collection runs, listing search and CSV exchange."""
 
 from contextlib import ExitStack
+from concurrent.futures import ThreadPoolExecutor
 import csv
 from hashlib import sha256
 from io import StringIO
@@ -20,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from . import db
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
-    CHROME_SOURCES, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome,
+    CHROME_SOURCES, LOGIN_URLS, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome,
     read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
@@ -68,7 +69,7 @@ class CollectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     keyword: str = Field(min_length=1, max_length=80)
     city: str = ""
-    sources: list[str] = Field(min_length=1, max_length=5)
+    sources: list[str] = Field(min_length=1, max_length=4)
     limit: int = Field(default=20, ge=1, le=30, strict=True)
     boss_local: bool = Field(default=False, strict=True)
     chrome_local: bool = Field(default=False, strict=True)
@@ -120,9 +121,33 @@ def save_progress(conn, owner, run_id, progress, status="running"):
                  (status, json.dumps(progress, ensure_ascii=False), owner, run_id))
 
 
+def run_chrome_sources(owner, run_id, config, progress):
+    lock = threading.Lock()
+
+    def run_source(source):
+        conn = db._get_conn()
+
+        def update(status, message):
+            with lock, conn:
+                progress[source] = {"status": status, "message": message}
+                save_progress(conn, owner, run_id, progress)
+
+        status, message, rows = collect_in_chrome(source, config.keyword, config.city, config.limit, update)
+        with lock, conn:
+            count = save_rows(conn, owner, source, rows)
+            progress[source] = {"status": status, "message": message, "count": count}
+            save_progress(conn, owner, run_id, progress)
+
+    with ThreadPoolExecutor(max_workers=len(config.sources), thread_name_prefix="recruitment-chrome") as pool:
+        list(pool.map(run_source, config.sources))
+
+
 def run_collection(owner, run_id, config, progress):
     conn = db._get_conn()
     try:
+        if config.chrome_local:
+            run_chrome_sources(owner, run_id, config, progress)
+            return
         from playwright.sync_api import Error as BrowserError, sync_playwright
 
         with sync_playwright() as playwright, ExitStack() as browsers:
@@ -138,8 +163,7 @@ def run_collection(owner, run_id, config, progress):
                 with conn:
                     save_progress(conn, owner, run_id, progress)
                 try:
-                    bridge = config.chrome_local or (config.boss_local and source == "boss" and use_local_chrome())
-                    if bridge and source in CHROME_SOURCES:
+                    if config.boss_local and source == "boss" and use_local_chrome():
                         status, message, rows = collect_in_chrome(
                             source, config.keyword, config.city, config.limit, browser_status
                         )
@@ -195,6 +219,7 @@ def page():
         return redirect(url_for("site.index"))
     return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
+                           collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},
                            zhilian_login_url=ZHILIAN_LOGIN_URL)
 
 
@@ -214,7 +239,7 @@ def start():
         config = CollectRequest.model_validate(request.get_json(silent=True))
     except ValidationError:
         return jsonify(message="请输入关键词，并选择平台和每个平台的采集上限。"), 400
-    if (config.city and config.city not in CITIES) or any(source not in SOURCES for source in config.sources):
+    if (config.city and config.city not in CITIES) or any(source not in CHROME_SOURCES for source in config.sources):
         return jsonify(message="城市或采集平台不在可用选项中。"), 400
     if config.boss_local and ("boss" not in config.sources or not local_desktop_request()):
         return jsonify(message="请在运行智航生涯的电脑上打开本机地址，并勾选 BOSS 直聘。"), 403
@@ -253,7 +278,7 @@ def runs():
         rows = conn.execute("SELECT id, keyword, city, started_at, status, progress FROM recruitment_runs "
                             "WHERE owner=? ORDER BY started_at DESC LIMIT 8", (owner,)).fetchall()
     return jsonify(items=[{**dict(row), "progress": {
-        source: {**item, "search_url": search_url(source, row["keyword"], row["city"])}
+        source: {**item, "search_url": search_url(source, row["keyword"], row["city"]), "login_url": LOGIN_URLS.get(source)}
         for source, item in json.loads(row["progress"]).items()
     }} for row in rows])
 

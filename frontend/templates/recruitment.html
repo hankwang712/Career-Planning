@@ -32,15 +32,15 @@
                     </div>
                     <fieldset>
                         <legend>采集平台</legend>
-                        {% for id, source in sources.items() %}
+                        {% for id, source in collection_sources.items() %}
                         <label class="recruitment-source"><input type="checkbox" name="source" value="{{ id }}" checked><span>{{ source[0] }}</span></label>
                         {% endfor %}
                     </fieldset>
                     {% if boss_local %}
                     <div class="recruitment-browser-option">
-                        <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '使用当前 Chrome 采集 BOSS 和智联' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
+                        <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '用本机 Chrome 采集' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
                         {% if chrome_available %}
-                        <p>采集会在当前 Chrome 新开搜索标签页，复用该浏览器的登录或验证状态。</p>
+                        <p>各平台会在后台打开。若需要登录或验证，每个平台最多等待 2 分钟。</p>
                         {% else %}
                         <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
                         {% endif %}

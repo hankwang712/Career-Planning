@@ -16,7 +16,20 @@ from .recruitment_sources import SOURCES, cards, platform_url, search_url
 logger = logging.getLogger(__name__)
 BRIDGE_URL = "http://127.0.0.1:3456"
 TAB_ID = re.compile(r"[0-9a-fA-F]{32}")
-CHROME_SOURCES = {"boss": ("www.zhipin.com", "/web/geek/jobs"), "zhilian": ("www.zhaopin.com", "/jobs")}
+CHROME_SOURCES = {
+    "boss": ("www.zhipin.com", "/web/geek/jobs"),
+    "51job": ("we.51job.com", "/pc/search"),
+    "zhilian": ("www.zhaopin.com", "/jobs"),
+    "xiaohongshu": ("www.xiaohongshu.com", "/search_result"),
+}
+LOGIN_WAIT_SECONDS = 120
+LOGIN_URLS = {
+    "boss": "https://www.zhipin.com/web/user/?ka=header-login",
+    "51job": "https://login.51job.com/",
+    "zhilian": "https://www.zhaopin.com/jobs/",
+    "xiaohongshu": "https://www.xiaohongshu.com/explore",
+}
+LOGIN_HOSTS = {"passport.zhipin.com", "passport.zhaopin.com", "login.51job.com", "passport.51job.com"}
 ZHILIAN_LOGIN_URL = "https://www.zhaopin.com/jobs/"
 ZHILIAN_LOGIN = r"""(() => {
     if (location.origin !== 'https://www.zhaopin.com') return 'unknown';
@@ -36,8 +49,18 @@ SNAPSHOT = """JSON.stringify({
     url: location.origin + location.pathname + location.search,
     title: document.title,
     verification: !!document.querySelector('#nc_1_n1z')?.getClientRects().length,
-    zhilianLogin: """ + ZHILIAN_LOGIN + """
+    zhilianLogin: """ + ZHILIAN_LOGIN + """,
+    bossLogin: document.querySelector('.btn-sign')?.getClientRects().length ? 'not_logged_in'
+        : document.querySelector('.user-nav')?.getClientRects().length ? 'ready' : 'unknown',
+    job51Login: document.querySelector('.user-info, .header-avatar')?.getClientRects().length ? 'ready'
+        : Array.from(document.querySelectorAll('a, button')).some(el =>
+            el.getClientRects().length && ['登录/注册', '登录／注册', '登录'].includes(el.innerText.trim()))
+            ? 'not_logged_in' : 'unknown',
+    xhsLogin: document.querySelector('button.login-btn, .login-container .qrcode')?.getClientRects().length ? 'not_logged_in'
+        : document.querySelector('a.link-wrapper[href^="/user/profile"], .user-avatar, .side-bar-user')?.getClientRects().length
+            ? 'ready' : 'unknown'
 })"""
+SESSION_FIELDS = {"boss": "bossLogin", "51job": "job51Login", "xiaohongshu": "xhsLogin"}
 ZHILIAN_LOGIN_MESSAGES = {
     "ready": "智联已登录，可以开始采集。",
     "not_logged_in": "尚未登录智联。请在当前 Chrome 登录官网，再检查。",
@@ -60,10 +83,14 @@ class ChromeTab:
         self.source = source
         self.host, self.path = CHROME_SOURCES[source]
 
-    def read(self, expression):
-        response = self.client.post("/eval", params={"target": self.identifier}, content=expression)
+    def read(self, expression, *, timeout=15):
+        response = self.client.post("/eval", params={"target": self.identifier}, content=expression, timeout=timeout)
         response.raise_for_status()
         return json.loads(response.json()["value"])
+
+    def navigate(self, url, timeout):
+        response = self.client.get("/navigate", params={"target": self.identifier, "url": url}, timeout=timeout)
+        response.raise_for_status()
 
     def evaluate(self, script, options):
         arguments = json.dumps(options, ensure_ascii=True)
@@ -82,14 +109,20 @@ def open_chrome_tab(source, target_url):
         if health.json().get("connected") is not True:
             yield None
             return
-        response = client.get("/new", params={"url": target_url})
+        # Get the owned tab ID first; a slow site must not leave an untracked tab behind.
+        response = client.get("/new", params={"url": "about:blank"})
         response.raise_for_status()
         identifier = str(response.json().get("targetId") or "")
         if not TAB_ID.fullmatch(identifier):
             yield None
             return
+        tab = ChromeTab(client, identifier, source)
         try:
-            yield ChromeTab(client, identifier, source)
+            try:
+                tab.navigate(target_url, timeout=20)
+            except httpx.TimeoutException:
+                pass
+            yield tab
         finally:
             try:
                 client.get("/close", params={"target": identifier}, timeout=3).raise_for_status()
@@ -109,6 +142,17 @@ def zhilian_session(snapshot):
     if urlsplit(snapshot["url"]).hostname == "passport.zhaopin.com":
         return "not_logged_in"
     return snapshot.get("zhilianLogin", "unknown")
+
+
+def platform_session(source, snapshot):
+    if source == "zhilian":
+        return zhilian_session(snapshot)
+    if is_verification(snapshot):
+        return "verification_required"
+    address = urlsplit(snapshot["url"])
+    if address.hostname in LOGIN_HOSTS or "请登录" in snapshot["title"]:
+        return "not_logged_in"
+    return snapshot.get(SESSION_FIELDS[source], "unknown")
 
 
 def check_zhilian_login():
@@ -161,26 +205,25 @@ def collect_in_chrome(source, keyword, city, limit, update):
     update("opening", "正在打开已授权的本机 Chrome 搜索标签页。")
     target_url = search_url(source, keyword, city)
     expected = parse_qs(urlsplit(target_url).query)
+    deadline = monotonic() + LOGIN_WAIT_SECONDS
     try:
         with open_chrome_tab(source, target_url) as tab:
             if tab is None:
                 return "unavailable", "本机 Chrome 桥尚未连接，请确认 Chrome 调试授权已开启。", []
-            deadline = monotonic() + (20 if source == "zhilian" else 100)
-            login_observed = source != "zhilian"
-            waiting = False
+            last_state = None
+            opened_login = False
+            returned_to_search = False
             while monotonic() < deadline:
                 try:
-                    snapshot = tab.read(SNAPSHOT)
+                    snapshot = tab.read(SNAPSHOT, timeout=max(0.1, min(5, deadline - monotonic())))
+                except httpx.TimeoutException:
+                    continue
                 except httpx.HTTPStatusError as error:
                     if error.response.status_code == 400:
                         sleep(1)
                         continue
                     raise
-                if source == "zhilian":
-                    state = zhilian_session(snapshot)
-                    if state in {"not_logged_in", "verification_required"}:
-                        return "login_required", ZHILIAN_LOGIN_MESSAGES[state], []
-                    login_observed = state == "ready"
+                state = platform_session(source, snapshot)
                 tab.url = snapshot["url"]
                 address = urlsplit(tab.url)
                 same_search = (
@@ -189,18 +232,33 @@ def collect_in_chrome(source, keyword, city, limit, update):
                     and address.path.rstrip("/") == tab.path
                     and all(parse_qs(address.query).get(key) == value for key, value in expected.items())
                 )
-                gated = is_verification(snapshot) or "请登录" in snapshot["title"]
-                if same_search and not gated and login_observed:
+                if same_search and state == "ready":
                     rows = cards(tab, source, limit)
                     if rows:
                         return "succeeded", f"从本机 Chrome 读取 {len(rows)} 条岗位。", rows
-                if not waiting:
-                    update("waiting_user", f"正在等待 {SOURCES[source][0]} 搜索结果。")
-                    waiting = True
-                sleep(1)
-            if not login_observed:
-                return "login_required", ZHILIAN_LOGIN_MESSAGES["unknown"], []
-            return "blocked", "Chrome 搜索标签页在等待时限内未显示匹配的岗位。", []
+                remaining = deadline - monotonic()
+                if state != last_state:
+                    if state == "ready":
+                        update("running", f"{SOURCES[source][0]} 已登录，正在读取搜索结果。")
+                    else:
+                        update("waiting_user", f"请在 Chrome 的{SOURCES[source][0]}标签页完成登录或验证，最多等待 2 分钟。")
+                    last_state = state
+                if remaining > 2 and state == "not_logged_in" and not opened_login and source in {"boss", "51job"}:
+                    opened_login = True
+                    try:
+                        tab.navigate(LOGIN_URLS[source], timeout=min(12, remaining))
+                    except httpx.TimeoutException:
+                        pass
+                elif remaining > 2 and state == "ready" and not same_search and not returned_to_search:
+                    returned_to_search = True
+                    try:
+                        tab.navigate(target_url, timeout=min(12, remaining))
+                    except httpx.TimeoutException:
+                        pass
+                sleep(max(0, min(1, deadline - monotonic())))
+            if last_state == "ready":
+                return "empty", "登录已通过，本轮没有读取到可用结果。", []
+            return "login_timeout", f"{SOURCES[source][0]} 在 2 分钟内未完成登录或验证，本轮暂不可用。", []
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         logger.exception("Local Chrome connector could not read the recruitment search")
         return "unavailable", "无法读取本机 Chrome，请确认浏览器已打开并已授权本机连接。", []

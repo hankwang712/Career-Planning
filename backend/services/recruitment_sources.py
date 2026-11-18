@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 from time import monotonic
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -12,7 +13,7 @@ SOURCES = {
     "boss": ("BOSS 直聘", "https://www.zhipin.com/web/geek/jobs", "query", "zhipin.com",
              ".job-card-wrap", ".job-name", ".boss-name", ".job-salary", ".company-location", ".job-name, a[href*='/job_detail/']"),
     "51job": ("前程无忧", "https://we.51job.com/pc/search", "keyword", "51job.com",
-              ".joblist-item", ".jname, .job-name", ".cname, .company-name", ".sal, .salary", ".area, .job-area", "a[href*='jobs.51job.com'], a[href*='jobdetail'], a[href*='job_detail']"),
+              ".joblist-item", ".jname, .job-name", ".cname, .company-name", ".sal, .salary", ".area, .job-area", "a[href*='jobdetail'], a[href*='job_detail'], a.ick[href]"),
     "zhilian": ("智联招聘", "https://www.zhaopin.com/jobs", "kw", "zhaopin.com",
                 ".job-card, .joblist-box__iteminfo", ".job-card__title-main, .jobinfo__name", ".job-card__company-name, .companyinfo__name",
                 ".job-card__salary, .jobinfo__salary", ".job-card__location, .jobinfo__other-info-item", "a[href*='/jobdetail/'], a[href*='/job/']"),
@@ -59,16 +60,23 @@ READ_CARDS = """({source, card, selectors, limit}) => {
         const props = node.__vue__?.$props ?? node.__vueParentComponent?.props;
         const cardData = source === 'boss' ? props?.data : null;
         const zhilianJob = source === 'zhilian' ? props?.job : null;
+        const title = text(node, 'title') || (typeof zhilianJob?.name === 'string' ? zhilianJob.name.trim() : '');
+        const company = text(node, 'company');
+        const jobListRoot = source === '51job' ? node.closest('.joblist')?.parentElement : null;
+        const jobList = jobListRoot?.__vue__?.$props?.joblist ?? jobListRoot?.__vueParentComponent?.props?.joblist;
+        const listIndex = Array.isArray(jobList) ? Array.from(node.parentElement.children)
+            .filter(child => child.matches(card)).indexOf(node) : -1;
+        const job51 = jobList?.[listIndex];
+        const job51Link = job51?.jobName?.trim() === title ? job51.jobHref : '';
         const salary = typeof cardData?.salaryDesc === 'string' && cardData.salaryDesc.trim()
             ? cardData.salaryDesc.trim() : source === 'zhilian' && displayedSalary.includes('*') ? '' : displayedSalary;
         const description = (node.innerText || '').trim();
         return {
-            title: text(node, 'title') || (typeof zhilianJob?.name === 'string' ? zhilianJob.name.trim() : ''),
-            company: text(node, 'company'), salary,
+            title, company, salary,
             location: text(node, 'location'),
             description: (displayedSalary ? description.replace(displayedSalary, salary) : description).slice(0, 3000),
             url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href')
-                || zhilianJob?.positionURL || zhilianJob?.positionUrl || ''
+                || zhilianJob?.positionURL || zhilianJob?.positionUrl || job51Link || ''
         };
     });
 }"""
@@ -103,7 +111,7 @@ def listing_url(source, href, base=None):
         return ""
     parsed = urlsplit(url)
     if source == "51job" and parsed.hostname == "jobs.51job.com":
-        if not parsed.path.lower().endswith(".html"):
+        if not re.fullmatch(r"\d+\.html", parsed.path.rsplit("/", 1)[-1], re.IGNORECASE):
             return ""
     elif not parsed.path.lower().startswith(LISTING_PATHS[source]):
         return ""
