@@ -198,3 +198,24 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch):
     state, _, rows = recruitment_chrome.collect_boss_in_chrome("Agent", "杭州", 20, lambda *_: None)
     assert state == "succeeded" and len(rows) == 1
     assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
+
+
+def test_encoded_salary_is_hidden_from_results_and_csv_without_erasing_a_known_value(make_account):
+    from services import db, recruitment
+
+    account = make_account("salary")
+    connection = db._get_conn()
+    encoded = "\ue032\ue031-\ue033K"
+    with connection:
+        connection.execute("INSERT INTO recruitment_listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (account.email, "boss", LINKS["boss"], "开发", "示例公司", "杭州", encoded,
+                            f"岗位说明\n{encoded}", LINKS["boss"], time.time()))
+    legacy = account.get(API + "/jobs").get_json()["items"][0]
+    assert legacy["salary"] == "" and legacy["description"] == "岗位说明"
+    assert encoded not in account.get(API + "/export").data.decode("utf-8-sig")
+
+    row = {"title": "开发", "url": LINKS["boss"]}
+    with connection:
+        recruitment.save_rows(connection, account.email, "boss", [{**row, "salary": "15-24K"}])
+        recruitment.save_rows(connection, account.email, "boss", [{**row, "salary": encoded}])
+    assert account.get(API + "/jobs").get_json()["items"][0]["salary"] == "15-24K"

@@ -7,6 +7,7 @@ from io import StringIO
 from ipaddress import ip_address
 import json
 import logging
+import re
 import sqlite3
 import threading
 import time
@@ -33,6 +34,7 @@ CSV_ALIASES = {"platform": "source", "job_title": "title", "company_name": "comp
                "jd_text": "description", "job_link": "url", "post_link": "url", "raw_text": "description",
                "note_title": "title", "crawl_time": "updated_at"}
 html_import_lock = threading.Lock()
+UNRENDERABLE_TEXT = re.compile(r"[\ue000-\uf8ff\U000f0000-\U0010fffd\ufffd]")
 
 
 def init_schema(conn):
@@ -63,10 +65,24 @@ class CollectRequest(BaseModel):
     boss_local: bool = Field(default=False, strict=True)
 
 
+def clean_listing(fields):
+    for key in ("title", "company", "location", "salary", "description"):
+        value = str(fields.get(key) or "").strip()
+        if key == "salary" and UNRENDERABLE_TEXT.search(value):
+            fields[key] = ""
+        elif key == "description":
+            lines = [line.strip() for line in value.splitlines() if not UNRENDERABLE_TEXT.search(line)]
+            fields[key] = "\n".join(lines).strip()
+        else:
+            fields[key] = UNRENDERABLE_TEXT.sub("", value)
+    return fields
+
+
 def save_rows(conn, owner, source, rows):
     seen = set()
     records = []
     for row in rows:
+        row = clean_listing(dict(row))
         url = listing_url(source, str(row.get("url") or "")) if row.get("url") else ""
         title = str(row.get("title") or "").strip()[:250]
         if not title and source == "xiaohongshu":
@@ -83,7 +99,8 @@ def save_rows(conn, owner, source, rows):
     conn.executemany("""
         INSERT INTO recruitment_listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(owner, source, url_key) DO UPDATE SET
-            title=excluded.title, company=excluded.company, location=excluded.location, salary=excluded.salary,
+            title=excluded.title, company=excluded.company, location=excluded.location,
+            salary=CASE WHEN excluded.salary='' THEN recruitment_listings.salary ELSE excluded.salary END,
             description=excluded.description, url=excluded.url, updated_at=excluded.updated_at
     """, records)
     return len(records)
@@ -229,7 +246,7 @@ def query_rows(owner, limit, offset=0):
     total = conn.execute("SELECT count(*) FROM recruitment_listings WHERE " + where, args).fetchone()[0]
     items = conn.execute("SELECT " + ", ".join(FIELDS) + " FROM recruitment_listings WHERE " + where
                          + " ORDER BY updated_at DESC, source, url_key LIMIT ? OFFSET ?", (*args, limit, offset))
-    return [dict(item) for item in items], total
+    return [clean_listing(dict(item)) for item in items], total
 
 
 @blueprint.get(API + "/jobs")

@@ -46,7 +46,7 @@ STATIC_DOMAINS = {
     "xiaohongshu": ("xiaohongshu.com", "xhscdn.com"),
 }
 
-READ_CARDS = """({card, selectors, limit}) => {
+READ_CARDS = """({source, card, selectors, limit}) => {
     const text = (node, key) => {
         for (const selector of selectors[key].split(',').filter(Boolean)) {
             const value = node.querySelector(selector)?.innerText.trim();
@@ -54,11 +54,21 @@ READ_CARDS = """({card, selectors, limit}) => {
         }
         return '';
     };
-    return Array.from(document.querySelectorAll(card)).slice(0, limit * 3).map(node => ({
-        title: text(node, 'title'), company: text(node, 'company'), salary: text(node, 'salary'),
-        location: text(node, 'location'), description: (node.innerText || '').trim().slice(0, 3000),
-        url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href') || ''
-    }));
+    return Array.from(document.querySelectorAll(card)).slice(0, limit * 3).map(node => {
+        const displayedSalary = text(node, 'salary');
+        const cardData = source === 'boss'
+            ? node.__vue__?.$props?.data ?? node.__vueParentComponent?.props?.data
+            : null;
+        const salary = typeof cardData?.salaryDesc === 'string' && cardData.salaryDesc.trim()
+            ? cardData.salaryDesc.trim() : displayedSalary;
+        const description = (node.innerText || '').trim();
+        return {
+            title: text(node, 'title'), company: text(node, 'company'), salary,
+            location: text(node, 'location'),
+            description: (displayedSalary ? description.replace(displayedSalary, salary) : description).slice(0, 3000),
+            url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href') || ''
+        };
+    });
 }"""
 
 
@@ -116,7 +126,7 @@ def allowed_request(source, request):
 
 def cards(page, source, limit):
     _, _, _, _, card, *selectors = SOURCES[source]
-    rows = page.evaluate(READ_CARDS, {"card": card, "limit": limit,
+    rows = page.evaluate(READ_CARDS, {"source": source, "card": card, "limit": limit,
                                     "selectors": dict(zip(("title", "company", "salary", "location", "url"), selectors))})
     unique = {}
     for row in rows:

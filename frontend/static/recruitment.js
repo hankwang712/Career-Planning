@@ -5,6 +5,7 @@
   const config = byId("recruitmentCollect");
   const filterForm = byId("recruitmentFilters");
   const sources = new Map(Array.from(filterForm.elements.source.options).map((option) => [option.value, option.text]));
+  const captureDate = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" });
   const start = byId("recruitmentStart");
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
@@ -52,9 +53,13 @@
     start.textContent = active ? "正在采集…" : "开始采集";
   }
 
+  function displaySalary(salary) {
+    return /[\p{Co}\uFFFD]/u.test(salary || "") ? "" : salary;
+  }
+
   function details(row) {
     byId("recruitmentDetailTitle").textContent = row.title;
-    byId("recruitmentDetailMeta").textContent = [sources.get(row.source), row.company, row.location, row.salary].filter(Boolean).join(" · ");
+    byId("recruitmentDetailMeta").textContent = [sources.get(row.source), row.company, row.location, displaySalary(row.salary)].filter(Boolean).join(" · ");
     byId("recruitmentDescription").textContent = row.description || "可在原站查看详情。";
     byId("recruitmentOriginal").href = row.url;
     byId("recruitmentDetail").showModal();
@@ -62,17 +67,27 @@
 
   function resultRow(row) {
     const el = node("article", "", "recruitment-row");
-    const main = node("div");
+    const header = node("div", "", "recruitment-row-header");
+    const source = node("span", sources.get(row.source), "recruitment-badge recruitment-job-source");
+    source.dataset.source = row.source;
+    header.append(source);
+    if (row.updated_at) {
+      header.append(node("span", captureDate.format(new Date(row.updated_at * 1000)) + " 采集", "recruitment-row-date"));
+    }
     const title = node("button", row.title, "recruitment-row-title");
     title.type = "button";
     title.addEventListener("click", () => details(row));
-    main.append(title);
     const meta = [row.company, row.location].filter(Boolean).join(" · ");
-    if (meta) main.append(node("p", meta, "recruitment-row-meta"));
-    const side = node("div", "", "recruitment-row-side");
-    if (row.salary) side.append(node("strong", row.salary));
-    side.append(node("span", sources.get(row.source), "recruitment-badge"));
-    el.append(main, side);
+    const footer = node("div", "", "recruitment-row-footer");
+    const salary = displaySalary(row.salary);
+    footer.append(node("strong", salary || "薪资未获取", salary ? "recruitment-salary" : "recruitment-salary is-missing"));
+    const original = node("a", "原帖 ↗", "recruitment-original");
+    original.href = row.url;
+    original.target = "_blank";
+    original.rel = "noopener noreferrer";
+    original.setAttribute("aria-label", "查看原帖：" + row.title);
+    footer.append(original);
+    el.append(header, title, node("p", meta, "recruitment-row-meta"), footer);
     return el;
   }
 
