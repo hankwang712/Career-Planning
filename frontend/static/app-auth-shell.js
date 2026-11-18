@@ -134,6 +134,7 @@ function clearPrivateWorkspace() {
   Object.assign(reportResumeUiState, { pending: false, loaded: false, source: null, error: "" });
   Object.assign(reportWizardUiState, { stage: 2, runtimeKey: "", started: false, manual: false });
   document.getElementById("reportWorkflowInput")?.reset();
+  document.getElementById("reportWorkflowTargets")?.removeAttribute("data-edited");
   reportGenerationStarting = false;
   reportGenerationError = "";
   inFlightGetRequests.clear();

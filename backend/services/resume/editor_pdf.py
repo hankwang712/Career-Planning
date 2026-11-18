@@ -59,6 +59,20 @@ def _web_links(page):
             if link.get("uri", "").startswith(("https://", "http://")) and not re.search(r"[\s()|]", link["uri"])]
 
 
+def _target_rows(items, label):
+    return [item for item in items if 0 < item.baseline - label.baseline < 40
+            and abs(item.rect.x0 - label.rect.x0) < 12 and not PHONE.search(item.text)]
+
+
+def read_page_target(page):
+    items = [line for row in _rows(page) for line in row]
+    for line in items:
+        if line.text.rstrip("：:") in {"求职意向", "目标岗位"}:
+            if following := _target_rows(items, line):
+                return following[0].text
+    return ""
+
+
 def _read_header(page, rows, cutoff):
     items = [line for row in rows for line in row]
     contact, extras, used = {}, [], set()
@@ -71,9 +85,7 @@ def _read_header(page, rows, cutoff):
     for line in items:
         if line.text.rstrip("：:") in {"求职意向", "目标岗位"}:
             used.add(id(line))
-            following = [item for item in items if item.baseline > line.baseline and
-                         item.baseline - line.baseline < 40 and abs(item.rect.x0 - line.rect.x0) < 12
-                         and not PHONE.search(item.text)]
+            following = _target_rows(items, line)
             if following:
                 contact["target"] = following[0].text
                 used.add(id(following[0]))

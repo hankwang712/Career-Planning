@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -10,30 +9,12 @@ from ..resume_rubric import DEFAULT_EXPERIENCE_WEIGHTS, EXPERIENCE_WEIGHTS, RESU
 from ..schemas.resume import ResumeAnalysis, ResumeInput
 from ..tools.document import read_document
 from ..utils.dates import education_timeline_context, resume_date_context, verify_education_timeline_claims
-from ..utils.resume_grounding import normalized, verify_resume_grounding
+from ..utils.resume_grounding import explicit_resume_role, normalized, verify_resume_grounding
 from ..utils.decision_grounding import model_attribution_questions
 from .base import BaseAgent
 
 
 UNSPECIFIED = {"无", "暂无", "未定", "待定", "不限", "不确定", "都可以", "无明确意向", "未提供", "none", "null"}
-
-
-def explicit_resume_role(raw_resume: str) -> str:
-    """只读取明确标注的求职意向，不从项目技术栈推断用户意愿。"""
-    lines = [
-        re.sub(r"^\s*(?:#{1,6}\s*|[-*]\s+)", "", line).replace("**", "").strip()
-        for line in raw_resume.splitlines() if line.strip()
-    ]
-    section_titles = {"教育经历", "教育背景", "工作经历", "实习经历", "项目经历", "科研成果", "技能能力", "个人信息"}
-    for index, line in enumerate(lines):
-        match = re.fullmatch(r"(?:求职意向|意向岗位|目标岗位|应聘岗位|应聘职位|求职岗位)(?:\s*[:：]\s*(.*))?", line)
-        if match:
-            if match[1]:
-                return match[1].strip()
-            # PDF/OCR 常将“求职意向”标题和具体岗位分在两行。
-            if index + 1 < len(lines) and lines[index + 1] not in section_titles:
-                return lines[index + 1]
-    return ""
 
 
 class ResumeAnalysisAgent(BaseAgent):

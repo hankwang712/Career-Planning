@@ -3,6 +3,27 @@ import re
 import unicodedata
 
 
+def explicit_resume_role(raw_resume: str) -> str:
+    """Read a labeled career goal without inferring it from experience."""
+    labels = r"求职意向|意向岗位|目标岗位|应聘岗位|应聘职位|求职岗位|Target Role|Desired Position"
+    section_titles = {"教育经历", "教育背景", "工作经历", "工作经验", "实习经历", "项目经历",
+                      "项目经验", "科研成果", "技能能力", "专业技能", "个人信息"}
+    lines = [line.strip() for line in raw_resume.splitlines() if line.strip()]
+    for index, raw in enumerate(lines):
+        line = re.sub(r"^(?:#{1,6}\s*|[-*]\s+)", "", raw).replace("**", "").strip()
+        match = re.fullmatch(rf"(?:{labels})(?:\s*[:：]\s*(.*))?", line, re.IGNORECASE)
+        if not match:
+            continue
+        if match[1]:
+            return match[1].strip()
+        if index + 1 < len(lines):
+            following = lines[index + 1].strip("* ")
+            if (following not in section_titles and not following.startswith("#")
+                    and not re.search(r"[@：:]|\d{7,}", following)):
+                return following
+    return ""
+
+
 def normalized(value):
     value = re.sub(r"([A-Za-z])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)", lambda match: match[1] + "^" + unicodedata.normalize("NFKC", match[2]), str(value or ""))
     value = unicodedata.normalize("NFKC", str(value or ""))

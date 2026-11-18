@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -73,6 +74,7 @@ from services.report.workflow import (
     validate_report_continuation,
     validate_report_request,
 )
+from services.resume.editor import read_source_target
 from services.user_state import (
     _current_user,
     _load_user_state,
@@ -117,7 +119,8 @@ def _report_resume_source(username, state):
             target = document["contact"].get("target")
             if target:
                 sections.insert(0, f"求职意向：{target}")
-            return {"kind": "draft", "title": row["title"], "text": "\n\n".join(sections), "path": ""}
+            return {"kind": "draft", "title": row["title"], "target": target,
+                    "text": "\n\n".join(sections), "path": ""}
 
     resume = state.get("resume_profile") or {}
     path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
@@ -134,7 +137,12 @@ def _report_resume_source(username, state):
 def api_career_report_resume_source():
     username = _current_user()["username"]
     source = _report_resume_source(username, _load_user_state(username))
-    return jsonify(source={"kind": source["kind"], "title": source["title"]} if source else None)
+    if not source:
+        return jsonify(source=None)
+    target = source.get("target") or read_source_target(source["path"], source["text"])
+    targets = dict.fromkeys(part.strip() for part in re.split(r"[\n、；;|｜]", target)
+                            if 0 < len(part.strip()) <= 300 and part.strip() not in {"未定", "待定", "不限", "暂无", "无"})
+    return jsonify(source={"kind": source["kind"], "title": source["title"], "targets": list(targets)[:5]})
 
 
 @blueprint.route("/api/career-report/generate/start", methods=["POST"])

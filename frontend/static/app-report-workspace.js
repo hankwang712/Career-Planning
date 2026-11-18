@@ -48,6 +48,13 @@ function renderReportWizard() {
   if (retry) retry.hidden = checking || !error;
   const sourceLabel = document.getElementById("reportResumeSourceLabel");
   if (sourceLabel) sourceLabel.textContent = source ? `分析简历：${source.title}` : "";
+  const targets = document.getElementById("reportWorkflowTargets");
+  const suggestedTargets = source?.targets || [];
+  if (targets && !targets.dataset.edited) targets.value = suggestedTargets.join("\n");
+  const targetHint = document.getElementById("reportTargetHint");
+  if (targetHint) targetHint.textContent = suggestedTargets.length
+    ? "已从简历带入求职意向，可按本次报告需要修改。"
+    : "请填写本次报告要分析的目标岗位。";
   const start = document.getElementById("reportStageStart");
   if (start) {
     start.disabled = locked || !source;
@@ -62,7 +69,8 @@ function renderReportWizard() {
   const form = document.getElementById("reportWorkflowInput");
   if (form && !form.dataset.wizardBound) {
     form.dataset.wizardBound = "1";
-    form.addEventListener("input", () => {
+    form.addEventListener("input", (event) => {
+      if (event.target.id === "reportWorkflowTargets") event.target.dataset.edited = "true";
       reportGenerationError = "";
       const feedback = document.getElementById("reportLaunchFeedback");
       if (feedback && !reportGenerationStarting) feedback.hidden = true;
@@ -810,20 +818,28 @@ function buildCareerReportGenerationPayload() {
   }
   const focusId = String(appState.focusedRoleId || roles[0]?.id || "").trim();
   const role_rankings = buildReportRoleRankingsForPayload(roles, focusId);
+  const targets = String(document.getElementById("reportWorkflowTargets")?.value || "")
+    .split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  const cities = Array.from(document.querySelectorAll("#reportWorkflowInput input[name=reportCity]:checked"), (input) => input.value);
+  const preferences = [
+    cities.length ? `意向城市：${cities.join("、")}` : "",
+    ...Array.from(document.querySelectorAll("#reportWorkflowInput select[data-report-preference]"),
+      (select) => select.value ? `${select.dataset.label}：${select.value}` : ""),
+    String(document.getElementById("reportWorkflowPreferences")?.value || "").trim()
+  ].filter(Boolean).join("\n");
+  const arrival = document.getElementById("reportWorkflowArrival")?.value;
+  const days = document.getElementById("reportWorkflowDays")?.value;
   return {
     profile_snapshot: profile,
     role_rankings: role_rankings,
     focus_role_id: focusId,
-    availability: {
-      arrival: document.getElementById("reportWorkflowArrival")?.value || "undecided",
-      days_per_week: Number(document.getElementById("reportWorkflowDays")?.value || 0)
-    },
+    availability: arrival || days ? { arrival: arrival || "undecided", days_per_week: Number(days || 0) } : null,
     workflow: {
-      targets: String(document.getElementById("reportWorkflowTargets")?.value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
-      preferences: String(document.getElementById("reportWorkflowPreferences")?.value || "").trim(),
+      targets,
+      preferences,
       additional_evidence: "",
       recruitment: {
-        request: `寻找近期招聘机会。目标方向：${document.getElementById("reportWorkflowTargets")?.value || ""}。求职偏好：${document.getElementById("reportWorkflowPreferences")?.value || "未额外指定"}`.slice(0, 3000),
+        request: `寻找近期招聘机会。目标方向：${targets.join("、")}。求职偏好：${preferences || "未额外指定"}`.slice(0, 3000),
         channel: "radar", limit: 12,
         published_after: document.getElementById("reportWorkflowPublishedAfter")?.value || null
       }

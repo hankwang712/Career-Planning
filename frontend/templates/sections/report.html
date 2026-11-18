@@ -33,24 +33,51 @@
             <div class="report-input-heading"><span class="report-input-step">01 · 分析目标</span><h3>填写目标与偏好</h3></div>
             <p class="report-stage-description">给探索一个方向，剩下的交给你的 Agent 团队。</p>
             <label>目标岗位或方向（每行一个，最多五个）
-                <textarea id="reportWorkflowTargets" rows="2" maxlength="1500" placeholder="例如：大模型应用开发工程师" required></textarea>
+                <textarea id="reportWorkflowTargets" rows="2" maxlength="1504" placeholder="例如：大模型应用开发工程师" aria-describedby="reportTargetHint" required></textarea>
+                <small id="reportTargetHint">请填写本次报告要分析的目标岗位。</small>
             </label>
-            <label>求职偏好与限制
-                <textarea id="reportWorkflowPreferences" rows="2" maxlength="4500" placeholder="例如：希望在杭州或上海工作，其他限制可留空"></textarea>
-            </label>
+            <fieldset class="report-preference-fields">
+                <legend>求职偏好 <span>选填</span></legend>
+                <fieldset class="report-city-options">
+                    <legend>意向城市（可多选）</legend>
+                    <div class="report-city-choices">
+                        {% for city in ('杭州', '上海', '北京', '深圳', '广州', '南京', '苏州', '成都', '武汉') %}
+                        <label class="report-city-choice"><input type="checkbox" name="reportCity" value="{{ city }}"><span>{{ city }}</span></label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+                <div class="report-preference-selects">
+                    {% for key, label, choices in (
+                        ('job-type', '求职类型', ('实习', '校招全职', '社招全职')),
+                        ('work-mode', '办公方式', ('现场办公', '混合办公', '远程办公')),
+                        ('overtime', '加班', ('接受偶尔加班', '不接受加班', '需要先了解加班安排')),
+                        ('travel', '出差', ('接受出差', '接受偶尔出差', '不接受出差'))
+                    ) %}
+                    <label>{{ label }}
+                        <select data-report-preference="{{ key }}" data-label="{{ label }}">
+                            <option value="">不设限制</option>
+                            {% for choice in choices %}<option value="{{ choice }}">{{ choice }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    {% endfor %}
+                </div>
+                <label>其他偏好
+                    <textarea id="reportWorkflowPreferences" rows="2" maxlength="4500" placeholder="可补充其他城市、行业或通勤限制"></textarea>
+                </label>
+            </fieldset>
             <div class="report-availability-fields">
-                <label>什么时候可以开始实习？
-                    <select id="reportWorkflowArrival" required>
-                        <option value="" disabled selected>选择到岗时间</option>
+                <label>实习到岗时间（选填）
+                    <select id="reportWorkflowArrival">
+                        <option value="">选择到岗时间</option>
                         <option value="now">随时到岗</option><option value="one_week">一周内</option>
                         <option value="two_weeks">两周内</option><option value="one_month">一个月内</option>
                         <option value="winter">寒假开始</option><option value="summer">暑假开始</option>
                         <option value="undecided">尚未确定</option>
                     </select>
                 </label>
-                <label>每周可以实习几天？
-                    <select id="reportWorkflowDays" required>
-                        <option value="" disabled selected>选择每周天数</option>
+                <label>每周可实习天数（选填）
+                    <select id="reportWorkflowDays">
+                        <option value="">选择每周天数</option>
                         <option value="1">1 天</option><option value="2">2 天</option><option value="3">3 天</option>
                         <option value="4">4 天</option><option value="5">5 天</option><option value="6">6 天</option>
                         <option value="7">7 天</option><option value="0">尚未确定</option>

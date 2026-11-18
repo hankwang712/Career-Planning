@@ -201,11 +201,28 @@ def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
     link.click()
     page.wait_for_url("**/user-center/resumes?from_report=1")
     page.locator("[name=title]").fill("应聘简历")
+    page.locator("[data-contact=target]").fill("大模型算法｜Agent 开发实习")
     page.locator(".re-section").first.locator("[data-section-content]").fill("开发招聘系统")
     page.get_by_role("button", name="保存", exact=True).click()
     page.get_by_text("已保存的简历", exact=True).wait_for()
     page.get_by_role("link", name="返回报告生成台").click()
-    page.locator("#reportWorkflowTargets").wait_for()
+    targets = page.locator("#reportWorkflowTargets")
+    targets.wait_for()
+    assert targets.input_value() == "大模型算法\nAgent 开发实习"
+    targets.fill("Agent 开发工程师")
+    page.evaluate("refreshReportResumePanel()")
+    assert targets.input_value() == "Agent 开发工程师"
+    page.get_by_role("checkbox", name="杭州").check()
+    page.get_by_role("checkbox", name="上海").check()
+    page.get_by_label("求职类型").select_option("实习")
+    page.get_by_label("办公方式").select_option("混合办公")
+    page.get_by_label("其他偏好").fill("希望做 AI 产品")
+    payload = page.evaluate("buildCareerReportGenerationPayload()")
+    assert payload["availability"] is None
+    assert payload["workflow"]["targets"] == ["Agent 开发工程师"]
+    preferences = "意向城市：杭州、上海\n求职类型：实习\n办公方式：混合办公\n希望做 AI 产品"
+    assert payload["workflow"]["preferences"] == preferences
+    assert preferences in payload["workflow"]["recruitment"]["request"]
     assert page.locator("#reportResumeNotice").is_hidden()
     assert page.locator("#reportResumeSourceLabel").inner_text() == "分析简历：应聘简历"
     assert page.locator("#report input[type=file]").count() == 0

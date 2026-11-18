@@ -14,11 +14,12 @@ from docx.opc.exceptions import PackageNotFoundError
 from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for
 from lxml.etree import XMLSyntaxError
 
+from backend.advisor.utils.resume_grounding import explicit_resume_role
 from services import db, llm_env
 from services.user_state import _current_user, _load_user_state, _login_required, _owned_resume_storage_path
 from . import pipeline
 from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, choose_layout, clean_document, parse_resume, render_resume
-from .editor_pdf import read_layout
+from .editor_pdf import read_layout, read_page_target
 from .matcher import _extract_docx_text
 
 blueprint = Blueprint("resume_editor", __name__)
@@ -149,6 +150,26 @@ def extract_for_editor(path):
                     return text, False, header
     text, ocr = extract_source(path)
     return text, ocr, {}
+
+
+def read_source_target(path, cached_text):
+    """Read the goal from an existing upload without rerunning OCR or AI."""
+    target = explicit_resume_role(cached_text)
+    if not path:
+        return target
+    path = Path(path)
+    try:
+        if path.suffix.lower() == ".pdf":
+            with fitz.open(path) as source:
+                if source.is_pdf and not source.needs_pass and len(source):
+                    page = source[0]
+                    return read_page_target(page) or target or explicit_resume_role(page.get_text(sort=True))
+        if path.suffix.lower() == ".docx" and not target:
+            text, _ = extract_source(path)
+            return explicit_resume_role(text)
+    except (BadZipFile, OSError, RuntimeError, ValueError):
+        pass
+    return target
 
 
 @blueprint.post("/api/resume-editor/import")

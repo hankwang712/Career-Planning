@@ -132,6 +132,10 @@ def test_template_aligns_project_metadata_and_renders_markdown(make_account):
 
 
 def test_pdf_import_uses_header_and_table_geometry_instead_of_flat_text(make_account):
+    from pathlib import Path
+
+    from services.user_state import _save_user_state, _user_upload_dir
+
     account = make_account("resume-pdf-layout")
     photo = BytesIO()
     Image.new("RGB", (45, 65), "#5591a2").save(photo, "JPEG")
@@ -163,6 +167,11 @@ def test_pdf_import_uses_header_and_table_geometry_instead_of_flat_text(make_acc
     assert [part["title"] for part in doc["sections"]] == ["教育经历", "项目经历", "专业技能"]
     assert "Demo University | Computer Science | 2023-2027" in doc["sections"][0]["content"]
     assert "Workshop | Developer | 2025-2026" in doc["sections"][1]["content"]
+    path = Path(_user_upload_dir(account.email)) / "sample.pdf"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    _save_user_state(account.email, {"resume_profile": {"file_name": "sample.pdf", "storage_path": str(path)}})
+    assert account.get("/api/career-report/resume-source").get_json()["source"]["targets"] == ["AI Engineer"]
     result = account.post("/api/resume-editor/render/pdf", json=doc)
     with fitz.open(stream=result.data, filetype="pdf") as pdf:
         assert len(pdf) == 1 and pdf[0].get_images()
