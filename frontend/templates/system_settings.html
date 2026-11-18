@@ -1,69 +1,134 @@
+{% macro icon(kind) -%}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{% if kind == 'key' %}<circle cx="8" cy="15.5" r="4.5"/><path d="m11.3 12.3 8-8m-2 2 2 2m-4 0 2 2"/>
+{% elif kind == 'chat' %}<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3m6-3v3m-6 14v3m6-3v3m4-13h3m-3 6h3M2 9h3m-3 6h3m4-3h6m-3-3v6"/>
+{% elif kind in ('image', 'ocr') %}<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 4-4 3 3 4-5 5 6"/>
+{% elif kind in ('embedding', 'rag-models') %}<circle cx="5" cy="12" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="m7 11 9-5m-9 7 9 5"/>
+{% elif kind in ('postgres', 'rag-storage') %}<ellipse cx="12" cy="5.8" rx="7.5" ry="3"/><path d="M4.5 6v12c0 4 15 4 15 0V6m-15 6c0 4 15 4 15 0"/>
+{% elif kind in ('news', 'retrieval') %}<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/>
+{% elif kind == 'test' %}<path d="M7 3v4m4-4v4M5 7h8v2a4 4 0 0 1-8 0zm4 6v2a4 4 0 0 0 8 0v-3m-2 0h4"/>
+{% elif kind == 'save' %}<path d="M4 4h13l3 3v13H4zm4 0v5h8V4m-8 16v-7h8v7"/>
+{% elif kind == 'chevron' %}<path d="m6 9 6 6 6-6"/>
+{% else %}<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2" fill="white"/><circle cx="16" cy="12" r="2" fill="white"/><circle cx="10" cy="18" r="2" fill="white"/>
+{% endif %}
+</svg>
+{%- endmacro %}
+
+{% macro nav_group(section, label) -%}
+    <p class="sc-nav-caption">{{ label }}</p>
+    {% for id, title, description, fields in section %}
+        <a href="#settings-{{ id }}" data-group-link="{{ id }}" {% if id == 'chat' %}aria-current="location"{% endif %}>
+            <span class="sc-dot" aria-hidden="true"></span><span>{{ title }}{% if id == 'chat' %}<b class="sc-required"> *</b>{% endif %}</span><small data-nav-count>–/{{ fields|length }}</small>
+        </a>
+    {% endfor %}
+{%- endmacro %}
+
+{% macro group_card(id, title, description, fields, deployment=false) -%}
+{% set writable = can_edit and not deployment %}
+{% set testable = writable and id in test_groups %}
+<section id="settings-{{ id }}" data-settings-group="{{ id }}" class="sc-card sc-group{{ ' sc-has-test' if testable }}">
+    <details {% if id == 'chat' %}open{% endif %}>
+        <summary>
+            <span class="sc-icon" data-tone="{{ id }}">{{ icon(id) }}</span>
+            <span class="sc-group-copy">
+                <span class="sc-group-name">
+                    <strong>{{ title }}</strong>
+                    <span class="sc-pill{{ ' sc-pill-required' if id == 'chat' }}">{{ '部署配置' if deployment else '必填' if id == 'chat' else '选填' }}</span>
+                    {% if id == 'chat' %}<span class="sc-pill" data-group-ready hidden></span>{% endif %}
+                </span>
+                <small data-group-count>–/{{ fields|length }} 项已配置</small>
+            </span>
+            <span class="sc-chevron">{{ icon('chevron') }}</span>
+        </summary>
+        <div class="sc-group-body">
+            <p class="sc-description">{{ description }}</p>
+            {% if testable %}<p class="sc-probe-status" id="test-status-{{ id }}" role="status"></p>{% endif %}
+            <div class="sc-fields">
+                {% for key, label in fields %}
+                {% set secret = key.endswith(('_API_KEY', '_PASSWORD')) %}
+                <div class="sc-field" data-setting-key="{{ key }}" {% if id == 'chat' %}data-required-field data-label="{{ label }}"{% elif not deployment %}data-optional-field{% endif %}>
+                    <div class="sc-field-head">
+                        {% if writable %}<label for="{{ key }}">{{ label }}{% if id == 'chat' %}<b class="sc-required"> *</b>{% endif %}</label>
+                        {% else %}<strong>{{ label }}{% if id == 'chat' %}<b class="sc-required"> *</b>{% endif %}</strong>{% endif %}
+                        {% if secret %}<span class="sc-secret">密钥</span>{% endif %}
+                    </div>
+                    {% if writable %}
+                        <input id="{{ key }}" name="{{ key }}" type="{{ 'password' if secret else 'text' }}" maxlength="2048" spellcheck="false" autocomplete="{{ 'new-password' if secret else 'off' }}" aria-describedby="state-{{ key }}">
+                    {% else %}
+                        <span class="sc-readout" data-readout>正在读取…</span>
+                    {% endif %}
+                    <div class="sc-field-foot">
+                        <code>{{ key }}</code>
+                        <span class="sc-pill sc-field-status" id="state-{{ key }}">读取中</span>
+                    </div>
+                    {% if writable %}<button type="button" class="sc-reset" data-reset="{{ key }}" hidden>移除网页值</button>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </details>
+    {% if testable %}
+    <button type="button" class="sc-probe sc-button" data-test-group="{{ id }}" aria-describedby="test-status-{{ id }}">{{ icon('test') }} 测试连通性</button>
+    {% endif %}
+</section>
+{%- endmacro %}
+
 <!doctype html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>系统配置 · Career Agent</title>
+    <title>系统配置 · 智航生涯</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='system-settings.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
 </head>
-<body class="ca-settings-page">
-    <header class="ca-settings-top"><a href="{{ url_for('site.index') }}">← 工作台</a><h1>系统配置</h1></header>
-    <main class="ca-settings-main">
-        <section class="ca-settings-summary">
-            <div><h2>服务与环境配置</h2>
-                <p>对话模型配置后可启用 AI 功能。标为选填的服务按需启用。</p>
-                {% if can_edit %}<p>网页模型配置保存后生效。部署项在环境中维护。</p>{% else %}<p>当前账号可查看各项配置状态。</p>{% endif %}
+<body class="sc-page">
+    <header class="sc-top">
+        <a href="{{ url_for('site.index', _anchor='dashboard') }}">← 工作台</a>
+        <div><h1>系统配置</h1><p>API 密钥与服务配置</p></div>
+    </header>
+    <main class="sc-main">
+        <section class="sc-card sc-overview">
+            <div class="sc-overview-content">
+                <span class="sc-icon sc-icon-key">{{ icon('key') }}</span>
+                <div>
+                    <h2>服务凭据与模型配置 <span class="sc-pill">{{ '服务端保存' if can_edit else '只读查看' }}</span></h2>
+                    <p>带 <b class="sc-required">*</b> 的字段是启用 AI 功能所需的配置，其余服务按需启用。{% if can_edit %}密钥保存后只显示配置状态。{% endif %}</p>
+                    <p id="settingsMissing" class="sc-missing" aria-live="polite"></p>
+                </div>
             </div>
-            <div><strong id="settingsProgressText">正在检查配置…</strong><progress id="settingsProgress" value="0" max="3"></progress></div>
+            <dl class="sc-metrics">
+                <div><dt>必填</dt><dd id="settingsRequiredCount">–/3</dd></div>
+                <div><dt>选填</dt><dd id="settingsOptionalCount">–</dd></div>
+            </dl>
+            <div class="sc-overview-track" aria-hidden="true"><span id="settingsOverviewBar"></span></div>
         </section>
-        <div class="ca-settings-layout">
-            <nav aria-label="配置分组">
-                <span>AI 服务</span>
-                {% for id, title, description, fields in groups %}<a href="#settings-{{ id }}">{{ title }}</a>{% endfor %}
-                <span>部署环境</span>
-                {% for id, title, description, fields in deployment_groups %}<a href="#settings-{{ id }}">{{ title }}</a>{% endfor %}
-            </nav>
+        <div class="sc-layout">
+            <aside class="sc-sidebar">
+                <nav aria-label="配置分组">
+                    {{ nav_group(groups, 'AI 服务') }}
+                    {{ nav_group(deployment_groups, '部署环境') }}
+                </nav>
+                <div class="sc-card sc-progress">
+                    <strong id="settingsProgressText">正在检查配置…</strong>
+                    <progress id="settingsProgress" value="0" max="3" aria-label="对话模型配置进度"></progress>
+                </div>
+            </aside>
             <form id="systemModelSettings" autocomplete="off" data-can-edit="{{ 'true' if can_edit else 'false' }}">
-                <fieldset disabled>
+                <fieldset disabled aria-label="服务配置">
                     {% for id, title, description, fields in groups %}
-                    <details id="settings-{{ id }}" class="ca-settings-group" {% if id == 'chat' %}open{% endif %}>
-                        <summary><strong>{{ title }}</strong> <span class="ca-tag {{ 'required' if id == 'chat' }}">{{ '使用 AI 时必填' if id == 'chat' else '选填' }}</span></summary>
-                        <p>{{ description }}</p>
-                        {% if can_edit and id in test_groups %}
-                        <div class="ca-settings-test"><button type="button" class="ca-button" data-test-group="{{ id }}">测试连通性</button><span role="status"></span></div>
-                        {% endif %}
-                        <div class="ca-settings-fields">
-                            {% for key, label in fields %}
-                            <div class="ca-settings-field">
-                                {% if can_edit %}
-                                <label for="{{ key }}">{{ label }}{% if id == 'chat' %} <span class="ca-required">*</span>{% endif %}</label>
-                                <input id="{{ key }}" name="{{ key }}" type="{{ 'password' if key.endswith('_API_KEY') else 'text' }}" maxlength="2048" spellcheck="false" autocomplete="{{ 'new-password' if key.endswith('_API_KEY') else 'off' }}" aria-describedby="state-{{ key }}">
-                                {% else %}<strong>{{ label }}</strong>{% endif %}
-                                <code>{{ key }}</code>
-                                <div class="ca-field-status"><span id="state-{{ key }}"></span><button type="button" class="ca-button" data-reset="{{ key }}" hidden>移除网页值</button></div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </details>
+                        {{ group_card(id, title, description, fields) }}
                     {% endfor %}
                     {% for id, title, description, fields in deployment_groups %}
-                    <details id="settings-{{ id }}" class="ca-settings-group">
-                        <summary><strong>{{ title }}</strong> <span class="ca-tag">部署配置</span></summary>
-                        <p>{{ description }}</p>
-                        <div class="ca-settings-fields">
-                            {% for key, label in fields %}
-                            <div class="ca-settings-field">
-                                <strong>{{ label }}</strong><code>{{ key }}</code>
-                                <div class="ca-field-status"><span id="state-{{ key }}" data-deployment></span></div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </details>
+                        {{ group_card(id, title, description, fields, true) }}
                     {% endfor %}
-                    {% if can_edit %}<div class="ca-settings-save"><button type="submit" class="ca-button primary" disabled>保存配置</button></div>{% endif %}
+                    {% if can_edit %}
+                    <div class="sc-save"><button type="submit" class="sc-button sc-save-button" disabled>{{ icon('save') }} 保存配置</button></div>
+                    {% endif %}
                 </fieldset>
-                <p id="settingsResult" role="status"></p>
+                <p id="settingsResult" class="sc-result" role="status"></p>
             </form>
         </div>
     </main>

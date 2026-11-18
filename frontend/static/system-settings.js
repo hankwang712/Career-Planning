@@ -5,12 +5,50 @@
   const result = document.getElementById("settingsResult");
   const pending = new Map();
   const canEdit = form.dataset.canEdit === "true";
+  const cards = [...form.querySelectorAll("[data-settings-group]")];
+  const groupLinks = [...document.querySelectorAll("[data-group-link]")];
+  const required = [...form.querySelectorAll("[data-required-field]")];
+  const optional = [...form.querySelectorAll("[data-optional-field]")];
   let fields = {};
 
+  function tally(nodes) {
+    return nodes.filter(node => fields[node.dataset.settingKey]?.configured).length;
+  }
+
   function updateProgress() {
-    const ready = Object.keys(fields).filter(key => key.startsWith("AI_CHAT_") && fields[key].configured).length;
+    const ready = tally(required);
+    const missing = required.filter(node => !fields[node.dataset.settingKey]?.configured);
+    const available = required.length;
     document.getElementById("settingsProgress").value = ready;
-    document.getElementById("settingsProgressText").textContent = `对话模型已配置 ${ready}/3`;
+    document.getElementById("settingsProgressText").textContent = `对话模型已配置 ${ready}/${available}`;
+    document.getElementById("settingsRequiredCount").textContent = `${ready}/${available}`;
+    document.getElementById("settingsOptionalCount").textContent = `${tally(optional)}/${optional.length}`;
+    document.getElementById("settingsMissing").textContent = missing.length
+      ? "还缺必填项：" + missing.map(node => node.dataset.label).join("、") : "";
+    const bar = document.getElementById("settingsOverviewBar");
+    bar.style.width = `${100 * ready / available}%`;
+    bar.dataset.status = missing.length ? "partial" : "ready";
+    for (const card of cards) {
+      const nodes = [...card.querySelectorAll("[data-setting-key]")];
+      const configured = tally(nodes);
+      const count = `${configured}/${nodes.length}`;
+      const state = configured === nodes.length ? "ready" : configured ? "partial" : "empty";
+      const link = groupLinks.find(item => item.dataset.groupLink === card.dataset.settingsGroup);
+      link.dataset.status = state;
+      link.querySelector("[data-nav-count]").textContent = count;
+      card.querySelector("[data-group-count]").textContent = count + " 项已配置";
+      const badge = card.querySelector("[data-group-ready]");
+      if (badge) {
+        badge.hidden = false;
+        badge.dataset.status = missing.length ? "partial" : "ready";
+        badge.textContent = missing.length ? `缺 ${missing.length} 项` : "✓ 已配齐";
+      }
+    }
+  }
+
+  function fieldStatus(status, label, state) {
+    status.textContent = label;
+    status.dataset.status = state;
   }
 
   function renderField(key) {
@@ -18,8 +56,9 @@
     const input = form.elements.namedItem(key);
     const status = document.getElementById("state-" + key);
     if (!status) return;
-    status.textContent = field.override ? "网页已配置" : field.configured ? "已配置" : "未配置";
-    if (status.hasAttribute("data-deployment") && field.value) status.textContent = field.value;
+    fieldStatus(status, field.configured ? "已配置" : "未配置", field.configured ? "ready" : "empty");
+    const readout = status.closest("[data-setting-key]").querySelector("[data-readout]");
+    if (readout) readout.textContent = field.value || (field.configured ? "配置已就绪" : "—");
     if (input) {
       input.value = field.value || "";
       input.placeholder = input.type === "password" && field.configured ? "已配置 · 输入新密钥可替换" : "";
@@ -59,16 +98,17 @@
     const clean = value.trim();
     if (clean && (type === "password" || clean !== original)) pending.set(name, clean);
     else pending.delete(name);
-    document.getElementById("state-" + name).textContent = pending.has(name) ? "待保存" :
-      fields[name].configured ? "已配置" : "未配置";
-      if (submit) submit.disabled = !pending.size;
+    const status = document.getElementById("state-" + name);
+    if (pending.has(name)) fieldStatus(status, "待保存", "pending");
+    else fieldStatus(status, fields[name].configured ? "已配置" : "未配置", fields[name].configured ? "ready" : "empty");
+    if (submit) submit.disabled = !pending.size;
   });
   form.addEventListener("click", event => {
     const key = event.target.dataset.reset;
     if (!key || !fields[key]?.override) return;
     form.elements.namedItem(key).value = "";
     pending.set(key, "");
-    document.getElementById("state-" + key).textContent = "保存后移除网页值";
+    fieldStatus(document.getElementById("state-" + key), "待移除", "pending");
     submit.disabled = false;
   });
   form.addEventListener("submit", event => {
@@ -77,7 +117,7 @@
   });
   form.querySelectorAll("[data-test-group]").forEach(button => {
     button.addEventListener("click", async () => {
-      const status = button.nextElementSibling;
+      const status = document.getElementById(button.getAttribute("aria-describedby"));
       if (pending.size) {
         status.textContent = "请先保存修改，再测试连通性。";
         return;
@@ -97,10 +137,25 @@
       }
     });
   });
-  document.querySelectorAll(".ca-settings-layout nav a").forEach(link => {
-    link.addEventListener("click", () => { document.querySelector(link.hash).open = true; });
-  });
-  const target = document.getElementById(location.hash.slice(1));
-  if (target instanceof HTMLDetailsElement) target.open = true;
+  function activate(id) {
+    groupLinks.forEach(link => {
+      if (link.dataset.groupLink === id) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    });
+  }
+  function syncHash() {
+    const card = cards.find(item => "#" + item.id === location.hash);
+    if (!card) return;
+    card.querySelector("details").open = true;
+    activate(card.dataset.settingsGroup);
+  }
+  groupLinks.forEach(link => link.addEventListener("click", () => {
+    const card = cards.find(item => "#" + item.id === link.hash);
+    card.querySelector("details").open = true;
+    activate(link.dataset.groupLink);
+  }));
+  cards.forEach(card => card.querySelector("summary").addEventListener("click", () => activate(card.dataset.settingsGroup)));
+  window.addEventListener("hashchange", syncHash);
+  syncHash();
   void load();
 })();
