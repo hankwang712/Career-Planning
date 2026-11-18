@@ -231,6 +231,34 @@ def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
     assert page.locator("#reportStageStart").is_enabled()
 
 
+def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment")
+    assert page.locator("#recruitmentCollect input[name=source]").count() == 5
+    page.get_by_role("button", name="导入网页").click()
+    dialog = page.get_by_role("dialog", name="导入已保存的搜索页")
+    markup = '''<div class="job-card-wrap">
+      <a class="job-name" href="/job_detail/sample.html?tracking=ignored">Agent 开发</a>
+      <span class="boss-name">样本公司</span><span class="company-location">杭州</span>
+      <script>document.querySelector(".job-name").textContent = "untrusted";</script>
+    </div>'''
+    dialog.locator("input[type=file]").set_input_files({
+        "name": "search.html", "mimeType": "text/html", "buffer": markup.encode()
+    })
+    dialog.get_by_role("button", name="读取岗位").click()
+    page.get_by_role("button", name="Agent 开发", exact=True).wait_for()
+    page.get_by_role("searchbox", name="搜索结果").fill("样本公司")
+    page.get_by_role("button", name="筛选", exact=True).click()
+    page.wait_for_function("new URL(document.querySelector('#recruitmentExport').href).searchParams.get('q') === '样本公司'")
+    page.get_by_role("button", name="Agent 开发", exact=True).click()
+    details = page.get_by_role("dialog", name="Agent 开发")
+    assert details.get_by_role("link", name="查看原帖").get_attribute("href") == "https://www.zhipin.com/job_detail/sample.html"
+    details.get_by_role("button", name="关闭").click()
+    with page.expect_download() as download:
+        page.get_by_role("link", name="导出 CSV").click()
+    assert download.value.suggested_filename == "recruitment.csv"
+
+
 def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

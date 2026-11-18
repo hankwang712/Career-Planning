@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>招聘信息采集 · 智航生涯</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='recruitment.css') }}">
+    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='recruitment.js') }}" defer></script>
+</head>
+<body>
+    <header class="recruitment-top">
+        <div>
+            <a class="recruitment-brand" href="{{ url_for('site.index') }}"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="">智航生涯</a>
+            <a class="recruitment-back" href="{{ url_for('site.index', _anchor='jobs') }}">← 返回岗位探索</a>
+        </div>
+    </header>
+    <main class="recruitment-main">
+        <header class="recruitment-hero">
+            <div><h1>招聘信息采集</h1><p>按平台搜索招聘信息，在本地浏览、筛选和导出结果。</p></div>
+            <span class="recruitment-badge">本地岗位库</span>
+        </header>
+        <p id="recruitmentFeedback" class="recruitment-feedback" role="status" hidden></p>
+        <div class="recruitment-layout">
+            <aside class="recruitment-sidebar">
+                <section class="recruitment-card" aria-labelledby="recruitmentConfig">
+                    <header><h2 id="recruitmentConfig">采集条件</h2></header>
+                    <form id="recruitmentCollect" class="recruitment-card-body">
+                        <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
+                        <div class="recruitment-form-grid">
+                            <label>城市<select name="city"><option value="">不限城市</option>{% for city in cities %}<option>{{ city }}</option>{% endfor %}</select></label>
+                            <label>每个平台上限<select name="limit"><option>10</option><option selected>20</option><option>30</option></select></label>
+                        </div>
+                        <fieldset>
+                            <legend>采集平台</legend>
+                            {% for id, source in sources.items() %}
+                            <label class="recruitment-source"><input type="checkbox" name="source" value="{{ id }}" checked><span>{{ source[0] }}</span></label>
+                            {% endfor %}
+                        </fieldset>
+                        <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
+                    </form>
+                </section>
+                <section class="recruitment-card" aria-labelledby="recruitmentRunsTitle">
+                    <header><h2 id="recruitmentRunsTitle">采集记录</h2><button id="recruitmentRefresh" type="button">刷新</button></header>
+                    <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
+                </section>
+            </aside>
+            <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
+                <header>
+                    <div><h2 id="recruitmentResultsTitle">岗位与招聘线索</h2><p id="recruitmentCount" aria-live="polite"></p></div>
+                    <div class="recruitment-actions">
+                        <button id="recruitmentImport" type="button">导入 CSV</button>
+                        <button id="recruitmentSavedPage" type="button">导入网页</button>
+                        <input type="file" id="recruitmentFile" accept=".csv,text/csv" hidden>
+                        <a id="recruitmentExport" class="recruitment-button" href="/api/job-market/collection/export">导出 CSV</a>
+                    </div>
+                </header>
+                <form class="recruitment-filters" id="recruitmentFilters" role="search">
+                    <input type="search" name="q" maxlength="120" aria-label="搜索结果" placeholder="按岗位、公司或地点搜索">
+                    <select name="source" aria-label="筛选平台"><option value="">全部平台</option>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select>
+                    <button type="submit">筛选</button>
+                </form>
+                <div id="recruitmentRows" class="recruitment-rows"></div>
+                <nav class="recruitment-paging" id="recruitmentPaging" aria-label="岗位分页" hidden>
+                    <button type="button" id="recruitmentPrev">上一页</button><span id="recruitmentPage"></span><button type="button" id="recruitmentNext">下一页</button>
+                </nav>
+            </section>
+        </div>
+    </main>
+    <dialog id="recruitmentDetail" class="recruitment-detail" aria-labelledby="recruitmentDetailTitle">
+        <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
+        <div class="recruitment-card-body">
+            <p id="recruitmentDetailMeta"></p>
+            <p id="recruitmentDescription"></p>
+            <a id="recruitmentOriginal" class="recruitment-button" target="_blank" rel="noopener noreferrer">查看原帖 ↗</a>
+        </div>
+    </dialog>
+    <dialog id="recruitmentImportPage" class="recruitment-detail" aria-labelledby="recruitmentImportPageTitle">
+        <header><h2 id="recruitmentImportPageTitle">导入已保存的搜索页</h2><form method="dialog"><button>关闭</button></form></header>
+        <form id="recruitmentHtmlForm" class="recruitment-card-body recruitment-html-form">
+            <p>在原站打开搜索结果，用浏览器的“网页，仅 HTML”保存，再上传该 HTML 文件。</p>
+            <label>招聘平台<select name="source" required>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select></label>
+            <label>HTML 文件<input type="file" name="file" accept=".html,.htm,text/html" required></label>
+            <p id="recruitmentHtmlFeedback" role="status"></p>
+            <button class="recruitment-primary">读取岗位</button>
+        </form>
+    </dialog>
+</body>
+</html>

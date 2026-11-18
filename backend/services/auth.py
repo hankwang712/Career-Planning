@@ -309,6 +309,10 @@ def init_app(app):
         if request.path.startswith(("/api/auth/", "/api/career-profile", "/api/job-market", "/api/system-settings/", "/api/resume-editor/")) and request.method in {"POST", "PUT", "DELETE", "PATCH"}:
             if request.path == "/api/resume-editor/import":
                 limit = 13 * 1024 * 1024
+            elif request.path == "/api/job-market/collection/import":
+                limit = 2_010_000
+            elif request.path == "/api/job-market/collection/import-html":
+                limit = 5_010_000
             elif request.path.startswith("/api/resume-editor/"):
                 limit = 256 * 1024
             else:
@@ -324,7 +328,7 @@ def init_app(app):
     def protect_auth_responses(response):
         private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/", "/api/career-profile", "/api/job-market",
                             "/api/profile-portrait", "/api/account", "/api/community-feed", "/api/system-settings/",
-                            "/api/workspace-logs", "/api/resume-editor/", "/user-center/resumes", "/app_data/")
+                            "/api/workspace-logs", "/api/resume-editor/", "/user-center/resumes", "/recruitment", "/app_data/")
         if request.path.startswith(private_prefixes):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"

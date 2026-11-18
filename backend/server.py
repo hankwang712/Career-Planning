@@ -48,7 +48,7 @@ from services.resume import api as resume_api
 from services.resume import editor as resume_editor
 from services.resume.jobs import RESUME_ANALYSIS_JOBS, _fail_interrupted_resume
 from services.resume.pipeline import fitz
-from services import site, webshell, workspace_tools
+from services import recruitment, site, webshell, workspace_tools
 from services.user_state import (
     _chat_resume_source,
     _current_user,
@@ -175,6 +175,7 @@ app.register_blueprint(create_career_blueprint(_login_required, _current_user, _
 _job_market_collector = JobMarketCollector()
 app.extensions["job_market"] = _job_market_collector
 app.register_blueprint(create_job_market_blueprint(_job_market_collector, _login_required, _current_user))
+app.register_blueprint(recruitment.blueprint)
 if os.environ.get("JOB_MARKET_SCHEDULER", "1").lower() not in {"0", "false", "no"}:
     _job_market_collector.start_scheduler()
 _load_users()

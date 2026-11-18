@@ -30,7 +30,7 @@
 | 模块 | 可以做什么 |
 | --- | --- |
 | 🧩 测评中心 | MBTI、霍兰德、深层 MBTI、老友记角色、情绪主导、SBTI 六项测评。保存答题进度、查看历史结果，基础测评支持最近两次结果对比。 |
-| 🔎 岗位探索 | 定时获取公开招聘岗位，查看最新机会、样本行情、技能要求与来源时间，支持多维筛选和 Excel 导出。保留历史岗位档案与城市分析。 |
+| 🔎 岗位探索 | 查看招聘样本、技能要求与城市分析。通过「招聘信息采集」可查找 BOSS 直聘、前程无忧、智联招聘、猎聘及小红书招聘线索，在本地筛选并导出 CSV。 |
 | 📄 简历分析 | 上传 PDF、DOCX 等简历，诊断经历深度、表达问题与证据缺口，给出有原文依据的修改建议。扫描文档可通过 OCR 读取。 |
 | 📝 简历编辑与导出 | 在个人中心的「我的简历」里手动填写、粘贴或识别 PDF、DOCX 和扫描图片，保存多份可继续编辑的简历。开启 AI 可辅助识别陌生栏目。智能排版、预览、A4 PDF 和 PNG 共用服务端版式，多页图片打包为 ZIP。 |
 | 🗺️ 职业规划报告 | 结合简历、目标和偏好分阶段生成报告，支持补充信息、确认方向、编辑润色、版本查看与 Word / PDF 导出。 |
@@ -281,6 +281,8 @@ flowchart LR
 
 招聘雷达合并 Radar 公开招聘汇总与 JobHunter 本地岗位库，按公司、岗位、城市、招聘批次和职位 ID 去重后筛选，再读取招聘链接核对内容。合并保留各来源及日期，不修改原始岗位库。岗位采集时间不代表公告发布日期或仍开放。JobHunter 尚未采集或岗位库暂不可用时，会说明缺项并继续使用 Radar。独立测试台启动命令：`python backend/tools/recruitment_lab/app.py`，访问 <http://127.0.0.1:8766/>。数据工作台位于 `/radar`，可手动同步、筛选及导入岗位。模型与可选正文提取服务使用根目录 `.env` 配置。
 
+「岗位探索 → 招聘信息采集」位于 `/recruitment`，按账号保存岗位、招聘线索和采集记录。实时采集读取各平台公开搜索页，需要 Playwright Chromium 或本机 Chrome、Edge。遇到平台登录或验证时，可在原站打开搜索结果，保存为 HTML 后导入，也可导入 UTF-8 CSV。CSV 兼容 `platform`、`job_link`、`job_title`、`jd_text` 等 Jobhunter AI 原始列名。页面按当前关键词和平台筛选导出，单次最多导出 10,000 条。
+
 <a id="configuration"></a>
 
 ## ⚙️ 模型与可选服务配置
@@ -527,6 +529,7 @@ career-agent/
 本项目参考并使用了以下开源项目，感谢作者的分享：
 
 - [JobHunter](https://github.com/Bynlk/JobHunter)：招聘信息采集。
+- [Jobhunter AI](https://github.com/jolie-z/jobhunter-ai/tree/main/backend)：五个招聘平台的搜索入口、字段规则与采集工作台参考。
 - [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)：校招数据聚合与招聘雷达。
 - [LightRAG](https://github.com/HKUDS/LightRAG)：岗位知识图谱与检索。
 

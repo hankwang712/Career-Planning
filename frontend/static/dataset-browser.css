@@ -53,6 +53,8 @@
 .dataset-browser [hidden] { display: none !important; }
 .dataset-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 17px; }
 .dataset-heading h3 { margin: 0; color: #637a97; font-size: 13px; font-weight: 600; letter-spacing: .4px; }
+.dataset-collection-link { padding: 7px 12px; border: 1px solid #d6e1ef; border-radius: 8px; background: #fff; color: #204e8f; font-size: 13px; font-weight: 650; text-decoration: none; }
+.dataset-collection-link:hover { background: #eef4ff; }
 .dataset-browser button { border: 1px solid #d9e3ef; border-radius: 10px; background: #fff; color: #587392; padding: 10px 16px; cursor: pointer; font: inherit; font-size: 13px; transition: border-color 180ms, background-color 180ms, box-shadow 180ms, transform 180ms; }
 .dataset-browser button:hover { background: #f2f6fd; border-color: #b4c8e6; }
 .dataset-browser button:focus-visible, .dataset-search input:focus-visible { outline: 3px solid #8eb1e8; outline-offset: 3px; }

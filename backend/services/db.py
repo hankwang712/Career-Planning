@@ -122,7 +122,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS resume_drafts_owner ON resume_drafts(owner, updated_at DESC);
     """)
     from .career import init_schema
+    from .recruitment import init_schema as init_recruitment_schema
     init_schema(conn)
+    init_recruitment_schema(conn)
     _split_legacy_user_states(conn)
     _scrub_legacy_llm_secrets(conn)
     migrated = cur.execute("SELECT 1 FROM auth_settings WHERE name = 'legacy_json_imported'").fetchone()
