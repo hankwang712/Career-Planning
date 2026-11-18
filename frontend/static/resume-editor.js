@@ -6,6 +6,9 @@
   const status = document.getElementById("resumeEditorStatus");
   const title = root.querySelector("[name=title]");
   const contact = [...root.querySelectorAll("[data-contact]")];
+  const photoPreview = document.getElementById("resumePhoto");
+  const photoPlaceholder = document.getElementById("resumePhotoPlaceholder");
+  const photoRemove = document.getElementById("resumeRemovePhoto");
   const restoreButtons = [...root.querySelectorAll("[data-restore]")];
   const extras = document.getElementById("resumeContactExtras");
   const extraTemplate = document.getElementById("resumeContactTemplate");
@@ -21,6 +24,7 @@
   let id = "";
   let revision = 0;
   let layout = "standard";
+  let photo = "";
   let dirty = false;
   let busy = false;
 
@@ -43,6 +47,7 @@
     return {
       title: title.value,
       contact: Object.fromEntries(contact.map(input => [input.dataset.contact, input.value])),
+      photo,
       extras: [...extras.children].map(row => ({
         label: row.querySelector("[data-field-label]").value,
         value: row.querySelector("[data-field-value]").value
@@ -106,8 +111,17 @@
     document.sections.forEach(section => appendSection(section));
     extras.replaceChildren();
     (document.extras || []).forEach(appendField);
+    setPhoto(document.photo || "");
     layout = document.layout;
     updateMoveButtons();
+  }
+
+  function setPhoto(data) {
+    photo = data;
+    photoPreview.hidden = photoRemove.hidden = !photo;
+    photoPlaceholder.hidden = Boolean(photo);
+    if (photo) photoPreview.src = "data:image/jpeg;base64," + photo;
+    else photoPreview.removeAttribute("src");
   }
 
   function markChanged() {
@@ -181,8 +195,18 @@
   }
 
   function mergeDraft(current, imported) {
+    if (!Object.values(current.contact).some(value => value.trim()) && !current.sections.some(part => part.content.trim())) {
+      current.layout = imported.layout;
+    }
     for (const [key, value] of Object.entries(imported.contact)) {
       if (!current.contact[key]?.trim() && value) current.contact[key] = value;
+    }
+    if (!current.photo && imported.photo) current.photo = imported.photo;
+    for (const field of imported.extras || []) {
+      if (!current.extras.some(item => item.label === field.label)) {
+        if (current.extras.length >= 8) throw new Error("合并后个人信息字段超过上限，请移除一些空字段后重试。");
+        current.extras.push(field);
+      }
     }
     for (const part of imported.sections) {
       const match = current.sections.find(section => section.title.trim() === part.title);
@@ -212,7 +236,7 @@
     void run(async () => {
       const result = await (await request("/import", { method: "POST", data })).json();
       const current = readDraft();
-      const edited = replace ? { ...result.document, title: current.title, layout: current.layout }
+      const edited = replace ? { ...result.document, title: current.title }
         : mergeDraft(current, result.document);
       if (edited.sections.length > maxSections) throw new Error(`合并后超过 ${maxSections} 个栏目，请先移除空栏目或选择替换。`);
       fillDraft(edited);
@@ -401,6 +425,10 @@
         break;
       case "add-field":
         addField();
+        break;
+      case "remove-photo":
+        setPhoto("");
+        markChanged();
         break;
       case "import":
         importStatus.textContent = "";

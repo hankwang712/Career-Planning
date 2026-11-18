@@ -1,9 +1,13 @@
 """Editable resume structure, import classification, and A4 composition."""
+import base64
+import binascii
 import re
 from html import escape
+from io import BytesIO
 from urllib.parse import urlsplit
 
 import pymupdf as fitz
+from PIL import Image
 
 from services import llm_env
 from services.llm_calls import call_structured_chat
@@ -12,11 +16,16 @@ CONTACT = {"name": "姓名", "target": "求职意向", "phone": "手机", "email
 SECTIONS = {
     "个人总结": ("个人总结", "个人简介", "自我评价", "个人优势", "Summary", "Profile"),
     "工作经历": ("工作经历", "工作经验", "职业经历", "实习经历", "实习经验", "Work Experience", "Experience", "Employment"),
-    "项目经历": ("项目经历", "项目经验", "项目实践", "Projects", "Project Experience"),
+    "项目经历": ("项目经历", "项目经验", "项目实践", "科研与项目经历", "科研项目", "Projects", "Project Experience"),
     "教育经历": ("教育经历", "教育背景", "教育经验", "学习经历", "学历", "Education"),
-    "专业技能": ("专业技能", "附加信息", "技能专长", "技术栈", "技能", "Skills", "Technical Skills"),
+    "专业技能": ("专业技能", "技能能力", "附加信息", "技能专长", "技术栈", "技能", "Skills", "Technical Skills"),
 }
-HEADING = {alias.casefold(): title for title, aliases in SECTIONS.items() for alias in aliases}
+HEADING = {alias.casefold(): title for title, aliases in {
+    **SECTIONS,
+    "获奖情况": ("获奖情况", "获奖经历", "荣誉奖项", "荣誉奖励", "Awards", "Honors"),
+    "科研成果": ("科研成果", "学术成果", "论文及专利", "Research Output", "Publications"),
+    "资格证书": ("资格证书", "职业证书", "Certifications"),
+}.items() for alias in aliases}
 MAX_TEXT = 24000
 MAX_SECTIONS = 18
 PHONE = re.compile(r"(?<!\d)(?:\+?86[ -]?)?1[3-9]\d{9}(?!\d)")
@@ -25,6 +34,12 @@ INLINE_MARKDOWN = re.compile(r"\[([^\]\n]{1,180})\]\((https?://[^\s()]{1,2048})\
 PAGE_INSET = 35.4
 # Story counts cell padding in addition to declared widths.
 ENTRY_WIDTH = fitz.paper_rect("a4").width - 2 * PAGE_INSET - 14
+
+
+def canonical_heading(line):
+    line = line.lstrip("#").strip().strip("* ").rstrip("：:").strip()
+    line = re.sub(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])", "", line)
+    return HEADING.get(" ".join(line.casefold().split()))
 
 
 def clean_document(payload):
@@ -61,11 +76,22 @@ def clean_document(payload):
     if extras:
         result["extras"] = [{"label": field(item.get("label", ""), 30), "value": field(item.get("value", ""), 180)}
                             for item in extras]
+    if photo := payload.get("photo"):
+        try:
+            raw = base64.b64decode(field(photo, 48000), validate=True)
+            with Image.open(BytesIO(raw)) as image:
+                if image.format != "JPEG" or image.width > 144 or image.height > 200:
+                    raise ValueError
+                image.verify()
+        except (ValueError, binascii.Error, OSError, Image.DecompressionBombError) as error:
+            raise ValueError("简历照片数据无效。") from error
+        result["photo"] = photo
     return result
 
 
-def parse_resume(text, use_ai=False):
-    contact = {}
+def parse_resume(text, use_ai=False, header=None):
+    header = header or {}
+    contact = dict(header.get("contact", {}))
     sections = []
     heading = "导入原文"
     lines = []
@@ -93,8 +119,7 @@ def parse_resume(text, use_ai=False):
                 contact["phone"] = line
                 continue
         clean_heading = line.lstrip("#").strip().strip("* ").rstrip("：:").strip()
-        heading_key = re.sub(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])", "", clean_heading)
-        known = HEADING.get(" ".join(heading_key.casefold().split()))
+        known = canonical_heading(line)
         if known or (line.startswith("#") and 0 < len(clean_heading) <= 60):
             flush()
             heading = known or clean_heading
@@ -106,7 +131,7 @@ def parse_resume(text, use_ai=False):
         sections = [{"title": "导入原文", "content": paragraph} for paragraph in paragraphs]
 
     warning = ""
-    unknown = [index for index, part in enumerate(sections) if part["title"] not in SECTIONS]
+    unknown = [index for index, part in enumerate(sections) if part["title"] not in HEADING.values()]
     if use_ai and unknown:
         runtime = llm_env.chat_runtime()
         if all(runtime):
@@ -141,7 +166,7 @@ def parse_resume(text, use_ai=False):
         rest = parts[MAX_SECTIONS - 1:]
         parts = parts[:MAX_SECTIONS - 1] + [{"title": "其他内容", "content":
                                             "\n\n".join(p["title"] + "\n" + p["content"] for p in rest)}]
-    return clean_document({"contact": contact, "sections": parts}), warning
+    return clean_document({**header, "contact": contact, "sections": parts}), warning
 
 
 def inline_markup(text):
@@ -180,7 +205,12 @@ def section_lines(section):
         separator = '<p class="project-gap"> </p>' if project and previous_blank else ""
         previous_blank = False
         columns = [cell.strip() for cell in re.split(r"[|｜]", line)]
-        if (project or education) and len(columns) == 3 and all(columns) and not re.match(r"^[-*•]|^\d+\.", line):
+        if section["title"] == "获奖情况" and len(columns) == 2 and all(col.startswith("- ") for col in columns):
+            yield '<table class="awards"><tr>' + "".join(
+                f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt">•　{inline_markup(col[2:])}</td>'
+                for ratio, col in zip((.52, .48), columns)
+            ) + '</tr></table>'
+        elif (project or education) and len(columns) == 3 and all(columns) and not re.match(r"^[-*•]|^\d+\.", line):
             name, role, date = (inline_markup(column) for column in columns)
             ratios = (0.63, 0.17, 0.20) if project else (0.36, 0.43, 0.21)
             left, middle, right = (ENTRY_WIDTH * ratio for ratio in ratios)
@@ -198,24 +228,38 @@ def section_lines(section):
 def document_html(document, compact):
     body = []
     contact = document["contact"]
-    if contact["target"]:
-        body.append(f'<table class="masthead"><tr><td style="width:30%"><p class="target-label">求职意向</p>'
-                    f'<p class="target">{escape(contact["target"])}</p></td>'
+    schedule = next((item["value"] for item in document.get("extras", []) if item["label"] == "实习安排"), "")
+    schedule_html = f'<p class="schedule">{escape(schedule)}</p>' if schedule else ""
+    if contact["target"] or document.get("photo"):
+        target_html = (f'<p class="target-label">求职意向</p><p class="target">{escape(contact["target"])}</p>{schedule_html}'
+                       if contact["target"] else "")
+        reserve = ' style="height:54pt"' if document.get("photo") else ""
+        body.append(f'<table class="masthead"><tr><td style="width:30%">{target_html}</td>'
                     f'<td style="width:40%"><h1>{escape(contact["name"] or document["title"])}</h1></td>'
-                    '<td style="width:30%"></td></tr></table>')
+                    f'<td{reserve}></td></tr></table>')
     else:
         body.append(f'<h1>{escape(contact["name"] or document["title"])}</h1>')
-    metadata = [escape(contact[key]) for key in ("phone", "email") if contact[key]]
-    metadata.extend(f'{escape(item["label"])}：{escape(item["value"])}' if item["label"] else escape(item["value"])
-                    for item in document.get("extras", []) if item["value"])
-    channels = "　 · 　".join(metadata)
-    if channels:
-        body.append(f'<p class="contact">{channels}</p>')
+    def metadata_item(item):
+        url = item["value"]
+        if item["label"] in {"GitHub", "个人主页"} and re.fullmatch(r"https?://[^\s()]+", url):
+            return inline_markup(f"[{url.split('://', 1)[1]}]({url})")
+        return f'{escape(item["label"])}：{escape(url)}' if item["label"] else escape(url)
+
+    extras = [metadata_item(item) for item in document.get("extras", []) if item["value"] and
+              (item["label"] != "实习安排" or not contact["target"])]
+    channels = [escape(contact["phone"]), escape(contact["email"]), extras.pop(0) if extras else ""]
+    if any(channels):
+        body.append('<table class="contacts"><tr>' + "".join(
+            f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt">{item}</td>'
+            for ratio, item in zip((.33, .30, .37), channels)
+        ) + "</tr></table>")
+    if extras:
+        body.append(f'<p class="contact">{"　 · 　".join(extras)}</p>')
     for section in document["sections"]:
         if not section["content"]:
             continue
         heading = escape(section["title"])
-        klass = "project" if section["title"] in {"项目经历", "项目经验"} else "section"
+        klass = "project" if section["title"] in {"项目经历", "项目经验"} else "compact-section" if section["title"] in {"获奖情况", "科研成果"} else "section"
         body.append(f'<div class="{klass}"><h2>{heading}</h2>')
         body.extend(section_lines(section))
         body.append("</div>")
@@ -230,7 +274,10 @@ def document_html(document, compact):
     a {{color: #004a91;}}
     .target-label {{font-family: sans-serif; font-weight: bold; color: #004a91; font-size: 10.6pt;}}
     .target {{font-size: 9.5pt;}}
-    .contact {{color: #50545a; text-align: center; font-size: 9.1pt; margin: 6pt 0 8pt;}}
+    .schedule {{font-size: 8.8pt; color: #50545a;}}
+    .masthead {{margin-bottom: 7pt;}}
+    .contacts {{color: #004a91; font-size: 9.1pt; margin: 6pt 0 7pt;}}
+    .contact {{color: #50545a; font-size: 9.1pt; margin: 3pt 0;}}
     table {{width: 100%; border-collapse: collapse;}}
     td {{padding: 0 4pt 1pt 0; vertical-align: top;}}
     .entry {{page-break-after: avoid;}}
@@ -239,8 +286,9 @@ def document_html(document, compact):
     .project .entry .role {{text-align: center;}}
     .entry .date {{text-align: right; padding-right: 0;}}
     .bullet {{padding-left: 13pt; text-indent: -13pt;}}
-    .project p {{font-size: 10.15pt; line-height: 1.42; margin-bottom: 2pt;}}
-    .project .project-gap {{margin-bottom: 6pt;}}
+    .compact-section p, .awards td {{font-size: 9.8pt; line-height: 1.27;}}
+    .project p {{font-size: 10.15pt; line-height: {1.32 if compact else 1.41}; margin-bottom: {1.2 if compact else 2}pt;}}
+    .project .project-gap {{line-height: .45; margin-bottom: 3pt;}}
     </style></head><body>{''.join(body)}</body></html>"""
 
 
@@ -256,6 +304,9 @@ def render_resume(document, layout=None):
 
     story = fitz.Story(html=document_html(document, compact))
     with story.write_with_links(page_rect) as pdf:
+        if photo := document.get("photo"):
+            pdf[0].insert_image(fitz.Rect(paper.width - PAGE_INSET - 47, 24, paper.width - PAGE_INSET, 85),
+                                stream=base64.b64decode(photo))
         pdf.subset_fonts()
         return pdf.tobytes(garbage=3, deflate=True), len(pdf)
 

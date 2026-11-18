@@ -129,3 +129,41 @@ def test_template_aligns_project_metadata_and_renders_markdown(make_account):
         assert points["WorkBench"] < 60 and points["Engineer"] > 355 and points["2026"] > 515
         assert "**Result" not in page.get_text() and "demo-account" in page.get_text()
         assert any(link.get("uri") == "https://example.com/project" for link in page.get_links())
+
+
+def test_pdf_import_uses_header_and_table_geometry_instead_of_flat_text(make_account):
+    account = make_account("resume-pdf-layout")
+    photo = BytesIO()
+    Image.new("RGB", (45, 65), "#5591a2").save(photo, "JPEG")
+    with fitz.open() as pdf:
+        page = pdf.new_page(width=595, height=842)
+        page.insert_text((275, 48), "Demo", fontsize=24)
+        page.insert_text((36, 37), "求职意向", fontname="china-s")
+        page.insert_text((36, 56), "AI Engineer")
+        page.insert_text((36, 90), "13800138000")
+        page.insert_text((207, 90), "resume@example.com")
+        page.insert_image(fitz.Rect(513, 22, 558, 87), stream=photo.getvalue())
+        page.insert_text((36, 112), "教育经历", fontname="china-s")
+        page.insert_text((36, 130), "Demo University")
+        page.insert_text((224, 130), "Computer Science")
+        page.insert_text((490, 131), "2023-2027")
+        page.insert_text((36, 160), "科研与项目经历", fontname="china-s")
+        page.insert_text((36, 180), "Workshop")
+        page.insert_text((392, 180), "Developer")
+        page.insert_text((490, 181), "2025-2026")
+        page.insert_text((36, 200), "Completed the project.")
+        page.insert_text((36, 235), "技能能力", fontname="china-s")
+        page.insert_text((36, 254), "Python")
+        raw = pdf.tobytes()
+    source = account.post("/api/resume-editor/import", data={"source": "file", "file": (BytesIO(raw), "sample.pdf")})
+    assert source.status_code == 200
+    doc = source.get_json()["document"]
+    assert doc["contact"] == {"name": "Demo", "target": "AI Engineer", "phone": "13800138000", "email": "resume@example.com"}
+    assert doc["photo"]
+    assert [part["title"] for part in doc["sections"]] == ["教育经历", "项目经历", "专业技能"]
+    assert "Demo University | Computer Science | 2023-2027" in doc["sections"][0]["content"]
+    assert "Workshop | Developer | 2025-2026" in doc["sections"][1]["content"]
+    result = account.post("/api/resume-editor/render/pdf", json=doc)
+    with fitz.open(stream=result.data, filetype="pdf") as pdf:
+        assert len(pdf) == 1 and pdf[0].get_images()
+        assert "resume@example.com" in pdf[0].get_text()

@@ -18,6 +18,7 @@ from services import db, llm_env
 from services.user_state import _current_user, _load_user_state, _login_required, _owned_resume_storage_path
 from . import pipeline
 from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, choose_layout, clean_document, parse_resume, render_resume
+from .editor_pdf import read_layout
 from .matcher import _extract_docx_text
 
 blueprint = Blueprint("resume_editor", __name__)
@@ -138,12 +139,25 @@ def extract_source(path):
     return "\n\n".join(text_pages.values()), used_ocr
 
 
+def extract_for_editor(path):
+    if path.suffix.lower() == ".pdf":
+        with fitz.open(path) as source:
+            if source.is_pdf and not source.needs_pass and len(source) <= pipeline.RESUME_MAX_PAGES:
+                structured = read_layout(source)
+                if structured:
+                    text, header = structured
+                    return text, False, header
+    text, ocr = extract_source(path)
+    return text, ocr, {}
+
+
 @blueprint.post("/api/resume-editor/import")
 @_login_required
 def import_source():
     owner = _current_user()["username"]
     try:
         kind = request.form.get("source")
+        header = {}
         if kind == "text":
             text, ocr = request.form.get("text", ""), False
         elif kind == "current":
@@ -151,7 +165,7 @@ def import_source():
             path = _owned_resume_storage_path(owner, profile.get("storage_path") or "")
             if not path or not Path(path).is_file():
                 raise ValueError("没有找到当前上传的简历。")
-            text, ocr = extract_source(Path(path))
+            text, ocr, header = extract_for_editor(Path(path))
         elif kind == "file":
             file = request.files.get("file")
             suffix = Path(file.filename or "").suffix.lower() if file else ""
@@ -163,7 +177,7 @@ def import_source():
             with TemporaryDirectory(prefix="career-resume-") as directory:
                 path = Path(directory) / ("resume" + suffix)
                 path.write_bytes(data)
-                text, ocr = extract_source(path)
+                text, ocr, header = extract_for_editor(path)
         else:
             raise ValueError("请选择简历来源。")
         text = str(text or "").strip().replace("\x00", "")
@@ -171,7 +185,7 @@ def import_source():
             raise ValueError("没有识别到文字。请检查扫描清晰度，或粘贴简历文本。")
         if len(text) > MAX_TEXT:
             raise ValueError("识别到的文本超过 24,000 字符，请精简后再导入。")
-        document, warning = parse_resume(text, use_ai=request.form.get("use_ai") == "1")
+        document, warning = parse_resume(text, use_ai=request.form.get("use_ai") == "1", header=header)
     except ValueError as exc:
         return jsonify(message=str(exc)), 400
     except (BadZipFile, UnidentifiedImageError, Image.DecompressionBombError, OSError, RuntimeError):

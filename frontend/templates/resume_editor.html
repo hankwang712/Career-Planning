@@ -20,6 +20,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>我的简历 · 智航生涯</title>
+    <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='resume-editor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='user-center-sidebar.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
@@ -55,7 +56,11 @@
                     <h2 id="resumeContactHeading">个人信息</h2>
                     <p class="re-privacy">{{ icon('shield') }} 个人信息用于简历预览和导出。</p>
                     <div class="re-contact-layout">
-                        <div class="re-portrait" aria-hidden="true">{{ icon('user') }}</div>
+                        <div class="re-portrait">
+                            <span id="resumePhotoPlaceholder">{{ icon('user') }}</span>
+                            <img id="resumePhoto" alt="导入的简历照片" hidden>
+                            <button type="button" id="resumeRemovePhoto" data-action="remove-photo" aria-label="移除照片" title="移除照片" hidden>×</button>
+                        </div>
                         <div>
                             <div class="re-contact">
                                 {% for key, label in contact.items() %}
