@@ -7,8 +7,11 @@ import os
 import socket
 import threading
 import time
+from io import BytesIO
 
+import pymupdf
 import pytest
+from PIL import Image, ImageDraw
 from services import db, runtime_settings
 
 playwright_sync = pytest.importorskip("playwright.sync_api")
@@ -212,6 +215,25 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     assert summary.locator("[data-section-content]").input_value() == "**产品开发**"
     page.locator("#resumeQuickField").select_option("GitHub")
     page.get_by_role("textbox", name="字段内容").fill("demo-account")
+    source = Image.new("RGB", (360, 300), "#d6e4ff")
+    ImageDraw.Draw(source).rectangle((140, 30, 200, 260), fill="#365ea8")
+    encoded = BytesIO()
+    source.save(encoded, format="PNG")
+    with page.expect_file_chooser() as chooser:
+        page.get_by_role("button", name="上传简历照片").click()
+    chooser.value.set_files({"name": "photo.png", "mimeType": "image/png", "buffer": encoded.getvalue()})
+    crop = page.get_by_role("dialog", name="裁剪简历照片")
+    crop.wait_for()
+    canvas = crop.locator("canvas")
+    original_crop = canvas.evaluate("(canvas) => canvas.toDataURL()")
+    crop.locator("#resumePhotoZoom").press("End")
+    assert canvas.evaluate("(canvas) => canvas.toDataURL()") != original_crop
+    zoomed_crop = canvas.evaluate("(canvas) => canvas.toDataURL()")
+    canvas.press("ArrowRight")
+    assert canvas.evaluate("(canvas) => canvas.toDataURL()") != zoomed_crop
+    crop.get_by_role("button", name="使用照片").click()
+    photo = page.get_by_role("img", name="简历照片")
+    assert photo.get_attribute("src").startswith("data:image/jpeg;base64,")
     page.get_by_role("button", name="智能排版").click()
     preview = page.get_by_role("dialog", name="简历预览")
     preview.get_by_role("img", name="简历第 1 页").wait_for()
@@ -224,12 +246,15 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page.reload()
     page.get_by_text("已保存的简历", exact=True).wait_for()
     assert page.get_by_role("textbox", name="字段内容").input_value() == "demo-account"
+    assert photo.is_visible()
     page.locator("[data-contact=name]").fill("林晓更新")
     page.get_by_role("button", name="保存", exact=True).click()
     page.get_by_text("已保存的简历", exact=True).wait_for()
     with page.expect_download() as downloaded:
         page.get_by_role("button", name="导出 PDF").click()
     assert downloaded.value.suggested_filename == "产品开发简历.pdf"
+    with pymupdf.open(downloaded.value.path()) as document:
+        assert document[0].get_images()[0][2:4] == (144, 187)
     page.get_by_role("link", name="账户设置").click()
     page.get_by_role("button", name="账户设置").and_(page.locator("[aria-current=page]")).wait_for()
     page.get_by_role("link", name="返回主工作台").click()

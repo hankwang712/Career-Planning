@@ -7,6 +7,7 @@
   const title = root.querySelector("[name=title]");
   const contact = [...root.querySelectorAll("[data-contact]")];
   const photoPreview = document.getElementById("resumePhoto");
+  const photoPicker = document.getElementById("resumePickPhoto");
   const photoPlaceholder = document.getElementById("resumePhotoPlaceholder");
   const photoRemove = document.getElementById("resumeRemovePhoto");
   const restoreButtons = [...root.querySelectorAll("[data-restore]")];
@@ -120,6 +121,8 @@
     photo = data;
     photoPreview.hidden = photoRemove.hidden = !photo;
     photoPlaceholder.hidden = Boolean(photo);
+    photoPicker.setAttribute("aria-label", photo ? "更换简历照片" : "上传简历照片");
+    photoPicker.title = photoPicker.getAttribute("aria-label");
     if (photo) photoPreview.src = "data:image/jpeg;base64," + photo;
     else photoPreview.removeAttribute("src");
   }
@@ -129,6 +132,11 @@
     badge.textContent = "未保存";
     status.textContent = "有未保存的修改";
   }
+
+  photoPicker.addEventListener("resume:photo-cropped", event => {
+    setPhoto(event.detail);
+    markChanged();
+  });
 
   function markSelected() {
     list.querySelectorAll("[data-draft-id]").forEach(button => {

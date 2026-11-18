@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='resume-editor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='user-center-sidebar.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='resume-photo-cropper.js') }}" defer></script>
     <script src="{{ url_for('static', filename='resume-editor.js') }}" defer></script>
 </head>
 <body>
@@ -58,9 +59,12 @@
                     <p class="re-privacy">{{ icon('shield') }} 个人信息用于简历预览和导出。</p>
                     <div class="re-contact-layout">
                         <div class="re-portrait">
-                            <span id="resumePhotoPlaceholder">{{ icon('user') }}</span>
-                            <img id="resumePhoto" alt="导入的简历照片" hidden>
-                            <button type="button" id="resumeRemovePhoto" data-action="remove-photo" aria-label="移除照片" title="移除照片" hidden>×</button>
+                            <button type="button" class="re-portrait-picker" id="resumePickPhoto" aria-label="上传简历照片">
+                                <span id="resumePhotoPlaceholder">{{ icon('user') }} <span>上传照片</span></span>
+                                <img id="resumePhoto" alt="简历照片" hidden>
+                            </button>
+                            <input type="file" id="resumePhotoFile" accept="image/jpeg,image/png,image/webp" hidden>
+                            <button type="button" class="re-portrait-remove" id="resumeRemovePhoto" data-action="remove-photo" aria-label="移除照片" title="移除照片" hidden>×</button>
                         </div>
                         <div>
                             <div class="re-contact">
@@ -76,6 +80,7 @@
                             </div>
                         </div>
                     </div>
+                    <p class="re-photo-status" id="resumePhotoStatus" role="status"></p>
                 </section>
                 <div id="resumeSections"></div>
                 <div class="re-add" id="resumeRestoreSections">
@@ -140,6 +145,19 @@
             <p class="re-note">留空时保留已有内容，将识别结果合并进来。导入后可检查和修改，点击保存才会写入简历。</p>
             <footer><span id="resumeImportStatus" role="status"></span><button type="submit" class="re-button re-primary">识别并填入</button></footer>
         </form>
+    </dialog>
+    <dialog id="resumePhotoCrop" class="re-dialog re-photo-crop" aria-labelledby="resumePhotoCropTitle">
+        <header><h2 id="resumePhotoCropTitle">裁剪简历照片</h2><button type="button" class="re-link" data-crop-close aria-label="关闭裁剪">×</button></header>
+        <p id="resumePhotoCropHint" class="re-note">拖动或用方向键调整位置，用滑块缩放。</p>
+        <div class="re-crop-stage">
+            <canvas id="resumePhotoCanvas" width="144" height="187" tabindex="0" aria-label="照片裁剪预览" aria-describedby="resumePhotoCropHint"></canvas>
+        </div>
+        <label class="re-crop-zoom">缩放 <input type="range" id="resumePhotoZoom" min="1" max="4" step=".05" value="1"></label>
+        <footer>
+            <button type="button" class="re-button" id="resumePhotoReset">重置</button>
+            <div><button type="button" class="re-button" data-crop-close>取消</button>
+                <button type="button" class="re-button re-primary" id="resumeApplyPhoto">使用照片</button></div>
+        </footer>
     </dialog>
     <dialog id="resumePreview" class="re-dialog re-preview" aria-labelledby="resumePreviewTitle">
         <header><h2 id="resumePreviewTitle">简历预览</h2><button type="button" class="re-link" data-close aria-label="关闭预览">×</button></header>
