@@ -22,11 +22,46 @@
         </header>
         <p id="recruitmentFeedback" class="recruitment-feedback" role="status" hidden></p>
         <div class="recruitment-layout">
+            <section class="recruitment-card recruitment-overview" aria-labelledby="recruitmentOverview">
+                <header>
+                    <div class="recruitment-section-heading">
+                        <span class="recruitment-section-icon" aria-hidden="true">▥</span>
+                        <h2 id="recruitmentOverview">平台采集概况</h2>
+                    </div>
+                    <div class="recruitment-actions">
+                        <span id="recruitmentLatest" class="recruitment-latest">正在读取采集概况…</span>
+                        <button id="recruitmentRefresh" type="button">刷新</button>
+                    </div>
+                </header>
+                <ul class="recruitment-platforms">
+                    {% for id, source in collection_sources.items() %}
+                    <li class="recruitment-platform" data-recruitment-platform="{{ id }}" data-source="{{ id }}">
+                        <div class="recruitment-platform-heading">
+                            <span class="recruitment-platform-dot" aria-hidden="true"></span>
+                            <strong>{{ source[0] }}</strong>
+                        </div>
+                        <div class="recruitment-platform-summary">
+                            <p class="recruitment-platform-count">—</p>
+                            <span class="recruitment-badge recruitment-run-state">读取中</span>
+                        </div>
+                        <p class="recruitment-platform-message" hidden></p>
+                        <a class="recruitment-platform-login" target="_blank" rel="noopener noreferrer" hidden>去登录 ↗</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <details class="recruitment-history">
+                    <summary>采集记录</summary>
+                    <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
+                </details>
+            </section>
             <section class="recruitment-card recruitment-config" aria-labelledby="recruitmentConfig">
-                <header><h2 id="recruitmentConfig">采集条件</h2></header>
+                <header><div class="recruitment-section-heading">
+                    <span class="recruitment-section-icon" aria-hidden="true">⚙</span>
+                    <h2 id="recruitmentConfig">采集条件</h2>
+                </div></header>
                 <form id="recruitmentCollect" class="recruitment-card-body">
-                    <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
                     <div class="recruitment-form-grid">
+                        <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
                         <label>城市<select name="city"><option value="">不限城市</option>{% for city in cities %}<option>{{ city }}</option>{% endfor %}</select></label>
                         <label>每个平台上限<select name="limit"><option>10</option><option selected>20</option><option>30</option></select></label>
                     </div>
@@ -37,23 +72,25 @@
                         {% endfor %}
                     </fieldset>
                     {% if boss_local %}
-                    <div class="recruitment-browser-option">
-                        <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '用本机 Chrome 采集' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
-                        {% if chrome_available %}
-                        <p>各平台会在后台打开。若需要登录或验证，每个平台最多等待 2 分钟。</p>
-                        {% else %}
-                        <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                    {% if boss_local and chrome_available %}
-                    <div id="recruitmentZhilianLogin" class="recruitment-browser-option">
-                        <strong>智联登录验证</strong>
-                        <p id="recruitmentZhilianStatus" role="status">采集前会检查当前 Chrome 的智联登录状态。</p>
-                        <div class="recruitment-browser-actions">
-                            <a href="{{ zhilian_login_url }}" class="recruitment-button" target="_blank" rel="noopener noreferrer">去智联登录 ↗</a>
-                            <button id="recruitmentCheckZhilian" type="button">检查登录</button>
+                    <div class="recruitment-browser-options">
+                        <div class="recruitment-browser-option">
+                            <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '用本机 Chrome 采集' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
+                            {% if chrome_available %}
+                            <p>各平台会在后台打开。若需要登录或验证，每个平台最多等待 2 分钟。</p>
+                            {% else %}
+                            <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
+                            {% endif %}
                         </div>
+                        {% if chrome_available %}
+                        <div id="recruitmentZhilianLogin" class="recruitment-browser-option">
+                            <div class="recruitment-browser-actions">
+                                <strong>智联登录验证</strong>
+                                <a href="{{ zhilian_login_url }}" class="recruitment-button" target="_blank" rel="noopener noreferrer">去智联登录 ↗</a>
+                                <button id="recruitmentCheckZhilian" type="button">检查登录</button>
+                            </div>
+                            <p id="recruitmentZhilianStatus" role="status">采集前会检查当前 Chrome 的智联登录状态。</p>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endif %}
                     <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
@@ -61,7 +98,11 @@
             </section>
             <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
                 <header>
-                    <div class="recruitment-results-heading"><h2 id="recruitmentResultsTitle">岗位与招聘线索</h2><span id="recruitmentCount" class="recruitment-badge" aria-live="polite"></span></div>
+                    <div class="recruitment-section-heading">
+                        <span class="recruitment-section-icon" aria-hidden="true">▤</span>
+                        <h2 id="recruitmentResultsTitle">岗位与招聘线索</h2>
+                        <span id="recruitmentCount" class="recruitment-badge" aria-live="polite"></span>
+                    </div>
                     <div class="recruitment-actions">
                         <button id="recruitmentImport" type="button">导入 CSV</button>
                         <button id="recruitmentSavedPage" type="button">导入网页</button>
@@ -78,10 +119,6 @@
                 <nav class="recruitment-paging" id="recruitmentPaging" aria-label="岗位分页" hidden>
                     <button type="button" id="recruitmentPrev">上一页</button><span id="recruitmentPage"></span><button type="button" id="recruitmentNext">下一页</button>
                 </nav>
-            </section>
-            <section class="recruitment-card recruitment-history" aria-labelledby="recruitmentRunsTitle">
-                <header><h2 id="recruitmentRunsTitle">采集记录</h2><button id="recruitmentRefresh" type="button">刷新</button></header>
-                <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
             </section>
         </div>
     </main>

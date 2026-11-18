@@ -260,6 +260,48 @@ def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_s
     assert download.value.suggested_filename == "recruitment.csv"
 
 
+def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in_page, live_server):
+    page = logged_in_page
+    errors = collect_errors(page)
+    latest = {
+        "id": 1, "keyword": "Agent", "city": "杭州", "started_at": time.time(), "status": "running",
+        "progress": {
+            "boss": {"status": "succeeded", "count": 15, "search_url": "https://www.zhipin.com/"},
+            "zhilian": {"status": "waiting_user", "message": "请在浏览器完成登录",
+                        "login_url": "https://passport.zhaopin.com/"},
+            "51job": {"status": "empty", "count": 0, "search_url": "https://we.51job.com/"},
+        },
+    }
+    page.route("**/api/job-market/collection/runs", lambda route: route.fulfill(json={"items": [latest]}))
+    page.goto(live_server + "/recruitment")
+    page.get_by_text("最近一次 · Agent · 杭州 · 采集中", exact=True).wait_for()
+    cards = page.locator(".recruitment-platform")
+    assert cards.count() == 4
+    assert cards.locator("[data-status=succeeded]").inner_text() == "已采集"
+    assert cards.filter(has_text="BOSS 直聘").locator(".recruitment-platform-count").inner_text() == "15 条"
+    assert cards.filter(has_text="前程无忧").locator(".recruitment-platform-count").inner_text() == "0 条"
+    assert cards.filter(has_text="小红书").get_by_text("未参与", exact=True).is_visible()
+    login = cards.filter(has_text="智联招聘").get_by_role("link", name="去登录")
+    assert login.get_attribute("href") == "https://passport.zhaopin.com/"
+    assert login.is_visible()
+    start = page.locator("#recruitmentStart")
+    platform_choices = page.locator("#recruitmentCollect fieldset")
+    assert start.is_disabled()
+    assert start.bounding_box()["y"] < platform_choices.bounding_box()["y"]
+
+    latest["status"] = "interrupted"
+    page.get_by_role("button", name="刷新", exact=True).click()
+    page.get_by_text("最近一次 · Agent · 杭州 · 已中断", exact=True).wait_for()
+    assert login.is_hidden()
+    assert start.is_enabled()
+    page.get_by_text("采集记录", exact=True).click()
+    assert page.locator("#recruitmentRuns").get_by_text("Agent · 杭州", exact=True).is_visible()
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth") == 390
+    assert start.bounding_box()["y"] > platform_choices.bounding_box()["y"]
+    assert errors == []
+
+
 def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

@@ -7,6 +7,7 @@
   const sources = new Map(Array.from(filterForm.elements.source.options).map((option) => [option.value, option.text]));
   const captureDate = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" });
   const start = byId("recruitmentStart");
+  const platformCards = document.querySelectorAll("[data-recruitment-platform]");
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
     partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
@@ -134,24 +135,62 @@
     }
   }
 
-  function runCard(run, first) {
+  function platformStatus(run, item) {
+    if (run.status === "interrupted" && ["queued", "running", "opening", "waiting_user"].includes(item.status)) {
+      return "interrupted";
+    }
+    return item.status;
+  }
+
+  function loginLink(status, item) {
+    return ["waiting_user", "login_required", "login_timeout"].includes(status) && item.login_url;
+  }
+
+  function updateOverview(run) {
+    byId("recruitmentLatest").textContent = run
+      ? ["最近一次", run.keyword, run.city, statusNames[run.status] || run.status].filter(Boolean).join(" · ")
+      : "暂无采集记录";
+    for (const card of platformCards) {
+      const item = run?.progress[card.dataset.recruitmentPlatform];
+      const status = item ? platformStatus(run, item) : "idle";
+      const badge = card.querySelector(".recruitment-run-state");
+      badge.textContent = statusNames[status] || (item ? status : run ? "未参与" : "未采集");
+      badge.dataset.status = status;
+      card.querySelector(".recruitment-platform-count").textContent = Number.isInteger(item?.count) ? `${item.count} 条` : "—";
+
+      const login = card.querySelector(".recruitment-platform-login");
+      const url = item && loginLink(status, item);
+      login.hidden = !url;
+      if (url) login.href = url;
+      else login.removeAttribute("href");
+
+      const message = card.querySelector(".recruitment-platform-message");
+      message.textContent = status === "interrupted" ? "" : item?.message || "";
+      message.hidden = !message.textContent || status === "succeeded";
+    }
+  }
+
+  function runCard(run, open) {
     const card = node("details", "", "recruitment-run");
-    card.open = first;
+    card.open = open;
+    card.dataset.runId = run.id;
     const title = node("summary");
+    const badge = node("span", statusNames[run.status] || run.status, "recruitment-badge recruitment-run-state");
+    badge.dataset.status = run.status;
     title.append(node("strong", [run.keyword, run.city].filter(Boolean).join(" · ")),
-      node("span", statusNames[run.status] || run.status, "recruitment-badge"));
+      badge);
     card.append(title, node("p", new Date(run.started_at * 1000).toLocaleString("zh-CN"), "recruitment-run-date"));
     for (const [source, item] of Object.entries(run.progress)) {
       const line = node("div", "", "recruitment-run-source");
-      const needsLogin = ["waiting_user", "login_required", "login_timeout"].includes(item.status) && item.login_url;
-      const link = node("a", needsLogin ? "去登录 ↗" : "原站 ↗");
-      link.href = needsLogin ? item.login_url : item.search_url;
+      const status = platformStatus(run, item);
+      const url = loginLink(status, item);
+      const link = node("a", url ? "去登录 ↗" : "原站 ↗");
+      link.href = url || item.search_url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       line.append(node("strong", sources.get(source)), link);
-      const interrupted = run.status === "interrupted" && ["queued", "running", "opening", "waiting_user"].includes(item.status);
-      const message = node("p", interrupted ? "已中断" : item.message || statusNames[item.status]);
-      message.dataset.status = item.status;
+      const message = node("p", status === "interrupted" ? statusNames[status] : item.message || statusNames[status]);
+      message.dataset.status = status;
       line.append(message);
       card.append(line);
     }
@@ -167,13 +206,17 @@
       const previouslyActive = active;
       active = data.items.some((run) => run.status === "running");
       updateStart();
-      byId("recruitmentRuns").replaceChildren(...(data.items.length ? data.items.map((run, index) => runCard(run, index === 0)) : [
+      updateOverview(data.items[0]);
+      const history = byId("recruitmentRuns");
+      const expanded = new Map(Array.from(history.querySelectorAll("[data-run-id]"), (card) => [card.dataset.runId, card.open]));
+      history.replaceChildren(...(data.items.length ? data.items.map((run, index) => runCard(run, expanded.get(String(run.id)) ?? index === 0)) : [
         node("p", "暂无采集记录。", "recruitment-empty")
       ]));
       if (active || previouslyActive) void loadJobs();
       if (active) poll = setTimeout(loadRuns, 3000);
     } catch (error) {
       if (sequence !== runSequence) return;
+      byId("recruitmentLatest").textContent = "采集概况读取失败";
       notice(error.message, "error");
       if (active) poll = setTimeout(loadRuns, 5000);
     }
