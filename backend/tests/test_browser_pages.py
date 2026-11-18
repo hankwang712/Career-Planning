@@ -13,7 +13,7 @@ from services import db, runtime_settings
 
 playwright_sync = pytest.importorskip("playwright.sync_api")
 
-PAGES = ["/", "/user-center", "/user-center/career-report/polish", "/resume-report", "/test-result", "/test-runner"]
+PAGES = ["/", "/user-center/workspace#report-workspace", "/user-center/career-report/polish", "/resume-report", "/test-result", "/test-runner"]
 
 # 页面加载后必须挂在 window 上的函数：其它脚本、内联事件和测试都按这些名字调用。
 REQUIRED_GLOBALS = [
@@ -177,7 +177,8 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
 
 
 def test_user_center_exposes_report_generation(logged_in_page, live_server):
-    logged_in_page.goto(live_server + "/user-center", wait_until="load")
+    logged_in_page.goto(live_server + "/user-center#report-workspace", wait_until="load")
+    logged_in_page.wait_for_url("**/user-center/workspace#report-workspace")
     logged_in_page.wait_for_timeout(1500)
     missing = logged_in_page.evaluate(
         "names => names.filter(name => typeof window[name] !== 'function')",
@@ -189,10 +190,9 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)
     page.goto(live_server + "/user-center")
-    sidebar_width = page.locator(".uc-workspace-sidebar").bounding_box()["width"]
-    page.get_by_role("link", name="我的简历").click()
-    assert page.locator(".uc-workspace-sidebar").bounding_box()["width"] == sidebar_width
+    page.wait_for_url("**/user-center/resumes")
     assert page.get_by_role("link", name="我的简历").get_attribute("aria-current") == "page"
+    assert page.get_by_role("link", name="职业档案").count() == 0
     work = page.get_by_role("button", name="工作经历", exact=True)
     assert work.get_attribute("aria-expanded") == "false"
     work.click()

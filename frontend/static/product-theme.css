@@ -156,12 +156,6 @@ body #profile .assessment-center-card:hover { box-shadow: 0 10px 30px #3156870c;
 .user-center-page .uc-sidebar-note p { color: #7b8ba3; }
 .user-center-page .uc-topbar { border-radius: 14px; border-color: #e7edf6; box-shadow: none; }
 .user-center-page .uc-surface { border-color: #e4ecf7; border-radius: 14px; box-shadow: var(--uc-shadow); }
-.user-center-page .cp-hero { border-top: 1px solid #dce9ff; background: radial-gradient(ellipse at top right, #e5f0ff, transparent 70%), #fff; }
-.user-center-page .cp-hero .uc-section-kicker { color: #246bfe; }
-.user-center-page .cp-tabs button.active { color: #246bfe; border-color: #246bfe; }
-.user-center-page .cp-card-head button, .user-center-page .cp-text-btn { color: #246bfe; }
-.user-center-page .cp-shell .career-report-primary-btn { background: #246bfe; box-shadow: 0 5px 16px #246bfe20; border-color: #246bfe; }
-.user-center-page .cp-shell .career-report-primary-btn:hover { background: #1553db; box-shadow: 0 6px 18px #246bfe26; }
 @media (max-width: 640px) {
   nav.gradient-bg > div > .flex { gap: 12px; }
   nav.gradient-bg .leading-tight { display: none; }

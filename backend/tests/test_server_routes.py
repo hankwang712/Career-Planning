@@ -51,7 +51,7 @@ def test_healthz_is_a_login_free_liveness_probe(client):
 
 
 @pytest.mark.parametrize("path", [
-    "/user-center", "/resume-report", "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow",
+    "/user-center", "/user-center/workspace", "/user-center/resumes", "/resume-report", "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow",
     "/user-center/career-report/polish",
 ])
 def test_private_pages_redirect_anonymous_visitors_to_login(client, path):
@@ -90,7 +90,7 @@ def test_polish_page_links_back_to_user_center(make_account):
     """页面蓝图改名后，模板里的 url_for 必须仍然能解析。"""
     account = make_account()
     html = account.get("/user-center/career-report/polish").get_data(as_text=True)
-    assert re.search(r'__CAREER_REPORT_POLISH_RETURN__ = "/user-center(\.html)?#report-workspace"', html)
+    assert re.search(r'__CAREER_REPORT_POLISH_RETURN__ = "/user-center/workspace#report-workspace"', html)
 
 
 def test_jobs_api_serves_city_data(client):

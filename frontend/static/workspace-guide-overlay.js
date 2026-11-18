@@ -44,12 +44,15 @@
   }
 
   function getUserCenterUrl(anchor = "", params = {}) {
-    const url = new URL("/user-center.html", window.location.origin);
+    const safeAnchor = String(anchor || "").trim().replace(/^#/, "");
+    if ((!safeAnchor || safeAnchor === "career-profile") && !Object.keys(params || {}).length) {
+      return new URL("/user-center/resumes", window.location.origin).toString();
+    }
+    const url = new URL("/user-center/workspace", window.location.origin);
     Object.entries(params || {}).forEach(([key, value]) => {
       if (value === null || value === undefined || value === "") return;
       url.searchParams.set(key, String(value));
     });
-    const safeAnchor = String(anchor || "").trim().replace(/^#/, "");
     if (safeAnchor) url.hash = safeAnchor;
     return url.toString();
   }
@@ -383,7 +386,7 @@
       openUserProfile();
       return;
     }
-    window.openUserCenterPage?.("career-profile");
+    window.openUserCenterPage?.();
   }
 
   function showPlanList() {

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>个人中心 | 智航生涯</title>
+    <script>
+      (() => {
+        const previous = new URL(window.location.href);
+        const section = previous.hash.slice(1).toLowerCase();
+        const direct = ["report-workspace", "plan-workspace", "account-center"].includes(section);
+        const action = ["settings", "generate"].includes(previous.searchParams.get("action"));
+        if (direct || action || previous.searchParams.get("report_id") || previous.searchParams.get("focus_role")) {
+          const workspace = new URL({{ url_for('pages.user_center_page') | tojson }}, previous);
+          workspace.search = previous.search;
+          if (direct) workspace.hash = section;
+          window.location.replace(workspace);
+        } else {
+          window.location.replace({{ url_for('resume_editor.index') | tojson }});
+        }
+      })();
+    </script>
+</head>
+<body><a href="{{ url_for('resume_editor.index') }}">打开我的简历</a></body>
+</html>

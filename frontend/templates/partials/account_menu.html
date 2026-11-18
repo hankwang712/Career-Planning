@@ -23,12 +23,12 @@
             <span id="notificationCount" class="nav-workspace-menu-badge">3</span>
         </button>
     {% endif %}
-        <a href="{{ '#career-profile' if account_menu_in_center|default(false) else '/user-center.html#career-profile' }}" onclick="closeNavWorkspaceMenu()" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" title="个人中心">
+        <a href="{{ url_for('resume_editor.index') }}" onclick="closeNavWorkspaceMenu()" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" title="个人中心">
             <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>
-            <span class="nav-workspace-menu-row-text">{{ '职业档案' if account_menu_in_center|default(false) else '个人中心' }}</span>
+            <span class="nav-workspace-menu-row-text">{{ '我的简历' if account_menu_in_center|default(false) else '个人中心' }}</span>
         </a>
         {% if account_menu_in_center|default(false) %}
     <a href="#account-center" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" onclick="closeNavWorkspaceMenu()">

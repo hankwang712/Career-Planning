@@ -28,7 +28,7 @@ def script_order(html, names):
     return [(Path(src).name, "defer" in rest) for src, rest in scripts if Path(src).name in names]
 
 
-@pytest.mark.parametrize("path", ["/user-center", "/user-center/career-report/polish", "/resume-report", "/test-result", "/test-runner", "/sbti"])
+@pytest.mark.parametrize("path", ["/user-center/workspace", "/user-center/resumes", "/user-center/career-report/polish", "/resume-report", "/test-result", "/test-runner", "/sbti"])
 def test_every_asset_a_page_references_is_served(make_account, path):
     account = make_account()
     html = account.get(path).get_data(as_text=True)
@@ -48,7 +48,7 @@ def test_main_workspace_assets_are_served(make_account):
 
 
 def test_user_center_loads_workspace_scripts_in_order_without_defer(make_account):
-    html = make_account().get("/user-center").get_data(as_text=True)
+    html = make_account().get("/user-center/workspace").get_data(as_text=True)
     assert script_order(html, set(WORKSPACE_SCRIPTS)) == [(name, False) for name in WORKSPACE_SCRIPTS]
 
 
@@ -73,7 +73,7 @@ def test_app_scripts_are_listed_state_first_and_boot_last():
 
 def test_every_page_with_the_workspace_scripts_loads_the_same_app_scripts(make_account):
     account = make_account()
-    for path in ("/", "/user-center", "/user-center/career-report/polish", "/resume-report"):
+    for path in ("/", "/user-center/workspace", "/user-center/career-report/polish", "/resume-report"):
         html = account.get(path).get_data(as_text=True)
         loaded = [name for name, _ in script_order(html, set(APP_SCRIPTS))]
         assert loaded == APP_SCRIPTS, path

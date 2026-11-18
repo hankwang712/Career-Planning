@@ -1102,7 +1102,6 @@
             </header>
 
             <main class="uc-content">
-                {% include "partials/career_profile.html" %}
                 <section id="report-workspace" class="uc-section">
                     <div class="uc-section-shell">
                         <section class="uc-surface uc-report-hero-surface">
@@ -1365,7 +1364,7 @@
                                 <div>
                                     <p class="uc-section-kicker">Account Center</p>
                                     <h2 class="uc-section-title">账户设置</h2>
-                                    <p class="uc-section-copy">维护登录密码与头像，职业资料统一保存在职业档案中。</p>
+                                    <p class="uc-section-copy">维护登录密码与个人头像。</p>
                                 </div>
                             </div>
                         </section>
@@ -1491,7 +1490,6 @@
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
     {% include "partials/report_workspace_scripts.html" %}
-    <script src="{{ url_for('static', filename='career-profile.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>
     <style>

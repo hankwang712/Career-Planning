@@ -25,6 +25,12 @@ def create_blueprint(current_user):
 
     @blueprint.route("/user-center")
     @blueprint.route("/user-center.html")
+    def user_center_entry():
+        if not current_user():
+            return redirect(url_for("site.index"))
+        return render_template("user_center_entry.html")
+
+    @blueprint.route("/user-center/workspace")
     def user_center_page():
         if not current_user():
             return redirect(url_for("site.index"))

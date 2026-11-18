@@ -8,7 +8,7 @@
     "check": "node scripts/check-static.mjs",
     "test:unit": "node tests/report-agent-result.cjs && node tests/resume-evidence-scores.cjs",
     "preview": "vite preview",
-    "test:browser": "node tests/app-cursor.cjs && node tests/report-agent-console.cjs && node tests/career-profile.cjs"
+    "test:browser": "node tests/app-cursor.cjs && node tests/report-agent-console.cjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

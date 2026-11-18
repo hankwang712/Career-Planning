@@ -1,5 +1,5 @@
 {% macro nav_item(label, path, section='', group='') -%}
-    {% set active = (resume_workshop and not section) or (not resume_workshop and section == 'career-profile') %}
+    {% set active = (resume_workshop and not section) or (not resume_workshop and section == 'report-workspace') %}
     {% if section and not resume_workshop %}
     <button type="button" class="uc-nav-link{{ ' active' if active }}" data-target="{{ section }}"{% if group %} data-nav-group="{{ group }}"{% endif %}{% if active %} aria-current="page"{% endif %}>
     {% else %}
@@ -21,11 +21,9 @@
         <div class="uc-brand-copy"><strong>智航生涯</strong><span>职业发展工作台</span></div>
     </a>
     <nav class="uc-nav" aria-label="个人中心导航">
-        {% set profile_icon %}<rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="9" r="2.5"/><path d="M8 17c0-4 8-4 8 0"/>{% endset %}
         {% set document_icon %}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/>{% endset %}
         {% set plan_icon %}<path d="M5 5h6a2 2 0 0 1 2 2v12a3 3 0 0 0-3-2H5zM13 7a2 2 0 0 1 2-2h4v12h-3a3 3 0 0 0-3 2"/>{% endset %}
         {% set account_icon %}<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v2"/>{% endset %}
-        {{ nav_item('职业档案', profile_icon, 'career-profile') }}
         {{ nav_item('我的简历', document_icon) }}
         <div class="uc-nav-group">{{ nav_item('规划报告', document_icon, 'report-workspace', 'report') }}</div>
         {{ nav_item('学习路径', plan_icon, 'plan-workspace') }}

@@ -1,5 +1,5 @@
-const USER_CENTER_DEFAULT_SECTION = "career-profile";
-const USER_CENTER_SECTIONS = ["career-profile", "report-workspace", "plan-workspace", "account-center"];
+const USER_CENTER_DEFAULT_SECTION = "report-workspace";
+const USER_CENTER_SECTIONS = ["report-workspace", "plan-workspace", "account-center"];
 const USER_CENTER_ROLE_FILTERS = {
   all: "全部",
   employed: "在职",
@@ -162,10 +162,6 @@ function switchUserCenterSection(sectionId, options = {}) {
 
   if (nextSection === "account-center") {
     renderUserCenterIdentity();
-  }
-
-  if (nextSection === "career-profile") {
-    void window.loadCareerProfile?.();
   }
 
   syncUserCenterSidebarSubnav();
@@ -1409,17 +1405,16 @@ function handleUserCenterUrlChange() {
 
   if (action === "settings") {
     // 地址栏 hash 已指定报告/学习路径时，不要被 ?action=settings 拽到设置中心（例如从主站带头像跳转后仍带旧 query）
-    if (hashSection === "report-workspace" || hashSection === "plan-workspace") {
-      url.searchParams.delete("action");
-    } else {
+    if (!url.hash || !["report-workspace", "plan-workspace"].includes(url.hash.slice(1))) {
       switchUserCenterSection("account-center", { updateHash: false });
-      url.searchParams.delete("action");
     }
+    url.searchParams.delete("action");
   } else if (action === "generate") {
     switchUserCenterSection("report-workspace", { updateHash: false });
     setUserCenterReportWorkspaceMode("detail", { renderPanels: false, renderOverview: false });
     setUserCenterReportViewMode("report", { renderPanels: false, renderOverview: false });
     url.searchParams.delete("action");
+    url.hash = "report-workspace";
     window.history.replaceState({}, "", url.toString());
     void startCareerReportGeneration();
     renderUserCenterDashboard();
@@ -1430,6 +1425,7 @@ function handleUserCenterUrlChange() {
     setUserCenterReportWorkspaceMode("library", { renderPanels: false, renderOverview: false });
     setUserCenterReportViewMode(userCenterState.reportViewMode || "report", { renderPanels: false, renderOverview: false });
   }
+  url.hash = userCenterState.activeSection;
   window.history.replaceState({}, "", url.toString());
   renderUserCenterDashboard();
 }

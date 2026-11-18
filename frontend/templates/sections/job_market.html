@@ -37,7 +37,7 @@
         <nav class="lm-side-card lm-quick-nav" aria-label="探索快捷导航"><h4>继续探索</h4><div class="lm-quick-grid">
             <button type="button" data-lm-action="cities"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V7l7-3v17M10 10l10-4v15M1 21h22M6 10v2m0 3v2m8-5v2m3-3v2m-3 3v2m3-3v2"/></svg><strong>城市分析</strong><small>看看不同城市的机会</small></button>
             <button type="button" data-lm-action="archives"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg><strong>岗位档案</strong><small>查看岗位画像与要求</small></button>
-            <a href="/user-center#career-profile"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 18v-1a4 4 0 0 1 8 0v1"/></svg><strong>职业档案</strong><small>整理经历与技能证据</small></a>
+            <a href="{{ url_for('resume_editor.index') }}"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 18v-1a4 4 0 0 1 8 0v1"/></svg><strong>我的简历</strong><small>填写经历和专业技能</small></a>
             <button type="button" onclick="showSection('profile')"><svg class="lm-quick-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg><strong>了解自己</strong><small>发现兴趣与职业倾向</small></button>
         </div></nav>
         <details class="lm-insights lm-side-card"><summary>样本分布 <span>城市与技能关键词</span></summary><div id="lmInsights" class="lm-insights-grid"></div></details>
