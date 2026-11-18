@@ -19312,12 +19312,6 @@ nav.gradient-bg .nav-action-strip .action-icon {
 #report .report-wizard-stage[hidden] { display: none !important; }
 #report .report-wizard-stage { animation: reportStageEnter .28s ease-out; }
 @keyframes reportStageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-#report .report-launch-page .report-workflow-form { box-sizing: border-box; width: min(100%, 1040px); margin: 0 auto; padding: 28px 32px; border-radius: 22px; border: 1px solid #dce5ef; box-shadow: 0 8px 30px #304c7610; }
-.report-stage-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #e9edf3; }
-.report-stage-footer > span { font-size: 12px; color: #8b97a6; }
-.report-stage-footer .report-launch-primary { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 46px; border-radius: 10px; font-size: 13px; }
-.report-stage-footer button:disabled { cursor: not-allowed; }
-#report .report-workflow-form .report-stage-description { margin: 10px 0 26px; font-size: 13px; }
 #report .report-workflow-form label { font-size: 13px; }
 #report .report-workflow-form textarea, #report .report-workflow-form select, #report .report-workflow-form input { background: #fbfcff; border-color: #dbe3ee; border-radius: 10px; padding: 13px 14px; transition: border-color .2s, box-shadow .2s; }
 #report .report-workflow-form :is(textarea, select, input):focus { outline: none; border-color: #80a2ed; box-shadow: 0 0 0 3px #3268e510; }
@@ -19369,10 +19363,6 @@ nav.gradient-bg .nav-action-strip .action-icon {
     .report-stage-nav small, .report-step-check, .report-stage-nav .is-complete:not(.is-current) .report-step-check { display: none; }
     .report-step-connector { width: 12px; }
     .report-stage-nav strong { font-size: 12px; }
-    #report .report-launch-page .report-workflow-form { padding: 22px; }
-    .report-stage-footer > span { display: none; }
-    .report-stage-footer { justify-content: flex-end; }
-    .report-stage-footer .report-launch-secondary { margin-right: auto; }
     .report-parallel-team { grid-template-columns: 1fr; gap: 16px; }
     #report .report-agent-map { padding: 18px; }
     .report-lane-heading p { display: none; }
@@ -19380,7 +19370,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
     .report-execution-intro { padding-inline: 2px; }
     .report-team-mark { display: none; }
 }
-@media (max-width: 480px) { .report-sequential-team { grid-template-columns: 1fr; } .report-launch-hero { padding: 22px; } .report-stage-footer { gap: 8px; } .report-stage-footer button { padding-inline: 12px; } }
+@media (max-width: 480px) { .report-sequential-team { grid-template-columns: 1fr; } .report-launch-hero { padding: 22px; } }
 @media (prefers-reduced-motion: reduce) { #report .report-wizard-stage, .report-task-card.is-active .report-speech-label i { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) { .report-task-card.is-active .report-ma-portrait { animation: none; } }

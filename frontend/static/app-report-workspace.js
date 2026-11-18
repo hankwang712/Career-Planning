@@ -47,14 +47,15 @@ function renderReportWizard() {
   if (noticeLink) noticeLink.hidden = checking || Boolean(error);
   if (retry) retry.hidden = checking || !error;
   const sourceLabel = document.getElementById("reportResumeSourceLabel");
-  if (sourceLabel) sourceLabel.textContent = source ? `分析简历：${source.title}` : "";
+  if (sourceLabel) sourceLabel.textContent = source?.title || "";
   const targets = document.getElementById("reportWorkflowTargets");
   const suggestedTargets = source?.targets || [];
   if (targets && !targets.dataset.edited) targets.value = suggestedTargets.join("\n");
   const targetHint = document.getElementById("reportTargetHint");
-  if (targetHint) targetHint.textContent = suggestedTargets.length
-    ? "已从简历带入求职意向，可按本次报告需要修改。"
-    : "请填写本次报告要分析的目标岗位。";
+  if (targetHint) {
+    targetHint.classList.toggle("is-imported", Boolean(suggestedTargets.length));
+    targetHint.textContent = suggestedTargets.length ? "已从简历带入求职意向，可按本次报告需要修改。" : "";
+  }
   const start = document.getElementById("reportStageStart");
   if (start) {
     start.disabled = locked || !source;
@@ -62,6 +63,7 @@ function renderReportWizard() {
   }
   const primary = document.getElementById("reportLaunchBtn");
   if (primary) {
+    primary.hidden = stage !== 3;
     primary.disabled = locked || (stage === 2 && !source);
     primary.textContent = reportGenerationStarting ? "正在启动…" : isCareerReportRunningStatus(state?.status) ? "生成中…"
       : stage === 2 ? "启动多智能体" : "重新设定目标";

@@ -224,9 +224,11 @@ def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
     assert payload["workflow"]["preferences"] == preferences
     assert preferences in payload["workflow"]["recruitment"]["request"]
     assert page.locator("#reportResumeNotice").is_hidden()
-    assert page.locator("#reportResumeSourceLabel").inner_text() == "分析简历：应聘简历"
+    assert page.locator("#reportResumeSourceLabel").inner_text() == "应聘简历"
     assert page.locator("#report input[type=file]").count() == 0
-    assert page.locator("#reportLaunchBtn").is_enabled()
+    assert page.locator("#reportLaunchBtn").is_hidden()
+    assert page.locator("#reportStageStart").is_visible()
+    assert page.locator("#reportStageStart").is_enabled()
 
 
 def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
