@@ -4,6 +4,8 @@
   const submit = form.querySelector("[type=submit]");
   const result = document.getElementById("settingsResult");
   const pending = new Map();
+  const probeButtons = [...form.querySelectorAll("[data-test-group]")];
+  const probeRequests = new WeakMap();
   const revealed = new Map();
   const eyeButtons = [...form.querySelectorAll("[data-reveal]")];
   let revealEpoch = 0;
@@ -136,6 +138,7 @@
 
   async function load(method = "GET") {
     hideAllSecrets();
+    if (method === "PATCH") probeButtons.forEach(resetProbe);
     fieldset.disabled = true;
     result.textContent = method === "GET" ? "正在读取配置…" : "正在保存…";
     try {
@@ -168,8 +171,12 @@
     if (clean && clean !== original) pending.set(name, clean);
     else pending.delete(name);
     const status = document.getElementById("state-" + name);
-    if (pending.has(name)) fieldStatus(status, "待保存", "pending");
-    else fieldStatus(status, fields[name].configured ? "已配置" : "未配置", fields[name].configured ? "ready" : "empty");
+    if (pending.has(name)) {
+      fieldStatus(status, "待保存", "pending");
+      resetProbe(event.target.closest("[data-settings-group]").querySelector("[data-test-group]"));
+    } else {
+      fieldStatus(status, fields[name].configured ? "已配置" : "未配置", fields[name].configured ? "ready" : "empty");
+    }
     if (submit) submit.disabled = !pending.size;
   });
   form.addEventListener("click", event => {
@@ -179,6 +186,7 @@
     if (eye) hideSecret(eye);
     form.elements.namedItem(key).value = "";
     pending.set(key, "");
+    resetProbe(event.target.closest("[data-settings-group]").querySelector("[data-test-group]"));
     fieldStatus(document.getElementById("state-" + key), "待移除", "pending");
     submit.disabled = false;
   });
@@ -186,25 +194,50 @@
     event.preventDefault();
     if (pending.size) void load("PATCH");
   });
-  form.querySelectorAll("[data-test-group]").forEach(button => {
+  function renderProbe(button, state, message = "", duration = null) {
+    const actions = button.parentElement;
+    const line = document.getElementById(button.getAttribute("aria-describedby"));
+    const label = button.querySelector("[data-probe-label]");
+    const success = actions.querySelector(".sc-probe-success");
+    actions.dataset.state = state;
+    button.disabled = state === "running";
+    label.textContent = state === "running" ? "正在测试…" :
+      (state === "success" || state === "error") ? "重新测试" : "测试连通性";
+    success.querySelector("[data-probe-result]").textContent = state === "success"
+      ? `已连通${Number.isFinite(duration) ? ` · ${duration} ms` : ""}` : "";
+    success.hidden = state !== "success";
+    line.dataset.state = state;
+    line.textContent = message;
+  }
+
+  function resetProbe(button) {
+    if (!button) return;
+    probeRequests.get(button)?.abort();
+    probeRequests.delete(button);
+    renderProbe(button, "idle");
+  }
+
+  probeButtons.forEach(button => {
     button.addEventListener("click", async () => {
-      const status = document.getElementById(button.getAttribute("aria-describedby"));
       if (pending.size) {
-        status.textContent = "请先保存修改，再测试连通性。";
+        document.getElementById(button.getAttribute("aria-describedby")).textContent = "请先保存修改，再测试连通性。";
         return;
       }
-      button.disabled = true;
-      status.textContent = "正在测试已保存的配置…";
+      const request = new AbortController();
+      probeRequests.set(button, request);
+      renderProbe(button, "running");
       try {
         const response = await fetch("/api/system-settings/test/" + button.dataset.testGroup, {
-          method: "POST", headers: await window.CareerAuth.headers(), cache: "no-store"
+          method: "POST", headers: await window.CareerAuth.headers(), cache: "no-store", signal: request.signal
         });
         const data = await response.json();
-        status.textContent = response.ok ? `${data.message}  ${data.duration_ms} ms` : data.message;
+        if (request.signal.aborted) return;
+        if (response.ok) renderProbe(button, "success", "", data.duration_ms);
+        else renderProbe(button, "error", data.message || "连通性测试失败。");
       } catch {
-        status.textContent = "暂时无法完成测试，请稍后重试。";
+        if (!request.signal.aborted) renderProbe(button, "error", "暂时无法完成测试，请稍后重试。");
       } finally {
-        button.disabled = false;
+        if (probeRequests.get(button) === request) probeRequests.delete(button);
       }
     });
   });

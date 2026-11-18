@@ -143,10 +143,20 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         eye.click()
         assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
         assert page.locator("#AI_CHAT_API_KEY").get_attribute("type") == "password"
-        page.route("**/api/system-settings/test/chat", lambda route: route.fulfill(
-            json={"message": "连通性测试通过。", "duration_ms": 12}))
+        probes = iter([(200, {"duration_ms": 12}), (502, {"message": "模型服务暂时不可用。"}), (200, {"duration_ms": 27})])
+
+        def probe(route):
+            status, response = next(probes)
+            route.fulfill(status=status, json=response)
+
+        page.route("**/api/system-settings/test/chat", probe)
         page.locator("[data-test-group=chat]").click()
-        page.get_by_text("连通性测试通过。").wait_for()
+        page.get_by_text("已连通 · 12 ms").wait_for()
+        page.get_by_role("button", name="重新测试").click()
+        page.get_by_text("模型服务暂时不可用。").wait_for()
+        assert page.get_by_text("已连通 · 12 ms").count() == 0
+        page.get_by_role("button", name="重新测试").click()
+        page.get_by_text("已连通 · 27 ms").wait_for()
         page.get_by_role("link", name="PostgreSQL / pgvector").click()
         page.get_by_text("POSTGRES_PASSWORD", exact=True).wait_for()
         assert page.locator('[data-group-link="postgres"]').get_attribute("aria-current") == "location"
@@ -156,6 +166,8 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_role("button", name="收起控制台").click()
         assert page.locator("#workspaceConsolePanel").is_hidden()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        errors = [error for error in errors if not (error.startswith("console:") and "502" in error
+                  and error.endswith("/api/system-settings/test/chat)"))]
         assert errors == [], "\n".join(errors)
     finally:
         context.close()
