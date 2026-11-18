@@ -231,6 +231,35 @@ def test_zhilian_login_status_only_checks_authorized_local_browser(make_account,
     assert response.get_json()["state"] == state
 
 
+def test_zhilian_detail_is_verified_cached_and_included_in_csv(make_account, monkeypatch):
+    from services import db, recruitment
+
+    owner = make_account("zhilian-detail")
+    other = make_account("other-zhilian-detail")
+    url = LINKS["zhilian"]
+    endpoint = API + "/jobs/zhilian/detail"
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, owner.email, "zhilian", [{"url": url, "title": "Agent 开发", "description": "卡片摘要"}])
+    states = iter([("not_logged_in", ""), ("ready", "岗位职责\n开发 Agent 应用。\n任职要求\n熟悉 Python。")])
+    calls = []
+
+    def read(candidate):
+        calls.append(candidate)
+        return next(states)
+
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "read_zhilian_detail", read)
+    assert other.post(endpoint, json={"url": url}).status_code == 404
+    assert owner.post(endpoint, json={"url": url}, environ_overrides={"REMOTE_ADDR": "192.0.2.15"}).status_code == 403
+    assert owner.post(endpoint, json={"url": url}).status_code == 422
+    result = owner.post(endpoint, json={"url": url}).get_json()
+    assert "任职要求" in result["description"]
+    assert owner.post(endpoint, json={"url": url}, environ_overrides={"REMOTE_ADDR": "192.0.2.15"}).get_json() == result
+    assert calls == [url, url]
+    assert owner.get(API + "/jobs?source=zhilian").get_json()["items"][0]["description"] == result["description"]
+    assert "开发 Agent 应用。" in owner.get(API + "/export?source=zhilian").data.decode("utf-8-sig")
+
+
 def test_encoded_salary_is_hidden_from_results_and_csv_without_erasing_a_known_value(make_account):
     from services import db, recruitment
 

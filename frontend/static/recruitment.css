@@ -183,6 +183,7 @@ input:not([type=checkbox]), select {
 .recruitment-detail { width: min(640px, calc(100vw - 28px)); max-height: 85vh; padding: 0; color: #18314e; }
 .recruitment-detail::backdrop { background: #0c223379; }
 #recruitmentDescription { margin: 12px 0 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recruitment-detail-status { margin-top: 10px; color: var(--muted); font-size: 13px; }
 .recruitment-html-form { display: grid; gap: 12px; }
 .recruitment-html-form p { color: var(--muted); }
 @media (max-width: 990px) {

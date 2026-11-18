@@ -20,7 +20,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from . import db
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
-    CHROME_SOURCES, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome, use_local_chrome,
+    CHROME_SOURCES, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome,
+    read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
     CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
@@ -55,6 +56,11 @@ def init_schema(conn):
             PRIMARY KEY(owner, source, url_key)
         );
         CREATE INDEX IF NOT EXISTS recruitment_listings_owner ON recruitment_listings(owner, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS recruitment_job_details (
+            owner TEXT NOT NULL, source TEXT NOT NULL, url_key TEXT NOT NULL, description TEXT NOT NULL,
+            PRIMARY KEY(owner, source, url_key),
+            FOREIGN KEY(owner, source, url_key) REFERENCES recruitment_listings(owner, source, url_key) ON DELETE CASCADE
+        );
     """)
 
 
@@ -261,8 +267,16 @@ def query_rows(owner, limit, offset=0):
     args = (owner, source, source, keyword, keyword, keyword)
     conn = db._get_conn()
     total = conn.execute("SELECT count(*) FROM recruitment_listings WHERE " + where, args).fetchone()[0]
-    items = conn.execute("SELECT " + ", ".join(FIELDS) + " FROM recruitment_listings WHERE " + where
-                         + " ORDER BY updated_at DESC, source, url_key LIMIT ? OFFSET ?", (*args, limit, offset))
+    columns = ", ".join(key for key in FIELDS if key != "description")
+    items = conn.execute(
+        f"""SELECT {columns}, COALESCE(
+                (SELECT d.description FROM recruitment_job_details d
+                 WHERE d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key),
+                j.description) AS description
+            FROM recruitment_listings j WHERE {where}
+            ORDER BY updated_at DESC, source, url_key LIMIT ? OFFSET ?""",
+        (*args, limit, offset),
+    )
     return [clean_listing(dict(item)) for item in items], total
 
 
@@ -272,6 +286,33 @@ def jobs():
     page_number = min(10000, max(1, request.args.get("page", 1, type=int)))
     items, total = query_rows(_current_user()["username"], 20, (page_number - 1) * 20)
     return jsonify(items=items, total=total, page=page_number, page_size=20)
+
+
+@blueprint.post(API + "/jobs/zhilian/detail")
+@_login_required
+def zhilian_job_detail():
+    payload = request.get_json(silent=True)
+    value = payload.get("url") if isinstance(payload, dict) else None
+    url = listing_url("zhilian", value) if isinstance(value, str) and len(value) <= 2048 else ""
+    if not url or urlsplit(url).hostname != "www.zhaopin.com" or not urlsplit(url).path.startswith("/jobdetail/"):
+        return jsonify(message="职位链接无效。"), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    args = (owner, "zhilian", url)
+    if not conn.execute("SELECT 1 FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone():
+        return jsonify(message="岗位记录不存在。"), 404
+    saved = conn.execute("SELECT description FROM recruitment_job_details WHERE owner=? AND source=? AND url_key=?", args).fetchone()
+    if saved:
+        return jsonify(description=saved["description"])
+    if not local_desktop_request() or not use_local_chrome():
+        return jsonify(message="首次读取职位详情，请从已启用 Chrome 连接的本机采集页打开。"), 403
+    state, detail = read_zhilian_detail(url)
+    text = clean_listing({"description": detail})["description"]
+    if not text:
+        return jsonify(message=ZHILIAN_LOGIN_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
+    with conn:
+        conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text))
+    return jsonify(description=text)
 
 
 @blueprint.get(API + "/export")

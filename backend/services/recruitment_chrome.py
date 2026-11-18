@@ -127,6 +127,36 @@ def check_zhilian_login():
         return "unavailable"
 
 
+def read_zhilian_detail(url):
+    expected_path = urlsplit(url).path.rstrip("/")
+    expression = (
+        "JSON.stringify(location.origin === 'https://www.zhaopin.com' "
+        f"&& location.pathname.replace(/\\/$/, '') === {json.dumps(expected_path)} "
+        f"&& {ZHILIAN_LOGIN} === 'ready' "
+        "? document.querySelector('.describtion-card__detail-content, .description-card__detail-content')"
+        "?.innerText.trim().slice(0, 12000) || '' : '')"
+    )
+    try:
+        with open_chrome_tab("zhilian", url) as tab:
+            if tab is None:
+                return "unavailable", ""
+            deadline = monotonic() + 8
+            state = "unknown"
+            while monotonic() < deadline:
+                snapshot = tab.read(SNAPSHOT)
+                state = zhilian_session(snapshot)
+                if state in {"not_logged_in", "verification_required"}:
+                    return state, ""
+                if state == "ready":
+                    text = tab.read(expression)
+                    if text:
+                        return "ready", text
+                sleep(1)
+            return ("no_detail" if state == "ready" else "unknown"), ""
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return "unavailable", ""
+
+
 def collect_in_chrome(source, keyword, city, limit, update):
     update("opening", "正在打开已授权的本机 Chrome 搜索标签页。")
     target_url = search_url(source, keyword, city)

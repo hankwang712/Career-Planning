@@ -16,6 +16,7 @@
   let filters = new URLSearchParams();
   let jobsSequence = 0;
   let runSequence = 0;
+  let detailSequence = 0;
   let poll;
   let submitting = false;
   let active = false;
@@ -57,12 +58,28 @@
     return /[\p{Co}\uFFFD]/u.test(salary || "") ? "" : salary;
   }
 
-  function details(row) {
+  async function details(row) {
+    const sequence = ++detailSequence;
+    const dialog = byId("recruitmentDetail");
+    const description = byId("recruitmentDescription");
+    const detailStatus = byId("recruitmentDetailStatus");
     byId("recruitmentDetailTitle").textContent = row.title;
     byId("recruitmentDetailMeta").textContent = [sources.get(row.source), row.company, row.location, displaySalary(row.salary)].filter(Boolean).join(" · ");
-    byId("recruitmentDescription").textContent = row.description || "可在原站查看详情。";
+    description.textContent = row.description || "可在原站查看详情。";
     byId("recruitmentOriginal").href = row.url;
-    byId("recruitmentDetail").showModal();
+    detailStatus.hidden = row.source !== "zhilian";
+    dialog.showModal();
+    if (row.source !== "zhilian") return;
+    detailStatus.textContent = "正在读取智联职位描述…";
+    try {
+      const result = await api("/jobs/zhilian/detail", { url: row.url });
+      if (sequence !== detailSequence || !dialog.open) return;
+      description.textContent = result.description;
+      detailStatus.hidden = true;
+    } catch (error) {
+      if (sequence !== detailSequence || !dialog.open) return;
+      detailStatus.textContent = error.message;
+    }
   }
 
   function resultRow(row) {
