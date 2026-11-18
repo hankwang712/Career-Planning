@@ -5,7 +5,11 @@
   const status = document.getElementById("resumeEditorStatus");
   const title = root.querySelector("[name=title]");
   const contact = [...root.querySelectorAll("[data-contact]")];
-  const sectionType = document.getElementById("resumeSectionType");
+  const restoreButtons = [...root.querySelectorAll("[data-restore]")];
+  const extras = document.getElementById("resumeContactExtras");
+  const extraTemplate = document.getElementById("resumeContactTemplate");
+  const quickField = document.getElementById("resumeQuickField");
+  const badge = document.getElementById("resumeVersionBadge");
   const sectionTemplate = document.getElementById("resumeSectionTemplate");
   const importDialog = document.getElementById("resumeImport");
   const importForm = document.getElementById("resumeImportForm");
@@ -38,6 +42,10 @@
     return {
       title: title.value,
       contact: Object.fromEntries(contact.map(input => [input.dataset.contact, input.value])),
+      extras: [...extras.children].map(row => ({
+        label: row.querySelector("[data-field-label]").value,
+        value: row.querySelector("[data-field-value]").value
+      })).filter(field => field.label.trim() || field.value.trim()),
       sections: [...container.children].map(section => ({
         title: section.querySelector("[data-section-title]").value,
         content: section.querySelector("[data-section-content]").value
@@ -51,26 +59,59 @@
       section.querySelector("[data-move='-1']").disabled = index === 0;
       section.querySelector("[data-move='1']").disabled = index === sections.length - 1;
     });
+    const used = new Set([...container.querySelectorAll("[data-section-title]")].map(input => input.value.trim()));
+    restoreButtons.forEach(button => { button.hidden = used.has(button.dataset.restore); });
   }
 
-  function appendSection(section) {
+  function toggleSection(card, open) {
+    card.querySelector("[data-toggle-section]").setAttribute("aria-expanded", String(open));
+    card.querySelector(".re-section-body").hidden = !open;
+  }
+
+  function setSectionCaption(card, title) {
+    card.querySelector("[data-section-name]").textContent = title;
+    const examples = {
+      "项目经历": "项目名称 | 项目角色 | 2025.01–2025.06\n- 填写职责与项目成果",
+      "教育经历": "学校 | 专业与学历 | 2022.09–2026.06",
+      "专业技能": "专业技能，支持 Markdown"
+    };
+    card.querySelector("[data-section-content]").placeholder = Object.hasOwn(examples, title)
+      ? examples[title] : `在此填写${title}的内容…`;
+  }
+
+  function appendSection(section, open = false) {
     const card = sectionTemplate.content.firstElementChild.cloneNode(true);
     card.querySelector("[data-section-title]").value = section.title;
-    card.querySelector("[data-section-content]").value = section.content;
+    setSectionCaption(card, section.title);
+    const content = card.querySelector("[data-section-content]");
+    content.value = section.content;
+    toggleSection(card, open || Boolean(section.content) || ["个人总结", "专业技能", "附加信息"].includes(section.title));
     container.append(card);
+    return card;
+  }
+
+  function appendField(field) {
+    const row = extraTemplate.content.firstElementChild.cloneNode(true);
+    row.querySelector("[data-field-label]").value = field.label;
+    row.querySelector("[data-field-value]").value = field.value;
+    extras.append(row);
+    return row;
   }
 
   function fillDraft(document) {
     title.value = document.title;
     contact.forEach(input => { input.value = document.contact[input.dataset.contact] || ""; });
     container.replaceChildren();
-    document.sections.forEach(appendSection);
+    document.sections.forEach(section => appendSection(section));
+    extras.replaceChildren();
+    (document.extras || []).forEach(appendField);
     layout = document.layout;
     updateMoveButtons();
   }
 
   function markChanged() {
     dirty = true;
+    badge.textContent = "未保存";
     status.textContent = "有未保存的修改";
   }
 
@@ -87,6 +128,7 @@
     revision = draft.revision;
     fillDraft(draft.document);
     dirty = false;
+    badge.textContent = "已保存";
     markSelected();
     status.textContent = "已保存的简历";
   }
@@ -95,10 +137,11 @@
     id = "";
     revision = 0;
     fillDraft({
-      title: "未命名简历", contact: {}, layout: "standard",
-      sections: [...sectionType.options].slice(0, -1).map(option => ({ title: option.value, content: "" }))
+      title: "新建简历版本", contact: {}, layout: "standard",
+      sections: restoreButtons.map(button => ({ title: button.dataset.restore, content: "" }))
     });
     dirty = false;
+    badge.textContent = "草稿";
     markSelected();
     status.textContent = "填写内容或导入已有简历";
   }
@@ -212,7 +255,78 @@
     status.textContent = dirty ? "已导出当前内容，修改尚未保存" : "已导出";
   }
 
-  root.addEventListener("input", markChanged);
+  function addField(label = "") {
+    if (extras.children.length >= 8) {
+      status.textContent = "最多可添加 8 个个人信息字段。";
+      return;
+    }
+    const row = appendField({ label, value: "" });
+    row.querySelector(label ? "[data-field-value]" : "[data-field-label]").focus();
+    markChanged();
+  }
+
+  function renameSection(section) {
+    const input = section.querySelector("[data-section-title]");
+    const toggle = section.querySelector("[data-toggle-section]");
+    if (!input.hidden) return;
+    const previous = input.value;
+    input.hidden = false;
+    toggle.hidden = true;
+    input.focus();
+    input.select();
+    const finish = name => {
+      input.value = name;
+      input.onkeydown = null;
+      setSectionCaption(section, name);
+      input.hidden = true;
+      toggle.hidden = false;
+      if (name !== previous) markChanged();
+      updateMoveButtons();
+    };
+    input.onkeydown = event => {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      if (event.key === "Escape") input.value = previous;
+      input.blur();
+      toggle.focus();
+    };
+    input.addEventListener("blur", () => finish(input.value.trim() || previous), { once: true });
+  }
+
+  function applyFormat(area, kind) {
+    const start = area.selectionStart;
+    const end = area.selectionEnd;
+    const text = area.value.slice(start, end);
+    const wraps = { bold: "**", italic: "*", strike: "~~" };
+    let offset = start;
+    let replacement;
+    if (wraps[kind]) {
+      const mark = wraps[kind];
+      replacement = mark + (text || "文字") + mark;
+    } else if (kind === "link") {
+      const url = window.prompt("输入链接（https:// 或 http://）", "https://");
+      if (!url || !/^https?:\/\/[^\s()[\]]+$/i.test(url)) return;
+      replacement = `[${text.replace(/[\[\]]/g, "") || "链接"}](${url})`;
+    } else {
+      offset = start === 0 ? 0 : area.value.lastIndexOf("\n", start - 1) + 1;
+      replacement = area.value.slice(offset, end).split("\n").map((line, index) => {
+        const prefix = kind === "heading" ? "### " : kind === "ordered" ? `${index + 1}. ` : "- ";
+        return prefix + line;
+      }).join("\n");
+    }
+    if (area.value.length + replacement.length - (end - offset) > area.maxLength) return;
+    area.setRangeText(replacement, offset, end, "end");
+    area.focus();
+    markChanged();
+  }
+
+  quickField.addEventListener("change", () => {
+    if (quickField.value) addField(quickField.value);
+    quickField.value = "";
+  });
+  root.addEventListener("input", event => {
+    if (event.target !== quickField && !event.target.hasAttribute("data-section-title")) markChanged();
+  });
   root.addEventListener("click", event => {
     const button = event.target.closest("button");
     if (!button || busy) return;
@@ -221,6 +335,33 @@
       return;
     }
     const section = button.closest(".re-section");
+    if (section && button.hasAttribute("data-toggle-section")) {
+      toggleSection(section, button.getAttribute("aria-expanded") !== "true");
+      return;
+    }
+    if (section && button.hasAttribute("data-rename")) {
+      renameSection(section);
+      return;
+    }
+    if (section && button.dataset.format) {
+      applyFormat(section.querySelector("[data-section-content]"), button.dataset.format);
+      return;
+    }
+    if (section && button.hasAttribute("data-tidy")) {
+      const area = section.querySelector("[data-section-content]");
+      const clean = area.value.replace(/[ \t]+$/gm, "").replace(/^([ \t]*)[•●·]\s*/gm, "$1- ").replace(/\n{3,}/g, "\n\n").trim();
+      if (area.value !== clean) {
+        area.value = clean;
+        markChanged();
+      }
+      status.textContent = "栏目格式已整理";
+      return;
+    }
+    if (button.hasAttribute("data-remove-field")) {
+      button.closest(".re-extra").remove();
+      markChanged();
+      return;
+    }
     if (section && button.hasAttribute("data-remove")) {
       section.remove();
       updateMoveButtons();
@@ -234,7 +375,7 @@
       markChanged();
       return;
     }
-    switch (button.dataset.action) {
+    switch (button.dataset.restore ? "add" : button.dataset.action) {
       case "new":
         if (canLeaveDraft()) startDraft();
         break;
@@ -243,10 +384,14 @@
           status.textContent = `最多支持 ${maxSections} 个栏目。`;
           return;
         }
-        appendSection({ title: sectionType.value, content: "" });
+        const added = appendSection({ title: button.dataset.restore || "自定义模块", content: "" }, true);
         updateMoveButtons();
         markChanged();
-        container.lastElementChild.querySelector("[data-section-title]").focus();
+        if (button.dataset.restore) added.querySelector("[data-section-content]").focus();
+        else renameSection(added);
+        break;
+      case "add-field":
+        addField();
         break;
       case "import":
         importStatus.textContent = "";

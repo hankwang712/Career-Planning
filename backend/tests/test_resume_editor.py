@@ -108,3 +108,24 @@ def test_export_keeps_chinese_text_and_matches_preview_pages(make_account):
     with ZipFile(BytesIO(images.data)) as pages:
         assert len(pages.namelist()) == preview["page_count"]
         assert pages.read("resume-01.png").startswith(b"\x89PNG")
+
+
+def test_template_aligns_project_metadata_and_renders_markdown(make_account):
+    account = make_account("resume-template")
+    doc = {
+        "contact": {"name": "林晓"},
+        "extras": [{"label": "GitHub", "value": "demo-account"}],
+        "sections": [{
+            "title": "项目经历",
+            "content": "WorkBench | Engineer | 2026\n- **Result:** [Repository](https://example.com/project)",
+        }],
+    }
+    assert account.post("/api/resume-editor/drafts", json=doc).get_json()["document"]["extras"] == doc["extras"]
+    response = account.post("/api/resume-editor/render/pdf", json=doc)
+    assert response.status_code == 200
+    with fitz.open(stream=response.data, filetype="pdf") as pdf:
+        page = pdf[0]
+        points = {word[4]: word[0] for word in page.get_text("words")}
+        assert points["WorkBench"] < 60 and points["Engineer"] > 355 and points["2026"] > 515
+        assert "**Result" not in page.get_text() and "demo-account" in page.get_text()
+        assert any(link.get("uri") == "https://example.com/project" for link in page.get_links())

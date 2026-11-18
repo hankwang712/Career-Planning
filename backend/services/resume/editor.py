@@ -187,7 +187,8 @@ def render(mode):
         return jsonify(message="不支持的导出类型。"), 404
     try:
         document = clean_document(request.get_json(silent=True))
-        if not any(document["contact"].values()) and not any(part["content"] for part in document["sections"]):
+        if not (any(document["contact"].values()) or any(item["value"] for item in document.get("extras", []))
+                or any(part["content"] for part in document["sections"])):
             raise ValueError("请先填写或导入简历内容。")
         if mode == "auto":
             layout, pdf, count = choose_layout(document)
