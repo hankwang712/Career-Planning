@@ -338,7 +338,7 @@ function formatUnixTime(ts) {
   }
 }
 
-// 模型由服务端 .env 统一配置：前端只读取"是否已配置"和模型名，拿不到任何密钥或接口地址。
+// 功能页面仅使用服务端公开的模型名称与配置状态。
 async function fetchLlmStatus() {
   const payload = await requestJson("/api/llm-status");
   const config = {

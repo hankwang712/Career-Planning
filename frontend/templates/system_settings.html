@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>系统配置 · Career Agent</title>
+    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
+</head>
+<body class="ca-settings-page">
+    <header class="ca-settings-top"><a href="{{ url_for('site.index') }}">← 工作台</a><h1>系统配置</h1></header>
+    <main class="ca-settings-main">
+        <section class="ca-settings-summary">
+            <div><h2>模型服务配置</h2><p>先配置对话模型即可使用 AI 功能。这里保存的值立即生效，移除网页配置后会回到部署值。</p></div>
+            <div><strong id="settingsProgressText">正在检查配置…</strong><progress id="settingsProgress" value="0" max="3"></progress></div>
+        </section>
+        <div class="ca-settings-layout">
+            <nav aria-label="配置分组">
+                {% for id, title, description, fields in groups %}<a href="#settings-{{ id }}">{{ title }}</a>{% endfor %}
+            </nav>
+            <form id="systemModelSettings" autocomplete="off">
+                <fieldset disabled>
+                    {% for id, title, description, fields in groups %}
+                    <details id="settings-{{ id }}" class="ca-settings-group" {% if id == 'chat' %}open{% endif %}>
+                        <summary><strong>{{ title }}</strong> <span class="ca-tag {{ 'required' if id == 'chat' }}">{{ '使用 AI 时必填' if id == 'chat' else '选填' }}</span></summary>
+                        <p>{{ description }}</p>
+                        <div class="ca-settings-fields">
+                            {% for key, label in fields %}
+                            <div class="ca-settings-field">
+                                <label for="{{ key }}">{{ label }}{% if id == 'chat' %} <span class="ca-required">*</span>{% endif %}</label>
+                                <input id="{{ key }}" name="{{ key }}" type="{{ 'password' if key.endswith('_API_KEY') else 'text' }}" maxlength="2048" spellcheck="false" autocomplete="{{ 'new-password' if key.endswith('_API_KEY') else 'off' }}" aria-describedby="state-{{ key }}">
+                                <div class="ca-field-status"><span id="state-{{ key }}"></span><button type="button" class="ca-button" data-reset="{{ key }}" hidden>移除网页值</button></div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                    <div class="ca-settings-save"><button type="submit" class="ca-button primary" disabled>保存配置</button></div>
+                </fieldset>
+                <p id="settingsResult" role="status"></p>
+            </form>
+        </div>
+    </main>
+    {% include "partials/workspace_console.html" %}
+</body>
+</html>

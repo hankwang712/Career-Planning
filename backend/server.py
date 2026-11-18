@@ -47,7 +47,7 @@ from services.report.store import _read_career_report_bundle
 from services.resume import api as resume_api
 from services.resume.jobs import RESUME_ANALYSIS_JOBS, _fail_interrupted_resume
 from services.resume.pipeline import fitz
-from services import site, webshell
+from services import site, webshell, workspace_tools
 from services.user_state import (
     _chat_resume_source,
     _current_user,
@@ -77,7 +77,7 @@ webshell.configure_app(app)
 
 
 def _model_runtime(selection=None):
-    """模型只从 .env 读取，不随用户变化；保留 selection 形参是为了兼容蓝图的调用方式。"""
+    """读取站点统一的对话模型配置。保留 selection 形参以兼容现有调用。"""
     return llm_env.chat_runtime()
 
 
@@ -120,6 +120,7 @@ _ensure_app_storage()
 _app_db.init_db()
 _restore_background_jobs()
 _auth.init_app(app)
+app.register_blueprint(workspace_tools.blueprint)
 app.register_blueprint(create_datasets_blueprint(_login_required))
 app.register_blueprint(create_community_blueprint(_login_required, _super_admin_required, _current_user))
 app.register_blueprint(create_interview_blueprint(_login_required, _model_runtime))

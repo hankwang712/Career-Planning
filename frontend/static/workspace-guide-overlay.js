@@ -1,14 +1,8 @@
 (function () {
-  const GUIDE_VERSION = "v8";
+  const GUIDE_VERSION = "v9";
   const PLAN_STORAGE_PREFIX = "dp_overlay_plans_v1_";
 
-  const guideState = {
-    open: false,
-    autoOpened: false,
-    currentIndex: 0,
-    steps: [],
-    activeAction: null
-  };
+  let guideAutoOpened = false;
 
   const overlayState = {
     plans: [],
@@ -123,272 +117,44 @@
     };
   }
 
-  function getGuideElements() {
-    return {
-      overlay: document.getElementById("workspaceGuideOverlay"),
-      fullFrost: document.getElementById("workspaceGuideFullFrost"),
-      frostFrame: document.getElementById("workspaceGuideFrostFrame"),
-      highlight: document.getElementById("workspaceGuideHighlight"),
-      card: document.getElementById("workspaceGuideCard"),
-      stepLabel: document.getElementById("workspaceGuideStepLabel"),
-      kicker: document.getElementById("workspaceGuideKicker"),
-      title: document.getElementById("workspaceGuideTitle"),
-      copy: document.getElementById("workspaceGuideCopy"),
-      meta: document.getElementById("workspaceGuideMeta"),
-      primaryBtn: document.getElementById("workspaceGuidePrimaryBtn"),
-      prevBtn: document.getElementById("workspaceGuidePrevBtn"),
-      nextBtn: document.getElementById("workspaceGuideNextBtn")
-    };
-  }
-
-  function syncGuideOverlayLock() {
-    const { overlay, highlight, card, fullFrost, frostFrame } = getGuideElements();
-    if (!overlay) return;
-    const isVisible = !overlay.classList.contains("hidden");
-    overlay.style.pointerEvents = "none";
-    /* 具体可点击性由 workspace-shell.css 中 #workspaceGuideCard 规则保证；此处仅清理隐藏态 */
-    if (card) card.style.removeProperty("pointer-events");
-    document.body.classList.toggle("workspace-guide-open", isVisible);
-    guideState.open = isVisible;
-
-    if (!isVisible) {
-      guideState.activeAction = null;
-      document.body.classList.remove("workspace-guide-phase-intro", "workspace-guide-phase-spotlight");
-      overlay.classList.remove("workspace-guide-phase-intro", "workspace-guide-phase-spotlight");
-      highlight?.classList.remove("is-intro");
-      if (highlight) highlight.style.opacity = "0";
-      card?.classList.remove("workspace-guide-card--intro");
-      fullFrost?.classList.add("hidden");
-      frostFrame?.classList.add("hidden");
-    }
-
-    if (typeof window.updateWorkspaceJourneyVisibility === "function") {
-      window.updateWorkspaceJourneyVisibility();
-    }
-  }
-
-  function buildWorkspaceGuideSteps() {
-    return [
-      {
-        phase: "intro",
-        selector: "#workspaceJourneyBand",
-        kicker: "Step 01",
-        title: "总览工作台流程",
-        copy: "先看 01-05 的全链路，你会知道每一块在什么时候做最有效。",
-        meta: "",
-        actionLabel: "去工作台",
-        onPrimary: () => window.showSection?.("dashboard")
-      },
-      {
-        phase: "spotlight",
-        selector: 'button[data-section="dashboard"]',
-        kicker: "Step 02",
-        title: "工作台入口",
-        copy: "这里回到总览面板，系统会汇总下一步建议和关键进度。",
-        meta: "建议每天先从这里开始。",
-        actionLabel: "打开工作台",
-        onPrimary: () => window.showSection?.("dashboard")
-      },
-      {
-        phase: "spotlight",
-        selector: 'button[data-section="jobs"]',
-        kicker: "Step 03",
-        title: "岗位探索",
-        copy: "对比城市、岗位和门槛，先明确主线目标岗位。",
-        meta: "主线越清晰，后续报告越有价值。",
-        actionLabel: "去岗位探索",
-        onPrimary: () => window.showSection?.("jobs")
-      },
-      {
-        phase: "spotlight",
-        selector: 'button[data-section="profile"]',
-        kicker: "Step 04",
-        title: "画像输入",
-        copy: "补齐测评、简历、访谈，系统会自动识别当前缺口。",
-        meta: "优先补最关键的证据项。",
-        actionLabel: "去画像输入",
-        onPrimary: () => window.showSection?.("profile")
-      },
-      {
-        phase: "spotlight",
-        selector: 'button[data-section="report"]',
-        kicker: "Step 05",
-        title: "职业报告",
-        copy: "在这里进入报告工作区，查看版本、结论和行动清单。",
-        meta: "支持持续迭代，不是一次性输出。",
-        actionLabel: "去职业报告",
-        onPrimary: () => window.showSection?.("report")
-      },
-      {
-        phase: "spotlight",
-        selector: ".topbar-avatar-btn",
-        kicker: "Step 06",
-        title: "个人中心入口",
-        copy: "点击头像进入新界面，可看你的岗位板、计划和账号配置。",
-        meta: "你可以随时重新打开本引导。",
-        actionLabel: "打开个人中心",
-        onPrimary: () => window.handleAvatarClick?.(new Event("click"))
-      }
-    ];
-  }
-
-  function setGuideStepContent(step) {
-    const { stepLabel, kicker, title, copy, meta, primaryBtn, prevBtn, nextBtn } = getGuideElements();
-    const total = guideState.steps.length || 1;
-    const current = Math.min(total, guideState.currentIndex + 1);
-    if (stepLabel) stepLabel.textContent = `${String(current).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
-    if (kicker) kicker.textContent = step.kicker || "Guide";
-    if (title) title.textContent = step.title || "Guide";
-    if (copy) copy.textContent = step.copy || "";
-    if (meta) meta.textContent = step.meta || "";
-    if (primaryBtn) primaryBtn.textContent = step.actionLabel || "Go";
-    if (prevBtn) {
-      const disabled = guideState.currentIndex <= 0;
-      prevBtn.disabled = disabled;
-      prevBtn.classList.toggle("is-disabled", disabled);
-      prevBtn.setAttribute("aria-disabled", disabled ? "true" : "false");
-    }
-    if (nextBtn) {
-      nextBtn.textContent = guideState.currentIndex >= total - 1 ? "完成" : "下一步";
-    }
-  }
-
-  function getGuideTargetRect(step) {
-    const target = step?.selector ? document.querySelector(step.selector) : null;
-    if (!target || typeof target.getBoundingClientRect !== "function") return null;
-    const rect = target.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    return rect;
-  }
-
-  function positionWorkspaceGuide(step) {
-    const { overlay, highlight, card, fullFrost, frostFrame } = getGuideElements();
-    if (!overlay || !highlight || !card || !step) return;
-
-    const isIntro = step.phase === "intro";
-    document.body.classList.toggle("workspace-guide-phase-intro", isIntro);
-    document.body.classList.toggle("workspace-guide-phase-spotlight", !isIntro);
-    overlay.classList.toggle("workspace-guide-phase-intro", isIntro);
-    overlay.classList.toggle("workspace-guide-phase-spotlight", !isIntro);
-    highlight.classList.toggle("is-intro", isIntro);
-    card.classList.toggle("workspace-guide-card--intro", false);
-
-    fullFrost?.classList.add("hidden");
-    frostFrame?.classList.add("hidden");
-
-    setGuideStepContent(step);
-    guideState.activeAction = typeof step.onPrimary === "function" ? step.onPrimary : null;
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const rect = getGuideTargetRect(step);
-
-    if (!rect) {
-      highlight.style.opacity = "0";
-      card.style.width = `${Math.min(420, viewportWidth - 32)}px`;
-      card.style.left = "50%";
-      card.style.top = "50%";
-      card.style.bottom = "auto";
-      card.style.transform = "translate(-50%, -50%)";
-      if (typeof window.updateWorkspaceJourneyVisibility === "function") {
-        window.updateWorkspaceJourneyVisibility();
-      }
-      return;
-    }
-
-    highlight.style.opacity = "1";
-    highlight.style.left = `${Math.max(10, rect.left - 8)}px`;
-    highlight.style.top = `${Math.max(10, rect.top - 8)}px`;
-    highlight.style.width = `${Math.max(64, rect.width + 16)}px`;
-    highlight.style.height = `${Math.max(44, rect.height + 16)}px`;
-
-    const cardWidth = Math.min(420, viewportWidth - 32);
-    card.style.width = `${cardWidth}px`;
-    card.style.transform = "none";
-
-    const cardHeight = Math.max(220, Math.min(360, card.offsetHeight || 260));
-    const spaceBelow = viewportHeight - rect.bottom;
-    const placeBelow = spaceBelow >= (cardHeight + 18);
-    const top = placeBelow
-      ? Math.min(viewportHeight - cardHeight - 12, rect.bottom + 14)
-      : Math.max(12, rect.top - cardHeight - 14);
-    const left = Math.max(12, Math.min(viewportWidth - cardWidth - 12, rect.left));
-
-    card.style.left = `${left}px`;
-    card.style.top = `${top}px`;
-    card.style.bottom = "auto";
-
-    if (typeof window.updateWorkspaceJourneyVisibility === "function") {
-      window.updateWorkspaceJourneyVisibility();
+  async function refreshWorkspaceGuide() {
+    const status = document.getElementById("workspaceGuideModelStatus");
+    if (!status) return;
+    status.textContent = "正在检查模型配置…";
+    delete status.dataset.ready;
+    try {
+      const response = await fetch("/api/llm-status", { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      status.textContent = data.configured ? "模型已填写" : "待配置模型";
+      status.dataset.ready = String(data.configured);
+    } catch {
+      status.textContent = "暂时无法检查";
+      delete status.dataset.ready;
     }
   }
 
   function openWorkspaceGuide(force = false) {
-    const { overlay } = getGuideElements();
-    if (!overlay) return;
-    if (!isAuthenticatedSafe()) return;
-    if (!force && window.hasSeenWorkspaceGuide?.()) return;
-    guideState.steps = buildWorkspaceGuideSteps();
-    guideState.currentIndex = 0;
-    overlay.classList.remove("hidden");
-    syncGuideOverlayLock();
-    positionWorkspaceGuide(guideState.steps[0]);
-    window.requestAnimationFrame(() => {
-      positionWorkspaceGuide(guideState.steps[0]);
-    });
-  }
-
-  function closeWorkspaceGuide(markSeen = false) {
-    const { overlay, highlight } = getGuideElements();
-    if (overlay) overlay.classList.add("hidden");
-    if (highlight) {
-      highlight.style.opacity = "0";
-      highlight.classList.remove("is-intro");
-    }
-    if (markSeen) window.setSeenWorkspaceGuide?.();
-    syncGuideOverlayLock();
-  }
-
-  function nextWorkspaceGuideStep() {
-    if (!guideState.open) return;
-    if (guideState.currentIndex >= guideState.steps.length - 1) {
-      closeWorkspaceGuide(true);
-      return;
-    }
-    guideState.currentIndex += 1;
-    positionWorkspaceGuide(guideState.steps[guideState.currentIndex]);
-  }
-
-  function prevWorkspaceGuideStep() {
-    if (!guideState.open) return;
-    if (guideState.currentIndex <= 0) return;
-    guideState.currentIndex -= 1;
-    positionWorkspaceGuide(guideState.steps[guideState.currentIndex]);
-  }
-
-  function handleWorkspaceGuidePrimary() {
-    if (typeof guideState.activeAction === "function") {
-      guideState.activeAction();
-    }
-    if (guideState.open) {
-      window.setTimeout(() => {
-        positionWorkspaceGuide(guideState.steps[guideState.currentIndex]);
-      }, 80);
-    }
-  }
-
-  function handleWorkspaceGuideBackdropClick(event) {
-    if (event?.target?.id === "workspaceGuideOverlay") {
-      closeWorkspaceGuide(true);
-    }
+    const dialog = document.getElementById("workspaceSetupGuide");
+    if (!dialog || dialog.open || !isAuthenticatedSafe()) return;
+    if (!force && window.hasSeenWorkspaceGuide()) return;
+    const focus = document.activeElement;
+    dialog.querySelector("[data-guide-settings]").hidden = !getCurrentUserSafe()?.can_manage_configs;
+    dialog.querySelector("[data-guide-admin-note]").hidden = Boolean(getCurrentUserSafe()?.can_manage_configs);
+    dialog.addEventListener("close", () => {
+      window.setSeenWorkspaceGuide();
+      document.body.classList.remove("workspace-guide-open");
+      window.updateWorkspaceJourneyVisibility?.();
+      focus?.focus();
+    }, { once: true });
+    dialog.showModal();
+    document.body.classList.add("workspace-guide-open");
+    window.updateWorkspaceJourneyVisibility?.();
+    void refreshWorkspaceGuide();
   }
 
   window.openWorkspaceGuide = openWorkspaceGuide;
-  window.closeWorkspaceGuide = closeWorkspaceGuide;
-  window.nextWorkspaceGuideStep = nextWorkspaceGuideStep;
-  window.prevWorkspaceGuideStep = prevWorkspaceGuideStep;
-  window.handleWorkspaceGuidePrimary = handleWorkspaceGuidePrimary;
-  window.handleWorkspaceGuideBackdropClick = handleWorkspaceGuideBackdropClick;
+  window.closeWorkspaceGuide = () => document.getElementById("workspaceSetupGuide")?.close();
 
   function getPlanStorageKey() {
     const username = String(getCurrentUserSafe()?.username || "guest").trim().toLowerCase() || "guest";
@@ -619,10 +385,6 @@
       openUserProfile();
       return;
     }
-    if (typeof window.openSettingsPanel === "function") {
-      window.openSettingsPanel();
-      return;
-    }
     window.openUserCenterPage?.("career-profile");
   }
 
@@ -748,46 +510,27 @@
   }
 
   function tryAutoOpenGuide() {
-    if (guideState.autoOpened) return;
-    if (!isAuthenticatedSafe()) return;
+    if (guideAutoOpened || !isAuthenticatedSafe() || !document.getElementById("workspaceSetupGuide")) return;
     const forceOpen = consumeForceWorkspaceGuideFlag();
-    if (!forceOpen && window.hasSeenWorkspaceGuide?.()) return;
-    const overlay = document.getElementById("workspaceGuideOverlay");
-    if (!overlay) return;
-    guideState.autoOpened = true;
-    window.setTimeout(() => {
-      window.openWorkspaceGuide?.(forceOpen);
-    }, 420);
-  }
-
-  function mountGuideOverlayObserver() {
-    const overlay = document.getElementById("workspaceGuideOverlay");
-    if (!overlay) return;
-    syncGuideOverlayLock();
-    const observer = new MutationObserver(syncGuideOverlayLock);
-    observer.observe(overlay, { attributes: true, attributeFilter: ["class"] });
-  }
-
-  function onResizeOrScroll() {
-    if (!guideState.open) return;
-    const step = guideState.steps[guideState.currentIndex];
-    if (!step) return;
-    positionWorkspaceGuide(step);
-  }
-
-  function onGuideEscape(event) {
-    if (event.key !== "Escape") return;
-    if (!guideState.open) return;
-    event.preventDefault();
-    closeWorkspaceGuide(true);
+    if (!forceOpen && window.hasSeenWorkspaceGuide()) return;
+    guideAutoOpened = true;
+    window.setTimeout(() => openWorkspaceGuide(forceOpen), 420);
   }
 
   function bootstrap() {
-    mountGuideOverlayObserver();
+    const dialog = document.getElementById("workspaceSetupGuide");
+    dialog?.querySelector("[data-guide-refresh]").addEventListener("click", refreshWorkspaceGuide);
+    dialog?.querySelectorAll("[data-guide-section]").forEach(button => {
+      button.addEventListener("click", () => {
+        const section = button.dataset.guideSection;
+        dialog.close();
+        window.showSection?.(section);
+      });
+    });
+    document.querySelectorAll("[data-open-workspace-guide]").forEach(button => {
+      button.addEventListener("click", () => openWorkspaceGuide(true));
+    });
     tryAutoOpenGuide();
-    window.addEventListener("resize", onResizeOrScroll);
-    window.addEventListener("scroll", onResizeOrScroll, { passive: true });
-    document.addEventListener("keydown", onGuideEscape);
   }
 
   if (document.readyState === "loading") {
@@ -797,12 +540,12 @@
   }
 
   window.addEventListener("app:auth-changed", () => {
-    guideState.autoOpened = false;
+    guideAutoOpened = false;
     overlayState.loaded = false;
     overlayState.plans = [];
     overlayState.activePlanId = "";
     closeUserProfile();
-    syncGuideOverlayLock();
+    if (!isAuthenticatedSafe()) window.closeWorkspaceGuide();
     window.setTimeout(() => {
       tryAutoOpenGuide();
       renderUserProfileOverlay();

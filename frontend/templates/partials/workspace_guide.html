@@ -1,27 +1,28 @@
-<div id="workspaceGuideOverlay" class="workspace-guide-overlay hidden" onclick="handleWorkspaceGuideBackdropClick(event)">
-    <div id="workspaceGuideFullFrost" class="workspace-guide-full-frost hidden" aria-hidden="true"></div>
-    <div id="workspaceGuideFrostFrame" class="workspace-guide-frost-frame hidden" aria-hidden="true">
-        <div class="workspace-guide-frost-bar workspace-guide-frost-top"></div>
-        <div class="workspace-guide-frost-bar workspace-guide-frost-left"></div>
-        <div class="workspace-guide-frost-bar workspace-guide-frost-right"></div>
-        <div class="workspace-guide-frost-bar workspace-guide-frost-bottom"></div>
-    </div>
-    <div class="workspace-guide-highlight" id="workspaceGuideHighlight"></div>
-    <div class="workspace-guide-card" id="workspaceGuideCard" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="workspaceGuideTitle">
-        <div class="workspace-guide-top">
-            <span id="workspaceGuideStepLabel">01 / 06</span>
-            <button type="button" onclick="closeWorkspaceGuide(true)">跳过</button>
-        </div>
-        <p class="workspace-guide-kicker" id="workspaceGuideKicker">首次进入引导</p>
-        <h3 id="workspaceGuideTitle">先看你的当前阶段</h3>
-        <div class="workspace-guide-copy" id="workspaceGuideCopy">这里会结合画像完成度、目标岗位和职业报告，告诉你现在最值得先做什么。</div>
-        <p class="workspace-guide-meta" id="workspaceGuideMeta"></p>
-        <div class="workspace-guide-actions">
-            <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrimaryBtn" onclick="handleWorkspaceGuidePrimary()">去这里看看</button>
-            <div class="workspace-guide-actions-end">
-                <button type="button" class="workspace-guide-btn ghost" id="workspaceGuidePrevBtn" onclick="prevWorkspaceGuideStep()">上一步</button>
-                <button type="button" class="workspace-guide-btn" id="workspaceGuideNextBtn" onclick="nextWorkspaceGuideStep()">下一步</button>
-            </div>
-        </div>
-    </div>
-</div>
+<dialog id="workspaceSetupGuide" class="ca-setup-guide" aria-labelledby="workspaceSetupTitle">
+    <header class="ca-tools-heading">
+        <div><h2 id="workspaceSetupTitle">新手引导</h2><p>从设置模型到生成第一份职业报告。</p></div>
+        <form method="dialog"><button class="ca-button" aria-label="关闭引导">×</button></form>
+    </header>
+    <ol class="ca-guide-steps">
+        <li><div class="ca-step-number">1</div><div>
+            <h3>配置对话模型 <span class="ca-tag required">使用 AI 时必填</span></h3>
+            <p>填写 API Key、接口地址和模型名称。岗位浏览和测评可直接使用。技能向量与头像生成按需配置。</p>
+            <p id="workspaceGuideModelStatus" class="ca-tag" aria-live="polite">正在检查模型配置…</p>
+            <a class="ca-button primary" href="/system-settings" data-guide-settings onclick="closeWorkspaceGuide()" hidden>去系统配置 →</a>
+            <p data-guide-admin-note hidden>如需启用 AI，请联系管理员。</p>
+        </div></li>
+        <li><div class="ca-step-number">2</div><div>
+            <h3>建立职业画像</h3><p>在岗位探索中选择目标方向，再补充简历、测评或职业访谈。先准备手头已有的资料即可。</p>
+            <button type="button" class="ca-button" data-guide-section="jobs">探索岗位 →</button>
+            <button type="button" class="ca-button" data-guide-section="profile">完善画像 →</button>
+        </div></li>
+        <li><div class="ca-step-number">3</div><div>
+            <h3>生成第一份职业报告</h3><p>在报告工作区确认目标岗位与已有资料，再发起生成。生成后可查看建议和行动清单。</p>
+            <button type="button" class="ca-button" data-guide-section="report">打开报告工作区 →</button>
+        </div></li>
+    </ol>
+    <footer class="ca-tools-heading ca-guide-footer">
+        <button type="button" class="ca-button" data-guide-refresh>重新检查模型</button>
+        <form method="dialog"><button class="ca-button primary">开始使用</button></form>
+    </footer>
+</dialog>

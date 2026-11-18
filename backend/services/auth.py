@@ -306,8 +306,8 @@ def init_app(app):
 
     @app.before_request
     def protect_auth_requests():
-        if request.path.startswith(("/api/auth/", "/api/career-profile", "/api/job-market")) and request.method in {"POST", "PUT", "DELETE", "PATCH"}:
-            limit = 65536 if request.path.startswith(("/api/career-profile", "/api/job-market")) else 16384
+        if request.path.startswith(("/api/auth/", "/api/career-profile", "/api/job-market", "/api/system-settings/")) and request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+            limit = 65536 if request.path.startswith(("/api/career-profile", "/api/job-market", "/api/system-settings/")) else 16384
             if request.content_length and request.content_length > limit:
                 raise AuthError("提交的内容过大。", 413)
             expected = session.get("csrf_token")
@@ -318,7 +318,8 @@ def init_app(app):
     @app.after_request
     def protect_auth_responses(response):
         private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/", "/api/career-profile", "/api/job-market",
-                            "/api/profile-portrait", "/api/account", "/api/community-feed", "/app_data/")
+                            "/api/profile-portrait", "/api/account", "/api/community-feed", "/api/system-settings/",
+                            "/api/workspace-logs", "/app_data/")
         if request.path.startswith(private_prefixes):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"

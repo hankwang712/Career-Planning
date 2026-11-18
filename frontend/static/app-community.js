@@ -399,8 +399,6 @@ function initCommunityForumEvents() {
 }
 
 // ── 模型配置 ────────────────────────────────────────────────────────────────────
-// 模型只在服务器 .env 里配置（AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL），页面里没有设置面板，
-// 也不能选择模型。下面这些函数保留旧名字，是因为别的脚本仍会调用它们。
 function toggleSettingsPanel(event) {
   if (event) event.stopPropagation();
 }

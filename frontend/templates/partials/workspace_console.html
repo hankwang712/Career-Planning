@@ -1,0 +1,11 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='workspace-tools.css') }}">
+<aside class="ca-console" aria-label="白盒控制台">
+    <section id="workspaceConsolePanel" hidden>
+        <header><strong>白盒控制台</strong><span data-console-status role="status">加载中…</span></header>
+        <label><span class="ca-sr-only">筛选日志</span><input type="search" placeholder="筛选接口或状态码" data-console-filter></label>
+        <ol data-console-entries></ol>
+        <p data-console-empty>暂无请求记录</p>
+    </section>
+    <button type="button" aria-controls="workspaceConsolePanel" aria-expanded="false" data-console-toggle>›_ 白盒控制台</button>
+</aside>
+<script src="{{ url_for('static', filename='workspace-console.js') }}" defer></script>

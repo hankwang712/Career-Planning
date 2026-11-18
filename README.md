@@ -215,7 +215,7 @@ npm start
 uv run --no-project python backend/scripts/create_admin.py
 ```
 
-按提示设置管理员邮箱和密码，模型在服务器根目录的 `.env` 里配置（`AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`），页面里没有模型设置入口，数据库也不保存任何密钥。
+按提示设置管理员邮箱和密码。登录后，从账号菜单打开「系统配置」填写对话模型的接口地址、API Key 和模型名称。岗位浏览和测评可以直接使用，技能向量和职业头像按需配置。工作台账号菜单可重新打开新手引导，页面右下角的白盒控制台可筛选当前账号近期请求的状态与耗时。
 
 ### 6. 修改前端时启用开发模式
 
@@ -292,11 +292,11 @@ flowchart LR
 
 | 配置 | 何时需要 | 配置方式 |
 | --- | --- | --- |
-| 对话模型 | 聊天、简历分析、职业规划报告、职业访谈 | `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。修改后重启服务。 |
+| 对话模型 | 聊天、简历分析、职业规划报告、职业访谈 | 「系统配置」或 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
 | 图片模型 | 画像海报 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`。 |
 | 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
 
-配置统一放在根目录 `.env`，完整示例见 [.env.example](.env.example)。进程环境变量优先于文件配置。从旧版本升级时，数据库里遗留的 API 配置会在 `.env` 配好后的首次启动自动清除。
+部署配置示例见 [.env.example](.env.example)。网页设置写入应用数据目录的 `model-settings.sqlite3`，密钥保存在服务端，页面只显示配置状态。对话、技能向量和职业头像的网页设置在保存后生效，优先于进程环境和 `.env`，移除网页值可恢复部署配置。数据库连接和 LightRAG 等部署专用选项仍在环境中设置。白盒控制台只保留进程内近期请求的接口模板、状态和耗时，服务重启后清空。
 
 ### 聊天记忆参数
 

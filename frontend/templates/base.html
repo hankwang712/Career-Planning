@@ -342,6 +342,7 @@
     {% include "sections/assessment_modal.html" %}
 
     {% include "partials/workspace_guide.html" %}
+    {% include "partials/workspace_console.html" %}
 
     <footer id="site-footer" class="bg-gray-800 text-white py-8">
         <div class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6">
@@ -521,6 +522,7 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-review.js') }}" defer></script>
     {% set defer_attr = " defer" %}{% include 'partials/app_scripts.html' %}
+    <script src="{{ url_for('static', filename='workspace-guide-overlay.js') }}" defer></script>
     <script src="{{ url_for('static', filename='job-market.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
     <script src="{{ url_for('static', filename='career-report-workspace.js') }}" defer></script>

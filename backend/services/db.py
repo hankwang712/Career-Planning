@@ -347,7 +347,7 @@ def _scrub_legacy_llm_secrets(conn):
         conn.execute(f"DROP TABLE {name}")
     conn.commit()
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    logger.warning("已清除数据库中旧的 API 配置（%s）；模型接口现在只从 .env 读取。", "、".join(legacy))
+    logger.warning("已清除数据库中旧的 API 配置（%s）。", "、".join(legacy))
 
 
 # ---------------------------------------------------------------------------

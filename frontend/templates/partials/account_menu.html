@@ -37,6 +37,12 @@
     </a>
     {% endif %}
         <div class="nav-workspace-menu-divider" role="presentation"></div>
+        {% if initial_user and initial_user.can_manage_configs %}
+        <a href="/system-settings" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem">系统配置</a>
+        {% endif %}
+        {% if not account_menu_in_center|default(false) %}
+        <button type="button" class="nav-workspace-menu-row" role="menuitem" data-open-workspace-guide onclick="closeNavWorkspaceMenu()">新手引导</button>
+        {% endif %}
         <button type="button" id="logoutBtn" onclick="logout()" class="nav-workspace-menu-row nav-workspace-menu-danger" role="menuitem">退出登录</button>
     </div>
 </div>

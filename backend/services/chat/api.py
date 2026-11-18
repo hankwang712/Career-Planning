@@ -87,6 +87,7 @@ class ChatTransport:
         headers = Headers(scope=scope)
         origin = headers.get("origin")
         same_origin = f"{scope['scheme']}://{headers.get('host', '')}"
+        started = time.perf_counter()
 
         async def private_send(message):
             if message["type"] == "http.response.start":
@@ -97,6 +98,11 @@ class ChatTransport:
                 outgoing.add_vary_header("Origin")
                 for name, value in cors_headers(origin, self.allowed_origins | {same_origin}).items():
                     outgoing[name] = value
+                owner = scope.get("state", {}).get("workspace_log_owner")
+                route = getattr(scope.get("route"), "path", None)
+                if owner and route:
+                    from ..workspace_tools import record_request
+                    record_request(owner, route, scope["method"], message["status"], started)
             await send(message)
 
         if scope["method"] == "OPTIONS":
@@ -182,6 +188,7 @@ def create_app(flask_app, *, service, current_user):
             user = current_user()
             if not user:
                 raise ChatError("请先登录。", 401)
+            request.state.workspace_log_owner = user["username"]
             if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
                 expected, supplied = session.get("csrf_token"), csrf_token or ""
                 if not isinstance(expected, str) or not hmac.compare_digest(expected.encode(), supplied.encode()):

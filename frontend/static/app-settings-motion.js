@@ -1,7 +1,13 @@
 // 设置面板与首页动效
 // 由原来的 app.js 拆出，仍是普通脚本、共享全局作用域；加载顺序见 templates/partials/app_scripts.html。
 
-function openSettingsPanel() {}
+function openSettingsPanel() {
+  if (window.getCurrentUser?.()?.can_manage_configs) {
+    window.location.assign("/system-settings");
+    return;
+  }
+  showToast("模型尚未配置", "请联系管理员在系统配置中填写对话模型。", "warning", 3200);
+}
 
 function closeSettingsPanel() {}
 
@@ -16,7 +22,7 @@ async function openModelPicker(onReady) {
     if (typeof onReady === "function") onReady();
     return;
   }
-  showToast("模型尚未配置", "请联系部署人员在服务器 .env 中补全 AI_CHAT_BASE_URL、AI_CHAT_API_KEY、AI_CHAT_MODEL 后重启。", "warning", 3200);
+  openSettingsPanel();
 }
 
 function closeModelPicker() {}

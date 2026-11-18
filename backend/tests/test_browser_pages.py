@@ -9,6 +9,7 @@ import threading
 import time
 
 import pytest
+from services import db, runtime_settings
 
 playwright_sync = pytest.importorskip("playwright.sync_api")
 
@@ -104,6 +105,37 @@ def test_workspace_exposes_the_functions_other_scripts_call(logged_in_page, live
         "names => names.filter(name => typeof window[name] !== 'function')", REQUIRED_GLOBALS)
     assert missing == [], f"window 上缺少：{missing}"
     assert errors == [], "\n".join(errors)
+
+
+def test_workspace_setup_and_console_in_browser(browser, live_server, make_account, monkeypatch, tmp_path):
+    monkeypatch.setattr(runtime_settings, "APP_DATA_DIR", tmp_path)
+    account = make_account("setup-browser")
+    with db._get_conn() as conn:
+        conn.execute("UPDATE users SET role = 'super_admin' WHERE username = ?", (account.email,))
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    try:
+        cookie = account.client.get_cookie("session")
+        context.add_cookies([{"name": "session", "value": cookie.value, "url": live_server}])
+        page = context.new_page()
+        page.route("**/*", lambda route: route.abort() if not route.request.url.startswith(live_server) else route.continue_())
+        errors = collect_errors(page)
+        page.goto(live_server)
+        guide = page.get_by_role("dialog", name="新手引导")
+        guide.wait_for(timeout=8000)
+        guide.get_by_role("link", name="去系统配置 →").click()
+        page.locator("#AI_CHAT_BASE_URL").fill("https://provider.example/v1")
+        page.locator("#AI_CHAT_API_KEY").fill("browser-test-key")
+        page.locator("#AI_CHAT_MODEL").fill("test-chat")
+        page.get_by_role("button", name="保存配置").click()
+        page.get_by_text("对话模型已配置 3/3").wait_for()
+        assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
+        page.get_by_role("button", name="›_ 白盒控制台").click()
+        page.locator("[data-console-filter]").fill("PATCH")
+        page.locator("[data-console-entries] li").filter(has_text="PATCH /api/system-settings/models").wait_for()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        assert errors == [], "\n".join(errors)
+    finally:
+        context.close()
 
 
 def test_user_center_exposes_report_generation(logged_in_page, live_server):

@@ -1,18 +1,13 @@
-"""Model access comes from environment variables (.env) only.
-
-The database never stores API keys, users cannot pick a provider, and there is no admin screen for
-editing credentials: whoever deploys the service decides the model in `.env`.
-"""
+"""Resolve runtime model settings, including local administrator overrides."""
 import os
 
 from .environment import ENV_FILE
+from . import runtime_settings
 
 
 def _values():
     from dotenv import dotenv_values
-    # Read the file on every call so an edited .env is picked up after a restart without code changes;
-    # explicit process variables still win, as in load_environment().
-    return {**dotenv_values(ENV_FILE, encoding="utf-8-sig"), **os.environ}
+    return {**dotenv_values(ENV_FILE, encoding="utf-8-sig"), **os.environ, **runtime_settings.read()}
 
 
 def runtime(prefix):
