@@ -4,6 +4,7 @@
   const submit = form.querySelector("[type=submit]");
   const result = document.getElementById("settingsResult");
   const pending = new Map();
+  const canEdit = form.dataset.canEdit === "true";
   let fields = {};
 
   function updateProgress() {
@@ -15,11 +16,15 @@
   function renderField(key) {
     const field = fields[key];
     const input = form.elements.namedItem(key);
-    input.value = field.value || "";
-    input.placeholder = input.type === "password" && field.configured ? "已配置 · 输入新密钥可替换" : "";
-    document.getElementById("state-" + key).textContent = field.override ? "网页已配置" :
-      field.configured ? "使用部署值或默认值" : "未配置";
-    form.querySelector(`[data-reset="${key}"]`).hidden = !field.override;
+    const status = document.getElementById("state-" + key);
+    if (!status) return;
+    status.textContent = field.override ? "网页已配置" : field.configured ? "已配置" : "未配置";
+    if (status.hasAttribute("data-deployment") && field.value) status.textContent = field.value;
+    if (input) {
+      input.value = field.value || "";
+      input.placeholder = input.type === "password" && field.configured ? "已配置 · 输入新密钥可替换" : "";
+      form.querySelector(`[data-reset="${key}"]`).hidden = !field.override;
+    }
   }
 
   async function load(method = "GET") {
@@ -31,7 +36,7 @@
         options.headers = { ...await window.CareerAuth.headers(), "Content-Type": "application/json" };
         options.body = JSON.stringify(Object.fromEntries(pending));
       }
-      const response = await fetch("/api/system-settings/models", options);
+      const response = await fetch(canEdit && method === "PATCH" ? "/api/system-settings/models" : "/api/system-settings/status", options);
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "暂时无法读取或保存配置。");
       fields = data.fields;
@@ -43,7 +48,7 @@
       result.textContent = error.message;
     } finally {
       fieldset.disabled = !Object.keys(fields).length;
-      submit.disabled = !pending.size;
+      if (submit) submit.disabled = !pending.size;
     }
   }
 
@@ -56,7 +61,7 @@
     else pending.delete(name);
     document.getElementById("state-" + name).textContent = pending.has(name) ? "待保存" :
       fields[name].configured ? "已配置" : "未配置";
-    submit.disabled = !pending.size;
+      if (submit) submit.disabled = !pending.size;
   });
   form.addEventListener("click", event => {
     const key = event.target.dataset.reset;
@@ -69,6 +74,28 @@
   form.addEventListener("submit", event => {
     event.preventDefault();
     if (pending.size) void load("PATCH");
+  });
+  form.querySelectorAll("[data-test-group]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const status = button.nextElementSibling;
+      if (pending.size) {
+        status.textContent = "请先保存修改，再测试连通性。";
+        return;
+      }
+      button.disabled = true;
+      status.textContent = "正在测试已保存的配置…";
+      try {
+        const response = await fetch("/api/system-settings/test/" + button.dataset.testGroup, {
+          method: "POST", headers: await window.CareerAuth.headers(), cache: "no-store"
+        });
+        const data = await response.json();
+        status.textContent = response.ok ? `${data.message}  ${data.duration_ms} ms` : data.message;
+      } catch {
+        status.textContent = "暂时无法完成测试，请稍后重试。";
+      } finally {
+        button.disabled = false;
+      }
+    });
   });
   document.querySelectorAll(".ca-settings-layout nav a").forEach(link => {
     link.addEventListener("click", () => { document.querySelector(link.hash).open = true; });

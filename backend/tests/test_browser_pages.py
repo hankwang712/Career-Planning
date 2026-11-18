@@ -129,9 +129,17 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_role("button", name="保存配置").click()
         page.get_by_text("对话模型已配置 3/3").wait_for()
         assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
+        page.route("**/api/system-settings/test/chat", lambda route: route.fulfill(
+            json={"message": "连通性测试通过。", "duration_ms": 12}))
+        page.locator("[data-test-group=chat]").click()
+        page.get_by_text("连通性测试通过。").wait_for()
+        page.get_by_role("link", name="PostgreSQL / pgvector").click()
+        page.get_by_text("POSTGRES_PASSWORD", exact=True).wait_for()
         page.get_by_role("button", name="›_ 白盒控制台").click()
         page.locator("[data-console-filter]").fill("PATCH")
         page.locator("[data-console-entries] li").filter(has_text="PATCH /api/system-settings/models").wait_for()
+        page.get_by_role("button", name="收起控制台").click()
+        assert page.locator("#workspaceConsolePanel").is_hidden()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         assert errors == [], "\n".join(errors)
     finally:

@@ -45,15 +45,20 @@
 .ca-settings-layout nav { display: flex; align-self: start; position: sticky; top: 16px; gap: 6px; flex-direction: column; }
 .ca-settings-layout nav a { padding: 9px 11px; border-radius: 8px; }
 .ca-settings-layout nav a:hover { background: #e8eef6; }
+.ca-settings-layout nav > span { margin: 5px 11px 0; color: #596f89; font-size: .73rem; font-weight: 700; }
+.ca-settings-entry { display: inline-grid; place-items: center; padding: 6px; }
+.ca-settings-test { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; color: #3e536e; font-size: .8rem; }
 .ca-settings-layout fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .ca-settings-group { margin-bottom: 12px; scroll-margin-top: 12px; }
 .ca-settings-group summary { cursor: pointer; }
 .ca-settings-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; }
 .ca-settings-field { min-width: 0; }
 .ca-settings-field label { display: block; font-size: .85rem; font-weight: 650; }
+.ca-settings-field > strong { font-size: .85rem; }
+.ca-settings-field code { display: block; color: #596f89; font-size: .68rem; overflow-wrap: anywhere; }
 .ca-settings-field input, .ca-console input { box-sizing: border-box; width: 100%; padding: 8px; border: 1px solid #cbd8e8; border-radius: 8px; background: #f8fafc; color: inherit; font: inherit; }
 .ca-settings-field input { margin: 6px 0; font-size: .875rem; }
-.ca-field-status { min-height: 27px; align-items: center; flex-wrap: wrap; font-size: .72rem; color: #50647d; }
+.ca-field-status { min-height: 27px; align-items: center; flex-wrap: wrap; font-size: .72rem; color: #50647d; overflow-wrap: anywhere; }
 .ca-field-status .ca-button { padding: 3px 6px; }
 .ca-settings-save { display: flex; justify-content: flex-end; }
 .ca-console { position: fixed; z-index: 1300; right: 14px; bottom: 14px; font: .8rem/1.5 system-ui, sans-serif; }
@@ -62,7 +67,9 @@ body:has(.ca-console) .assistant-mascot { bottom: 44px; }
 .ca-console button, .ca-console section { color: #edf2f7; background: #171b24; border: 1px solid #404a5b; border-radius: 10px; box-shadow: 0 8px 20px #0f172a28; }
 .ca-console button { display: block; margin-left: auto; padding: 7px 11px; font: inherit; cursor: pointer; }
 .ca-console section { width: min(410px, calc(100vw - 28px)); box-sizing: border-box; padding: 12px; margin-bottom: 8px; }
-.ca-console header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ca-console header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.ca-console header [data-console-collapse] { margin: 0; padding: 0 8px; font-size: 1rem; box-shadow: none; }
+.ca-console header strong { margin-right: auto; }
 .ca-console header span { color: #9fe0c5; }
 .ca-console input { background: #252c3a; border-color: #4b5566; }
 .ca-console ol { list-style: none; padding: 0; margin: 8px 0 0; overflow: auto; max-height: min(45dvh, 340px); }

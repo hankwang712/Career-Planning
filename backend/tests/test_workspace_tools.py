@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
+import httpx
 from fastapi.testclient import TestClient
 
-from services import db, llm_env, runtime_settings
+from services import db, llm_env, runtime_settings, workspace_tools
 
 
 def test_model_settings_are_private_and_reload_without_restart(make_account, monkeypatch, tmp_path):
@@ -18,6 +21,7 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     }
 
     assert user.get(endpoint).status_code == 403
+    assert user.get("/system-settings").status_code == 200
     assert user.request("patch", endpoint, json=changes).status_code == 403
     assert admin.client.patch(endpoint, json=changes).status_code == 403
     assert admin.get("/system-settings").status_code == 200
@@ -31,8 +35,46 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     assert saved.get_json()["fields"]["AI_CHAT_API_KEY"] == {"configured": True, "override": True}
     assert llm_env.chat_runtime() == ("https://provider.example/v1", "test-secret", "web-model")
     assert user.get("/api/llm-status").get_json() == {"configured": True, "model": "web-model"}
+    overview = user.get("/api/system-settings/status").get_json()["fields"]
+    assert "POSTGRES_PASSWORD" in overview
+    assert overview["AI_CHAT_BASE_URL"]["configured"]
+    assert all("value" not in field for field in overview.values())
     assert admin.request("patch", endpoint, json={"AI_CHAT_MODEL": ""}).status_code == 200
     assert llm_env.chat_runtime()[2] == "deployment-model"
+
+
+def test_connection_probes_the_saved_model_without_returning_provider_payload(make_account, monkeypatch):
+    admin = make_account("probe-admin")
+    user = make_account("probe-user")
+    with db._get_conn() as conn:
+        conn.execute("UPDATE users SET role = 'super_admin' WHERE username = ?", (admin.email,))
+    endpoint = "/api/system-settings/test/chat"
+    monkeypatch.setattr(llm_env, "chat_runtime", lambda: ("https://provider.example", "probe-secret", "saved-model"))
+    requests = []
+    status = 200
+
+    def provider(request):
+        requests.append(request)
+        if status != 200:
+            return httpx.Response(status, json={"error": "provider-private-details"})
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "OK"}}]})
+
+    net = SimpleNamespace(Client=lambda **kwargs: httpx.Client(transport=httpx.MockTransport(provider), **kwargs),
+                          HTTPError=httpx.HTTPError)
+    monkeypatch.setattr(workspace_tools, "httpx", net)
+    assert user.post(endpoint).status_code == 403
+    assert admin.client.post(endpoint).status_code == 403
+    response = admin.post(endpoint, json={"base_url": "https://ignored.example"})
+    assert response.status_code == 200
+    assert requests[0].url == "https://provider.example/v1/chat/completions"
+    assert b'"model":"saved-model"' in requests[0].content
+    assert "probe-secret" not in response.get_data(as_text=True)
+
+    status = 401
+    response = admin.post(endpoint)
+    assert response.status_code == 502
+    assert "401" in response.get_json()["message"]
+    assert "provider-private-details" not in response.get_data(as_text=True)
 
 
 def test_request_console_is_scoped_and_omits_request_data(server, make_account):

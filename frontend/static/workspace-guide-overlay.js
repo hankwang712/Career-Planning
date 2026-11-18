@@ -139,8 +139,6 @@
     if (!dialog || dialog.open || !isAuthenticatedSafe()) return;
     if (!force && window.hasSeenWorkspaceGuide()) return;
     const focus = document.activeElement;
-    dialog.querySelector("[data-guide-settings]").hidden = !getCurrentUserSafe()?.can_manage_configs;
-    dialog.querySelector("[data-guide-admin-note]").hidden = Boolean(getCurrentUserSafe()?.can_manage_configs);
     dialog.addEventListener("close", () => {
       window.setSeenWorkspaceGuide();
       document.body.classList.remove("workspace-guide-open");

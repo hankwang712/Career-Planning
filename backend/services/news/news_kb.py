@@ -16,6 +16,7 @@ from typing import Any
 # 路径 & 常量
 # ---------------------------------------------------------------------------
 from ..paths import APP_DATA_DIR
+from .. import llm_env
 
 NEWS_STORE_FILE = os.path.join(APP_DATA_DIR, "news_store.json")
 NEWS_CHUNKS_CACHE_FILE = os.path.join(APP_DATA_DIR, "news_chunks_cache.json")
@@ -23,7 +24,6 @@ NEWS_STORE_LOCK = threading.RLock()  # load 时可能就地修复并回写，需
 
 EMBEDDING_MODEL = "baai/bge-m3"
 EMBEDDING_BASE_URL = "https://openrouter.ai/api/v1"
-EMBEDDING_API_KEY = os.getenv("NEWS_EMBEDDING_API_KEY", "").strip()
 
 NEWS_MAX_ENTRIES = 500     # 最多保留条数
 NEWS_MAX_AGE_DAYS = 45     # 超过此天数的条目会被裁剪
@@ -535,7 +535,8 @@ def _chunk_text(
 
 def _get_embedding(text: str) -> list[float] | None:
     """调用 OpenRouter baai/bge-m3 接口，返回 embedding 向量。"""
-    if not text or not text.strip() or not EMBEDDING_API_KEY:
+    api_key = str(llm_env._values().get("NEWS_EMBEDDING_API_KEY") or "").strip()
+    if not text or not text.strip() or not api_key:
         return None
     try:
         payload = json.dumps({
@@ -547,7 +548,7 @@ def _get_embedding(text: str) -> list[float] | None:
             data=payload,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {EMBEDDING_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "HTTP-Referer": "https://career-platform.local",
                 "X-Title": "Career Platform",
             },

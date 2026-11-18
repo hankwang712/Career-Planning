@@ -67,6 +67,10 @@
     void refresh(++session);
   });
   filter.addEventListener("input", render);
+  panel.querySelector("[data-console-collapse]").addEventListener("click", () => {
+    close();
+    toggle.focus();
+  });
   panel.addEventListener("keydown", event => {
     if (event.key === "Escape") {
       close();

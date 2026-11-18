@@ -15,8 +15,40 @@ GROUPS = (
     ("image", "职业头像", "用于生成职业头像。接口地址留空时使用默认 OpenRouter 地址。", (
         ("TEXT_TO_IMAGE_BASE_URL", "接口地址"), ("TEXT_TO_IMAGE_API_KEY", "API Key"),
     )),
+    ("news", "资讯向量", "用于职业资讯的语义检索，使用 OpenRouter 的 BGE-M3。", (
+        ("NEWS_EMBEDDING_API_KEY", "OpenRouter API Key"),
+    )),
 )
 KEYS = frozenset(key for _, _, _, fields in GROUPS for key, _ in fields)
+
+DEPLOYMENT_GROUPS = (
+    ("ocr", "OCR 与文档识别", "主站文档识别使用本机 OCR。这里显示环境模板中的外部 OCR 字段。", (
+        ("AI_OCR_BASE_URL", "接口地址"), ("AI_OCR_API_KEY", "API Key"), ("AI_OCR_MODEL", "模型名称"),
+        ("TESSERACT_CMD", "Tesseract 路径"),
+    )),
+    ("rag-models", "LightRAG 模型", "构建图谱、向量索引和岗位检索所使用的环境配置。", (
+        ("LLM_BINDING", "语言模型协议"), ("LLM_BINDING_HOST", "语言模型地址"),
+        ("LLM_BINDING_API_KEY", "语言模型密钥"), ("LLM_MODEL", "语言模型名称"),
+        ("EMBEDDING_BINDING", "向量协议"), ("EMBEDDING_BINDING_HOST", "向量接口地址"),
+        ("EMBEDDING_BINDING_API_KEY", "向量密钥"), ("EMBEDDING_MODEL", "向量模型名称"),
+        ("EMBEDDING_DIM", "向量维度"), ("EMBEDDING_TOKEN_LIMIT", "分词上限"),
+    )),
+    ("rag-storage", "LightRAG 存储", "由图谱运行环境读取。", (
+        ("LIGHTRAG_WORKSPACE", "图谱工作区"), ("WORKSPACE", "存储工作区"),
+        ("LIGHTRAG_KV_STORAGE", "键值存储"), ("LIGHTRAG_VECTOR_STORAGE", "向量存储"),
+        ("LIGHTRAG_GRAPH_STORAGE", "图存储"), ("LIGHTRAG_DOC_STATUS_STORAGE", "文档状态存储"),
+        ("SUMMARY_LANGUAGE", "摘要语言"),
+    )),
+    ("postgres", "PostgreSQL / pgvector", "启用图谱数据库时配置。容器和数据库启动时读取这些值。", (
+        ("POSTGRES_HOST", "主机"), ("POSTGRES_PORT", "端口"), ("POSTGRES_USER", "用户名"),
+        ("POSTGRES_PASSWORD", "数据库密码"), ("POSTGRES_DATABASE", "数据库名称"),
+        ("POSTGRES_VECTOR_INDEX_TYPE", "向量索引类型"),
+    )),
+    ("retrieval", "岗位检索", "用于控制图谱检索和本地岗位描述语料。", (
+        ("JOB_RETRIEVAL_GRAPH_ENABLED", "启用图谱检索"), ("JOB_JD_SOURCE_PATH", "岗位描述文件"),
+    )),
+)
+DEPLOYMENT_KEYS = frozenset(key for _, _, _, fields in DEPLOYMENT_GROUPS for key, _ in fields)
 
 
 def read():

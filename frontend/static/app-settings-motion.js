@@ -2,11 +2,7 @@
 // 由原来的 app.js 拆出，仍是普通脚本、共享全局作用域；加载顺序见 templates/partials/app_scripts.html。
 
 function openSettingsPanel() {
-  if (window.getCurrentUser?.()?.can_manage_configs) {
-    window.location.assign("/system-settings");
-    return;
-  }
-  showToast("模型尚未配置", "请联系管理员在系统配置中填写对话模型。", "warning", 3200);
+  window.location.assign("/system-settings");
 }
 
 function closeSettingsPanel() {}
