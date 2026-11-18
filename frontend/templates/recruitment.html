@@ -38,6 +38,12 @@
                             <label class="recruitment-source"><input type="checkbox" name="source" value="{{ id }}" checked><span>{{ source[0] }}</span></label>
                             {% endfor %}
                         </fieldset>
+                        {% if boss_local %}
+                        <div class="recruitment-browser-option">
+                            <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked><span>用本机浏览器采集 BOSS</span></label>
+                            <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
+                        </div>
+                        {% endif %}
                         <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
                     </form>
                 </section>

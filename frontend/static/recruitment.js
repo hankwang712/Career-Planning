@@ -8,7 +8,8 @@
   const start = byId("recruitmentStart");
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
-    partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用"
+    partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
+    opening: "打开浏览器", waiting_user: "等待登录或验证"
   };
   let page = 1;
   let filters = new URLSearchParams();
@@ -115,8 +116,8 @@
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       line.append(node("strong", sources.get(source)), link);
-      const state = run.status === "interrupted" && ["queued", "running"].includes(item.status) ? "已中断" : statusNames[item.status];
-      const message = node("p", item.message || state);
+      const interrupted = run.status === "interrupted" && ["queued", "running", "opening", "waiting_user"].includes(item.status);
+      const message = node("p", interrupted ? "已中断" : item.message || statusNames[item.status]);
       message.dataset.status = item.status;
       line.append(message);
       card.append(line);
@@ -154,7 +155,10 @@
     submitting = true;
     updateStart();
     try {
-      await api("/runs", { keyword: data.get("keyword"), city: data.get("city"), limit: Number(data.get("limit")), sources: platforms });
+      await api("/runs", {
+        keyword: data.get("keyword"), city: data.get("city"), limit: Number(data.get("limit")), sources: platforms,
+        boss_local: platforms.includes("boss") && data.has("bossLocal")
+      });
       active = true;
       notice("已启动采集。各平台的结果会陆续显示。");
     } catch (error) {

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from time import monotonic
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
 
 
@@ -164,17 +165,79 @@ def collect_source(browser, source, keyword, city, limit):
         context.close()
 
 
-def launch_browser(playwright):
+def browser_options(playwright):
     if Path(playwright.chromium.executable_path).is_file():
-        return playwright.chromium.launch()
+        return {}
     if os.name == "nt":
         for root in (os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)"), os.environ.get("LOCALAPPDATA")):
             if root:
                 for relative in ("Google/Chrome/Application/chrome.exe", "Microsoft/Edge/Application/msedge.exe"):
                     path = Path(root) / relative
                     if path.is_file():
-                        return playwright.chromium.launch(executable_path=str(path))
-    return playwright.chromium.launch()
+                        return {"executable_path": str(path)}
+    return {}
+
+
+def launch_browser(playwright):
+    return playwright.chromium.launch(**browser_options(playwright))
+
+
+def collect_local_boss(playwright, profile_dir, keyword, city, limit, update):
+    """Keep the user's login, manual verification and job search in one profile."""
+    from playwright.sync_api import Error as BrowserError
+
+    update("opening", "正在打开 BOSS 专用浏览器。")
+    options = browser_options(playwright)
+    with playwright.chromium.launch_persistent_context(
+        profile_dir, headless=False, locale="zh-CN", accept_downloads=False, **options
+    ) as context:
+        page = context.pages[0] if context.pages else context.new_page()
+        page.bring_to_front()
+        target = search_url("boss", keyword, city)
+        expected_query = parse_qs(urlsplit(target).query)
+        deadline = monotonic() + 150
+        current_state = "opening"
+        retried_search = False
+
+        def go_to_search():
+            try:
+                page.goto(target, timeout=12000, wait_until="commit")
+            except BrowserError:
+                if page.is_closed():
+                    raise
+
+        go_to_search()
+        while monotonic() < deadline and not page.is_closed():
+            if not platform_url("boss", page.url):
+                state = "waiting_user"
+            else:
+                address = urlsplit(page.url)
+                title = page.title()
+                gated = (any(word in title for word in ("安全验证", "安全限制", "请稍候", "请登录"))
+                         or address.hostname == "passport.zhipin.com"
+                         or any(part in address.path for part in ("/login", "/verify", "/security"))
+                         or page.locator("#nc_1_n1z").first.is_visible())
+                if gated:
+                    state = "waiting_user"
+                elif address.path.rstrip("/") == "/web/geek/jobs" and all(
+                    parse_qs(address.query).get(key) == value for key, value in expected_query.items()
+                ):
+                    rows = cards(page, "boss", limit)
+                    if rows:
+                        return "succeeded", f"从 BOSS 登录窗口读取 {len(rows)} 条岗位。", rows
+                    if page.get_by_text("暂无相关职位", exact=False).first.is_visible():
+                        return "empty", "BOSS 暂无匹配职位，请调整关键词。", []
+                    state = "waiting_user"
+                else:
+                    state = "waiting_user"
+                    if current_state == "waiting_user" and not retried_search and page.locator(".user-nav").first.is_visible():
+                        retried_search = True
+                        go_to_search()
+            if state != current_state:
+                update(state, "请在 BOSS 窗口登录或完成安全验证。搜索结果出现后会自动读取。")
+                current_state = state
+            page.wait_for_timeout(1000)
+        return "blocked", "BOSS 窗口已关闭，或等待登录、验证超时。可以重新开始。", []
 
 
 def parse_page(browser, source, document, limit):

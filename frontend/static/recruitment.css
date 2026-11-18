@@ -94,6 +94,9 @@ input:not([type=checkbox]), select {
 }
 .recruitment-source:has(input:checked) { color: #234b88; background: #f3f7ff; }
 .recruitment-source input { accent-color: var(--blue); }
+.recruitment-browser-option { margin-bottom: 12px; }
+.recruitment-browser-option p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.recruitment-run-source p[data-status=waiting_user] { color: #8a5607; }
 .recruitment-primary { width: 100%; min-height: 39px; border-color: var(--blue); background: var(--blue); color: #fff; }
 .recruitment-primary:hover:not(:disabled) { background: #174fc4; }
 .recruitment-actions { display: flex; flex-wrap: wrap; gap: 8px; }

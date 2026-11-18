@@ -1,19 +1,26 @@
 """Account-scoped collection runs, listing search and CSV exchange."""
 
+from contextlib import ExitStack
 import csv
+from hashlib import sha256
 from io import StringIO
+from ipaddress import ip_address
 import json
 import logging
 import sqlite3
 import threading
 import time
 import uuid
+from urllib.parse import urlsplit
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import db
-from .recruitment_sources import CITIES, SOURCES, collect_source, launch_browser, listing_url, read_saved_page, search_url
+from .paths import APP_DATA_DIR
+from .recruitment_sources import (
+    CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
+)
 from .user_state import _current_user, _login_required
 
 
@@ -52,6 +59,7 @@ class CollectRequest(BaseModel):
     city: str = ""
     sources: list[str] = Field(min_length=1, max_length=5)
     limit: int = Field(default=20, ge=1, le=30, strict=True)
+    boss_local: bool = Field(default=False, strict=True)
 
 
 def save_rows(conn, owner, source, rows):
@@ -90,15 +98,32 @@ def run_collection(owner, run_id, config, progress):
     try:
         from playwright.sync_api import Error as BrowserError, sync_playwright
 
-        with sync_playwright() as playwright, launch_browser(playwright) as browser:
+        with sync_playwright() as playwright, ExitStack() as browsers:
+            browser = None
+
+            def boss_status(status, message):
+                progress["boss"] = {"status": status, "message": message}
+                with conn:
+                    save_progress(conn, owner, run_id, progress)
+
             for source in config.sources:
                 progress[source] = {"status": "running"}
                 with conn:
                     save_progress(conn, owner, run_id, progress)
                 try:
-                    status, message, rows = collect_source(browser, source, config.keyword, config.city, config.limit)
+                    if source == "boss" and config.boss_local:
+                        profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
+                        status, message, rows = collect_local_boss(
+                            playwright, profile, config.keyword, config.city, config.limit, boss_status
+                        )
+                    else:
+                        if browser is None:
+                            browser = browsers.enter_context(launch_browser(playwright))
+                        status, message, rows = collect_source(browser, source, config.keyword, config.city, config.limit)
                 except BrowserError:
                     status, message, rows = "unavailable", "页面加载未完成，请尝试原站搜索。", []
+                    if source == "boss" and config.boss_local:
+                        status, message = "blocked", "BOSS 窗口已关闭或无法继续加载，可以重新开始。"
                 with conn:
                     count = save_rows(conn, owner, source, rows)
                     progress[source] = {"status": status, "message": message, "count": count}
@@ -106,7 +131,7 @@ def run_collection(owner, run_id, config, progress):
     except Exception:
         logger.exception("Recruitment collection could not finish")
         for source in config.sources:
-            if progress[source]["status"] in {"queued", "running"}:
+            if progress[source]["status"] in {"queued", "running", "opening", "waiting_user"}:
                 progress[source] = {"status": "unavailable", "message": "浏览器采集未完成，请检查是否安装 Chromium、Chrome 或 Edge。", "count": 0}
     finally:
         with conn:
@@ -120,11 +145,21 @@ def run_collection(owner, run_id, config, progress):
         conn.close()
 
 
+def local_desktop_request():
+    try:
+        host = urlsplit("//" + request.host).hostname
+        remote = ip_address(request.remote_addr or "")
+        return (remote.is_loopback and host in {"localhost", "127.0.0.1", "::1"}
+                and not any(header in request.headers for header in ("Forwarded", "X-Forwarded-For", "X-Forwarded-Host")))
+    except ValueError:
+        return False
+
+
 @blueprint.get("/recruitment")
 def page():
     if not _current_user():
         return redirect(url_for("site.index"))
-    return render_template("recruitment.html", sources=SOURCES, cities=CITIES)
+    return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request())
 
 
 @blueprint.post(API + "/runs")
@@ -136,6 +171,8 @@ def start():
         return jsonify(message="请输入关键词，并选择平台和每个平台的采集上限。"), 400
     if (config.city and config.city not in CITIES) or any(source not in SOURCES for source in config.sources):
         return jsonify(message="城市或采集平台不在可用选项中。"), 400
+    if config.boss_local and ("boss" not in config.sources or not local_desktop_request()):
+        return jsonify(message="请在运行智航生涯的电脑上打开本机地址，并勾选 BOSS 直聘。"), 403
     config.sources = list(dict.fromkeys(config.sources))
     owner = _current_user()["username"]
     progress = {source: {"status": "queued"} for source in config.sources}

@@ -78,3 +78,84 @@ def test_upstream_csv_import_and_export_share_the_same_dedup_key(make_account):
     assert len(entries) == 1
     assert entries[0]["title"] == "'=1+1"
     assert entries[0]["url"] == LINKS["boss"]
+
+
+def test_local_boss_waits_in_account_profile_and_rejects_remote_launch(make_account, monkeypatch):
+    from services import recruitment
+
+    account = make_account("local-boss")
+    seen_profiles = []
+
+    def local_boss(_playwright, profile, keyword, city, limit, update):
+        assert (keyword, city, limit) == ("Agent", "杭州", 10)
+        seen_profiles.append(profile)
+        update("waiting_user", "等待手动验证")
+        return "succeeded", "读取 1 条岗位。", [{"title": "Agent 开发", "url": LINKS["boss"]}]
+
+    monkeypatch.setattr(recruitment, "collect_local_boss", local_boss)
+    config = {"keyword": "Agent", "city": "杭州", "limit": 10, "sources": ["boss"], "boss_local": True}
+    denied = account.post(API + "/runs", json=config, environ_overrides={"REMOTE_ADDR": "192.0.2.15"})
+    assert denied.status_code == 403
+    forwarded = account.post(API + "/runs", json=config, headers={"X-Forwarded-For": "192.0.2.15"})
+    assert forwarded.status_code == 403
+    started = account.post(API + "/runs", json=config)
+    assert started.status_code == 202
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        run = account.get(API + "/runs").get_json()["items"][0]
+        if run["status"] != "running":
+            break
+        time.sleep(.05)
+    assert run["status"] == "complete"
+    assert run["progress"]["boss"]["count"] == 1
+    assert len(seen_profiles) == 1
+    assert seen_profiles[0].parent.parent.name == "recruitment_profiles"
+    assert account.email not in str(seen_profiles[0])
+
+
+def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from services import recruitment_sources
+
+    class Page:
+        verified = False
+
+        def goto(self, url, **_kwargs):
+            self.url = url
+
+        def title(self):
+            return "职位搜索" if self.verified else "安全验证"
+
+        def wait_for_timeout(self, _delay):
+            self.verified = True
+
+        def is_closed(self):
+            return False
+
+        def bring_to_front(self):
+            pass
+
+        def locator(self, _selector):
+            return SimpleNamespace(first=SimpleNamespace(is_visible=lambda: False))
+
+    page = Page()
+
+    def read_cards(candidate, source, limit):
+        assert candidate is page and page.verified and source == "boss" and limit == 10
+        return [{"title": "Agent 开发", "url": LINKS["boss"]}]
+
+    def open_window(profile, **settings):
+        assert profile == tmp_path and settings["headless"] is False
+        return nullcontext(SimpleNamespace(pages=[page]))
+
+    monkeypatch.setattr(recruitment_sources, "cards", read_cards)
+    playwright = SimpleNamespace(chromium=SimpleNamespace(
+        executable_path=__file__, launch_persistent_context=open_window
+    ))
+    updates = []
+    status, _, rows = recruitment_sources.collect_local_boss(
+        playwright, tmp_path, "Agent", "杭州", 10, lambda state, _message: updates.append(state)
+    )
+    assert updates == ["opening", "waiting_user"]
+    assert status == "succeeded" and len(rows) == 1
