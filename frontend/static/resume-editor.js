@@ -1,6 +1,7 @@
 (() => {
   const root = document.getElementById("resumeWorkshop");
   const list = document.getElementById("resumeDraftList");
+  const versions = document.getElementById("resumeVersions");
   const container = document.getElementById("resumeSections");
   const status = document.getElementById("resumeEditorStatus");
   const title = root.querySelector("[name=title]");
@@ -330,8 +331,12 @@
   root.addEventListener("click", event => {
     const button = event.target.closest("button");
     if (!button || busy) return;
-    if (button.dataset.draftId && button.dataset.draftId !== id && canLeaveDraft()) {
-      void run(async () => showDraft(await (await request("/drafts/" + button.dataset.draftId)).json()), "正在打开简历…");
+    if (button.dataset.draftId) {
+      if (button.dataset.draftId === id) versions.open = false;
+      else if (canLeaveDraft()) {
+        versions.open = false;
+        void run(async () => showDraft(await (await request("/drafts/" + button.dataset.draftId)).json()), "正在打开简历…");
+      }
       return;
     }
     const section = button.closest(".re-section");
@@ -377,7 +382,11 @@
     }
     switch (button.dataset.restore ? "add" : button.dataset.action) {
       case "new":
-        if (canLeaveDraft()) startDraft();
+        if (canLeaveDraft()) {
+          versions.open = false;
+          startDraft();
+          title.focus();
+        }
         break;
       case "add":
         if (container.children.length >= maxSections) {
@@ -426,6 +435,15 @@
 
   document.querySelectorAll("[data-close]").forEach(button => {
     button.addEventListener("click", () => { if (!busy || button.closest("dialog") === previewDialog) button.closest("dialog").close(); });
+  });
+  document.addEventListener("pointerdown", event => {
+    if (versions.open && !versions.contains(event.target)) versions.open = false;
+  });
+  versions.addEventListener("keydown", event => {
+    if (event.key === "Escape" && versions.open) {
+      versions.open = false;
+      versions.querySelector("summary").focus();
+    }
   });
   importDialog.addEventListener("cancel", event => { if (busy) event.preventDefault(); });
   previewDialog.addEventListener("close", () => document.getElementById("resumePreviewPages").replaceChildren());

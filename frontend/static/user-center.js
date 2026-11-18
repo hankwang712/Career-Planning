@@ -141,7 +141,10 @@ function switchUserCenterSection(sectionId, options = {}) {
   userCenterState.activeSection = nextSection;
 
   document.querySelectorAll(".uc-nav-link[data-target]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.target === nextSection);
+    const selected = button.dataset.target === nextSection;
+    button.classList.toggle("active", selected);
+    if (selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
   document.querySelectorAll(".uc-section").forEach((section) => {
     section.classList.toggle("active", section.id === nextSection);

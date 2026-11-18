@@ -2,32 +2,8 @@ body.user-center-page:has(#report-workspace.active) {
     background: #f5f7fa;
     color: #26394b;
 }
-body.user-center-page .user-center-layout { grid-template-columns: 224px minmax(0, 1fr); }
-body.user-center-page .uc-sidebar {
-    padding: 28px 16px 20px;
-    gap: 30px;
-    color: #607183;
-    border-right: 1px solid #e2e8ef;
-    background: #fff;
-}
-body.user-center-page .uc-brand { gap: 12px; padding: 0 8px; }
-body.user-center-page .uc-brand-mark { width: 40px; height: 40px; border-radius: 11px; box-shadow: none; }
-body.user-center-page .uc-brand-mark svg { width: 27px; height: 27px; }
-body.user-center-page .uc-brand-copy strong { color: #223b53; font-size: 17px; }
-body.user-center-page .uc-brand-copy span { font-size: 11px; color: #8c99a6; }
-body.user-center-page .uc-nav { gap: 8px; }
-body.user-center-page .uc-nav-link {
-    min-height: 46px; padding: 10px 14px; gap: 12px; border-radius: 9px;
-    color: #65778b; background: transparent; border: 1px solid transparent; box-shadow: none;
-    font-size: 14px; font-weight: 500;
-}
-body.user-center-page .uc-nav-link:hover { background: #f5f8fb; color: #244e74; transform: none; }
-body.user-center-page .uc-nav-link.active { background: #edf4fb; border-color: #e3edf7; color: #2e618f; font-weight: 600; }
-body.user-center-page .uc-nav-icon { width: 21px; height: 21px; padding: 0; border-radius: 0; background: none; }
-body.user-center-page .uc-nav-icon svg { width: 21px; height: 21px; stroke-linecap: round; stroke-linejoin: round; }
-body.user-center-page .uc-sidebar-footer { margin-top: auto; border-top: 1px solid #edf1f5; padding-top: 18px; }
+body.user-center-page .user-center-layout { grid-template-columns: var(--uc-nav-width) minmax(0, 1fr); }
 body.user-center-page .uc-main { padding: 0; background: #f5f7fa; }
-body.user-center-page .uc-footer-link { color: #75869a; font-size: 12px; }
 body.user-center-page .uc-topbar {
     margin: 0; padding: 18px 30px; min-height: 82px; border-radius: 0;
     background: #fff; border: 0; border-bottom: 1px solid #e5ebf1; box-shadow: none;
@@ -182,7 +158,6 @@ body.user-center-page #report-workspace .career-report-md-hr { margin-block: 24p
 body.user-center-page #report-workspace :is(button, a, summary):focus-visible { outline: 2px solid #6695ba; outline-offset: 4px; }
 
 @media (max-width: 1240px) {
-    body.user-center-page .user-center-layout { grid-template-columns: 200px minmax(0, 1fr); }
     body.user-center-page .uc-content { padding: 22px; }
     body.user-center-page #report-workspace .uc-report-library-card-main { grid-template-columns: minmax(0, 1fr) 250px; column-gap: 22px; }
     body.user-center-page #report-workspace .uc-report-library-stats { padding-left: 0; }
@@ -196,15 +171,6 @@ body.user-center-page #report-workspace :is(button, a, summary):focus-visible { 
 @media (max-width: 900px) {
     body.user-center-page .user-center-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100dvh; min-height: 0; }
     body.user-center-page .uc-main { height: auto; min-height: 0; }
-    body.user-center-page .uc-sidebar { position: relative; width: 100%; height: auto; padding: 16px 20px 12px; gap: 16px; border: 0; border-bottom: 1px solid #e2e8ef; }
-    body.user-center-page .uc-brand { padding: 0; }
-    body.user-center-page .uc-brand-copy span { display: none; }
-    body.user-center-page .uc-nav { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; }
-    body.user-center-page .uc-nav-group { display: contents; }
-    body.user-center-page .uc-nav-link { width: auto; flex: none; min-height: 38px; padding: 8px 12px; font-size: 12px; }
-    body.user-center-page .uc-nav-icon { width: 17px; height: 17px; }
-    body.user-center-page .uc-nav-icon svg { width: 17px; height: 17px; }
-    body.user-center-page .uc-sidebar-footer { display: none; }
     body.user-center-page #report-workspace .uc-report-library-card-main { grid-template-columns: minmax(0, 1fr); }
     body.user-center-page #report-workspace .uc-report-library-stats { grid-column: 1; grid-row: auto; border: 0; padding: 0; }
     body.user-center-page #report-workspace .uc-report-library-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }

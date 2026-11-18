@@ -159,7 +159,10 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)
     page.goto(live_server + "/user-center")
+    sidebar_width = page.locator(".uc-workspace-sidebar").bounding_box()["width"]
     page.get_by_role("link", name="我的简历").click()
+    assert page.locator(".uc-workspace-sidebar").bounding_box()["width"] == sidebar_width
+    assert page.get_by_role("link", name="我的简历").get_attribute("aria-current") == "page"
     work = page.get_by_role("button", name="工作经历", exact=True)
     assert work.get_attribute("aria-expanded") == "false"
     work.click()
@@ -185,6 +188,8 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     preview.get_by_role("button", name="关闭预览").click()
     page.locator("[name=title]").fill("产品开发简历")
     page.get_by_role("button", name="保存", exact=True).click()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    page.locator("#resumeVersions summary").click()
     page.get_by_role("button", name="产品开发简历").wait_for()
     page.reload()
     page.get_by_text("已保存的简历", exact=True).wait_for()
@@ -195,6 +200,8 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     with page.expect_download() as downloaded:
         page.get_by_role("button", name="导出 PDF").click()
     assert downloaded.value.suggested_filename == "产品开发简历.pdf"
+    page.get_by_role("link", name="账户设置").click()
+    page.get_by_role("button", name="账户设置").and_(page.locator("[aria-current=page]")).wait_for()
     assert errors == [], "\n".join(errors)
 
 

@@ -21,21 +21,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>我的简历 · 智航生涯</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='resume-editor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='user-center-sidebar.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='resume-editor.js') }}" defer></script>
 </head>
 <body>
     <div class="re-shell" id="resumeWorkshop" data-max-sections="{{ max_sections }}">
-        <aside class="re-sidebar">
-            <a href="/user-center" class="re-back">← 个人中心</a>
-            <div class="re-sidebar-title">{{ icon('doc') }}<h1>我的简历</h1></div>
-            <nav id="resumeDraftList" aria-label="已保存的简历"></nav>
-            <button type="button" data-action="new" class="re-button re-primary re-new">＋ 新建简历</button>
-        </aside>
+        {% with resume_workshop = true %}{% include "partials/user_center_sidebar.html" %}{% endwith %}
         <main class="re-main">
             <header class="re-toolbar">
                 <div class="re-version">{{ icon('doc') }}<label><span class="re-sr-only">简历版本名称</span><input name="title" maxlength="80" value="新建简历版本"></label><span id="resumeVersionBadge" class="re-version-badge">草稿</span></div>
                 <div class="re-toolbar-actions">
+                    <details class="re-versions" id="resumeVersions">
+                        <summary class="re-button">简历版本 <span aria-hidden="true">⌄</span></summary>
+                        <div class="re-versions-popover">
+                            <nav id="resumeDraftList" aria-label="已保存的简历"></nav>
+                            <button type="button" data-action="new" class="re-button">＋ 新建简历</button>
+                        </div>
+                    </details>
                     <div class="re-action-tray">
                         <button type="button" class="re-icon-button re-blue" data-action="import" aria-label="导入简历" title="导入简历">{{ icon('upload') }}</button>
                         <div class="re-actions-highlight"><button type="button" class="re-button re-accent" data-action="auto">{{ icon('wand') }} 智能排版</button></div>

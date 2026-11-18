@@ -1,0 +1,52 @@
+:root { --uc-nav-width: 224px; }
+
+.uc-sidebar.uc-workspace-sidebar {
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    min-width: 0;
+    height: 100dvh;
+    padding: 28px 16px 20px;
+    color: #607183;
+    border-right: 1px solid #e2e8ef;
+    background: #fff;
+}
+.uc-workspace-sidebar .uc-brand { display: flex; align-items: center; gap: 12px; padding: 0 8px; color: inherit; text-decoration: none; }
+.uc-workspace-sidebar .uc-brand-mark {
+    display: grid; flex: none; place-items: center; width: 40px; height: 40px;
+    border-radius: 11px; box-shadow: none; color: #fff;
+    background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 58%, #319795 100%);
+}
+.uc-workspace-sidebar .uc-brand-mark svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.uc-workspace-sidebar .uc-brand-copy { display: grid; gap: .18rem; }
+.uc-workspace-sidebar .uc-brand-copy strong { color: #223b53; font-size: 17px; font-weight: 700; }
+.uc-workspace-sidebar .uc-brand-copy span { font-size: 11px; color: #8c99a6; }
+.uc-workspace-sidebar .uc-nav, .uc-workspace-sidebar .uc-nav-group { display: grid; gap: 8px; }
+.uc-workspace-sidebar .uc-nav-link {
+    display: flex; box-sizing: border-box; align-items: center; width: 100%;
+    min-height: 46px; padding: 10px 14px; gap: 12px; border-radius: 9px;
+    color: #65778b; background: transparent; border: 1px solid transparent; box-shadow: none;
+    font: inherit; font-size: 14px; font-weight: 500; text-align: left; text-decoration: none; cursor: pointer;
+}
+.uc-workspace-sidebar .uc-nav-link:hover { background: #f5f8fb; color: #244e74; transform: none; }
+.uc-workspace-sidebar .uc-nav-link.active { background: #edf4fb; border-color: #e3edf7; color: #2e618f; font-weight: 600; transform: none; }
+.uc-workspace-sidebar .uc-nav-icon { display: inline-grid; place-items: center; flex: none; width: 21px; height: 21px; padding: 0; border-radius: 0; background: none; color: #6a8cbd; }
+.uc-workspace-sidebar .uc-nav-icon svg { width: 21px; height: 21px; stroke-linecap: round; stroke-linejoin: round; }
+.uc-workspace-sidebar .uc-sidebar-footer { margin-top: auto; border-top: 1px solid #edf1f5; padding-top: 18px; }
+.uc-workspace-sidebar .uc-footer-link { color: #75869a; font-size: 12px; text-decoration: none; }
+
+@media (max-width: 1240px) {
+    :root { --uc-nav-width: 200px; }
+}
+@media (max-width: 900px) {
+    .uc-sidebar.uc-workspace-sidebar { position: relative; width: 100%; height: auto; padding: 16px 20px 12px; gap: 16px; border: 0; border-bottom: 1px solid #e2e8ef; }
+    .uc-workspace-sidebar .uc-brand { padding: 0; }
+    .uc-workspace-sidebar .uc-brand-copy span, .uc-workspace-sidebar .uc-sidebar-footer { display: none; }
+    .uc-workspace-sidebar .uc-nav { display: flex; flex-wrap: nowrap; overflow-x: auto; }
+    .uc-workspace-sidebar .uc-nav-group { display: contents; }
+    .uc-workspace-sidebar .uc-nav-link { width: auto; flex: none; min-height: 38px; padding: 8px 12px; font-size: 12px; }
+    .uc-workspace-sidebar .uc-nav-icon, .uc-workspace-sidebar .uc-nav-icon svg { width: 17px; height: 17px; }
+}
