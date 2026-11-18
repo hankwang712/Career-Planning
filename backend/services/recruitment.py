@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import db
 from .paths import APP_DATA_DIR
+from .recruitment_chrome import collect_boss_in_chrome, use_local_chrome
 from .recruitment_sources import (
     CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
 )
@@ -112,10 +113,15 @@ def run_collection(owner, run_id, config, progress):
                     save_progress(conn, owner, run_id, progress)
                 try:
                     if source == "boss" and config.boss_local:
-                        profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
-                        status, message, rows = collect_local_boss(
-                            playwright, profile, config.keyword, config.city, config.limit, boss_status
-                        )
+                        if use_local_chrome():
+                            status, message, rows = collect_boss_in_chrome(
+                                config.keyword, config.city, config.limit, boss_status
+                            )
+                        else:
+                            profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
+                            status, message, rows = collect_local_boss(
+                                playwright, profile, config.keyword, config.city, config.limit, boss_status
+                            )
                     else:
                         if browser is None:
                             browser = browsers.enter_context(launch_browser(playwright))
@@ -159,7 +165,8 @@ def local_desktop_request():
 def page():
     if not _current_user():
         return redirect(url_for("site.index"))
-    return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request())
+    return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
+                           boss_chrome=use_local_chrome())
 
 
 @blueprint.post(API + "/runs")

@@ -40,8 +40,12 @@
                         </fieldset>
                         {% if boss_local %}
                         <div class="recruitment-browser-option">
-                            <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked><span>用本机浏览器采集 BOSS</span></label>
+                            <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked><span>{{ '用已登录的本机 Chrome 采集 BOSS' if boss_chrome else '用本机浏览器采集 BOSS' }}</span></label>
+                            {% if boss_chrome %}
+                            <p>采集会创建新的 BOSS 搜索标签页，并复用当前 Chrome 的登录状态。</p>
+                            {% else %}
                             <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
+                            {% endif %}
                         </div>
                         {% endif %}
                         <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>

@@ -83,6 +83,7 @@ def test_upstream_csv_import_and_export_share_the_same_dedup_key(make_account):
 def test_local_boss_waits_in_account_profile_and_rejects_remote_launch(make_account, monkeypatch):
     from services import recruitment
 
+    monkeypatch.setenv("CAREER_BOSS_USE_LOCAL_CHROME", "0")
     account = make_account("local-boss")
     seen_profiles = []
 
@@ -159,3 +160,41 @@ def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_
     )
     assert updates == ["opening", "waiting_user"]
     assert status == "succeeded" and len(rows) == 1
+
+
+def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch):
+    import json
+
+    import httpx
+
+    from services import recruitment_chrome
+
+    tab_id = "3" * 32
+    target = "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100"
+    requests = []
+
+    def route(request):
+        path = request.url.path
+        requests.append(path)
+        if path == "/health":
+            return httpx.Response(200, json={"connected": True})
+        if path == "/new":
+            assert request.url.params["url"] == target
+            return httpx.Response(200, json={"targetId": tab_id})
+        assert request.url.params["target"] == tab_id
+        if path == "/close":
+            return httpx.Response(200, json={"success": True})
+        script = request.content.decode()
+        if "verification:" in script:
+            value = {"url": target, "title": "岗位搜索", "verification": False}
+        else:
+            assert "location.origin === 'https://www.zhipin.com'" in script
+            value = [{"title": "Agent 开发", "url": LINKS["boss"]}]
+        return httpx.Response(200, json={"value": json.dumps(value)})
+
+    client = httpx.Client
+    monkeypatch.setattr(recruitment_chrome.httpx, "Client",
+                        lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(route)))
+    state, _, rows = recruitment_chrome.collect_boss_in_chrome("Agent", "杭州", 20, lambda *_: None)
+    assert state == "succeeded" and len(rows) == 1
+    assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
