@@ -10,7 +10,7 @@
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
     partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
-    opening: "打开浏览器", waiting_user: "等待登录或验证"
+    opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录"
   };
   let page = 1;
   let filters = new URLSearchParams();
@@ -196,6 +196,30 @@
   byId("recruitmentPrev").onclick = () => { page -= 1; void loadJobs(); };
   byId("recruitmentNext").onclick = () => { page += 1; void loadJobs(); };
   byId("recruitmentRefresh").onclick = () => { void loadRuns(); void loadJobs(); };
+  const zhilianLogin = byId("recruitmentZhilianLogin");
+  if (zhilianLogin) {
+    const status = byId("recruitmentZhilianStatus");
+    const check = byId("recruitmentCheckZhilian");
+    const zhilian = config.querySelector('input[name="source"][value="zhilian"]');
+    const syncVisibility = () => { zhilianLogin.hidden = !zhilian.checked; };
+    zhilian.addEventListener("change", syncVisibility);
+    syncVisibility();
+    check.addEventListener("click", async () => {
+      check.disabled = true;
+      status.dataset.state = "checking";
+      status.textContent = "正在检查当前 Chrome 的智联登录状态…";
+      try {
+        const result = await api("/session/zhilian", {});
+        status.dataset.state = result.state;
+        status.textContent = result.message;
+      } catch (error) {
+        status.dataset.state = "unavailable";
+        status.textContent = error.message;
+      } finally {
+        check.disabled = false;
+      }
+    });
+  }
   const upload = byId("recruitmentFile");
   const importButton = byId("recruitmentImport");
   importButton.onclick = () => upload.click();

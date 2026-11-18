@@ -19,7 +19,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import db
 from .paths import APP_DATA_DIR
-from .recruitment_chrome import CHROME_SOURCES, collect_in_chrome, use_local_chrome
+from .recruitment_chrome import (
+    CHROME_SOURCES, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome, use_local_chrome,
+)
 from .recruitment_sources import (
     CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
 )
@@ -135,6 +137,8 @@ def run_collection(owner, run_id, config, progress):
                         status, message, rows = collect_in_chrome(
                             source, config.keyword, config.city, config.limit, browser_status
                         )
+                    elif source == "zhilian":
+                        status, message, rows = "login_required", "智联采集需要启用本机 Chrome 并完成登录检查。", []
                     elif source == "boss" and config.boss_local:
                         profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
                         status, message, rows = collect_local_boss(
@@ -184,7 +188,17 @@ def page():
     if not _current_user():
         return redirect(url_for("site.index"))
     return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
-                           chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES)
+                           chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
+                           zhilian_login_url=ZHILIAN_LOGIN_URL)
+
+
+@blueprint.post(API + "/session/zhilian")
+@_login_required
+def zhilian_login_status():
+    if not local_desktop_request() or not use_local_chrome():
+        return jsonify(message="请从已启用 Chrome 连接的电脑访问本机采集页。"), 403
+    state = check_zhilian_login()
+    return jsonify(state=state, message=ZHILIAN_LOGIN_MESSAGES[state])
 
 
 @blueprint.post(API + "/runs")

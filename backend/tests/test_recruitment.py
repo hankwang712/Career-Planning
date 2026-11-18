@@ -39,6 +39,7 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
 
     owner = make_account("collector")
     other = make_account("other-collector")
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
     monkeypatch.setattr(recruitment, "launch_browser", lambda _: nullcontext(object()))
 
     def collect(_browser, source, keyword, city, limit):
@@ -46,9 +47,12 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
         return "succeeded", "读取 1 条结果。", [{"title": "Agent 开发", "url": LINKS[source], "location": city}]
 
     monkeypatch.setattr(recruitment, "collect_source", collect)
+    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda source, keyword, city, limit, _update:
+                        collect(None, source, keyword, city, limit))
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
-    response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": list(LINKS), "limit": 10})
+    response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": list(LINKS), "limit": 10,
+                                               "chrome_local": True})
     assert response.status_code == 202
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
@@ -163,13 +167,15 @@ def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_
     assert status == "succeeded" and len(rows) == 1
 
 
-@pytest.mark.parametrize(("source", "host", "target", "route_url"), [
+@pytest.mark.parametrize(("source", "host", "target", "route_url", "login"), [
     ("boss", "www.zhipin.com", "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100",
-     "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100"),
+     "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100", "unknown"),
     ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
-     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653"),
+     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "ready"),
+    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
+     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "not_logged_in"),
 ])
-def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source, host, target, route_url):
+def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source, host, target, route_url, login):
     import json
 
     import httpx
@@ -192,7 +198,7 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source,
             return httpx.Response(200, json={"success": True})
         script = request.content.decode()
         if "verification:" in script:
-            value = {"url": route_url, "title": "岗位搜索", "verification": False}
+            value = {"url": route_url, "title": "岗位搜索", "verification": False, "zhilianLogin": login}
         else:
             assert f"location.origin === 'https://{host}'" in script
             value = [{"title": "Agent 开发", "url": LINKS[source]}]
@@ -202,8 +208,27 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source,
     monkeypatch.setattr(recruitment_chrome.httpx, "Client",
                         lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(route)))
     state, _, rows = recruitment_chrome.collect_in_chrome(source, "Agent", "杭州", 20, lambda *_: None)
-    assert state == "succeeded" and len(rows) == 1
-    assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
+    if login == "not_logged_in":
+        assert state == "login_required" and rows == []
+        assert requests == ["/health", "/new", "/eval", "/close"]
+    else:
+        assert state == "succeeded" and len(rows) == 1
+        assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
+
+
+@pytest.mark.parametrize("state", ["not_logged_in", "ready", "verification_required"])
+def test_zhilian_login_status_only_checks_authorized_local_browser(make_account, monkeypatch, state):
+    from services import recruitment
+
+    account = make_account("zhilian-login")
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "check_zhilian_login", lambda: state)
+    url = API + "/session/zhilian"
+    assert account.post(url, json={}, environ_overrides={"REMOTE_ADDR": "192.0.2.15"}).status_code == 403
+    assert account.client.post(url, json={}).status_code == 403
+    response = account.post(url, json={})
+    assert response.status_code == 200
+    assert response.get_json()["state"] == state
 
 
 def test_encoded_salary_is_hidden_from_results_and_csv_without_erasing_a_known_value(make_account):

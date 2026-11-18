@@ -285,6 +285,8 @@ flowchart LR
 
 本机已运行经过用户授权的 web-access Chrome 桥时，可在 `.env` 中设置 `CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`（兼容旧配置 `CAREER_BOSS_USE_LOCAL_CHROME`）。开启后，BOSS 和智联可以在普通 Chrome 里新建搜索标签页，复用当前浏览器的登录或验证状态。远程访问的账号使用公开页采集或导入。
 
+智联实时采集需要确认官网已登录。可使用「智联登录验证」卡片打开官网完成登录，再点击「检查登录」。如智联提示安全验证，在官网完成后可以重新检查；采集任务也会再次校验当前会话。
+
 <a id="configuration"></a>
 
 ## ⚙️ 模型与可选服务配置

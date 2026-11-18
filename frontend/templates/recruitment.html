@@ -46,6 +46,16 @@
                         {% endif %}
                     </div>
                     {% endif %}
+                    {% if boss_local and chrome_available %}
+                    <div id="recruitmentZhilianLogin" class="recruitment-browser-option">
+                        <strong>智联登录验证</strong>
+                        <p id="recruitmentZhilianStatus" role="status">采集前会检查当前 Chrome 的智联登录状态。</p>
+                        <div class="recruitment-browser-actions">
+                            <a href="{{ zhilian_login_url }}" class="recruitment-button" target="_blank" rel="noopener noreferrer">去智联登录 ↗</a>
+                            <button id="recruitmentCheckZhilian" type="button">检查登录</button>
+                        </div>
+                    </div>
+                    {% endif %}
                     <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
                 </form>
             </section>
