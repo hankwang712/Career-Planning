@@ -155,6 +155,37 @@ def test_user_center_exposes_report_generation(logged_in_page, live_server):
     assert missing == []
 
 
+def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
+    page = logged_in_page
+    errors = collect_errors(page)
+    page.goto(live_server + "/user-center")
+    page.get_by_role("link", name="我的简历").click()
+    page.get_by_role("button", name="导入简历").click()
+    dialog = page.get_by_role("dialog", name="导入简历")
+    dialog.locator("[name=source]").select_option("text")
+    dialog.locator("[name=text]").fill("姓名：林晓\n## 工作经验\n开发履历编辑功能。")
+    dialog.get_by_role("button", name="识别并填入").click()
+    page.get_by_text("已填入，请检查后保存。").wait_for()
+    assert page.locator("[data-contact=name]").input_value() == "林晓"
+    assert page.locator("[data-section-content]").nth(1).input_value() == "开发履历编辑功能。"
+    page.get_by_role("button", name="智能排版").click()
+    preview = page.get_by_role("dialog", name="简历预览")
+    preview.get_by_role("img", name="简历第 1 页").wait_for()
+    preview.get_by_role("button", name="关闭预览").click()
+    page.locator("[name=title]").fill("产品开发简历")
+    page.get_by_role("button", name="保存", exact=True).click()
+    page.get_by_role("button", name="产品开发简历").wait_for()
+    page.reload()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    page.locator("[data-contact=name]").fill("林晓更新")
+    page.get_by_role("button", name="保存", exact=True).click()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    with page.expect_download() as downloaded:
+        page.get_by_role("button", name="导出 PDF").click()
+    assert downloaded.value.suggested_filename == "产品开发简历.pdf"
+    assert errors == [], "\n".join(errors)
+
+
 def test_switching_sections_works(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
     logged_in_page.goto(live_server + "/", wait_until="load")

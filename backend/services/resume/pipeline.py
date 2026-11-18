@@ -281,33 +281,39 @@ def _prepare_resume_ocr_image(image):
     return prepared
 
 
-def _run_resume_ocr(image, lang):
+def _run_resume_ocr(image, lang, *, keep_lines=False):
     if pytesseract is None or image is None or not lang:
         return ""
     _configure_tesseract_command()
+    def clean(text):
+        if keep_lines:
+            return "\n".join(line.strip() for line in text.splitlines()).strip()
+        return _normalize_resume_text(text)
+
+    options = {"timeout": 12} if keep_lines else {}
     primary_text = ""
     try:
-        primary_text = pytesseract.image_to_string(image, lang=lang, config="--oem 3 --psm 6")
+        primary_text = pytesseract.image_to_string(image, lang=lang, config="--oem 3 --psm 6", **options)
     except Exception as exc:
         logger.warning("OCR 首次识别失败：%s", type(exc).__name__)
         primary_text = ""
     primary_score = _resume_text_quality_score(primary_text)
     if primary_score >= 900:
-        return _normalize_resume_text(primary_text)
+        return clean(primary_text)
 
     prepared_image = _prepare_resume_ocr_image(image)
     if prepared_image is image:
-        return _normalize_resume_text(primary_text)
+        return clean(primary_text)
 
     try:
-        fallback_text = pytesseract.image_to_string(prepared_image, lang=lang, config="--oem 3 --psm 6")
+        fallback_text = pytesseract.image_to_string(prepared_image, lang=lang, config="--oem 3 --psm 6", **options)
     except Exception as exc:
         logger.warning("OCR 预处理后识别失败：%s", type(exc).__name__)
         fallback_text = ""
 
     if _resume_text_quality_score(fallback_text) > primary_score:
-        return _normalize_resume_text(fallback_text)
-    return _normalize_resume_text(primary_text)
+        return clean(fallback_text)
+    return clean(primary_text)
 
 
 def _extract_pdf_text_pages(pdf_path):
@@ -375,7 +381,7 @@ def _should_fallback_ocr(text_pages, *_):
     return total_chars < 240 or meaningful_ratio < 0.42
 
 
-def _ocr_pdf_pages(pdf_path):
+def _ocr_pdf_pages(pdf_path, *, keep_lines=False, page_numbers=None):
     if fitz is None or pytesseract is None or Image is None:
         return []
     ocr_lang = _resolve_resume_ocr_lang()
@@ -387,11 +393,15 @@ def _ocr_pdf_pages(pdf_path):
     try:
         with fitz.open(pdf_path) as doc:
             for idx in range(min(len(doc), RESUME_MAX_PAGES)):
+                if page_numbers is not None and idx + 1 not in page_numbers:
+                    continue
                 if time.monotonic() - start_at > RESUME_OCR_TIMEOUT_SECONDS:
                     break
-                pix = doc[idx].get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                page = doc[idx]
+                scale = min(2, 3600 / max(page.rect.width, page.rect.height)) if keep_lines else 2
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                 image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                text = _run_resume_ocr(image, ocr_lang)
+                text = _run_resume_ocr(image, ocr_lang, keep_lines=True) if keep_lines else _run_resume_ocr(image, ocr_lang)
                 if text:
                     pages.append({"page_no": idx + 1, "source": f"ocr:{ocr_lang}", "text": text})
     except Exception as exc:

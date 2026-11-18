@@ -111,6 +111,15 @@ def init_db():
             started_at REAL NOT NULL,
             attempts INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS resume_drafts (
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            document TEXT NOT NULL,
+            updated_at REAL NOT NULL,
+            revision INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS resume_drafts_owner ON resume_drafts(owner, updated_at DESC);
     """)
     from .career import init_schema
     init_schema(conn)

@@ -45,6 +45,7 @@ from services.report import api as report_api
 from services.report.jobs import CAREER_REPORT_JOBS, _fail_interrupted_report
 from services.report.store import _read_career_report_bundle
 from services.resume import api as resume_api
+from services.resume import editor as resume_editor
 from services.resume.jobs import RESUME_ANALYSIS_JOBS, _fail_interrupted_resume
 from services.resume.pipeline import fitz
 from services import site, webshell, workspace_tools
@@ -115,6 +116,7 @@ def _restore_background_jobs():
 app.register_blueprint(webshell.blueprint)
 app.register_blueprint(report_api.blueprint)
 app.register_blueprint(resume_api.blueprint)
+app.register_blueprint(resume_editor.blueprint)
 app.register_blueprint(site.blueprint)
 _ensure_app_storage()
 _app_db.init_db()

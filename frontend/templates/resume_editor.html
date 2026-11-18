@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>我的简历 · 智航生涯</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='resume-editor.css') }}">
+    <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='resume-editor.js') }}" defer></script>
+</head>
+<body>
+    <div class="re-shell" id="resumeWorkshop" data-max-sections="{{ max_sections }}">
+        <aside class="re-sidebar">
+            <a href="/user-center">← 个人中心</a>
+            <div class="re-sidebar-title"><h1>我的简历</h1><button type="button" data-action="new" class="re-button" title="新建简历">＋ 新建</button></div>
+            <nav id="resumeDraftList" aria-label="已保存的简历"></nav>
+        </aside>
+        <main class="re-main">
+            <header class="re-toolbar">
+                <label><span class="re-sr-only">简历版本名称</span><input name="title" maxlength="80" value="未命名简历"></label>
+                <div class="re-toolbar-actions">
+                    <button type="button" class="re-button" data-action="import">导入简历</button>
+                    <button type="button" class="re-button re-accent" data-action="auto">智能排版</button>
+                    <button type="button" class="re-button" data-action="preview">预览</button>
+                    <button type="button" class="re-button" data-action="pdf">导出 PDF</button>
+                    <button type="button" class="re-button" data-action="image">导出图片</button>
+                    <button type="button" class="re-button re-primary" data-action="save">保存</button>
+                </div>
+            </header>
+            <div class="re-content">
+                <div class="re-status"><span id="resumeEditorStatus" role="status">正在读取已保存的简历…</span><button type="button" class="re-link re-danger" data-action="delete" hidden>删除这份简历</button></div>
+                <section class="re-card" aria-labelledby="resumeContactHeading">
+                    <h2 id="resumeContactHeading">个人信息</h2>
+                    <div class="re-contact">
+                        {% for key, label in contact.items() %}
+                        <label>{{ label }}<input data-contact="{{ key }}" maxlength="180" autocomplete="off"></label>
+                        {% endfor %}
+                    </div>
+                </section>
+                <div id="resumeSections"></div>
+                <div class="re-add">
+                    <label><span class="re-sr-only">选择栏目类型</span><select id="resumeSectionType">
+                        {% for section in sections %}<option>{{ section }}</option>{% endfor %}<option>自定义模块</option>
+                    </select></label>
+                    <button type="button" data-action="add" class="re-button">添加栏目</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <template id="resumeSectionTemplate">
+        <section class="re-card re-section">
+            <div class="re-section-head">
+                <label><span class="re-sr-only">栏目标题</span><input data-section-title maxlength="60"></label>
+                <div>
+                    <button type="button" class="re-link" data-move="-1" aria-label="上移栏目">↑</button>
+                    <button type="button" class="re-link" data-move="1" aria-label="下移栏目">↓</button>
+                    <button type="button" class="re-link re-danger" data-remove aria-label="删除栏目">移除</button>
+                </div>
+            </div>
+            <label><span class="re-sr-only">栏目正文</span><textarea data-section-content rows="4" maxlength="24000" placeholder="填写内容，可换行或用 - 添加项目符号"></textarea></label>
+        </section>
+    </template>
+    <dialog id="resumeImport" class="re-dialog" aria-labelledby="resumeImportTitle">
+        <form id="resumeImportForm">
+            <header><h2 id="resumeImportTitle">导入简历</h2><button type="button" class="re-link" data-close aria-label="关闭导入">×</button></header>
+            <label>来源<select name="source">
+                <option value="file">上传文件或扫描图</option>
+                {% if has_source %}<option value="current">使用已上传的当前简历</option>{% endif %}
+                <option value="text">粘贴简历文本</option>
+            </select></label>
+            <label data-source="file">PDF、DOCX、PNG、JPEG 或 WebP<input type="file" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp"></label>
+            <label data-source="text" hidden>简历文本<textarea name="text" rows="7" maxlength="24000"></textarea></label>
+            <label class="re-checkbox"><input name="use_ai" type="checkbox" value="1" {% if not ai_configured %}disabled{% endif %}>使用 AI 理解未识别的栏目</label>
+            <p class="re-note">{% if ai_configured %}开启后会将未识别栏目的标题和少量正文发送给已配置的模型。{% else %}当前未配置对话模型，导入时会根据已有标题规则归类。{% endif %}</p>
+            <label class="re-checkbox"><input id="resumeReplace" type="checkbox">用导入内容替换填写区</label>
+            <p class="re-note">留空时保留已有内容，将识别结果合并进来。导入后可检查和修改，点击保存才会写入简历。</p>
+            <footer><span id="resumeImportStatus" role="status"></span><button type="submit" class="re-button re-primary">识别并填入</button></footer>
+        </form>
+    </dialog>
+    <dialog id="resumePreview" class="re-dialog re-preview" aria-labelledby="resumePreviewTitle">
+        <header><h2 id="resumePreviewTitle">简历预览</h2><button type="button" class="re-link" data-close aria-label="关闭预览">×</button></header>
+        <p id="resumePreviewInfo"></p><div id="resumePreviewPages"></div>
+    </dialog>
+    {% include "partials/workspace_console.html" %}
+</body>
+</html>

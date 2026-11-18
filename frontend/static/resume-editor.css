@@ -1,0 +1,75 @@
+:root {
+  color-scheme: light;
+  font: 15px/1.45 system-ui, "Microsoft YaHei", sans-serif;
+  color: #182739;
+  background: #f6f8fb;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+button, input, textarea, select { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #41778c; outline-offset: 2px; }
+[hidden] { display: none !important; }
+.re-shell { display: grid; grid-template-columns: 225px minmax(0, 1fr); min-height: 100dvh; }
+.re-sidebar { position: sticky; top: 0; align-self: start; min-height: 100dvh; padding: 20px 14px; background: #eef2f6; border-right: 1px solid #dce4ec; }
+.re-sidebar > a { color: #315b70; text-decoration: none; font-size: .86rem; }
+.re-sidebar-title { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin: 19px 0 10px; }
+.re-sidebar-title h1, .re-card h2, .re-dialog h2 { font-size: 1.12rem; margin: 0; }
+.re-sidebar nav { display: grid; gap: 5px; max-height: calc(100dvh - 120px); overflow: auto; }
+.re-sidebar nav button { background: transparent; border: 0; border-radius: 7px; text-align: left; padding: 8px 9px; cursor: pointer; overflow-wrap: anywhere; color: inherit; }
+.re-sidebar nav button:hover, .re-sidebar nav button[aria-current] { background: #dce8ec; color: #163c4d; }
+.re-toolbar {
+  position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px; padding: 12px clamp(14px, 3vw, 34px); background: #fff;
+  border-bottom: 1px solid #dce4ec;
+}
+.re-toolbar input { width: min(15rem, 100%); font-size: 1.02rem; font-weight: 700; }
+.re-toolbar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.re-button, .re-link { color: #244256; cursor: pointer; }
+.re-button { border: 1px solid #cfdce5; border-radius: 8px; background: #fff; padding: 6px 10px; font-size: .86rem; }
+.re-button:hover { background: #f0f5f7; }
+.re-primary { background: #19394b; color: #fff; border-color: #19394b; }
+.re-primary:hover { background: #26536a; }
+.re-accent { background: #e5f1ee; border-color: #c2ded8; color: #194f47; }
+.re-link { border: 0; background: transparent; padding: 4px 6px; font-size: .83rem; }
+.re-danger { color: #a03641; }
+button:disabled { opacity: .43; cursor: default; }
+.re-content { width: min(100%, 890px); margin: 0 auto; padding: 18px clamp(14px, 3vw, 28px) 75px; }
+.re-status { color: #4e6576; min-height: 30px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: .85rem; }
+.re-card { min-width: 0; padding: clamp(14px, 3vw, 23px); margin-bottom: 13px; background: #fff; border: 1px solid #dce4ec; border-radius: 13px; box-shadow: 0 2px 4px #122d4610; }
+.re-contact { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 18px; margin-top: 14px; }
+.re-card label, .re-dialog label { display: block; font-size: .87rem; color: #3d5568; }
+.re-shell input, .re-shell textarea, .re-shell select, .re-dialog input:not([type=checkbox]), .re-dialog textarea, .re-dialog select {
+  border: 1px solid #cfdae4; border-radius: 8px; padding: 7px 9px; background: #fbfdfe; color: #182739;
+}
+.re-card input, .re-card textarea, .re-dialog textarea, .re-dialog select, .re-dialog input[type=file] { display: block; width: 100%; margin-top: 5px; }
+.re-card textarea, .re-dialog textarea { resize: vertical; line-height: 1.55; }
+.re-section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.re-section-head > label { width: min(16rem, 60%); }
+.re-section-head input { font-weight: 700; margin: 0; }
+.re-section-head > div { display: flex; flex-shrink: 0; }
+.re-add { display: flex; gap: 8px; }
+.re-dialog { width: min(560px, calc(100% - 26px)); max-height: calc(100dvh - 28px); margin: auto; padding: 20px; border: 1px solid #cbdce6; border-radius: 13px; color: inherit; background: #fff; }
+.re-dialog::backdrop { background: #10203383; }
+.re-dialog header, .re-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.re-dialog footer { margin-top: 15px; }
+.re-dialog footer button { flex-shrink: 0; }
+.re-dialog label { margin-top: 13px; }
+.re-dialog .re-checkbox { display: flex; align-items: center; gap: 7px; }
+.re-dialog .re-note, #resumeImportStatus { margin: 5px 0; font-size: .8rem; color: #4d6375; }
+.re-preview { width: min(880px, calc(100% - 26px)); padding: 0; background: #e5ebef; }
+.re-preview header { position: sticky; top: 0; padding: 13px 18px; background: #fff; border-bottom: 1px solid #dce4ec; }
+#resumePreviewInfo { color: #3c5669; margin: 11px 18px 0; font-size: .85rem; }
+#resumePreviewPages { display: grid; gap: 12px; padding: 14px; }
+#resumePreviewPages img { display: block; width: 100%; height: auto; box-shadow: 0 1px 7px #0002; }
+.re-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 730px) {
+  .re-shell { grid-template-columns: minmax(0, 1fr); }
+  .re-sidebar { position: static; min-height: 0; padding: 10px 14px; border-right: 0; border-bottom: 1px solid #dce4ec; }
+  .re-sidebar-title { margin: 5px 0; }
+  .re-sidebar nav { display: flex; overflow: auto; }
+  .re-sidebar nav button { flex: 0 0 auto; max-width: 13rem; }
+}
+@media (max-width: 390px) {
+  .re-content { padding-inline: 10px; }
+  .re-section-head > label { width: min(14rem, 53%); }
+}
