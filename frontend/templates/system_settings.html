@@ -1,3 +1,6 @@
+{% set groups = groups | rejectattr('0', 'in', ('image', 'news')) | list %}
+{% set deployment_groups = deployment_groups | rejectattr('0', 'equalto', 'retrieval') | list %}
+
 {% macro icon(kind) -%}
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 {% if kind == 'key' %}<circle cx="8" cy="15.5" r="4.5"/><path d="m11.3 12.3 8-8m-2 2 2 2m-4 0 2 2"/>
@@ -20,12 +23,13 @@
     <p class="sc-nav-caption">{{ label }}</p>
     {% for id, title, description, fields in section %}
         <a href="#settings-{{ id }}" data-group-link="{{ id }}" {% if id == 'chat' %}aria-current="location"{% endif %}>
-            <span class="sc-dot" aria-hidden="true"></span><span>{{ title }}{% if id == 'chat' %}<b class="sc-required"> *</b>{% endif %}</span><small data-nav-count>–/{{ fields|length }}</small>
+            <span class="sc-dot" aria-hidden="true"></span><span>{{ title }}{% if id == 'chat' %}<b class="sc-required"> *</b>{% endif %}</span><small data-nav-count>–/{{ fields | rejectattr('0', 'equalto', 'TESSERACT_CMD') | list | length }}</small>
         </a>
     {% endfor %}
 {%- endmacro %}
 
 {% macro group_card(id, title, description, fields, deployment=false) -%}
+{% set fields = fields | rejectattr('0', 'equalto', 'TESSERACT_CMD') | list %}
 {% set writable = can_edit and not deployment %}
 {% set testable = writable and id in test_groups %}
 <section id="settings-{{ id }}" data-settings-group="{{ id }}" class="sc-card sc-group{{ ' sc-has-test' if testable }}">

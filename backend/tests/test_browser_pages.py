@@ -129,6 +129,10 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_role("button", name="保存配置").click()
         page.get_by_text("对话模型已配置 3/3").wait_for()
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
+        assert page.locator("#settingsOptionalCount").inner_text().endswith("/3")
+        assert page.locator("#settings-image, #settings-news, #settings-retrieval").count() == 0
+        assert page.locator("#settings-ocr [data-setting-key]").count() == 3
+        assert page.locator('[data-setting-key="TESSERACT_CMD"]').count() == 0
         assert page.locator('[data-group-link="chat"]').get_attribute("data-status") == "ready"
         assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
         eye = page.locator('[data-reveal="AI_CHAT_API_KEY"]')
