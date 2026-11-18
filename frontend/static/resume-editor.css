@@ -71,7 +71,7 @@ button:disabled { opacity: .34; cursor: default; }
 .re-section-head { justify-content: space-between; gap: 8px; }
 .re-section-label { min-width: 0; }
 .re-section-toggle { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 0; border: 0; background: transparent; font-size: 15px; font-weight: 680; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
-.re-chevron { color: #a1a1aa; font-weight: 400; transition: transform .15s ease; }
+.re-icon.re-chevron { width: 13px; height: 13px; color: #71717a; transition: transform .15s ease; }
 .re-section-toggle[aria-expanded=true] .re-chevron { transform: rotate(180deg); }
 .re-section-actions { gap: 2px; flex: 0 0 auto; }
 .re-rename { opacity: .45; }
