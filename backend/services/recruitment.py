@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import db
 from .paths import APP_DATA_DIR
-from .recruitment_chrome import collect_boss_in_chrome, use_local_chrome
+from .recruitment_chrome import CHROME_SOURCES, collect_in_chrome, use_local_chrome
 from .recruitment_sources import (
     CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
 )
@@ -63,6 +63,7 @@ class CollectRequest(BaseModel):
     sources: list[str] = Field(min_length=1, max_length=5)
     limit: int = Field(default=20, ge=1, le=30, strict=True)
     boss_local: bool = Field(default=False, strict=True)
+    chrome_local: bool = Field(default=False, strict=True)
 
 
 def clean_listing(fields):
@@ -119,8 +120,8 @@ def run_collection(owner, run_id, config, progress):
         with sync_playwright() as playwright, ExitStack() as browsers:
             browser = None
 
-            def boss_status(status, message):
-                progress["boss"] = {"status": status, "message": message}
+            def browser_status(status, message):
+                progress[source] = {"status": status, "message": message}
                 with conn:
                     save_progress(conn, owner, run_id, progress)
 
@@ -129,16 +130,16 @@ def run_collection(owner, run_id, config, progress):
                 with conn:
                     save_progress(conn, owner, run_id, progress)
                 try:
-                    if source == "boss" and config.boss_local:
-                        if use_local_chrome():
-                            status, message, rows = collect_boss_in_chrome(
-                                config.keyword, config.city, config.limit, boss_status
-                            )
-                        else:
-                            profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
-                            status, message, rows = collect_local_boss(
-                                playwright, profile, config.keyword, config.city, config.limit, boss_status
-                            )
+                    bridge = config.chrome_local or (config.boss_local and source == "boss" and use_local_chrome())
+                    if bridge and source in CHROME_SOURCES:
+                        status, message, rows = collect_in_chrome(
+                            source, config.keyword, config.city, config.limit, browser_status
+                        )
+                    elif source == "boss" and config.boss_local:
+                        profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
+                        status, message, rows = collect_local_boss(
+                            playwright, profile, config.keyword, config.city, config.limit, browser_status
+                        )
                     else:
                         if browser is None:
                             browser = browsers.enter_context(launch_browser(playwright))
@@ -183,7 +184,7 @@ def page():
     if not _current_user():
         return redirect(url_for("site.index"))
     return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
-                           boss_chrome=use_local_chrome())
+                           chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES)
 
 
 @blueprint.post(API + "/runs")
@@ -197,6 +198,8 @@ def start():
         return jsonify(message="城市或采集平台不在可用选项中。"), 400
     if config.boss_local and ("boss" not in config.sources or not local_desktop_request()):
         return jsonify(message="请在运行智航生涯的电脑上打开本机地址，并勾选 BOSS 直聘。"), 403
+    if config.chrome_local and (not local_desktop_request() or not use_local_chrome()):
+        return jsonify(message="请从已启用 Chrome 连接的电脑访问本机采集页。"), 403
     config.sources = list(dict.fromkeys(config.sources))
     owner = _current_user()["username"]
     progress = {source: {"status": "queued"} for source in config.sources}

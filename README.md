@@ -283,7 +283,7 @@ flowchart LR
 
 「岗位探索 → 招聘信息采集」位于 `/recruitment`，按账号保存岗位、招聘线索和采集记录。实时采集读取各平台公开搜索页，需要 Playwright Chromium 或本机 Chrome、Edge。从运行服务的电脑访问本机地址时，可以选择「用本机浏览器采集 BOSS」，在打开的专用窗口手动登录或完成验证，采集会复用该账号的浏览器配置。其他平台可以在原站打开搜索结果，保存为 HTML 后导入，也可导入 UTF-8 CSV。CSV 兼容 `platform`、`job_link`、`job_title`、`jd_text` 等 Jobhunter AI 原始列名。页面按当前关键词和平台筛选导出，单次最多导出 10,000 条。
 
-本机已运行经过用户授权的 web-access Chrome 桥时，可在 `.env` 中设置 `CAREER_BOSS_USE_LOCAL_CHROME=1`。开启后，本机采集选项会在普通 Chrome 里新建 BOSS 搜索标签页，并用该浏览器当前的登录状态读取结果。远程访问的账号使用公开页采集或导入。
+本机已运行经过用户授权的 web-access Chrome 桥时，可在 `.env` 中设置 `CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`（兼容旧配置 `CAREER_BOSS_USE_LOCAL_CHROME`）。开启后，BOSS 和智联可以在普通 Chrome 里新建搜索标签页，复用当前浏览器的登录或验证状态。远程访问的账号使用公开页采集或导入。
 
 <a id="configuration"></a>
 

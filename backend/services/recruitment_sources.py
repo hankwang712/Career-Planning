@@ -56,17 +56,19 @@ READ_CARDS = """({source, card, selectors, limit}) => {
     };
     return Array.from(document.querySelectorAll(card)).slice(0, limit * 3).map(node => {
         const displayedSalary = text(node, 'salary');
-        const cardData = source === 'boss'
-            ? node.__vue__?.$props?.data ?? node.__vueParentComponent?.props?.data
-            : null;
+        const props = node.__vue__?.$props ?? node.__vueParentComponent?.props;
+        const cardData = source === 'boss' ? props?.data : null;
+        const zhilianJob = source === 'zhilian' ? props?.job : null;
         const salary = typeof cardData?.salaryDesc === 'string' && cardData.salaryDesc.trim()
-            ? cardData.salaryDesc.trim() : displayedSalary;
+            ? cardData.salaryDesc.trim() : source === 'zhilian' && displayedSalary.includes('*') ? '' : displayedSalary;
         const description = (node.innerText || '').trim();
         return {
-            title: text(node, 'title'), company: text(node, 'company'), salary,
+            title: text(node, 'title') || (typeof zhilianJob?.name === 'string' ? zhilianJob.name.trim() : ''),
+            company: text(node, 'company'), salary,
             location: text(node, 'location'),
             description: (displayedSalary ? description.replace(displayedSalary, salary) : description).slice(0, 3000),
-            url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href') || ''
+            url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href')
+                || zhilianJob?.positionURL || zhilianJob?.positionUrl || ''
         };
     });
 }"""

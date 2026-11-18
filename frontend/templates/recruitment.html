@@ -38,9 +38,9 @@
                     </fieldset>
                     {% if boss_local %}
                     <div class="recruitment-browser-option">
-                        <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked><span>{{ '用已登录的本机 Chrome 采集 BOSS' if boss_chrome else '用本机浏览器采集 BOSS' }}</span></label>
-                        {% if boss_chrome %}
-                        <p>采集会创建新的 BOSS 搜索标签页，并复用当前 Chrome 的登录状态。</p>
+                        <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '使用当前 Chrome 采集 BOSS 和智联' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
+                        {% if chrome_available %}
+                        <p>采集会在当前 Chrome 新开搜索标签页，复用该浏览器的登录或验证状态。</p>
                         {% else %}
                         <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
                         {% endif %}

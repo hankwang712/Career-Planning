@@ -84,6 +84,7 @@ def test_local_boss_waits_in_account_profile_and_rejects_remote_launch(make_acco
     from services import recruitment
 
     monkeypatch.setenv("CAREER_BOSS_USE_LOCAL_CHROME", "0")
+    monkeypatch.delenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", raising=False)
     account = make_account("local-boss")
     seen_profiles = []
 
@@ -162,7 +163,13 @@ def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_
     assert status == "succeeded" and len(rows) == 1
 
 
-def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch):
+@pytest.mark.parametrize(("source", "host", "target", "route_url"), [
+    ("boss", "www.zhipin.com", "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100",
+     "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100"),
+    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
+     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653"),
+])
+def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source, host, target, route_url):
     import json
 
     import httpx
@@ -170,7 +177,6 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch):
     from services import recruitment_chrome
 
     tab_id = "3" * 32
-    target = "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100"
     requests = []
 
     def route(request):
@@ -186,16 +192,16 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch):
             return httpx.Response(200, json={"success": True})
         script = request.content.decode()
         if "verification:" in script:
-            value = {"url": target, "title": "岗位搜索", "verification": False}
+            value = {"url": route_url, "title": "岗位搜索", "verification": False}
         else:
-            assert "location.origin === 'https://www.zhipin.com'" in script
-            value = [{"title": "Agent 开发", "url": LINKS["boss"]}]
+            assert f"location.origin === 'https://{host}'" in script
+            value = [{"title": "Agent 开发", "url": LINKS[source]}]
         return httpx.Response(200, json={"value": json.dumps(value)})
 
     client = httpx.Client
     monkeypatch.setattr(recruitment_chrome.httpx, "Client",
                         lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(route)))
-    state, _, rows = recruitment_chrome.collect_boss_in_chrome("Agent", "杭州", 20, lambda *_: None)
+    state, _, rows = recruitment_chrome.collect_in_chrome(source, "Agent", "杭州", 20, lambda *_: None)
     assert state == "succeeded" and len(rows) == 1
     assert requests == ["/health", "/new", "/eval", "/eval", "/close"]
 

@@ -170,9 +170,11 @@
     submitting = true;
     updateStart();
     try {
+      const chromeSources = config.elements.bossLocal?.dataset.chromeSources;
       await api("/runs", {
         keyword: data.get("keyword"), city: data.get("city"), limit: Number(data.get("limit")), sources: platforms,
-        boss_local: platforms.includes("boss") && data.has("bossLocal")
+        boss_local: !chromeSources && platforms.includes("boss") && data.has("bossLocal"),
+        chrome_local: Boolean(data.has("bossLocal") && chromeSources?.split(",").some((source) => platforms.includes(source)))
       });
       active = true;
       notice("已启动采集。各平台的结果会陆续显示。");
