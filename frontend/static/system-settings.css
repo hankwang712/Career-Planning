@@ -78,6 +78,13 @@ a[data-status="partial"] .sc-dot { background: #edab12; }
 .sc-field input, .sc-readout { display: block; width: 100%; min-height: 35px; padding: 7px 9px; border: 1px solid #d8e3ef; border-radius: 9px; background: #f8fafd; color: #344b68; font: inherit; font-size: 12px; }
 .sc-readout { overflow-wrap: anywhere; }
 .sc-field input::placeholder { color: #637995; }
+.sc-input-wrap { position: relative; }
+.sc-input-secret input { padding-right: 38px; }
+.sc-eye { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: grid; place-items: center; width: 30px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #526c8a; cursor: pointer; }
+.sc-eye > span { display: grid; }
+.sc-eye:hover { background: #eaf0f7; }
+.sc-eye[aria-pressed="false"] [data-eye-hide], .sc-eye[aria-pressed="true"] [data-eye-show] { display: none; }
+.sc-eye:disabled { opacity: .45; cursor: default; }
 .sc-field-foot { margin-top: 6px; flex-wrap: wrap; }
 .sc-field code { min-width: 0; color: #566d89; font: 10px/1.3 system-ui, sans-serif; overflow-wrap: anywhere; }
 .sc-pill { display: inline-flex; align-items: center; gap: 4px; width: fit-content; border: 1px solid #e4ebf3; border-radius: 6px; padding: 0 5px; color: #4c617e; background: #f0f4f8; font-size: 10px; font-weight: 600; white-space: nowrap; }

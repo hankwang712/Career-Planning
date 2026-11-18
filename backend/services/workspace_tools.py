@@ -95,6 +95,19 @@ def model_status():
     return jsonify(fields=settings_state(can_edit=_current_user()["role"] == "super_admin"))
 
 
+@blueprint.post("/api/system-settings/reveal")
+@_super_admin_required
+def reveal_model_secret():
+    data = request.get_json(silent=True)
+    key = data.get("key") if isinstance(data, dict) else None
+    if not isinstance(key, str) or key not in runtime_settings.KEYS or not key.endswith("_API_KEY"):
+        return jsonify(message="该字段无法在网页显示。"), 400
+    value = str(llm_env._values().get(key) or "").strip()
+    if not value:
+        return jsonify(message="此密钥尚未配置。"), 404
+    return jsonify(value=value)
+
+
 def probe_runtime(group):
     if group == "chat":
         return llm_env.chat_runtime()

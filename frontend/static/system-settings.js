@@ -4,6 +4,9 @@
   const submit = form.querySelector("[type=submit]");
   const result = document.getElementById("settingsResult");
   const pending = new Map();
+  const revealed = new Map();
+  const eyeButtons = [...form.querySelectorAll("[data-reveal]")];
+  let revealEpoch = 0;
   const canEdit = form.dataset.canEdit === "true";
   const cards = [...form.querySelectorAll("[data-settings-group]")];
   const groupLinks = [...document.querySelectorAll("[data-group-link]")];
@@ -51,6 +54,71 @@
     status.dataset.status = state;
   }
 
+  function setEye(button, open) {
+    const label = button.getAttribute("aria-label").replace(/^(显示|隐藏)/, open ? "隐藏" : "显示");
+    button.setAttribute("aria-pressed", String(open));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+  }
+
+  function hideSecret(button) {
+    const key = button.dataset.reveal;
+    const input = form.elements.namedItem(key);
+    if (revealed.delete(key) && !pending.has(key)) input.value = "";
+    input.type = "password";
+    setEye(button, false);
+  }
+
+  function hideAllSecrets() {
+    revealEpoch += 1;
+    eyeButtons.forEach(hideSecret);
+  }
+
+  eyeButtons.forEach(button => {
+    button.addEventListener("click", async () => {
+      const key = button.dataset.reveal;
+      const input = form.elements.namedItem(key);
+      if (button.getAttribute("aria-pressed") === "true") {
+        hideSecret(button);
+        return;
+      }
+      if (!input.value && (pending.has(key) || !fields[key]?.configured)) {
+        result.textContent = pending.has(key) ? "该密钥已标记移除。" : "此密钥尚未配置。";
+        return;
+      }
+      if (!input.value) {
+        const epoch = revealEpoch;
+        button.disabled = true;
+        try {
+          const response = await fetch("/api/system-settings/reveal", {
+            method: "POST", cache: "no-store",
+            headers: { ...await window.CareerAuth.headers(), "Content-Type": "application/json" },
+            body: JSON.stringify({ key })
+          });
+          const data = await response.json();
+          if (epoch !== revealEpoch) return;
+          if (!response.ok) throw new Error(data.message || "暂时无法显示密钥。");
+          if (!input.value && !pending.has(key)) {
+            revealed.set(key, data.value);
+            input.value = data.value;
+          }
+        } catch (error) {
+          if (epoch === revealEpoch) result.textContent = error.message;
+          return;
+        } finally {
+          button.disabled = false;
+        }
+      }
+      if (input.value) {
+        result.textContent = "";
+        input.type = "text";
+        setEye(button, true);
+      }
+    });
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) hideAllSecrets(); });
+  window.addEventListener("pagehide", hideAllSecrets);
+
   function renderField(key) {
     const field = fields[key];
     const input = form.elements.namedItem(key);
@@ -67,6 +135,7 @@
   }
 
   async function load(method = "GET") {
+    hideAllSecrets();
     fieldset.disabled = true;
     result.textContent = method === "GET" ? "正在读取配置…" : "正在保存…";
     try {
@@ -92,11 +161,11 @@
   }
 
   form.addEventListener("input", event => {
-    const { name, value, type } = event.target;
+    const { name, value } = event.target;
     if (!fields[name]) return;
-    const original = fields[name].value || "";
+    const original = event.target.hasAttribute("data-secret-input") ? revealed.get(name) || "" : fields[name].value || "";
     const clean = value.trim();
-    if (clean && (type === "password" || clean !== original)) pending.set(name, clean);
+    if (clean && clean !== original) pending.set(name, clean);
     else pending.delete(name);
     const status = document.getElementById("state-" + name);
     if (pending.has(name)) fieldStatus(status, "待保存", "pending");
@@ -106,6 +175,8 @@
   form.addEventListener("click", event => {
     const key = event.target.dataset.reset;
     if (!key || !fields[key]?.override) return;
+    const eye = eyeButtons.find(button => button.dataset.reveal === key);
+    if (eye) hideSecret(eye);
     form.elements.namedItem(key).value = "";
     pending.set(key, "");
     fieldStatus(document.getElementById("state-" + key), "待移除", "pending");

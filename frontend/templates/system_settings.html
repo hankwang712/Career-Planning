@@ -8,6 +8,8 @@
 {% elif kind in ('news', 'retrieval') %}<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/>
 {% elif kind == 'test' %}<path d="M7 3v4m4-4v4M5 7h8v2a4 4 0 0 1-8 0zm4 6v2a4 4 0 0 0 8 0v-3m-2 0h4"/>
 {% elif kind == 'save' %}<path d="M4 4h13l3 3v13H4zm4 0v5h8V4m-8 16v-7h8v7"/>
+{% elif kind == 'eye' %}<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/>
+{% elif kind == 'eye-off' %}<path d="m3 3 18 18M9.5 6.3A12 12 0 0 1 12 6c6.5 0 10 6 10 6a15 15 0 0 1-4 4.2M6.2 7.8A15 15 0 0 0 2 12s3.5 6 10 6c.9 0 1.8-.1 2.6-.4"/>
 {% elif kind == 'chevron' %}<path d="m6 9 6 6 6-6"/>
 {% else %}<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2" fill="white"/><circle cx="16" cy="12" r="2" fill="white"/><circle cx="10" cy="18" r="2" fill="white"/>
 {% endif %}
@@ -53,7 +55,14 @@
                         {% if secret %}<span class="sc-secret">密钥</span>{% endif %}
                     </div>
                     {% if writable %}
-                        <input id="{{ key }}" name="{{ key }}" type="{{ 'password' if secret else 'text' }}" maxlength="2048" spellcheck="false" autocomplete="{{ 'new-password' if secret else 'off' }}" aria-describedby="state-{{ key }}">
+                        <div class="sc-input-wrap{{ ' sc-input-secret' if secret }}">
+                            <input id="{{ key }}" name="{{ key }}" type="{{ 'password' if secret else 'text' }}" maxlength="2048" spellcheck="false" autocomplete="{{ 'new-password' if secret else 'off' }}" aria-describedby="state-{{ key }}"{% if secret %} data-secret-input{% endif %}>
+                            {% if secret %}
+                            <button type="button" class="sc-eye" data-reveal="{{ key }}" aria-controls="{{ key }}" aria-label="显示 {{ label }}" title="显示 {{ label }}" aria-pressed="false">
+                                <span data-eye-show>{{ icon('eye') }}</span><span data-eye-hide>{{ icon('eye-off') }}</span>
+                            </button>
+                            {% endif %}
+                        </div>
                     {% else %}
                         <span class="sc-readout" data-readout>正在读取…</span>
                     {% endif %}
@@ -95,7 +104,7 @@
                 <span class="sc-icon sc-icon-key">{{ icon('key') }}</span>
                 <div>
                     <h2>服务凭据与模型配置 <span class="sc-pill">{{ '服务端保存' if can_edit else '只读查看' }}</span></h2>
-                    <p>带 <b class="sc-required">*</b> 的字段是启用 AI 功能所需的配置，其余服务按需启用。{% if can_edit %}密钥保存后只显示配置状态。{% endif %}</p>
+                    <p>带 <b class="sc-required">*</b> 的字段是启用 AI 功能所需的配置，其余服务按需启用。{% if can_edit %}密钥默认隐藏，可点击眼睛查看。{% endif %}</p>
                     <p id="settingsMissing" class="sc-missing" aria-live="polite"></p>
                 </div>
             </div>

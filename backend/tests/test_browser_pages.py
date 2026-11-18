@@ -131,6 +131,14 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
         assert page.locator('[data-group-link="chat"]').get_attribute("data-status") == "ready"
         assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
+        eye = page.locator('[data-reveal="AI_CHAT_API_KEY"]')
+        eye.click()
+        page.wait_for_function("document.getElementById('AI_CHAT_API_KEY').type === 'text'")
+        assert page.locator("#AI_CHAT_API_KEY").input_value() == "browser-test-key"
+        assert page.get_by_role("button", name="保存配置").is_disabled()
+        eye.click()
+        assert page.locator("#AI_CHAT_API_KEY").input_value() == ""
+        assert page.locator("#AI_CHAT_API_KEY").get_attribute("type") == "password"
         page.route("**/api/system-settings/test/chat", lambda route: route.fulfill(
             json={"message": "连通性测试通过。", "duration_ms": 12}))
         page.locator("[data-test-group=chat]").click()

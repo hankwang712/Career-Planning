@@ -33,6 +33,14 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     assert saved.status_code == 200
     assert "test-secret" not in saved.get_data(as_text=True)
     assert saved.get_json()["fields"]["AI_CHAT_API_KEY"] == {"configured": True, "override": True}
+    reveal = "/api/system-settings/reveal"
+    assert user.post(reveal, json={"key": "AI_CHAT_API_KEY"}).status_code == 403
+    assert admin.client.post(reveal, json={"key": "AI_CHAT_API_KEY"}).status_code == 403
+    assert admin.post(reveal, json={"key": "POSTGRES_PASSWORD"}).status_code == 400
+    revealed = admin.post(reveal, json={"key": "AI_CHAT_API_KEY"})
+    assert revealed.get_json() == {"value": "test-secret"}
+    assert "no-store" in revealed.headers["Cache-Control"]
+    assert "test-secret" not in admin.get("/api/system-settings/status").get_data(as_text=True)
     assert llm_env.chat_runtime() == ("https://provider.example/v1", "test-secret", "web-model")
     assert user.get("/api/llm-status").get_json() == {"configured": True, "model": "web-model"}
     overview = user.get("/api/system-settings/status").get_json()["fields"]
