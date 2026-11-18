@@ -126,8 +126,10 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.locator("#AI_CHAT_BASE_URL").fill("https://provider.example/v1")
         page.locator("#AI_CHAT_API_KEY").fill("browser-test-key")
         page.locator("#AI_CHAT_MODEL").fill("test-chat")
-        page.get_by_role("button", name="保存配置").click()
+        save = page.locator("header").get_by_role("button", name="保存配置")
+        save.click()
         page.get_by_text("对话模型已配置 3/3").wait_for()
+        page.get_by_text("配置已保存。").wait_for()
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
         assert page.locator("#settingsOptionalCount").inner_text().endswith("/3")
         assert page.locator("#settings-image, #settings-news, #settings-retrieval").count() == 0
@@ -160,6 +162,7 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_role("link", name="PostgreSQL / pgvector").click()
         page.get_by_text("POSTGRES_PASSWORD", exact=True).wait_for()
         assert page.locator('[data-group-link="postgres"]').get_attribute("aria-current") == "location"
+        assert 0 <= save.bounding_box()["y"] < 88
         page.get_by_role("button", name="›_ 白盒控制台").click()
         page.locator("[data-console-filter]").fill("PATCH")
         page.locator("[data-console-entries] li").filter(has_text="PATCH /api/system-settings/models").wait_for()

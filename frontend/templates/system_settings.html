@@ -103,8 +103,18 @@
 </head>
 <body class="sc-page">
     <header class="sc-top">
-        <a href="{{ url_for('site.index', _anchor='dashboard') }}">← 工作台</a>
-        <div><h1>系统配置</h1><p>API 密钥与服务配置</p></div>
+        <div class="sc-top-inner">
+            <div class="sc-top-title">
+                <a href="{{ url_for('site.index', _anchor='dashboard') }}">← 工作台</a>
+                <div><h1>系统配置</h1><p>API 密钥与服务配置</p></div>
+            </div>
+            <div class="sc-top-actions">
+                <p id="settingsResult" class="sc-result" role="status"></p>
+                {% if can_edit %}
+                <button id="settingsSave" type="submit" form="systemModelSettings" class="sc-button sc-save-button" disabled>{{ icon('save') }} 保存配置</button>
+                {% endif %}
+            </div>
+        </div>
     </header>
     <main class="sc-main">
         <section class="sc-card sc-overview">
@@ -141,11 +151,7 @@
                     {% for id, title, description, fields in deployment_groups %}
                         {{ group_card(id, title, description, fields, true) }}
                     {% endfor %}
-                    {% if can_edit %}
-                    <div class="sc-save"><button type="submit" class="sc-button sc-save-button" disabled>{{ icon('save') }} 保存配置</button></div>
-                    {% endif %}
                 </fieldset>
-                <p id="settingsResult" class="sc-result" role="status"></p>
             </form>
         </div>
     </main>

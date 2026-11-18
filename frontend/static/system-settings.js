@@ -1,7 +1,7 @@
 (() => {
   const form = document.getElementById("systemModelSettings");
   const fieldset = form.querySelector("fieldset");
-  const submit = form.querySelector("[type=submit]");
+  const submit = document.getElementById("settingsSave");
   const result = document.getElementById("settingsResult");
   const pending = new Map();
   const probeButtons = [...form.querySelectorAll("[data-test-group]")];
@@ -140,6 +140,7 @@
     hideAllSecrets();
     if (method === "PATCH") probeButtons.forEach(resetProbe);
     fieldset.disabled = true;
+    if (submit) submit.disabled = true;
     result.textContent = method === "GET" ? "正在读取配置…" : "正在保存…";
     try {
       const options = { method, cache: "no-store" };
@@ -177,7 +178,7 @@
     } else {
       fieldStatus(status, fields[name].configured ? "已配置" : "未配置", fields[name].configured ? "ready" : "empty");
     }
-    if (submit) submit.disabled = !pending.size;
+    if (submit) updateSaveState();
   });
   form.addEventListener("click", event => {
     const key = event.target.dataset.reset;
@@ -188,12 +189,16 @@
     pending.set(key, "");
     resetProbe(event.target.closest("[data-settings-group]").querySelector("[data-test-group]"));
     fieldStatus(document.getElementById("state-" + key), "待移除", "pending");
-    submit.disabled = false;
+    updateSaveState();
   });
   form.addEventListener("submit", event => {
     event.preventDefault();
     if (pending.size) void load("PATCH");
   });
+  function updateSaveState() {
+    submit.disabled = !pending.size;
+    result.textContent = pending.size ? "有未保存的修改" : "";
+  }
   function renderProbe(button, state, message = "", duration = null) {
     const actions = button.parentElement;
     const line = document.getElementById(button.getAttribute("aria-describedby"));
