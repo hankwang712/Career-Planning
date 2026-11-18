@@ -115,7 +115,7 @@ def read_report_workflow(username, report_id):
 def validate_report_request(payload, raw_resume="", *, file_path=""):
     from backend.advisor.report_workflow import ReportInput
     supplied = dict(payload)
-    # Only the server selects the account's uploaded file; the browser cannot supply paths or resume text.
+    # Resume text and file paths come from the account's server-side resume source.
     supplied["raw_resume"] = "" if file_path else raw_resume
     schema = ReportInput
     if file_path:

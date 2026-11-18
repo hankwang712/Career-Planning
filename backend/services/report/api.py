@@ -9,7 +9,7 @@ import uuid
 
 from flask import Blueprint, current_app, jsonify, request, send_file, url_for
 
-from services import llm_env, personality
+from services import db, llm_env, personality
 from services.appctx import get_app
 from services.llm_calls import call_markdown_chat
 from services.report import build_stage_progress, CAREER_REPORT_STAGE_DEFS, empty_report_state
@@ -104,6 +104,39 @@ def _validate_private_report_identifiers():
     return None
 
 
+def _report_resume_source(username, state):
+    rows = db._get_conn().execute(
+        "SELECT title, document FROM resume_drafts WHERE owner=? ORDER BY updated_at DESC, id DESC",
+        (username,),
+    )
+    for row in rows:
+        document = json.loads(row["document"])
+        sections = [f"## {section['title']}\n{section['content']}" for section in document["sections"]
+                    if section["content"].strip()]
+        if sections:
+            target = document["contact"].get("target")
+            if target:
+                sections.insert(0, f"求职意向：{target}")
+            return {"kind": "draft", "title": row["title"], "text": "\n\n".join(sections), "path": ""}
+
+    resume = state.get("resume_profile") or {}
+    path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
+    path = path if path and os.path.isfile(path) else ""
+    content = str(resume.get("resume_source_text") or "").strip()
+    if path or content:
+        return {"kind": "upload", "title": resume.get("original_file_name") or resume.get("file_name") or "已上传的简历",
+                "text": content, "path": path}
+    return None
+
+
+@blueprint.get("/api/career-report/resume-source")
+@_login_required
+def api_career_report_resume_source():
+    username = _current_user()["username"]
+    source = _report_resume_source(username, _load_user_state(username))
+    return jsonify(source={"kind": source["kind"], "title": source["title"]} if source else None)
+
+
 @blueprint.route("/api/career-report/generate/start", methods=["POST"])
 @_login_required
 def api_career_report_generate_start():
@@ -157,12 +190,14 @@ def api_career_report_generate_start():
             continuation = {"checkpoint_id": checkpoint_id, "response": response}
         else:
             report_id = f"report-{uuid.uuid4().hex[:12]}"
-            resume_scope = state.get("resume_profile") or {}
-            resume_path = _owned_resume_storage_path(username, str(resume_scope.get("storage_path") or ""))
-            resume_path = resume_path if resume_path and os.path.isfile(resume_path) else ""
-            raw_resume = str(resume_scope.get("resume_source_text") or "").strip()
-            if not resume_path and not raw_resume:
-                return jsonify({"message": "请先上传简历，再启动多智能体报告。"}), 400
+            source = _report_resume_source(username, state)
+            if not source:
+                return jsonify({"message": "请先到个人中心填写或导入简历并保存。"}), 400
+            if source["kind"] == "draft":
+                profile_payload["agent_memory"]["resume_memory"] = {
+                    "resume_source_text": source["text"],
+                    "resume_text_char_count": len(source["text"]),
+                }
             workflow_request = dict(payload.get("workflow") or {})
             profile_payload["report_user_inputs"] = {key: workflow_request.get(key, "")
                 for key in ("preferences", "additional_evidence")}
@@ -182,7 +217,9 @@ def api_career_report_generate_start():
                     schedule = "\n时间安排（用户选择）：" + availability["summary"]
                     recruitment["request"] = str(recruitment.get("request") or "")[:3000 - len(schedule)] + schedule
                     workflow_request["recruitment"] = recruitment
-            profile_payload["agent_workflow"] = validate_report_request(workflow_request, raw_resume, file_path=resume_path)
+            profile_payload["agent_workflow"] = validate_report_request(
+                workflow_request, source["text"], file_path=source["path"]
+            )
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify({"message": str(exc)}), 400
     except ImportError:

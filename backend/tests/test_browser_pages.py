@@ -189,6 +189,29 @@ def test_user_center_exposes_report_generation(logged_in_page, live_server):
     assert missing == []
 
 
+def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
+    page = logged_in_page
+    page.add_init_script("localStorage.setItem('tg_done', '1')")
+    page.goto(live_server + "/#report", wait_until="load")
+    page.get_by_role("button", name="关闭引导").click()
+    link = page.get_by_role("link", name="前往我的简历")
+    link.wait_for()
+    assert page.locator("#reportWorkflowInput").is_hidden()
+    assert page.locator("#reportLaunchBtn").is_disabled()
+    link.click()
+    page.wait_for_url("**/user-center/resumes?from_report=1")
+    page.locator("[name=title]").fill("应聘简历")
+    page.locator(".re-section").first.locator("[data-section-content]").fill("开发招聘系统")
+    page.get_by_role("button", name="保存", exact=True).click()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    page.get_by_role("link", name="返回报告生成台").click()
+    page.locator("#reportWorkflowTargets").wait_for()
+    assert page.locator("#reportResumeNotice").is_hidden()
+    assert page.locator("#reportResumeSourceLabel").inner_text() == "分析简历：应聘简历"
+    assert page.locator("#report input[type=file]").count() == 0
+    assert page.locator("#reportLaunchBtn").is_enabled()
+
+
 def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

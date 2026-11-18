@@ -19312,22 +19312,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
 #report .report-wizard-stage[hidden] { display: none !important; }
 #report .report-wizard-stage { animation: reportStageEnter .28s ease-out; }
 @keyframes reportStageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-#report .report-launch-page .report-resume-panel, #report .report-launch-page .report-workflow-form { box-sizing: border-box; width: min(100%, 1040px); margin: 0 auto; padding: 28px 32px; border-radius: 22px; border: 1px solid #dce5ef; box-shadow: 0 8px 30px #304c7610; }
-#report .report-resume-heading { margin-bottom: 0; }
-.report-resume-intro { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-items: center; gap: 30px; padding: 32px 0 36px; }
-.report-stage-eyebrow { color: #64857e; font-size: 10px; font-weight: 700; letter-spacing: .15em; }
-.report-resume-intro h4 { margin: 10px 0 14px; color: #273f56; font-size: clamp(20px, 2.4vw, 28px); font-weight: 750; letter-spacing: -.02em; line-height: 1.45; }
-.report-resume-intro p:not(.report-stage-eyebrow) { max-width: 430px; color: #758399; font-size: 13px; line-height: 1.9; }
-.report-intro-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-.report-intro-tags span { padding: 5px 10px; color: #548173; background: #f0f7f3; border: 1px solid #e2eee7; border-radius: 7px; font-size: 11px; }
-.report-document-art { position: relative; display: grid; place-items: center; height: 185px; border-radius: 50%; background: radial-gradient(ellipse, #e7f0f8 0%, #f5f8fc 58%, transparent 70%); }
-.report-art-page { position: relative; width: 100px; padding: 20px 14px; border: 1px solid #dbe3ed; border-radius: 9px; background: #fff; box-shadow: 9px 9px 0 -2px #edf1f8, 10px 10px 0 -2px #d9e3f1, 0 12px 25px #2f52641c; transform: rotate(-10deg); }
-.report-art-page span { display: block; width: 22px; height: 22px; margin-bottom: 12px; border-radius: 50%; background: #d7e8f3; }
-.report-art-page i { display: block; height: 4px; margin: 6px 0; border-radius: 3px; background: #e3eaf2; }
-.report-art-page i:nth-of-type(even) { width: 70%; }
-.report-art-page b { display: block; height: 18px; margin-top: 10px; border-radius: 3px; background: #edf5f1; }
-.report-art-note { position: absolute; right: -8px; bottom: 16px; padding: 9px 12px; border: 1px solid #e6e7cf; border-radius: 8px; background: #fffef0; color: #7d8060; font-size: 10px; box-shadow: 0 4px 10px #405c7110; transform: rotate(5deg); }
-#report .report-resume-dropzone { border-radius: 13px; }
+#report .report-launch-page .report-workflow-form { box-sizing: border-box; width: min(100%, 1040px); margin: 0 auto; padding: 28px 32px; border-radius: 22px; border: 1px solid #dce5ef; box-shadow: 0 8px 30px #304c7610; }
 .report-stage-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #e9edf3; }
 .report-stage-footer > span { font-size: 12px; color: #8b97a6; }
 .report-stage-footer .report-launch-primary { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 46px; border-radius: 10px; font-size: 13px; }
@@ -19384,9 +19369,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
     .report-stage-nav small, .report-step-check, .report-stage-nav .is-complete:not(.is-current) .report-step-check { display: none; }
     .report-step-connector { width: 12px; }
     .report-stage-nav strong { font-size: 12px; }
-    #report .report-launch-page .report-resume-panel, #report .report-launch-page .report-workflow-form { padding: 22px; }
-    .report-resume-intro { grid-template-columns: 1fr; gap: 12px; padding: 26px 0; }
-    .report-document-art { display: none; }
+    #report .report-launch-page .report-workflow-form { padding: 22px; }
     .report-stage-footer > span { display: none; }
     .report-stage-footer { justify-content: flex-end; }
     .report-stage-footer .report-launch-secondary { margin-right: auto; }

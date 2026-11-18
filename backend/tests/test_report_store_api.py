@@ -123,6 +123,39 @@ def test_generation_requires_a_model(make_account):
     assert response.get_json()["message"]
 
 
+def test_generation_uses_latest_nonempty_resume_draft(make_account, monkeypatch):
+    from services.report import api
+    from services.user_state import _save_user_state
+
+    account = make_account("report-draft")
+    other = make_account("other-draft")
+    source_url = "/api/career-report/resume-source"
+    start_url = "/api/career-report/generate/start"
+    drafts_url = "/api/resume-editor/drafts"
+    assert account.get(source_url).get_json() == {"source": None}
+    assert "个人中心" in account.post(start_url, json={}).get_json()["message"]
+
+    _save_user_state(account.email, {"resume_profile": {"file_name": "old.pdf", "resume_source_text": "旧版内容"}})
+    assert account.get(source_url).get_json() == {"source": {"kind": "upload", "title": "old.pdf"}}
+    section = {"title": "项目经历", "content": "开发简历分析工具"}
+    assert account.post(drafts_url, json={"title": "历史版本", "sections": [{**section, "content": "旧项目"}]}).status_code == 201
+    assert account.post(drafts_url, json={"title": "求职版", "sections": [section],
+                                          "contact": {"email": "private@example.com"}}).status_code == 201
+    assert account.post(drafts_url, json={"title": "空白版"}).status_code == 201
+    assert account.get(source_url).get_json() == {"source": {"kind": "draft", "title": "求职版"}}
+    assert other.get(source_url).get_json() == {"source": None}
+
+    def validate(_workflow, raw_resume, *, file_path):
+        assert raw_resume == "## 项目经历\n开发简历分析工具"
+        assert not file_path
+        raise ValueError("validated")
+
+    monkeypatch.setattr(api, "validate_report_request", validate)
+    response = account.post(start_url, json={"workflow": {"targets": ["开发工程师"], "raw_resume": "客户端替代内容"}})
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "validated"
+
+
 def test_deleting_the_current_version_promotes_the_archived_one(seeded):
     account, save = seeded
     save(account.email, make_bundle("r-second", "第二份"))

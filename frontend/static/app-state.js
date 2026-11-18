@@ -346,7 +346,7 @@ const resumeTaskState = {
   reportObserver: null
 };
 
-const reportResumeUiState = { pending: false, phase: "", error: "" };
+const reportResumeUiState = { pending: false, loaded: false, source: null, error: "" };
 
 let reportGenerationStarting = false;
 
@@ -442,7 +442,7 @@ const REPORT_AGENT_FLOW = [
   { key: "report_writer", title: "报告合成", role: "结果整理", detail: "整理已校验结果供阅读与导出", icon: "report", x: 1310, y: 326 }
 ];
 
-const reportWizardUiState = { stage: 1, runtimeKey: "", started: false, manual: false };
+const reportWizardUiState = { stage: 2, runtimeKey: "", started: false, manual: false };
 
 const reportAgentConsoleState = { selected: "", collapsed: false, tab: "overview", nodes: [], scope: "", snapshot: null, loading: false, loadedVersion: "", error: "", retrying: false };
 

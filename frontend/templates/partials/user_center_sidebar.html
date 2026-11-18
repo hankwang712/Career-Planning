@@ -30,6 +30,10 @@
         {{ nav_item('账户设置', account_icon, 'account-center') }}
     </nav>
     <div class="uc-sidebar-footer">
+        {% if resume_workshop and request.args.get('from_report') == '1' %}
+        <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='report') }}">← 返回报告生成台</a>
+        {% else %}
         <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='dashboard') }}">← 返回主工作台</a>
+        {% endif %}
     </div>
 </aside>

@@ -131,8 +131,8 @@ function initNavWorkspaceMenu() {
 function clearPrivateWorkspace() {
   accountRequestEpoch += 1;
   window.ReportReview?.reset();
-  Object.assign(reportResumeUiState, { pending: false, phase: "", error: "" });
-  Object.assign(reportWizardUiState, { stage: 1, runtimeKey: "", started: false, manual: false });
+  Object.assign(reportResumeUiState, { pending: false, loaded: false, source: null, error: "" });
+  Object.assign(reportWizardUiState, { stage: 2, runtimeKey: "", started: false, manual: false });
   document.getElementById("reportWorkflowInput")?.reset();
   reportGenerationStarting = false;
   reportGenerationError = "";
@@ -611,7 +611,7 @@ function showSection(sectionId) {
   try { window.history.replaceState({}, '', '#' + sectionId); } catch (_) {}
   if (sectionId === "report") {
     renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
-    void refreshReportResumePanel(true);
+    void refreshReportResumePanel();
   }
   if (sectionId === "jobs") {
     void openDatasetBrowser();

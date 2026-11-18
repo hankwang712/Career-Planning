@@ -17,36 +17,47 @@ function renderReportWizard() {
   if (executionTitle) executionTitle.textContent = isCareerReportReadyStatus(state?.status) ? "这一站，已经为你梳理好了。"
     : state?.status === "waiting_input" ? "聊聊你的想法，再继续规划。"
     : ["failed", "canceled"].includes(state?.status) ? "进度已保留，可以接着完成。" : "Agent 团队，正在一起探索。";
-  const ready = Boolean(getResumeProfileFromCache()?.file_name);
-  const locked = reportGenerationStarting || reportResumeUiState.pending || resumeTaskState.uploadInFlight
-    || resumeTaskState.analyzeInFlight || isCareerReportRunningStatus(state?.status);
-  const panels = ["reportResumePanel", "reportWorkflowInput", "reportExecutionPanel"];
-  panels.forEach((id, index) => {
+  const { source, pending, loaded, error } = reportResumeUiState;
+  const locked = reportGenerationStarting || pending || isCareerReportRunningStatus(state?.status);
+  const panels = {
+    reportResumeNotice: stage === 2 && !source,
+    reportWorkflowInput: stage === 2 && Boolean(source),
+    reportExecutionPanel: stage === 3,
+  };
+  Object.entries(panels).forEach(([id, visible]) => {
     const element = document.getElementById(id);
-    if (element) element.hidden = stage !== index + 1;
+    if (element) element.hidden = !visible;
   });
   document.querySelectorAll("[data-report-step]").forEach((button) => {
     const step = Number(button.dataset.reportStep);
-    button.disabled = step === 2 ? !ready : step === 3 ? !reportWizardUiState.started : false;
+    button.disabled = step === 3 && !reportWizardUiState.started;
     button.classList.toggle("is-current", step === stage);
-    button.classList.toggle("is-complete", step === 1 ? ready : step === 2 ? reportWizardUiState.started : isCareerReportReadyStatus(state?.status));
+    button.classList.toggle("is-complete", step === 2 ? reportWizardUiState.started : isCareerReportReadyStatus(state?.status));
     if (step === stage) button.setAttribute("aria-current", "step");
     else button.removeAttribute("aria-current");
   });
-  const hint = document.getElementById("reportStepResumeHint");
-  if (hint) hint.textContent = ready ? "简历已准备好" : "从你的经历开始";
-  const next = document.getElementById("reportResumeNext");
-  if (next) next.disabled = !ready || reportResumeUiState.pending || resumeTaskState.uploadInFlight;
+  const noticeTitle = document.getElementById("reportResumeNoticeTitle");
+  const noticeDetail = document.getElementById("reportResumeNoticeDetail");
+  const noticeLink = document.getElementById("reportResumeEditorLink");
+  const retry = document.getElementById("reportResumeRetry");
+  const checking = pending || !loaded;
+  if (noticeTitle) noticeTitle.textContent = checking ? "正在检查简历" : error ? "简历状态暂时无法读取" : "请先保存一份简历";
+  if (noticeDetail) noticeDetail.textContent = checking ? "规划报告使用个人中心保存的简历。"
+    : error || "前往个人中心的「我的简历」，填写经历或导入已有简历并保存，再回来设定报告方向。";
+  if (noticeLink) noticeLink.hidden = checking || Boolean(error);
+  if (retry) retry.hidden = checking || !error;
+  const sourceLabel = document.getElementById("reportResumeSourceLabel");
+  if (sourceLabel) sourceLabel.textContent = source ? `分析简历：${source.title}` : "";
   const start = document.getElementById("reportStageStart");
   if (start) {
-    start.disabled = locked || !ready;
+    start.disabled = locked || !source;
     start.textContent = reportGenerationStarting ? "正在启动…" : "启动多智能体 ↗";
   }
   const primary = document.getElementById("reportLaunchBtn");
-  if (primary && !reportGenerationStarting) {
-    primary.disabled = stage === 1 ? !ready || reportResumeUiState.pending : locked;
-    primary.textContent = isCareerReportRunningStatus(state?.status) ? "生成中…"
-      : stage === 1 ? "下一步：填写目标" : stage === 2 ? "启动多智能体" : "重新设定目标";
+  if (primary) {
+    primary.disabled = locked || (stage === 2 && !source);
+    primary.textContent = reportGenerationStarting ? "正在启动…" : isCareerReportRunningStatus(state?.status) ? "生成中…"
+      : stage === 2 ? "启动多智能体" : "重新设定目标";
   }
   const form = document.getElementById("reportWorkflowInput");
   if (form && !form.dataset.wizardBound) {
@@ -60,23 +71,21 @@ function renderReportWizard() {
 }
 
 function showReportWizardStage(stage) {
-  if (stage === 2 && !getResumeProfileFromCache()?.file_name) return;
   if (stage === 3 && !reportWizardUiState.started) return;
   reportWizardUiState.stage = stage;
   reportWizardUiState.manual = true;
   renderReportWizard();
   if (stage !== 3) window.ReportReview?.close();
   else renderReportWorkflowReview(getReportRuntimeState());
-  const target = document.getElementById(stage === 1 ? "reportResumeSelectBtn" : stage === 2 ? "reportWorkflowTargets" : "reportStatusTitle");
+  const target = document.getElementById(reportResumeUiState.source ? "reportWorkflowTargets" : "reportResumeEditorLink");
   requestAnimationFrame(() => {
     if (target && stage !== 3) target.focus({ preventScroll: true });
   });
 }
 
 function reportWizardPrimaryAction() {
-  if (reportWizardUiState.stage === 1) showReportWizardStage(2);
-  else if (reportWizardUiState.stage === 2) void startCareerReportGeneration();
-  else showReportWizardStage(getResumeProfileFromCache()?.file_name ? 2 : 1);
+  if (reportWizardUiState.stage === 2) void startCareerReportGeneration();
+  else showReportWizardStage(2);
 }
 
 function reportAgentCurrentMessage(item, state) {
@@ -659,13 +668,10 @@ function renderReportWorkspace(profile, roles) {
   const running = ["queued", "running"].includes(status);
   const failed = status === "failed";
   const waiting = status === "waiting_input";
-  // 检查是否有正式报告：状态为 ready/done 或 appState.reportGenerated 为 true
-  const hasReport = appState.reportGenerated || isCareerReportReadyStatus(status) || Boolean(appState.careerReport);
   const selected = safeRoles.find((item) => item.id === appState.focusedRoleId) || safeRoles[0] || null;
   const statusTitle = document.getElementById("reportStatusTitle");
   const statusHint = document.getElementById("reportStatusHint");
   const generatedTime = document.getElementById("reportGeneratedTime");
-  const launchBtn = document.getElementById("reportLaunchBtn");
   const cancelBtn = document.getElementById("reportCancelBtn");
   const mapEl = document.getElementById("reportAgentMap");
   const missingCount = Array.isArray(profile?.missingItems) ? profile.missingItems.length : 0;
@@ -695,21 +701,10 @@ function renderReportWorkspace(profile, roles) {
   if (generatedTime) {
     generatedTime.textContent = state?.updated_at || state?.finished_at || state?.created_at || new Date().toLocaleString("zh-CN", { hour12: false });
   }
-  if (launchBtn) {
-    launchBtn.disabled = running;
-    const isReady = isCareerReportReadyStatus(status);
-    launchBtn.textContent = waiting ? "重新开始" : running
-      ? "生成中"
-        : (isReady || hasReport)
-          ? "重新生成"
-            : "启动生成";
-  }
   if (cancelBtn) {
     cancelBtn.classList.toggle("hidden", !running);
     cancelBtn.disabled = !running;
   }
-  const inputForm = document.getElementById("reportWorkflowInput");
-  if (inputForm) inputForm.querySelectorAll("input, textarea, select").forEach((input) => { input.disabled = running; });
   renderReportResumePanel();
   renderReportWorkflowReview(state);
   if (mapEl) {
@@ -719,7 +714,6 @@ function renderReportWorkspace(profile, roles) {
     renderReportAgentInspector(mapEl);
     if (reportAgentConsoleState.selected) void loadReportAgentSnapshot(mapEl);
   }
-  renderReportWizard();
 }
 
 function getCareerReportStateSafe() {
@@ -974,42 +968,11 @@ async function resumeCareerReportRuntime() {
   }
 }
 
-function renderReportResumePanel(data = getResumeProfileFromCache()) {
-  const panel = document.getElementById("reportResumePanel");
-  if (!panel) return;
-  const hasFile = Boolean(data?.file_name);
-  const ready = hasFile;
+function renderReportResumePanel() {
   const running = isCareerReportRunningStatus(getCareerReportStateSafe()?.status);
-  const busy = reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight;
-  const locked = running || busy || reportGenerationStarting;
-  const title = document.getElementById("reportResumeFileName");
-  const meta = document.getElementById("reportResumeFileMeta");
-  const badge = document.getElementById("reportResumeStatus");
-  const hint = document.getElementById("reportResumeHint");
-  const select = document.getElementById("reportResumeSelectBtn");
-  const input = document.getElementById("reportResumeFileInput");
-  panel.dataset.state = reportResumeUiState.error ? "error" : busy ? "busy" : ready ? "ready" : "empty";
-  panel.setAttribute("aria-busy", String(busy));
-  if (title) title.textContent = hasFile ? (data.original_file_name || data.file_name) : "选择简历文件，或拖拽到这里";
-  if (meta) meta.textContent = hasFile
-    ? `${String(data.file_type || "文件").toUpperCase()} · ${(Number(data.file_size || 0) / 1024).toFixed(0)} KB`
-    : "支持 PDF、DOCX，单个文件不超过 12 MB。";
-  if (badge) badge.textContent = busy ? (reportResumeUiState.phase || "正在处理") : ready ? "已上传" : "未上传";
-  if (hint) hint.textContent = reportResumeUiState.error || (busy
-    ? "当前任务正在处理，请稍候。"
-    : ready ? "简历已准备好。点击下一步，填写目标与偏好。"
-    : "先上传简历，再填写目标岗位，点击“启动生成”开始多智能体分析。");
-  if (select) { select.disabled = locked; select.textContent = hasFile ? "更换简历" : "上传简历"; }
-  if (input) input.disabled = locked;
   document.getElementById("reportWorkflowInput")?.querySelectorAll("input, textarea, select").forEach((field) => {
     field.disabled = running || reportGenerationStarting;
   });
-  const launch = document.getElementById("reportLaunchBtn");
-  if (launch) {
-    launch.disabled = locked || !hasFile;
-    launch.title = !hasFile ? "请先在下方上传简历" : busy ? "当前任务正在处理，请稍候" : "使用当前简历启动多智能体分析";
-    if (reportGenerationStarting) launch.textContent = "正在启动";
-  }
   const feedback = document.getElementById("reportLaunchFeedback");
   if (feedback) {
     feedback.hidden = !reportGenerationStarting && !reportGenerationError;
@@ -1027,78 +990,24 @@ function renderReportResumePanel(data = getResumeProfileFromCache()) {
   renderReportWizard();
 }
 
-async function refreshReportResumePanel(force = true) {
-  if (reportResumeUiState.pending) return;
-  try {
-    const data = await loadResumeProfile(force);
-    if (data.file_name) reportResumeUiState.error = "";
-    renderReportResumePanel(data);
-  } catch (error) {
-    if (error.code === "ACCOUNT_CHANGED") return;
-    reportResumeUiState.error = error.message || "简历状态加载失败，请刷新页面重试。";
-    renderReportResumePanel();
-  }
-}
-
-function pickReportResumeFile() {
-  if (!isAuthenticatedUser()) return showToast("请先登录", "请登录后上传简历。", "warning", 2000);
-  if (!reportResumeUiState.pending && !resumeTaskState.uploadInFlight && !resumeTaskState.analyzeInFlight && !reportGenerationStarting && !isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
-    document.getElementById("reportResumeFileInput")?.click();
-  }
-}
-
-async function uploadReportResumeFile(file) {
-  if (!file) return;
-  if (!isAuthenticatedUser()) return showToast("请先登录", "请登录后上传简历。", "warning", 2000);
-  if (reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight || reportGenerationStarting || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
-    return showToast("请稍候", "当前有上传或分析任务正在进行，请完成后再更换简历。", "warning", 2500);
-  }
-  if (!/\.(pdf|docx)$/i.test(file.name) || file.size <= 0 || file.size > 12 * 1024 * 1024) {
-    reportResumeUiState.error = "请选择不超过 12 MB 的非空 PDF 或 DOCX 简历文件。";
-    renderReportResumePanel();
-    return;
-  }
+async function refreshReportResumePanel() {
+  if (reportResumeUiState.pending || !isAuthenticatedUser()) return;
   const epoch = accountRequestEpoch;
   reportResumeUiState.pending = true;
-  reportResumeUiState.error = "";
-  reportResumeUiState.phase = "上传中";
-  resumeTaskState.uploadInFlight = true;
-  updateResumeActionButtons();
+  renderReportWizard();
   try {
-    const body = new FormData();
-    body.append("file", file);
-    const payload = await requestJson("/api/resume/upload", { method: "POST", body });
-    const uploaded = payload.data || emptyResumeProfile();
-    userWorkspaceState.scopedData.resume_profile = uploaded;
-    userWorkspaceState.scopedDataLoaded.resume_profile = true;
-    renderResumeProfileSection(uploaded);
-    showToast("上传成功", "文件已保存。点击“启动生成”，由现有分析流程读取并分析简历。", "success", 2800);
-    refreshUnifiedExperience();
+    const { source } = await requestJson("/api/career-report/resume-source");
+    if (epoch === accountRequestEpoch) Object.assign(reportResumeUiState, { source, error: "" });
   } catch (error) {
-    if (error.code !== "ACCOUNT_CHANGED" && epoch === accountRequestEpoch) {
-      reportResumeUiState.error = error.message || "简历上传失败，请重试。";
-      showToast("简历上传失败", reportResumeUiState.error, "error", 3200);
+    if (epoch === accountRequestEpoch && error.code !== "ACCOUNT_CHANGED") {
+      Object.assign(reportResumeUiState, { source: null, error: error.message || "请稍后重试。" });
     }
   } finally {
     if (epoch === accountRequestEpoch) {
-      reportResumeUiState.pending = false;
-      reportResumeUiState.phase = "";
-      resumeTaskState.uploadInFlight = false;
-      updateResumeActionButtons();
+      Object.assign(reportResumeUiState, { pending: false, loaded: true });
+      renderReportWizard();
     }
   }
-}
-
-async function onReportResumeSelected(event) {
-  try { await uploadReportResumeFile(event?.target?.files?.[0]); }
-  finally { if (event?.target) event.target.value = ""; }
-}
-
-function onReportResumeDrop(event) {
-  event.preventDefault();
-  event.currentTarget?.classList.remove("is-dragging");
-  if (event.dataTransfer?.files?.length !== 1) return showToast("请选择一个文件", "一次上传一份用于当前分析的简历。", "warning", 2000);
-  void uploadReportResumeFile(event.dataTransfer.files[0]);
 }
 
 async function startCareerReportGeneration() {
@@ -1111,13 +1020,13 @@ async function startCareerReportGeneration() {
     return;
   }
   if (reportWizardUiState.stage !== 2) {
-    showReportWizardStage(getResumeProfileFromCache()?.file_name ? 2 : 1);
+    showReportWizardStage(2);
     return;
   }
-  if (reportGenerationStarting || reportResumeUiState.pending || resumeTaskState.uploadInFlight || resumeTaskState.analyzeInFlight || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
+  if (reportGenerationStarting || reportResumeUiState.pending || isCareerReportRunningStatus(getCareerReportStateSafe()?.status)) {
     return showToast("请稍候", "简历或报告任务正在执行中。", "warning", 2000);
   }
-  if (document.getElementById("reportWorkflowInput")?.reportValidity?.() === false) return;
+  if (!reportResumeUiState.source || document.getElementById("reportWorkflowInput")?.reportValidity?.() === false) return;
   const payload = buildCareerReportGenerationPayload();
   if (!payload) {
     showSection("profile");
@@ -1128,27 +1037,17 @@ async function startCareerReportGeneration() {
   const epoch = accountRequestEpoch;
   reportGenerationError = "";
   reportGenerationStarting = true;
-  const launchBtn = document.getElementById("reportLaunchBtn");
-  if (launchBtn) {
-    launchBtn.disabled = true;
-    launchBtn.textContent = "启动中";
-  }
   renderReportResumePanel();
 
   try {
     if (!payload.workflow.targets.length || payload.workflow.targets.length > 5) {
       throw new Error("请填写 1 到 5 个目标岗位或方向，每行一个。");
     }
-    const resume = await loadResumeProfile(true);
-    if (!resume.file_name) {
-      showReportWizardStage(1);
-      document.getElementById("reportResumePanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      throw new Error("请先在上方上传 PDF 或 DOCX 简历。");
-    }
     await submitCareerReportWorkflow(payload);
   } catch (error) {
     if (error.code !== "ACCOUNT_CHANGED" && epoch === accountRequestEpoch) {
       reportGenerationError = error.message || "请稍后重试。";
+      if (error.status === 400) void refreshReportResumePanel();
       showToast("启动失败", reportGenerationError, "error", 3200);
     }
   } finally {
