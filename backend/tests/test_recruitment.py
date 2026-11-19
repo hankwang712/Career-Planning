@@ -52,11 +52,11 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["liepin"]}).status_code == 400
-    auto = {"rules": {"auto": True, "title_exclusions": ["Agent"]}}
+    auto = {"profile": "full_time", "rules": {"auto": True, "title_exclusions": ["Agent"]}}
     assert owner.post(API + "/cleaning/save", json=auto).status_code == 200
     active = [source for source in LINKS if source != "liepin"]
     response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": active, "limit": 10,
-                                               "chrome_local": True})
+                                               "chrome_local": True, "profile": "full_time"})
     assert response.status_code == 202
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
@@ -68,7 +68,8 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     assert set(run["progress"]) == set(active)
     assert all(item["count"] == 1 and item["cleaning"]["rejected"] == 1 for item in run["progress"].values())
     assert owner.get(API + "/jobs?source=51job").get_json()["total"] == 1
-    assert owner.get(API + "/jobs").get_json()["total"] == 4
+    assert run["profile"] == "full_time"
+    assert owner.get(API + "/jobs?profile=full_time").get_json()["total"] == 4
     assert other.get(API + "/jobs").get_json()["total"] == 0
     assert other.get(API + "/runs").get_json()["items"] == []
 
@@ -409,7 +410,70 @@ def test_auto_cleaning_applies_to_imports_and_keeps_uncertain_fields(make_accoun
     reply = account.post(API + "/import-html", data={"source": "boss", "file": (BytesIO(b"<p>job</p>"), "jobs.html")})
     assert reply.get_json()["cleaning"]["rejected"] == 1
     assert account.post(endpoint + "/save", json={"rules": {"min_salary_k": 20, "max_salary_k": 10}}).status_code == 400
-    assert account.get(endpoint).get_json()["rules"] == {**rules, "max_salary_k": None, "cities": [], "title_exclusions": []}
+    assert account.get(endpoint).get_json()["rules"] == {
+        **rules, "max_salary_k": None, "min_daily_salary": None, "max_daily_salary": None, "cities": [], "title_exclusions": [],
+    }
+
+
+def test_cleaning_profiles_keep_rules_and_decisions_separate(make_account):
+    account = make_account("profile-rules")
+    other = make_account("profile-other")
+    endpoint = API + "/cleaning"
+    intern = {"min_daily_salary": 200, "max_daily_salary": 350, "auto": True}
+    full_time = {"min_salary_k": 15, "title_exclusions": ["实习"], "auto": True}
+    assert account.post(endpoint + "/save", json={"profile": "internship", "rules": intern}).status_code == 200
+    assert account.post(endpoint + "/save", json={"profile": "full_time", "rules": full_time}).status_code == 200
+    assert account.post(endpoint + "/save", json={"profile": "full_time", "rules": intern}).status_code == 400
+
+    def import_job(profile, path, title, pay):
+        csv = f"source,title,salary,url\nboss,{title},{pay},https://www.zhipin.com/job_detail/{path}.html\n"
+        return account.post(API + "/import", data={"profile": profile, "file": (BytesIO(csv.encode()), "jobs.csv")}).get_json()
+
+    assert import_job("internship", "a", "工程实习", "150–250元/天")["cleaning"]["passed"] == 1
+    assert import_job("internship", "b", "工程实习", "150元/天")["cleaning"]["rejected"] == 1
+    assert import_job("full_time", "c", "工程师", "12-18K")["cleaning"]["passed"] == 1
+    assert import_job("full_time", "d", "工程师", "150–250元/天")["cleaning"]["review"] == 1
+    assert import_job("general", "b", "工程实习", "150元/天")["cleaning"]["rejected"] == 1
+    assert import_job("full_time", "b", "工程实习", "150元/天")["cleaning"]["rejected"] == 1
+    assert account.get(endpoint + "?profile=internship").get_json()["counts"]["rejected"] == 1
+    assert account.get(endpoint + "?profile=full_time").get_json()["counts"]["review"] == 1
+    assert account.get(endpoint).get_json()["counts"]["rejected"] == 0
+    assert account.get(API + "/jobs?profile=internship").get_json()["total"] == 2
+    preview = account.post(endpoint + "/preview", json={"profile": "internship", "rules": intern}).get_json()
+    assert preview["counts"] == {"passed": 1, "rejected": 1, "review": 0}
+    assert account.post(endpoint + "/apply", json={"profile": "full_time", "rules": full_time, "token": preview["token"]}).status_code == 409
+
+    item = {"source": "boss", "url": "https://www.zhipin.com/job_detail/b.html"}
+    assert other.post(API + "/jobs/profile", json={**item, "profile": "full_time"}).status_code == 404
+    assert account.post(endpoint + "/release", json={**item, "profile": "internship"}).status_code == 200
+    assert account.post(API + "/jobs/profile", json={**item, "profile": "full_time"}).status_code == 200
+    moved = account.get(API + "/jobs?profile=full_time&clean_status=rejected").get_json()["items"]
+    assert len(moved) == 1 and moved[0]["cleaning_reason"] == "标题命中排除词「实习」"
+
+
+def test_existing_cleaning_rules_and_listings_migrate_to_general():
+    import sqlite3
+    from services import recruitment
+
+    with sqlite3.connect(":memory:") as conn:
+        conn.row_factory = sqlite3.Row
+        conn.executescript("""
+            CREATE TABLE users (username TEXT PRIMARY KEY);
+            INSERT INTO users VALUES ('legacy');
+            CREATE TABLE recruitment_cleaning_rules (owner TEXT PRIMARY KEY, rules TEXT NOT NULL);
+            INSERT INTO recruitment_cleaning_rules VALUES ('legacy', '{"min_salary_k":12,"auto":true}');
+            CREATE TABLE recruitment_listings (
+                owner TEXT, source TEXT, url_key TEXT, title TEXT, company TEXT, location TEXT,
+                salary TEXT, description TEXT, url TEXT, updated_at REAL, PRIMARY KEY(owner, source, url_key)
+            );
+            INSERT INTO recruitment_listings VALUES ('legacy','boss','url','title','','','9K','','url',0);
+        """)
+        recruitment.init_schema(conn)
+        recruitment.init_schema(conn)
+        rule = recruitment.cleaning.load_rules(conn, "legacy", "general")
+        assert rule.auto and rule.min_salary_k == 12
+        assert not recruitment.cleaning.load_rules(conn, "legacy", "internship").auto
+        assert conn.execute("SELECT profile FROM recruitment_listings").fetchone()[0] == "general"
 
 
 @pytest.mark.parametrize(("salary", "expected"), [
@@ -430,7 +494,9 @@ def test_encoded_salary_is_hidden_from_results_and_csv_without_erasing_a_known_v
     connection = db._get_conn()
     encoded = "\ue032\ue031-\ue033K"
     with connection:
-        connection.execute("INSERT INTO recruitment_listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        connection.execute("""INSERT INTO recruitment_listings
+                           (owner, source, url_key, title, company, location, salary, description, url, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                            (account.email, "boss", LINKS["boss"], "开发", "示例公司", "杭州", encoded,
                             f"岗位说明\n{encoded}", LINKS["boss"], time.time()))
     legacy = account.get(API + "/jobs").get_json()["items"][0]

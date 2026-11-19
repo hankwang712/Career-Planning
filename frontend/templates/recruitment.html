@@ -106,6 +106,9 @@
                                 </div>
                             </div>
                         </div>
+                        <label>求职方向<select name="profile" id="recruitmentProfile" aria-label="求职方向">
+                            {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+                        </select></label>
                         <label>每个平台上限<select name="limit"><option>10</option><option selected>20</option><option>30</option></select></label>
                     </div>
                     <fieldset>
@@ -161,7 +164,7 @@
                     <div class="recruitment-section-heading">
                         <span class="recruitment-section-icon" aria-hidden="true">◇</span>
                         <h2 id="recruitmentCleaningTitle">规则清洗</h2>
-                        <span id="recruitmentCleaningMode" class="recruitment-badge">手动清洗</span>
+                        <span id="recruitmentCleaningMode" class="recruitment-badge">通用 · 手动清洗</span>
                     </div>
                     <div class="recruitment-actions">
                         <button id="recruitmentCleaningOpen" type="button">配置与预览</button>
@@ -191,6 +194,9 @@
                 <form class="recruitment-filters" id="recruitmentFilters" role="search">
                     <input type="search" name="q" maxlength="120" aria-label="搜索结果" placeholder="按岗位、公司或地点搜索">
                     <select name="source" aria-label="筛选平台"><option value="">全部平台</option>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select>
+                    <select name="profile" aria-label="按求职方向筛选"><option value="">全部方向</option>
+                        {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+                    </select>
                     <select name="clean_status" aria-label="清洗状态">
                         <option value="">全部清洗状态</option><option value="unreviewed">未清洗</option>
                         <option value="passed">通过</option><option value="rejected">淘汰</option>
@@ -206,13 +212,17 @@
         </div>
     </main>
     <dialog id="recruitmentCleaningDialog" class="recruitment-detail" aria-labelledby="recruitmentRulesTitle">
-        <header><h2 id="recruitmentRulesTitle">清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
+        <header><div class="recruitment-section-heading"><h2 id="recruitmentRulesTitle">清洗规则</h2><span id="recruitmentRulesProfile" class="recruitment-badge">通用</span></div><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentCleaningForm" class="recruitment-card-body">
             <fieldset class="recruitment-rule-fields" disabled>
                 <label>目标城市<input name="cities" maxlength="2500" placeholder="例如 杭州、上海、远程"></label>
                 <div class="recruitment-rule-salary">
                     <label>最低月薪（K）<input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
                     <label>最高月薪（K）<input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
+                </div>
+                <div class="recruitment-rule-salary" id="recruitmentDailyRules" hidden>
+                    <label>最低日薪（元/天）<input type="number" name="min_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
+                    <label>最高日薪（元/天）<input type="number" name="max_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
                 </div>
                 <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
                 <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
@@ -231,6 +241,13 @@
         <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
         <div class="recruitment-card-body">
             <p id="recruitmentDetailMeta"></p>
+            <div class="recruitment-detail-profile">
+                <label>归入求职方向<select id="recruitmentDetailProfile" aria-label="归入求职方向">
+                    {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+                </select></label>
+                <button id="recruitmentMoveProfile" type="button" disabled>更新方向</button>
+            </div>
+            <p id="recruitmentMoveFeedback" class="recruitment-detail-status" role="status" hidden></p>
             <p id="recruitmentDetailStatus" class="recruitment-detail-status" role="status" hidden></p>
             <p id="recruitmentDescription"></p>
             <a id="recruitmentOriginal" class="recruitment-button" target="_blank" rel="noopener noreferrer">查看原帖 ↗</a>
@@ -240,6 +257,9 @@
         <header><h2 id="recruitmentImportPageTitle">导入已保存的搜索页</h2><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentHtmlForm" class="recruitment-card-body recruitment-html-form">
             <p>在原站打开搜索结果，用浏览器的“网页，仅 HTML”保存，再上传该 HTML 文件。</p>
+            <label>导入到<select name="profile">
+                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+            </select></label>
             <label>招聘平台<select name="source" required>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select></label>
             <label>HTML 文件<input type="file" name="file" accept=".html,.htm,text/html" required></label>
             <p id="recruitmentHtmlFeedback" role="status"></p>

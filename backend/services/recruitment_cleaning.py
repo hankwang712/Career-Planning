@@ -3,7 +3,7 @@
 from hashlib import sha256
 import json
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 from unicodedata import normalize
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -12,6 +12,9 @@ from .recruitment_sources import CITIES
 
 
 STATUSES = ("unreviewed", "passed", "rejected", "review")
+Profile = Literal["general", "internship", "full_time"]
+DEFAULT_PROFILE = "general"
+PROFILES = {"general": "通用", "internship": "实习", "full_time": "正式工作"}
 CITY_SEPARATOR = re.compile(r"[\s·•/／|,，、;；—-]+")
 KNOWN_CITIES = frozenset(CITIES) | {
     "重庆", "天津", "苏州", "无锡", "宁波", "温州", "合肥", "福州", "厦门", "南昌",
@@ -24,6 +27,7 @@ MONTHLY_PAY = re.compile(
     r"(/(?:月|month)|每月)?(?:[·*×x]\d+薪)?", re.I
 )
 PAY_SCALE = {"k": 1000, "千": 1000, "千元": 1000, "万": 10000, "万元": 10000, "元": 1, None: 1}
+DAILY_PAY = re.compile(r"(\d+(?:\.\d+)?)(?:元)?(?:[-~至](\d+(?:\.\d+)?))?(?:元)?(?:/[天日]|每天|每日)")
 RuleTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 SalaryK = Annotated[float, Field(gt=0, le=1000, allow_inf_nan=False)]
 
@@ -33,6 +37,8 @@ class CleaningRules(BaseModel):
     cities: list[RuleTerm] = Field(default_factory=list, max_length=30)
     min_salary_k: SalaryK | None = None
     max_salary_k: SalaryK | None = None
+    min_daily_salary: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    max_daily_salary: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
     title_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
     company_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
     auto: bool = Field(default=False, strict=True)
@@ -41,14 +47,19 @@ class CleaningRules(BaseModel):
     def check_salary_order(self):
         if self.min_salary_k is not None and self.max_salary_k is not None and self.min_salary_k > self.max_salary_k:
             raise ValueError("最低月薪不能高于最高月薪。")
+        if (self.min_daily_salary is not None and self.max_daily_salary is not None
+                and self.min_daily_salary > self.max_daily_salary):
+            raise ValueError("最低日薪不能高于最高日薪。")
         return self
 
 
 def init_schema(conn):
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS recruitment_cleaning_rules (
-            owner TEXT PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
-            rules TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS recruitment_cleaning_profiles (
+            owner TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+            profile TEXT NOT NULL CHECK (profile IN ('general', 'internship', 'full_time')),
+            rules TEXT NOT NULL,
+            PRIMARY KEY(owner, profile)
         );
         CREATE TABLE IF NOT EXISTS recruitment_cleaning_results (
             owner TEXT NOT NULL, source TEXT NOT NULL, url_key TEXT NOT NULL,
@@ -66,18 +77,36 @@ def init_schema(conn):
             WHERE owner=NEW.owner AND source=NEW.source AND url_key=NEW.url_key AND status <> 'released';
         END;
     """)
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for table in ("recruitment_listings", "recruitment_runs"):
+            if "profile" not in {column[1] for column in conn.execute(f"PRAGMA table_info({table})")}:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN profile TEXT NOT NULL DEFAULT 'general'")
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recruitment_cleaning_rules'").fetchone():
+            conn.execute("""
+                INSERT OR IGNORE INTO recruitment_cleaning_profiles
+                SELECT owner, 'general', rules FROM recruitment_cleaning_rules
+            """)
+            conn.execute("DROP TABLE recruitment_cleaning_rules")
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS recruitment_recheck_moved_listing
+            AFTER UPDATE OF profile ON recruitment_listings WHEN NEW.profile <> OLD.profile
+            BEGIN
+                DELETE FROM recruitment_cleaning_results WHERE owner=NEW.owner AND source=NEW.source AND url_key=NEW.url_key;
+            END
+        """)
 
 
-def load_rules(conn, owner):
-    row = conn.execute("SELECT rules FROM recruitment_cleaning_rules WHERE owner=?", (owner,)).fetchone()
+def load_rules(conn, owner, profile):
+    row = conn.execute("SELECT rules FROM recruitment_cleaning_profiles WHERE owner=? AND profile=?", (owner, profile)).fetchone()
     return CleaningRules.model_validate_json(row["rules"]) if row else CleaningRules()
 
 
-def save_rules(conn, owner, rules):
+def save_rules(conn, owner, profile, rules):
     conn.execute("""
-        INSERT INTO recruitment_cleaning_rules VALUES (?, ?)
-        ON CONFLICT(owner) DO UPDATE SET rules=excluded.rules
-    """, (owner, rules.model_dump_json()))
+        INSERT INTO recruitment_cleaning_profiles VALUES (?, ?, ?)
+        ON CONFLICT(owner, profile) DO UPDATE SET rules=excluded.rules
+    """, (owner, profile, rules.model_dump_json()))
 
 
 def comparable_text(value):
@@ -114,6 +143,36 @@ def monthly_pay(value):
     return (minimum, maximum) if 0 < minimum <= maximum <= 10_000_000 else (None, None)
 
 
+def daily_pay(value):
+    text = re.sub(r"\s+", "", comparable_text(value)).replace("–", "-").replace("—", "-")
+    match = DAILY_PAY.fullmatch(text)
+    if not match:
+        return None, None
+    low, high = map(float, (match[1], match[2] or match[1]))
+    return (low, high) if 0 < low <= high <= 100000 else (None, None)
+
+
+def salary_decision(salary, rules):
+    configured = False
+    for label, parser, minimum, maximum, scale in (
+        ("月薪", monthly_pay, rules.min_salary_k, rules.max_salary_k, 1000),
+        ("日薪", daily_pay, rules.min_daily_salary, rules.max_daily_salary, 1),
+    ):
+        if minimum is None and maximum is None:
+            continue
+        configured = True
+        low, high = parser(salary)
+        if low is None:
+            continue
+        if ((minimum is not None and high < minimum * scale) or (maximum is not None and low > maximum * scale)):
+            return "rejected", f"{label}「{salary}」与目标区间无交集"
+        return "passed", ""
+    if configured:
+        reason = "月薪无法确认" if rules.min_daily_salary is None and rules.max_daily_salary is None else "薪资口径或金额待核对"
+        return "review", reason
+    return "passed", ""
+
+
 def evaluate(row, rules):
     if row["status"] == "released":
         return "released", row["reason"]
@@ -135,31 +194,29 @@ def evaluate(row, rules):
                 return "rejected", f"地点「{row['location']}」不在目标城市"
             if matches is None:
                 missing.append("城市无法确认")
-        if rules.min_salary_k is not None or rules.max_salary_k is not None:
-            low, high = monthly_pay(row["salary"])
-            if low is None:
-                missing.append("月薪无法确认")
-            elif ((rules.min_salary_k is not None and high < rules.min_salary_k * 1000)
-                  or (rules.max_salary_k is not None and low > rules.max_salary_k * 1000)):
-                return "rejected", f"月薪「{row['salary']}」与目标区间无交集"
+        status, reason = salary_decision(row["salary"], rules)
+        if status == "rejected":
+            return status, reason
+        if status == "review":
+            missing.append(reason)
     return ("review", "、".join(missing)) if missing else ("passed", "")
 
 
-def stored_counts(conn, owner):
+def stored_counts(conn, owner, profile):
     counts = dict.fromkeys(STATUSES, 0)
     for row in conn.execute("""
         SELECT COALESCE(r.status, 'unreviewed') AS status, count(*) AS count
         FROM recruitment_listings j
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
-        WHERE j.owner=? GROUP BY r.status
-    """, (owner,)):
+        WHERE j.owner=? AND j.profile=? GROUP BY r.status
+    """, (owner, profile)):
         counts["passed" if row["status"] == "released" else row["status"]] += row["count"]
     return counts
 
 
 LISTINGS = """
     SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary,
-           r.status, r.reason
+           r.status, r.reason, j.profile
     FROM recruitment_listings j
     LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
     WHERE j.owner=?
@@ -187,10 +244,10 @@ def result_counts(results):
     return counts
 
 
-def preview(conn, owner, rules):
-    rows = list(conn.execute(LISTINGS + " ORDER BY j.source, j.url_key", (owner,)))
+def preview(conn, owner, profile, rules):
+    rows = list(conn.execute(LISTINGS + " AND j.profile=? ORDER BY j.source, j.url_key", (owner, profile)))
     results = list(result_rows(rows, rules))
-    snapshot = [owner, rules.model_dump(), load_rules(conn, owner).model_dump(), [tuple(row) for row in rows]]
+    snapshot = [owner, profile, rules.model_dump(), load_rules(conn, owner, profile).model_dump(), [tuple(row) for row in rows]]
     token = sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     samples = {status: [] for status in STATUSES[1:]}
     for source, _, title, status, reason in results:
@@ -203,14 +260,19 @@ def preview(conn, owner, rules):
 def apply_ingested(conn, owner, source, urls):
     if not urls:
         return {}
-    rules = load_rules(conn, owner)
-    if not rules.auto:
+    rules = {profile: load_rules(conn, owner, profile) for profile in PROFILES}
+    if not any(rule.auto for rule in rules.values()):
         return {}
     results = []
     for start in range(0, len(urls), 500):
         batch = urls[start:start + 500]
         placeholders = ", ".join("?" for _ in batch)
         rows = conn.execute(LISTINGS + f" AND j.source=? AND j.url_key IN ({placeholders})", (owner, source, *batch))
-        results.extend(result_rows(rows, rules))
+        for row in rows:
+            rule = rules[row["profile"]]
+            if rule.auto:
+                results.extend(result_rows((row,), rule))
+    if not results:
+        return {}
     write_results(conn, owner, results)
     return result_counts(results)

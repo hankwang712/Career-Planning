@@ -104,7 +104,7 @@ input:not([type=checkbox]), select {
 .recruitment-config form > :is(fieldset, .recruitment-browser-options, .recruitment-city-coverage) { grid-column: 1 / -1; }
 .recruitment-form-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(110px, .4fr) minmax(110px, .3fr);
+    grid-template-columns: minmax(0, 1fr) minmax(110px, .4fr) minmax(105px, .3fr) minmax(105px, .3fr);
     align-items: end;
     gap: 12px;
 }
@@ -321,7 +321,7 @@ input:not([type=checkbox]), select {
 .recruitment-rule-preview-group p { margin-top: 4px; font-size: 12px; }
 .recruitment-filters {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(100px, 145px) minmax(100px, 150px) auto;
+    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(100px, 140px)) auto;
     gap: 8px;
     padding: 14px 16px;
     border-bottom: 1px solid #eaf0f7;
@@ -348,6 +348,8 @@ input:not([type=checkbox]), select {
 }
 .recruitment-row:is(:hover, :focus-within) { border-color: #b1c9ef; box-shadow: 0 4px 10px #294c7d12; }
 .recruitment-row-header, .recruitment-row-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.recruitment-row-header { flex-wrap: wrap; justify-content: flex-start; }
+.recruitment-row-header .recruitment-row-date { margin-inline-start: auto; }
 .recruitment-row-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .recruitment-job-source { background: var(--platform-tint, #ebf2fd); color: var(--platform-color, #284f84); }
 .recruitment-row-title, .recruitment-row-title:hover:not(:disabled) {
@@ -385,6 +387,8 @@ input:not([type=checkbox]), select {
 .recruitment-detail::backdrop { background: #0c223379; }
 #recruitmentDescription { margin: 12px 0 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .recruitment-detail-status { margin-top: 10px; color: var(--muted); font-size: 13px; }
+.recruitment-detail-profile { display: flex; align-items: end; gap: 8px; margin-top: 12px; }
+.recruitment-detail-profile label { flex: 1; min-width: 0; }
 .recruitment-html-form { display: grid; gap: 12px; }
 .recruitment-html-form p { color: var(--muted); }
 @media (max-width: 1050px) {
@@ -400,7 +404,8 @@ input:not([type=checkbox]), select {
     .recruitment-rows { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
-    .recruitment-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+    .recruitment-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .recruitment-filters input { grid-column: 1 / -1; }
+    .recruitment-filters button { grid-column: 3; }
     .recruitment-cleaning-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

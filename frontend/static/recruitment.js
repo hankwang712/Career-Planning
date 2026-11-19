@@ -3,6 +3,8 @@
   const API = "/api/job-market/collection";
   const byId = (id) => document.getElementById(id);
   const config = byId("recruitmentCollect");
+  const profileSelect = byId("recruitmentProfile");
+  const profileNames = new Map(Array.from(profileSelect.options, (option) => [option.value, option.text]));
   const filterForm = byId("recruitmentFilters");
   const sources = new Map(Array.from(filterForm.elements.source.options).map((option) => [option.value, option.text]));
   const captureDate = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" });
@@ -68,6 +70,7 @@
     const detailStatus = byId("recruitmentDetailStatus");
     byId("recruitmentDetailTitle").textContent = row.title;
     byId("recruitmentDetailMeta").textContent = [sources.get(row.source), row.company, row.location, displaySalary(row.salary)].filter(Boolean).join(" · ");
+    setupProfileMove(row, sequence);
     description.textContent = row.description || "可在原站查看详情。";
     byId("recruitmentOriginal").href = row.url;
     detailStatus.hidden = row.source !== "zhilian";
@@ -85,12 +88,45 @@
     }
   }
 
+  function setupProfileMove(row, sequence) {
+    let current = row.profile || "general";
+    const select = byId("recruitmentDetailProfile");
+    const button = byId("recruitmentMoveProfile");
+    const feedback = byId("recruitmentMoveFeedback");
+    select.value = current;
+    select.disabled = false;
+    button.disabled = true;
+    feedback.hidden = true;
+    select.onchange = () => { button.disabled = select.value === current; };
+    button.onclick = async () => {
+      const profile = select.value;
+      select.disabled = true;
+      button.disabled = true;
+      feedback.hidden = true;
+      try {
+        await api("/jobs/profile", { source: row.source, url: row.url, profile });
+        current = profile;
+        if (sequence === detailSequence) feedback.textContent = "已归入" + profileNames.get(profile);
+        void loadJobs();
+      } catch (error) {
+        if (sequence === detailSequence) feedback.textContent = error.message;
+      } finally {
+        if (sequence === detailSequence) {
+          select.disabled = false;
+          button.disabled = select.value === current;
+          feedback.hidden = false;
+        }
+      }
+    };
+  }
+
   function resultRow(row) {
     const el = node("article", "", "recruitment-row");
     const header = node("div", "", "recruitment-row-header");
     const source = node("span", sources.get(row.source), "recruitment-badge recruitment-job-source");
     source.dataset.source = row.source;
     header.append(source);
+    if (row.profile) header.append(node("span", profileNames.get(row.profile), "recruitment-badge"));
     if (row.updated_at) {
       header.append(node("span", captureDate.format(new Date(row.updated_at * 1000)) + " 采集", "recruitment-row-date"));
     }
@@ -122,8 +158,7 @@
         release.addEventListener("click", async () => {
           release.disabled = true;
           try {
-            const result = await api("/cleaning/release", { source: row.source, url: row.url });
-            showCleaningCounts(result.counts);
+            await api("/cleaning/release", { source: row.source, url: row.url, profile: row.profile || "general" });
             notice("已放行：" + row.title);
             await loadJobs();
           } catch (error) {
@@ -144,6 +179,7 @@
     const sequence = ++jobsSequence;
     const query = new URLSearchParams(filters);
     query.set("page", page);
+    query.set("count_profile", profileSelect.value);
     try {
       const data = await api("/jobs?" + query);
       if (sequence !== jobsSequence) return;
@@ -209,7 +245,7 @@
     const title = node("summary");
     const badge = node("span", statusNames[run.status] || run.status, "recruitment-badge recruitment-run-state");
     badge.dataset.status = run.status;
-    title.append(node("strong", [run.keyword, run.city].filter(Boolean).join(" · ")),
+    title.append(node("strong", [run.keyword, run.city, run.profile !== "general" && profileNames.get(run.profile)].filter(Boolean).join(" · ")),
       badge);
     card.append(title, node("p", new Date(run.started_at * 1000).toLocaleString("zh-CN"), "recruitment-run-date"));
     for (const [source, item] of Object.entries(run.progress)) {
@@ -365,6 +401,7 @@
       const chromeSources = config.elements.bossLocal?.dataset.chromeSources;
       await api("/runs", {
         keyword: data.get("keyword"), city: data.get("city"), limit: Number(data.get("limit")), sources: platforms,
+        profile: profileSelect.value,
         boss_local: !chromeSources && platforms.includes("boss") && data.has("bossLocal"),
         chrome_local: Boolean(data.has("bossLocal") && chromeSources?.split(",").some((source) => platforms.includes(source)))
       });
@@ -395,7 +432,8 @@
   const cleaningPreview = byId("recruitmentCleaningPreview");
   const applyRules = byId("recruitmentCleaningApply");
   let previewToken = "";
-  let rulesLoaded = false;
+  let loadedProfile = "";
+  let ruleLoadSequence = 0;
   let rulesBusy = false;
 
   function showCleaningCounts(counts) {
@@ -412,11 +450,12 @@
     for (const name of ["cities", "title_exclusions", "company_exclusions"]) {
       cleaningForm.elements[name].value = rules[name].join("、");
     }
-    for (const name of ["min_salary_k", "max_salary_k"]) {
+    for (const name of ["min_salary_k", "max_salary_k", "min_daily_salary", "max_daily_salary"]) {
       cleaningForm.elements[name].value = rules[name] ?? "";
     }
     cleaningForm.elements.auto.checked = rules.auto;
-    byId("recruitmentCleaningMode").textContent = rules.auto ? "自动清洗已开启" : "手动清洗";
+    const name = profileNames.get(profileSelect.value);
+    byId("recruitmentCleaningMode").textContent = `${name} · ${rules.auto ? "自动清洗已开启" : "手动清洗"}`;
   }
 
   function readRules() {
@@ -425,7 +464,8 @@
     const salary = (name) => form.get(name) ? Number(form.get(name)) : null;
     return {
       cities: terms("cities"), title_exclusions: terms("title_exclusions"), company_exclusions: terms("company_exclusions"),
-      min_salary_k: salary("min_salary_k"), max_salary_k: salary("max_salary_k"), auto: form.has("auto")
+      min_salary_k: salary("min_salary_k"), max_salary_k: salary("max_salary_k"),
+      min_daily_salary: salary("min_daily_salary"), max_daily_salary: salary("max_daily_salary"), auto: form.has("auto")
     };
   }
 
@@ -452,34 +492,45 @@
   }
 
   async function loadRules() {
-    if (rulesLoaded || rulesBusy) return;
-    rulesBusy = true;
+    const profile = profileSelect.value;
+    if (loadedProfile === profile || rulesBusy) return;
+    const sequence = ++ruleLoadSequence;
+    loadedProfile = "";
+    resetPreview();
+    cleaningFields.disabled = true;
+    const profileName = profileNames.get(profile);
+    byId("recruitmentRulesProfile").textContent = profileName;
+    byId("recruitmentCleaningMode").textContent = profileName;
+    const dailyRules = byId("recruitmentDailyRules");
+    dailyRules.hidden = profile !== "internship";
+    for (const input of dailyRules.querySelectorAll("input")) input.disabled = dailyRules.hidden;
     cleaningFeedback.textContent = "正在读取规则…";
     try {
-      const data = await api("/cleaning");
+      const data = await api("/cleaning?profile=" + profile);
+      if (sequence !== ruleLoadSequence) return;
       showRules(data.rules);
-      rulesLoaded = true;
+      loadedProfile = profile;
       cleaningFeedback.textContent = "";
     } catch (error) {
-      cleaningFeedback.textContent = error.message;
+      if (sequence === ruleLoadSequence) cleaningFeedback.textContent = error.message;
     } finally {
-      rulesBusy = false;
-      cleaningFields.disabled = !rulesLoaded;
+      if (sequence === ruleLoadSequence) cleaningFields.disabled = loadedProfile !== profile;
     }
   }
 
   async function runRuleAction(action) {
-    if (rulesBusy || !cleaningForm.reportValidity() || (action === "apply" && !previewToken)) return;
-    const payload = { rules: readRules(), token: previewToken };
+    if (rulesBusy || loadedProfile !== profileSelect.value || !cleaningForm.reportValidity() || (action === "apply" && !previewToken)) return;
+    const payload = { profile: loadedProfile, rules: readRules(), token: previewToken };
     resetPreview();
     rulesBusy = true;
     cleaningFields.disabled = true;
+    profileSelect.disabled = true;
     cleaningFeedback.textContent = "正在处理…";
     try {
       const result = await api("/cleaning/" + action, payload);
       if (action === "preview") {
         showPreview(result);
-        cleaningFeedback.textContent = "预览完成，确认后应用到当前账号的现有岗位。";
+        cleaningFeedback.textContent = `预览完成，确认后应用到「${profileNames.get(payload.profile)}」岗位。`;
       } else {
         showRules(result.rules);
         showCleaningCounts(result.counts);
@@ -490,6 +541,7 @@
       cleaningFeedback.textContent = error.message;
     } finally {
       cleaningFields.disabled = false;
+      profileSelect.disabled = false;
       rulesBusy = false;
     }
   }
@@ -508,6 +560,10 @@
   });
   byId("recruitmentCleaningSave").onclick = () => { void runRuleAction("save"); };
   applyRules.onclick = () => { void runRuleAction("apply"); };
+  profileSelect.addEventListener("change", () => {
+    void loadRules();
+    void loadJobs();
+  });
   void loadRules();
 
   const sessions = byId("recruitmentSessions");
@@ -562,9 +618,12 @@
     importButton.disabled = true;
     const data = new FormData();
     data.append("file", file);
+    const profile = profileSelect.value;
+    data.append("profile", profile);
     try {
       const result = await api("/import", data);
-      notice(`已保存 ${result.count} 条记录。` + (Object.keys(result.cleaning || {}).length ? cleaningSummary(result.cleaning) : ""));
+      notice(`已保存 ${result.count} 条记录 · ${profileNames.get(profile)}。` +
+        (Object.keys(result.cleaning || {}).length ? cleaningSummary(result.cleaning) : ""));
       page = 1;
       void loadJobs();
     } catch (error) {
@@ -579,6 +638,7 @@
   const htmlFeedback = byId("recruitmentHtmlFeedback");
   byId("recruitmentSavedPage").onclick = () => {
     htmlFeedback.textContent = "";
+    htmlForm.elements.profile.value = profileSelect.value;
     importPage.showModal();
   };
   htmlForm.addEventListener("submit", async (event) => {

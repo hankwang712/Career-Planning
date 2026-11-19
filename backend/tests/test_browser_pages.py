@@ -369,6 +369,38 @@ def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, 
     job.get_by_text("已放行", exact=True).wait_for()
 
 
+def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment")
+    profile = page.get_by_label("求职方向", exact=True)
+    profile.select_option("internship")
+    page.get_by_role("button", name="配置与预览").click()
+    dialog = page.get_by_role("dialog", name="清洗规则")
+    dialog.get_by_label("最低日薪（元/天）").fill("200")
+    dialog.get_by_role("button", name="保存规则").click()
+    dialog.get_by_text("规则已保存。").wait_for()
+    dialog.get_by_role("button", name="关闭").click()
+    csv = "source,title,url\nboss,示例岗位,https://www.zhipin.com/job_detail/profile.html\n"
+    page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
+    job = page.locator(".recruitment-row").filter(has_text="示例岗位")
+    job.get_by_text("实习", exact=True).wait_for()
+
+    profile.select_option("full_time")
+    page.get_by_role("button", name="配置与预览").click()
+    dialog.get_by_label("最低月薪（K）").fill("15")
+    assert dialog.get_by_label("最低日薪（元/天）").is_hidden()
+    dialog.get_by_role("button", name="保存规则").click()
+    dialog.get_by_text("规则已保存。").wait_for()
+    dialog.get_by_role("button", name="关闭").click()
+    job.get_by_role("button", name="示例岗位").click()
+    detail = page.get_by_role("dialog", name="示例岗位")
+    detail.get_by_label("归入求职方向").select_option("full_time")
+    detail.get_by_role("button", name="更新方向").click()
+    detail.get_by_text("已归入正式工作").wait_for()
+    detail.get_by_role("button", name="关闭").click()
+    job.get_by_text("正式工作", exact=True).wait_for()
+
+
 def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

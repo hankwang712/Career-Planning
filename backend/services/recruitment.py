@@ -71,6 +71,7 @@ class CollectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     keyword: str = Field(min_length=1, max_length=80)
     city: str = ""
+    profile: cleaning.Profile = cleaning.DEFAULT_PROFILE
     sources: list[str] = Field(min_length=1, max_length=4)
     limit: int = Field(default=20, ge=1, le=30, strict=True)
     boss_local: bool = Field(default=False, strict=True)
@@ -90,7 +91,7 @@ def clean_listing(fields):
     return fields
 
 
-def save_rows(conn, owner, source, rows, *, cleaning_counts=None):
+def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cleaning_counts=None):
     seen = set()
     records = []
     for row in rows:
@@ -107,13 +108,15 @@ def save_rows(conn, owner, source, rows, *, cleaning_counts=None):
         seen.add(url)
         values = [str(row.get(key) or "").strip()[:limit] for key, limit in
                   (("company", 250), ("location", 120), ("salary", 120), ("description", 6000))]
-        records.append((owner, source, url, title, *values, url, time.time()))
+        records.append((owner, source, url, title, *values, url, time.time(), profile))
     conn.executemany("""
-        INSERT INTO recruitment_listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO recruitment_listings (owner, source, url_key, title, company, location, salary, description, url, updated_at, profile)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(owner, source, url_key) DO UPDATE SET
             title=excluded.title, company=excluded.company, location=excluded.location,
             salary=CASE WHEN excluded.salary='' THEN recruitment_listings.salary ELSE excluded.salary END,
-            description=excluded.description, url=excluded.url, updated_at=excluded.updated_at
+            description=excluded.description, url=excluded.url, updated_at=excluded.updated_at,
+            profile=CASE WHEN recruitment_listings.profile='general' THEN excluded.profile ELSE recruitment_listings.profile END
     """, records)
     counts = cleaning.apply_ingested(conn, owner, source, list(seen))
     if counts and cleaning_counts is not None:
@@ -141,7 +144,7 @@ def run_chrome_sources(owner, run_id, config, progress):
         status, message, rows = collect_in_chrome(source, config.keyword, config.city, config.limit, update)
         with lock, conn:
             counts = {}
-            count = save_rows(conn, owner, source, rows, cleaning_counts=counts)
+            count = save_rows(conn, owner, source, rows, profile=config.profile, cleaning_counts=counts)
             progress[source] = {"status": status, "message": message, "count": count}
             if counts:
                 progress[source]["cleaning"] = counts
@@ -196,7 +199,7 @@ def run_collection(owner, run_id, config, progress):
                         status, message = "blocked", "BOSS 窗口已关闭或无法继续加载，可以重新开始。"
                 with conn:
                     counts = {}
-                    count = save_rows(conn, owner, source, rows, cleaning_counts=counts)
+                    count = save_rows(conn, owner, source, rows, profile=config.profile, cleaning_counts=counts)
                     progress[source] = {"status": status, "message": message, "count": count}
                     if counts:
                         progress[source]["cleaning"] = counts
@@ -239,7 +242,7 @@ def page():
                            boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
                            collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},
-                           login_urls=LOGIN_URLS)
+                           login_urls=LOGIN_URLS, profiles=cleaning.PROFILES)
 
 
 @blueprint.post(API + "/session/<source>")
@@ -281,8 +284,10 @@ def start():
     try:
         with conn:
             conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE status='running' AND started_at<?", (now - 300,))
-            conn.execute("INSERT INTO recruitment_runs VALUES (?, ?, ?, ?, ?, 'running', ?)",
-                         (run_id, owner, config.keyword, config.city, now, json.dumps(progress)))
+            conn.execute("""
+                INSERT INTO recruitment_runs (id, owner, keyword, city, started_at, status, progress, profile)
+                VALUES (?, ?, ?, ?, ?, 'running', ?, ?)
+            """, (run_id, owner, config.keyword, config.city, now, json.dumps(progress), config.profile))
     except sqlite3.IntegrityError:
         return jsonify(message="已有采集任务运行，请稍后重试。"), 409
     try:
@@ -302,7 +307,7 @@ def runs():
     with db._get_conn() as conn:
         conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE owner=? AND status='running' AND started_at<?",
                      (owner, time.time() - 300))
-        rows = conn.execute("SELECT id, keyword, city, started_at, status, progress FROM recruitment_runs "
+        rows = conn.execute("SELECT id, keyword, city, started_at, status, progress, profile FROM recruitment_runs "
                             "WHERE owner=? ORDER BY started_at DESC LIMIT 8", (owner,)).fetchall()
     return jsonify(items=[{**dict(row), "progress": {
         source: {**item, "search_url": search_url(source, row["keyword"], row["city"]), "login_url": LOGIN_URLS.get(source)}
@@ -313,9 +318,13 @@ def runs():
 @blueprint.get(API + "/cleaning")
 @_login_required
 def cleaning_overview():
+    profile = request.args.get("profile", cleaning.DEFAULT_PROFILE)
+    if profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
-    return jsonify(rules=cleaning.load_rules(conn, owner).model_dump(), counts=cleaning.stored_counts(conn, owner))
+    return jsonify(rules=cleaning.load_rules(conn, owner, profile).model_dump(),
+                   counts=cleaning.stored_counts(conn, owner, profile))
 
 
 @blueprint.post(API + "/cleaning/<action>")
@@ -326,48 +335,64 @@ def cleaning_update(action):
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict) or not isinstance(payload.get("rules"), dict):
         return jsonify(message="请输入有效的清洗规则。"), 400
+    profile = payload.get("profile", cleaning.DEFAULT_PROFILE)
+    if not isinstance(profile, str) or profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
     try:
         rules = cleaning.CleaningRules.model_validate(payload["rules"])
     except ValidationError as error:
-        message = ("最低月薪不能高于最高月薪。" if error.errors()[0]["loc"] == ()
-                   else "请输入有效的月薪区间或缩短规则列表。")
+        reason = error.errors()[0]
+        message = reason["msg"].removeprefix("Value error, ") if not reason["loc"] else "请输入有效的薪资区间或缩短规则列表。"
         return jsonify(message=message), 400
+    if profile != "internship" and (rules.min_daily_salary is not None or rules.max_daily_salary is not None):
+        return jsonify(message="日薪规则适用于实习方向。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
     if action == "preview":
         with conn:
             conn.execute("BEGIN")
-            result, _ = cleaning.preview(conn, owner, rules)
+            result, _ = cleaning.preview(conn, owner, profile, rules)
         return jsonify(result)
     with conn:
         conn.execute("BEGIN IMMEDIATE")
         if action == "apply":
-            result, rows = cleaning.preview(conn, owner, rules)
+            result, rows = cleaning.preview(conn, owner, profile, rules)
             if result["token"] != payload.get("token"):
                 return jsonify(message="岗位或规则已变化，请重新预览后应用。"), 409
             cleaning.write_results(conn, owner, rows)
-        cleaning.save_rules(conn, owner, rules)
-        counts = cleaning.stored_counts(conn, owner)
+        cleaning.save_rules(conn, owner, profile, rules)
+        counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(rules=rules.model_dump(), counts=counts)
+
+
+def listing_identity(payload):
+    if not isinstance(payload, dict):
+        return None, ""
+    source, value = payload.get("source"), payload.get("url")
+    if not isinstance(source, str) or source not in SOURCES or not isinstance(value, str) or len(value) > 4096:
+        return None, ""
+    return source, listing_url(source, value)
 
 
 @blueprint.post(API + "/cleaning/release")
 @_login_required
 def cleaning_release():
     payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
+    source, url = listing_identity(payload)
+    if not url:
         return jsonify(message="岗位记录无效。"), 400
-    source, value = payload.get("source"), payload.get("url")
-    if not isinstance(source, str) or source not in SOURCES or not isinstance(value, str) or len(value) > 4096:
-        return jsonify(message="岗位记录无效。"), 400
-    url = listing_url(source, value)
+    profile = payload.get("profile", cleaning.DEFAULT_PROFILE)
+    if not isinstance(profile, str) or profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
     with conn:
         conn.execute("BEGIN IMMEDIATE")
         decision = conn.execute("""
-            SELECT status FROM recruitment_cleaning_results WHERE owner=? AND source=? AND url_key=?
-        """, (owner, source, url)).fetchone()
+            SELECT r.status FROM recruitment_cleaning_results r
+            JOIN recruitment_listings j USING(owner, source, url_key)
+            WHERE j.owner=? AND j.source=? AND j.url_key=? AND j.profile=?
+        """, (owner, source, url, profile)).fetchone()
         if not decision:
             return jsonify(message="该岗位当前没有可放行的清洗结果。"), 404
         if decision["status"] not in {"rejected", "released"}:
@@ -376,8 +401,30 @@ def cleaning_release():
             UPDATE recruitment_cleaning_results SET status='released'
             WHERE owner=? AND source=? AND url_key=?
         """, (owner, source, url))
-        counts = cleaning.stored_counts(conn, owner)
+        counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(counts=counts)
+
+
+@blueprint.post(API + "/jobs/profile")
+@_login_required
+def move_profile():
+    payload = request.get_json(silent=True)
+    source, url = listing_identity(payload)
+    if not url:
+        return jsonify(message="岗位记录无效。"), 400
+    profile = payload.get("profile")
+    if not isinstance(profile, str) or profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    with conn:
+        result = conn.execute("""
+            UPDATE recruitment_listings SET profile=? WHERE owner=? AND source=? AND url_key=?
+        """, (profile, owner, source, url))
+        if not result.rowcount:
+            return jsonify(message="岗位记录不存在。"), 404
+        cleaning.apply_ingested(conn, owner, source, [url])
+    return jsonify(profile=profile)
 
 
 def query_rows(owner, limit, offset=0):
@@ -387,6 +434,10 @@ def query_rows(owner, limit, offset=0):
     keyword = f"%{request.args.get('q', '').strip()[:120]}%"
     where = "j.owner=? AND (?='' OR j.source=?) AND (j.title LIKE ? OR j.company LIKE ? OR j.location LIKE ?)"
     args = (owner, source, source, keyword, keyword, keyword)
+    profile = request.args.get("profile", "")
+    if profile:
+        where += " AND j.profile=?"
+        args += (profile,)
     status = request.args.get("clean_status", "")
     if status == "unreviewed":
         where += " AND r.status IS NULL"
@@ -404,7 +455,7 @@ def query_rows(owner, limit, offset=0):
                 (SELECT d.description FROM recruitment_job_details d
                  WHERE d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key),
                 j.description) AS description, COALESCE(r.status, 'unreviewed') AS cleaning_status,
-                COALESCE(r.reason, '') AS cleaning_reason
+                COALESCE(r.reason, '') AS cleaning_reason, j.profile
             {joined}{where}
             ORDER BY j.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?""",
         (*args, limit, offset),
@@ -418,8 +469,9 @@ def jobs():
     page_number = min(10000, max(1, request.args.get("page", 1, type=int)))
     owner = _current_user()["username"]
     items, total = query_rows(owner, 20, (page_number - 1) * 20)
+    count_profile = request.args.get("count_profile", cleaning.DEFAULT_PROFILE)
     return jsonify(items=items, total=total, page=page_number, page_size=20,
-                   cleaning_counts=cleaning.stored_counts(db._get_conn(), owner))
+                   cleaning_counts=cleaning.stored_counts(db._get_conn(), owner, count_profile))
 
 
 @blueprint.post(API + "/jobs/zhilian/detail")
@@ -467,6 +519,9 @@ def export():
 @blueprint.post(API + "/import")
 @_login_required
 def import_csv():
+    profile = request.form.get("profile", cleaning.DEFAULT_PROFILE)
+    if profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
     file = request.files.get("file")
     data = file.stream.read(2_000_001) if file else b""
     if not data or len(data) > 2_000_000:
@@ -492,7 +547,7 @@ def import_csv():
         return jsonify(message="请使用 UTF-8 编码的 CSV。"), 400
     counts = {}
     with db._get_conn() as conn:
-        count = sum(save_rows(conn, _current_user()["username"], source, rows, cleaning_counts=counts)
+        count = sum(save_rows(conn, _current_user()["username"], source, rows, profile=profile, cleaning_counts=counts)
                     for source, rows in grouped.items())
     if not count:
         return jsonify(message="未找到有效结果。请核对平台标识、岗位标题和原站链接。"), 400
@@ -505,6 +560,9 @@ def import_html():
     from lxml.etree import ParserError
     from playwright.sync_api import Error as BrowserError
 
+    profile = request.form.get("profile", cleaning.DEFAULT_PROFILE)
+    if profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
     source = request.form.get("source")
     file = request.files.get("file")
     data = file.stream.read(5_000_001) if file else b""
@@ -522,7 +580,7 @@ def import_html():
         html_import_lock.release()
     counts = {}
     with db._get_conn() as conn:
-        count = save_rows(conn, _current_user()["username"], source, rows, cleaning_counts=counts)
+        count = save_rows(conn, _current_user()["username"], source, rows, profile=profile, cleaning_counts=counts)
     if not count:
         return jsonify(message="页面里没有可以读取的公开岗位卡片。请保存已显示搜索结果的页面，或导入 CSV。"), 400
     return jsonify(count=count, cleaning=counts)
