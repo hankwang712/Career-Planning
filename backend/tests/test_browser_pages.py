@@ -105,36 +105,63 @@ def test_page_loads_without_script_errors(logged_in_page, live_server, path):
 
 
 def test_fresh_browser_opens_the_local_workspace(browser, live_server):
-    page = browser.new_page()
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+
+    def topbar_signature(navigation):
+        page.evaluate("document.fonts.ready")
+        return navigation.evaluate("""nav => [
+            '.topbar-row', '.nav-tab-strip', '[data-section="dashboard"]', '.topbar-guide-entry',
+            '.ca-settings-entry', '#navWorkspaceToggle'
+        ].map(selector => {
+            const element = nav.querySelector(selector);
+            const { x, width, height } = element.getBoundingClientRect();
+            return [Math.round(x), Math.round(width), Math.round(height), getComputedStyle(element).textDecorationLine];
+        })""")
+
     try:
         page.add_init_script("localStorage.setItem('tg_done', '1')")
         page.route("**/*", lambda route: route.continue_() if route.request.url.startswith(live_server) else route.abort())
         errors = collect_errors(page)
         page.goto(live_server)
         page.wait_for_url("**/recruitment")
-        assert page.get_by_role("heading", name="招聘信息采集").is_visible()
-        assert page.get_by_text("返回工作台").count() == 0
+        assert page.get_by_role("heading", name="岗位全链路流水线").is_visible()
         navigation = page.get_by_role("navigation", name="主导航")
+        expected_topbar = topbar_signature(navigation)
+        avatar_initial = navigation.locator("#currentUserAvatar").inner_text()
         assert [link.strip() for link in navigation.locator(".nav-tab-strip a").all_text_contents()] == [
             "首页", "岗位探索", "测评中心", "规划报告",
         ]
         assert navigation.get_by_role("link", name="岗位探索").get_attribute("aria-current") == "page"
         navigation.get_by_role("button", name="工作区菜单").click()
         assert navigation.get_by_role("menuitem", name="个人中心").is_visible()
+        menu_links = navigation.get_by_role("menuitem").all_text_contents()
         navigation.get_by_role("link", name="首页", exact=True).click()
         page.locator("#dashboard").wait_for(state="visible")
         page.wait_for_function("window.getCurrentUser?.()?.username")
         assert page.locator("#startupScreen, #loginForm, #logoutBtn").count() == 0
         page.get_by_role("button", name="关闭引导").click()
+        assert topbar_signature(navigation) == expected_topbar
+        assert navigation.locator("#currentUserAvatar").inner_text() == avatar_initial
         page.get_by_role("button", name="工作区菜单").click()
         assert page.get_by_role("menuitem", name="个人中心").is_visible()
+        assert navigation.get_by_role("menuitem").all_text_contents() == menu_links
+        page.keyboard.press("Escape")
+        for title in ("测评中心", "规划报告"):
+            tab = navigation.get_by_role("button", name=title, exact=True)
+            tab.click()
+            assert tab.get_attribute("aria-current") == "page"
+            assert topbar_signature(navigation) == expected_topbar
         navigation = page.get_by_role("navigation", name="主导航")
         navigation.get_by_role("link", name="岗位探索").click()
         page.wait_for_url("**/recruitment")
-        assert page.get_by_role("heading", name="招聘信息采集").is_visible()
+        assert page.get_by_role("heading", name="岗位全链路流水线").is_visible()
         assert navigation.get_by_role("link", name="岗位探索").get_attribute("aria-current") == "page"
         page.set_viewport_size({"width": 390, "height": 844})
         assert page.evaluate("document.documentElement.scrollWidth") == 390
+        narrow_topbar = topbar_signature(navigation)
+        navigation.get_by_role("link", name="测评中心").click()
+        page.locator("#profile").wait_for(state="visible")
+        assert topbar_signature(navigation) == narrow_topbar
         assert errors == []
     finally:
         page.close()
@@ -155,7 +182,7 @@ def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
     overview.get_by_role("button", name="快速开始").click()
     page.get_by_role("dialog", name="新手引导").get_by_role("button", name="查看行业快报 →").click()
     assert page.get_by_role("navigation", name="主导航").get_by_role("link", name="行业资讯", exact=True).count() == 0
-    page.wait_for_function("document.getElementById('careerNewsBoard').getBoundingClientRect().top < innerHeight / 2")
+    page.wait_for_function("document.getElementById('careerNewsBoard').getBoundingClientRect().top < innerHeight")
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") == 390
     entry = page.get_by_role("button", name="新手引导")

@@ -179,24 +179,7 @@ html :is(.rp-main, .rp-drawer, .rp-modal) :is(a, button, input, select, textarea
 
 /* ---------- sticky 指挥顶栏 ---------- */
 .recruitment-topbar { position: sticky; top: 0; z-index: 50; }
-.recruitment-topbar .topbar-row { align-items: center; }
-.recruitment-topbar :is(.topbar-brand, .nav-action-strip) { display: flex; align-items: center; }
-.recruitment-topbar .topbar-brand { white-space: nowrap; }
-.recruitment-topbar .topbar-brand h1 { font-weight: 700; }
-.recruitment-topbar .nav-brand-mark { overflow: hidden; }
-.recruitment-topbar .nav-brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .recruitment-topbar .nav-tab-strip { min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.recruitment-topbar .nav-item { flex-shrink: 0; white-space: nowrap; }
-.recruitment-topbar .nav-workspace-shell { position: relative; }
-.recruitment-topbar .hidden { display: none; }
-.recruitment-topbar .ca-settings-entry {
-    display: grid; place-items: center;
-    width: 36px; height: 36px;
-    color: var(--dr-muted);
-    border: 1px solid var(--dr-line);
-    border-radius: var(--dr-radius-sm);
-}
-.recruitment-topbar .ca-settings-entry:hover { color: var(--dr-accent); background: var(--dr-surface-soft); }
 
 .rp-commandbar {
     position: sticky;

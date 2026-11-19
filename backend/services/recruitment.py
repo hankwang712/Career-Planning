@@ -30,7 +30,7 @@ from .recruitment_sources import (
     CITIES, CITY_CATALOG, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url,
     read_saved_page, search_url, supports_city, xiaohongshu_note_url,
 )
-from .user_state import _current_user, _login_required
+from .user_state import _current_user, _login_required, _public_user
 
 
 blueprint = Blueprint("recruitment", __name__)
@@ -253,11 +253,13 @@ def local_desktop_request():
 
 @blueprint.get("/recruitment")
 def page():
-    if not _current_user():
+    user = _current_user()
+    if not user:
         return redirect(url_for("site.index"))
     unsupported = {city: {source: SOURCES[source][0] for source in CHROME_SOURCES if not supports_city(source, city)}
                    for city in CITIES}
-    return render_template("recruitment.html", sources=SOURCES, city_catalog=CITY_CATALOG, unsupported_cities=unsupported,
+    return render_template("recruitment.html", initial_user=_public_user(user),
+                           sources=SOURCES, city_catalog=CITY_CATALOG, unsupported_cities=unsupported,
                            boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
                            collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},

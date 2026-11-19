@@ -1,7 +1,7 @@
 <div id="navWorkspaceShell" class="nav-workspace-shell relative">
     <button type="button" id="navWorkspaceToggle" class="nav-workspace-pill" aria-expanded="false" aria-haspopup="menu" aria-controls="navWorkspaceMenu" aria-label="工作区菜单">
         <span class="nav-workspace-avatar-wrap">
-            <span id="currentUserAvatar" class="nav-workspace-avatar-inner">人</span>
+            <span id="currentUserAvatar" class="nav-workspace-avatar-inner"{% if recruitment_nav|default(false) %} data-avatar-url="{{ url_for('site.api_user_state', scope='account_avatar') }}"{% endif %}>{% if initial_user %}{{ '管' if initial_user.role == 'super_admin' else (initial_user.display_name or initial_user.username)[:1]|upper }}{% else %}人{% endif %}</span>
         </span>
         <span id="navWorkspaceTitle" class="nav-workspace-title">个人空间</span>
         <svg class="nav-workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -22,8 +22,8 @@
         <span class="nav-workspace-menu-row-text">工作区外观</span>
     </a>
     {% endif %}
+        {% if initial_user and initial_user.can_manage_configs %}
         <div class="nav-workspace-menu-divider" role="presentation"></div>
-        {% if recruitment_nav|default(false) or (initial_user and initial_user.can_manage_configs) %}
         <a href="/system-settings" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem">系统配置</a>
         {% endif %}
     </div>

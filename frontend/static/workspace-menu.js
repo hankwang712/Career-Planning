@@ -8,7 +8,25 @@ function closeNavWorkspaceMenu() {
   }
 }
 
+async function loadWorkspaceMenuAvatar() {
+  const avatar = document.querySelector("#currentUserAvatar[data-avatar-url]");
+  if (!avatar) return;
+  try {
+    const response = await fetch(avatar.dataset.avatarUrl, { cache: "no-store" });
+    if (!response.ok) return;
+    const { data } = await response.json();
+    if (typeof data?.image_url !== "string" || !data.image_url.trim()) return;
+    const image = new Image();
+    image.alt = "";
+    image.onload = () => avatar.replaceChildren(image);
+    image.src = data.image_url;
+  } catch (_) {
+    // Keep the account initial when the avatar is unavailable.
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  void loadWorkspaceMenuAvatar();
   const shell = document.getElementById("navWorkspaceShell");
   const toggle = document.getElementById("navWorkspaceToggle");
   const menu = document.getElementById("navWorkspaceMenu");

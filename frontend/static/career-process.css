@@ -12,11 +12,6 @@ body.bg-gray-50:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar + mai
     padding-top: var(--topbar-height, 76px);
 }
 
-body:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar .topbar-container {
-    max-width: 1520px;
-    padding-inline: clamp(16px, 4vw, 42px);
-}
-
 .dashboard-inner {
     box-sizing: border-box;
     width: min(100%, 1520px);
@@ -236,10 +231,6 @@ body:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar .topbar-containe
     .dashboard-workspace-overview::before { background: linear-gradient(100deg, #edf2ffee, #e9efff9c 75%, #e7edff54); }
 }
 @media (max-width: 520px) {
-    body:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar .nav-item {
-        gap: 4px;
-        padding-inline: 5px !important;
-    }
     .dashboard-workspace-actions { flex-wrap: wrap; gap: 9px; margin-top: 17px; }
     .dashboard-job-search { flex-basis: 100%; }
     .dashboard-workspace-metrics { gap: 6px; }
