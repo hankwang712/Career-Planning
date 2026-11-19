@@ -423,7 +423,7 @@ def test_recruitment_ai_semantic_and_match_use_separate_models_and_preserve_evid
     other = make_account("ai-screen-other")
     cleaner = ("https://cleaner.example", "mock-key", "cleaner")
     main = ("https://main.example", "mock-key", "main")
-    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda **_: cleaner)
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda: cleaner)
     monkeypatch.setattr(recruitment.llm_env, "chat_runtime", lambda: main)
     first = {"source": "boss", "url": LINKS["boss"], "profile": "internship"}
     second = {**first, "url": "https://www.zhipin.com/job_detail/another.html"}
@@ -478,7 +478,7 @@ def test_recruitment_ai_extracts_multiple_jobs_from_uploaded_note_images(make_ac
     with db._get_conn() as conn:
         recruitment.save_rows(conn, account.email, "xiaohongshu", [{"title": "招聘图文", "url": url}])
     runtime = ("https://vision.example", "mock-key", "vision")
-    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda **_: runtime)
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda: runtime)
 
     def model(selected, _prompt, _payload, images):
         assert selected == runtime

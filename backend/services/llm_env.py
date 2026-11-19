@@ -28,18 +28,9 @@ def chat_configured():
     return all(chat_runtime())
 
 
-def recruitment_cleaner_runtime(*, vision=False):
-    values = _values()
-    base, key, model = (str(values.get("CLEANER_LLM_" + field) or "").strip()
-                        for field in ("BASE_URL", "API_KEY", "MODEL"))
-    main = chat_runtime()
-    if vision:
-        vision_model = str(values.get("CLEANER_VISION_MODEL") or "").strip()
-        if vision_model:
-            return (base, key, vision_model) if base and key else (*main[:2], vision_model)
-        return runtime("AI_OCR_")
-    force_main = str(values.get("USE_MAIN_LLM_FOR_CLEANER") or "").strip().lower() in {"1", "true", "yes"}
-    return (base, key, model or main[2]) if base and key and not force_main else main
+def recruitment_cleaner_runtime():
+    cleaner = runtime("CLEANER_LLM_")
+    return cleaner if all(cleaner) else chat_runtime()
 
 
 def status():

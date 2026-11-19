@@ -309,7 +309,7 @@ flowchart LR
 | 配置 | 何时需要 | 配置方式 |
 | --- | --- | --- |
 | 对话模型 | 聊天、简历分析、职业规划报告、职业访谈、招聘 AI 初评 | 「系统配置」或 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
-| 招聘清洗模型 | 岗位语义清洗、小红书笔记配图提取 | 「系统配置」或 `CLEANER_LLM_BASE_URL`、`CLEANER_LLM_API_KEY`、`CLEANER_LLM_MODEL`、`CLEANER_VISION_MODEL`。未配置专用文本通道时沿用对话模型，`USE_MAIN_LLM_FOR_CLEANER=true` 可强制文本使用对话模型。视觉模型留空时使用已配置的 `AI_OCR_*` 通道。 |
+| 招聘清洗模型 | 岗位语义清洗；手动提取笔记配图时复用同一模型 | 「系统配置」或 `CLEANER_LLM_BASE_URL`、`CLEANER_LLM_API_KEY`、`CLEANER_LLM_MODEL`。清洗配置未填完整时沿用对话模型。图片提取需要当前模型支持图文输入。 |
 | 图片模型 | 画像海报 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`。 |
 | 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
 

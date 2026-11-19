@@ -52,17 +52,19 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
 
     cleaner = {
         "CLEANER_LLM_BASE_URL": "https://clean.example/v1", "CLEANER_LLM_API_KEY": "cleaner-secret",
-        "CLEANER_LLM_MODEL": "clean-text", "CLEANER_VISION_MODEL": "clean-vision",
+        "CLEANER_LLM_MODEL": "clean-multimodal",
     }
-    assert "招聘清洗模型" in admin.get("/system-settings").get_data(as_text=True)
+    settings_page = admin.get("/system-settings").get_data(as_text=True)
+    assert "招聘清洗模型" in settings_page
+    assert 'id="CLEANER_VISION_MODEL"' not in settings_page
+    assert 'id="USE_MAIN_LLM_FOR_CLEANER"' not in settings_page
+    assert llm_env.recruitment_cleaner_runtime() == llm_env.chat_runtime()
     assert user.request("patch", endpoint, json=cleaner).status_code == 403
     updated = admin.request("patch", endpoint, json=cleaner)
     assert updated.status_code == 200 and "cleaner-secret" not in updated.get_data(as_text=True)
-    assert llm_env.recruitment_cleaner_runtime()[2] == "clean-text"
-    assert llm_env.recruitment_cleaner_runtime(vision=True)[2] == "clean-vision"
-    assert admin.request("patch", endpoint, json={"USE_MAIN_LLM_FOR_CLEANER": "true"}).status_code == 200
+    assert llm_env.recruitment_cleaner_runtime() == ("https://clean.example/v1", "cleaner-secret", "clean-multimodal")
+    assert admin.request("patch", endpoint, json={"CLEANER_LLM_MODEL": ""}).status_code == 200
     assert llm_env.recruitment_cleaner_runtime() == llm_env.chat_runtime()
-    assert llm_env.recruitment_cleaner_runtime(vision=True)[2] == "clean-vision"
 
 
 def test_connection_probes_the_saved_model_without_returning_provider_payload(make_account, monkeypatch):

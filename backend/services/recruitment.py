@@ -670,7 +670,7 @@ def recruitment_ai_run(kind):
         return jsonify(message="请先保存语义规则。"), 400
     if kind == "match" and not resume:
         return jsonify(message="请先配置本方向的基准简历，或上传并解析简历。"), 400
-    runtime = llm_env.chat_runtime() if kind == "match" else llm_env.recruitment_cleaner_runtime(vision=kind == "vision")
+    runtime = llm_env.chat_runtime() if kind == "match" else llm_env.recruitment_cleaner_runtime()
     if not all(runtime):
         return jsonify(message="模型尚未配置，请查看系统配置。"), 400
     try:
@@ -711,6 +711,8 @@ def recruitment_ai_run(kind):
         return jsonify(result=result)
     except Exception as error:
         logger.warning("Recruitment %s model operation failed (%s)", kind, type(error).__name__)
+        if kind == "vision":
+            return jsonify(message="图片提取失败，请确认当前清洗模型支持图文输入，再检查配置后重试。"), 502
         return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
     finally:
         ai.SLOTS.release()
