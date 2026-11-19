@@ -25,6 +25,7 @@
   let id = "";
   let revision = 0;
   let layout = "standard";
+  let style = "classic";
   let photo = "";
   let dirty = false;
   let busy = false;
@@ -57,7 +58,7 @@
         title: section.querySelector("[data-section-title]").value,
         content: section.querySelector("[data-section-content]").value
       })),
-      layout
+      layout, style
     };
   }
 
@@ -114,6 +115,7 @@
     (document.extras || []).forEach(appendField);
     setPhoto(document.photo || "");
     layout = document.layout;
+    style = document.style || "classic";
     updateMoveButtons();
   }
 
@@ -254,14 +256,14 @@
     }, "正在识别简历…", importStatus).finally(() => { submit.disabled = false; });
   });
 
-  async function render(mode) {
-    const response = await request("/render/" + mode, { method: "POST", data: readDraft() });
+  async function render(mode, documentData = readDraft(), temporary = false) {
+    const response = await request("/render/" + mode, { method: "POST", data: documentData });
     if (mode === "auto" || mode === "preview") {
       const result = await response.json();
-      if (mode === "auto" && layout !== result.layout) {
+      if (!temporary && mode === "auto" && layout !== result.layout) {
         layout = result.layout;
         markChanged();
-      } else {
+      } else if (!temporary) {
         status.textContent = dirty ? "有未保存的修改" : "";
       }
       document.getElementById("resumePreviewInfo").textContent =
@@ -278,15 +280,156 @@
     const file = await response.blob();
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
-    const name = readDraft().title.trim().replace(/[\\/:*?"<>|\x00-\x1f]/g, "_") || "简历";
+    const name = documentData.title.trim().replace(/[\\/:*?"<>|\x00-\x1f]/g, "_") || "简历";
     link.href = url;
     link.download = name + (mode === "pdf" ? ".pdf" : file.type === "application/zip" ? "-图片.zip" : ".png");
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    status.textContent = dirty ? "已导出当前内容，修改尚未保存" : "已导出";
+    if (!temporary) status.textContent = dirty ? "已导出当前内容，修改尚未保存" : "已导出";
   }
+
+  const rewriteDialog = document.getElementById("resumeRewrite");
+  const rewriteForm = document.getElementById("resumeRewriteForm");
+  const rewriteStatus = document.getElementById("resumeRewriteStatus");
+  const rewriteResult = document.getElementById("resumeRewriteResult");
+  const skillSelect = document.getElementById("resumeRewriteSkill");
+  const skillPrompt = document.getElementById("resumeSkillPrompt");
+  let rewriteDocument;
+  let rewriteJob = {};
+  let rewriteBusy = false;
+
+  function applyRewriteSettings(data) {
+    skillSelect.replaceChildren(...data.skills.map(skill => new Option(`${skill.name} · ${skill.origin}`, skill.id)));
+    skillSelect.value = data.settings.skill;
+    rewriteForm.elements.style.value = data.settings.style;
+    rewriteForm.elements.diagnosis.checked = data.settings.diagnosis;
+    skillPrompt.textContent = data.prompt;
+  }
+
+  function readRewriteSettings() {
+    return { skill: skillSelect.value, style: rewriteForm.elements.style.value,
+      diagnosis: rewriteForm.elements.diagnosis.checked };
+  }
+
+  async function rewriteAction(task, progress) {
+    if (rewriteBusy) return;
+    rewriteBusy = true;
+    const enabled = [...rewriteForm.querySelectorAll("button, input, textarea, select")].filter(control => !control.disabled);
+    enabled.forEach(control => { control.disabled = true; });
+    rewriteStatus.textContent = progress;
+    try {
+      await task();
+    } catch (error) {
+      rewriteStatus.textContent = error.message;
+    } finally {
+      enabled.forEach(control => { control.disabled = false; });
+      rewriteBusy = false;
+    }
+  }
+
+  async function openRewrite() {
+    if (!rewriteDialog.open) rewriteDialog.showModal();
+    await rewriteAction(async () => {
+      applyRewriteSettings(await (await request("/rewrite/settings")).json());
+      rewriteStatus.textContent = "";
+    }, "正在读取改写设置…");
+  }
+
+  function setRewriteJob(job) {
+    if (!job || typeof job.title !== "string") return;
+    rewriteJob = job;
+    rewriteForm.elements.job_title.value = job.title.slice(0, 120);
+    rewriteForm.elements.job_description.value = String(job.description || "").slice(0, 12000);
+    if (rewriteForm.elements.resume_source && !readDraft().sections.some(section => section.content.trim())) {
+      rewriteForm.elements.resume_source.value = "uploaded";
+    }
+  }
+
+  document.querySelector("[data-rewrite-close]").onclick = () => { if (!rewriteBusy) rewriteDialog.close(); };
+  rewriteDialog.addEventListener("cancel", event => { if (rewriteBusy) event.preventDefault(); });
+  skillSelect.addEventListener("change", async () => {
+    const selected = skillSelect.value;
+    try {
+      const data = await (await request("/rewrite/settings?skill=" + encodeURIComponent(selected))).json();
+      if (selected === skillSelect.value) skillPrompt.textContent = data.prompt || "";
+    } catch (error) {
+      if (selected === skillSelect.value) rewriteStatus.textContent = error.message;
+    }
+  });
+  document.getElementById("resumeSkillImport").onclick = () => {
+    const location = document.getElementById("resumeSkillLocation");
+    const file = document.getElementById("resumeSkillFile");
+    const data = new FormData();
+    data.set("location", location.value);
+    if (file.files.length) data.set("skill_file", file.files[0]);
+    void rewriteAction(async () => {
+      applyRewriteSettings(await (await request("/rewrite/skills", { method: "POST", data })).json());
+      location.value = file.value = "";
+      rewriteStatus.textContent = "已导入并选用此 Skill。";
+    }, "正在导入 Skill…");
+  };
+  document.getElementById("resumeRewriteSaveSettings").onclick = () => {
+    const data = readRewriteSettings();
+    void rewriteAction(async () => {
+      applyRewriteSettings(await (await request("/rewrite/settings", { method: "POST", data })).json());
+      rewriteStatus.textContent = "设置已保存。";
+    }, "正在保存设置…");
+  };
+  rewriteForm.addEventListener("submit", event => {
+    event.preventDefault();
+    const settings = readRewriteSettings();
+    const job = {
+      ...rewriteJob, title: rewriteForm.elements.job_title.value,
+      description: rewriteForm.elements.job_description.value,
+    };
+    const useUploaded = rewriteForm.elements.resume_source?.value === "uploaded";
+    const draft = readDraft();
+    void rewriteAction(async () => {
+      rewriteDocument = null;
+      rewriteResult.hidden = true;
+      await request("/rewrite/settings", { method: "POST", data: settings });
+      let base = draft;
+      if (useUploaded) {
+        const data = new FormData();
+        data.append("source", "current");
+        base = (await (await request("/import", { method: "POST", data })).json()).document;
+      }
+      const result = await (await request("/rewrite", { method: "POST", data: { job, document: base } })).json();
+      rewriteDocument = result.document;
+      const changes = document.getElementById("resumeRewriteChanges");
+      changes.replaceChildren(...result.changes.map(change => {
+        const entry = document.createElement("div");
+        entry.className = "re-rewrite-change";
+        for (const [tag, value] of [["strong", change.section], ["p", "原句：" + change.before], ["p", "改写：" + change.after]]) {
+          const element = document.createElement(tag);
+          element.textContent = value;
+          entry.append(element);
+        }
+        return entry;
+      }));
+      rewriteResult.hidden = !result.changes.length;
+      rewriteStatus.textContent = result.changes.length ? `已生成临时草稿，共 ${result.changes.length} 处改写。`
+        : "没有通过原文核对的改写建议。";
+    }, "正在生成临时改写草稿…");
+  });
+  rewriteResult.querySelectorAll("[data-rewrite-output]").forEach(button => {
+    button.onclick = () => {
+      if (!rewriteDocument) return;
+      const mode = button.dataset.rewriteOutput;
+      void rewriteAction(async () => {
+        if (mode === "save") {
+          await request("/drafts", { method: "POST", data: rewriteDocument });
+          await refreshList();
+          rewriteStatus.textContent = "已另存为新版本，可在「简历版本」中打开编辑。";
+          return;
+        }
+        await render(mode, rewriteDocument, true);
+        rewriteStatus.textContent = mode === "pdf" ? "已导出改写草稿。" : "已打开草稿预览。";
+      }, "正在处理草稿…");
+    };
+  });
 
   function addField(label = "") {
     if (extras.children.length >= 8) {
@@ -442,6 +585,9 @@
         importStatus.textContent = "";
         importDialog.showModal();
         break;
+      case "rewrite":
+        void openRewrite();
+        break;
       case "delete":
         if (!id || !window.confirm("删除这份已保存的简历？")) return;
         void run(async () => {
@@ -495,4 +641,14 @@
     if (drafts.length) showDraft(await (await request("/drafts/" + drafts[0].id)).json());
     else status.textContent = "填写内容或导入已有简历";
   }, "正在读取已保存的简历…");
+  if (new URLSearchParams(window.location.search).get("rewrite") === "1") {
+    try {
+      const handoff = sessionStorage.getItem("career:resume-rewrite-job");
+      sessionStorage.removeItem("career:resume-rewrite-job");
+      if (handoff) setRewriteJob(JSON.parse(handoff));
+    } catch (_) {
+      // The drawer also supports entering the target job manually.
+    }
+    void openRewrite();
+  }
 })();

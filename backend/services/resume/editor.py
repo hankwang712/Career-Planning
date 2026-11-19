@@ -2,6 +2,7 @@
 import base64
 import io
 import json
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -17,12 +18,13 @@ from lxml.etree import XMLSyntaxError
 from backend.advisor.utils.resume_grounding import explicit_resume_role
 from services import db, llm_env
 from services.user_state import _current_user, _load_user_state, _login_required, _owned_resume_storage_path
-from . import pipeline
-from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, choose_layout, clean_document, parse_resume, render_resume
+from . import pipeline, rewrite
+from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, STYLES, choose_layout, clean_document, parse_resume, render_resume
 from .editor_pdf import read_layout, read_page_target
 from .matcher import _extract_docx_text
 
 blueprint = Blueprint("resume_editor", __name__)
+logger = logging.getLogger(__name__)
 UPLOAD_LIMIT = pipeline.RESUME_MAX_FILE_SIZE
 IMAGE_EXTENSIONS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP"}
 
@@ -36,7 +38,115 @@ def index():
     has_source = bool(path and Path(path).is_file())
     return render_template("resume_editor.html", contact=CONTACT, sections=list(SECTIONS),
                            has_source=has_source, ai_configured=llm_env.chat_configured(),
-                           max_sections=MAX_SECTIONS)
+                           max_sections=MAX_SECTIONS, styles=STYLES)
+
+
+def rewrite_state(conn, owner, preview_skill=None):
+    settings = rewrite.options(conn, owner)
+    response = jsonify(settings=settings, skills=rewrite.skills(conn, owner),
+                       prompt=rewrite.instructions(conn, owner, preview_skill or settings["skill"]))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@blueprint.route("/api/resume-editor/rewrite/settings", methods=["GET", "POST"])
+@_login_required
+def rewrite_settings():
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    if request.method == "POST":
+        try:
+            with conn:
+                rewrite.save_options(conn, owner, request.get_json(silent=True))
+        except ValueError as error:
+            return jsonify(message=str(error)), 400
+    return rewrite_state(conn, owner, request.args.get("skill"))
+
+
+@blueprint.post("/api/resume-editor/rewrite/skills")
+@_login_required
+def rewrite_skill_import():
+    from services.recruitment import local_desktop_request
+
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    file = request.files.get("skill_file")
+    location = request.form.get("location", "").strip()
+    if bool(file) == bool(location) or len(location) > 2048:
+        return jsonify(message="选择一个 Markdown 文件，或填写 GitHub 链接或本机路径。"), 400
+    try:
+        if file:
+            filename = Path(file.filename or "").name
+            if Path(filename).suffix.lower() != ".md":
+                raise ValueError("请上传 Markdown Skill 文件。")
+            origin, data = "上传", file.stream.read(rewrite.MAX_SKILL + 1)
+        elif "://" in location:
+            origin, data, filename = "GitHub", rewrite.read_github(location), location.rstrip("/").rsplit("/", 1)[-1]
+        else:
+            if not local_desktop_request():
+                return jsonify(message="本机路径导入需从本机地址访问，也可以上传 Markdown 文件。"), 403
+            origin = "本机路径"
+            data, filename = rewrite.read_local(location)
+        with conn:
+            rewrite.import_skill(conn, owner, data, filename, origin)
+    except (ValueError, OSError) as error:
+        return jsonify(message=str(error) if isinstance(error, ValueError) else "暂时无法读取 Skill 文件。"), 400
+    return rewrite_state(conn, owner)
+
+
+@blueprint.post("/api/resume-editor/rewrite")
+@_login_required
+def rewrite_resume():
+    from services.recruitment import listing_identity
+
+    payload = request.get_json(silent=True)
+    job = payload.get("job") if isinstance(payload, dict) else None
+    if not isinstance(job, dict) or not all(isinstance(job.get(key), str) and "\x00" not in job[key]
+                                          for key in ("title", "description")):
+        return jsonify(message="请填写目标岗位和岗位描述。"), 400
+    job_title, description = job["title"].strip(), job["description"].strip()
+    if not job_title or len(job_title) > 120 or not description or len(description) > 12000:
+        return jsonify(message="请填写目标岗位和岗位描述（最多 12,000 字符）。"), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    settings = rewrite.options(conn, owner)
+    skill = rewrite.instructions(conn, owner, settings["skill"])
+    if not skill:
+        return jsonify(message="请先选择有效的改写 Skill。"), 400
+    diagnosis = {}
+    if settings["diagnosis"] and job.get("source") and job.get("url"):
+        source, url = listing_identity(job)
+        if url:
+            row = conn.execute("""
+                SELECT payload FROM recruitment_ai_results
+                WHERE owner=? AND source=? AND url_key=? AND kind='match'
+            """, (owner, source, url)).fetchone()
+            if row:
+                analysis = json.loads(row["payload"])
+                diagnosis = {key: {"score": item.get("score"), "reason": item.get("reason")}
+                             for key, item in analysis.get("dimensions", {}).items()}
+    if not rewrite.SLOTS.acquire(blocking=False):
+        return jsonify(message="当前改写任务较多，请稍后重试。"), 429
+    try:
+        document = clean_document(payload.get("document"))
+        try:
+            result, changes = rewrite.generate(document, {"title": job_title, "description": description},
+                                               skill, settings["style"], diagnosis)
+        except ValueError:
+            if not rewrite.source_lines(document) or not llm_env.chat_configured():
+                raise
+            logger.warning("Resume rewrite could not complete")
+            return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    except Exception:
+        logger.warning("Resume rewrite could not complete")
+        return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
+    finally:
+        rewrite.SLOTS.release()
+    response = jsonify(document=result, changes=changes)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @blueprint.route("/api/resume-editor/drafts", methods=["GET", "POST"])

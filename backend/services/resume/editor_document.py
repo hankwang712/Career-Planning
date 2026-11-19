@@ -1,9 +1,12 @@
 """Editable resume structure, import classification, and A4 composition."""
 import base64
 import binascii
+import os
 import re
+from functools import lru_cache
 from html import escape
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import pymupdf as fitz
@@ -28,6 +31,8 @@ HEADING = {alias.casefold(): title for title, aliases in {
 }.items() for alias in aliases}
 MAX_TEXT = 24000
 MAX_SECTIONS = 18
+STYLES = {"classic": "墨色经典", "blue": "商务蓝", "compact": "紧凑深蓝"}
+CJK = re.compile(r"([\u2e80-\u9fff\uff01-\uffee]+)")
 PHONE = re.compile(r"(?<!\d)(?:\+?86[ -]?)?1[3-9]\d{9}(?!\d)")
 EMAIL = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 INLINE_MARKDOWN = re.compile(r"\[([^\]\n]{1,180})\]\((https?://[^\s()]{1,2048})\)|(\*\*|\*|~~)([^\n]{1,2048}?)\3")
@@ -73,6 +78,10 @@ def clean_document(payload):
         "sections": clean_sections,
         "layout": "compact" if payload.get("layout") == "compact" else "standard",
     }
+    if payload.get("style") is not None:
+        if not isinstance(payload["style"], str) or payload["style"] not in STYLES:
+            raise ValueError("请选择有效的简历版式。")
+        result["style"] = payload["style"]
     if extras:
         result["extras"] = [{"label": field(item.get("label", ""), 30), "value": field(item.get("value", ""), 180)}
                             for item in extras]
@@ -169,11 +178,23 @@ def parse_resume(text, use_ai=False, header=None):
     return clean_document({**header, "contact": contact, "sections": parts}), warning
 
 
+def text_markup(text):
+    parts = []
+    for index, value in enumerate(CJK.split(text)):
+        part = escape(value)
+        if index % 2:
+            parts.append(f'<span class="cjk">{part}</span>')
+        else:
+            # Some font CMaps alias the visible hyphen to a discretionary hyphen on PDF extraction.
+            parts.append(part.replace("-", '<span class="literal-hyphen">-</span>'))
+    return "".join(parts)
+
+
 def inline_markup(text):
     parts = []
     offset = 0
     for match in INLINE_MARKDOWN.finditer(text):
-        parts.append(escape(text[offset:match.start()]))
+        parts.append(text_markup(text[offset:match.start()]))
         label, url, marker, content = match.groups()
         if url:
             try:
@@ -182,14 +203,14 @@ def inline_markup(text):
             except ValueError:
                 allowed = False
             if allowed:
-                parts.append(f'<a href="{escape(url, quote=True)}">{escape(label)}</a>')
+                parts.append(f'<a href="{escape(url, quote=True)}">{text_markup(label)}</a>')
             else:
-                parts.append(escape(match.group()))
+                parts.append(text_markup(match.group()))
         else:
             tag = {"**": "strong", "*": "em", "~~": "del"}[marker]
-            parts.append(f"<{tag}>{escape(content)}</{tag}>")
+            parts.append(f"<{tag}>{text_markup(content)}</{tag}>")
         offset = match.end()
-    parts.append(escape(text[offset:]))
+    parts.append(text_markup(text[offset:]))
     return "".join(parts)
 
 
@@ -225,58 +246,93 @@ def section_lines(section):
             yield separator + f'<p>{inline_markup(line)}</p>'
 
 
+@lru_cache(maxsize=1)
+def resume_fonts():
+    archive = fitz.Archive()
+    faces = []
+    families = {}
+    windows = Path(os.getenv("WINDIR", "C:/Windows")) / "Fonts"
+    fonts = {
+        "LatinResume": [(windows, "arial.ttf", "arialbd.ttf"),
+                        (Path("/usr/share/fonts/truetype/liberation2"), "LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf"),
+                        (Path("/usr/share/fonts/truetype/liberation"), "LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf")],
+        "ChineseResume": [(windows, "msyh.ttc", "msyhbd.ttc"),
+                          (Path("/usr/share/fonts/opentype/noto"), "NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc")],
+    }
+    for family, candidates in fonts.items():
+        families[family] = "sans-serif"
+        for directory, regular, bold in candidates:
+            if not (directory / regular).is_file():
+                continue
+            for weight, filename in (("normal", regular), ("bold", bold)):
+                path = directory / filename
+                if not path.is_file():
+                    continue
+                archive.add(path.read_bytes(), filename)
+                faces.append(f"@font-face {{font-family:{family};font-weight:{weight};src:url({filename});}}")
+            families[family] = family
+            break
+    return archive, "".join(faces), families
+
+
 def document_html(document, compact):
+    _, faces, families = resume_fonts()
+    accent = {"classic": "#20252b", "blue": "#254f77", "compact": "#283b60"}[document.get("style", "classic")]
     body = []
     contact = document["contact"]
     schedule = next((item["value"] for item in document.get("extras", []) if item["label"] == "实习安排"), "")
-    schedule_html = f'<p class="schedule">{escape(schedule)}</p>' if schedule else ""
+    schedule_html = f'<p class="schedule">{text_markup(schedule)}</p>' if schedule else ""
     if contact["target"] or document.get("photo"):
-        target_html = (f'<p class="target-label">求职意向</p><p class="target">{escape(contact["target"])}</p>{schedule_html}'
+        target_html = (f'<p class="target-label"><span class="cjk">求职意向</span></p><p class="target">{text_markup(contact["target"])}</p>{schedule_html}'
                        if contact["target"] else "")
         reserve = ' style="height:54pt"' if document.get("photo") else ""
         body.append(f'<table class="masthead"><tr><td style="width:30%">{target_html}</td>'
-                    f'<td style="width:40%"><h1>{escape(contact["name"] or document["title"])}</h1></td>'
+                    f'<td style="width:40%"><h1>{text_markup(contact["name"] or document["title"])}</h1></td>'
                     f'<td{reserve}></td></tr></table>')
     else:
-        body.append(f'<h1>{escape(contact["name"] or document["title"])}</h1>')
+        body.append(f'<h1>{text_markup(contact["name"] or document["title"])}</h1>')
     def metadata_item(item):
         url = item["value"]
         if item["label"] in {"GitHub", "个人主页"} and re.fullmatch(r"https?://[^\s()]+", url):
             return inline_markup(f"[{url.split('://', 1)[1]}]({url})")
-        return f'{escape(item["label"])}：{escape(url)}' if item["label"] else escape(url)
+        return text_markup(f'{item["label"]}：{url}' if item["label"] else url)
 
     extras = [metadata_item(item) for item in document.get("extras", []) if item["value"] and
               (item["label"] != "实习安排" or not contact["target"])]
-    channels = [escape(contact["phone"]), escape(contact["email"]), extras.pop(0) if extras else ""]
-    if any(channels):
+    channels = [item for item in [text_markup(contact["phone"]), text_markup(contact["email"]), extras.pop(0) if extras else ""] if item]
+    if channels:
+        ratios = (.33, .30, .37) if len(channels) == 3 else [1 / len(channels)] * len(channels)
         body.append('<table class="contacts"><tr>' + "".join(
-            f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt">{item}</td>'
-            for ratio, item in zip((.33, .30, .37), channels)
+            f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt;{"text-align:center" if len(channels) == 1 else ""}">{item}</td>'
+            for ratio, item in zip(ratios, channels)
         ) + "</tr></table>")
     if extras:
         body.append(f'<p class="contact">{"　 · 　".join(extras)}</p>')
     for section in document["sections"]:
         if not section["content"]:
             continue
-        heading = escape(section["title"])
+        heading = text_markup(section["title"])
         klass = "project" if section["title"] in {"项目经历", "项目经验"} else "compact-section" if section["title"] in {"获奖情况", "科研成果"} else "section"
         body.append(f'<div class="{klass}"><h2>{heading}</h2>')
         body.extend(section_lines(section))
         body.append("</div>")
     return f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><style>
-    body {{font-family: serif; color: #1e2126; font-size: {9.8 if compact else 10.15}pt;
+    {faces}
+    body {{font-family: {families["LatinResume"]}; color: #1e2126; font-size: {9.8 if compact else 10.15}pt;
            line-height: {1.34 if compact else 1.40}; margin: 0; overflow-wrap: break-word;}}
-    h1 {{font-family: sans-serif; font-size: 25pt; margin: 0 0 5pt; color: #004a91; text-align: center;}}
-    h2 {{font-family: sans-serif; font-size: 12.3pt; color: #1e2126; border-bottom: 0.65pt solid #97a1ac;
+    .cjk {{font-family: {families["ChineseResume"]};}}
+    .literal-hyphen {{font-family: sans-serif;}}
+    h1 {{font-size: 23pt; margin: 0 0 5pt; color: {accent}; text-align: center;}}
+    h2 {{font-size: 11.6pt; color: {accent}; border-bottom: 0.6pt solid #a6acb3;
          padding-bottom: 2pt; margin: {6 if compact else 9}pt 0 4pt; page-break-after: avoid;}}
     h3 {{font-size: 10.65pt; margin: 3pt 0 1pt; page-break-after: avoid;}}
     p {{margin: 0 0 {0.6 if compact else 1.15}pt;}}
-    a {{color: #004a91;}}
-    .target-label {{font-family: sans-serif; font-weight: bold; color: #004a91; font-size: 10.6pt;}}
+    a {{color: {accent};}}
+    .target-label {{font-weight: bold; color: {accent}; font-size: 10.2pt;}}
     .target {{font-size: 9.5pt;}}
     .schedule {{font-size: 8.8pt; color: #50545a;}}
     .masthead {{margin-bottom: 7pt;}}
-    .contacts {{color: #004a91; font-size: 9.1pt; margin: 6pt 0 7pt;}}
+    .contacts {{color: #3e4853; font-size: 9.1pt; margin: 6pt 0 7pt;}}
     .contact {{color: #50545a; font-size: 9.1pt; margin: 3pt 0;}}
     table {{width: 100%; border-collapse: collapse;}}
     td {{padding: 0 4pt 1pt 0; vertical-align: top;}}
@@ -302,7 +358,7 @@ def render_resume(document, layout=None):
             raise ValueError("简历内容过长或无法分页，请缩短后重试。")
         return paper, content, None
 
-    story = fitz.Story(html=document_html(document, compact))
+    story = fitz.Story(html=document_html(document, compact), archive=resume_fonts()[0])
     with story.write_with_links(page_rect) as pdf:
         if photo := document.get("photo"):
             pdf[0].insert_image(fitz.Rect(paper.width - PAGE_INSET - 47, 24, paper.width - PAGE_INSET, 85),

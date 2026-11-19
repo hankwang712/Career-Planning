@@ -1,10 +1,77 @@
 from io import BytesIO
+import json
 from zipfile import ZipFile
 
 import pymupdf as fitz
 from PIL import Image
 
 from services.resume import editor_document, pipeline
+
+
+def test_rewrite_creates_only_a_temporary_copy_and_rejects_unsupported_claims(make_account, monkeypatch):
+    from services.resume import rewrite
+
+    account = make_account("resume-rewrite")
+    route = "/api/resume-editor"
+    original = {"title": "基础简历", "contact": {"name": "林晓", "email": "private@example.com"}, "sections": [
+        {"title": "工作经历", "content": "### 订单开发组 2025.03\n- 使用 Python 编写订单脚本，整理对账记录\n- 配合维护已有接口并处理常见数据问题"},
+        {"title": "教育经历", "content": "示例大学 | 本科 | 2022–2026"},
+    ]}
+    saved = account.post(route + "/drafts", json=original).get_json()
+    default = account.get(route + "/rewrite/settings").get_json()
+    assert default["settings"]["skill"] == "resume_rewrite"
+    assert "JobHunter" in default["skills"][0]["name"]
+    monkeypatch.setattr(rewrite.llm_env, "chat_runtime", lambda: ("https://model.invalid", "mock-key", "mock"))
+
+    def model(*args, **kwargs):
+        raw = args[3][0]["content"]
+        assert "private@example.com" not in raw and "林晓" not in raw
+        lines = json.loads(raw)["lines"]
+        assert set(lines) == {"0:1", "0:2"}
+        return {"edits": [
+            {"id": "0:1", "evidence": lines["0:1"]["text"], "text": "- 用 Python 编写订单脚本，整理对账记录"},
+            {"id": "0:2", "evidence": lines["0:2"]["text"], "text": "- 主导 Kubernetes 部署，效率提升 90%"},
+        ]}
+
+    monkeypatch.setattr(rewrite, "call_structured_chat", model)
+    result = account.post(route + "/rewrite", json={"document": saved["document"], "job": {
+        "title": "数据工程师", "description": "使用 Python 搭建订单数据管道",
+    }}).get_json()
+    assert len(result["changes"]) == 1
+    assert result["document"]["contact"] == saved["document"]["contact"]
+    assert result["document"]["sections"][1] == saved["document"]["sections"][1]
+    assert "Kubernetes" not in result["document"]["sections"][0]["content"]
+    assert len(account.get(route + "/drafts").get_json()["drafts"]) == 1
+    assert account.get(route + "/drafts/" + saved["id"]).get_json() == saved
+    copied = account.post(route + "/drafts", json=result["document"]).get_json()
+    assert copied["id"] != saved["id"]
+
+
+def test_imported_resume_skill_is_account_scoped_and_selected(make_account, monkeypatch, tmp_path):
+    from services.resume import rewrite
+
+    owner = make_account("resume-skill")
+    other = make_account("resume-skill-other")
+    route = "/api/resume-editor/rewrite"
+    path = tmp_path / "SKILL.md"
+    path.write_text("---\nname: 精简条目\n---\n写明行为和结果。", encoding="utf-8")
+    assert owner.post(route + "/skills", data={"location": str(path.parent)},
+                      environ_overrides={"REMOTE_ADDR": "192.0.2.30"}).status_code == 403
+    response = owner.post(route + "/skills", data={"location": str(path.parent)})
+    settings = response.get_json()
+    assert response.status_code == 200 and settings["skills"][1]["name"] == "精简条目"
+    assert settings["settings"]["skill"] == settings["skills"][1]["id"]
+    assert other.post(route + "/settings", json=settings["settings"]).status_code == 400
+    assert owner.post(route + "/skills", data={"location": "https://example.com/SKILL.md"}).status_code == 400
+    assert rewrite.github_request("https://github.com/org/repo/tree/main/skills/resume") == (
+        "https://api.github.com/repos/org/repo/contents/skills/resume/SKILL.md", {"ref": "main"}, True,
+    )
+    monkeypatch.setattr(rewrite, "read_github", lambda _: b"---\nname: GitHub skill\n---\nUse concise lists.")
+    result = owner.post(route + "/skills", data={"location": "https://github.com/org/repo"}).get_json()
+    assert result["prompt"] == "Use concise lists."
+    assert any(skill["id"] == result["settings"]["skill"] and skill["origin"] == "GitHub" for skill in result["skills"])
+    uploaded = owner.post(route + "/skills", data={"skill_file": (BytesIO(b"Prefer short bullets."), "SKILL.md")}).get_json()
+    assert uploaded["prompt"] == "Prefer short bullets."
 
 
 def upload_text(account, text, ai="0"):

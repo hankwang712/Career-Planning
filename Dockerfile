@@ -20,7 +20,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # tesseract 用于简历/招聘图片的本地 OCR（可选能力）；curl 供健康检查使用。
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-chi-sim curl \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-chi-sim fonts-noto-cjk fonts-liberation curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

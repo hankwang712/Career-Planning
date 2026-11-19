@@ -123,8 +123,10 @@ def init_db():
     """)
     from .career import init_schema
     from .recruitment import init_schema as init_recruitment_schema
+    from .resume.rewrite import init_schema as init_resume_rewrite_schema
     init_schema(conn)
     init_recruitment_schema(conn)
+    init_resume_rewrite_schema(conn)
     _split_legacy_user_states(conn)
     _scrub_legacy_llm_secrets(conn)
     migrated = cur.execute("SELECT 1 FROM auth_settings WHERE name = 'legacy_json_imported'").fetchone()

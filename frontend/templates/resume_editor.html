@@ -45,6 +45,7 @@
                     <div class="re-action-tray">
                         <button type="button" class="re-icon-button re-blue" data-action="import" aria-label="导入简历" title="导入简历">{{ icon('upload') }}</button>
                         <div class="re-actions-highlight"><button type="button" class="re-button re-accent" data-action="auto">{{ icon('wand') }} 智能排版</button></div>
+                        <button type="button" class="re-button re-rewrite-trigger" data-action="rewrite">{{ icon('pencil') }} 简历改写</button>
                         <button type="button" class="re-icon-button re-blue" data-action="preview" aria-label="预览" title="预览">{{ icon('eye') }}</button>
                         <button type="button" class="re-icon-button re-pink" data-action="image" aria-label="导出图片" title="导出图片">{{ icon('image') }}</button>
                         <button type="button" class="re-icon-button re-green" data-action="pdf" aria-label="导出 PDF" title="导出 PDF">{{ icon('download') }}</button>
@@ -158,6 +159,64 @@
             <div><button type="button" class="re-button" data-crop-close>取消</button>
                 <button type="button" class="re-button re-primary" id="resumeApplyPhoto">使用照片</button></div>
         </footer>
+    </dialog>
+    <dialog id="resumeRewrite" class="re-dialog re-rewrite" aria-labelledby="resumeRewriteTitle">
+        <header class="re-rewrite-head">
+            <div><h2 id="resumeRewriteTitle">简历改写</h2><p class="re-note">按岗位描述生成临时版本，核对后再导出或另存。</p></div>
+            <button type="button" class="re-link" data-rewrite-close aria-label="关闭简历改写">×</button>
+        </header>
+        <form id="resumeRewriteForm" class="re-rewrite-body">
+            <section class="re-rewrite-card">
+                <h3>目标岗位</h3>
+                <label>岗位名称<input name="job_title" maxlength="120" required></label>
+                <label>岗位描述<textarea name="job_description" rows="4" maxlength="12000" required></textarea></label>
+                {% if has_source %}
+                <label>基准简历<select name="resume_source"><option value="editor">当前编辑版本</option><option value="uploaded">已上传的当前简历</option></select></label>
+                {% endif %}
+            </section>
+            <section class="re-rewrite-card">
+                <h3>改写 Skill</h3>
+                <label>当前 Skill<select id="resumeRewriteSkill" name="skill"></select></label>
+                <details>
+                    <summary>导入自定义 Skill</summary>
+                    <label>GitHub 链接或本机路径<input id="resumeSkillLocation" maxlength="2048" placeholder="https://github.com/owner/repo/tree/main/skills/resume"></label>
+                    <label>或上传 Markdown 文件<input id="resumeSkillFile" type="file" accept=".md,text/markdown,text/plain"></label>
+                    <button type="button" id="resumeSkillImport" class="re-button">导入并选用</button>
+                </details>
+                <details>
+                    <summary>查看当前 Skill 原文</summary>
+                    <pre id="resumeSkillPrompt" class="re-skill-prompt"></pre>
+                </details>
+            </section>
+            <section class="re-rewrite-card">
+                <h3>改写与版式</h3>
+                <label class="re-checkbox"><input name="diagnosis" type="checkbox">参考该岗位已保存的 AI 初评</label>
+                <fieldset class="re-material-styles">
+                    <legend>简历版式</legend>
+                    {% for value, name in styles.items() %}
+                    <label class="re-material-style" data-style="{{ value }}">
+                        <input type="radio" name="style" value="{{ value }}" {% if loop.first %}checked{% endif %}>
+                        <span class="re-material-paper" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                        <span>{{ name }}</span>
+                    </label>
+                    {% endfor %}
+                </fieldset>
+            </section>
+            <div class="re-rewrite-actions">
+                <button id="resumeRewriteSaveSettings" type="button" class="re-button">保存设置</button>
+                <button type="submit" class="re-button re-primary">生成改写草稿</button>
+            </div>
+            <p id="resumeRewriteStatus" class="re-note" role="status"></p>
+            <section id="resumeRewriteResult" class="re-rewrite-card" hidden>
+                <h3>临时改写草稿</h3>
+                <div id="resumeRewriteChanges" class="re-rewrite-changes"></div>
+                <div class="re-rewrite-actions">
+                    <button type="button" class="re-button" data-rewrite-output="preview">预览草稿</button>
+                    <button type="button" class="re-button" data-rewrite-output="pdf">导出草稿 PDF</button>
+                    <button type="button" class="re-button re-primary" data-rewrite-output="save">另存为新版本</button>
+                </div>
+            </section>
+        </form>
     </dialog>
     <dialog id="resumePreview" class="re-dialog re-preview" aria-labelledby="resumePreviewTitle">
         <header><h2 id="resumePreviewTitle">简历预览</h2><button type="button" class="re-link" data-close aria-label="关闭预览">×</button></header>

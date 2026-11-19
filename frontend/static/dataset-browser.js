@@ -292,7 +292,7 @@
       <section class="jd-info-card"><h3>来源信息</h3><div class="jd-sources">${sourceLabels.map(label => `<span class="jd-source">${escape(label)}</span>`).join("")}</div>${urls.length ? urls.map(url => `<a class="jd-source-link" href="${escape(url)}" target="_blank" rel="noopener noreferrer">查看原始岗位 ↗</a>`).join("") : '<p class="jd-hint">暂无原始岗位链接</p>'}${record.published_at ? `<p class="jd-hint">发布于 ${escape(record.published_at)}</p>` : ""}</section></aside></div>`;
     detailFooter.className = "jd-foot";
     detailFooter.hidden = false;
-    detailFooter.innerHTML = '<span class="jd-foot-note">职位信息来自公开招聘样本<br>请以招聘方最新发布内容为准</span><div class="jd-actions"><button type="button" class="jd-ghost" data-dataset-action="copy-job">复制岗位信息</button><button type="button" class="jd-primary" data-dataset-action="close">返回岗位列表 →</button></div>';
+    detailFooter.innerHTML = '<span class="jd-foot-note">职位信息来自公开招聘样本<br>请以招聘方最新发布内容为准</span><div class="jd-actions"><button type="button" class="jd-ghost" data-dataset-action="copy-job">复制岗位信息</button><button type="button" class="jd-primary" data-dataset-action="rewrite-job">按此岗位改写简历</button><button type="button" class="jd-ghost" data-dataset-action="close">返回岗位列表 →</button></div>';
     detailBody.scrollTop = 0;
     detailHeader.querySelector("button")?.focus({ preventScroll: true });
   }
@@ -383,6 +383,12 @@
     const action = event.target.closest("[data-dataset-action]")?.dataset.datasetAction;
     if (action === "close") dialog.close();
     if (action === "copy-job") void copyJob(event.target.closest("button"));
+    if (action === "rewrite-job" && detailRecord) {
+      const job = { title: detailRecord.title, description: [detailRecord.description, detailRecord.responsibilities,
+        detailRecord.requirements].filter(Boolean).join("\n\n").slice(0, 12000) };
+      try { sessionStorage.setItem("career:resume-rewrite-job", JSON.stringify(job)); } catch (_) {}
+      window.location.assign("/user-center/resumes?rewrite=1");
+    }
     if (action === "previous" && !pending) void loadPage(page - 1);
     if (action === "next" && !pending) void loadPage(page + 1);
     const pick = event.target.closest("[data-dataset-query]");

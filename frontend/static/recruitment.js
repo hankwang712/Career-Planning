@@ -87,6 +87,12 @@
     setupProfileMove(row, sequence);
     description.textContent = row.description || "可在原站查看详情。";
     byId("recruitmentOriginal").href = row.url;
+    byId("recruitmentResumeRewrite").onclick = () => {
+      const text = description.textContent;
+      const job = { title: row.title, description: text === "可在原站查看详情。" ? "" : text, source: row.source, url: row.url };
+      try { sessionStorage.setItem("career:resume-rewrite-job", JSON.stringify(job)); } catch (_) {}
+      window.location.assign("/user-center/resumes?rewrite=1");
+    };
     setupJobAi(row, sequence);
     detailStatus.hidden = row.source !== "zhilian";
     dialog.showModal();
