@@ -182,15 +182,14 @@
   const IN_PROGRESS = new Set(["collected", "cleaned", "screened", "deep", "rewritten", "greeted"]);
   const TABS = ["all", "rejected", "in_progress", "reeval", "approval", "queued", "delivered", "failed"];
   const RUN_STAGES = [
-    { stage: "clean", label: "规则清洗" }, { stage: "screen", label: "AI 初评" },
-    { stage: "deep", label: "深度评估" }, { stage: "rewrite", label: "简历改写" },
+    { stage: "clean", label: "规则清洗" }, { stage: "evaluate", label: "AI 评估" },
+    { stage: "rewrite", label: "简历改写" },
     { stage: "greet", label: "打招呼语" }
   ];
   const RAIL_STEPS = [
     { key: "scraping", label: "本地导入", icon: "inbox", run: null },
     { key: "cleaning", label: "规则清洗", icon: "filter", run: "clean" },
-    { key: "evaluating", label: "AI 初评", icon: "sparkles", run: "screen" },
-    { key: "deep_eval", label: "深度评估", icon: "gauge", run: "deep" },
+    { key: "evaluating", label: "AI 评估", icon: "sparkles", run: "evaluate" },
     { key: "rewriting", label: "简历改写", icon: "pen", run: "rewrite" },
     { key: "greeting", label: "打招呼语", icon: "message", run: "greet" },
     { key: "review", label: "待审批", icon: "shield", run: null },
@@ -283,6 +282,7 @@
     job.attempts = raw.failure_count ?? failure.failure_count ?? null;
     job.updatedAt = raw.action_at || raw.updated_at || 0;
     job.crawledAt = raw.updated_at || 0;
+    job.hasDeep = Boolean(raw.has_deep);
     job.hasRewrite = Boolean(raw.has_rewrite);
     job.hasGreeting = Boolean(raw.has_greeting);
     job.tab = TABS.includes(raw.tab) ? raw.tab : tabOf(job);
@@ -403,7 +403,7 @@
   function defaultStepDesc(key) {
     return {
       scraping: "CSV / 网页 / 种子库本地导入", cleaning: "硬规则 + AI 初筛规则",
-      evaluating: "八维打分与分级", deep_eval: "七键深评，自动流转",
+      evaluating: "八维评级，精投岗位自动深评",
       rewriting: "基准简历定向改写", greeting: "高情商开场白",
       review: "人工审批：放行 / 拒绝 / 重评", delivering: "本地队列 · dry-run 投递包"
     }[key] || "";
@@ -598,6 +598,10 @@
   function stageResultMessage(result, label) {
     const processed = result?.processed ?? 0;
     const mode = result?.mode === "llm" ? "模型" : "启发式";
+    if (result?.stage === "evaluate") {
+      const { screened, deep, parse_failed: failed } = result.counts;
+      return `${label}完成：初评 ${screened} 条，深评 ${deep} 条${failed ? `，待重试 ${failed} 条` : ""}。`;
+    }
     return `${label}完成：处理 ${processed} 条（${mode}模式）。`;
   }
 
@@ -951,7 +955,9 @@
     byId("rpJobPager").hidden = pages <= 1;
     byId("rpJobPrev").disabled = disabled || state.page <= 1;
     byId("rpJobNext").disabled = disabled || state.page >= pages;
-    byId("rpJobPageStatus").textContent = `第 ${state.page} / ${pages} 页 · ${state.boardTotal} 条`;
+    byId("rpJobPageStatus").textContent = state.boardLoading
+      ? "正在读取…"
+      : `第 ${state.page} / ${pages} 页 · ${state.boardTotal} 条`;
     const input = byId("rpJobPageInput");
     input.max = String(pages);
     input.disabled = disabled;
@@ -1052,9 +1058,9 @@
     if (state.bulkBusy) return Promise.resolve();
     state.bulkBusy = true;
     renderTabBanner();
-    toast("正在运行 AI 初评（覆盖待重评与清洗通过岗位）…");
-    return runStage("screen")
-      .then((result) => { toast(stageResultMessage(result, "AI 初评"), "success"); void refresh({ silent: true }); })
+    toast("正在运行 AI 评估…");
+    return runStage("evaluate")
+      .then((result) => { toast(stageResultMessage(result, "AI 评估"), "success"); void refresh({ silent: true }); })
       .catch((error) => toast(error.message, "error"))
       .finally(() => { state.bulkBusy = false; renderTabBanner(); });
   }
@@ -1588,7 +1594,7 @@
     if (Number.isSafeInteger(page) && page > 1 && page <= Math.floor(Number.MAX_SAFE_INTEGER / BOARD_PAGE_SIZE)) state.page = page;
     renderTabs();
     renderCommandbar();
-    const drawer = params.get("drawer");
+    const drawer = params.get("drawer") === "deep_eval" ? "evaluating" : params.get("drawer");
     let bootDrawerOpened = false;
     if (drawer && drawers.has(drawer)) { openDrawer(drawer); bootDrawerOpened = true; }
     void refresh({ silent: true }).then(() => {

@@ -435,6 +435,32 @@ def test_pipeline_job_card_keeps_materials_beside_metadata_on_desktop(browser, l
         context.close()
 
 
+def test_pipeline_evaluation_drawer_runs_screen_and_deep_together(browser, live_server, server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job, run, setup_account
+
+    account = setup_account(server, make_account, "combined-evaluation-browser")
+    add_job(account, "combined-evaluation", JOB_CUSTOM)
+    run(account, "clean")
+    context = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment?drawer=deep_eval")
+        rail = page.locator("#rpRail")
+        rail.get_by_role("button", name="AI评估", exact=False).wait_for()
+        assert rail.get_by_text("深度评估", exact=True).count() == 0
+        drawer = page.get_by_role("dialog", name="AI 评估")
+        drawer.get_by_text("八维评估权重", exact=True).wait_for()
+        assert drawer.get_by_text("分流阈值与投递白名单", exact=True).is_visible()
+        with page.expect_response(lambda response: response.url.endswith("/pipeline/run")) as response:
+            drawer.get_by_role("button", name="运行 AI 评估", exact=True).click()
+        result = response.value.json()
+        assert result["stage"] == "evaluate" and result["counts"]["screened"] == result["counts"]["deep"] == 1
+        drawer.get_by_role("button", name="查看七键分析", exact=True).wait_for()
+    finally:
+        context.close()
+
+
 def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job
 

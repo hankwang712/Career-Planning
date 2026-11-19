@@ -1019,8 +1019,14 @@ def deliver_one(conn, owner, row, simulate="ok"):
 # 阶段批量执行
 # ---------------------------------------------------------------------------
 
-def _pipeline_candidates(conn, owner, stages, limit):
+def _pipeline_candidates(conn, owner, stages, limit, *, cleaned=False, review_type=None):
     placeholders = ", ".join("?" for _ in stages)
+    where, args = f"p.owner=? AND p.stage IN ({placeholders})", [owner, *stages]
+    if cleaned:
+        where += f" AND ({cleaning.EFFECTIVE_STATUS}) IN ('passed', 'released')"
+    if review_type is not None:
+        where += " AND p.review_type=?"
+        args.append(review_type)
     return conn.execute(f"""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
                j.profile, COALESCE(d.description, j.description) AS description,
@@ -1032,9 +1038,9 @@ def _pipeline_candidates(conn, owner, stages, limit):
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
         LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
         {cleaning.SEMANTIC_JOIN}
-        WHERE p.owner=? AND p.stage IN ({placeholders})
+        WHERE {where}
         ORDER BY p.updated_at, j.source, j.url_key LIMIT ?
-    """, (owner, *stages, limit)).fetchall()
+    """, (*args, limit)).fetchall()
 
 
 def run_clean(conn, owner, config, limit):
@@ -1112,16 +1118,26 @@ def run_clean(conn, owner, config, limit):
             "tier2_remaining": max(0, len(tier2_jobs) - tier2_attempts)}
 
 
-def run_screen(conn, owner, config, limit):
+def _store_deep(conn, owner, row, screen, resume, config, runtime):
+    payload = deep_job(_job_dict(row), _load(row["meta"]), resume, screen, config, runtime)
+    _update(conn, owner, row["source"], row["url_key"], stage="deep",
+            follow_status=FOLLOW_DEEP, deep_payload=_dump(payload))
+
+
+def run_screen(conn, owner, config, limit, *, include_deep=False):
     ensure_rows(conn, owner)
-    rows = [row for row in _pipeline_candidates(conn, owner, ("cleaned", "reeval"), limit)
-            if row["cleaning_status"] in ("passed", "released")]
     runtime = llm_env.chat_runtime()
     if not all(runtime) and not config.heuristic_mode:
         return {"error": "模型未配置且启发式模式未开启，无法执行 AI 初评。"}
     resume = (baseline_resume(owner, config) or {}).get("text", "")
+    pending = _pipeline_candidates(conn, owner, ("screened",), limit, review_type="custom") if include_deep else []
+    rows = _pipeline_candidates(conn, owner, ("cleaned", "reeval"), limit - len(pending), cleaned=True)
     counts = {"screened": 0, "custom": 0, "mass": 0, "parse_failed": 0}
     mode = "heuristic" if config.heuristic_mode else ("llm" if all(runtime) else "heuristic")
+    if include_deep:
+        counts["deep"] = len(pending)
+        for row in pending:
+            _store_deep(conn, owner, row, _load(row["screen_payload"]), resume, config, runtime)
     for row in rows:
         job, meta = _job_dict(row), _load(row["meta"])
         result, error = screen_job(job, meta, resume, config, runtime)
@@ -1132,7 +1148,7 @@ def run_screen(conn, owner, config, limit):
             conn.execute("DELETE FROM recruitment_ai_results WHERE owner=? AND source=? AND url_key=? AND kind='semantic'", identity)
             _update(conn, owner, row["source"], row["url_key"], stage="failed",
                     follow_status=FOLLOW_EVAL_FAILED, grade="", score=None, review_type="",
-                    screen_payload=_dump(result),
+                    screen_payload=_dump(result), deep_payload="", rewrite_payload="", greeting_payload="",
                     failure_payload=_dump({"kind": "eval", "error": result.get("error", error),
                                            "retryable": True, "failed_at": time.time()}))
             counts["parse_failed"] += 1
@@ -1145,26 +1161,27 @@ def run_screen(conn, owner, config, limit):
         _update(conn, owner, row["source"], row["url_key"], stage="screened",
                 follow_status=FOLLOW_SCREENED, review_type=review_type,
                 grade=result["grade"], score=result["total"], screen_payload=_dump(payload),
-                failure_payload="", approval="")
+                deep_payload="", rewrite_payload="", greeting_payload="", failure_payload="", approval="")
         counts["screened"] += 1
         counts[review_type] += 1
-    return {"processed": len(rows), "counts": counts, "mode": mode}
+        if include_deep and review_type == "custom":
+            _store_deep(conn, owner, row, payload, resume, config, runtime)
+            counts["deep"] += 1
+    return {"processed": len(rows) + len(pending), "counts": counts, "mode": mode}
+
+
+def run_evaluate(conn, owner, config, limit):
+    return run_screen(conn, owner, config, limit, include_deep=True)
 
 
 def run_deep(conn, owner, config, limit):
     ensure_rows(conn, owner)
-    rows = [row for row in _pipeline_candidates(conn, owner, ("screened",), limit)
-            if row["review_type"] == "custom"]
+    rows = _pipeline_candidates(conn, owner, ("screened",), limit, review_type="custom")
     runtime = llm_env.chat_runtime()
     resume = (baseline_resume(owner, config) or {}).get("text", "")
-    processed = 0
     for row in rows:
-        job, meta = _job_dict(row), _load(row["meta"])
-        payload = deep_job(job, meta, resume, _load(row["screen_payload"]), config, runtime)
-        _update(conn, owner, row["source"], row["url_key"], stage="deep",
-                follow_status=FOLLOW_DEEP, deep_payload=_dump(payload))
-        processed += 1
-    return {"processed": processed, "mode": "llm" if all(runtime) else "heuristic"}
+        _store_deep(conn, owner, row, _load(row["screen_payload"]), resume, config, runtime)
+    return {"processed": len(rows), "mode": "llm" if all(runtime) and not config.heuristic_mode else "heuristic"}
 
 
 def run_rewrite(conn, owner, config, limit):
@@ -1238,7 +1255,7 @@ def run_greet(conn, owner, config, limit):
     return {"processed": len(rows), "counts": counts, "mode": "llm" if all(runtime) else "heuristic"}
 
 
-RUNNERS = {"clean": run_clean, "screen": run_screen, "deep": run_deep,
+RUNNERS = {"clean": run_clean, "evaluate": run_evaluate, "screen": run_screen, "deep": run_deep,
            "rewrite": run_rewrite, "greet": run_greet}
 
 
@@ -1273,7 +1290,6 @@ def rail_payload(conn, owner, config):
     baseline = baseline_resume(owner, config)
     options = resume_options(owner)
     llm_ready = llm_env.chat_configured()
-    deep_done = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND deep_payload<>''", (owner,)).fetchone()[0]
     rewritten = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND rewrite_payload<>''", (owner,)).fetchone()[0]
     greeted = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND greeting_payload<>''", (owner,)).fetchone()[0]
     steps = [
@@ -1281,11 +1297,9 @@ def rail_payload(conn, owner, config):
          "config_state": "configured" if seeded else "required_missing", "count": funnel["crawled"]},
         {"key": "cleaning", "label": "规则清洗", "desc": "Tier1 硬规则 + Tier2 语义规则",
          "config_state": "configured" if rules_saved else "required_missing", "count": funnel["cleaned"]},
-        {"key": "evaluating", "label": "AI初评", "desc": "八维打分与评级分流",
+        {"key": "evaluating", "label": "AI评估", "desc": "八维评级，精投岗位自动深评",
          "config_state": "configured" if (llm_ready or config.heuristic_mode) else "required_missing",
          "count": funnel["evaluated"]},
-        {"key": "deep_eval", "label": "深度评估", "desc": "精投轨自动流转，无需配置",
-         "config_state": "auto", "count": deep_done},
         {"key": "rewriting", "label": "简历改写", "desc": "以基准简历为底稿定向改写",
          "config_state": "configured" if config.baseline_resume_id else "required_missing", "count": rewritten},
         {"key": "greeting", "label": "打招呼语", "desc": "精投生成；海投只认人工母本",
@@ -1344,7 +1358,7 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.url, j.experience, j.education,
                j.updated_at, p.stage, p.follow_status, p.review_type, p.grade, p.score, p.approval,
                p.failure_payload, p.failure_count, p.meta, p.updated_at AS action_at,
-               p.rewrite_payload<>'' AS has_rewrite, p.greeting_payload<>'' AS has_greeting,
+               p.deep_payload<>'' AS has_deep, p.rewrite_payload<>'' AS has_rewrite, p.greeting_payload<>'' AS has_greeting,
                r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
         FROM recruitment_pipeline p
         JOIN recruitment_listings j USING(owner, source, url_key)
@@ -1479,7 +1493,7 @@ def register_routes(blueprint):
         payload = request.get_json(silent=True) or {}
         stage = payload.get("stage")
         if stage not in RUNNERS:
-            return jsonify(message="阶段无效，可选 clean/screen/deep/rewrite/greet。"), 400
+            return jsonify(message="阶段无效，可选 clean/evaluate/screen/deep/rewrite/greet。"), 400
         owner = _current_user()["username"]
         conn = db._get_conn()
         config = load_config(conn, owner)

@@ -1,5 +1,5 @@
 /* 岗位全链路流水线 · 面板层
-   右滑抽屉 8 面板：本地导入 / 规则清洗 / AI 初评 / 深度评估 /
+   右滑抽屉 7 面板：本地导入 / 规则清洗 / AI 评估 /
    简历改写 / 打招呼语 / 审批操作 / 投递队列 + 物料预览渲染。
    依赖 recruitment.js 暴露的 window.RP；流水线配置走 /pipeline/config。 */
 (() => {
@@ -517,9 +517,9 @@
     }
   });
 
-  /* ---------- 3. AI 初评（evaluating，流水线评估权重 + 启发式开关） ---------- */
+  /* ---------- AI 评估 ---------- */
   RP.registerDrawer("evaluating", {
-    title: "AI 初评配置", icon: "sparkles", tone: "info",
+    title: "AI 评估", icon: "sparkles", tone: "info",
     render(body) {
       const token = RP.drawerToken();
       const readiness = note("正在读取模型与评估配置…");
@@ -536,7 +536,7 @@
       }
       const heuristic = input("checkbox");
       const heuristicLabel = node("label", "", "rp-inline-check");
-      heuristicLabel.append(heuristic, document.createTextNode("模型未配置时允许启发式回退（确定性打分，界面明示启发式模式）"));
+      heuristicLabel.append(heuristic, document.createTextNode("使用启发式评估（按规则打分和诊断）"));
       const saveBtn = button("保存评估配置", "", "check");
       saveBtn.type = "submit";
       const settingsFeedback = feedback();
@@ -546,19 +546,22 @@
       );
       form.append(settingsSection);
 
-      const runSection = section("批量初评", "play");
-      runSection.append(node("p", "对清洗通过与待重评岗位运行八维初评：达到阈值走精投轨，未达标走海投轨；解析失败置空评级并拦截。", "rp-hint"));
+      const runSection = section("批量评估", "play");
+      runSection.append(node("p", "先对清洗通过和待重评岗位做八维评级。达到精投阈值的岗位自动生成深评诊断，其余进入海投。初评解析失败时保留待重试状态。", "rp-hint"));
       const runFeedback = feedback();
-      const runBtn = button("运行 AI 初评", "rp-btn-primary", "play");
+      const runBtn = button("运行 AI 评估", "rp-btn-primary", "play");
       runBtn.addEventListener("click", async () => {
         runBtn.disabled = true;
         try {
-          const result = await withBusy(() => RP.runStage("screen"), runFeedback, "正在批量初评，可能需要一些时间…");
+          const result = await withBusy(() => RP.runStage("evaluate"), runFeedback, "正在评级并诊断精投岗位…");
           if (!alive(token, body)) return;
-          setFeedback(runFeedback, RP.stageResultMessage(result, "AI 初评"), "success");
-          toast(RP.stageResultMessage(result, "AI 初评"), "success");
-          void RP.refresh({ silent: true });
+          const message = RP.stageResultMessage(result, "AI 评估");
+          setFeedback(runFeedback, message, "success");
+          toast(message, "success");
+          await RP.refresh({ silent: true });
+          if (!alive(token, body)) return;
           paintStats();
+          paintList();
         } catch (error) {
           if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
         } finally { runBtn.disabled = false; }
@@ -591,15 +594,19 @@
       paintStats();
       runSection.append(runBtn, runFeedback, stats);
       body.append(readiness, form, runSection);
+      const paintList = appendEvaluationDetails(body, token);
 
       let loadSeq = 0;
       function showConfig(data) {
         const settings = data.settings || {};
         for (const [key, number] of weightInputs) number.value = settings.evaluation_weights?.[key] ?? 1;
         heuristic.checked = Boolean(settings.heuristic_mode);
-        if (data.llm_configured) {
+        if (settings.heuristic_mode) {
+          readiness.dataset.tone = "warning";
+          readiness.textContent = "当前使用启发式评估。";
+        } else if (data.llm_configured) {
           readiness.dataset.tone = "success";
-          readiness.textContent = "对话模型已就绪：初评走模型八维打分，失败时按配置回退。";
+          readiness.textContent = "对话模型已就绪，可运行八维评级与精投诊断。";
         } else if (data.heuristic_active) {
           readiness.dataset.tone = "warning";
           readiness.replaceChildren(document.createTextNode("启发式模式：对话模型未配置，初评使用确定性启发式打分。前往 "),
@@ -643,116 +650,92 @@
     }
   });
 
-  /* ---------- 4. 深度评估（deep_eval，阈值与投递白名单可配） ---------- */
-  RP.registerDrawer("deep_eval", {
-    title: "深度评估", icon: "gauge", tone: "ink",
-    render(body) {
-      const token = RP.drawerToken();
-      body.append(note("深评对精投轨岗位产出七键分析（不打分、不分级），供简历改写与人工审批参考，自动流转无需必配。", "info"));
-
-      const gate = section("分流阈值与投递白名单", "target");
-      const threshold = select([["A", "A 级（仅 A 走精投）"], ["B", "B 级（A/B 走精投，默认）"], ["C", "C 级（A/B/C 走精投）"]], "B");
-      const gradeBoxes = new Map();
-      const gradeRow = node("div", "", "rp-stat-chips");
-      for (const grade of GRADE_OPTIONS) {
-        const box = input("checkbox");
-        gradeBoxes.set(grade, box);
-        const label = node("label", "", "rp-inline-check");
-        label.append(box, document.createTextNode(grade + " 级"));
-        gradeRow.append(label);
-      }
-      const gateFeedback = feedback();
-      const gateSave = button("保存阈值配置", "", "check");
-      gateSave.addEventListener("click", async () => {
-        const autoDeliver = [...gradeBoxes].filter(([, box]) => box.checked).map(([grade]) => grade);
-        if (!autoDeliver.length) { setFeedback(gateFeedback, "自动投递等级白名单不能为空。", "error"); return; }
-        gateSave.disabled = true;
-        try {
-          await saveConfig({ threshold: threshold.value, auto_deliver_grades: autoDeliver }, gateFeedback, "阈值配置已保存。");
-          if (alive(token, body)) setFeedback(gateFeedback, "阈值配置已保存。", "success");
-        } catch (error) {
-          if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
-        } finally { gateSave.disabled = false; }
-      });
-      gate.append(field("精投分流阈值", threshold),
-        node("p", "自动投递等级白名单（海投轨）：白名单外评级与解析失败件一律拦截进审批。", "rp-hint"),
-        gradeRow, gateSave, gateFeedback);
-
-      const runSection = section("批量深评", "play");
-      const runFeedback = feedback();
-      const runBtn = button("运行深度评估", "rp-btn-primary", "play");
-      runBtn.addEventListener("click", async () => {
-        runBtn.disabled = true;
-        try {
-          const result = await withBusy(() => RP.runStage("deep"), runFeedback, "正在批量深评…");
-          if (!alive(token, body)) return;
-          setFeedback(runFeedback, RP.stageResultMessage(result, "深度评估"), "success");
-          toast(RP.stageResultMessage(result, "深度评估"), "success");
-          void RP.refresh({ silent: true });
-          paintList();
-        } catch (error) {
-          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
-        } finally { runBtn.disabled = false; }
-      });
-      runSection.append(runBtn, runFeedback);
-
-      const listSection = section("深评记录", "eye");
-      const list = node("div", "", "rp-mini-list");
-      const detail = node("div", "", "rp-deep-keys");
-      function paintList() {
-        const jobs = state.jobs.filter((job) => RP.stageIndex(job.stage) >= RP.stageIndex("deep")).slice(0, 8);
-        if (!jobs.length) {
-          list.replaceChildren(emptyBlock("暂无深评记录", "初评通过后运行深度评估，这里会列出可查阅的岗位。"));
-          return;
-        }
-        list.replaceChildren(...jobs.map((job) => {
-          const row = miniJob(job);
-          const actions = node("div", "", "rp-mini-job-actions");
-          const view = button("查看七键分析", "rp-btn-sm rp-btn-ghost", "eye");
-          view.addEventListener("click", async () => {
-            view.disabled = true;
-            detail.replaceChildren(node("p", "正在读取深评结果…", "rp-hint"));
-            try {
-              const payload = await RP.fetchJobPayload(job);
-              if (!alive(token, body)) return;
-              const deep = payloadOf(payload, "deep_payload", "deep");
-              detail.replaceChildren();
-              if (!deep) {
-                detail.append(note("该岗位还没有深评结果，可能仍在队列中。", "warning"));
-                return;
-              }
-              for (const [key, label] of DEEP_KEYS) {
-                const value = deep[key];
-                if (value == null || value === "") continue;
-                const fold = node("details", "", "rp-deep-key");
-                fold.append(node("summary", label));
-                const doc = node("div", "", "rp-doc");
-                RP.renderDoc(doc, RP.payloadText(value));
-                fold.append(doc);
-                detail.append(fold);
-              }
-              if (!detail.childNodes.length) detail.append(note("深评结果为空。", "warning"));
-            } catch (error) {
-              if (alive(token, body)) detail.replaceChildren(note(error.message, "danger"));
-            } finally { view.disabled = false; }
-          });
-          actions.append(view);
-          row.append(actions);
-          return row;
-        }));
-      }
-      paintList();
-      listSection.append(list, detail);
-      body.append(gate, runSection, listSection);
-
-      loadConfig().then((data) => {
-        if (!alive(token, body)) return;
-        threshold.value = data.settings?.threshold || "B";
-        const allowed = data.settings?.auto_deliver_grades || ["C", "D", "F"];
-        for (const [grade, box] of gradeBoxes) box.checked = allowed.includes(grade);
-      }).catch(() => {});
+  function appendEvaluationDetails(body, token) {
+    const gate = section("分流阈值与投递白名单", "target");
+    const threshold = select([["A", "A 级（仅 A 走精投）"], ["B", "B 级（A/B 走精投，默认）"], ["C", "C 级（A/B/C 走精投）"]], "B");
+    const gradeBoxes = new Map();
+    const gradeRow = node("div", "", "rp-stat-chips");
+    for (const grade of GRADE_OPTIONS) {
+      const box = input("checkbox");
+      gradeBoxes.set(grade, box);
+      const label = node("label", "", "rp-inline-check");
+      label.append(box, document.createTextNode(grade + " 级"));
+      gradeRow.append(label);
     }
-  });
+    const gateFeedback = feedback();
+    const gateSave = button("保存阈值配置", "", "check");
+    gateSave.addEventListener("click", async () => {
+      const autoDeliver = [...gradeBoxes].filter(([, box]) => box.checked).map(([grade]) => grade);
+      if (!autoDeliver.length) { setFeedback(gateFeedback, "自动投递等级白名单不能为空。", "error"); return; }
+      gateSave.disabled = true;
+      try {
+        await saveConfig({ threshold: threshold.value, auto_deliver_grades: autoDeliver }, gateFeedback, "阈值配置已保存。");
+        if (alive(token, body)) setFeedback(gateFeedback, "阈值配置已保存。", "success");
+      } catch (error) {
+        if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
+      } finally { gateSave.disabled = false; }
+    });
+    gate.append(field("精投分流阈值", threshold),
+      node("p", "自动投递等级白名单（海投轨）：白名单外评级与解析失败件一律拦截进审批。", "rp-hint"),
+      gradeRow, gateSave, gateFeedback);
+
+    const listSection = section("深评记录", "eye");
+    const list = node("div", "", "rp-mini-list");
+    const detail = node("div", "", "rp-deep-keys");
+    function paintList() {
+      const jobs = state.jobs.filter(job => job.hasDeep).slice(0, 8);
+      if (!jobs.length) {
+        list.replaceChildren(emptyBlock("暂无深评记录", "运行 AI 评估后，可在这里查看精投岗位的诊断。"));
+        return;
+      }
+      list.replaceChildren(...jobs.map((job) => {
+        const row = miniJob(job);
+        const actions = node("div", "", "rp-mini-job-actions");
+        const view = button("查看七键分析", "rp-btn-sm rp-btn-ghost", "eye");
+        view.addEventListener("click", async () => {
+          view.disabled = true;
+          detail.replaceChildren(node("p", "正在读取深评结果…", "rp-hint"));
+          try {
+            const payload = await RP.fetchJobPayload(job);
+            if (!alive(token, body)) return;
+            const deep = payloadOf(payload, "deep_payload", "deep");
+            detail.replaceChildren();
+            if (!deep) {
+              detail.append(note("该岗位还没有深评结果，可能仍在队列中。", "warning"));
+              return;
+            }
+            for (const [key, label] of DEEP_KEYS) {
+              const value = deep[key];
+              if (value == null || value === "") continue;
+              const fold = node("details", "", "rp-deep-key");
+              fold.append(node("summary", label));
+              const doc = node("div", "", "rp-doc");
+              RP.renderDoc(doc, RP.payloadText(value));
+              fold.append(doc);
+              detail.append(fold);
+            }
+            if (!detail.childNodes.length) detail.append(note("深评结果为空。", "warning"));
+          } catch (error) {
+            if (alive(token, body)) detail.replaceChildren(note(error.message, "danger"));
+          } finally { view.disabled = false; }
+        });
+        actions.append(view);
+        row.append(actions);
+        return row;
+      }));
+    }
+    paintList();
+    listSection.append(list, detail);
+    body.append(gate, listSection);
+
+    loadConfig().then((data) => {
+      if (!alive(token, body)) return;
+      threshold.value = data.settings?.threshold || "B";
+      const allowed = data.settings?.auto_deliver_grades || ["C", "D", "F"];
+      for (const [grade, box] of gradeBoxes) box.checked = allowed.includes(grade);
+    }).catch(() => {});
+    return paintList;
+  }
 
   /* ---------- 5. 简历改写（rewriting，基准简历 + 对比） ---------- */
   RP.registerDrawer("rewriting", {

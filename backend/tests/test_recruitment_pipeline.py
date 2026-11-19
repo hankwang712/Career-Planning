@@ -132,13 +132,13 @@ def test_full_pipeline_heuristic_chain(server, make_account):
     assert job(owner, rejected)["stage"] == "rejected"
     assert job(owner, rejected)["follow_status"] == "清洗淘汰"
 
-    result = run(owner, "screen")
-    assert result["mode"] == "heuristic" and result["counts"]["screened"] == 3
+    result = run(owner, "evaluate")
+    assert result["mode"] == "heuristic" and result["counts"]["screened"] == 3 and result["counts"]["deep"] == 1
     custom_row, mass_row, big_row = job(owner, custom), job(owner, mass), job(owner, big)
     assert custom_row["grade"] in ("A", "B") and custom_row["review_type"] == "custom"
     assert mass_row["grade"] == "C" and mass_row["review_type"] == "mass"
     assert big_row["review_type"] == "mass"
-    assert custom_row["follow_status"] == "已完成初步评估"
+    assert custom_row["stage"] == "deep"
     assert set(custom_row["screen_payload"]["scores"]) == {
         "role_match", "skills_align", "seniority", "compensation",
         "interview_prob", "company_stage", "market_fit", "growth"}
@@ -147,13 +147,12 @@ def test_full_pipeline_heuristic_chain(server, make_account):
     by_key = {item["key"]: item["count"] for item in funnel["stages"]}
     assert by_key == {"crawled": 4, "cleaned": 3, "evaluated": 3, "pending": 0, "ready": 0, "delivered": 0}
 
-    result = run(owner, "deep")
-    assert result["processed"] == 1
-    deep = job(owner, custom)["deep_payload"]
+    deep = custom_row["deep_payload"]
     assert set(deep) >= {"extracted_skills", "ats_ability_analysis", "resume_audit", "dream_picture",
                          "strong_fit_assessment", "risk_red_flags", "deep_action_plan"}
     assert deep["mode"] == "heuristic" and deep["missing_skills"] == []
     assert job(owner, mass)["stage"] == "screened"
+    assert not mass_row["deep_payload"]
 
     result = run(owner, "rewrite")
     assert result["processed"] == 1
@@ -254,6 +253,28 @@ def test_threshold_routes_by_grade_only(server, make_account):
     assert row["grade"] == "C" and row["review_type"] == "custom"
 
 
+def test_combined_evaluation_finishes_previously_screened_jobs_within_batch_limit(server, make_account):
+    owner = setup_account(server, make_account, "pipeline-evaluate-backlog")
+    mass = add_job(owner, "t:mass", JOB_MASS)
+    pending = add_job(owner, "t:pending", JOB_CUSTOM)
+    run(owner, "clean")
+    run(owner, "screen")
+    assert job(owner, pending)["stage"] == "screened"
+    fresh = add_job(owner, "t:fresh", JOB_CUSTOM)
+    run(owner, "clean")
+
+    result = run(owner, "evaluate", limit=1)
+    assert result["processed"] == 1 and result["counts"]["screened"] == 0 and result["counts"]["deep"] == 1
+    assert job(owner, pending)["stage"] == "deep"
+    assert job(owner, mass)["stage"] == "screened"
+    assert job(owner, fresh)["stage"] == "cleaned"
+
+    result = run(owner, "evaluate", limit=1)
+    assert result["processed"] == 1 and result["counts"]["screened"] == 1 and result["counts"]["deep"] == 1
+    assert job(owner, fresh)["stage"] == "deep"
+    assert run(owner, "evaluate")["processed"] == 0
+
+
 def test_screen_parse_failed_never_fabricates_grade(server, make_account, monkeypatch):
     owner = setup_account(server, make_account, "pipeline-parse-fail")
     identity = add_job(owner, "t:custom", JOB_CUSTOM)
@@ -271,8 +292,8 @@ def test_screen_parse_failed_never_fabricates_grade(server, make_account, monkey
         raise ValueError("模型输出不是合法 JSON")
 
     monkeypatch.setattr(pipeline, "_screen_llm", broken)
-    result = run(owner, "screen")
-    assert result["counts"]["parse_failed"] == 1
+    result = run(owner, "evaluate")
+    assert result["counts"]["parse_failed"] == 1 and result["counts"]["deep"] == 0
     assert len(calls) == 3, "解析失败应重试至多 2 次"
     row = job(owner, identity)
     assert row["stage"] == "failed" and row["follow_status"] == "AI评估失败"
