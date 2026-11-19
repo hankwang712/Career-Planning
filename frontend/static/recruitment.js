@@ -524,6 +524,12 @@
   const cleaningFeedback = byId("recruitmentCleaningFeedback");
   const cleaningPreview = byId("recruitmentCleaningPreview");
   const applyRules = byId("recruitmentCleaningApply");
+  const scoutList = byId("recruitmentScoutRules");
+  const scoutExampleNotice = byId("recruitmentScoutExamples");
+  const termEditors = [...cleaningForm.querySelectorAll("[data-rule-terms]")];
+  const splitTerms = (value) => value.split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean);
+  let scoutExamples = [];
+  let examplesOnly = false;
   let previewToken = "";
   let loadedProfile = "";
   let ruleLoadSequence = 0;
@@ -539,16 +545,164 @@
     return ["passed", "rejected", "review"].map((status) => `${cleaningNames[status]} ${counts[status]}`).join(" · ");
   }
 
+  function markRuleEdit() {
+    resetPreview();
+    cleaningFeedback.textContent = "";
+  }
+
+  function renderTerms(editor, values) {
+    const chips = editor.querySelector(".recruitment-rule-chips");
+    chips.replaceChildren(...values.map((value) => {
+      const chip = node("button", value + " ×", "recruitment-rule-chip");
+      chip.dataset.value = value;
+      chip.type = "button";
+      chip.setAttribute("aria-label", "移除 " + value);
+      chip.onclick = () => {
+        chip.remove();
+        editor.querySelector("input").focus();
+        markRuleEdit();
+      };
+      return chip;
+    }));
+  }
+
+  function readTerms(editor) {
+    return [...new Set([
+      ...[...editor.querySelectorAll("[data-value]")].map((chip) => chip.dataset.value),
+      ...splitTerms(editor.querySelector("input").value)
+    ])];
+  }
+
+  for (const editor of termEditors) {
+    const input = editor.querySelector("input");
+    const add = () => {
+      renderTerms(editor, readTerms(editor));
+      input.value = "";
+      input.focus();
+      markRuleEdit();
+    };
+    editor.querySelector("button").onclick = add;
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        add();
+      }
+    });
+  }
+
+  function enableExamples() {
+    examplesOnly = false;
+    scoutExampleNotice.hidden = true;
+    markRuleEdit();
+  }
+
+  function readScoutRow(row) {
+    return {
+      keyword: row.querySelector("input").value.trim(),
+      condition: row.querySelector("select").value,
+      desc: row.querySelector("textarea").value.trim()
+    };
+  }
+
+  function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
+    const row = node("div", "", "recruitment-scout-row");
+    if (rule.legacy) row.dataset.legacy = rule.legacy;
+    const controls = node("div", "", "recruitment-scout-controls");
+    const keyword = node("input");
+    keyword.value = rule.keyword;
+    keyword.maxLength = 240;
+    const condition = node("select");
+    condition.append(new Option("必须包含", "must"), new Option("绝不包含", "never"));
+    condition.value = rule.condition;
+    const desc = node("textarea");
+    desc.value = rule.desc;
+    desc.rows = 2;
+    desc.maxLength = 600;
+    const status = node("p", "", "recruitment-rule-hint");
+    status.setAttribute("role", "status");
+    const actions = node("div", "", "recruitment-actions");
+    const generate = node("button", "AI 生成标准");
+    const remove = node("button", "删除规则");
+    remove.type = generate.type = "button";
+    const wrap = (title, field) => {
+      const label = node("label", title);
+      label.append(field);
+      return label;
+    };
+    row.dataset.condition = condition.value;
+    row.addEventListener("input", () => {
+      delete row.dataset.legacy;
+      row.dataset.condition = condition.value;
+      enableExamples();
+    });
+    remove.onclick = () => {
+      row.remove();
+      enableExamples();
+      byId("recruitmentScoutAdd").focus();
+    };
+    generate.onclick = async () => {
+      const current = readScoutRow(row);
+      if (!current.keyword) {
+        status.textContent = "请先填写规则词。";
+        keyword.focus();
+        return;
+      }
+      generate.disabled = true;
+      status.textContent = "正在生成…";
+      try {
+        const result = await api("/cleaning/describe", current);
+        const latest = readScoutRow(row);
+        if (row.isConnected && !rulesBusy && Object.keys(current).every((key) => current[key] === latest[key])) {
+          desc.value = result.desc;
+          delete row.dataset.legacy;
+          enableExamples();
+          status.textContent = "";
+        } else {
+          status.textContent = "生成期间规则已变更，请重新生成。";
+        }
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        generate.disabled = false;
+      }
+    };
+    controls.append(wrap("规则词", keyword), wrap("判定条件", condition));
+    actions.append(generate, remove);
+    row.append(controls, wrap("判定标准", desc), actions, status);
+    return row;
+  }
+
+  byId("recruitmentScoutEnable").onclick = enableExamples;
+  byId("recruitmentScoutAdd").onclick = () => {
+    if (scoutList.children.length >= 24) {
+      cleaningFeedback.textContent = "每个方向最多可保存 24 条 AI 初筛规则。";
+      return;
+    }
+    enableExamples();
+    const row = scoutRow();
+    scoutList.append(row);
+    row.querySelector("input").focus();
+  };
+
   function showRules(rules) {
-    for (const name of ["cities", "title_exclusions", "company_exclusions"]) {
+    for (const name of ["title_exclusions", "company_exclusions"]) {
       cleaningForm.elements[name].value = rules[name].join("、");
     }
-    for (const name of ["min_salary_k", "max_salary_k", "min_daily_salary", "max_daily_salary"]) {
+    for (const editor of termEditors) {
+      editor.querySelector("input").value = "";
+      renderTerms(editor, rules[editor.dataset.ruleTerms] || []);
+    }
+    for (const name of ["min_salary_k", "max_salary_k", "min_daily_salary", "max_daily_salary", "experience_years_max"]) {
       cleaningForm.elements[name].value = rules[name] ?? "";
     }
-    for (const name of ["semantic_required", "semantic_excluded"]) {
-      cleaningForm.elements[name].value = (rules[name] || []).join("\n");
-    }
+    const stored = [
+      ...(rules.ai_scout_rules || []),
+      ...(rules.semantic_required || []).map((keyword) => ({ keyword, condition: "must", desc: "", legacy: "semantic_required" })),
+      ...(rules.semantic_excluded || []).map((keyword) => ({ keyword, condition: "never", desc: "", legacy: "semantic_excluded" }))
+    ];
+    examplesOnly = !stored.length && !!scoutExamples.length;
+    scoutExampleNotice.hidden = !examplesOnly;
+    scoutList.replaceChildren(...(examplesOnly ? scoutExamples : stored).map(scoutRow));
     cleaningForm.elements.auto.checked = rules.auto;
     const name = profileNames.get(profileSelect.value);
     byId("recruitmentCleaningMode").textContent = `${name} · ${rules.auto ? "自动清洗已开启" : "手动清洗"}`;
@@ -556,13 +710,17 @@
 
   function readRules() {
     const form = new FormData(cleaningForm);
-    const terms = (name) => [...new Set(form.get(name).split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean))];
+    const terms = (name) => [...new Set(splitTerms(form.get(name)))];
     const salary = (name) => form.get(name) ? Number(form.get(name)) : null;
-    const semantic = (name) => form.get(name).split("\n").map((rule) => rule.trim()).filter(Boolean);
+    const lists = Object.fromEntries(termEditors.map((editor) => [editor.dataset.ruleTerms, readTerms(editor)]));
+    const rows = examplesOnly ? [] : [...scoutList.children];
+    const legacy = (name) => rows.filter((row) => row.dataset.legacy === name).map((row) => readScoutRow(row).keyword);
     return {
-      cities: terms("cities"), title_exclusions: terms("title_exclusions"), company_exclusions: terms("company_exclusions"),
+      ...lists, title_exclusions: terms("title_exclusions"), company_exclusions: terms("company_exclusions"),
       min_salary_k: salary("min_salary_k"), max_salary_k: salary("max_salary_k"),
-      semantic_required: semantic("semantic_required"), semantic_excluded: semantic("semantic_excluded"),
+      experience_years_max: salary("experience_years_max"),
+      ai_scout_rules: rows.filter((row) => !row.dataset.legacy).map(readScoutRow).filter((rule) => rule.keyword),
+      semantic_required: legacy("semantic_required"), semantic_excluded: legacy("semantic_excluded"),
       min_daily_salary: salary("min_daily_salary"), max_daily_salary: salary("max_daily_salary"), auto: form.has("auto")
     };
   }
@@ -605,6 +763,7 @@
     try {
       const data = await api("/cleaning?profile=" + profile);
       if (sequence !== ruleLoadSequence) return;
+      scoutExamples = data.examples || [];
       showRules(data.rules);
       loadedProfile = profile;
       cleaningFeedback.textContent = "";
@@ -650,10 +809,7 @@
     cleaningDialog.showModal();
     void loadRules();
   };
-  cleaningForm.addEventListener("input", () => {
-    resetPreview();
-    cleaningFeedback.textContent = "";
-  });
+  cleaningForm.addEventListener("input", markRuleEdit);
   cleaningForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void runRuleAction("preview");
@@ -755,7 +911,7 @@
       aiFeedback.textContent = "";
       aiBatchResults.replaceChildren();
       aiSettings.hidden = kind !== "match";
-      byId("recruitmentAiDialogTitle").textContent = kind === "match" ? "AI 初评" : "AI 语义清洗";
+      byId("recruitmentAiDialogTitle").textContent = kind === "match" ? "AI 初评" : "AI 初筛";
       aiRun.textContent = kind === "match" ? "评估所选岗位" : "清洗所选岗位";
       if (kind === "match") void loadAiSettings();
       else aiSettingsSequence += 1;
@@ -848,7 +1004,7 @@
     const section = byId("recruitmentAiDetails");
     section.replaceChildren();
     for (const [kind, entry] of Object.entries(results)) {
-      const title = { semantic: "AI 语义清洗", match: "AI 初评", vision: "图片提取结果" }[kind];
+      const title = { semantic: "AI 初筛", match: "AI 初评", vision: "图片提取结果" }[kind];
       section.append(node("h3", title + " · " + aiResultLabel(entry)));
       if (entry.reason) section.append(node("p", entry.reason));
       if (entry.evidence) section.append(node("p", "岗位原文：" + entry.evidence));

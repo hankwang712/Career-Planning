@@ -34,6 +34,30 @@ DAILY_PAY = re.compile(r"(\d+(?:\.\d+)?)(?:元)?(?:[-~至](\d+(?:\.\d+)?))?(?:�
 RuleTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 SalaryK = Annotated[float, Field(gt=0, le=1000, allow_inf_nan=False)]
 SemanticRule = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
+EDUCATION_TERMS = {
+    "初中": "初中", "中专": "中专", "中技": "中专", "高中": "高中", "技校": "中专", "大专": "大专", "专科": "大专",
+    "本科": "本科", "学士": "本科", "硕士": "硕士", "研究生": "硕士", "博士": "博士",
+}
+EDUCATION = re.compile("|".join(EDUCATION_TERMS))
+EDUCATION_RANK = {level: rank for rank, level in enumerate(("初中", "高中", "中专", "大专", "本科", "硕士", "博士"))}
+EXPERIENCE = re.compile(
+    r"(?P<years>\d{1,2})(?:[-~至]\d{1,2})?年(?:及?以上|\+)?(?:的)?(?:相关)?(?:工作|行业|项目|管理|开发)?经验"
+)
+EXPERIENCE_FIELD = re.compile(r"(?P<years>\d{1,2})(?:[-~至]\d{1,2})?年(?:及?以上|\+)?(?:(?:工作)?经验)?")
+SCOUT_EXAMPLES = (
+    {"keyword": "单休", "condition": "never", "desc": "识别每周只休一天或双休不固定的安排，包括大小周、单双休、五天半、每周工作六天和月休四至六天。只有轮休、调休等字样时，还需核对实际休息天数。"},
+    {"keyword": "外包", "condition": "never", "desc": "识别劳务派遣、人力外包、项目外派、驻场等非招聘公司直接雇佣的情形。仅与外部公司合作、对接外包团队或团队名称含外包时不命中。"},
+    {"keyword": "销售", "condition": "never", "desc": "判断岗位本身是否承担获客、拓客、成交等销售职责。电销、网销、面销、BD、客户代表、客户经理等以实际职责为准。只为销售团队提供技术或运营支持时不命中。"},
+    {"keyword": "实习", "condition": "never", "desc": "识别招聘实习生、带薪实习、兼职实习或短期实习培训的岗位。只要求有实习经历、实习证明，或写明实习经验非必需时不命中。"},
+    {"keyword": "兼职", "condition": "never", "desc": "识别明确的非全日制、小时工、临时工或按项目短期计酬工作。弹性工作时间本身不足以判定兼职，实习和志愿服务也应单独判断。"},
+)
+
+
+class ScoutRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    keyword: SemanticRule
+    condition: Literal["must", "never"]
+    desc: Annotated[str, StringConstraints(strip_whitespace=True, max_length=600)] = ""
 
 
 class CleaningRules(BaseModel):
@@ -43,6 +67,10 @@ class CleaningRules(BaseModel):
     max_salary_k: SalaryK | None = None
     min_daily_salary: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
     max_daily_salary: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    experience_years_max: int | None = Field(default=None, ge=1, le=50, strict=True)
+    require_education: list[RuleTerm] = Field(default_factory=list, max_length=12)
+    exclude_education: list[RuleTerm] = Field(default_factory=list, max_length=12)
+    ai_scout_rules: list[ScoutRule] = Field(default_factory=list, max_length=24)
     title_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
     company_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
     semantic_required: list[SemanticRule] = Field(default_factory=list, max_length=12)
@@ -51,12 +79,19 @@ class CleaningRules(BaseModel):
 
     @model_validator(mode="after")
     def check_salary_order(self):
+        if self.require_education and self.exclude_education:
+            raise ValueError("学历白名单和黑名单只能启用一个。")
+        if len({comparable_text(rule.keyword) for rule in self.ai_scout_rules}) != len(self.ai_scout_rules):
+            raise ValueError("AI 规则关键词不能重复。")
         if self.min_salary_k is not None and self.max_salary_k is not None and self.min_salary_k > self.max_salary_k:
             raise ValueError("最低月薪不能高于最高月薪。")
         if (self.min_daily_salary is not None and self.max_daily_salary is not None
                 and self.min_daily_salary > self.max_daily_salary):
             raise ValueError("最低日薪不能高于最高日薪。")
         return self
+
+    def semantic_config(self):
+        return [self.semantic_required, self.semantic_excluded, [rule.model_dump() for rule in self.ai_scout_rules]]
 
 
 def init_schema(conn):
@@ -88,6 +123,25 @@ def init_schema(conn):
         for table in ("recruitment_listings", "recruitment_runs"):
             if "profile" not in {column[1] for column in conn.execute(f"PRAGMA table_info({table})")}:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN profile TEXT NOT NULL DEFAULT 'general'")
+        columns = {column[1] for column in conn.execute("PRAGMA table_info(recruitment_listings)")}
+        for column in ("experience", "education"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE recruitment_listings ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS recruitment_recheck_requirements
+            AFTER UPDATE OF experience, education, description ON recruitment_listings
+            WHEN NEW.experience IS NOT OLD.experience OR NEW.education IS NOT OLD.education
+                 OR (NEW.description IS NOT OLD.description AND EXISTS (
+                    SELECT 1 FROM recruitment_cleaning_profiles p WHERE p.owner=NEW.owner AND p.profile=NEW.profile
+                    AND (json_extract(p.rules, '$.experience_years_max') IS NOT NULL
+                    OR json_array_length(json_extract(p.rules, '$.require_education')) > 0
+                    OR json_array_length(json_extract(p.rules, '$.exclude_education')) > 0)
+                 ))
+            BEGIN
+                DELETE FROM recruitment_cleaning_results
+                WHERE owner=NEW.owner AND source=NEW.source AND url_key=NEW.url_key AND status <> 'released';
+            END
+        """)
         if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recruitment_cleaning_rules'").fetchone():
             conn.execute("""
                 INSERT OR IGNORE INTO recruitment_cleaning_profiles
@@ -179,6 +233,48 @@ def salary_decision(salary, rules):
     return "passed", ""
 
 
+def job_experience(row):
+    field = re.sub(r"\s+", "", comparable_text(row["experience"])).replace("–", "-").replace("—", "-")
+    if any(word in field for word in ("不限", "无经验", "应届", "无需")):
+        return None, ""
+    if match := EXPERIENCE_FIELD.fullmatch(field):
+        return int(match["years"]), row["experience"]
+    for clause in re.split(r"[\n。；;，,]", comparable_text(row["description"]).replace("–", "-").replace("—", "-")):
+        if any(word in clause for word in ("优先", "无需", "不限", "不要求", "可放宽")):
+            continue
+        clause = re.sub(r"\s+", "", clause)
+        if match := EXPERIENCE_FIELD.fullmatch(clause) or EXPERIENCE.search(clause):
+            return int(match["years"]), match[0]
+    return None, ""
+
+
+def education_levels(text):
+    return {EDUCATION_TERMS[term] for term in EDUCATION.findall(text)}
+
+
+def education_rejection(row, rules):
+    value = row["education"]
+    if not value:
+        value = " ".join(
+            clause for clause in re.split(r"[\n。；;，,]", row["description"])
+            if EDUCATION.fullmatch(clause.strip())
+            or (EDUCATION.search(clause) and any(word in clause for word in ("学历", "以上"))
+            and not any(word in clause for word in ("优先", "不限", "可放宽"))
+            )
+        )
+    if not value or "不限" in value:
+        return ""
+    levels = education_levels(value)
+    for term in rules.exclude_education:
+        if term in value or levels.intersection(education_levels(term)):
+            return f"学历要求「{value[:80]}」命中排除项「{term}」"
+    if rules.require_education and levels and not any(term in value for term in rules.require_education):
+        thresholds = set().union(*(education_levels(term) for term in rules.require_education))
+        if thresholds and min(map(EDUCATION_RANK.get, levels)) < min(map(EDUCATION_RANK.get, thresholds)):
+            return f"学历要求「{value[:80]}」低于白名单门槛"
+    return ""
+
+
 def evaluate(row, rules):
     if row["status"] == "released":
         return "released", row["reason"]
@@ -205,6 +301,13 @@ def evaluate(row, rules):
             return status, reason
         if status == "review":
             missing.append(reason)
+        if rules.experience_years_max is not None:
+            years, evidence = job_experience(row)
+            if years is not None and years >= rules.experience_years_max:
+                return "rejected", f"经验要求「{evidence}」达到 {rules.experience_years_max} 年上限"
+        if rules.require_education or rules.exclude_education:
+            if reason := education_rejection(row, rules):
+                return "rejected", reason
     return ("review", "、".join(missing)) if missing else ("passed", "")
 
 
@@ -222,10 +325,12 @@ def stored_counts(conn, owner, profile):
 
 
 LISTINGS = """
-    SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary,
+    SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
+           COALESCE(d.description, j.description) AS description,
            r.status, r.reason, j.profile
     FROM recruitment_listings j
     LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+    LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
     WHERE j.owner=?
 """
 

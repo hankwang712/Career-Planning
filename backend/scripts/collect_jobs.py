@@ -13,7 +13,7 @@ from services.job_market.store import SOURCES
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="JobHunter 岗位采集与调度")
+    parser = argparse.ArgumentParser(description="岗位采集与调度")
     parser.add_argument("--once", action="store_true", help="运行一次采集")
     parser.add_argument("--worker", action="store_true", help="运行独立定时采集进程")
     parser.add_argument("--sources", nargs="+", choices=list(SOURCES))

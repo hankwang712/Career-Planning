@@ -12,7 +12,7 @@ from ..radar.client import enrich_jobs, search_jobs
 async def search_recruitment_radar(query: str, intent: dict, config: RunnableConfig,
     limit: Annotated[int, Field(ge=1, le=40)] = 24,
     read_limit: Annotated[int, Field(ge=0, le=10)] = 5) -> dict:
-    """合并 Radar 招聘汇总、企业官网、固定公告、导入数据与 JobHunter 本地岗位库，去重后检索。
+    """合并公开招聘汇总、企业官网、固定公告、导入数据与本地岗位库，去重后检索。
 
     intent填写用户明确条件及语义展开岗位；保留招聘类别、城市、企业和时间范围。
     保留各条线索来源并继续核对原文；采集时间、源表更新日期不等于公告发布日期。

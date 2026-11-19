@@ -83,8 +83,7 @@ def create_blueprint(collector, login_required, current_user):
         companies = json.loads(companies_path.read_text(encoding="utf-8"))
         return jsonify(settings=store.settings(), runs=store.runs(), sources=SOURCES,
             can_manage=False,
-            companies=[{"name": row["name"], "industry": row.get("industry", "")} for row in companies],
-            upstream="https://github.com/Bynlk/JobHunter")
+            companies=[{"name": row["name"], "industry": row.get("industry", "")} for row in companies])
 
     @bp.get("/export")
     @login_required

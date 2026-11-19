@@ -232,20 +232,52 @@
                 {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
             </select></label>
             <fieldset class="recruitment-rule-fields" disabled>
-                <label>目标城市<input name="cities" maxlength="2500" placeholder="例如 杭州、上海、远程"></label>
-                <div class="recruitment-rule-salary">
-                    <label>最低月薪（K）<input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
-                    <label>最高月薪（K）<input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
-                </div>
-                <div class="recruitment-rule-salary" id="recruitmentDailyRules" hidden>
-                    <label>最低日薪（元/天）<input type="number" name="min_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
-                    <label>最高日薪（元/天）<input type="number" name="max_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
-                </div>
-                <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
-                <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
-                <label>AI 语义必备条件<textarea name="semantic_required" rows="2" maxlength="2900" placeholder="每行一条，例如：明确接受应届生"></textarea></label>
-                <label>AI 语义排除条件<textarea name="semantic_excluded" rows="2" maxlength="2900" placeholder="每行一条，例如：单休，包括大小周"></textarea></label>
-                <label class="recruitment-rule-auto"><input name="auto" type="checkbox">对新采集和新导入的记录自动运行硬规则</label>
+                <section class="recruitment-rule-section" aria-labelledby="recruitmentHardRules">
+                    <h3 id="recruitmentHardRules">硬规则</h3>
+                    <div class="recruitment-rule-salary">
+                        <label>最低月薪（K）<input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
+                        <label>最高月薪（K）<input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
+                        <label>经验上限（年）<input type="number" name="experience_years_max" min="1" max="50" step="1" placeholder="不限" aria-describedby="recruitmentExperienceHint"></label>
+                    </div>
+                    <p id="recruitmentExperienceHint" class="recruitment-rule-hint">岗位要求的最低经验达到上限时淘汰。</p>
+                    <div class="recruitment-rule-salary" id="recruitmentDailyRules" hidden>
+                        <label>最低日薪（元/天）<input type="number" name="min_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
+                        <label>最高日薪（元/天）<input type="number" name="max_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
+                    </div>
+                    {% for key, label, placeholder in [
+                        ('cities', '目标城市', '输入城市后按回车'),
+                        ('require_education', '学历白名单', '添加可接受的最低学历'),
+                        ('exclude_education', '学历黑名单', '添加需要排除的学历')
+                    ] %}
+                    <div class="recruitment-rule-terms" data-rule-terms="{{ key }}">
+                        <label for="recruitment-rule-{{ key }}">{{ label }}</label>
+                        <div class="recruitment-rule-term-input">
+                            <input id="recruitment-rule-{{ key }}" name="{{ key }}" maxlength="2500" placeholder="{{ placeholder }}"
+                                {% if key != 'cities' %}list="recruitmentEducationLevels"{% endif %}>
+                            <button type="button" aria-label="添加{{ label }}">添加</button>
+                        </div>
+                        <div class="recruitment-rule-chips"></div>
+                    </div>
+                    {% endfor %}
+                    <datalist id="recruitmentEducationLevels">
+                        {% for level in ['中专/中技', '高中', '大专', '本科', '硕士', '博士'] %}<option value="{{ level }}">{% endfor %}
+                    </datalist>
+                    <p class="recruitment-rule-hint">学历白名单和黑名单任选一种。</p>
+                    <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
+                    <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
+                    <label class="recruitment-rule-auto"><input name="auto" type="checkbox">对新采集和新导入的记录自动运行硬规则</label>
+                </section>
+                <section class="recruitment-rule-section" aria-labelledby="recruitmentScoutTitle">
+                    <div class="recruitment-rule-section-head">
+                        <h3 id="recruitmentScoutTitle">AI 初筛规则</h3>
+                        <button id="recruitmentScoutAdd" type="button">添加规则</button>
+                    </div>
+                    <div id="recruitmentScoutExamples" class="recruitment-scout-example" hidden>
+                        <span>内置示例。启用或编辑后保存，即可用于初筛。</span>
+                        <button id="recruitmentScoutEnable" type="button">启用示例</button>
+                    </div>
+                    <div id="recruitmentScoutRules" class="recruitment-scout-list"></div>
+                </section>
                 <div class="recruitment-actions">
                     <button id="recruitmentCleaningSave" type="button">保存规则</button>
                     <button type="submit">预览现有岗位</button>
@@ -254,7 +286,7 @@
             </fieldset>
             <p id="recruitmentCleaningFeedback" class="recruitment-rule-feedback" role="status"></p>
             <ul id="recruitmentCleaningPreview" class="recruitment-rule-preview" hidden></ul>
-            <button id="recruitmentSemanticOpen" type="button">运行已保存的语义规则</button>
+            <button id="recruitmentSemanticOpen" type="button">运行已保存的 AI 初筛规则</button>
         </form>
     </dialog>
     <dialog id="recruitmentAiDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentAiDialogTitle">

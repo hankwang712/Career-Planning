@@ -358,7 +358,45 @@ input:not([type=checkbox]), select {
 .recruitment-cleaning-decision button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 .recruitment-cleaning-badge { background: var(--clean-bg); color: var(--clean-color); }
 .recruitment-card-body .recruitment-rule-fields { display: grid; gap: 10px; }
-.recruitment-rule-salary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.recruitment-rule-section {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 12px;
+}
+.recruitment-rule-section h3 { margin: 0; font-size: 15px; }
+.recruitment-rule-section-head,
+.recruitment-rule-term-input,
+.recruitment-scout-example {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+.recruitment-rule-term-input input { flex: 1; min-width: 0; }
+.recruitment-rule-terms { display: grid; gap: 5px; }
+.recruitment-rule-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.recruitment-rule-chips:empty, .recruitment-rule-hint:empty, .recruitment-scout-example[hidden] { display: none; }
+.recruitment-rule-chips .recruitment-rule-chip { background: #edf3fe; padding: 3px 8px; min-height: 0; }
+.recruitment-rule-hint { margin: 0; color: var(--muted); font-size: 12px; }
+.recruitment-scout-example { flex-wrap: wrap; background: #fff7e7; padding: 9px; border-radius: 8px; }
+.recruitment-scout-list { display: grid; gap: 8px; }
+.recruitment-scout-row {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-left: 3px solid #bc5269;
+    border-radius: 8px;
+}
+.recruitment-scout-row[data-condition="must"] { border-left-color: #28836a; }
+.recruitment-scout-controls, .recruitment-rule-salary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+    gap: 10px;
+}
 .recruitment-rule-fields textarea {
     min-width: 0;
     padding: 6px 9px;

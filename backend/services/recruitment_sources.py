@@ -66,9 +66,15 @@ READ_CARDS = """({source, card, selectors, limit}) => {
         const salary = typeof cardData?.salaryDesc === 'string' && cardData.salaryDesc.trim()
             ? cardData.salaryDesc.trim() : source === 'zhilian' && displayedSalary.includes('*') ? '' : displayedSalary;
         const description = (node.innerText || '').trim();
+        const bossTags = source === 'boss' ? Array.from(node.querySelectorAll('.tag-list li'), tag => tag.innerText.trim()) : [];
+        const job51Matches = job51?.jobName?.trim() === title;
+        const experience = bossTags[0] || (job51Matches ? job51.workYearString : '');
+        const education = bossTags[1] || (job51Matches ? job51.degreeString : '');
         return {
             title, company, salary,
             location: text(node, 'location'),
+            ...(typeof experience === 'string' && experience.trim() ? {experience: experience.trim()} : {}),
+            ...(typeof education === 'string' && education.trim() ? {education: education.trim()} : {}),
             description: (displayedSalary ? description.replace(displayedSalary, salary) : description).slice(0, 3000),
             url: (node.matches(selectors.url) ? node : node.querySelector(selectors.url) || node.closest(selectors.url))?.getAttribute('href')
                 || zhilianJob?.positionURL || zhilianJob?.positionUrl || job51Link || ''

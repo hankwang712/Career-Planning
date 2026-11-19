@@ -35,10 +35,11 @@ from .user_state import _current_user, _login_required
 blueprint = Blueprint("recruitment", __name__)
 API = "/api/job-market/collection"
 logger = logging.getLogger(__name__)
-FIELDS = ("source", "title", "company", "location", "salary", "description", "url", "updated_at")
+FIELDS = ("source", "title", "company", "location", "salary", "description", "url", "updated_at", "experience", "education")
 CSV_ALIASES = {"platform": "source", "job_title": "title", "company_name": "company", "city": "location",
                "jd_text": "description", "job_link": "url", "post_link": "url", "raw_text": "description",
-               "note_title": "title", "crawl_time": "updated_at"}
+               "note_title": "title", "crawl_time": "updated_at", "experience_req": "experience",
+               "education_req": "education", "work_address": "location"}
 html_import_lock = threading.Lock()
 UNRENDERABLE_TEXT = re.compile(r"[\ue000-\uf8ff\U000f0000-\U0010fffd\ufffd]")
 
@@ -81,7 +82,7 @@ class CollectRequest(BaseModel):
 
 
 def clean_listing(fields):
-    for key in ("title", "company", "location", "salary", "description"):
+    for key in ("title", "company", "location", "salary", "description", "experience", "education"):
         value = str(fields.get(key) or "").strip()
         if key == "salary" and UNRENDERABLE_TEXT.search(value):
             fields[key] = ""
@@ -109,18 +110,22 @@ def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cl
         if url in seen:
             continue
         seen.add(url)
-        values = [str(row.get(key) or "").strip()[:limit] for key, limit in
-                  (("company", 250), ("location", 120), ("salary", 120), ("description", 6000))]
+        values = [row[key][:limit] for key, limit in
+                  (("company", 250), ("location", 120), ("salary", 120), ("description", 6000),
+                   ("experience", 120), ("education", 120))]
         records.append((owner, source, url, title, *values, url, time.time(), profile))
         if source == "xiaohongshu" and (note_url := xiaohongshu_note_url(str(row.get("note_url") or ""))):
             if listing_url(source, note_url) == url:
                 note_links.append((owner, source, url, note_url))
     conn.executemany("""
-        INSERT INTO recruitment_listings (owner, source, url_key, title, company, location, salary, description, url, updated_at, profile)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO recruitment_listings
+            (owner, source, url_key, title, company, location, salary, description, experience, education, url, updated_at, profile)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(owner, source, url_key) DO UPDATE SET
             title=excluded.title, company=excluded.company, location=excluded.location,
             salary=CASE WHEN excluded.salary='' THEN recruitment_listings.salary ELSE excluded.salary END,
+            experience=COALESCE(NULLIF(excluded.experience, ''), recruitment_listings.experience),
+            education=COALESCE(NULLIF(excluded.education, ''), recruitment_listings.education),
             description=excluded.description, url=excluded.url, updated_at=excluded.updated_at,
             profile=CASE WHEN recruitment_listings.profile='general' THEN excluded.profile ELSE recruitment_listings.profile END
     """, records)
@@ -334,7 +339,7 @@ def cleaning_overview():
         return jsonify(message="求职方向无效。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
-    return jsonify(rules=cleaning.load_rules(conn, owner, profile).model_dump(),
+    return jsonify(rules=cleaning.load_rules(conn, owner, profile).model_dump(), examples=cleaning.SCOUT_EXAMPLES,
                    counts=cleaning.stored_counts(conn, owner, profile))
 
 
@@ -353,7 +358,7 @@ def cleaning_update(action):
         rules = cleaning.CleaningRules.model_validate(payload["rules"])
     except ValidationError as error:
         reason = error.errors()[0]
-        message = reason["msg"].removeprefix("Value error, ") if not reason["loc"] else "请输入有效的薪资区间或缩短规则列表。"
+        message = reason["msg"].removeprefix("Value error, ") if not reason["loc"] else "请检查薪资、经验上限或规则条目的格式与数量。"
         return jsonify(message=message), 400
     if profile != "internship" and (rules.min_daily_salary is not None or rules.max_daily_salary is not None):
         return jsonify(message="日薪规则适用于实习方向。"), 400
@@ -372,11 +377,32 @@ def cleaning_update(action):
                 return jsonify(message="岗位或规则已变化，请重新预览后应用。"), 409
             cleaning.write_results(conn, owner, rows)
         previous = cleaning.load_rules(conn, owner, profile)
-        if (previous.semantic_required, previous.semantic_excluded) != (rules.semantic_required, rules.semantic_excluded):
+        if previous.semantic_config() != rules.semantic_config():
             ai.invalidate(conn, owner, profile, "semantic")
         cleaning.save_rules(conn, owner, profile, rules)
         counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(rules=rules.model_dump(), counts=counts)
+
+
+@blueprint.post(API + "/cleaning/describe")
+@_login_required
+def cleaning_describe():
+    try:
+        rule = cleaning.ScoutRule.model_validate(request.get_json(silent=True))
+    except ValidationError:
+        return jsonify(message="请先填写规则关键词。"), 400
+    runtime = llm_env.recruitment_cleaner_runtime()
+    if not all(runtime):
+        return jsonify(message="请先在系统配置中填写招聘清洗模型。"), 400
+    if not ai.SLOTS.acquire(blocking=False):
+        return jsonify(message="AI 任务繁忙，请稍后重试。"), 429
+    try:
+        return jsonify(desc=ai.describe_rule(runtime, rule))
+    except Exception as error:
+        logger.warning("Cleaning rule description failed (%s)", type(error).__name__)
+        return jsonify(message="未能生成判定标准，请检查模型配置后重试。"), 502
+    finally:
+        ai.SLOTS.release()
 
 
 def listing_identity(payload):
@@ -606,7 +632,7 @@ def recruitment_ai_candidates(kind):
 
 def ai_listing(conn, identity):
     return conn.execute(f"""
-        SELECT j.profile, j.title, j.company, j.location, j.salary, j.description,
+        SELECT j.profile, j.title, j.company, j.location, j.salary, j.description, j.experience, j.education,
                COALESCE(d.description, j.description) AS detail,
                n.note_url, r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
                r.reason AS cleaning_reason, a.payload AS semantic_payload,
@@ -624,6 +650,8 @@ def ai_listing(conn, identity):
 def ai_material(row, kind):
     job = {key: row[key] for key in ("title", "company", "location", "salary", "description")}
     job["description"] = row["detail"]
+    if kind == "semantic":
+        job.update(experience=row["experience"], education=row["education"])
     if kind != "vision" and row["vision_payload"]:
         extracted = json.loads(row["vision_payload"])["jobs"]
         if len(extracted) == 1:
@@ -676,7 +704,7 @@ def ai_context(conn, identity, row, kind):
     profile = row["profile"]
     if kind == "semantic":
         rules = cleaning.load_rules(conn, owner, profile)
-        return rules, "", ai.fingerprint([rules.semantic_required, rules.semantic_excluded])
+        return rules, "", ai.fingerprint(rules.semantic_config())
     if kind == "match":
         settings = ai.load_settings(conn, owner, profile)
         resume = ai.resume_text(owner, settings)
@@ -704,8 +732,8 @@ def recruitment_ai_run(kind):
     if kind != "vision" and payload.get("profile") != row["profile"]:
         return jsonify(message="岗位求职方向已变更，请刷新。"), 409
     settings, resume, context = ai_context(conn, identity, row, kind)
-    if kind == "semantic" and not (settings.semantic_required or settings.semantic_excluded):
-        return jsonify(message="请先保存语义规则。"), 400
+    if kind == "semantic" and not any(settings.semantic_config()):
+        return jsonify(message="请先保存 AI 初筛规则。"), 400
     if kind == "match" and not resume:
         return jsonify(message="请先配置本方向的基准简历，或上传并解析简历。"), 400
     runtime = llm_env.chat_runtime() if kind == "match" else llm_env.recruitment_cleaner_runtime()
@@ -779,7 +807,16 @@ def zhilian_job_detail():
     if not text:
         return jsonify(message=SESSION_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
     with conn:
-        conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text))
+        inserted = conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text)).rowcount
+        if inserted:
+            row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
+            rules = cleaning.load_rules(conn, owner, row["profile"])
+            if rules.experience_years_max is not None or rules.require_education or rules.exclude_education:
+                conn.execute("""
+                    DELETE FROM recruitment_cleaning_results
+                    WHERE owner=? AND source=? AND url_key=? AND status <> 'released'
+                """, args)
+                cleaning.apply_ingested(conn, owner, "zhilian", [url])
     return jsonify(description=text)
 
 
@@ -813,7 +850,7 @@ def import_csv():
         reader = csv.DictReader(StringIO(data.decode("utf-8-sig")), strict=True)
         fields = {CSV_ALIASES.get(field, field) for field in reader.fieldnames or ()}
         if "url" not in fields or not fields.intersection({"title", "description"}):
-            return jsonify(message="CSV 表头需要包含链接，以及标题或描述。支持导出文件及 Jobhunter AI 原始列名。"), 400
+            return jsonify(message="CSV 表头需要包含链接，以及标题或描述。兼容 url、job_link、title、job_title、description 和 jd_text。"), 400
         for index, row in enumerate(reader):
             if index >= 3000:
                 return jsonify(message="每次最多导入 3000 条岗位。"), 400

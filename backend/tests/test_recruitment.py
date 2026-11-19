@@ -412,8 +412,46 @@ def test_auto_cleaning_applies_to_imports_and_keeps_uncertain_fields(make_accoun
     assert account.post(endpoint + "/save", json={"rules": {"min_salary_k": 20, "max_salary_k": 10}}).status_code == 400
     assert account.get(endpoint).get_json()["rules"] == {
         **rules, "max_salary_k": None, "min_daily_salary": None, "max_daily_salary": None, "cities": [], "title_exclusions": [],
-        "semantic_required": [], "semantic_excluded": [],
+        "semantic_required": [], "semantic_excluded": [], "experience_years_max": None,
+        "require_education": [], "exclude_education": [], "ai_scout_rules": [],
     }
+
+
+def test_cleaning_hard_requirements_and_structured_scout(make_account, monkeypatch):
+    from services import recruitment
+
+    account = make_account("scout-rules")
+    endpoint = API + "/cleaning"
+    assert len(account.get(endpoint).get_json()["examples"]) == 5
+    assert account.post(endpoint + "/save", json={"rules": {
+        "require_education": ["本科"], "exclude_education": ["大专"],
+    }}).status_code == 400
+    csv = ("platform,job_title,job_link,experience_req,education_req,jd_text\n"
+           "boss,资深,https://www.zhipin.com/job_detail/senior.html,5-8年,本科,负责平台开发\n"
+           "boss,学历,https://www.zhipin.com/job_detail/diploma.html,1-3年,大专,负责平台开发\n"
+           "boss,研发,https://www.zhipin.com/job_detail/dev.html,1-3年,硕士,要求 Python 并接受项目外派\n")
+    assert account.post(API + "/import", data={"file": (BytesIO(csv.encode()), "jobs.csv")}).status_code == 200
+    rules = {"experience_years_max": 5, "require_education": ["本科"], "ai_scout_rules": [
+        {"keyword": "Python", "condition": "must", "desc": "明确要求使用 Python"},
+        {"keyword": "外包", "condition": "never", "desc": "包括项目外派"},
+    ]}
+    preview = account.post(endpoint + "/preview", json={"rules": rules}).get_json()
+    assert preview["counts"] == {"passed": 1, "rejected": 2, "review": 0}
+    assert account.post(endpoint + "/apply", json={"rules": rules, "token": preview["token"]}).status_code == 200
+    assert account.get(endpoint + "?profile=internship").get_json()["rules"]["ai_scout_rules"] == []
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda: ("https://example.test", "key", "cleaner"))
+    outcomes = iter([
+        {"desc": "识别项目外派与劳务派遣。"},
+        {"rules": [{"id": 1, "matches": True, "evidence": "Python"}, {"id": 2, "matches": True, "evidence": "项目外派"}]},
+        {"rules": [{"id": 1, "matches": True, "evidence": "Python"}, {"id": 2, "matches": True, "evidence": "伪造"}]},
+        {"rules": [{"id": 1, "matches": False}, {"id": 2, "matches": False}]},
+    ])
+    monkeypatch.setattr(recruitment.ai, "request_model", lambda *_: next(outcomes))
+    assert account.post(endpoint + "/describe", json=rules["ai_scout_rules"][1]).get_json()["desc"] == "识别项目外派与劳务派遣。"
+    job = {"source": "boss", "url": "https://www.zhipin.com/job_detail/dev.html", "profile": "general"}
+    for expected, keyword in (("rejected", "外包"), ("review", None), ("rejected", "Python")):
+        result = account.post(API + "/ai/run/semantic", json=job).get_json()["result"]
+        assert (result["verdict"], result.get("rule")) == (expected, keyword)
 
 
 def test_recruitment_ai_semantic_and_match_use_separate_models_and_preserve_evidence(make_account, monkeypatch):

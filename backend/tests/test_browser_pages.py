@@ -464,12 +464,22 @@ def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, 
     page.get_by_role("button", name="配置与预览").click()
     dialog = page.get_by_role("dialog", name="清洗规则")
     assert dialog.get_by_role("button", name="应用到现有岗位").is_disabled()
+    assert dialog.get_by_role("button", name="启用示例").is_visible()
+    dialog.get_by_label("目标城市", exact=True).fill("杭州")
+    dialog.get_by_label("目标城市", exact=True).press("Enter")
+    dialog.get_by_role("button", name="移除 杭州").click()
+    dialog.get_by_label("经验上限（年）").fill("5")
+    dialog.get_by_role("button", name="启用示例").click()
+    scout = dialog.locator(".recruitment-scout-row").first
+    scout.get_by_label("判定标准").fill("明确要求每周工作六天时命中")
     dialog.get_by_label("岗位标题排除词").fill("销售")
     dialog.get_by_role("button", name="预览现有岗位").click()
     dialog.get_by_text("淘汰 1 条", exact=True).wait_for()
     assert job.get_by_text("未清洗", exact=True).is_visible()
     dialog.get_by_role("button", name="应用到现有岗位").click()
     dialog.get_by_text("已应用清洗规则。", exact=True).wait_for()
+    assert dialog.get_by_label("经验上限（年）").input_value() == "5"
+    assert scout.get_by_label("判定标准").input_value() == "明确要求每周工作六天时命中"
     dialog.get_by_role("button", name="关闭").click()
     page.get_by_role("button", name="已淘汰", exact=True).click()
     assert job.get_by_text("标题命中排除词「销售」").count() == 0

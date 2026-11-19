@@ -111,13 +111,13 @@ def deduplicate_jobs(jobs):
 def read_jobhunter_jobs(path=None, limit=10000):
     path = Path(path or MARKET_DB)
     if not path.is_file():
-        return {"jobs": [], "status": "not_collected", "limitations": ["JobHunter 尚无本地岗位库，本轮仅使用 Radar 数据。"]}
+        return {"jobs": [], "status": "not_collected", "limitations": ["本地岗位库尚无采集数据，本轮仅使用公开招聘汇总。"]}
     try:
         with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM jobs ORDER BY last_seen DESC,id LIMIT ?", (limit + 1,)).fetchall()
     except sqlite3.Error:
-        return {"jobs": [], "status": "unavailable", "limitations": ["JobHunter 岗位库暂不可读取，本轮保留 Radar 检索结果。"]}
+        return {"jobs": [], "status": "unavailable", "limitations": ["本地岗位库暂不可读取，本轮保留公开招聘汇总结果。"]}
     limited = len(rows) > limit
     types = {"intern": "实习", "graduate": "校招", "experienced": "社招"}
     jobs = []
@@ -128,10 +128,10 @@ def read_jobhunter_jobs(path=None, limit=10000):
             "url": row["job_url"], "announcement_url": "", "industry": row["industry"],
             "description": row["job_desc"], "published_at": row["publish_date"],
             "updated_at": row["last_seen"], "snapshot_at": row["last_seen"],
-            "source_type": "jobhunter", "source_name": "JobHunter · " + row["source_label"],
+            "source_type": "jobhunter", "source_name": "本地岗位库 · " + row["source_label"],
             "source_record_id": row["id"], "source_sheet": "", "detail_state": "not_read",
             "salary": row["salary"], "published_at_source": "jobhunter_listing" if row["publish_date"] else "unverified"})
-    limitations = ["JobHunter 数据来自本地采集记录；最近采集时间不代表公告发布日期或岗位仍开放。"] if jobs else []
+    limitations = ["本地岗位库来自采集记录。公告发布日期和开放状态需另行核实。"] if jobs else []
     if limited:
-        limitations.append(f"JobHunter 本轮最多读取最近采集的 {limit} 条记录，历史岗位覆盖可能不完整。")
+        limitations.append(f"本地岗位库本轮最多读取最近采集的 {limit} 条记录。")
     return {"jobs": jobs, "status": "ok" if jobs else "empty", "limitations": limitations}

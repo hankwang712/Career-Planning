@@ -603,7 +603,7 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
             return await sync_jobs(publish=publish)
         except (httpx.HTTPError, OSError, ValueError):
             cached = read_jobs()
-            cached["limitations"].append("Radar 同步未完成，本轮使用其缓存及 JobHunter 本地岗位。")
+            cached["limitations"].append("公开招聘汇总同步未完成，本轮使用汇总缓存及本地岗位。")
             return {**cached, "status": "partial"}
     data, market = await asyncio.gather(radar_data(), asyncio.to_thread(read_jobhunter_jobs))
     market_jobs = []
@@ -623,7 +623,7 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
     if market["status"] == "unavailable":
         data["status"] = "partial"
     if publish:
-        await publish("merge", title="合并 Radar 与 JobHunter 岗位", **merge_stats)
+        await publish("merge", title="合并公开招聘汇总与本地岗位", **merge_stats)
     roles = list(dict.fromkeys([*intent.get("roles", []), *intent.get("expanded_roles", [])]))
     excluded = {tuple(row) for row in intent.get("_excluded_records", []) if isinstance(row, (list, tuple)) and len(row) == 5}
     ranked, audits = [], []
@@ -670,7 +670,7 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
             "read": job["detail_state"] == "read", "content_preview": job.get("description", "")[:1000]}
         audits.append(audit)
         if publish:
-            await publish("candidate", query="Radar 与 JobHunter 合并岗位检索", **audit)
+            await publish("candidate", query="公开招聘汇总与本地岗位检索", **audit)
     return {"status": data["status"], "jobs": selected, "total_records": len(data["jobs"]), "matched_records": len(ranked),
         "candidates": audits, "limitations": data["limitations"], "mode": data["mode"], "fetched_at": data.get("fetched_at"),
         "merge_stats": merge_stats}

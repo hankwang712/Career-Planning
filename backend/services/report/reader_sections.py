@@ -144,9 +144,12 @@ def recruitment_review(results, presentation):
         parts.append(f"### {index}. " + title)
         metadata = []
         if source.get("origin") == "radar":
-            kind = {"aggregate": "公开招聘汇总", "snapshot": "历史快照", "official_site": "企业官网或公告", "import": "导入记录", "jobhunter": "JobHunter 岗位库"}.get(source.get("source_type"), "招聘来源")
+            kind = {"aggregate": "公开招聘汇总", "snapshot": "历史快照", "official_site": "企业官网或公告", "import": "导入记录", "jobhunter": "本地岗位库"}.get(source.get("source_type"), "招聘来源")
             metadata.append("来源：招聘雷达 · " + kind)
-            origins = list(dict.fromkeys(row.get("source_name") for row in source.get("provenance", []) if row.get("source_name")))
+            origins = list(dict.fromkeys(
+                re.sub(r"(?i)^jobhunter(?: ai)?\b", "本地岗位库", row["source_name"])
+                for row in source.get("provenance", []) if row.get("source_name")
+            ))
             if origins:
                 metadata.append("采集来源：" + "、".join(origins))
         if job.get("city"):

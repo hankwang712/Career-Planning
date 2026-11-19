@@ -116,7 +116,7 @@ def main():
         emit("finished", status=status, message=message)
         return 0
     except Exception:
-        logging.exception("JobHunter source failed")
+        logging.exception("Recruitment site source failed")
         emit("finished", status="failed", message="来源未完成采集，请检查网络、来源可用性或浏览器运行环境。")
         return 1
 
