@@ -8,13 +8,13 @@ import re
 
 import httpx
 from dotenv import dotenv_values
-from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, g, jsonify, render_template, request
 from openai import APIConnectionError, APIStatusError, OpenAI
 
 from . import llm_env, runtime_settings
 from .environment import ENV_FILE
 from .llm_calls import normalize_sdk_base_url
-from .user_state import _current_user, _login_required, _super_admin_required
+from .user_state import _current_user, _login_required
 
 blueprint = Blueprint("workspace_tools", __name__)
 recent_requests = deque(maxlen=2000)
@@ -31,18 +31,14 @@ def extra_env_keys():
 
 @blueprint.get("/system-settings")
 def settings_page():
-    user = _current_user()
-    if not user:
-        return redirect(url_for("site.index"))
-    can_edit = user["role"] == "super_admin"
     deployment_groups = runtime_settings.DEPLOYMENT_GROUPS
-    extra = extra_env_keys() if can_edit else ()
+    extra = extra_env_keys()
     if extra:
         deployment_groups += (("other", "其他环境变量", "列出本地 .env 中额外定义的变量及配置状态。",
                                tuple((key, "环境变量") for key in extra)),)
     return render_template(
         "system_settings.html", groups=runtime_settings.GROUPS,
-        deployment_groups=deployment_groups, can_edit=can_edit, test_groups=TEST_GROUPS,
+        deployment_groups=deployment_groups, can_edit=True, test_groups=TEST_GROUPS,
     )
 
 
@@ -63,7 +59,6 @@ def settings_state(can_edit=True):
 
 
 @blueprint.route("/api/system-settings/models", methods=["GET", "PATCH"])
-@_super_admin_required
 def models():
     if request.method == "PATCH":
         changes = request.get_json(silent=True)
@@ -92,11 +87,10 @@ def models():
 @blueprint.get("/api/system-settings/status")
 @_login_required
 def model_status():
-    return jsonify(fields=settings_state(can_edit=_current_user()["role"] == "super_admin"))
+    return jsonify(fields=settings_state())
 
 
 @blueprint.post("/api/system-settings/reveal")
-@_super_admin_required
 def reveal_model_secret():
     data = request.get_json(silent=True)
     key = data.get("key") if isinstance(data, dict) else None
@@ -122,7 +116,6 @@ def probe_runtime(group):
 
 
 @blueprint.post("/api/system-settings/test/<group>")
-@_super_admin_required
 def test_connection(group):
     if group not in TEST_GROUPS:
         return jsonify(message="这个分组不支持连通性测试。"), 404

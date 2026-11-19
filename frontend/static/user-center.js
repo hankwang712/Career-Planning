@@ -99,43 +99,6 @@ function getUserCenterReportModuleConfig(moduleKey = "") {
   return modules[normalizeUserCenterReportModule(moduleKey)] || null;
 }
 
-function setUserCenterPasswordMessage(message, tone = "info") {
-  const el = document.getElementById("ucPasswordMessage");
-  if (!el) return;
-  el.textContent = message || "";
-  el.style.color = tone === "error" ? "#dc2626" : tone === "success" ? "#047857" : "#64748b";
-}
-
-async function submitUserCenterPassword(event) {
-  if (event) event.preventDefault();
-  const currentPassword = document.getElementById("ucCurrentPassword")?.value || "";
-  const newPassword = document.getElementById("ucNewPassword")?.value || "";
-  const confirmPassword = document.getElementById("ucConfirmPassword")?.value || "";
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    setUserCenterPasswordMessage("请完整填写当前密码、新密码和确认密码。", "error");
-    return;
-  }
-  setUserCenterPasswordMessage("正在更新密码…");
-  try {
-    const payload = await requestJson("/api/auth/password", {
-      method: "PUT",
-      body: {
-        current_password: currentPassword,
-        new_password: newPassword,
-        confirm_password: confirmPassword
-      }
-    });
-    ["ucCurrentPassword", "ucNewPassword", "ucConfirmPassword"].forEach((id) => {
-      const input = document.getElementById(id);
-      if (input) input.value = "";
-    });
-    setUserCenterPasswordMessage(payload?.message || "密码已更新。", "success");
-    showToast("密码已更新", "下次登录请使用新密码。", "success", 1800);
-  } catch (error) {
-    setUserCenterPasswordMessage(error.message || "密码更新失败。", "error");
-  }
-}
-
 function switchUserCenterSection(sectionId, options = {}) {
   const nextSection = normalizeUserCenterSection(sectionId);
   userCenterState.activeSection = nextSection;
@@ -1106,17 +1069,14 @@ function renderUserCenterIdentity() {
   if (!user) return;
 
   const displayName = user.display_name || user.displayName || user.username || "用户";
-  const roleLabel = user.role === "super_admin" ? "系统管理员" : "普通用户";
   const avatarState = getUserCenterAvatarState();
   const avatarUrl = avatarState?.source === "uploaded" ? String(avatarState.image_url || "").trim() : "";
 
   const nameEl = document.getElementById("upName");
-  const roleEl = document.getElementById("upRoleTag");
   const stageEl = document.getElementById("userCenterAvatarStage");
   const hintEl = document.getElementById("userCenterAvatarHint");
   const removeBtn = document.getElementById("userCenterAvatarRemoveBtn");
   if (nameEl) nameEl.textContent = displayName;
-  if (roleEl) roleEl.textContent = roleLabel;
 
   if (stageEl) {
     if (avatarUrl) {
@@ -1129,7 +1089,7 @@ function renderUserCenterIdentity() {
   if (hintEl) {
     hintEl.textContent = avatarUrl
       ? `当前头像最近更新于 ${avatarState?.updated_at || "--"}。`
-      : "支持本地图片上传，并在裁切框中调整后保存为账号头像。";
+      : "上传本地图片并裁剪，保存为工作区头像。";
   }
   if (removeBtn) removeBtn.classList.toggle("hidden", !avatarUrl);
 
@@ -1455,11 +1415,10 @@ window.setUserCenterReportModule = setUserCenterReportModule;
 window.getUserCenterReportViewMode = () => normalizeUserCenterReportViewMode(userCenterState.reportViewMode);
 window.getUserCenterReportWorkspaceMode = () => normalizeUserCenterReportWorkspaceMode(userCenterState.reportWorkspaceMode);
 window.getUserCenterReportModule = () => normalizeUserCenterReportModule(userCenterState.reportModule);
-window.submitUserCenterPassword = submitUserCenterPassword;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindUserCenterEvents();
-  Promise.resolve(initAuth()).finally(async () => {
+  Promise.resolve(initWorkspace()).finally(async () => {
     if (typeof _loadCareerPlans === "function") {
       await _loadCareerPlans();
     }

@@ -7,7 +7,7 @@ import pytest
 EXPECTED_ROUTES = {
     "/", "/main.html", "/user-center", "/user-center/career-report/polish", "/resume-report",
     "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow", "/app_data/<path:filename>",
-    "/api/auth/status", "/api/auth/login", "/api/auth/register", "/api/auth/logout",
+    "/api/workspace/security",
     "/api/llm-status", "/api/bootstrap", "/api/user-state/<scope>",
     "/api/career-news", "/api/news-kb/stats", "/api/news-kb/search",
     "/api/profile-portrait/generate",
@@ -38,9 +38,13 @@ def test_route_endpoints_are_unique_per_rule_and_method(server):
             seen[key] = rule.endpoint
 
 
-@pytest.mark.parametrize("path", ["/", "/api/auth/status", "/api/career-news", "/api/cities", "/api/jobs/bootstrap"])
+@pytest.mark.parametrize("path", ["/", "/api/bootstrap", "/api/career-news"])
 def test_public_pages_and_data_are_reachable_without_login(client, path):
-    assert client.get(path).status_code == 200
+    assert client.get(path, follow_redirects=True).status_code == 200
+
+
+def test_workspace_home_opens_recruitment(client):
+    assert client.get("/").location == "/recruitment"
 
 
 def test_healthz_is_a_login_free_liveness_probe(client):
@@ -52,10 +56,8 @@ def test_healthz_is_a_login_free_liveness_probe(client):
     "/user-center", "/user-center/workspace", "/user-center/resumes", "/resume-report", "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow",
     "/user-center/career-report/polish",
 ])
-def test_private_pages_redirect_anonymous_visitors_to_login(client, path):
-    response = client.get(path)
-    assert response.status_code == 302
-    assert response.headers["Location"].rsplit("/", 1)[-1] in {"", "main.html"}
+def test_workspace_pages_open_without_login(client, path):
+    assert client.get(path, follow_redirects=True).status_code == 200
 
 
 @pytest.mark.parametrize("method,path", [
@@ -65,14 +67,14 @@ def test_private_pages_redirect_anonymous_visitors_to_login(client, path):
     ("post", "/api/career-interview"), ("post", "/api/mbti-clarifier"), ("post", "/api/deep-test-analysis"),
     ("post", "/api/profile-portrait/generate"), ("get", "/api/career-report/export"),
 ])
-def test_private_api_rejects_anonymous_requests(client, method, path):
-    response = getattr(client, method)(path)
-    assert response.status_code == 401, (method, path, response.status_code)
+def test_workspace_api_rejects_remote_requests(client, method, path):
+    response = getattr(client, method)(path, environ_overrides={"REMOTE_ADDR": "192.0.2.15"})
+    assert response.status_code == 403, (method, path, response.status_code)
 
 
 def test_private_responses_are_not_cacheable(make_account):
     account = make_account()
-    response = account.get("/api/auth/status")
+    response = account.get("/api/bootstrap")
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["X-Content-Type-Options"] == "nosniff"

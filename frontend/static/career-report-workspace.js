@@ -6503,17 +6503,17 @@
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      const authReady = typeof window.initAuth === "function"
-        ? window.initAuth()
-        : (typeof initAuth === "function" ? initAuth() : null);
+      const authReady = typeof window.initWorkspace === "function"
+        ? window.initWorkspace()
+        : (typeof initWorkspace === "function" ? initWorkspace() : null);
       Promise.resolve(authReady).finally(() => {
         void initializeRestoration();
       });
     }, { once: true });
   } else {
-    const authReady = typeof window.initAuth === "function"
-      ? window.initAuth()
-      : (typeof initAuth === "function" ? initAuth() : null);
+    const authReady = typeof window.initWorkspace === "function"
+      ? window.initWorkspace()
+      : (typeof initWorkspace === "function" ? initWorkspace() : null);
     Promise.resolve(authReady).finally(() => {
       void initializeRestoration();
     });

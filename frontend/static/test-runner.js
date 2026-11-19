@@ -148,7 +148,7 @@
   function updateTopUser(user) {
     const label = document.getElementById("currentUserLabel");
     const avatar = document.getElementById("currentUserAvatar");
-    const display = String(user?.display_name || user?.displayName || user?.username || "未登录");
+    const display = String(user?.display_name || user?.displayName || user?.username || "个人工作区");
     if (label) label.textContent = display;
     if (avatar) avatar.textContent = display.slice(0, 1).toUpperCase();
   }
@@ -468,16 +468,6 @@
     const backBtn = document.getElementById("tsBackBtn");
     if (backBtn) backBtn.addEventListener("click", toMainProfile);
 
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        try {
-          await requestJson("/api/auth/logout", { method: "POST" });
-        } catch (_) {}
-        window.location.href = "/main.html";
-      });
-    }
-
     const avatarBtn = document.getElementById("tsAvatarBtn");
     if (avatarBtn) avatarBtn.addEventListener("click", goUserCenter);
 
@@ -486,10 +476,9 @@
     });
   }
 
-  async function initAuth() {
-    const payload = await requestJson("/api/auth/status");
+  async function initWorkspace() {
+    const payload = await requestJson("/api/bootstrap");
     if (!payload || !payload.authenticated || !payload.user) {
-      window.location.href = "/main.html";
       return false;
     }
     state.user = payload.user;
@@ -505,7 +494,7 @@
       if (textEl) textEl.textContent = "测试引擎未加载，请刷新页面重试。";
       return;
     }
-    const ok = await initAuth().catch(() => false);
+    const ok = await initWorkspace().catch(() => false);
     if (!ok) return;
     // Expose authenticated user so deep-test-hub uses the correct username for localStorage keys
     window.getCurrentUser = () => state.user;

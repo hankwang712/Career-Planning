@@ -184,7 +184,7 @@ asgi_app = create_chat_app(app, service=_chat_blueprint.chat_service, current_us
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
+    host = "0.0.0.0" if os.environ.get("CAREER_CONTAINER") == "1" else "127.0.0.1"
     port = int(os.environ.get("PORT", "8080"))
     auto_open_browser = os.environ.get("AUTO_OPEN_BROWSER", "").lower() in {"1", "true", "yes"}
     print("=" * 50)
@@ -199,4 +199,4 @@ if __name__ == "__main__":
     if auto_open_browser:
         threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run(asgi_app, host=host, port=port)
+    uvicorn.run(asgi_app, host=host, port=port, proxy_headers=False)

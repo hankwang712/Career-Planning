@@ -24,7 +24,7 @@ const viteBin = useViteDevServer
   ? path.join(path.dirname(frontendRequire.resolve("vite/package.json")), "bin", "vite.js")
   : null;
 
-const host = process.env.HOST || "0.0.0.0"; 
+const host = process.env.CAREER_CONTAINER === "1" ? "0.0.0.0" : "127.0.0.1";
 const port = process.env.PORT || "8080";
 
 // 强制 Node.js 标准流使用 UTF-8，避免 Windows 控制台中文乱码
@@ -108,7 +108,6 @@ const pythonProc = spawnTagged(
   ["backend/server.py"],
   "backend",
   {
-    HOST: host,
     PORT: port,
     VITE_DEV_SERVER_URL: useViteDevServer ? viteOrigin : "",
     PYTHONIOENCODING: "utf-8",
@@ -119,7 +118,7 @@ const pythonProc = spawnTagged(
 const viteProc = useViteDevServer
   ? spawnTagged(
       process.execPath,
-      [viteBin, "--config", path.join(frontendDir, "vite.config.mjs"), "--host", "0.0.0.0", "--port", "5173"],
+      [viteBin, "--config", path.join(frontendDir, "vite.config.mjs"), "--host", "127.0.0.1", "--port", "5173"],
       "vite"
     )
   : null;

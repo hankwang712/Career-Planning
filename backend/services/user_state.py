@@ -174,18 +174,6 @@ def _login_required(view_func):
     return wrapper
 
 
-def _super_admin_required(view_func):
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        user = _current_user()
-        if not user:
-            return jsonify({"message": "请先登录。"}), 401
-        if user.get("role") != "super_admin":
-            return jsonify({"message": "当前账号无权修改系统模型配置。"}), 403
-        return view_func(*args, **kwargs)
-    return wrapper
-
-
 def _user_state_path(username):
     safe_name = re.sub(r"[^0-9A-Za-z_.-]", "_", str(username or "").strip())
     return os.path.join(USER_STATE_DIR, f"{safe_name}.json")

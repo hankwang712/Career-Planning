@@ -1047,7 +1047,7 @@ function handleCareerInterviewInputKeydown(event) {
 async function requestCareerInterview(messages) {
   const config = getStoredCareerInterviewConfig();
   if (!config.configured) {
-    throw new Error("职业访谈模型尚未由系统管理员配置。");
+    throw new Error("请先在系统配置中设置职业访谈使用的模型。");
   }
   return requestJson("/api/career-interview", {
     method: "POST",

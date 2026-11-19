@@ -230,19 +230,20 @@ def test_policy_immediate_flag_wins():
 
 def test_asgi_app_serves_chat_api_and_the_flask_site(server):
     """聊天走 FastAPI，其余页面通过 a2wsgi 交给 Flask；两边都要可用。"""
-    client = TestClient(server.asgi_app)
+    client = TestClient(server.asgi_app, base_url="http://localhost", client=("127.0.0.1", 40000))
     health = client.get("/api/chat/health")
     assert health.status_code == 200
-    assert client.get("/api/chat/sessions").status_code == 401
+    assert client.get("/api/chat/sessions").status_code == 200
+    assert client.get("/api/chat/sessions", headers={"Host": "external.example"}).status_code == 403
     page = client.get("/")
     assert page.status_code == 200 and "text/html" in page.headers["content-type"]
-    assert client.get("/api/auth/status").json()["authenticated"] is False
-    assert client.get("/api/cities").status_code == 200
+    assert client.get("/api/bootstrap").json()["user"]["username"]
+    assert client.get("/api/career-news").status_code == 200
 
 
 def test_asgi_chat_requires_csrf_for_writes(server, make_account):
     account = make_account("chatter")
-    client = TestClient(server.asgi_app)
+    client = TestClient(server.asgi_app, base_url="http://localhost", client=("127.0.0.1", 40000))
     headers = {"Cookie": "session=" + account.client.get_cookie("session").value}
     assert client.get("/api/chat/sessions", headers=headers).status_code == 200
     assert client.post("/api/chat/sessions", headers=headers, json={}).status_code == 403

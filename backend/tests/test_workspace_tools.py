@@ -20,12 +20,12 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
         "AI_CHAT_MODEL": "web-model",
     }
 
-    assert user.get(endpoint).status_code == 403
+    assert user.get(endpoint).status_code == 200
     assert user.get("/system-settings").status_code == 200
-    assert user.request("patch", endpoint, json=changes).status_code == 403
+    assert user.request("patch", endpoint, json=changes, headers={"Origin": "https://external.example"}).status_code == 403
     assert admin.client.patch(endpoint, json=changes).status_code == 403
     assert admin.get("/system-settings").status_code == 200
-    assert "/system-settings" in admin.get("/").get_data(as_text=True)
+    assert "/system-settings" in admin.get("/", follow_redirects=True).get_data(as_text=True)
     assert admin.request("patch", endpoint, json={**changes, "POSTGRES_PASSWORD": "test"}).status_code == 400
     assert admin.request("patch", endpoint, json={"AI_CHAT_BASE_URL": "https://example.test/?api_key=secret"}).status_code == 400
 
@@ -34,7 +34,7 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     assert "test-secret" not in saved.get_data(as_text=True)
     assert saved.get_json()["fields"]["AI_CHAT_API_KEY"] == {"configured": True, "override": True}
     reveal = "/api/system-settings/reveal"
-    assert user.post(reveal, json={"key": "AI_CHAT_API_KEY"}).status_code == 403
+    assert user.post(reveal, json={"key": "AI_CHAT_API_KEY"}, headers={"Origin": "https://external.example"}).status_code == 403
     assert admin.client.post(reveal, json={"key": "AI_CHAT_API_KEY"}).status_code == 403
     assert admin.post(reveal, json={"key": "POSTGRES_PASSWORD"}).status_code == 400
     revealed = admin.post(reveal, json={"key": "AI_CHAT_API_KEY"})
@@ -46,7 +46,7 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     overview = user.get("/api/system-settings/status").get_json()["fields"]
     assert "POSTGRES_PASSWORD" in overview
     assert overview["AI_CHAT_BASE_URL"]["configured"]
-    assert all("value" not in field for field in overview.values())
+    assert "value" not in overview["AI_CHAT_API_KEY"]
     assert admin.request("patch", endpoint, json={"AI_CHAT_MODEL": ""}).status_code == 200
     assert llm_env.chat_runtime()[2] == "deployment-model"
 
@@ -59,7 +59,6 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     assert 'id="CLEANER_VISION_MODEL"' not in settings_page
     assert 'id="USE_MAIN_LLM_FOR_CLEANER"' not in settings_page
     assert llm_env.recruitment_cleaner_runtime() == llm_env.chat_runtime()
-    assert user.request("patch", endpoint, json=cleaner).status_code == 403
     updated = admin.request("patch", endpoint, json=cleaner)
     assert updated.status_code == 200 and "cleaner-secret" not in updated.get_data(as_text=True)
     assert llm_env.recruitment_cleaner_runtime() == ("https://clean.example/v1", "cleaner-secret", "clean-multimodal")
@@ -86,7 +85,7 @@ def test_connection_probes_the_saved_model_without_returning_provider_payload(ma
     net = SimpleNamespace(Client=lambda **kwargs: httpx.Client(transport=httpx.MockTransport(provider), **kwargs),
                           HTTPError=httpx.HTTPError)
     monkeypatch.setattr(workspace_tools, "httpx", net)
-    assert user.post(endpoint).status_code == 403
+    assert user.post(endpoint, headers={"Origin": "https://external.example"}).status_code == 403
     assert admin.client.post(endpoint).status_code == 403
     response = admin.post(endpoint, json={"base_url": "https://ignored.example"})
     assert response.status_code == 200
@@ -104,9 +103,9 @@ def test_connection_probes_the_saved_model_without_returning_provider_payload(ma
 def test_request_console_is_scoped_and_omits_request_data(server, make_account):
     first = make_account("log-first")
     second = make_account("log-second")
-    assert server.app.test_client().get("/api/workspace-logs").status_code == 401
+    assert server.app.test_client().get("/api/workspace-logs").status_code == 200
     first.get("/api/llm-status?private=secret-query")
-    asgi = TestClient(server.asgi_app)
+    asgi = TestClient(server.asgi_app, base_url="http://localhost", client=("127.0.0.1", 40000))
     session = first.client.get_cookie(server.app.config["SESSION_COOKIE_NAME"])
     assert asgi.get("/api/chat/sessions", headers={"Cookie": f"{session.key}={session.value}"}).status_code == 200
     response = first.get("/api/workspace-logs")

@@ -311,15 +311,9 @@
     const accountFocus = document.getElementById("upAccountFocusRole");
     const accountSummary = document.getElementById("upAccountSummary");
     const accountNext = document.getElementById("upAccountNextAction");
-    const accountHint = document.getElementById("upAccountPermissionHint");
     if (accountFocus) accountFocus.textContent = focusRole;
     if (accountSummary) accountSummary.textContent = "该面板会持续同步你的岗位状态、计划执行与报告进展。";
     if (accountNext) accountNext.textContent = "先做最小可执行动作";
-    if (accountHint) {
-      accountHint.textContent = user?.role === "super_admin"
-        ? "你当前是 system 用户，可管理模型与 API 配置。"
-        : "普通用户可维护个人进度与计划，系统配置由管理员维护。";
-    }
 
     const signals = document.getElementById("upReportSignals");
     if (signals) {

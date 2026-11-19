@@ -13,7 +13,6 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        "src/entries/login.js": path.join(ROOT_DIR, "src", "entries", "login.js"),
         "src/entries/workspace.js": path.join(ROOT_DIR, "src", "entries", "workspace.js"),
         "src/entries/user-center.js": path.join(ROOT_DIR, "src", "entries", "user-center.js"),
         "src/entries/resume-report.js": path.join(ROOT_DIR, "src", "entries", "resume-report.js"),

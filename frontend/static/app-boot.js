@@ -101,7 +101,7 @@ window.buildReportRoleRankingsForPayload = buildReportRoleRankingsForPayload;
 window.continueCareerReportWorkflow = continueCareerReportWorkflow;
 
 document.addEventListener("DOMContentLoaded", function () {
-  const authReady = initAuth();
+  const authReady = initWorkspace();
   initCharts();
   initAnimations();
   bindGlobalEvents();

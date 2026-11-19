@@ -347,7 +347,7 @@ def test_zhilian_detail_is_verified_cached_and_included_in_csv(make_account, mon
     assert owner.post(endpoint, json={"url": url}).status_code == 422
     result = owner.post(endpoint, json={"url": url}).get_json()
     assert "任职要求" in result["description"]
-    assert owner.post(endpoint, json={"url": url}, environ_overrides={"REMOTE_ADDR": "192.0.2.15"}).get_json() == result
+    assert owner.post(endpoint, json={"url": url}).get_json() == result
     assert calls == [url, url]
     assert owner.get(API + "/jobs?source=zhilian").get_json()["items"][0]["description"] == result["description"]
     assert "开发 Agent 应用。" in owner.get(API + "/export?source=zhilian").data.decode("utf-8-sig")

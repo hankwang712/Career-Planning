@@ -86,7 +86,11 @@ def collect_errors(page):
             errors.append(f"console: {message.text} ({origin})")
 
     page.on("console", on_console)
-    page.on("requestfailed", lambda request: errors.append(f"requestfailed: {request.url}") if request.url.startswith("http://127.0.0.1") else None)
+    def on_request_failed(request):
+        if request.url.startswith("http://127.0.0.1") and request.failure != "net::ERR_ABORTED":
+            errors.append(f"requestfailed: {request.url}")
+
+    page.on("requestfailed", on_request_failed)
     return errors
 
 
@@ -100,9 +104,31 @@ def test_page_loads_without_script_errors(logged_in_page, live_server, path):
     assert errors == [], f"{path}:\n" + "\n".join(errors)
 
 
+def test_fresh_browser_opens_the_local_workspace(browser, live_server):
+    page = browser.new_page()
+    try:
+        page.add_init_script("localStorage.setItem('tg_done', '1')")
+        page.route("**/*", lambda route: route.continue_() if route.request.url.startswith(live_server) else route.abort())
+        errors = collect_errors(page)
+        page.goto(live_server)
+        page.wait_for_url("**/recruitment")
+        assert page.get_by_role("heading", name="招聘信息采集").is_visible()
+        assert page.get_by_text("返回工作台").count() == 0
+        page.get_by_role("link", name="仪表盘").click()
+        page.locator("#dashboard").wait_for(state="visible")
+        page.wait_for_function("window.getCurrentUser?.()?.username")
+        assert page.locator("#startupScreen, #loginForm, #logoutBtn").count() == 0
+        page.get_by_role("button", name="关闭引导").click()
+        page.get_by_role("button", name="工作区菜单").click()
+        assert page.get_by_role("menuitem", name="个人中心").is_visible()
+        assert errors == []
+    finally:
+        page.close()
+
+
 def test_workspace_exposes_the_functions_other_scripts_call(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
-    logged_in_page.goto(live_server + "/", wait_until="load")
+    logged_in_page.goto(live_server + "/main.html", wait_until="load")
     logged_in_page.wait_for_timeout(1500)
     missing = logged_in_page.evaluate(
         "names => names.filter(name => typeof window[name] !== 'function')", REQUIRED_GLOBALS)
@@ -122,7 +148,7 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page = context.new_page()
         page.route("**/*", lambda route: route.abort() if not route.request.url.startswith(live_server) else route.continue_())
         errors = collect_errors(page)
-        page.goto(live_server)
+        page.goto(live_server + "/main.html")
         guide = page.get_by_role("dialog", name="新手引导")
         guide.wait_for(timeout=8000)
         guide.get_by_role("link", name="去系统配置 →").click()
@@ -612,8 +638,8 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     assert downloaded.value.suggested_filename == "产品开发简历.pdf"
     with pymupdf.open(downloaded.value.path()) as document:
         assert document[0].get_images()[0][2:4] == (144, 187)
-    page.get_by_role("link", name="账户设置").click()
-    page.get_by_role("button", name="账户设置").and_(page.locator("[aria-current=page]")).wait_for()
+    page.get_by_role("link", name="工作区外观").click()
+    page.get_by_role("button", name="工作区外观").and_(page.locator("[aria-current=page]")).wait_for()
     page.get_by_role("link", name="返回主工作台").click()
     page.wait_for_url("**/main.html#dashboard")
     page.locator('button[data-section="dashboard"]').wait_for()
@@ -622,11 +648,11 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
 
 def test_switching_sections_works(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
-    logged_in_page.goto(live_server + "/#forum", wait_until="load")
+    logged_in_page.goto(live_server + "/main.html#forum", wait_until="load")
     logged_in_page.wait_for_timeout(1200)
     assert logged_in_page.locator("#dashboard").is_visible()
     assert logged_in_page.locator('[data-section="forum"], #forum').count() == 0
-    for section in ("jobs", "profile", "report", "dashboard"):
+    for section in ("profile", "report", "dashboard"):
         logged_in_page.evaluate("section => window.showSection(section)", section)
         logged_in_page.wait_for_timeout(400)
     assert errors == [], "\n".join(errors)

@@ -64,43 +64,6 @@ function addMonths(date, count) {
   return d;
 }
 
-function getActiveAuthFeedbackEl() {
-  if (!document.getElementById("loginAuthFeedback")) {
-    return document.getElementById("authMessage");
-  }
-  const startupScreen = document.getElementById("startupScreen");
-  const isLogin = startupScreen ? startupScreen.classList.contains("auth-mode-login") : true;
-  return document.getElementById(isLogin ? "loginAuthFeedback" : "registerAuthFeedback");
-}
-
-function clearInactiveAuthFeedback(isLogin) {
-  const otherId = isLogin ? "registerAuthFeedback" : "loginAuthFeedback";
-  const other = document.getElementById(otherId);
-  if (!other) return;
-  other.textContent = "";
-  other.className = "auth-feedback";
-  other.setAttribute("role", "status");
-}
-
-function showAuthMessage(message, type = "info") {
-  const el = getActiveAuthFeedbackEl();
-  if (!el) return;
-  const isInline = el.id === "loginAuthFeedback" || el.id === "registerAuthFeedback";
-  el.textContent = message || "";
-  if (isInline) {
-    el.className = "auth-feedback";
-    if (type === "success") el.classList.add("success");
-    else if (type === "error") el.classList.add("error");
-    else if (type === "warning") el.classList.add("warning");
-    else el.classList.add("is-muted");
-    el.setAttribute("role", type === "error" ? "alert" : "status");
-    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
-  } else {
-    el.className = "auth-message";
-    if (type === "success" || type === "error" || type === "warning") el.classList.add(type);
-  }
-}
-
 function showToast(title, text = "", type = "info", duration = 2200) {
   const container = document.getElementById("toastContainer");
   if (!container) return;
@@ -192,12 +155,9 @@ function emitAuthStateChange() {
 }
 
 async function requestJson(url, options = {}) {
-  const owner = getCurrentUser()?.username || "";
-  const epoch = accountRequestEpoch;
-  const accountBound = /^\/api\/(user-state\/|resume\/|career-report\/|career-profile|job-market|profile|account|career-interview|llm|resume-llm|deep-test|tools\/)/.test(url);
   const method = String(options.method || "GET").toUpperCase();
   const headers = { ...(options.headers || {}) };
-  if ((url.startsWith("/api/auth/") || url.startsWith("/api/career-profile") || url.startsWith("/api/job-market")) && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+  if ((url.startsWith("/api/career-profile") || url.startsWith("/api/job-market")) && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
     Object.assign(headers, await window.CareerAuth.headers());
   }
   let body = options.body;
@@ -206,7 +166,7 @@ async function requestJson(url, options = {}) {
     body = JSON.stringify(body);
   }
   const isGetWithoutBody = method === "GET" && !body;
-  const dedupeKey = isGetWithoutBody ? `${owner}::${epoch}::${method}::${url}::${JSON.stringify(headers)}` : "";
+  const dedupeKey = isGetWithoutBody ? `${method}::${url}::${JSON.stringify(headers)}` : "";
   if (isGetWithoutBody && inFlightGetRequests.has(dedupeKey)) {
     return inFlightGetRequests.get(dedupeKey);
   }
@@ -221,41 +181,8 @@ async function requestJson(url, options = {}) {
     });
 
     const payload = await response.json().catch(() => ({}));
-    const responseOwner = decodeURIComponent(response.headers.get("X-Workspace-Owner") || "");
-    if (!url.startsWith("/api/auth/") && (accountBound || responseOwner)) {
-      if (owner !== (getCurrentUser()?.username || "") || epoch !== accountRequestEpoch || (responseOwner && responseOwner !== owner)) {
-        const error = new Error("账号已切换，本次请求的结果已丢弃。");
-        error.code = "ACCOUNT_CHANGED";
-        if (responseOwner && responseOwner !== owner && epoch === accountRequestEpoch) window.location.reload();
-        throw error;
-      }
-    }
     if (!response.ok) {
-      if (response.status === 401) {
-        userWorkspaceState.currentUser = null;
-        userWorkspaceState.scopedData.career_interview = null;
-        userWorkspaceState.scopedData.assessment_hub = null;
-        userWorkspaceState.scopedData.resume_profile = null;
-        userWorkspaceState.scopedData.career_report = null;
-        userWorkspaceState.scopedData.profile_portrait = null;
-        userWorkspaceState.scopedData.account_avatar = null;
-        userWorkspaceState.scopedData.profile_snapshot = null;
-        userWorkspaceState.scopedData.career_matching = null;
-        userWorkspaceState.scopedData.news_context = null;
-        userWorkspaceState.scopedDataLoaded.career_interview = false;
-        userWorkspaceState.scopedDataLoaded.assessment_hub = false;
-        userWorkspaceState.scopedDataLoaded.resume_profile = false;
-        userWorkspaceState.scopedDataLoaded.career_report = false;
-        userWorkspaceState.scopedDataLoaded.profile_portrait = false;
-        userWorkspaceState.scopedDataLoaded.account_avatar = false;
-        userWorkspaceState.scopedDataLoaded.profile_snapshot = false;
-        userWorkspaceState.scopedDataLoaded.career_matching = false;
-        userWorkspaceState.scopedDataLoaded.news_context = false;
-        if (typeof lockApp === "function") lockApp();
-        emitAuthStateChange();
-      }
-      const error = new Error(payload.message || `请求失败：${response.status}`);
-      error.status = response.status;
+      const error = Object.assign(new Error(payload.message || `请求失败：${response.status}`), { status: response.status, code: payload.code });
       throw error;
     }
     return payload;

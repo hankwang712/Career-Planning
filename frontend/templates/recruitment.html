@@ -12,8 +12,12 @@
 <body>
     <header class="recruitment-top">
         <div>
-            <a class="recruitment-brand" href="{{ url_for('site.index') }}"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="">智航生涯</a>
-            <a class="recruitment-back" href="{{ url_for('site.index', _anchor='jobs') }}">← 返回岗位探索</a>
+            <a class="recruitment-brand" href="{{ url_for('site.home') }}"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="">智航生涯</a>
+            <nav class="recruitment-nav" aria-label="工作区">
+                <a href="{{ url_for('site.index', _anchor='dashboard') }}">仪表盘</a>
+                <a href="{{ url_for('resume_editor.index') }}">我的简历</a>
+                <a href="{{ url_for('workspace_tools.settings_page') }}">系统配置</a>
+            </nav>
         </div>
     </header>
     <main class="recruitment-main">

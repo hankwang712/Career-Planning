@@ -278,7 +278,7 @@
   }
 
   function setUser(user) {
-    const name = String(user?.display_name || user?.displayName || user?.username || "未登录");
+    const name = String(user?.display_name || user?.displayName || user?.username || "个人工作区");
     const chip = $("#rrCurrentUser"), avatar = $("#rrAvatarBtn");
     if (chip) chip.textContent = name;
     if (avatar) avatar.textContent = name.slice(0, 1).toUpperCase();
@@ -297,10 +297,6 @@
       const btn = e.target.closest(".nav-tab");
       if (btn) switchTab(Number(btn.dataset.tabIndex || 0));
     });
-    $("#rrLogoutBtn")?.addEventListener("click", async () => {
-      try { await json("/api/auth/logout", { method: "POST" }); } catch (_) {}
-      window.location.href = "/main.html";
-    });
     $("#rrAvatarBtn")?.addEventListener("click", () => { window.location.href = "/user-center.html#report-workspace"; });
     document.addEventListener("click", (e) => {
       const el = e.target.closest("[data-rr-action]");
@@ -312,9 +308,8 @@
   async function init() {
     bind();
     setStatus("正在加载报告", "");
-    const auth = await json("/api/auth/status?bootstrap=1").catch(() => null);
-    if (!auth || !auth.authenticated || !auth.user) { window.location.href = "/main.html"; return; }
-    setUser(auth.user);
+    const auth = await json("/api/bootstrap").catch(() => null);
+    setUser(auth?.user);
     const resume = auth?.scoped_data?.resume_profile || await json("/api/resume/profile").catch(() => ({}));
     if (has(resume || {})) {
       renderReport(resume || {});
@@ -331,7 +326,7 @@
       return;
     }
     setStatus("等待上传简历", "warning");
-    renderState("当前账号还没有可展示的简历报告", "先上传简历并完成分析，完整深度诊断页才会解锁。", "");
+    renderState("还没有可展示的简历报告", "先上传简历并完成分析，完整深度诊断页才会解锁。", "");
   }
 
   window.switchResumeReportTab = switchTab;

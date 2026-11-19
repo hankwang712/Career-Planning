@@ -22,79 +22,6 @@ function animateCounter(el, target, suffix = "", duration = 500) {
   requestAnimationFrame(frame);
 }
 
-function getRelockReturnTarget() {
-  try {
-    const url = new URL(window.location.href);
-    const raw = String(url.searchParams.get("return_to") || "").trim();
-    if (!raw) return "";
-    if (/^https?:\/\//i.test(raw)) {
-      const parsed = new URL(raw);
-      if (parsed.origin !== window.location.origin) return "";
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    }
-    return raw.startsWith("/") ? raw : `/${raw.replace(/^\/+/, "")}`;
-  } catch (_) {
-    return "";
-  }
-}
-
-function shouldForceRelock() {
-  try {
-    const url = new URL(window.location.href);
-    return ["1", "true", "yes"].includes(String(url.searchParams.get("force_lock") || "").trim().toLowerCase());
-  } catch (_) {
-    return false;
-  }
-}
-
-function consumeRelockParams() {
-  try {
-    const url = new URL(window.location.href);
-    let changed = false;
-    if (url.searchParams.has("force_lock")) {
-      url.searchParams.delete("force_lock");
-      changed = true;
-    }
-    if (url.searchParams.has("return_to")) {
-      url.searchParams.delete("return_to");
-      changed = true;
-    }
-    if (changed) window.history.replaceState({}, "", url.toString());
-  } catch (_) {}
-}
-
-function redirectAfterUnlock() {
-  const target = getRelockReturnTarget();
-  if (!target) return false;
-  consumeRelockParams();
-  window.location.href = target;
-  return true;
-}
-
-function switchAuthTab(tab) {
-  const isLogin = tab === "login";
-  const loginForm = document.getElementById("loginForm");
-  const registerForm = document.getElementById("registerForm");
-  const loginBtn = document.getElementById("loginTabBtn");
-  const registerBtn = document.getElementById("registerTabBtn");
-  if (!loginForm || !registerForm || !loginBtn || !registerBtn) return;
-  loginForm.classList.toggle("hidden", !isLogin);
-  registerForm.classList.toggle("hidden", isLogin);
-  loginBtn.classList.toggle("active", isLogin);
-  registerBtn.classList.toggle("active", !isLogin);
-  const startupScreen = document.getElementById("startupScreen");
-  if (startupScreen && document.getElementById("loginAuthFeedback")) {
-    startupScreen.classList.toggle("auth-mode-login", isLogin);
-    startupScreen.classList.toggle("auth-mode-register", !isLogin);
-    clearInactiveAuthFeedback(isLogin);
-  }
-  if (isLogin) {
-    showAuthMessage("使用账号和密码登录，并完成安全验证。");
-  } else {
-    showAuthMessage("输入邮箱和密码即可创建账户，注册成功后会自动登录。");
-  }
-}
-
 function closeNavWorkspaceMenu() {
   const menu = document.getElementById("navWorkspaceMenu");
   const toggle = document.getElementById("navWorkspaceToggle");
@@ -128,280 +55,40 @@ function initNavWorkspaceMenu() {
   });
 }
 
-function clearPrivateWorkspace() {
-  accountRequestEpoch += 1;
-  window.ReportReview?.reset();
-  Object.assign(reportResumeUiState, { pending: false, loaded: false, source: null, error: "" });
-  Object.assign(reportWizardUiState, { stage: 2, runtimeKey: "", started: false, manual: false });
-  document.getElementById("reportWorkflowInput")?.reset();
-  document.getElementById("reportWorkflowTargets")?.removeAttribute("data-edited");
-  reportGenerationStarting = false;
-  reportGenerationError = "";
-  inFlightGetRequests.clear();
-  stopCareerReportPolling();
-  stopAnalyzeProgressTicker();
-  stopProfilePortraitLoading();
-  Object.keys(userWorkspaceState.scopedData).forEach(key => { userWorkspaceState.scopedData[key] = null; });
-  Object.keys(userWorkspaceState.scopedDataLoaded).forEach(key => { userWorkspaceState.scopedDataLoaded[key] = false; });
-  Object.keys(userWorkspaceState.llmConfigs).forEach(key => { userWorkspaceState.llmConfigs[key] = null; });
-  Object.assign(appState, { careerReport: null, careerReportState: null, careerReportTracker: null,
-    careerReportVersions: [], careerReportCanonicalId: "", careerReportViewingHistorical: false,
-    reportGenerated: false, reportReady: false, derivedProfile: null, matchingRoles: [], focusedRoleId: "",
-    selectedJobs: [], profileComplete: false, profileCompletion: 0, baseExploredJobs: 0, score: 0, lastGreetingKey: "" });
-  Object.assign(resumeTaskState, { uploadInFlight: false, analyzeInFlight: false, forceInputView: false, deckIndices: {} });
-  reportWorkflowSnapshot = null;
-  resetCareerInterviewState({ preserveBasics: false });
-  window.closeReportViewer?.();
-  window.renderCareerReportPanels?.();
-}
-
-function lockApp() {
-  void window.CareerAuth.ensureReady();
-  clearPrivateWorkspace();
-  userWorkspaceState.currentUser = null;
-  userWorkspaceState.authReadyPromise = null;
-  document.body.classList.remove("auth-checking");
-  document.body.classList.add("auth-locked");
-  const startup = document.getElementById("startupScreen");
-  const label = document.getElementById("currentUserLabel");
-  const avatar = document.getElementById("currentUserAvatar");
-  const shell = document.getElementById("navWorkspaceShell");
-  if (startup) startup.classList.remove("hidden");
-  if (label) label.textContent = "未登录";
-  if (shell) shell.classList.add("hidden");
-  if (typeof window.loadAccountAvatarState === "function") {
-    void window.loadAccountAvatarState(true);
-  } else if (avatar) {
-    avatar.textContent = "人";
-  }
-  closeNavWorkspaceMenu();
-  if (typeof window.__hidePageLoader === "function") {
-    requestAnimationFrame(() => window.__hidePageLoader());
-  }
-}
-
-function unlockAppForUser(user) {
-  if (userWorkspaceState.currentUser?.username !== user.username) clearPrivateWorkspace();
-  userWorkspaceState.currentUser = user;
-  const startup = document.getElementById("startupScreen");
-  const label = document.getElementById("currentUserLabel");
-  const avatar = document.getElementById("currentUserAvatar");
-  const shell = document.getElementById("navWorkspaceShell");
-  const hadAuthChecking = document.body.classList.contains("auth-checking");
-  let postLogin = false;
-  try {
-    postLogin = sessionStorage.getItem("app_post_login_refresh") === "1";
-    if (postLogin) sessionStorage.removeItem("app_post_login_refresh");
-  } catch (_) {
-    postLogin = false;
-  }
-  document.body.classList.remove("auth-checking", "auth-locked");
-  if (startup) startup.classList.add("hidden");
-  if (label) label.textContent = `${user.display_name || user.displayName || user.username} (${user.role === "super_admin" ? "Super Admin" : "User"})`;
-  if (shell) shell.classList.remove("hidden");
-  if (typeof window.loadAccountAvatarState === "function") {
-    void window.loadAccountAvatarState(true);
-  } else if (avatar) {
-    avatar.textContent = user.role === "super_admin" ? "管" : "人";
-  }
-  addLiveActivity(`User signed in: ${user.username}`);
-  const silentSessionRestore = hadAuthChecking && !postLogin;
-  if (!silentSessionRestore) {
-    showToast("登录成功", `欢迎回来，${user.display_name || user.displayName || user.username}。`, "success", 1800);
-  }
-  emitAuthStateChange();
-  if (redirectAfterUnlock()) return;
-  if (typeof window.__hidePageLoader === "function") {
-    requestAnimationFrame(() => window.__hidePageLoader());
-  }
-}
-
-async function handleLogin(event) {
-  event.preventDefault();
-  const username = (document.getElementById("loginUsername")?.value || "").trim();
-  const password = document.getElementById("loginPassword")?.value || "";
-  if (!username || !password) return showAuthMessage("请输入账号和密码。", "error");
-  const submitBtn = event.target?.querySelector?.('button[type="submit"]');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.dataset.originalLabel = submitBtn.textContent;
-    submitBtn.textContent = "登录中…";
-  }
-  try {
-    await requestJson("/api/auth/login", {
-      method: "POST",
-      body: { username, password, ...await window.CareerAuth.credentials("login") }
-    });
-    try {
-      sessionStorage.setItem("app_post_login_refresh", "1");
-    } catch (_) {
-      // ignore
-    }
-    if (typeof window.__showPageLoader === "function") {
-      window.__showPageLoader({
-        brand: shouldForceRelock() ? "解 锁 成 功" : "登 录 成 功",
-        tip: shouldForceRelock()
-          ? "正在返回上一界面 · Restoring your session"
-          : "正在进入你的工作台 · Preparing your workspace"
-      });
-    }
-    if (shouldForceRelock()) {
-      showAuthMessage("解锁成功，正在返回上一界面……", "success");
-    } else {
-      showAuthMessage("登录成功，正在进入你的独立空间……", "success");
-    }
-    window.setTimeout(() => window.location.reload(), 360);
-  } catch (error) {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      if (submitBtn.dataset.originalLabel) submitBtn.textContent = submitBtn.dataset.originalLabel;
-    }
-    showAuthMessage(error.message || "登录失败，请稍后重试。", "error");
-    void window.CareerAuth.refresh("login");
-  }
-}
-
-async function handleRegister(event) {
-  event.preventDefault();
-  const email = (document.getElementById("registerUsername")?.value || "").trim();
-  const password = document.getElementById("registerPassword")?.value || "";
-  const confirmPassword = document.getElementById("registerConfirmPassword")?.value || "";
-  if (!email || !password || !confirmPassword) {
-    showAuthMessage("请完整填写邮箱和密码。", "error");
-    return;
-  }
-  const submitBtn = event.target?.querySelector?.('button[type="submit"]');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.dataset.originalLabel = submitBtn.textContent;
-    submitBtn.textContent = "创建中…";
-  }
-  showAuthMessage("正在创建账户，请稍候……");
-  try {
-    await requestJson("/api/auth/register", {
-      method: "POST",
-      body: {
-        email,
-        password,
-        confirm_password: confirmPassword,
-        ...await window.CareerAuth.credentials("register")
-      }
-    });
-    if (typeof window.__showPageLoader === "function") {
-      window.__showPageLoader({
-        brand: "注 册 成 功",
-        tip: "正在初始化你的独立空间 · Initializing your workspace"
-      });
-    }
-    showAuthMessage("注册成功，正在进入你的独立空间……", "success");
-    window.setTimeout(() => window.location.reload(), 360);
-  } catch (error) {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      if (submitBtn.dataset.originalLabel) submitBtn.textContent = submitBtn.dataset.originalLabel;
-    }
-    showAuthMessage(error.message || "注册失败，请稍后重试。", "error");
-    void window.CareerAuth.refresh("register");
-  }
-}
-
-async function logout() {
-  if (typeof window.__showPageLoader === "function") {
-    window.__showPageLoader({
-      brand: "正 在 退 出",
-      tip: "正在安全退出当前会话 · Signing you out"
-    });
-  }
-  try {
-    await requestJson("/api/auth/logout", { method: "POST" });
-  } catch (_) {
-    // ignore logout race
-  }
-  window.location.reload();
-}
-
-async function initAuth() {
+function initWorkspace() {
   if (userWorkspaceState.authReadyPromise) return userWorkspaceState.authReadyPromise;
   userWorkspaceState.authReadyPromise = (async () => {
     try {
-      let payload = null;
-      try {
-        payload = await requestJson("/api/auth/status?bootstrap=1");
-      } catch (bootstrapError) {
-        console.warn("bootstrap endpoint unavailable, fallback to auth/status", bootstrapError);
-        payload = await requestJson("/api/auth/status");
+      const payload = await requestJson("/api/bootstrap");
+      userWorkspaceState.currentUser = payload.user;
+      const llm = payload.llm || {};
+      if (typeof llm.configured === "boolean") {
+        const config = { base_url: "", api_key: "", model: llm.model || "", configured: llm.configured, editable: false, api_key_masked: "" };
+        userWorkspaceState.llmConfigs.career_interview = config;
+        userWorkspaceState.llmConfigs.assessment_hub = config;
       }
-      if (payload.authenticated && payload.user) {
-        if (shouldForceRelock()) {
-          const returnTarget = getRelockReturnTarget();
-          consumeRelockParams();
-          if (returnTarget) {
-            window.location.replace(returnTarget);
-            return null;
-          }
-          // 已登录且无 return_to：仅去掉 force_lock 参数，正常进入系统，不再弹出假登录
-        }
-        unlockAppForUser(payload.user);
-        const llm = payload.llm || {};
-        const scoped = payload.scoped_data || {};
-        if (typeof llm.configured === "boolean") {
-          const config = { base_url: "", api_key: "", model: String(llm.model || "").trim(), configured: llm.configured, editable: false, api_key_masked: "" };
-          userWorkspaceState.llmConfigs.career_interview = config;
-          userWorkspaceState.llmConfigs.assessment_hub = config;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "career_interview")) {
-          userWorkspaceState.scopedData.career_interview = scoped.career_interview ?? null;
-          userWorkspaceState.scopedDataLoaded.career_interview = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "assessment_hub")) {
-          userWorkspaceState.scopedData.assessment_hub = scoped.assessment_hub ?? null;
-          userWorkspaceState.scopedDataLoaded.assessment_hub = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "resume_profile")) {
-          userWorkspaceState.scopedData.resume_profile = scoped.resume_profile || emptyResumeProfile();
-          userWorkspaceState.scopedDataLoaded.resume_profile = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "career_report")) {
-          userWorkspaceState.scopedData.career_report = scoped.career_report ?? null;
-          userWorkspaceState.scopedDataLoaded.career_report = true;
-          appState.careerReportState = scoped.career_report ?? null;
-          appState.reportGenerated = isCareerReportReadyStatus(scoped.career_report?.status);
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "profile_portrait")) {
-          userWorkspaceState.scopedData.profile_portrait = scoped.profile_portrait ?? null;
-          userWorkspaceState.scopedDataLoaded.profile_portrait = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "account_avatar")) {
-          userWorkspaceState.scopedData.account_avatar = scoped.account_avatar ?? null;
-          userWorkspaceState.scopedDataLoaded.account_avatar = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "profile_snapshot")) {
-          userWorkspaceState.scopedData.profile_snapshot = scoped.profile_snapshot ?? null;
-          userWorkspaceState.scopedDataLoaded.profile_snapshot = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "career_matching")) {
-          userWorkspaceState.scopedData.career_matching = scoped.career_matching ?? null;
-          userWorkspaceState.scopedDataLoaded.career_matching = true;
-        }
-        if (Object.prototype.hasOwnProperty.call(scoped, "news_context")) {
-          userWorkspaceState.scopedData.news_context = scoped.news_context ?? null;
-          userWorkspaceState.scopedDataLoaded.news_context = true;
-        }
-        await Promise.allSettled([
-          loadCareerInterviewConfig(false),
-          hydrateCareerInterviewState(false),
-          refreshResumeProfile(false),
-          loadProfilePortraitState(false)
-        ]);
-        return payload.user;
+      for (const [scope, data] of Object.entries(payload.scoped_data || {})) {
+        userWorkspaceState.scopedData[scope] = scope === "resume_profile" ? data || emptyResumeProfile() : data;
+        userWorkspaceState.scopedDataLoaded[scope] = true;
       }
+      appState.careerReportState = payload.scoped_data?.career_report ?? null;
+      appState.reportGenerated = isCareerReportReadyStatus(appState.careerReportState?.status);
+      emitAuthStateChange();
+      await Promise.allSettled([
+        loadCareerInterviewConfig(false),
+        hydrateCareerInterviewState(false),
+        refreshResumeProfile(false),
+        loadProfilePortraitState(false),
+        window.loadAccountAvatarState?.(false)
+      ]);
+      return payload.user;
     } catch (error) {
-      console.error("init auth failed", error);
+      showToast("工作区加载失败", "请刷新页面重试。", "error");
+      console.error(error);
+      return null;
+    } finally {
+      requestAnimationFrame(() => window.__hidePageLoader?.());
     }
-    lockApp();
-    switchAuthTab("login");
-    emitAuthStateChange();
-    return null;
   })();
   return userWorkspaceState.authReadyPromise;
 }
@@ -554,8 +241,10 @@ function markReportGenerated(source = "view") {
   updateDashboardMetrics();
 }
 
-function showSection(sectionId) {
-  const sections = ["dashboard", "jobs", "profile", "report"];
+var showSection = function(sectionId) {
+  // 岗位探索直接使用招聘信息采集工作台（/recruitment）：实时采集的岗位在本机缓存为实时岗位库。
+  if (sectionId === "jobs") { window.location.href = "/recruitment"; return; }
+  const sections = ["dashboard", "profile", "report"];
   if (!sections.includes(sectionId)) sectionId = "dashboard";
   if (sectionId === appState.currentSection) return;
   sections.forEach((id) => {
@@ -593,11 +282,6 @@ function showSection(sectionId) {
   if (sectionId === "report") {
     renderReportWorkspace(appState.derivedProfile || deriveUnifiedProfile(), appState.matchingRoles || []);
     void refreshReportResumePanel();
-  }
-  if (sectionId === "jobs") {
-    void openDatasetBrowser();
-  } else {
-    window.DatasetBrowser?.pause();
   }
   if (sectionId === "profile") {
     window.AssessmentCenter?.refresh();

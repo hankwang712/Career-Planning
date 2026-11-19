@@ -1,5 +1,10 @@
 (() => {
   "use strict";
+  // Old root bookmarks retain their hash across the redirect to the new home page.
+  if (["#dashboard", "#profile", "#report"].includes(window.location.hash)) {
+    window.location.replace("/main.html" + window.location.hash);
+    return;
+  }
   const API = "/api/job-market/collection";
   const byId = (id) => document.getElementById(id);
   const config = byId("recruitmentCollect");

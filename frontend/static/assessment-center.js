@@ -86,7 +86,7 @@
         const existing = (await current.json()).data || {};
         const known = existing[type];
         if (known && Number(known.completed_at) >= entry.completed_at && known.result === entry.result && known.summary === entry.summary) return;
-        const security = await (await fetch(`${base}/api/auth/security`, { credentials: "same-origin" })).json();
+        const security = await (await fetch(`${base}/api/workspace/security`, { credentials: "same-origin" })).json();
         const saved = await fetch(`${base}/api/user-state/deep_tests`, {
           method: "PUT", credentials: "same-origin",
           headers: { "Content-Type": "application/json", "X-CSRF-Token": security.csrf_token },

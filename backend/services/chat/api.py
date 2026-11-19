@@ -164,7 +164,7 @@ def create_app(flask_app, *, service, current_user):
             await run_in_threadpool(service.memory.close)
 
     api = FastAPI(title="智航生涯聊天 API",
-                  description="先在主站登录。写操作的 X-CSRF-Token 使用 /api/auth/security 返回的 csrf_token；会话归属由登录用户决定。",
+                  description="个人工作区的聊天接口。写操作的 X-CSRF-Token 使用 /api/workspace/security 返回的 csrf_token。",
                   docs_url="/api/chat/docs", redoc_url=None,
                   openapi_url="/api/chat/openapi.json", lifespan=lifespan)
     api.state.chat_service = service
@@ -181,13 +181,13 @@ def create_app(flask_app, *, service, current_user):
 
     def authenticate(request: Request, csrf_token: Annotated[str | None, Header(alias="X-CSRF-Token")] = None):
         # Only this short bridge needs Flask context; model calls and streams do not.
-        # Use Flask's session interface and current_user() so revoked/disabled logins
-        # are checked against auth_sessions, rather than trusting a username cookie.
+        from services.auth import local_request
+        if not local_request(request.headers.get("host", ""), request.client.host if request.client else None,
+                             request.headers.get("origin")):
+            raise ChatError("个人工作区仅接受本机访问。", 403)
         with flask_app.test_request_context(str(request.url), method=request.method,
                                            headers={"Cookie": request.headers.get("cookie", "")}):
             user = current_user()
-            if not user:
-                raise ChatError("请先登录。", 401)
             request.state.workspace_log_owner = user["username"]
             if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
                 expected, supplied = session.get("csrf_token"), csrf_token or ""

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from services.chat.api import ChatTransport
 from services.cors import ALLOWED_HEADERS, ALLOWED_METHODS, cors_headers, normalize_origins
 
-FRONT = "http://front.example:5173"
+FRONT = "http://localhost:5173"
 
 
 def test_normalize_origins_drops_blanks_and_trailing_slashes():
@@ -31,22 +31,22 @@ def test_wildcard_origin_is_never_reflected():
 def test_flask_api_adds_headers_for_configured_origin(client, monkeypatch):
     from services import webshell
     monkeypatch.setattr(webshell, "FRONTEND_ORIGIN", FRONT)
-    allowed = client.get("/api/auth/status", headers={"Origin": FRONT})
+    allowed = client.get("/api/bootstrap", headers={"Origin": FRONT})
     assert allowed.headers["Access-Control-Allow-Origin"] == FRONT
     assert "Origin" in allowed.headers["Vary"]
-    denied = client.get("/api/auth/status", headers={"Origin": "http://evil.test"})
+    denied = client.get("/api/bootstrap", headers={"Origin": "http://evil.test"})
     assert "Access-Control-Allow-Origin" not in denied.headers
 
 
 def test_flask_accepts_same_origin_and_ignores_non_api_paths(client):
-    same = client.get("/api/auth/status", headers={"Origin": "http://localhost"})
+    same = client.get("/api/bootstrap", headers={"Origin": "http://localhost"})
     assert same.headers["Access-Control-Allow-Origin"] == "http://localhost"
     page = client.get("/", headers={"Origin": FRONT})
     assert "Access-Control-Allow-Origin" not in page.headers
 
 
-def test_flask_answers_api_preflight_without_auth(client):
-    response = client.options("/api/auth/status", headers={"Origin": "http://localhost"})
+def test_flask_answers_api_preflight_without_cookie(client):
+    response = client.options("/api/bootstrap", headers={"Origin": "http://localhost"})
     assert response.status_code == 204
 
 

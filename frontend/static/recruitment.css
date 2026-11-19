@@ -36,7 +36,7 @@ button:disabled { opacity: .55; cursor: default; }
 .recruitment-top > div { display: flex; justify-content: space-between; align-items: center; min-height: 64px; gap: 12px; }
 .recruitment-brand { display: inline-flex; gap: 9px; align-items: center; color: #18314e; font-weight: 750; }
 .recruitment-brand img { width: 32px; height: 32px; border-radius: 8px; }
-.recruitment-back { font-size: 13px; }
+.recruitment-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 14px; font-size: 13px; }
 .recruitment-main { padding: 23px 0 36px; }
 .recruitment-card, .recruitment-detail {
     border: 1px solid var(--border);

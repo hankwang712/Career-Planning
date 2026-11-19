@@ -1348,7 +1348,7 @@
   function updateTopUser(user) {
     const label = document.getElementById("currentUserLabel");
     const avatar = document.getElementById("currentUserAvatar");
-    const display = String(user?.display_name || user?.displayName || user?.username || "未登录");
+    const display = String(user?.display_name || user?.displayName || user?.username || "个人工作区");
     if (label) label.textContent = display;
     if (avatar) avatar.textContent = display.slice(0, 1).toUpperCase();
   }
@@ -1360,13 +1360,6 @@
   function toRetest() {
     const safe = sanitizeTestType(state.testType);
     window.location.href = `/test-runner.html?test=${encodeURIComponent(safe)}&restart=1`;
-  }
-
-  async function doLogout() {
-    try {
-      await requestJson("/api/auth/logout", { method: "POST" });
-    } catch (_) {}
-    window.location.href = "/main.html";
   }
 
   function bindEvents() {
@@ -1381,9 +1374,6 @@
         renderResult();
       });
     });
-
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) logoutBtn.addEventListener("click", doLogout);
 
     const avatarBtn = document.getElementById("trAvatarBtn");
     if (avatarBtn) avatarBtn.addEventListener("click", () => {
@@ -1404,10 +1394,9 @@
     });
   }
 
-  async function initAuth() {
-    const payload = await requestJson("/api/auth/status");
+  async function initWorkspace() {
+    const payload = await requestJson("/api/bootstrap");
     if (!payload || !payload.authenticated || !payload.user) {
-      window.location.href = "/main.html";
       return false;
     }
     state.user = payload.user;
@@ -1417,7 +1406,7 @@
 
   async function init() {
     bindEvents();
-    const ok = await initAuth().catch(() => false);
+    const ok = await initWorkspace().catch(() => false);
     if (!ok) return;
     state.testType = parseTestTypeFromUrl();
     setTestTypeToUrl(state.testType, true);
