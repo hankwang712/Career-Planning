@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>招聘信息采集 · 智航生涯</title>
+    <title>岗位全链路流水线 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
     {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
@@ -13,364 +13,169 @@
     <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='recruitment.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='recruitment-pipeline.js') }}" defer></script>
 </head>
 <body>
     {% with recruitment_nav = true %}{% include "partials/workspace_topbar.html" %}{% endwith %}
-    <main class="recruitment-main">
-        <header class="recruitment-hero">
-            <h1>招聘信息采集</h1>
+    <script type="application/json" id="rpMeta">{{ {
+        'profiles': profiles,
+        'sources': sources,
+        'dimensions': ai_dimensions,
+        'settings_url': url_for('workspace_tools.settings_page'),
+        'resumes_url': '/user-center/resumes',
+        'export_url': url_for('recruitment.export')
+    } | tojson }}</script>
+    <main class="recruitment-main rp-main">
+        <header class="rp-commandbar" id="rpCommandbar">
+            <div class="rp-commandbar-inner">
+                <a class="rp-back" href="{{ url_for('site.index', _anchor='dashboard') }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>
+                    返回工作台
+                </a>
+                <div class="rp-titleblock recruitment-hero">
+                    <h1>岗位全链路流水线</h1>
+                    <p>导入 · 清洗 · 评估 · 改写 · 审批 · 投递，全程本地运行</p>
+                </div>
+                <span id="rpRunPill" class="rp-runpill" data-state="loading" role="status">
+                    <i class="rp-runpill-dot" aria-hidden="true"></i><span id="rpRunPillText">正在读取…</span>
+                </span>
+                <button id="rpMainAction" class="rp-btn rp-mainaction" type="button" data-state="loading" disabled>正在读取…</button>
+            </div>
         </header>
-        <p id="recruitmentFeedback" class="recruitment-feedback" role="status" hidden></p>
-        <div class="recruitment-layout">
-            <section class="recruitment-card recruitment-workflow" aria-labelledby="recruitmentOverview">
-                <header>
-                    <div class="recruitment-section-heading">
-                        <span class="recruitment-section-icon" aria-hidden="true">▥</span>
-                        <h2 id="recruitmentOverview">招聘流程</h2>
+
+        <div id="rpBlockBanner" class="rp-blockbanner" role="status" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.8 19.5h18.4zM12 10v4m0 3h.01"/></svg>
+            <p id="rpBlockBannerText"></p>
+            <div class="rp-blockbanner-actions">
+                <button id="rpBlockBannerOpen" class="rp-btn rp-btn-sm" type="button">打开评估配置</button>
+                <a id="rpBlockBannerSettings" class="rp-btn rp-btn-sm rp-btn-ghost" href="{{ url_for('workspace_tools.settings_page') }}">系统配置</a>
+            </div>
+        </div>
+
+        <div class="rp-stack">
+            <section class="rp-card rp-funnel-card" aria-labelledby="rpFunnelTitle">
+                <header class="rp-card-head">
+                    <div class="rp-card-heading">
+                        <span class="rp-icon-tile" data-tone="accent" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z"/></svg>
+                        </span>
+                        <h2 id="rpFunnelTitle">全链路转化漏斗</h2>
+                        <span class="rp-roundpill">本轮</span>
                     </div>
-                    <div class="recruitment-actions">
-                        <span id="recruitmentLatest" class="recruitment-latest">正在读取采集概况…</span>
-                        <button id="recruitmentRefresh" type="button">刷新</button>
+                    <div class="rp-funnel-rate">
+                        <span>综合投递率</span>
+                        <strong id="rpDeliveryRate" class="rp-rate dr-count">—</strong>
                     </div>
                 </header>
-                <details id="recruitmentPlatformOverview" class="recruitment-platform-overview">
-                    <summary>平台概况与采集记录</summary>
-                    <ul class="recruitment-platforms">
-                    {% for id, source in collection_sources.items() %}
-                    <li class="recruitment-platform" data-recruitment-platform="{{ id }}" data-source="{{ id }}">
-                        <div class="recruitment-platform-heading">
-                            <span class="recruitment-platform-dot" aria-hidden="true"></span>
-                            <strong>{{ source[0] }}</strong>
-                        </div>
-                        <div class="recruitment-platform-summary">
-                            <p class="recruitment-platform-count">—</p>
-                            <span class="recruitment-badge recruitment-run-state">读取中</span>
-                        </div>
-                        <p class="recruitment-platform-message" hidden></p>
-                        <a class="recruitment-platform-login" target="_blank" rel="noopener noreferrer" hidden>去登录 ↗</a>
-                    </li>
-                    {% endfor %}
-                    </ul>
-                    <details class="recruitment-history">
-                        <summary>采集记录</summary>
-                        <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
-                    </details>
-                </details>
-                <ol class="recruitment-stages">
-                    <li>
-                        <button id="recruitmentCollectOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置采集">
-                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">⚙</span><strong>平台采集</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
-                            <span id="recruitmentCollectSummary" class="recruitment-stage-summary">通用 · 不限城市</span>
-                        </button>
-                    </li>
-                    <li>
-                        <button id="recruitmentCleaningOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置与预览">
-                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">◇</span><strong>规则清洗</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
-                            <span id="recruitmentCleaningMode" class="recruitment-stage-summary">通用 · 手动清洗</span>
-                            <span id="recruitmentCleaningCounts" class="recruitment-stage-counts">
-                                {% for key, label in [('unreviewed','未清洗'), ('passed','通过'), ('review','待核对'), ('rejected','淘汰')] %}
-                                <span data-clean-status="{{ key }}">{{ label }} <b>—</b></span>
-                                {% endfor %}
-                            </span>
-                        </button>
-                    </li>
-                    <li>
-                        <button id="recruitmentAiOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置与评估">
-                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">✦</span><strong>AI 初评</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
-                            <span class="recruitment-stage-summary">评估已通过清洗的岗位</span>
-                        </button>
-                    </li>
-                    <li>
-                        <a class="recruitment-stage" href="{{ url_for('resume_editor.index', rewrite=1) }}">
-                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">✎</span><strong>简历改写</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
-                            <span class="recruitment-stage-summary">打开定向简历草稿</span>
-                        </a>
-                    </li>
-                </ol>
+                <div id="rpFunnel" class="rp-funnel" aria-live="polite">
+                    <div class="rp-skeleton-tile"></div><div class="rp-skeleton-tile"></div>
+                    <div class="rp-skeleton-tile"></div><div class="rp-skeleton-tile"></div>
+                    <div class="rp-skeleton-tile"></div><div class="rp-skeleton-tile"></div>
+                </div>
             </section>
-            <dialog id="recruitmentCollectDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentCollectTitle">
-                <header><h2 id="recruitmentCollectTitle">采集条件</h2><form method="dialog"><button>关闭</button></form></header>
-                <form id="recruitmentCollect" class="recruitment-card-body">
-                    <div class="recruitment-form-grid">
-                        <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
-                        <div class="recruitment-city" id="recruitmentCityPicker">
-                            <span id="recruitmentCityLabel">城市</span>
-                            <input type="hidden" name="city" value="">
-                            <button id="recruitmentCityToggle" class="recruitment-city-toggle" type="button"
-                                    aria-expanded="false" aria-controls="recruitmentCityMenu" aria-labelledby="recruitmentCityLabel recruitmentCityValue">
-                                <span id="recruitmentCityValue">不限城市</span><span aria-hidden="true">⌄</span>
-                            </button>
-                            <div id="recruitmentCityMenu" class="recruitment-city-menu" hidden>
-                                <input id="recruitmentCitySearch" type="search" aria-label="搜索城市" placeholder="搜索城市，例如 苏州">
-                                {% macro city_button(city, label=None) %}
-                                    <button type="button" data-city="{{ city }}" data-unsupported="{{ unsupported_cities.get(city, {}) | tojson | forceescape }}"
-                                            aria-pressed="{{ 'false' if city else 'true' }}">{{ label or city }}</button>
-                                {% endmacro %}
-                                <div class="recruitment-city-options recruitment-city-scopes" data-city-section="scope">
-                                    {{ city_button('', '不限城市') }}
-                                    {% for city in city_catalog.scopes %}{{ city_button(city) }}{% endfor %}
-                                </div>
-                                <div class="recruitment-city-index" aria-label="城市分组">
-                                    {% for key, label in [('hot', '热门'), ('all', '全部')] %}
-                                    <button type="button" data-city-index="{{ key }}" aria-pressed="{{ 'true' if key == 'hot' else 'false' }}">{{ label }}</button>
-                                    {% endfor %}
-                                    {% for letter in city_catalog.groups %}
-                                    <button type="button" data-city-index="{{ letter }}" aria-pressed="false">{{ letter }}</button>
-                                    {% endfor %}
-                                </div>
-                                <div class="recruitment-city-scroll">
-                                    <div data-city-section="hot">
-                                        <p class="recruitment-city-group-title">热门城市</p>
-                                        <div class="recruitment-city-options">
-                                            {% for city in city_catalog.hot %}{{ city_button(city) }}{% endfor %}
-                                        </div>
-                                    </div>
-                                    {% for letter, cities in city_catalog.groups.items() %}
-                                    <div data-city-section="{{ letter }}" hidden>
-                                        <p class="recruitment-city-group-title">{{ letter }}</p>
-                                        <div class="recruitment-city-options">
-                                            {% for city in cities %}{{ city_button(city) }}{% endfor %}
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                    <p id="recruitmentCityEmpty" class="recruitment-city-group-title" hidden>没有匹配的城市。</p>
-                                </div>
-                            </div>
-                        </div>
-                        <label>求职方向<select name="profile" id="recruitmentProfile" aria-label="求职方向">
-                            {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-                        </select></label>
-                        <label>每个平台上限<select name="limit"><option>10</option><option selected>20</option><option>30</option></select></label>
+
+            <section class="rp-card rp-rail-card" aria-labelledby="rpRailTitle">
+                <header class="rp-card-head">
+                    <div class="rp-card-heading">
+                        <span class="rp-icon-tile" data-tone="ink" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+                        </span>
+                        <h2 id="rpRailTitle">全链路执行导航</h2>
+                        <span class="rp-roundpill">本轮</span>
                     </div>
-                    <fieldset>
-                        <legend>采集平台</legend>
-                        {% for id, source in collection_sources.items() %}
-                        <label class="recruitment-source"><input type="checkbox" name="source" value="{{ id }}" checked><span>{{ source[0] }}</span></label>
-                        {% endfor %}
-                    </fieldset>
-                    <p id="recruitmentCityCoverage" class="recruitment-city-coverage" role="status" hidden></p>
-                    {% if boss_local %}
-                    <div class="recruitment-browser-options">
-                        <div class="recruitment-browser-option">
-                            <label class="recruitment-source"><input type="checkbox" name="bossLocal" checked {% if chrome_available %}data-chrome-sources="{{ chrome_sources | join(',') }}"{% endif %}><span>{{ '用本机 Chrome 采集' if chrome_available else '用本机浏览器采集 BOSS' }}</span></label>
-                            {% if chrome_available %}
-                            <p>各平台会在后台打开。若需要登录或验证，每个平台最多等待 2 分钟。</p>
-                            {% else %}
-                            <p>首次使用时，在打开的 BOSS 窗口登录或验证。岗位出现后会自动读取。</p>
-                            {% endif %}
-                        </div>
-                        {% if chrome_available %}
-                        <section id="recruitmentSessions" class="recruitment-browser-sessions" aria-labelledby="recruitmentSessionsHeading">
-                            <div class="recruitment-session-toolbar">
-                                <h3 id="recruitmentSessionsHeading">平台登录状态</h3>
-                                <button id="recruitmentCheckAll" type="button">检查全部</button>
-                            </div>
-                            <ul class="recruitment-session-list">
-                                {% for id, source in collection_sources.items() %}
-                                <li class="recruitment-session" data-source="{{ id }}">
-                                    <div class="recruitment-session-heading">
-                                        <img class="recruitment-session-icon" src="{{ url_for('static', filename='brand/recruitment/' ~ id ~ '.jpg') }}" width="36" height="36" alt="">
-                                        <strong>{{ source[0] }}</strong>
-                                    </div>
-                                    <div class="recruitment-session-result" role="status" aria-atomic="true" data-state="idle">
-                                        <strong class="recruitment-session-label">未检查</strong>
-                                        <p class="recruitment-session-message" hidden></p>
-                                    </div>
-                                    <div class="recruitment-session-actions">
-                                        <a href="{{ login_urls[id] }}" class="recruitment-button" aria-label="去{{ source[0] }}登录" target="_blank" rel="noopener noreferrer">去登录 ↗</a>
-                                        <button type="button" aria-label="检查{{ source[0] }}登录">检查登录</button>
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </section>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                    <p id="recruitmentCollectFeedback" class="recruitment-drawer-feedback" role="status" hidden></p>
-                    <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
-                </form>
-            </dialog>
-            <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
-                <header>
-                    <div class="recruitment-section-heading">
-                        <span class="recruitment-section-icon" aria-hidden="true">▤</span>
-                        <h2 id="recruitmentResultsTitle">岗位与招聘线索</h2>
-                        <span id="recruitmentCount" class="recruitment-badge" aria-live="polite"></span>
-                    </div>
-                    <div class="recruitment-actions">
-                        <button id="recruitmentImport" type="button">导入 CSV</button>
-                        <button id="recruitmentSavedPage" type="button">导入网页</button>
-                        <input type="file" id="recruitmentFile" accept=".csv,text/csv" hidden>
-                        <a id="recruitmentExport" class="recruitment-button recruitment-export" href="/api/job-market/collection/export?clean_status=passed&amp;sort=match">导出 CSV</a>
+                    <div class="rp-rail-actions">
+                        <span id="rpResumePill" class="rp-resume-slot"></span>
+                        <button id="rpRailRefresh" class="rp-btn rp-btn-sm rp-btn-ghost rp-iconbtn" type="button" aria-label="刷新流水线状态" title="刷新">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg>
+                        </button>
                     </div>
                 </header>
-                <nav id="recruitmentViews" class="recruitment-views" aria-label="岗位结果视图">
-                    {% for key, name in [('priority','优先看'), ('all','全部岗位'), ('unreviewed','待清洗'), ('scored','已评分'), ('review','待核对'), ('rejected','已淘汰')] %}
-                    <button type="button" data-view="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
-                        {{ name }} <span data-view-count aria-hidden="true"></span>
+                <div id="rpRailNotice" class="rp-railnotice" role="status"></div>
+                <div id="rpRail" class="rp-rail" data-lenis-prevent>
+                    <div class="rp-skeleton-step"></div><div class="rp-skeleton-step"></div>
+                    <div class="rp-skeleton-step"></div><div class="rp-skeleton-step"></div>
+                </div>
+            </section>
+
+            <section class="rp-card rp-board-card" aria-labelledby="rpBoardTitle">
+                <header class="rp-card-head">
+                    <div class="rp-card-heading">
+                        <span class="rp-icon-tile" data-tone="brass" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>
+                        </span>
+                        <h2 id="rpBoardTitle">岗位状态看板</h2>
+                        <span id="rpBoardCount" class="rp-boardcount" aria-live="polite"></span>
+                    </div>
+                    <div class="rp-board-actions">
+                        <label class="rp-search">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg>
+                            <input id="rpSearch" type="search" maxlength="120" placeholder="搜索岗位、公司或来源" aria-label="搜索岗位">
+                        </label>
+                        <a id="rpExport" class="rp-btn rp-btn-sm rp-btn-ghost" href="{{ url_for('recruitment.export') }}?clean_status=passed&amp;sort=match">导出 CSV</a>
+                    </div>
+                </header>
+                <nav id="rpTabs" class="rp-tabs" aria-label="岗位状态视图">
+                    {% for key, label in [
+                        ('all', '全部'), ('rejected', '淘汰'), ('in_progress', '评估·改写·投递中'),
+                        ('reeval', '待重评'), ('approval', '待审批'), ('queued', '待投递'),
+                        ('delivered', '已投递'), ('failed', '执行失败')
+                    ] %}
+                    <button type="button" class="rp-tab" data-tab="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+                        {{ label }} <span class="rp-tab-count" data-tab-count aria-hidden="true"></span>
                     </button>
                     {% endfor %}
                 </nav>
-                <form class="recruitment-filters" id="recruitmentFilters" role="search">
-                    <input type="search" name="q" maxlength="120" aria-label="搜索结果" placeholder="按岗位、公司或地点搜索">
-                    <select name="source" aria-label="筛选平台"><option value="">全部平台</option>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select>
-                    <select name="profile" aria-label="按求职方向筛选"><option value="">全部方向</option>
-                        {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-                    </select>
-                    <select name="sort" aria-label="排序"><option value="">默认顺序</option><option value="latest">最新采集</option><option value="match">初评分数</option></select>
-                    <button type="submit">筛选</button>
-                </form>
-                <div id="recruitmentRows" class="recruitment-rows"></div>
-                <nav class="recruitment-paging" id="recruitmentPaging" aria-label="岗位分页" hidden>
-                    <button type="button" id="recruitmentPrev">上一页</button><span id="recruitmentPage"></span><button type="button" id="recruitmentNext">下一页</button>
-                </nav>
+                <div id="rpTabBanner" class="rp-tabbanner" hidden></div>
+                <div id="rpJobs" class="rp-jobs">
+                    <div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div>
+                </div>
+                <div id="rpJobsMore" class="rp-jobsmore" hidden>
+                    <button id="rpJobsMoreBtn" class="rp-btn rp-btn-ghost" type="button">加载更多岗位</button>
+                </div>
             </section>
+        </div>
+
+        <div id="rpBoot" class="rp-boot" hidden>
+            <span class="rp-icon-tile" data-tone="accent" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+            </span>
+            <strong>等待流水线初始化</strong>
+            <p id="rpBootText">流水线服务尚未就绪。后端接口上线后，这里会显示转化漏斗、执行轨道与岗位看板。</p>
+            <button id="rpBootRetry" class="rp-btn rp-btn-primary" type="button">重试连接</button>
         </div>
     </main>
-    {% macro rule_icon(name, tone='') -%}
-        <svg class="recruitment-rule-icon {{ tone }}" aria-hidden="true" focusable="false"><use href="#rule-icon-{{ name }}"></use></svg>
-    {%- endmacro %}
-    <dialog id="recruitmentCleaningDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentRulesTitle">
-        <svg class="recruitment-rule-symbols" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-            <symbol id="rule-icon-brush" viewBox="0 0 24 24"><path d="m13 15 7.4-8.9a1.8 1.8 0 0 0-2.5-2.5L9 11m4 4-4-4m4 4c0 3.6-2.5 5-5.5 5H3c1.7-1.4 2.4-2.7 2.5-4.2C5.7 13 7 11 9 11"/></symbol>
-            <symbol id="rule-icon-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z"/></symbol>
-            <symbol id="rule-icon-salary" viewBox="0 0 24 24"><path d="m6 4 6 7 6-7M6.5 11.5h11M6.5 15.5h11M12 11v9"/></symbol>
-            <symbol id="rule-icon-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18m-9-1v3"/></symbol>
-            <symbol id="rule-icon-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 10-7 10s-7-5-7-10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
-            <symbol id="rule-icon-school" viewBox="0 0 24 24"><path d="m2.5 9 9.5-4 9.5 4-9.5 4zM6.5 11v5c3.5 3 7.5 3 11 0v-5m4-2v6"/></symbol>
-            <symbol id="rule-icon-sparkles" viewBox="0 0 24 24"><path d="m11 3 1.6 5.4L18 10l-5.4 1.6L11 17l-1.6-5.4L4 10l5.4-1.6zm7 10 1 2.5 2.5 1L19 17l-1 2.5-1-2.5-2.5-.5 2.5-1zM5 15v5m-2.5-2.5h5"/></symbol>
-            <symbol id="rule-icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-            <symbol id="rule-icon-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15m-12 0 1 14h7l1-14m-7-3h5l1 3M10.5 10v7m3-7v7"/></symbol>
-        </svg>
-        <header><h2 id="recruitmentRulesTitle" class="recruitment-rule-heading">{{ rule_icon('brush', 'rule-amber') }}清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
-        <form id="recruitmentCleaningForm" class="recruitment-card-body">
-            <label>清洗方向<select id="recruitmentRulesProfile" aria-label="清洗方向">
-                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-            </select></label>
-            <fieldset class="recruitment-rule-fields" disabled>
-                <section class="recruitment-rule-section" aria-labelledby="recruitmentHardRules">
-                    <h3 id="recruitmentHardRules" class="recruitment-rule-heading">{{ rule_icon('filter', 'rule-blue') }}硬规则</h3>
-                    <div class="recruitment-rule-salary">
-                        <label><span class="recruitment-rule-caption">{{ rule_icon('salary', 'rule-amber') }}最低月薪（K）</span><input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
-                        <label><span class="recruitment-rule-caption">{{ rule_icon('salary', 'rule-amber') }}最高月薪（K）</span><input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
-                        <label><span class="recruitment-rule-caption">{{ rule_icon('briefcase', 'rule-violet') }}经验上限（年）</span><input type="number" name="experience_years_max" min="1" max="50" step="1" placeholder="不限" aria-describedby="recruitmentExperienceHint"></label>
-                    </div>
-                    <p id="recruitmentExperienceHint" class="recruitment-rule-hint">岗位要求的最低经验达到上限时淘汰。</p>
-                    <div class="recruitment-rule-salary" id="recruitmentDailyRules" hidden>
-                        <label>最低日薪（元/天）<input type="number" name="min_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
-                        <label>最高日薪（元/天）<input type="number" name="max_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
-                    </div>
-                    {% for key, label, placeholder, icon, tone in [
-                        ('cities', '目标城市', '输入城市后按回车', 'pin', 'rule-green'),
-                        ('require_education', '学历白名单', '添加可接受的最低学历', 'school', 'rule-blue'),
-                        ('exclude_education', '学历黑名单', '添加需要排除的学历', 'school', 'rule-red')
-                    ] %}
-                    <div class="recruitment-rule-terms" data-rule-terms="{{ key }}">
-                        <label class="recruitment-rule-caption" for="recruitment-rule-{{ key }}">{{ rule_icon(icon, tone) }}{{ label }}</label>
-                        <div class="recruitment-rule-term-input">
-                            <input id="recruitment-rule-{{ key }}" name="{{ key }}" maxlength="2500" placeholder="{{ placeholder }}"
-                                {% if key != 'cities' %}list="recruitmentEducationLevels"{% endif %}>
-                            <button class="recruitment-rule-button {{ tone }}" type="button" aria-label="添加{{ label }}">{{ rule_icon('add') }}添加</button>
-                        </div>
-                        <div class="recruitment-rule-chips"></div>
-                    </div>
-                    {% endfor %}
-                    <datalist id="recruitmentEducationLevels">
-                        {% for level in ['中专/中技', '高中', '大专', '本科', '硕士', '博士'] %}<option value="{{ level }}">{% endfor %}
-                    </datalist>
-                    <p class="recruitment-rule-hint">学历白名单和黑名单任选一种。</p>
-                    <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
-                    <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
-                    <label class="recruitment-rule-auto"><input name="auto" type="checkbox">对新采集和新导入的记录自动运行硬规则</label>
-                </section>
-                <section class="recruitment-rule-section" aria-labelledby="recruitmentScoutTitle">
-                    <div class="recruitment-rule-section-head">
-                        <h3 id="recruitmentScoutTitle" class="recruitment-rule-heading">{{ rule_icon('sparkles', 'rule-violet') }}AI 初筛规则</h3>
-                        <button class="recruitment-rule-button rule-violet" id="recruitmentScoutAdd" type="button">{{ rule_icon('add') }}添加规则</button>
-                    </div>
-                    <div id="recruitmentScoutExamples" class="recruitment-scout-example" hidden>
-                        <span>内置示例。启用或编辑后保存，即可用于初筛。</span>
-                        <button id="recruitmentScoutEnable" type="button">启用示例</button>
-                    </div>
-                    <div id="recruitmentScoutRules" class="recruitment-scout-list"></div>
-                </section>
-                <div class="recruitment-actions">
-                    <button id="recruitmentCleaningSave" type="button">保存规则</button>
-                    <button type="submit">预览现有岗位</button>
-                    <button id="recruitmentCleaningApply" type="button" class="recruitment-primary" disabled>应用到现有岗位</button>
-                </div>
-            </fieldset>
-            <p id="recruitmentCleaningFeedback" class="recruitment-rule-feedback" role="status"></p>
-            <ul id="recruitmentCleaningPreview" class="recruitment-rule-preview" hidden></ul>
-            <button id="recruitmentSemanticOpen" type="button">运行已保存的 AI 初筛规则</button>
-        </form>
-    </dialog>
-    <dialog id="recruitmentAiDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentAiDialogTitle">
-        <header><h2 id="recruitmentAiDialogTitle">AI 初评</h2><form method="dialog"><button>关闭</button></form></header>
-        <div class="recruitment-card-body recruitment-ai-content">
-            <label>评估方向<select id="recruitmentAiProfile" aria-label="评估方向">
-                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-            </select></label>
-            <form id="recruitmentAiSettings" class="recruitment-ai-settings">
-                <label>基准简历<textarea name="resume" maxlength="18000" rows="5" placeholder="留空时使用账号中已解析的简历"></textarea></label>
-                <label>初评偏好<textarea name="preferences" maxlength="2000" rows="3" placeholder="例如 薪资目标、到岗日期、每周可出勤天数"></textarea></label>
-                <fieldset class="recruitment-ai-weights">
-                    <legend>维度权重（0 表示关闭）</legend>
-                    {% for key, name in ai_dimensions.items() %}
-                    <label>{{ name }}<input type="number" data-dimension="{{ key }}" min="0" max="5" step="1" required></label>
-                    {% endfor %}
-                </fieldset>
-                <button type="submit">保存初评配置</button>
-                <p id="recruitmentAiReadiness" class="recruitment-rule-feedback" role="status"></p>
-            </form>
-            <label>搜索待处理岗位<input type="search" id="recruitmentAiSearch" maxlength="100" placeholder="按岗位或公司搜索"></label>
-            <div id="recruitmentAiCandidates" class="recruitment-ai-candidates"></div>
-            <button id="recruitmentAiRun" class="recruitment-primary" type="button" disabled>评估所选岗位</button>
-            <p id="recruitmentAiFeedback" class="recruitment-rule-feedback" role="status"></p>
-            <ul id="recruitmentAiBatchResults" class="recruitment-ai-results"></ul>
+
+    <div id="rpDrawerRoot" class="rp-drawer-root" hidden>
+        <div class="rp-drawer-overlay" data-rp-drawer-close></div>
+        <aside class="rp-drawer" role="dialog" aria-modal="true" aria-labelledby="rpDrawerTitle">
+            <header class="rp-drawer-head">
+                <span id="rpDrawerIcon" class="rp-icon-tile" data-tone="accent" aria-hidden="true"></span>
+                <h2 id="rpDrawerTitle"></h2>
+                <button id="rpDrawerClose" class="rp-btn rp-btn-sm rp-btn-ghost rp-iconbtn" type="button" aria-label="关闭面板">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                </button>
+            </header>
+            <div id="rpDrawerBody" class="rp-drawer-body" data-lenis-prevent></div>
+        </aside>
+    </div>
+
+    <div id="rpModalRoot" class="rp-modal-root" hidden>
+        <div class="rp-modal-overlay" data-rp-modal-close></div>
+        <div class="rp-modal" role="dialog" aria-modal="true" aria-labelledby="rpModalTitle">
+            <header class="rp-modal-head">
+                <h2 id="rpModalTitle">物料预览</h2>
+                <button id="rpModalClose" class="rp-btn rp-btn-sm rp-btn-ghost rp-iconbtn" type="button" aria-label="关闭预览">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                </button>
+            </header>
+            <nav id="rpModalTabs" class="rp-modal-tabs" aria-label="物料类型">
+                <button type="button" data-material="resume" aria-pressed="true">投递简历</button>
+                <button type="button" data-material="greeting" aria-pressed="false">破冰欢迎语</button>
+            </nav>
+            <div id="rpModalBody" class="rp-modal-body" data-lenis-prevent></div>
         </div>
-    </dialog>
-    <dialog id="recruitmentDetail" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentDetailTitle">
-        <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
-        <div class="recruitment-card-body">
-            <p id="recruitmentDetailMeta"></p>
-            <div class="recruitment-detail-profile">
-                <label>归入求职方向<select id="recruitmentDetailProfile" aria-label="归入求职方向">
-                    {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-                </select></label>
-                <button id="recruitmentMoveProfile" type="button" disabled>更新方向</button>
-            </div>
-            <p id="recruitmentMoveFeedback" class="recruitment-detail-status" role="status" hidden></p>
-            <p id="recruitmentDetailStatus" class="recruitment-detail-status" role="status" hidden></p>
-            <p id="recruitmentDetailDecision" class="recruitment-detail-status" hidden></p>
-            <p id="recruitmentDescription"></p>
-            <section id="recruitmentVision" class="recruitment-ai-content" hidden>
-                <h3>小红书配图提取</h3>
-                <label>上传笔记配图<input id="recruitmentVisionFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
-                <div class="recruitment-actions">
-                    <button id="recruitmentVisionRead" type="button">读取 Chrome 原帖配图</button>
-                    <button id="recruitmentVisionUpload" type="button">提取上传图片</button>
-                </div>
-                <p id="recruitmentVisionFeedback" class="recruitment-rule-feedback" role="status"></p>
-            </section>
-            <section id="recruitmentAiDetails" class="recruitment-ai-content" aria-label="AI 结果" hidden></section>
-            <a id="recruitmentOriginal" class="recruitment-button" target="_blank" rel="noopener noreferrer">查看原帖 ↗</a>
-            <button id="recruitmentResumeRewrite" type="button">按此岗位改写简历</button>
-        </div>
-    </dialog>
-    <dialog id="recruitmentImportPage" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentImportPageTitle">
-        <header><h2 id="recruitmentImportPageTitle">导入已保存的搜索页</h2><form method="dialog"><button>关闭</button></form></header>
-        <form id="recruitmentHtmlForm" class="recruitment-card-body recruitment-html-form">
-            <p>在原站打开搜索结果，用浏览器的“网页，仅 HTML”保存，再上传该 HTML 文件。</p>
-            <label>导入到<select name="profile">
-                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-            </select></label>
-            <label>招聘平台<select name="source" required>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select></label>
-            <label>HTML 文件<input type="file" name="file" accept=".html,.htm,text/html" required></label>
-            <p id="recruitmentHtmlFeedback" role="status"></p>
-            <button class="recruitment-primary">读取岗位</button>
-        </form>
-    </dialog>
+    </div>
+
+    <div id="rpToasts" class="rp-toasts" role="status" aria-live="polite"></div>
 </body>
 </html>

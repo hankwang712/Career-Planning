@@ -20,6 +20,7 @@ from flask import Blueprint, Response, jsonify, redirect, render_template, reque
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import db, llm_env, recruitment_ai as ai, recruitment_cleaning as cleaning
+from . import recruitment_pipeline as pipeline
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
     CHROME_SOURCES, LOGIN_URLS, SESSION_LABELS, SESSION_MESSAGES, check_platform_login, collect_in_chrome,
@@ -34,6 +35,7 @@ from .user_state import _current_user, _login_required
 
 blueprint = Blueprint("recruitment", __name__)
 API = "/api/job-market/collection"
+pipeline.register_routes(blueprint)
 logger = logging.getLogger(__name__)
 FIELDS = ("source", "title", "company", "location", "salary", "description", "url", "updated_at", "experience", "education")
 CSV_ALIASES = {"platform": "source", "job_title": "title", "company_name": "company", "city": "location",
@@ -68,6 +70,7 @@ def init_schema(conn):
     """)
     cleaning.init_schema(conn)
     ai.init_schema(conn)
+    pipeline.init_schema(conn)
 
 
 class CollectRequest(BaseModel):
@@ -452,6 +455,7 @@ def cleaning_release():
             UPDATE recruitment_cleaning_results SET status='released', reason=?
             WHERE owner=? AND source=? AND url_key=?
         """, (reason, owner, source, url))
+        pipeline.revive_released(conn, owner, source, url)
         counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(counts=counts)
 

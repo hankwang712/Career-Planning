@@ -1,0 +1,1294 @@
+/* 岗位全链路流水线 · 面板层
+   右滑抽屉 8 面板：本地导入 / 规则清洗 / AI 初评 / 深度评估 /
+   简历改写 / 打招呼语 / 审批操作 / 投递队列 + 物料预览渲染。
+   依赖 recruitment.js 暴露的 window.RP；流水线配置走 /pipeline/config。 */
+(() => {
+  "use strict";
+  const RP = window.RP;
+  if (!RP) return;
+  const { node, icon, tile, toast, api, pipelineApi, meta, state } = RP;
+
+  const PROFILE_KEYS = Object.keys(meta.profiles || { general: "通用" });
+  const DEEP_KEYS = [
+    ["extracted_skills", "技能提取"],
+    ["ats_ability_analysis", "ATS 能力分析"],
+    ["resume_audit", "简历审计"],
+    ["dream_picture", "理想画像"],
+    ["strong_fit_assessment", "强匹配评估"],
+    ["risk_red_flags", "风险红旗"],
+    ["deep_action_plan", "深度行动建议"]
+  ];
+  const DIMENSION_LABELS = {
+    role_match: "职责匹配", skills_align: "技能重合", seniority: "职级资历", compensation: "薪资契合",
+    interview_prob: "面试概率", company_stage: "公司阶段", market_fit: "赛道前景", growth: "成长空间"
+  };
+  const GRADE_OPTIONS = ["A", "B", "C", "D", "F"];
+
+  /* ---------- 面板小工具 ---------- */
+  function alive(token, body) { return token === RP.drawerToken() && body.isConnected; }
+  function section(title, iconName) {
+    const root = node("section", "", "rp-panel-section");
+    if (title) {
+      const h = node("h3", title);
+      if (iconName) h.prepend(icon(iconName));
+      root.append(h);
+    }
+    return root;
+  }
+  function note(text, tone) {
+    const el = node("p", text, "rp-panel-note");
+    if (tone) el.dataset.tone = tone;
+    return el;
+  }
+  function feedback() { return node("p", "", "rp-feedback"); }
+  function setFeedback(el, message, tone) {
+    el.textContent = message || "";
+    if (tone) el.dataset.tone = tone;
+    else delete el.dataset.tone;
+  }
+  function field(labelText, control, span2) {
+    const label = node("label", "", "rp-field" + (span2 ? " rp-span-2" : ""));
+    label.append(node("span", labelText), control);
+    return label;
+  }
+  function input(type, attrs = {}) {
+    const el = node("input");
+    el.type = type;
+    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+    return el;
+  }
+  function select(options, value) {
+    const el = node("select");
+    for (const [key, label] of options) el.append(new Option(label, key));
+    if (value != null) el.value = value;
+    return el;
+  }
+  function profileSelect(value) {
+    return select(Object.entries(meta.profiles), value || PROFILE_KEYS[0]);
+  }
+  function button(label, cls, iconName) {
+    const el = node("button", label, "rp-btn " + (cls || ""));
+    el.type = "button";
+    if (iconName) el.prepend(icon(iconName));
+    return el;
+  }
+  function emptyBlock(title, desc, actionLabel, onAction) {
+    const el = node("div", "", "rp-empty");
+    el.append(tile("inbox", "accent"), node("strong", title));
+    if (desc) el.append(node("p", desc));
+    if (actionLabel) {
+      const action = button(actionLabel, "rp-btn-primary");
+      action.addEventListener("click", onAction);
+      el.append(action);
+    }
+    return el;
+  }
+  function gradeBadge(grade) {
+    const el = node("span", grade || "—", "rp-grade");
+    if (grade) el.dataset.grade = grade;
+    return el;
+  }
+  function payloadOf(payload, ...keys) {
+    if (!payload) return null;
+    for (const key of keys) {
+      if (payload[key] != null && payload[key] !== "") return payload[key];
+    }
+    return null;
+  }
+  async function copyText(text, okMessage) {
+    if (!text) { toast("没有可复制的内容。", "warning"); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMessage || "已复制到剪贴板。", "success");
+    } catch (_) {
+      const area = node("textarea");
+      area.value = text;
+      area.style.cssText = "position:fixed;opacity:0;";
+      document.body.append(area);
+      area.select();
+      try { document.execCommand("copy"); toast(okMessage || "已复制到剪贴板。", "success"); }
+      catch (__) { toast("复制失败，请手动选择文本。", "error"); }
+      area.remove();
+    }
+  }
+  function miniJob(job, { checkbox = false, checked = false, onCheck } = {}) {
+    const row = node("div", "", "rp-mini-job");
+    const head = node("div", "", "rp-mini-job-head");
+    if (checkbox) {
+      const box = input("checkbox");
+      box.checked = checked;
+      box.setAttribute("aria-label", "选择 " + job.title);
+      box.addEventListener("change", () => onCheck?.(box.checked));
+      head.append(box);
+    }
+    head.append(node("span", job.title, "rp-mini-job-title"));
+    if (job.grade) head.append(gradeBadge(job.grade));
+    const metaLine = node("p", [job.company, RP.sourceLabel(job.source), job.salary, job.score != null ? job.score + " 分" : ""]
+      .filter(Boolean).join(" · "), "rp-mini-job-meta");
+    row.append(head, metaLine);
+    return row;
+  }
+  async function withBusy(task, feedbackEl, busyMessage) {
+    RP.setDrawerBusy(true);
+    if (feedbackEl) setFeedback(feedbackEl, busyMessage || "正在处理…");
+    try { return await task(); }
+    finally { RP.setDrawerBusy(false); }
+  }
+  function loadConfig() { return pipelineApi("/config", undefined, "GET"); }
+  async function saveConfig(patch, feedbackEl, okMessage) {
+    const result = await withBusy(() => pipelineApi("/config", patch), feedbackEl, "正在保存配置…");
+    toast(okMessage || "流水线配置已保存。", "success");
+    void RP.refresh({ silent: true });
+    return result;
+  }
+  function modeChip(mode) {
+    const chip = node("span", mode === "llm" ? "模型生成" : "启发式生成", "rp-stat-chip");
+    return chip;
+  }
+
+  /* ---------- 1. 本地导入（scraping） ---------- */
+  RP.registerDrawer("scraping", {
+    title: "本地导入 · 抓取替代", icon: "inbox", tone: "accent",
+    render(body) {
+      const token = RP.drawerToken();
+      body.append(note("本流水线不连接外部招聘平台。抓取阶段由三种本地导入替代：种子岗位库、CSV 文件、已保存的搜索页 HTML。", "info"));
+
+      const seedSection = section("城市岗位种子库", "database");
+      seedSection.append(node("p", "从内置城市岗位样本（data/jobs）批量建档，幂等去重，导入后自动进入清洗段。", "rp-hint"));
+      const seedFeedback = feedback();
+      const seedBtn = button("导入种子岗位", "rp-btn-primary", "download");
+      seedBtn.addEventListener("click", async () => {
+        seedBtn.disabled = true;
+        try {
+          const result = await withBusy(() => pipelineApi("/seed", {}), seedFeedback, "正在导入种子岗位…");
+          if (!alive(token, body)) return;
+          const count = result?.imported ?? result?.count ?? 0;
+          setFeedback(seedFeedback, `已导入 ${count} 条种子岗位。`, "success");
+          toast(`种子岗位导入完成：${count} 条。`, "success");
+          void RP.refresh({ silent: true });
+        } catch (error) {
+          if (alive(token, body)) setFeedback(seedFeedback, error.message, "error");
+        } finally { seedBtn.disabled = false; }
+      });
+      seedSection.append(seedBtn, seedFeedback);
+
+      const csvSection = section("导入 CSV", "upload");
+      const csvProfile = profileSelect();
+      const csvFile = input("file", { accept: ".csv,text/csv" });
+      const csvFeedback = feedback();
+      const csvBtn = button("导入 CSV 文件", "", "upload");
+      csvBtn.addEventListener("click", async () => {
+        const file = csvFile.files[0];
+        if (!file) { setFeedback(csvFeedback, "请先选择 CSV 文件（不超过 2 MB）。", "error"); return; }
+        const data = new FormData();
+        data.append("file", file);
+        data.append("profile", csvProfile.value);
+        csvBtn.disabled = true;
+        try {
+          const result = await withBusy(() => api("/import", data), csvFeedback, "正在读取 CSV…");
+          if (!alive(token, body)) return;
+          setFeedback(csvFeedback, `已保存 ${result.count} 条记录。`, "success");
+          toast(`CSV 导入完成：${result.count} 条。`, "success");
+          csvFile.value = "";
+          void RP.refresh({ silent: true });
+        } catch (error) {
+          if (alive(token, body)) setFeedback(csvFeedback, error.message, "error");
+        } finally { csvBtn.disabled = false; }
+      });
+      csvSection.append(
+        node("p", "表头需包含链接列（url / job_link），以及标题或描述列；兼容常见平台导出格式。", "rp-hint"),
+        field("归入求职方向", csvProfile), field("CSV 文件", csvFile), csvBtn, csvFeedback
+      );
+
+      const htmlSection = section("导入已保存的搜索页", "file-text");
+      const htmlSource = select(Object.entries(meta.sources));
+      const htmlProfile = profileSelect();
+      const htmlFile = input("file", { accept: ".html,.htm,text/html" });
+      const htmlFeedback = feedback();
+      const htmlBtn = button("读取页面岗位", "", "upload");
+      htmlBtn.addEventListener("click", async () => {
+        const file = htmlFile.files[0];
+        if (!file) { setFeedback(htmlFeedback, "请先选择浏览器保存的 HTML 文件（不超过 5 MB）。", "error"); return; }
+        const data = new FormData();
+        data.append("file", file);
+        data.append("source", htmlSource.value);
+        data.append("profile", htmlProfile.value);
+        htmlBtn.disabled = true;
+        try {
+          const result = await withBusy(() => api("/import-html", data), htmlFeedback, "正在读取页面…");
+          if (!alive(token, body)) return;
+          setFeedback(htmlFeedback, `已保存 ${result.count} 条记录。`, "success");
+          toast(`页面导入完成：${result.count} 条。`, "success");
+          htmlFile.value = "";
+          void RP.refresh({ silent: true });
+        } catch (error) {
+          if (alive(token, body)) setFeedback(htmlFeedback, error.message, "error");
+        } finally { htmlBtn.disabled = false; }
+      });
+      htmlSection.append(
+        node("p", "在原站打开搜索结果后，用浏览器「网页，仅 HTML」保存，再上传该文件；读取在本地完成。", "rp-hint"),
+        field("来源平台", htmlSource), field("归入求职方向", htmlProfile), field("HTML 文件", htmlFile), htmlBtn, htmlFeedback
+      );
+
+      body.append(seedSection, csvSection, htmlSection);
+    }
+  });
+
+  /* ---------- 2. 规则清洗（cleaning，复用现有 cleaning 引擎） ---------- */
+  RP.registerDrawer("cleaning", {
+    title: "规则清洗配置", icon: "filter", tone: "brass",
+    render(body) {
+      const token = RP.drawerToken();
+      const form = node("form", "", "rp-form");
+      const profile = profileSelect();
+      const profileRow = node("div", "", "rp-select-row");
+      profileRow.append(node("span", "清洗方向", "rp-hint"), profile);
+      const fields = node("fieldset");
+      const status = feedback();
+
+      /* 硬规则 */
+      const hard = section("硬规则", "filter");
+      const salaryGrid = node("div", "", "rp-panel-grid");
+      const minSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
+      const maxSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
+      const expMax = input("number", { min: "1", max: "50", step: "1", placeholder: "不限" });
+      salaryGrid.append(field("最低月薪（K）", minSalary), field("最高月薪（K）", maxSalary), field("经验上限（年）", expMax));
+      const dailyGrid = node("div", "", "rp-panel-grid");
+      dailyGrid.hidden = true;
+      const minDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
+      const maxDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
+      dailyGrid.append(field("最低日薪（元/天）", minDaily), field("最高日薪（元/天）", maxDaily));
+      hard.append(salaryGrid, node("p", "岗位要求的最低经验达到上限时淘汰；面议薪资放行。", "rp-hint"), dailyGrid);
+
+      const splitTerms = (value) => value.split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean);
+      function termsEditor(key, label, placeholder) {
+        const wrap = node("div", "", "rp-terms");
+        wrap.dataset.terms = key;
+        const row = node("div", "", "rp-terms-input");
+        const entry = input("text", { maxlength: "2500", placeholder });
+        const add = button("添加", "rp-btn-sm", "plus");
+        const chips = node("div", "", "rp-chips");
+        const paint = (values) => {
+          chips.replaceChildren(...values.map((value) => {
+            const chip = node("button", value + " ×", "rp-chip-x");
+            chip.type = "button";
+            chip.dataset.value = value;
+            chip.setAttribute("aria-label", "移除 " + value);
+            chip.addEventListener("click", () => { chip.remove(); entry.focus(); });
+            return chip;
+          }));
+        };
+        const commit = () => {
+          const values = [...new Set([
+            ...[...chips.querySelectorAll("[data-value]")].map((chip) => chip.dataset.value),
+            ...splitTerms(entry.value)
+          ])];
+          paint(values);
+          entry.value = "";
+          entry.focus();
+        };
+        add.addEventListener("click", commit);
+        entry.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); commit(); }
+        });
+        row.append(entry, add);
+        wrap.append(node("span", label, "rp-hint"), row, chips);
+        wrap._paint = paint;
+        wrap._read = () => [...new Set([
+          ...[...chips.querySelectorAll("[data-value]")].map((chip) => chip.dataset.value),
+          ...splitTerms(entry.value)
+        ])];
+        return wrap;
+      }
+      const cities = termsEditor("cities", "目标城市", "输入城市后回车添加");
+      const requireEdu = termsEditor("require_education", "学历白名单", "添加可接受的最低学历");
+      const excludeEdu = termsEditor("exclude_education", "学历黑名单", "添加需要排除的学历");
+      const titleExcl = node("textarea");
+      titleExcl.rows = 2; titleExcl.maxLength = 4100; titleExcl.placeholder = "例如 电话销售、保险代理";
+      const companyExcl = node("textarea");
+      companyExcl.rows = 2; companyExcl.maxLength = 4100; companyExcl.placeholder = "用逗号、顿号或换行分隔";
+      const auto = input("checkbox");
+      const autoLabel = node("label", "", "rp-inline-check");
+      autoLabel.append(auto, document.createTextNode("对新采集和新导入的记录自动运行硬规则"));
+      hard.append(cities, requireEdu, excludeEdu,
+        node("p", "学历白名单和黑名单任选一种。", "rp-hint"),
+        field("岗位标题排除词", titleExcl, true), field("公司排除词", companyExcl, true), autoLabel);
+
+      /* AI 初筛规则 */
+      const scout = section("AI 初筛规则", "sparkles");
+      const scoutHead = node("div", "", "rp-panel-actions");
+      const scoutAdd = button("添加规则", "rp-btn-sm", "plus");
+      scoutHead.append(scoutAdd);
+      const exampleNotice = node("div", "", "rp-panel-note");
+      exampleNotice.dataset.tone = "warning";
+      exampleNotice.hidden = true;
+      const exampleText = node("span", "当前展示内置示例，启用或编辑后保存即可用于初筛。");
+      const exampleEnable = button("启用示例", "rp-btn-sm");
+      exampleNotice.append(exampleText, exampleEnable);
+      const scoutList = node("div", "", "rp-scout-list");
+      let examples = [];
+      let examplesOnly = false;
+      function enableExamples() { examplesOnly = false; exampleNotice.hidden = true; }
+      function readScout(row) {
+        return {
+          keyword: row.querySelector("input").value.trim(),
+          condition: row.querySelector("select").value,
+          desc: row.querySelector("textarea").value.trim()
+        };
+      }
+      function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
+        const row = node("div", "", "rp-scout-row");
+        if (rule.legacy) row.dataset.legacy = rule.legacy;
+        row.dataset.condition = rule.condition;
+        const controls = node("div", "", "rp-scout-controls");
+        const keyword = input("text", { maxlength: "240", placeholder: "规则词，例如 单休" });
+        keyword.value = rule.keyword;
+        const condition = select([["must", "必须包含"], ["never", "绝不包含"]], rule.condition);
+        controls.append(field("规则词", keyword), field("判定条件", condition));
+        const desc = node("textarea");
+        desc.rows = 2; desc.maxLength = 600; desc.value = rule.desc;
+        desc.placeholder = "判定标准：命中/排除的具体依据";
+        const actions = node("div", "", "rp-scout-actions");
+        const generate = button("AI 生成标准", "rp-btn-sm", "sparkles");
+        const remove = button("删除规则", "rp-btn-sm rp-btn-danger", "trash");
+        const rowStatus = feedback();
+        row.addEventListener("input", () => { delete row.dataset.legacy; row.dataset.condition = condition.value; enableExamples(); });
+        remove.addEventListener("click", () => { row.remove(); enableExamples(); scoutAdd.focus(); });
+        generate.addEventListener("click", async () => {
+          const current = readScout(row);
+          if (!current.keyword) { setFeedback(rowStatus, "请先填写规则词。", "error"); keyword.focus(); return; }
+          generate.disabled = true;
+          setFeedback(rowStatus, "正在生成…");
+          try {
+            const result = await api("/cleaning/describe", current);
+            const latest = readScout(row);
+            if (row.isConnected && Object.keys(current).every((key) => current[key] === latest[key])) {
+              desc.value = result.desc;
+              delete row.dataset.legacy;
+              enableExamples();
+              setFeedback(rowStatus, "");
+            } else setFeedback(rowStatus, "生成期间规则已变更，请重新生成。", "error");
+          } catch (error) {
+            setFeedback(rowStatus, error.message, "error");
+          } finally { generate.disabled = false; }
+        });
+        actions.append(generate, remove);
+        row.append(controls, field("判定标准", desc), actions, rowStatus);
+        return row;
+      }
+      scoutAdd.addEventListener("click", () => {
+        if (scoutList.children.length >= 24) { setFeedback(status, "每个方向最多保存 24 条 AI 初筛规则。", "error"); return; }
+        enableExamples();
+        const row = scoutRow();
+        scoutList.append(row);
+        row.querySelector("input").focus();
+      });
+      exampleEnable.addEventListener("click", enableExamples);
+      scout.append(scoutHead, exampleNotice, scoutList);
+
+      /* 操作与预览 */
+      const actions = section(null);
+      const saveBtn = button("保存规则", "", "check");
+      const previewBtn = button("预览现有岗位", "", "eye");
+      previewBtn.type = "submit";
+      const applyBtn = button("应用到现有岗位", "rp-btn-primary", "check");
+      applyBtn.disabled = true;
+      const actionRow = node("div", "", "rp-panel-actions");
+      actionRow.append(saveBtn, previewBtn, applyBtn);
+      const previewList = node("div", "", "rp-rule-preview");
+      previewList.hidden = true;
+      actions.append(actionRow, status, previewList);
+
+      fields.append(hard, scout, actions);
+      form.append(profileRow, fields);
+      body.append(form);
+
+      let previewToken = "";
+      let loadedProfile = "";
+      let loadSeq = 0;
+      const CLEAN_NAMES = { unreviewed: "未清洗", passed: "通过", rejected: "淘汰", review: "待核对", released: "已放行" };
+      function resetPreview() {
+        previewToken = "";
+        applyBtn.disabled = true;
+        previewList.hidden = true;
+        previewList.replaceChildren();
+      }
+      function showRules(rules) {
+        titleExcl.value = (rules.title_exclusions || []).join("、");
+        companyExcl.value = (rules.company_exclusions || []).join("、");
+        cities._paint(rules.cities || []);
+        requireEdu._paint(rules.require_education || []);
+        excludeEdu._paint(rules.exclude_education || []);
+        minSalary.value = rules.min_salary_k ?? "";
+        maxSalary.value = rules.max_salary_k ?? "";
+        expMax.value = rules.experience_years_max ?? "";
+        minDaily.value = rules.min_daily_salary ?? "";
+        maxDaily.value = rules.max_daily_salary ?? "";
+        const stored = [
+          ...(rules.ai_scout_rules || []),
+          ...(rules.semantic_required || []).map((keyword) => ({ keyword, condition: "must", desc: "", legacy: "semantic_required" })),
+          ...(rules.semantic_excluded || []).map((keyword) => ({ keyword, condition: "never", desc: "", legacy: "semantic_excluded" }))
+        ];
+        examplesOnly = !stored.length && !!examples.length;
+        exampleNotice.hidden = !examplesOnly;
+        scoutList.replaceChildren(...(examplesOnly ? examples : stored).map(scoutRow));
+        auto.checked = Boolean(rules.auto);
+        const daily = profile.value === "internship";
+        dailyGrid.hidden = !daily;
+        minDaily.disabled = maxDaily.disabled = !daily;
+      }
+      function readRules() {
+        const number = (el) => el.value ? Number(el.value) : null;
+        const rows = examplesOnly ? [] : [...scoutList.children];
+        const legacy = (name) => rows.filter((row) => row.dataset.legacy === name).map((row) => readScout(row).keyword);
+        return {
+          cities: cities._read(), require_education: requireEdu._read(), exclude_education: excludeEdu._read(),
+          title_exclusions: splitTerms(titleExcl.value), company_exclusions: splitTerms(companyExcl.value),
+          min_salary_k: number(minSalary), max_salary_k: number(maxSalary),
+          experience_years_max: number(expMax),
+          min_daily_salary: number(minDaily), max_daily_salary: number(maxDaily),
+          ai_scout_rules: rows.filter((row) => !row.dataset.legacy).map(readScout).filter((rule) => rule.keyword),
+          semantic_required: legacy("semantic_required"), semantic_excluded: legacy("semantic_excluded"),
+          auto: auto.checked
+        };
+      }
+      async function loadRules() {
+        const target = profile.value;
+        const sequence = ++loadSeq;
+        loadedProfile = "";
+        resetPreview();
+        fields.disabled = true;
+        setFeedback(status, "正在读取规则…");
+        try {
+          const data = await api("/cleaning?profile=" + target);
+          if (sequence !== loadSeq || !alive(token, body)) return;
+          examples = data.examples || [];
+          showRules(data.rules);
+          loadedProfile = target;
+          setFeedback(status, "");
+        } catch (error) {
+          if (sequence === loadSeq) setFeedback(status, error.message, "error");
+        } finally {
+          if (sequence === loadSeq) fields.disabled = loadedProfile !== target;
+        }
+      }
+      async function runAction(action) {
+        if (loadedProfile !== profile.value || !form.reportValidity() || (action === "apply" && !previewToken)) return;
+        const payload = { profile: loadedProfile, rules: readRules(), token: previewToken };
+        resetPreview();
+        fields.disabled = true;
+        profile.disabled = true;
+        try {
+          const result = await withBusy(() => api("/cleaning/" + action, payload), status, "正在处理…");
+          if (!alive(token, body)) return;
+          if (action === "preview") {
+            previewToken = result.token;
+            applyBtn.disabled = false;
+            previewList.replaceChildren(...Object.entries(result.samples || {}).map(([cleanStatus, samples]) => {
+              const group = node("div", "", "rp-rule-preview-group");
+              group.dataset.status = cleanStatus;
+              group.append(node("strong", `${CLEAN_NAMES[cleanStatus] || cleanStatus} ${result.counts?.[cleanStatus] ?? 0} 条`));
+              for (const sample of samples) {
+                group.append(node("p", [sample.title, RP.sourceLabel(sample.source), sample.reason].filter(Boolean).join(" · ")));
+              }
+              return group;
+            }));
+            previewList.hidden = false;
+            setFeedback(status, "预览完成，确认后应用到该方向岗位。", "success");
+          } else {
+            showRules(result.rules);
+            setFeedback(status, action === "save" ? "规则已保存。" : "已应用清洗规则。", "success");
+            toast(action === "save" ? "清洗规则已保存。" : "清洗规则已应用到现有岗位。", "success");
+            void RP.refresh({ silent: true });
+          }
+        } catch (error) {
+          if (alive(token, body)) setFeedback(status, error.message, "error");
+        } finally {
+          fields.disabled = false;
+          profile.disabled = false;
+        }
+      }
+      form.addEventListener("submit", (event) => { event.preventDefault(); void runAction("preview"); });
+      form.addEventListener("input", resetPreview);
+      saveBtn.addEventListener("click", () => void runAction("save"));
+      applyBtn.addEventListener("click", () => void runAction("apply"));
+      profile.addEventListener("change", () => void loadRules());
+      void loadRules();
+    }
+  });
+
+  /* ---------- 3. AI 初评（evaluating，流水线评估权重 + 启发式开关） ---------- */
+  RP.registerDrawer("evaluating", {
+    title: "AI 初评配置", icon: "sparkles", tone: "info",
+    render(body) {
+      const token = RP.drawerToken();
+      const readiness = note("正在读取模型与评估配置…");
+      const form = node("form", "", "rp-form");
+      const settingsSection = section("八维评估权重", "sliders");
+      const weights = node("div", "", "rp-weights");
+      const weightInputs = new Map();
+      for (const [key, label] of Object.entries(DIMENSION_LABELS)) {
+        const number = input("number", { min: "0", max: "5", step: "0.1", required: "required" });
+        weightInputs.set(key, number);
+        const wrap = node("label");
+        wrap.append(document.createTextNode(label), number);
+        weights.append(wrap);
+      }
+      const heuristic = input("checkbox");
+      const heuristicLabel = node("label", "", "rp-inline-check");
+      heuristicLabel.append(heuristic, document.createTextNode("模型未配置时允许启发式回退（确定性打分，界面明示启发式模式）"));
+      const saveBtn = button("保存评估配置", "", "check");
+      saveBtn.type = "submit";
+      const settingsFeedback = feedback();
+      settingsSection.append(
+        node("p", "权重 0-5：3 为中性缺失，4 为明确正面，5 极罕见；总分只展示不分流，分流只看 A-F 评级。", "rp-hint"),
+        weights, heuristicLabel, saveBtn, settingsFeedback
+      );
+      form.append(settingsSection);
+
+      const runSection = section("批量初评", "play");
+      runSection.append(node("p", "对清洗通过与待重评岗位运行八维初评：达到阈值走精投轨，未达标走海投轨；解析失败置空评级并拦截。", "rp-hint"));
+      const runFeedback = feedback();
+      const runBtn = button("运行 AI 初评", "rp-btn-primary", "play");
+      runBtn.addEventListener("click", async () => {
+        runBtn.disabled = true;
+        try {
+          const result = await withBusy(() => RP.runStage("screen"), runFeedback, "正在批量初评，可能需要一些时间…");
+          if (!alive(token, body)) return;
+          setFeedback(runFeedback, RP.stageResultMessage(result, "AI 初评"), "success");
+          toast(RP.stageResultMessage(result, "AI 初评"), "success");
+          void RP.refresh({ silent: true });
+          paintStats();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
+        } finally { runBtn.disabled = false; }
+      });
+      const stats = node("div", "", "rp-stat-chips");
+      function paintStats() {
+        const grades = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+        let scored = 0;
+        let custom = 0;
+        let mass = 0;
+        for (const job of state.jobs) {
+          if (job.score != null) scored += 1;
+          if (job.grade) grades[job.grade] = (grades[job.grade] || 0) + 1;
+          if (job.track === "mass") mass += 1;
+          else if (job.stage !== "collected" && job.stage !== "cleaned") custom += 1;
+        }
+        const chips = [node("span", "", "rp-stat-chip")];
+        chips[0].append(document.createTextNode("已评分 "), node("b", String(scored)));
+        for (const [grade, count] of Object.entries(grades)) {
+          if (!count) continue;
+          const chip = node("span", "", "rp-stat-chip");
+          chip.append(document.createTextNode(grade + " 级 "), node("b", String(count)));
+          chips.push(chip);
+        }
+        const trackChip = node("span", "", "rp-stat-chip");
+        trackChip.append(document.createTextNode("精投 "), node("b", String(custom)), document.createTextNode(" · 海投 "), node("b", String(mass)));
+        chips.push(trackChip);
+        stats.replaceChildren(...(scored ? chips : [node("span", "暂无已评分岗位", "rp-stat-chip")]));
+      }
+      paintStats();
+      runSection.append(runBtn, runFeedback, stats);
+      body.append(readiness, form, runSection);
+
+      let loadSeq = 0;
+      function showConfig(data) {
+        const settings = data.settings || {};
+        for (const [key, number] of weightInputs) number.value = settings.evaluation_weights?.[key] ?? 1;
+        heuristic.checked = Boolean(settings.heuristic_mode);
+        if (data.llm_configured) {
+          readiness.dataset.tone = "success";
+          readiness.textContent = "对话模型已就绪：初评走模型八维打分，失败时按配置回退。";
+        } else if (data.heuristic_active) {
+          readiness.dataset.tone = "warning";
+          readiness.replaceChildren(document.createTextNode("启发式模式：对话模型未配置，初评使用确定性启发式打分。前往 "),
+            (() => { const a = node("a", "系统配置"); a.href = meta.settings_url; return a; })(),
+            document.createTextNode(" 填写模型。"));
+        } else {
+          readiness.dataset.tone = "danger";
+          readiness.textContent = "模型未配置且启发式回退已关闭：初评无法执行，请开启启发式或先配置模型。";
+        }
+      }
+      async function loadSettings() {
+        const sequence = ++loadSeq;
+        saveBtn.disabled = true;
+        try {
+          const data = await loadConfig();
+          if (sequence !== loadSeq || !alive(token, body)) return;
+          showConfig(data);
+        } catch (error) {
+          if (sequence === loadSeq) { readiness.dataset.tone = "danger"; readiness.textContent = error.message; }
+        } finally {
+          if (sequence === loadSeq) saveBtn.disabled = false;
+        }
+      }
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const patch = {
+          heuristic_mode: heuristic.checked,
+          evaluation_weights: Object.fromEntries([...weightInputs].map(([key, number]) => [key, Number(number.value)]))
+        };
+        saveBtn.disabled = true;
+        try {
+          const data = await saveConfig(patch, settingsFeedback, "评估配置已保存。");
+          if (!alive(token, body)) return;
+          showConfig(data);
+          setFeedback(settingsFeedback, "评估配置已保存。", "success");
+        } catch (error) {
+          if (alive(token, body)) setFeedback(settingsFeedback, error.message, "error");
+        } finally { saveBtn.disabled = false; }
+      });
+      void loadSettings();
+    }
+  });
+
+  /* ---------- 4. 深度评估（deep_eval，阈值与投递白名单可配） ---------- */
+  RP.registerDrawer("deep_eval", {
+    title: "深度评估", icon: "gauge", tone: "ink",
+    render(body) {
+      const token = RP.drawerToken();
+      body.append(note("深评对精投轨岗位产出七键分析（不打分、不分级），供简历改写与人工审批参考，自动流转无需必配。", "info"));
+
+      const gate = section("分流阈值与投递白名单", "target");
+      const threshold = select([["A", "A 级（仅 A 走精投）"], ["B", "B 级（A/B 走精投，默认）"], ["C", "C 级（A/B/C 走精投）"]], "B");
+      const gradeBoxes = new Map();
+      const gradeRow = node("div", "", "rp-stat-chips");
+      for (const grade of GRADE_OPTIONS) {
+        const box = input("checkbox");
+        gradeBoxes.set(grade, box);
+        const label = node("label", "", "rp-inline-check");
+        label.append(box, document.createTextNode(grade + " 级"));
+        gradeRow.append(label);
+      }
+      const gateFeedback = feedback();
+      const gateSave = button("保存阈值配置", "", "check");
+      gateSave.addEventListener("click", async () => {
+        const autoDeliver = [...gradeBoxes].filter(([, box]) => box.checked).map(([grade]) => grade);
+        if (!autoDeliver.length) { setFeedback(gateFeedback, "自动投递等级白名单不能为空。", "error"); return; }
+        gateSave.disabled = true;
+        try {
+          await saveConfig({ threshold: threshold.value, auto_deliver_grades: autoDeliver }, gateFeedback, "阈值配置已保存。");
+          if (alive(token, body)) setFeedback(gateFeedback, "阈值配置已保存。", "success");
+        } catch (error) {
+          if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
+        } finally { gateSave.disabled = false; }
+      });
+      gate.append(field("精投分流阈值", threshold),
+        node("p", "自动投递等级白名单（海投轨）：白名单外评级与解析失败件一律拦截进审批。", "rp-hint"),
+        gradeRow, gateSave, gateFeedback);
+
+      const runSection = section("批量深评", "play");
+      const runFeedback = feedback();
+      const runBtn = button("运行深度评估", "rp-btn-primary", "play");
+      runBtn.addEventListener("click", async () => {
+        runBtn.disabled = true;
+        try {
+          const result = await withBusy(() => RP.runStage("deep"), runFeedback, "正在批量深评…");
+          if (!alive(token, body)) return;
+          setFeedback(runFeedback, RP.stageResultMessage(result, "深度评估"), "success");
+          toast(RP.stageResultMessage(result, "深度评估"), "success");
+          void RP.refresh({ silent: true });
+          paintList();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
+        } finally { runBtn.disabled = false; }
+      });
+      runSection.append(runBtn, runFeedback);
+
+      const listSection = section("深评记录", "eye");
+      const list = node("div", "", "rp-mini-list");
+      const detail = node("div", "", "rp-deep-keys");
+      function paintList() {
+        const jobs = state.jobs.filter((job) => RP.stageIndex(job.stage) >= RP.stageIndex("deep")).slice(0, 8);
+        if (!jobs.length) {
+          list.replaceChildren(emptyBlock("暂无深评记录", "初评通过后运行深度评估，这里会列出可查阅的岗位。"));
+          return;
+        }
+        list.replaceChildren(...jobs.map((job) => {
+          const row = miniJob(job);
+          const actions = node("div", "", "rp-mini-job-actions");
+          const view = button("查看七键分析", "rp-btn-sm rp-btn-ghost", "eye");
+          view.addEventListener("click", async () => {
+            view.disabled = true;
+            detail.replaceChildren(node("p", "正在读取深评结果…", "rp-hint"));
+            try {
+              const payload = await RP.fetchJobPayload(job);
+              if (!alive(token, body)) return;
+              const deep = payloadOf(payload, "deep_payload", "deep");
+              detail.replaceChildren();
+              if (!deep) {
+                detail.append(note("该岗位还没有深评结果，可能仍在队列中。", "warning"));
+                return;
+              }
+              for (const [key, label] of DEEP_KEYS) {
+                const value = deep[key];
+                if (value == null || value === "") continue;
+                const fold = node("details", "", "rp-deep-key");
+                fold.append(node("summary", label));
+                const doc = node("div", "", "rp-doc");
+                RP.renderDoc(doc, RP.payloadText(value));
+                fold.append(doc);
+                detail.append(fold);
+              }
+              if (!detail.childNodes.length) detail.append(note("深评结果为空。", "warning"));
+            } catch (error) {
+              if (alive(token, body)) detail.replaceChildren(note(error.message, "danger"));
+            } finally { view.disabled = false; }
+          });
+          actions.append(view);
+          row.append(actions);
+          return row;
+        }));
+      }
+      paintList();
+      listSection.append(list, detail);
+      body.append(gate, runSection, listSection);
+
+      loadConfig().then((data) => {
+        if (!alive(token, body)) return;
+        threshold.value = data.settings?.threshold || "B";
+        const allowed = data.settings?.auto_deliver_grades || ["C", "D", "F"];
+        for (const [grade, box] of gradeBoxes) box.checked = allowed.includes(grade);
+      }).catch(() => {});
+    }
+  });
+
+  /* ---------- 5. 简历改写（rewriting，基准简历 + 对比） ---------- */
+  RP.registerDrawer("rewriting", {
+    title: "简历改写 · 定制面板", icon: "pen", tone: "accent",
+    render(body, ctx) {
+      const token = RP.drawerToken();
+      body.append(note("以基准简历 + 岗位 JD 生成定向改写稿。真实性边界：不虚构经历、不注入原简历没有的技术、经历一段不裁、无量化不编数据。", "info"));
+
+      const baselineSection = section("基准简历", "file-text");
+      const baselineSelect = select([["", "正在读取简历库…"]]);
+      const baselineInfo = node("p", "", "rp-hint");
+      const baselineFeedback = feedback();
+      baselineSelect.addEventListener("change", async () => {
+        if (!baselineSelect.value) return;
+        baselineSelect.disabled = true;
+        try {
+          await saveConfig({ baseline_resume_id: baselineSelect.value }, baselineFeedback, "基准简历已切换。");
+          if (alive(token, body)) void loadCompare();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(baselineFeedback, error.message, "error");
+        } finally { baselineSelect.disabled = false; }
+      });
+      const baselineLink = node("a", "去简历库上传/解析 ↗");
+      baselineLink.href = meta.resumes_url;
+      baselineSection.append(field("选择基准简历", baselineSelect), baselineInfo, baselineLink, baselineFeedback);
+
+      const picker = section("选择岗位", "briefcase");
+      const eligible = state.jobs.filter((job) => RP.stageIndex(job.stage) >= RP.stageIndex("screened") && job.tab !== "rejected" && job.tab !== "failed");
+      if (ctx.job && !eligible.some((job) => RP.jobId(job) === RP.jobId(ctx.job))) eligible.unshift(ctx.job);
+      const jobSelect = select(eligible.slice(0, 200).map((job) => [RP.jobId(job), `${job.title} · ${job.company || RP.sourceLabel(job.source)}`]),
+        ctx.job ? RP.jobId(ctx.job) : eligible[0] ? RP.jobId(eligible[0]) : null);
+      const currentJob = () => eligible.find((job) => RP.jobId(job) === jobSelect.value) || null;
+      const runFeedback = feedback();
+      const runBtn = button("生成定向改写（批量阶段）", "rp-btn-primary", "pen");
+      runBtn.addEventListener("click", async () => {
+        runBtn.disabled = true;
+        try {
+          const result = await withBusy(() => RP.runStage("rewrite"), runFeedback, "正在生成定向改写稿…");
+          if (!alive(token, body)) return;
+          setFeedback(runFeedback, RP.stageResultMessage(result, "简历改写"), "success");
+          toast(RP.stageResultMessage(result, "简历改写"), "success");
+          void RP.refresh({ silent: true });
+          void loadCompare();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
+        } finally { runBtn.disabled = false; }
+      });
+      picker.append(field("目标岗位", jobSelect), runBtn, runFeedback);
+      if (!eligible.length) picker.append(note("暂无可改写的岗位：先完成初评，或从看板选择岗位。", "warning"));
+
+      const compareSection = section("改写对比", "eye");
+      const compare = node("div", "", "rp-compare");
+      const baseCol = node("div", "", "rp-compare-col");
+      const rewriteCol = node("div", "", "rp-compare-col");
+      baseCol.append(node("h4", "基准简历"));
+      rewriteCol.append(node("h4", "定向改写稿"));
+      const baseDoc = node("div", "", "rp-doc");
+      const rewriteDoc = node("div", "", "rp-doc");
+      baseCol.append(baseDoc);
+      rewriteCol.append(rewriteDoc);
+      compare.append(baseCol, rewriteCol);
+      const rewriteMeta = node("div", "", "rp-stat-chips");
+      const downgrades = node("details", "", "rp-deep-key");
+      downgrades.hidden = true;
+      const compareActions = node("div", "", "rp-panel-actions");
+      const copyBtn = button("复制改写稿", "rp-btn-sm", "copy");
+      let rewriteText = "";
+      copyBtn.addEventListener("click", () => copyText(rewriteText, "改写稿已复制。"));
+      compareActions.append(copyBtn);
+      compareSection.append(compare, rewriteMeta, downgrades, compareActions);
+      body.append(baselineSection, picker, compareSection);
+
+      let baselineOptions = [];
+      loadConfig().then((data) => {
+        if (!alive(token, body)) return;
+        const baseline = data.resume_baseline || {};
+        baselineOptions = baseline.options || [];
+        baselineSelect.replaceChildren(...baselineOptions.map((option) =>
+          new Option(`${option.title}（${option.chars} 字）`, option.id)));
+        if (!baselineOptions.length) {
+          baselineSelect.replaceChildren(new Option("简历库暂无已解析文档", ""));
+          baselineInfo.textContent = "请先在简历库上传并解析简历，再选择基准。";
+        } else {
+          const current = baselineOptions.find((option) => option.title === baseline.name);
+          baselineSelect.value = current?.id || baselineOptions[0].id;
+          baselineInfo.textContent = baseline.enabled
+            ? `当前基准：${baseline.name}。初评与改写均以该简历为底稿。`
+            : "尚未选定基准简历：选择后保存，改写阶段才可执行。";
+        }
+      }).catch((error) => {
+        if (alive(token, body)) setFeedback(baselineFeedback, error.message, "error");
+      });
+
+      let compareSeq = 0;
+      async function loadCompare() {
+        const sequence = ++compareSeq;
+        const job = currentJob();
+        const selected = baselineOptions.find((option) => option.id === baselineSelect.value);
+        baseDoc.replaceChildren();
+        if (selected) {
+          baseDoc.append(node("h5", selected.title));
+          baseDoc.append(node("p", `已解析简历文档 · ${selected.chars} 字。全文请在简历库查看，改写稿不会裁剪经历条目。`));
+        } else {
+          baseDoc.append(node("p", "尚未选定基准简历。", "rp-doc-empty"));
+        }
+        const baseLink = node("a", "在简历库中查看 ↗");
+        baseLink.href = meta.resumes_url;
+        baseDoc.append(baseLink);
+        rewriteDoc.replaceChildren(node("p", job ? "正在读取改写稿…" : "请先选择岗位。", "rp-doc-empty"));
+        rewriteMeta.replaceChildren();
+        downgrades.hidden = true;
+        rewriteText = "";
+        copyBtn.disabled = true;
+        if (!job) return;
+        try {
+          const payload = await RP.fetchJobPayload(job);
+          if (sequence !== compareSeq || !alive(token, body)) return;
+          const rewrite = payloadOf(payload, "rewrite_payload", "rewrite");
+          rewriteDoc.replaceChildren();
+          rewriteText = RP.payloadText(rewrite);
+          if (rewriteText) RP.renderDoc(rewriteDoc, rewriteText);
+          else rewriteDoc.append(node("p", "尚未生成改写稿，点击上方按钮生成。", "rp-doc-empty"));
+          copyBtn.disabled = !rewriteText;
+          if (rewrite && typeof rewrite === "object") {
+            rewriteMeta.append(modeChip(rewrite.mode));
+            if (rewrite.baseline_name) rewriteMeta.append(node("span", `基准：${rewrite.baseline_name}`, "rp-stat-chip"));
+            const list = Array.isArray(rewrite.downgrades) ? rewrite.downgrades : [];
+            if (list.length) {
+              downgrades.hidden = false;
+              downgrades.replaceChildren(node("summary", `真实性边界降级记录（${list.length}）`));
+              const doc = node("div", "", "rp-doc");
+              for (const item of list) {
+                doc.append(node("p", `${item.original} → ${item.replaced} · ${item.reason || ""}`));
+              }
+              downgrades.append(doc);
+            }
+          }
+        } catch (error) {
+          if (sequence === compareSeq) rewriteDoc.replaceChildren(node("p", error.message, "rp-doc-empty"));
+        }
+      }
+      jobSelect.addEventListener("change", () => void loadCompare());
+      void loadCompare();
+    }
+  });
+
+  /* ---------- 6. 打招呼语（greeting，海投母本 + 预览核验） ---------- */
+  RP.registerDrawer("greeting", {
+    title: "打招呼语预览", icon: "message", tone: "success",
+    render(body) {
+      const token = RP.drawerToken();
+      body.append(note("高情商开场白：150-250 字、2-3 个匹配理由、禁弱势词。精投轨由模型/模板生成；海投轨只认下方人工母本，母本为空时岗位转人工复核，禁止现场编造。", "info"));
+
+      const masterSection = section("海投母本（人工配置）", "pen");
+      const master = node("textarea");
+      master.rows = 4; master.maxLength = 2000;
+      master.placeholder = "填写海投轨统一使用的打招呼母本；留空时海投岗位停在人工复核。";
+      const masterFeedback = feedback();
+      const masterSave = button("保存母本", "", "check");
+      masterSave.addEventListener("click", async () => {
+        masterSave.disabled = true;
+        try {
+          await saveConfig({ mass_greeting: master.value }, masterFeedback, "海投母本已保存。");
+          if (alive(token, body)) setFeedback(masterFeedback, "海投母本已保存。", "success");
+        } catch (error) {
+          if (alive(token, body)) setFeedback(masterFeedback, error.message, "error");
+        } finally { masterSave.disabled = false; }
+      });
+      masterSection.append(master, masterSave, masterFeedback);
+
+      const runSection = section("批量生成", "play");
+      const runFeedback = feedback();
+      const runBtn = button("生成打招呼语", "rp-btn-primary", "play");
+      runBtn.addEventListener("click", async () => {
+        runBtn.disabled = true;
+        try {
+          const result = await withBusy(() => RP.runStage("greet"), runFeedback, "正在批量生成…");
+          if (!alive(token, body)) return;
+          setFeedback(runFeedback, RP.stageResultMessage(result, "打招呼语"), "success");
+          toast(RP.stageResultMessage(result, "打招呼语"), "success");
+          void RP.refresh({ silent: true });
+          paintList();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
+        } finally { runBtn.disabled = false; }
+      });
+      runSection.append(runBtn, runFeedback);
+
+      const previewSection = section("生成稿预览", "eye");
+      const list = node("div", "", "rp-mini-list");
+      const preview = node("div", "", "rp-panel-section");
+      const textBox = node("div", "", "rp-greeting-text");
+      const gate = feedback();
+      const actions = node("div", "", "rp-panel-actions");
+      const copyBtn = button("复制欢迎语", "rp-btn-sm", "copy");
+      let greetingText = "";
+      copyBtn.addEventListener("click", () => copyText(greetingText, "欢迎语已复制。"));
+      actions.append(copyBtn);
+      preview.append(textBox, gate, actions);
+      preview.hidden = true;
+
+      function showGreeting(greeting) {
+        const text = RP.payloadText(greeting);
+        greetingText = text;
+        preview.hidden = false;
+        textBox.textContent = text || "（空）";
+        const illegal = !text.trim() || /❌|生成失败/.test(text) || (greeting && greeting.legal === false);
+        if (illegal) setFeedback(gate, "未通过合法性闸：内容为空或含失败标记，严禁外发。", "error");
+        else {
+          const length = text.replace(/\s/g, "").length;
+          setFeedback(gate, `合法性闸通过 · ${length} 字${length < 150 || length > 250 ? "（建议 150-250 字）" : ""}，外发前请人工核验。`, "success");
+        }
+        copyBtn.disabled = illegal;
+      }
+      function paintList() {
+        const jobs = state.jobs.filter((job) => job.hasGreeting || RP.stageIndex(job.stage) >= RP.stageIndex("greeted")).slice(0, 10);
+        if (!jobs.length) {
+          list.replaceChildren(emptyBlock("暂无打招呼语", "运行生成后，这里会列出可预览的岗位。"));
+          preview.hidden = true;
+          return;
+        }
+        list.replaceChildren(...jobs.map((job) => {
+          const row = miniJob(job);
+          const rowActions = node("div", "", "rp-mini-job-actions");
+          const view = button("预览", "rp-btn-sm rp-btn-ghost", "eye");
+          view.addEventListener("click", async () => {
+            view.disabled = true;
+            try {
+              const payload = await RP.fetchJobPayload(job);
+              if (!alive(token, body)) return;
+              showGreeting(payloadOf(payload, "greeting_payload", "greeting"));
+            } catch (error) {
+              if (alive(token, body)) toast(error.message, "error");
+            } finally { view.disabled = false; }
+          });
+          rowActions.append(view);
+          row.append(rowActions);
+          return row;
+        }));
+      }
+      paintList();
+      previewSection.append(list, preview);
+      body.append(masterSection, runSection, previewSection);
+
+      loadConfig().then((data) => {
+        if (alive(token, body)) master.value = data.settings?.mass_greeting || "";
+      }).catch(() => {});
+    }
+  });
+
+  /* ---------- 7. 审批操作（review） ---------- */
+  RP.registerDrawer("review", {
+    title: "审批操作", icon: "shield", tone: "warning",
+    render(body) {
+      const token = RP.drawerToken();
+      body.append(note("精投轨走简历人工复核；海投轨按公司规模闸拦截（默认 ≥1000 人）。放行需物料齐备（定制简历稿 + 合法欢迎语），拒绝为终态，重评打回评估段。", "info"));
+      const head = section("待审批队列", "user-check");
+      const countLine = node("p", "", "rp-hint");
+      const bulkBtn = button("一键放行全部", "rp-btn-primary", "check");
+      const list = node("div", "", "rp-mini-list");
+      function paint() {
+        const jobs = state.jobs.filter((job) => job.tab === "approval");
+        countLine.textContent = jobs.length ? `共 ${jobs.length} 个岗位等待审批。` : "";
+        bulkBtn.disabled = !jobs.length || state.bulkBusy;
+        bulkBtn.textContent = jobs.length ? `一键放行全部（${jobs.length}）` : "一键放行全部";
+        if (!jobs.length) {
+          list.replaceChildren(emptyBlock("审批队列已清空", "启动流水线或等待岗位流转到审批段。"));
+          return;
+        }
+        list.replaceChildren(...jobs.slice(0, 50).map((job) => {
+          const row = miniJob(job);
+          row.append(node("p", [job.track === "mass" ? "海投轨" : "精投轨", job.followStatus, job.reason].filter(Boolean).join(" · "), "rp-mini-job-meta"));
+          const actions = node("div", "", "rp-mini-job-actions");
+          const reject = button("拒绝", "rp-btn-sm rp-btn-danger", "x");
+          const reeval = button("重评", "rp-btn-sm rp-btn-ghost", "rotate");
+          const approve = button("放行", "rp-btn-sm rp-btn-success", "check");
+          reject.addEventListener("click", async () => { await RP.decide(job, "reject"); if (alive(token, body)) paint(); });
+          reeval.addEventListener("click", async () => { await RP.decide(job, "reeval"); if (alive(token, body)) paint(); });
+          approve.addEventListener("click", async () => { await RP.decide(job, "approve"); if (alive(token, body)) paint(); });
+          actions.append(reject, reeval, approve);
+          row.append(actions);
+          return row;
+        }));
+      }
+      bulkBtn.addEventListener("click", async () => {
+        const jobs = state.jobs.filter((job) => job.tab === "approval");
+        bulkBtn.disabled = true;
+        let done = 0;
+        for (const job of jobs) {
+          try {
+            await pipelineApi("/approve", { source: job.source, url_key: job.url_key, decision: "approve" });
+            job.stage = "queued"; job.tab = "queued"; job.followStatus = "待投递";
+            RP.adjustCounts("approval", "queued");
+            done += 1;
+          } catch (error) { toast(`放行中断：${error.message}`, "error"); break; }
+        }
+        RP.renderBoard();
+        void RP.refresh({ silent: true });
+        if (done) toast(`已放行 ${done} 个岗位。`, "success");
+        if (alive(token, body)) paint();
+      });
+      paint();
+      head.append(countLine, bulkBtn, list);
+      body.append(head);
+    }
+  });
+
+  /* ---------- 8. 投递队列（delivering，dry-run + 投递包） ---------- */
+  RP.registerDrawer("delivering", {
+    title: "投递队列 · dry-run", icon: "send", tone: "accent",
+    render(body, ctx) {
+      const token = RP.drawerToken();
+      body.append(note("投递为本地 dry-run：模拟执行并生成投递包（JSON/CSV 导出），不向外部平台发起请求。失败台账按持久/瞬时故障分诊，自动重试最多 2 次。", "info"));
+
+      const gate = section("投递闸配置", "sliders");
+      const headcount = input("number", { min: "1", max: "10000000", step: "1" });
+      const stopAtReview = input("checkbox");
+      const stopLabel = node("label", "", "rp-inline-check");
+      stopLabel.append(stopAtReview, document.createTextNode("停在待投递队列等待手动/波次 dry-run（推荐）"));
+      const gateFeedback = feedback();
+      const gateSave = button("保存投递闸配置", "", "check");
+      gateSave.addEventListener("click", async () => {
+        gateSave.disabled = true;
+        try {
+          await saveConfig({
+            mass_apply_max_headcount: Number(headcount.value) || 1000,
+            stop_at_review: stopAtReview.checked
+          }, gateFeedback, "投递闸配置已保存。");
+          if (alive(token, body)) setFeedback(gateFeedback, "投递闸配置已保存。", "success");
+        } catch (error) {
+          if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
+        } finally { gateSave.disabled = false; }
+      });
+      gate.append(field("海投拦截门槛（公司规模上限，人）", headcount), stopLabel, gateSave, gateFeedback);
+
+      const selected = new Set();
+      const queueSection = section("待投递", "send");
+      const queueList = node("div", "", "rp-mini-list");
+      const queueActions = node("div", "", "rp-panel-actions");
+      const deliverBtn = button("dry-run 投递所选", "rp-btn-accent", "send");
+      const exportBtn = button("全部投递并导出 CSV", "rp-btn-ghost", "download");
+      const deliverFeedback = feedback();
+      function syncDeliverBtn() {
+        deliverBtn.disabled = !selected.size || state.bulkBusy;
+        deliverBtn.textContent = selected.size ? `dry-run 投递所选（${selected.size}）` : "dry-run 投递所选";
+      }
+      function paintQueue() {
+        const jobs = state.jobs.filter((job) => job.tab === "queued");
+        syncDeliverBtn();
+        if (!jobs.length) {
+          queueList.replaceChildren(emptyBlock("待投递队列为空", "审批放行后岗位会进入这里。"));
+          return;
+        }
+        queueList.replaceChildren(...jobs.slice(0, 50).map((job) => {
+          const row = miniJob(job, {
+            checkbox: true,
+            checked: selected.has(RP.jobId(job)),
+            onCheck: (checked) => {
+              if (checked) selected.add(RP.jobId(job));
+              else selected.delete(RP.jobId(job));
+              syncDeliverBtn();
+            }
+          });
+          const actions = node("div", "", "rp-mini-job-actions");
+          const deliver = button("立即投递", "rp-btn-sm rp-btn-accent", "send");
+          deliver.addEventListener("click", async () => {
+            await RP.deliverJobs([job]);
+            if (alive(token, body)) { paintQueue(); paintDelivered(); }
+          });
+          const cancel = button("终止投递", "rp-btn-sm rp-btn-ghost", "stop");
+          cancel.addEventListener("click", async () => {
+            await RP.abandonDelivery(job);
+            if (alive(token, body)) paintQueue();
+          });
+          actions.append(cancel, deliver);
+          row.append(actions);
+          return row;
+        }));
+      }
+      deliverBtn.addEventListener("click", async () => {
+        const jobs = state.jobs.filter((job) => job.tab === "queued" && selected.has(RP.jobId(job)));
+        selected.clear();
+        await RP.deliverJobs(jobs);
+        if (alive(token, body)) { paintQueue(); paintDelivered(); }
+      });
+      exportBtn.addEventListener("click", async () => {
+        exportBtn.disabled = true;
+        setFeedback(deliverFeedback, "正在执行 dry-run 并导出投递包…");
+        try {
+          await RP.exportDeliveryCsv();
+          if (!alive(token, body)) return;
+          setFeedback(deliverFeedback, "投递包 CSV 已导出（含本轮 dry-run 结果）。", "success");
+          toast("投递包 CSV 已导出。", "success");
+          void RP.refresh({ silent: true });
+          paintQueue();
+          paintDelivered();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(deliverFeedback, error.message, "error");
+        } finally { exportBtn.disabled = false; }
+      });
+      queueActions.append(deliverBtn, exportBtn);
+      queueSection.append(queueActions, deliverFeedback, queueList);
+
+      const deliveredSection = section("已投递 · 投递包", "check-circle");
+      const deliveredList = node("div", "", "rp-mini-list");
+      const packageView = node("div", "", "rp-panel-section");
+      packageView.hidden = true;
+      function renderPackage(delivery) {
+        packageView.replaceChildren();
+        const pkg = delivery?.package;
+        if (!pkg) {
+          packageView.append(RP.payloadText(delivery)
+            ? (() => { const doc = node("div", "", "rp-doc"); RP.renderDoc(doc, RP.payloadText(delivery)); return doc; })()
+            : note("投递包为空：该岗位可能由早期 dry-run 生成。", "warning"));
+          return;
+        }
+        const chips = node("div", "", "rp-stat-chips");
+        for (const text of [
+          pkg.grade ? `评级 ${pkg.grade}` : "", pkg.score != null ? `${pkg.score} 分` : "",
+          pkg.track === "mass" ? "海投轨" : "精投轨", "dry-run 模拟投递",
+          delivery.delivered_at ? "投递时间 " + RP.fmtTime(delivery.delivered_at) : ""
+        ].filter(Boolean)) chips.append(node("span", text, "rp-stat-chip"));
+        packageView.append(chips);
+        if (pkg.greeting) {
+          packageView.append(node("h3", "破冰欢迎语"));
+          const box = node("div", "", "rp-greeting-text");
+          box.textContent = pkg.greeting;
+          packageView.append(box);
+        }
+        if (pkg.resume_markdown) {
+          packageView.append(node("h3", "投递简历（改写稿）"));
+          const doc = node("div", "", "rp-doc");
+          RP.renderDoc(doc, pkg.resume_markdown);
+          packageView.append(doc);
+        }
+      }
+      async function openPackage(job) {
+        packageView.hidden = false;
+        packageView.replaceChildren(node("p", "正在读取投递包…", "rp-hint"));
+        try {
+          const payload = await RP.fetchJobPayload(job);
+          if (!alive(token, body)) return;
+          renderPackage(payloadOf(payload, "delivery_payload", "delivery"));
+        } catch (error) {
+          if (alive(token, body)) packageView.replaceChildren(note(error.message, "danger"));
+        }
+      }
+      function paintDelivered() {
+        const jobs = state.jobs.filter((job) => job.tab === "delivered");
+        if (!jobs.length) {
+          deliveredList.replaceChildren(emptyBlock("暂无投递记录", "dry-run 投递完成后会在这里留档。"));
+          return;
+        }
+        deliveredList.replaceChildren(...jobs.slice(0, 30).map((job) => {
+          const row = miniJob(job);
+          row.append(node("p", job.updatedAt ? "投递时间 " + RP.fmtTime(job.updatedAt) : "", "rp-mini-job-meta"));
+          const actions = node("div", "", "rp-mini-job-actions");
+          const view = button("查看投递包", "rp-btn-sm rp-btn-ghost", "eye");
+          view.addEventListener("click", () => openPackage(job));
+          actions.append(view);
+          row.append(actions);
+          return row;
+        }));
+      }
+      deliveredSection.append(deliveredList, packageView);
+      paintQueue();
+      paintDelivered();
+      body.append(gate, queueSection, deliveredSection);
+
+      loadConfig().then((data) => {
+        if (!alive(token, body)) return;
+        headcount.value = data.settings?.mass_apply_max_headcount ?? 1000;
+        stopAtReview.checked = data.settings?.stop_at_review !== false;
+      }).catch(() => {});
+      if (ctx.job && ctx.job.tab === "delivered") void openPackage(ctx.job);
+    }
+  });
+
+  /* ---------- 物料预览弹窗渲染 ---------- */
+  RP.registerMaterialsRenderer((body, job, payload, tab) => {
+    body.append(node("p", [job.company, RP.sourceLabel(job.source), job.location, job.salary].filter(Boolean).join(" · "), "rp-modal-meta"));
+    if (tab === "resume") {
+      const rewrite = payloadOf(payload, "rewrite_payload", "rewrite");
+      const text = RP.payloadText(rewrite);
+      if (!text) {
+        body.append(emptyBlock("尚未生成定向改写稿", "改写以基准简历为底稿，结合该岗位 JD 生成。", "去生成改写", () => {
+          RP.closeMaterials();
+          RP.openDrawer("rewriting", { job });
+        }));
+        return;
+      }
+      if (rewrite && typeof rewrite === "object") {
+        const chips = node("div", "", "rp-stat-chips");
+        chips.append(modeChip(rewrite.mode));
+        if (rewrite.baseline_name) chips.append(node("span", `基准：${rewrite.baseline_name}`, "rp-stat-chip"));
+        body.append(chips);
+      }
+      const doc = node("div", "", "rp-doc");
+      RP.renderDoc(doc, text);
+      const actions = node("div", "", "rp-modal-actions");
+      const copy = button("复制全文", "rp-btn-sm", "copy");
+      copy.addEventListener("click", () => copyText(text, "改写稿已复制。"));
+      const open = button("打开定制面板", "rp-btn-sm rp-btn-ghost", "sliders");
+      open.addEventListener("click", () => { RP.closeMaterials(); RP.openDrawer("rewriting", { job }); });
+      actions.append(copy, open);
+      body.append(doc, actions);
+      const list = Array.isArray(rewrite?.downgrades) ? rewrite.downgrades : [];
+      if (list.length) {
+        const fold = node("details", "", "rp-deep-key");
+        fold.append(node("summary", `真实性边界降级记录（${list.length}）`));
+        const foldDoc = node("div", "", "rp-doc");
+        for (const item of list) foldDoc.append(node("p", `${item.original} → ${item.replaced} · ${item.reason || ""}`));
+        fold.append(foldDoc);
+        body.append(fold);
+      }
+      body.append(note("本地改写稿预览，无外部原件；外发前请人工核验真实性边界。", "info"));
+    } else {
+      const greeting = payloadOf(payload, "greeting_payload", "greeting");
+      const text = RP.payloadText(greeting);
+      if (!text) {
+        body.append(emptyBlock("尚未生成破冰欢迎语", "生成后可在这里核验合法性并复制。", "去生成欢迎语", () => {
+          RP.closeMaterials();
+          RP.openDrawer("greeting");
+        }));
+        return;
+      }
+      const box = node("div", "", "rp-greeting-text");
+      box.textContent = text;
+      const illegal = /❌|生成失败/.test(text) || (greeting && greeting.legal === false);
+      const gate = note(illegal ? "未通过合法性闸：内容为空或含失败标记，严禁外发。" : "合法性闸通过，外发前请人工核验匹配理由。", illegal ? "danger" : "success");
+      const actions = node("div", "", "rp-modal-actions");
+      const copy = button("复制欢迎语", "rp-btn-sm", "copy");
+      copy.disabled = illegal;
+      copy.addEventListener("click", () => copyText(text, "欢迎语已复制。"));
+      actions.append(copy);
+      body.append(box, gate, actions);
+    }
+  });
+})();
