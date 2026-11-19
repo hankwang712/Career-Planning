@@ -25,7 +25,8 @@ from .recruitment_chrome import (
     read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
-    CITIES, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url, read_saved_page, search_url,
+    CITIES, CITY_CATALOG, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url,
+    read_saved_page, search_url, supports_city,
 )
 from .user_state import _current_user, _login_required
 
@@ -146,8 +147,9 @@ def run_chrome_sources(owner, run_id, config, progress):
                 progress[source]["cleaning"] = counts
             save_progress(conn, owner, run_id, progress)
 
-    with ThreadPoolExecutor(max_workers=len(config.sources), thread_name_prefix="recruitment-chrome") as pool:
-        list(pool.map(run_source, config.sources))
+    queued = [source for source in config.sources if progress[source]["status"] == "queued"]
+    with ThreadPoolExecutor(max_workers=len(queued), thread_name_prefix="recruitment-chrome") as pool:
+        list(pool.map(run_source, queued))
 
 
 def run_collection(owner, run_id, config, progress):
@@ -167,6 +169,8 @@ def run_collection(owner, run_id, config, progress):
                     save_progress(conn, owner, run_id, progress)
 
             for source in config.sources:
+                if progress[source]["status"] == "city_unsupported":
+                    continue
                 progress[source] = {"status": "running"}
                 with conn:
                     save_progress(conn, owner, run_id, progress)
@@ -204,7 +208,8 @@ def run_collection(owner, run_id, config, progress):
                 progress[source] = {"status": "unavailable", "message": "浏览器采集未完成，请检查是否安装 Chromium、Chrome 或 Edge。", "count": 0}
     finally:
         with conn:
-            if all(item.get("count") for item in progress.values()):
+            attempted = [item for item in progress.values() if item["status"] != "city_unsupported"]
+            if attempted and all(item.get("count") for item in attempted):
                 status = "complete"
             elif any(item.get("count") for item in progress.values()):
                 status = "partial"
@@ -228,7 +233,10 @@ def local_desktop_request():
 def page():
     if not _current_user():
         return redirect(url_for("site.index"))
-    return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
+    unsupported = {city: {source: SOURCES[source][0] for source in CHROME_SOURCES if not supports_city(source, city)}
+                   for city in CITIES}
+    return render_template("recruitment.html", sources=SOURCES, city_catalog=CITY_CATALOG, unsupported_cities=unsupported,
+                           boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
                            collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},
                            login_urls=LOGIN_URLS)
@@ -260,7 +268,13 @@ def start():
         return jsonify(message="请从已启用 Chrome 连接的电脑访问本机采集页。"), 403
     config.sources = list(dict.fromkeys(config.sources))
     owner = _current_user()["username"]
-    progress = {source: {"status": "queued"} for source in config.sources}
+    progress = {
+        source: {"status": "queued"} if supports_city(source, config.city) else
+        {"status": "city_unsupported", "message": f"{SOURCES[source][0]} 暂无「{config.city}」的城市筛选编码，已跳过。"}
+        for source in config.sources
+    }
+    if all(item["status"] == "city_unsupported" for item in progress.values()):
+        return jsonify(message="所选平台暂无该城市的采集选项，请更换城市或平台。"), 400
     run_id = uuid.uuid4().hex
     now = time.time()
     conn = db._get_conn()

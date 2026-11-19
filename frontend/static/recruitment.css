@@ -101,13 +101,54 @@ input:not([type=checkbox]), select {
     gap: 10px 12px;
 }
 .recruitment-config form > .recruitment-primary { grid-area: 1 / 2; align-self: end; }
-.recruitment-config form > :is(fieldset, .recruitment-browser-options) { grid-column: 1 / -1; }
+.recruitment-config form > :is(fieldset, .recruitment-browser-options, .recruitment-city-coverage) { grid-column: 1 / -1; }
 .recruitment-form-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(110px, .4fr) minmax(110px, .3fr);
     align-items: end;
     gap: 12px;
 }
+.recruitment-city { position: relative; display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.recruitment-city .recruitment-city-toggle {
+    justify-content: space-between;
+    min-width: 0;
+    min-height: 37px;
+    padding: 6px 9px;
+    background: #f8faff;
+    color: #18314e;
+    font-weight: 500;
+}
+.recruitment-city-toggle[aria-expanded=true] { border-color: #477ae8; }
+.recruitment-city-menu {
+    position: absolute;
+    z-index: 4;
+    top: calc(100% + 6px);
+    right: 0;
+    display: grid;
+    gap: 8px;
+    width: min(370px, calc(100vw - 56px));
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 12px 30px #233d5626, 0 2px 8px #233d5612;
+}
+.recruitment-city-scroll { max-height: min(240px, 36vh); overflow: auto; }
+.recruitment-city-scroll > div + div { margin-top: 6px; }
+.recruitment-city-index, .recruitment-city-options { display: flex; flex-wrap: wrap; gap: 4px; }
+.recruitment-city-index, .recruitment-city-scopes { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.recruitment-city-menu button {
+    min-height: 28px;
+    padding: 3px 8px;
+    border-color: transparent;
+    background: #f3f7fc;
+    font-size: 12px;
+}
+.recruitment-city-menu button:hover { background: #e8f0ff; }
+.recruitment-city-menu button[aria-pressed=true] { background: var(--blue); color: #fff; }
+.recruitment-city-index button { padding-inline: 6px; background: #fff; }
+.recruitment-city-group-title { margin: 0 0 5px; color: var(--muted); font-size: 12px; }
+.recruitment-city-coverage { color: #815007; font-size: 12px; }
 .recruitment-card-body fieldset { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; margin: 0; border: 0; padding: 0; }
 .recruitment-card-body legend { margin-bottom: 5px; padding: 0; font-size: 13px; }
 .recruitment-card-body .recruitment-source {
@@ -218,6 +259,7 @@ input:not([type=checkbox]), select {
 .recruitment-run-state:is([data-status=succeeded], [data-status=complete]) { background: #e5f6ee; color: #12654e; }
 .recruitment-run-state:is([data-status=running], [data-status=opening], [data-status=queued]) { background: #eaf2ff; color: #2454a2; }
 .recruitment-run-state:is([data-status=partial], [data-status=blocked], [data-status=waiting_user], [data-status=login_required], [data-status=login_timeout]) { background: #fff2df; color: #854c09; }
+.recruitment-run-state[data-status=city_unsupported] { background: #fff2df; color: #854c09; }
 .recruitment-run-state:is([data-status=unavailable], [data-status=interrupted]) { background: #fdf0f1; color: #982f43; }
 .recruitment-history { margin: 0 16px 9px; }
 .recruitment-history > summary {
@@ -354,6 +396,7 @@ input:not([type=checkbox]), select {
     .recruitment-config form { grid-template-columns: minmax(0, 1fr); }
     .recruitment-config form > .recruitment-primary { grid-area: auto; }
     .recruitment-form-grid > :first-child { grid-column: 1 / -1; }
+    .recruitment-city-menu { right: auto; left: 0; }
     .recruitment-rows { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {

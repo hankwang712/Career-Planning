@@ -73,6 +73,51 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     assert other.get(API + "/runs").get_json()["items"] == []
 
 
+def test_city_catalog_uses_each_platform_code():
+    from urllib.parse import parse_qs, urlsplit
+    from services.recruitment_sources import CITY_CATALOG, search_url
+
+    groups = {city for group in CITY_CATALOG["groups"].values() for city in group}
+    assert len(groups) > 100
+    assert set(CITY_CATALOG["hot"]) <= groups
+    for source, parameter, code in (("boss", "city", "101190400"), ("51job", "jobArea", "070300"),
+                                    ("zhilian", "jl", "639")):
+        query = parse_qs(urlsplit(search_url(source, "Agent", "苏州")).query)
+        assert query[parameter] == [code]
+    assert search_url("boss", "Agent", "泉州") == ""
+    assert search_url("51job", "Agent", "远程") == ""
+    query = parse_qs(urlsplit(search_url("xiaohongshu", "Agent", "远程")).query)
+    assert query["keyword"] == ["远程 Agent 招聘"]
+
+
+def test_collection_skips_platform_without_city_code(make_account, monkeypatch):
+    from services import recruitment
+
+    owner = make_account("city-coverage")
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    called = []
+
+    def collect(source, keyword, city, limit, _update):
+        called.append((source, city))
+        return "succeeded", "读取 1 条结果。", [{"title": "Agent 开发", "url": LINKS[source], "location": city}]
+
+    monkeypatch.setattr(recruitment, "collect_in_chrome", collect)
+    config = {"keyword": "Agent", "city": "泉州", "sources": ["boss"], "chrome_local": True}
+    assert owner.post(API + "/runs", json=config).status_code == 400
+    assert owner.post(API + "/runs", json={**config, "city": "不存在", "sources": ["xiaohongshu"]}).status_code == 400
+    assert owner.post(API + "/runs", json={**config, "sources": ["boss", "51job"]}).status_code == 202
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        run = owner.get(API + "/runs").get_json()["items"][0]
+        if run["status"] != "running":
+            break
+        time.sleep(.05)
+    assert run["status"] == "complete"
+    assert called == [("51job", "泉州")]
+    assert run["progress"]["boss"]["status"] == "city_unsupported"
+    assert run["progress"]["boss"]["search_url"] == ""
+
+
 def test_upstream_csv_import_and_export_share_the_same_dedup_key(make_account):
     account = make_account("recruitment-csv")
     text = ("platform,job_title,company_name,city,jd_text,job_link\n"

@@ -1,5 +1,6 @@
 """Read the visible results of recruitment searches in an isolated browser."""
 
+import json
 import os
 from pathlib import Path
 import re
@@ -25,17 +26,11 @@ SOURCES = {
                     "section.note-item, section:has(a.cover)", "a.title, .title", "", "", "", "a[href*='/explore/'], a[href*='/search_result/']"),
 }
 
-# Only city codes supported across all four job boards are offered by the form.
-CITIES = {
-    "北京": ("101010100", "010000", "530", "010"),
-    "上海": ("101020100", "020000", "538", "020"),
-    "广州": ("101280100", "030200", "763", "050020"),
-    "深圳": ("101280600", "040000", "765", "050090"),
-    "杭州": ("101210100", "080200", "653", "070020"),
-    "成都": ("101270100", "090200", "801", "280020"),
-    "南京": ("101190100", "070200", "635", "060020"),
-}
+CITY_CATALOG = json.loads(Path(__file__).with_name("recruitment_cities.json").read_text(encoding="utf-8"))
+CITIES = CITY_CATALOG["codes"]
 CITY_FIELDS = {"boss": "city", "51job": "jobArea", "zhilian": "jl", "liepin": "dq"}
+LIEPIN_CITY_CODES = {"北京": "010", "上海": "020", "广州": "050020", "深圳": "050090",
+                     "杭州": "070020", "成都": "280020", "南京": "060020"}
 LIEPIN_PUBLIC_CITIES = {"北京": "bj", "上海": "sh", "广州": "gz", "深圳": "sz", "杭州": "hz", "成都": "cd", "南京": "nj"}
 LISTING_PATHS = {
     "boss": ("/job_detail/",), "zhilian": ("/jobdetail/", "/job/"), "liepin": ("/job/", "/a/"),
@@ -82,11 +77,23 @@ READ_CARDS = """({source, card, selectors, limit}) => {
 }"""
 
 
+def city_code(source, city):
+    if source == "liepin":
+        return LIEPIN_CITY_CODES.get(city)
+    return CITIES.get(city, {}).get(source)
+
+
+def supports_city(source, city):
+    return not city or (source == "xiaohongshu" and city in CITIES) or city_code(source, city) is not None
+
+
 def search_url(source, keyword, city):
+    if not supports_city(source, city):
+        return ""
     _, base, field, *_ = SOURCES[source]
     params = {field: f"{keyword} 招聘" if source == "xiaohongshu" else keyword}
     if city and source in CITY_FIELDS:
-        params[CITY_FIELDS[source]] = CITIES[city][list(CITY_FIELDS).index(source)]
+        params[CITY_FIELDS[source]] = city_code(source, city)
     if city and source == "xiaohongshu":
         params[field] = f"{city} {params[field]}"
     return f"{base}?{urlencode(params)}"
@@ -176,7 +183,7 @@ def collect_source(browser, source, keyword, city, limit):
             part in urlsplit(page.url).path for part in ("/login", "/verify", "/security")
         ):
             return "blocked", "平台要求登录或验证，请在原站查看或导入 CSV。", []
-        if source == "liepin" and city:
+        if source == "liepin" and city in LIEPIN_PUBLIC_CITIES:
             rows = collect_liepin_catalog(browser, keyword, city, limit)
             if rows:
                 return "succeeded", f"公开城市页匹配到 {len(rows)} 条岗位。", rows

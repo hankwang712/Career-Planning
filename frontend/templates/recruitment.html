@@ -62,7 +62,50 @@
                 <form id="recruitmentCollect" class="recruitment-card-body">
                     <div class="recruitment-form-grid">
                         <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
-                        <label>城市<select name="city"><option value="">不限城市</option>{% for city in cities %}<option>{{ city }}</option>{% endfor %}</select></label>
+                        <div class="recruitment-city" id="recruitmentCityPicker">
+                            <span id="recruitmentCityLabel">城市</span>
+                            <input type="hidden" name="city" value="">
+                            <button id="recruitmentCityToggle" class="recruitment-city-toggle" type="button"
+                                    aria-expanded="false" aria-controls="recruitmentCityMenu" aria-labelledby="recruitmentCityLabel recruitmentCityValue">
+                                <span id="recruitmentCityValue">不限城市</span><span aria-hidden="true">⌄</span>
+                            </button>
+                            <div id="recruitmentCityMenu" class="recruitment-city-menu" hidden>
+                                <input id="recruitmentCitySearch" type="search" aria-label="搜索城市" placeholder="搜索城市，例如 苏州">
+                                {% macro city_button(city, label=None) %}
+                                    <button type="button" data-city="{{ city }}" data-unsupported="{{ unsupported_cities.get(city, {}) | tojson | forceescape }}"
+                                            aria-pressed="{{ 'false' if city else 'true' }}">{{ label or city }}</button>
+                                {% endmacro %}
+                                <div class="recruitment-city-options recruitment-city-scopes" data-city-section="scope">
+                                    {{ city_button('', '不限城市') }}
+                                    {% for city in city_catalog.scopes %}{{ city_button(city) }}{% endfor %}
+                                </div>
+                                <div class="recruitment-city-index" aria-label="城市分组">
+                                    {% for key, label in [('hot', '热门'), ('all', '全部')] %}
+                                    <button type="button" data-city-index="{{ key }}" aria-pressed="{{ 'true' if key == 'hot' else 'false' }}">{{ label }}</button>
+                                    {% endfor %}
+                                    {% for letter in city_catalog.groups %}
+                                    <button type="button" data-city-index="{{ letter }}" aria-pressed="false">{{ letter }}</button>
+                                    {% endfor %}
+                                </div>
+                                <div class="recruitment-city-scroll">
+                                    <div data-city-section="hot">
+                                        <p class="recruitment-city-group-title">热门城市</p>
+                                        <div class="recruitment-city-options">
+                                            {% for city in city_catalog.hot %}{{ city_button(city) }}{% endfor %}
+                                        </div>
+                                    </div>
+                                    {% for letter, cities in city_catalog.groups.items() %}
+                                    <div data-city-section="{{ letter }}" hidden>
+                                        <p class="recruitment-city-group-title">{{ letter }}</p>
+                                        <div class="recruitment-city-options">
+                                            {% for city in cities %}{{ city_button(city) }}{% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                    <p id="recruitmentCityEmpty" class="recruitment-city-group-title" hidden>没有匹配的城市。</p>
+                                </div>
+                            </div>
+                        </div>
                         <label>每个平台上限<select name="limit"><option>10</option><option selected>20</option><option>30</option></select></label>
                     </div>
                     <fieldset>
@@ -71,6 +114,7 @@
                         <label class="recruitment-source"><input type="checkbox" name="source" value="{{ id }}" checked><span>{{ source[0] }}</span></label>
                         {% endfor %}
                     </fieldset>
+                    <p id="recruitmentCityCoverage" class="recruitment-city-coverage" role="status" hidden></p>
                     {% if boss_local %}
                     <div class="recruitment-browser-options">
                         <div class="recruitment-browser-option">

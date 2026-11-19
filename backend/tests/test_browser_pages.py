@@ -303,6 +303,45 @@ def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_p
     assert sessions.is_hidden()
 
 
+def test_recruitment_city_picker_search_group_and_submission(logged_in_page, live_server):
+    page = logged_in_page
+    requests = []
+
+    def runs(route):
+        if route.request.method == "POST":
+            requests.append(route.request.post_data_json)
+            return route.fulfill(status=202, json={"id": "test"})
+        return route.fulfill(json={"items": []})
+
+    page.route("**/api/job-market/collection/runs", runs)
+    page.goto(live_server + "/recruitment")
+    toggle = page.locator("#recruitmentCityToggle")
+    menu = page.locator("#recruitmentCityMenu")
+    toggle.click()
+    menu.get_by_role("button", name="D", exact=True).click()
+    menu.get_by_role("button", name="东莞", exact=True).click()
+    assert toggle.inner_text().startswith("东莞")
+    assert page.locator("#recruitmentCityCoverage").is_hidden()
+    page.set_viewport_size({"width": 375, "height": 800})
+    toggle.click()
+    bounds = menu.bounding_box()
+    assert bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 375
+    search = menu.get_by_role("searchbox", name="搜索城市")
+    search.fill("不存在")
+    menu.get_by_text("没有匹配的城市。").wait_for()
+    search.press("Escape")
+    assert menu.is_hidden()
+    toggle.click()
+    search.fill("泉州市")
+    search.press("Enter")
+    assert toggle.inner_text().startswith("泉州")
+    assert page.locator("#recruitmentCityCoverage").inner_text().startswith("将跳过 BOSS 直聘")
+    page.get_by_label("关键词").fill("Agent")
+    page.get_by_role("button", name="开始采集").click()
+    page.get_by_text("已启动采集。各平台的结果会陆续显示。").wait_for()
+    assert requests[0]["city"] == "泉州"
+
+
 def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment")

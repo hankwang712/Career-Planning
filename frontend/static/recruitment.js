@@ -11,7 +11,8 @@
   const statusNames = {
     queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
     partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
-    opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时"
+    opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时",
+    city_unsupported: "城市暂不支持"
   };
   const cleaningNames = { unreviewed: "未清洗", passed: "通过", rejected: "淘汰", review: "待核对", released: "已放行" };
   let page = 1;
@@ -215,11 +216,14 @@
       const line = node("div", "", "recruitment-run-source");
       const status = platformStatus(run, item);
       const url = loginLink(status, item);
-      const link = node("a", url ? "去登录 ↗" : "原站 ↗");
-      link.href = url || item.search_url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      line.append(node("strong", sources.get(source)), link);
+      line.append(node("strong", sources.get(source)));
+      if (url || item.search_url) {
+        const link = node("a", url ? "去登录 ↗" : "原站 ↗");
+        link.href = url || item.search_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        line.append(link);
+      }
       const message = node("p", status === "interrupted" ? statusNames[status] : item.message || statusNames[status]);
       message.dataset.status = status;
       line.append(message);
@@ -253,6 +257,101 @@
       if (active) poll = setTimeout(loadRuns, 5000);
     }
   }
+
+  const cityPicker = byId("recruitmentCityPicker");
+  const cityToggle = byId("recruitmentCityToggle");
+  const cityMenu = byId("recruitmentCityMenu");
+  const citySearch = byId("recruitmentCitySearch");
+  const citySections = [...cityMenu.querySelectorAll("[data-city-section]")];
+  const cityIndexes = [...cityMenu.querySelectorAll("[data-city-index]")];
+  let cityIndex = "hot";
+  let unsupportedPlatforms = {};
+
+  function showCities() {
+    const term = citySearch.value.trim().replace(/(.+)市$/, "$1");
+    let firstMatch;
+    for (const section of citySections) {
+      const group = section.dataset.citySection;
+      const matchingGroup = term ? group !== "hot" : group === "scope" || group === cityIndex ||
+        (cityIndex === "all" && group !== "hot");
+      let hasVisibleCity = false;
+      for (const option of section.querySelectorAll("[data-city]")) {
+        option.hidden = Boolean(term && !option.textContent.includes(term));
+        if (matchingGroup && !option.hidden) {
+          hasVisibleCity = true;
+          firstMatch ||= option;
+        }
+      }
+      section.hidden = !hasVisibleCity;
+    }
+    for (const index of cityIndexes) index.setAttribute("aria-pressed", index.dataset.cityIndex === cityIndex);
+    byId("recruitmentCityEmpty").hidden = Boolean(firstMatch);
+    return firstMatch;
+  }
+
+  function closeCities(restoreFocus = false) {
+    cityMenu.hidden = true;
+    cityToggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus) cityToggle.focus();
+  }
+
+  function showCityCoverage() {
+    const coverage = byId("recruitmentCityCoverage");
+    const skipped = new FormData(config).getAll("source").filter((source) => source in unsupportedPlatforms);
+    coverage.hidden = !skipped.length;
+    coverage.textContent = skipped.length
+      ? `将跳过 ${skipped.map((source) => unsupportedPlatforms[source]).join("、")}，暂无「${config.elements.city.value}」的城市筛选编码。`
+      : "";
+  }
+
+  function selectCity(option) {
+    config.elements.city.value = option.dataset.city;
+    byId("recruitmentCityValue").textContent = option.textContent;
+    unsupportedPlatforms = JSON.parse(option.dataset.unsupported);
+    for (const button of cityMenu.querySelectorAll("[data-city]")) {
+      button.setAttribute("aria-pressed", button.dataset.city === option.dataset.city);
+    }
+    showCityCoverage();
+    closeCities(true);
+  }
+
+  cityToggle.onclick = () => {
+    if (!cityMenu.hidden) return closeCities();
+    citySearch.value = "";
+    showCities();
+    cityMenu.hidden = false;
+    cityToggle.setAttribute("aria-expanded", "true");
+    citySearch.focus();
+  };
+  citySearch.addEventListener("input", showCities);
+  citySearch.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    const match = citySearch.value.trim() && showCities();
+    if (match) selectCity(match);
+  });
+  cityMenu.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-city]");
+    if (option) return selectCity(option);
+    const index = event.target.closest("[data-city-index]");
+    if (index) {
+      cityIndex = index.dataset.cityIndex;
+      citySearch.value = "";
+      showCities();
+    }
+  });
+  cityPicker.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !cityMenu.hidden) {
+      event.preventDefault();
+      closeCities(true);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!cityMenu.hidden && !cityPicker.contains(event.target)) closeCities();
+  });
+  config.addEventListener("change", (event) => {
+    if (event.target.name === "source") showCityCoverage();
+  });
 
   config.addEventListener("submit", async (event) => {
     event.preventDefault();
