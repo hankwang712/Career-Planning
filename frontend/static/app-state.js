@@ -475,4 +475,3 @@ const welfareIcons = {
 };
 
 // 在 dashboard 显示时初始化动画
-let _productDashboardAnimationsInitialized = false;

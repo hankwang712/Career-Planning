@@ -1,199 +1,46 @@
         <section id="dashboard" class="cs-home cs-home-concierge max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 fade-in">
-            <!-- Hero：玻璃拟态 + 深色科技风（参考主视觉中间稿） -->
-            <section class="cs-hero-product" id="productHero">
-                <div class="cs-hero-orb cs-orb-1" id="gradient-orb-1" aria-hidden="true"></div>
-                <div class="cs-hero-orb cs-orb-2" id="gradient-orb-2" aria-hidden="true"></div>
-                <div class="cs-hero-orb cs-orb-3" id="gradient-orb-3" aria-hidden="true"></div>
-
-                <div class="cs-hero-product-map" aria-hidden="true">
-                    <svg class="cs-hero-product-map-svg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="csMapArcA" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stop-color="#4b6887" stop-opacity="0.85"/>
-                                <stop offset="100%" stop-color="#a6b7c8" stop-opacity="0.42"/>
-                            </linearGradient>
-                            <radialGradient id="csMapGlow" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stop-color="#d8e4ef" stop-opacity="0.32"/>
-                                <stop offset="100%" stop-color="transparent"/>
-                            </radialGradient>
-                        </defs>
-                        <path d="M-40 280 Q 280 80 520 200 T 1100 120" fill="none" stroke="url(#csMapArcA)" stroke-width="1.25" opacity="0.55"/>
-                        <path d="M80 360 Q 400 200 720 260 T 1220 180" fill="none" stroke="#b8c7d6" stroke-width="0.9" opacity="0.42"/>
-                        <ellipse cx="900" cy="100" rx="180" ry="60" fill="url(#csMapGlow)" opacity="0.5"/>
-                    </svg>
-                </div>
-
-                <div class="cs-hero-product-inner">
-                    <div class="cs-hero-concierge-panels">
-                        <div class="cs-hero-concierge-main cs-hero-glass-panel">
-                            <div class="cs-hero-product-badge">
-                                <span class="cs-hero-product-dot"></span>
-                                <span>AI 驱动的职业路径规划</span>
-                            </div>
-                            <h1 class="cs-hero-brand-title" id="heroBrandTitle">AI Career Concierge</h1>
-                            <p class="cs-hero-brand-sub-en" id="heroBrandSubEn">Where do you want to go today?</p>
-                            <p class="cs-hero-brand-zh">智能职业顾问 · 聚合画像、匹配与规划</p>
-                            <p class="cs-hero-kimi-tagline">发现你的 <span class="cs-hero-kimi-em">理想职业</span> 道路</p>
-                            <p class="cs-hero-kimi-lead">我们的智能平台分析你的技能、兴趣和市场需求，引导你走向更匹配的职业方向。让 AI 成为你职业发展的得力助手。</p>
-
-                            <div class="cs-hero-search-row">
-                                <div class="cs-hero-search-wrap cs-hero-search-kimi">
-                                    <span class="cs-hero-search-icon" aria-hidden="true">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                                    </span>
-                                    <input type="search" class="cs-hero-search-input" id="dashboardHeroSearch" placeholder="输入岗位、技能或行业关键词…" autocomplete="off" aria-label="搜索岗位或技能"/>
-                                    <button type="button" class="cs-hero-search-submit" id="dashboardHeroSearchBtn" aria-label="搜索">搜索</button>
-                                </div>
-                            </div>
-                            <div class="cs-hero-kimi-actions-secondary">
-                                <button type="button" class="cs-btn-product cs-btn-product-secondary" onclick="showSection('report')">了解更多</button>
-                            </div>
-
-                            <div class="cs-hero-product-stats" aria-label="职业探索关键指标">
-                                <div class="cs-product-stat">
-                                    <span id="pendingTaskCount" class="cs-product-stat-value">3</span>
-                                    <span class="cs-product-stat-label">待完成任务<small id="pendingTaskHint">点击查看</small></span>
-                                </div>
-                                <div class="cs-product-stat-divider"></div>
-                                <div class="cs-product-stat">
-                                    <span id="exploredJobsCount" class="cs-product-stat-value">12</span>
-                                    <span class="cs-product-stat-label">推荐岗位</span>
-                                </div>
-                                <div class="cs-product-stat-divider"></div>
-                                <div class="cs-product-stat">
-                                    <span id="topMatchRate" class="cs-product-stat-value">94%</span>
-                                    <span class="cs-product-stat-label">最高匹配<small id="topMatchRole">等待岗位方向</small></span>
-                                </div>
-                                <div class="cs-product-stat-divider"></div>
-                                <div class="cs-product-stat">
-                                    <span id="dashboardScore" class="cs-product-stat-value">44%</span>
-                                    <span class="cs-product-stat-label">整体进度<small id="scoreTrend">等待画像输入</small></span>
-                                </div>
-                            </div>
-
-                            <div class="cs-hero-product-actions">
-                                <button type="button" class="cs-btn-product cs-btn-product-primary" onclick="showSection('profile')">
-                                    继续测评
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                                </button>
-                                <button type="button" class="cs-btn-product cs-btn-product-ghost" onclick="TourGuide.start()">使用引导</button>
-                            </div>
-                        </div>
-
-                        <div class="cs-hero-product-visual" aria-live="polite">
-                            <div class="cs-hero-visual-stage">
-                                <figure class="cs-hero-portrait-card cs-hero-photo-card">
-                                    <div class="cs-hero-portrait-backdrop" aria-hidden="true"></div>
-                                    <img
-                                        class="cs-hero-portrait-image cs-hero-photo-image"
-                                        src="{{ url_for('static', filename='assets/photos/wikimedia-career-workspace-photo.jpg') }}"
-                                        alt="在明亮办公空间中进行职业规划与工作的年轻职业人"
-                                    >
-                                </figure>
-                            </div>
-                            <svg class="cs-hero-gsap-helper" viewBox="0 0 120 80" aria-hidden="true" focusable="false">
-                                <g class="product-nodes">
-                                    <circle cx="30" cy="40" r="6" fill="#96abc0" opacity="0.9"/>
-                                    <circle cx="60" cy="40" r="6" fill="#4b6887" opacity="0.9"/>
-                                    <circle cx="90" cy="40" r="6" fill="#263c56" opacity="0.9"/>
-                                </g>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <div class="cs-hero-pulse" aria-label="职业趋势与平台进度">
-                        <div class="cs-hero-pulse-heading">
-                            <span class="cs-hero-pulse-label">Career Pulse</span>
-                        </div>
-                        <div class="cs-hero-pulse-track">
-                            <span class="cs-hero-pulse-chip" style="--pulse:#355b82"><em>AI 应用工程</em><small>岗位热度持续上升</small></span>
-                            <span class="cs-hero-pulse-chip" style="--pulse:#4b6887"><em>数据分析</em><small>适合能力迁移切入</small></span>
-                            <span class="cs-hero-pulse-chip" style="--pulse:#6b849f"><em>产品运营</em><small>跨专业友好度更高</small></span>
-                            <span class="cs-hero-pulse-chip" style="--pulse:#93a8bc"><em>智能制造</em><small>区域岗位需求稳定</small></span>
-                        </div>
-                        <div class="cs-hero-kimi-trust" aria-hidden="true">
-                            <div class="cs-hero-kimi-trust-item">
-                                <strong>95%</strong>
-                                <span>画像完成建议可信度</span>
-                            </div>
-                            <div class="cs-hero-kimi-trust-item">
-                                <strong>10K+</strong>
-                                <span>活跃职业样本参考</span>
-                            </div>
-                            <div class="cs-hero-kimi-trust-item">
-                                <strong>500+</strong>
-                                <span>可追踪岗位机会</span>
-                            </div>
-                        </div>
+            <section class="dashboard-workspace-overview" aria-labelledby="dashboardWorkspaceTitle">
+                <div class="dashboard-workspace-main">
+                    <h2 id="dashboardWorkspaceTitle">职业工作台</h2>
+                    <form class="dashboard-job-search" action="{{ url_for('recruitment.page') }}" role="search">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                        <input name="q" type="search" maxlength="120" placeholder="按岗位、公司或地点搜索" aria-label="搜索岗位" autocomplete="off" required>
+                        <button type="submit">搜索</button>
+                    </form>
+                    <div class="dashboard-workspace-actions">
+                        <button type="button" onclick="showSection('profile')">继续测评 <span aria-hidden="true">→</span></button>
+                        <button type="button" onclick="TourGuide.start()">使用引导</button>
                     </div>
                 </div>
+                <dl class="dashboard-workspace-metrics" aria-label="当前进度">
+                    <div><dt>画像进度</dt><dd id="profileCompletionRate">—</dd></div>
+                    <div><dt>推荐岗位</dt><dd id="exploredJobsCount">—</dd></div>
+                    <div><dt>待完成任务</dt><dd id="pendingTaskCount">—</dd></div>
+                </dl>
             </section>
 
-            <section class="cs-career-process" aria-labelledby="careerProcessTitle">
-                <header class="cs-career-process-head">
-                    <div class="cs-career-process-intro">
-                        <p class="cs-career-process-eyebrow">职业发展路径</p>
-                        <h2 id="careerProcessTitle">从了解自己，到<span>明确下一步。</span></h2>
-                        <p class="cs-career-process-description">把能力、岗位与行动连接起来，逐步建立适合你的职业路径。</p>
-                    </div>
-                    <div class="cs-career-process-start">
-                        <button type="button" class="cs-career-process-primary" onclick="showSection('profile')">
-                            开始能力评估
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
-                        </button>
-                        <span>建议从第一步开始</span>
-                    </div>
-                </header>
-
-                <ol class="cs-career-process-steps">
-                    <li class="cs-career-process-step cs-career-process-step--profile">
-                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">01</span><span>了解自己</span></div>
-                        <div class="cs-process-preview cs-process-preview--profile" aria-hidden="true">
-                            <div class="cs-process-preview-heading"><span>能力结构</span><small>功能示意</small></div>
-                            <div class="cs-process-profile-chart">
-                                <svg viewBox="0 0 210 140" class="cs-process-radar">
-                                    <g class="cs-process-radar-grid"><path d="m105 12 64 42-24 67H65L41 54Z"/><path d="m105 33 43 28-16 44H78L62 61Z"/><path d="m105 54 22 14-8 22H91L83 68Z"/><path d="M105 77V12m0 65 64-23m-64 23 40 44m-40-44-40 44m40-44L41 54"/></g>
-                                    <path class="cs-process-radar-area" d="m105 24 49 35-30 39-48 12-22-52Z"/>
-                                    <g class="cs-process-radar-points"><circle cx="105" cy="24" r="3"/><circle cx="154" cy="59" r="3"/><circle cx="124" cy="98" r="3"/><circle cx="76" cy="110" r="3"/><circle cx="54" cy="58" r="3"/></g>
-                                </svg>
-                                <div class="cs-process-profile-legend"><span><i></i>技能基础</span><span><i></i>兴趣方向</span><span><i></i>实践经历</span></div>
-                            </div>
-                        </div>
-                        <h3>看清自己的能力与优势</h3>
-                        <p class="cs-career-process-step-description">梳理技能、兴趣与已有经历，找到能够支撑职业选择的优势，也明确接下来需要补充的部分。</p>
-                        <button type="button" class="cs-career-process-link" onclick="showSection('profile')">建立能力画像<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
-                    </li>
-                    <li class="cs-career-process-step cs-career-process-step--jobs">
-                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">02</span><span>探索机会</span></div>
-                        <div class="cs-process-preview cs-process-preview--jobs" aria-hidden="true">
-                            <div class="cs-process-preview-heading"><span>机会筛选</span><small>功能示意</small></div>
-                            <div class="cs-process-filter-row"><span>目标城市 <b>⌄</b></span><span>岗位方向 <b>⌄</b></span></div>
-                            <div class="cs-process-job-sample"><span class="cs-process-job-mark">A</span><div><strong>与能力相符的方向</strong><span class="cs-process-skeleton"></span></div><span class="cs-process-job-status">优先了解</span></div>
-                            <div class="cs-process-job-sample"><span class="cs-process-job-mark">B</span><div><strong>值得探索的机会</strong><span class="cs-process-skeleton"></span></div><span class="cs-process-job-status cs-process-job-status--muted">进一步评估</span></div>
-                        </div>
-                        <h3>筛选适合自己的岗位</h3>
-                        <p class="cs-career-process-step-description">结合目标城市、岗位要求与个人背景，缩小选择范围，把精力放在值得进一步了解的机会。</p>
-                        <button type="button" class="cs-career-process-link" onclick="showSection('jobs')">查看匹配岗位<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
-                    </li>
-                    <li class="cs-career-process-step cs-career-process-step--plan">
-                        <div class="cs-career-process-step-head"><span class="cs-career-process-number" aria-hidden="true">03</span><span>推进计划</span></div>
-                        <div class="cs-process-preview cs-process-preview--plan" aria-hidden="true">
-                            <div class="cs-process-preview-heading"><span>下一步行动</span><small>功能示意</small></div>
-                            <div class="cs-process-task"><span class="cs-process-task-check cs-process-task-check--done">✓</span><span>梳理项目经历</span><small>了解优势</small></div>
-                            <div class="cs-process-task"><span class="cs-process-task-check"></span><span>优化岗位简历</span><small>完善表达</small></div>
-                            <div class="cs-process-task"><span class="cs-process-task-check"></span><span>制定投递安排</span><small>推进目标</small></div>
-                            <div class="cs-process-plan-track"><span></span><span></span><span></span><span></span><span></span></div>
-                        </div>
-                        <h3>把职业目标拆成行动</h3>
-                        <p class="cs-career-process-step-description">围绕选定方向，明确技能提升、项目实践与求职安排，让每一个阶段都有具体的目标与下一步。</p>
-                        <button type="button" class="cs-career-process-link" onclick="showSection('report')">查看规划报告<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
-                    </li>
-                </ol>
-
-                <footer class="cs-career-process-footer">
-                    <p>职业方向可以逐步明确。你可以随时补充信息，调整自己的选择。</p>
-                    <a class="cs-career-process-assistant" href="/assistant.html">还没想好？和生涯助手聊聊<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>
-                </footer>
+            <section class="dashboard-workspace-tools" aria-labelledby="careerProcessTitle">
+                <h2 id="careerProcessTitle">求职工具</h2>
+                <div class="dashboard-tool-grid">
+                    <button type="button" class="dashboard-tool" data-tone="profile" onclick="showSection('profile')">
+                        <span class="dashboard-tool-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="7" r="3.5"/><path d="M5 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/></svg>
+                        </span>
+                        <span>测评中心</span><span class="dashboard-tool-arrow" aria-hidden="true">→</span>
+                    </button>
+                    <a class="dashboard-tool" data-tone="jobs" href="{{ url_for('recruitment.page') }}">
+                        <span class="dashboard-tool-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                        </span>
+                        <span>岗位探索</span><span class="dashboard-tool-arrow" aria-hidden="true">→</span>
+                    </a>
+                    <button type="button" class="dashboard-tool" data-tone="report" onclick="showSection('report')">
+                        <span class="dashboard-tool-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 3h7l4 4v14H6V3h1Zm7 0v5h4M9 12h6m-6 4h6"/></svg>
+                        </span>
+                        <span>规划报告</span><span class="dashboard-tool-arrow" aria-hidden="true">→</span>
+                    </button>
+                </div>
             </section>
 
             <!-- 职业发展路径 -->

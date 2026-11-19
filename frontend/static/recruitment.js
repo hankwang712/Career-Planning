@@ -1010,5 +1010,12 @@
     }
   });
   void loadRuns();
-  void loadJobs();
+  const initialQuery = new URLSearchParams(window.location.search).get("q")?.trim().slice(0, 120);
+  if (initialQuery) {
+    filterForm.elements.q.value = initialQuery;
+    filters.set("q", initialQuery);
+    selectView("all");
+  } else {
+    void loadJobs();
+  }
 })();

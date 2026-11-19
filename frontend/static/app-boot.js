@@ -169,15 +169,6 @@ const _originalShowSection = showSection;
 showSection = function(sectionId) {
   _originalShowSection(sectionId);
   if (sectionId === "dashboard") {
-    requestAnimationFrame(() => {
-      initHeroProductParallax();
-      initDashboardHeroSearch();
-      if (!_productDashboardAnimationsInitialized) {
-        initHeroProductGsapAnimations();
-        initProductSvgAnimations();
-        _productDashboardAnimationsInitialized = true;
-      }
-      initCareerNewsGsapAnimations();
-    });
+    requestAnimationFrame(initCareerNewsGsapAnimations);
   }
 };

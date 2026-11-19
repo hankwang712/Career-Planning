@@ -140,6 +140,27 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
         page.close()
 
 
+def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
+    page = logged_in_page
+    page.add_init_script("localStorage.setItem('tg_done', '1')")
+    page.goto(live_server + "/main.html")
+    overview = page.get_by_role("region", name="职业工作台")
+    tools = page.get_by_role("region", name="求职工具")
+    assert overview.is_visible() and tools.is_visible()
+    assert page.get_by_text("功能示意", exact=True).count() == 0
+    assert tools.get_by_role("link", name="岗位探索").get_attribute("href") == "/recruitment"
+    page.get_by_role("button", name="关闭引导").click()
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth") == 390
+    search = overview.get_by_role("searchbox", name="搜索岗位")
+    search.fill("数据分析")
+    with page.expect_request(lambda request: "/api/job-market/collection/jobs?" in request.url) as sent:
+        search.press("Enter")
+    assert "q=%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90" in sent.value.url
+    assert "clean_status=" not in sent.value.url
+    assert page.get_by_role("searchbox", name="搜索结果").input_value() == "数据分析"
+
+
 def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page, live_server, monkeypatch):
     from services import site
 
