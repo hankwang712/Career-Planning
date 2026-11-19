@@ -155,6 +155,9 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
                     published_at=f"2026-11-{18-index:02d}T12:00:00+08:00", published_label="11-18 12:00")
     monkeypatch.setattr(site, "get_career_news_payload", lambda: {"visible_items": items})
     page = logged_in_page
+    image_bytes = BytesIO()
+    Image.new("RGB", (32, 12), "#c4d3ed").save(image_bytes, format="PNG")
+    page.route(cover, lambda route: route.fulfill(body=image_bytes.getvalue(), content_type="image/png"))
     page.goto(live_server + "/main.html")
     board = page.locator("#careerNewsBoard")
     lead = board.locator(".nd-deck .nd-story--lead")
@@ -165,9 +168,15 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     assert sides.last.bounding_box()["x"] > lead.bounding_box()["x"]
     pause = board.locator("#careerNewsPauseBtn")
     pause.evaluate("(button) => button.click()")
+    lead.locator(".nd-feature-image").dispatch_event("error")
+    assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     board.locator("#careerNewsNextBtn").evaluate("(button) => button.click()")
     assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
     assert lead.locator(".nd-feature-image").count() == 0
+    assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
+    summary = lead.locator(".nd-story-summary").bounding_box()
+    byline = lead.locator(".nd-story-bottom").bounding_box()
+    assert byline["y"] - (summary["y"] + summary["height"]) <= 20
     board.get_by_role("button", name="职业成长").evaluate("(button) => button.click()")
     assert lead.locator(".nd-tag").inner_text() == "职业成长"
     page.set_viewport_size({"width": 390, "height": 844})

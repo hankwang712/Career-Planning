@@ -198,13 +198,30 @@
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   grid-auto-rows: auto;
+  align-items: start;
   gap: 12px 20px;
   padding: 4px 0 0;
   overflow: visible;
 }
 #careerNewsBoard.nd-board .nd-deck:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
-#careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story--lead { grid-row: span 2; }
-#careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story.nd-story--side { grid-column: 2; }
+#careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story.nd-story--side { grid-column: auto; }
+@media (min-width: 961px) {
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) {
+    grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, 1fr));
+  }
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)):has(.nd-feature-image:not([hidden])) {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)):has(.nd-feature-image:not([hidden])) > .nd-story--lead {
+    grid-row: span 2;
+  }
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)):has(.nd-feature-image:not([hidden])) > .nd-story--side {
+    grid-column: 2;
+  }
+}
+@media (min-width: 761px) and (max-width: 960px) {
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story--lead { grid-column: 1 / -1; }
+}
 #careerNewsBoard.nd-board .nd-story {
   --news-tone: #365f96;
   --news-tint: #eaf2fc;
@@ -265,6 +282,8 @@
 }
 #careerNewsBoard.nd-board .nd-story--lead .nd-story-summary { -webkit-line-clamp: 3; }
 #careerNewsBoard.nd-board .nd-story .nd-story-bottom { border-top: 0; padding-top: 2px; }
+#careerNewsBoard.nd-board .nd-deck .nd-story-summary { margin-bottom: 12px; }
+#careerNewsBoard.nd-board .nd-deck .nd-story-bottom { margin-top: 0; }
 #careerNewsBoard.nd-board .nd-story .nd-byline { flex-wrap: nowrap; gap: 7px; font-size: 11px; }
 #careerNewsBoard.nd-board .nd-story .nd-byline time { width: auto; }
 .nd-source-logo { width: 19px; height: 19px; flex: 0 0 19px; border-radius: 4px; object-fit: contain; }
@@ -287,8 +306,6 @@
 @media (max-width: 760px) {
   #careerNewsBoard.nd-board .nd-deck,
   #careerNewsBoard.nd-board .nd-grid { grid-template-columns: minmax(0, 1fr); }
-  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story--lead { grid-row: auto; }
-  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story.nd-story--side { grid-column: auto; }
 }
 .nd-deck-nav button:hover:not(:disabled) {
   background:#456cce;
