@@ -40,7 +40,7 @@ def test_every_asset_a_page_references_is_served(make_account, path):
 
 def test_main_workspace_assets_are_served(make_account):
     account = make_account()
-    html = account.get("/").get_data(as_text=True)
+    html = account.get("/main.html").get_data(as_text=True)
     scripts, styles = asset_refs(html)
     assert len(scripts) > 5
     for asset in [src for src, _ in scripts] + styles:
@@ -58,7 +58,7 @@ def test_polish_page_loads_the_same_scripts_deferred(make_account):
 
 
 def test_main_page_loads_the_report_workspace_after_app(make_account):
-    html = make_account().get("/").get_data(as_text=True)
+    html = make_account().get("/main.html").get_data(as_text=True)
     order = [name for name, _ in script_order(html, set(WORKSPACE_SCRIPTS))]
     assert order.index("app-boot.js") < order.index("report-reader-layout.js") < order.index("career-report-workspace.js")
 
@@ -73,7 +73,7 @@ def test_app_scripts_are_listed_state_first_and_boot_last():
 
 def test_every_page_with_the_workspace_scripts_loads_the_same_app_scripts(make_account):
     account = make_account()
-    for path in ("/", "/user-center/workspace", "/user-center/career-report/polish", "/resume-report"):
+    for path in ("/main.html", "/user-center/workspace", "/user-center/career-report/polish", "/resume-report"):
         html = account.get(path).get_data(as_text=True)
         loaded = [name for name, _ in script_order(html, set(APP_SCRIPTS))]
         assert loaded == APP_SCRIPTS, path

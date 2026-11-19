@@ -1,26 +1,34 @@
-        <section id="dashboard" class="cs-home cs-home-concierge max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 fade-in">
-            <section class="dashboard-workspace-overview" aria-labelledby="dashboardWorkspaceTitle">
-                <div class="dashboard-workspace-main">
-                    <h2 id="dashboardWorkspaceTitle">职业工作台</h2>
-                    <form class="dashboard-job-search" action="{{ url_for('recruitment.page') }}" role="search">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-                        <input name="q" type="search" maxlength="120" placeholder="按岗位、公司或地点搜索" aria-label="搜索岗位" autocomplete="off" required>
-                        <button type="submit">搜索</button>
-                    </form>
+        <section id="dashboard" class="cs-home cs-home-concierge dashboard-landing fade-in">
+            <section class="dashboard-workspace-overview" aria-label="职业工作台">
+                <img class="dashboard-workspace-panorama" src="{{ url_for('static', filename='assets/dashboard/city-panorama.webp') }}" alt="" fetchpriority="high" decoding="async">
+                <div class="dashboard-inner dashboard-workspace-main">
+                    <h2 id="dashboardWorkspaceTitle">你好，欢迎来到<span>职业工作台</span></h2>
                     <div class="dashboard-workspace-actions">
-                        <button type="button" onclick="showSection('profile')">继续测评 <span aria-hidden="true">→</span></button>
+                        <form class="dashboard-job-search" action="{{ url_for('recruitment.page') }}" role="search">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                            <input name="q" type="search" maxlength="120" placeholder="按岗位、公司或地点搜索" aria-label="搜索岗位" autocomplete="off" required>
+                            <button type="submit">搜索</button>
+                        </form>
+                        <button type="button" class="dashboard-quick-start" aria-haspopup="dialog" data-open-workspace-guide>快速开始 <span aria-hidden="true">→</span></button>
                     </div>
                     <dl class="dashboard-workspace-metrics" aria-label="当前进度">
-                        <div><dt>画像进度</dt><dd id="profileCompletionRate">—</dd></div>
-                        <div><dt>推荐岗位</dt><dd id="exploredJobsCount">—</dd></div>
-                        <div><dt>待完成任务</dt><dd id="pendingTaskCount">—</dd></div>
+                        <div>
+                            <svg class="dashboard-metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8" opacity=".35"/><path d="M12 4a8 8 0 1 1-8 8"/></svg>
+                            <dt>画像进度</dt><dd id="profileCompletionRate">—</dd>
+                        </div>
+                        <div>
+                            <svg class="dashboard-metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg>
+                            <dt>推荐岗位</dt><dd id="exploredJobsCount">—</dd>
+                        </div>
+                        <div>
+                            <svg class="dashboard-metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg>
+                            <dt>待完成任务</dt><dd id="pendingTaskCount">—</dd>
+                        </div>
                     </dl>
-                </div>
-                <div class="dashboard-workspace-window">
-                    <img src="{{ url_for('static', filename='assets/dashboard/office-window.webp') }}" alt="" fetchpriority="high" decoding="async">
                 </div>
             </section>
 
+            <div class="dashboard-inner dashboard-content">
             <section class="dashboard-workspace-tools" aria-labelledby="careerProcessTitle">
                 <h2 id="careerProcessTitle">求职工具</h2>
                 <div class="dashboard-tool-grid">
@@ -35,6 +43,12 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
                         </span>
                         <span>岗位探索</span><span class="dashboard-tool-arrow" aria-hidden="true">→</span>
+                    </a>
+                    <a class="dashboard-tool" data-tone="growth" href="{{ url_for('pages.user_center_page', _anchor='plan-workspace') }}">
+                        <span class="dashboard-tool-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5zM8 15l3-3 2 2 3-4"/></svg>
+                        </span>
+                        <span>成长规划</span><span class="dashboard-tool-arrow" aria-hidden="true">→</span>
                     </a>
                     <button type="button" class="dashboard-tool" data-tone="report" onclick="showSection('report')">
                         <span class="dashboard-tool-icon">
@@ -118,4 +132,5 @@
 
             <!-- 新闻区 -->
             {% include "sections/dashboard_career_news.html" %}
+            </div>
         </section>

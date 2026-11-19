@@ -18,10 +18,12 @@
     {% else %}
         {% set category = 'tech' %}{% set category_label = '科技行业' %}
     {% endif %}
+    {% set cover_icons = {'ai': 'ai-sparkles', 'tech': 'tone-tech', 'hiring': 'role', 'growth': 'tone-strategy'} %}
+    {% set fallback_image = url_for('static', filename='assets/icons/user-center-report/' ~ cover_icons[category] ~ '.svg') %}
     <a class="career-news-item nd-story {{ variant }}" href="{{ item.url }}" target="_blank" rel="noopener noreferrer"
-       data-published="{{ item.published_at }}" data-category="{{ category }}"{% if item.image_url %} data-image="{{ item.image_url }}"{% endif %}>
-        {% if variant == 'nd-story--lead' and item.image_url %}
-        <img class="nd-feature-image" src="{{ item.image_url }}" width="640" height="240" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+       data-published="{{ item.published_at }}" data-category="{{ category }}" data-fallback="{{ fallback_image }}"{% if item.image_url %} data-image="{{ item.image_url }}"{% endif %}>
+        {% if variant %}
+        <img class="nd-feature-image{% if not item.image_url %} nd-feature-icon{% endif %}" src="{{ item.image_url or fallback_image }}" data-fallback="{{ fallback_image }}" width="144" height="128" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
         {% endif %}
         <div class="nd-story-top">
             <span class="nd-tag" data-tone="{{ category }}"><span aria-hidden="true"></span>{{ category_label }}</span>

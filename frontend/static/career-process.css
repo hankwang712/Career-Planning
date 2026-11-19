@@ -1,55 +1,102 @@
+#dashboard.dashboard-landing.cs-home-concierge {
+    width: 100%;
+    max-width: none;
+    padding: 0 0 40px;
+    background: linear-gradient(#edf2ff 0, #f4f6fb 750px, #f6f7fa);
+}
+
+body.bg-gray-50:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar + main {
+    padding-top: var(--topbar-height, 76px);
+}
+
+body:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar .topbar-container {
+    max-width: 1520px;
+    padding-inline: clamp(16px, 4vw, 42px);
+}
+
+.dashboard-inner {
+    box-sizing: border-box;
+    width: min(100%, 1520px);
+    padding-inline: clamp(16px, 4vw, 42px);
+    margin-inline: auto;
+}
+
 .dashboard-workspace-overview {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
-    --workspace-gutter: clamp(22px, 3vw, 40px);
-    min-height: 248px;
-    border: 1px solid var(--dr-line, #dce5ed);
-    border-radius: 14px;
-    background: #fff;
-    color: var(--dr-ink, #20334a);
-}
-
-.dashboard-workspace-main { align-self: center; padding: var(--workspace-gutter); }
-
-.dashboard-workspace-window {
     position: relative;
-    min-height: 190px;
-    margin: 8px;
+    isolation: isolate;
     overflow: hidden;
-    border-radius: 9px;
-    background: #e5edf1;
+    color: var(--dr-ink, #17233b);
+    background: #d7e4f6;
 }
 
-.dashboard-workspace-window img {
+.dashboard-workspace-panorama,
+.dashboard-workspace-overview::before,
+.dashboard-workspace-overview::after {
     position: absolute;
+    pointer-events: none;
+}
+
+.dashboard-workspace-panorama {
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center 52%;
+    object-position: center 56%;
+    z-index: -3;
 }
 
-.dashboard-workspace-overview h2,
-.dashboard-workspace-tools h2 {
+.dashboard-workspace-overview::before {
+    content: "";
+    inset: 0;
+    z-index: -2;
+    background: linear-gradient(104deg, #edf2ffeb 0%, #eaf1ffb0 28%, #e6eeff36 58%, transparent 77%);
+}
+
+.dashboard-workspace-overview::after {
+    content: "";
+    z-index: -1;
+    inset: auto -8% -43px;
+    height: 111px;
+    border: 1px solid #ffffffb8;
+    border-radius: 48% 52% 0 0 / 78% 64% 0 0;
+    background: linear-gradient(176deg, #d4e2ffa0, #edf2ff 67%);
+    box-shadow: 0 -8px 28px #cfdeff8a;
+    transform: rotate(-2deg);
+}
+
+.dashboard-workspace-main { padding-block: clamp(36px, 5vw, 68px) clamp(80px, 8vw, 116px); }
+
+.dashboard-workspace-overview h2, .dashboard-workspace-tools h2 {
     margin: 0;
     font-family: var(--app-font-stack, system-ui, sans-serif);
-    font-weight: 670;
-    line-height: 1.3;
+    color: var(--dr-ink, #17233b);
+    font-weight: 720;
+    line-height: 1.24;
 }
 
-.dashboard-workspace-overview h2 { font-size: clamp(23px, 2.3vw, 32px); }
+.dashboard-workspace-overview h2 { font-size: clamp(29px, 3vw, 48px); }
+.dashboard-workspace-overview h2 span { color: var(--dr-accent, #2745cf); }
+
+.dashboard-workspace-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: 740px;
+    margin-top: 24px;
+}
 
 .dashboard-job-search {
     display: flex;
     align-items: center;
-    gap: 9px;
-    margin-top: 16px;
-    padding: 4px;
-    padding-inline-start: 12px;
-    border: 1px solid var(--dr-line, #dce5ed);
-    border-radius: 9px;
-    color: var(--dr-muted, #61748a);
-    background: var(--dr-surface-soft, #f7f9fc);
+    flex: 1;
+    min-width: 0;
+    gap: 10px;
+    padding: 4px 4px 4px 14px;
+    border: 1px solid #fff;
+    border-radius: 14px;
+    color: #506482;
+    background: #f8fbffed;
+    box-shadow: 0 8px 24px #24478212;
 }
 
 .dashboard-job-search:focus-within { border-color: var(--dr-accent, #335cbd); }
@@ -62,60 +109,81 @@
     font-size: 14px;
     background: transparent;
 }
-
+.dashboard-job-search input::placeholder { color: #536985; opacity: 1; }
 .dashboard-job-search input:focus-visible { outline: none; }
-.dashboard-job-search button,
-.dashboard-workspace-actions button {
-    min-height: 36px;
-    padding: 6px 12px;
-    border: 1px solid var(--dr-line, #dce5ed);
-    border-radius: 8px;
-    color: var(--dr-ink, #20334a);
-    font-size: 13px;
-    font-weight: 600;
+
+.dashboard-job-search button, .dashboard-quick-start {
+    min-height: 40px;
+    padding: 6px 16px;
+    font-size: 14px;
+    font-weight: 650;
     white-space: nowrap;
-    background: #fff;
 }
 
 .dashboard-job-search button {
-    border-color: var(--dr-accent, #335cbd);
+    border-radius: 10px;
     color: #fff;
-    background: var(--dr-accent, #335cbd);
+    background: #2f51dd;
 }
-.dashboard-job-search button:hover { background: var(--dr-accent-hover, #294d9e); }
-
-.dashboard-workspace-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 13px;
+.dashboard-job-search button:hover { background: #2140c2; }
+.dashboard-quick-start {
+    border: 1px solid #fff;
+    border-radius: 999px;
+    color: #20386e;
+    background: #f8fbffdf;
 }
-.dashboard-workspace-actions button:hover { background: var(--dr-surface-soft, #f7f9fc); }
+.dashboard-quick-start:hover { background: #fff; }
 
 .dashboard-workspace-metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 17px 0 0;
-    padding-top: 13px;
-    border-top: 1px solid var(--dr-line, #dce5ed);
+    gap: 12px;
+    max-width: 620px;
+    margin: 20px 0 0;
 }
-.dashboard-workspace-metrics div { padding: 0 12px; }
-.dashboard-workspace-metrics div:first-child { padding-inline-start: 0; }
-.dashboard-workspace-metrics div + div { border-left: 1px solid var(--dr-line, #dce5ed); }
-.dashboard-workspace-metrics dt { color: var(--dr-muted, #61748a); font-size: 13px; }
+
+.dashboard-workspace-metrics > div {
+    --metric-ink: #275f97;
+    --metric-fill: #e3effc;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    align-content: center;
+    padding: 11px 12px;
+    border: 1px solid #ffffffc9;
+    border-radius: 14px;
+    background: #f5f9ffda;
+    box-shadow: 0 5px 18px #2549850d;
+}
+.dashboard-workspace-metrics > div:nth-child(2) { --metric-ink: #6b43a6; --metric-fill: #f0e7fc; }
+.dashboard-workspace-metrics > div:nth-child(3) { --metric-ink: #31614e; --metric-fill: #e3f2eb; }
+.dashboard-metric-icon {
+    grid-row: span 2;
+    align-self: center;
+    width: 40px;
+    height: 40px;
+    padding: 9px;
+    border-radius: 12px;
+    color: var(--metric-ink);
+    background: var(--metric-fill);
+}
+.dashboard-workspace-metrics dt { color: #465b77; font-size: 13px; }
 .dashboard-workspace-metrics dd {
-    margin: 4px 0 0;
-    font-size: clamp(19px, 2.2vw, 28px);
-    font-weight: 670;
+    margin: 0;
+    font-size: clamp(19px, 2vw, 28px);
+    font-weight: 720;
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
 }
 
+.dashboard-content { position: relative; margin-top: -22px; }
+
 .dashboard-workspace-tools {
-    margin: 26px 0 0;
+    margin: 0;
     color: var(--dr-ink, #20334a);
 }
 .dashboard-workspace-tools h2 { margin-bottom: 12px; font-size: 19px; }
-.dashboard-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dashboard-tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 
 .dashboard-tool {
     --tool-ink: #365c92;
@@ -126,15 +194,16 @@
     min-width: 0;
     padding: 12px 14px;
     border: 1px solid var(--dr-line, #dce5ed);
-    border-radius: 10px;
+    border-radius: 14px;
     color: inherit;
     text-align: left;
     text-decoration: none;
     font-size: 15px;
     font-weight: 620;
-    background: #fff;
+    background: #ffffffad;
 }
 .dashboard-tool[data-tone="jobs"] { --tool-ink: #276a60; --tool-tint: #e7f3ef; }
+.dashboard-tool[data-tone="growth"] { --tool-ink: #6944ad; --tool-tint: #eee6fb; }
 .dashboard-tool[data-tone="report"] { --tool-ink: #885a2c; --tool-tint: #f6eee2; }
 .dashboard-tool:hover { border-color: var(--tool-ink); color: var(--tool-ink); }
 .dashboard-tool-icon {
@@ -155,12 +224,27 @@
     outline-offset: 2px;
 }
 
+@media (max-width: 920px) {
+    .dashboard-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
-    .dashboard-workspace-overview { grid-template-columns: minmax(0, 1fr); }
-    .dashboard-workspace-window { min-height: 185px; margin-top: 0; }
+    body.bg-gray-50:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar + main { padding-top: 112px; }
+    .dashboard-workspace-panorama { object-position: 63% center; }
+    .dashboard-workspace-overview::before { background: linear-gradient(100deg, #edf2ffee, #e9efff9c 75%, #e7edff54); }
 }
 @media (max-width: 520px) {
-    .dashboard-tool-grid { grid-template-columns: minmax(0, 1fr); gap: 7px; }
-    .dashboard-workspace-tools { margin-top: 20px; }
-    .dashboard-tool { padding-block: 9px; }
+    body:has(#dashboard.dashboard-landing:not(.hidden)) .app-topbar .nav-item {
+        gap: 4px;
+        padding-inline: 5px !important;
+    }
+    .dashboard-workspace-actions { flex-wrap: wrap; gap: 9px; margin-top: 17px; }
+    .dashboard-job-search { flex-basis: 100%; }
+    .dashboard-workspace-metrics { gap: 6px; }
+    .dashboard-workspace-metrics > div { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 6px; }
+    .dashboard-metric-icon { grid-row: auto; width: 28px; height: 28px; padding: 5px; border-radius: 8px; }
+    .dashboard-workspace-metrics dt { font-size: 11px; }
+    .dashboard-tool-grid { gap: 7px; }
+    .dashboard-tool { gap: 7px; padding: 7px; font-size: 13px; }
+    .dashboard-tool-icon { flex-basis: 28px; height: 28px; }
+    .dashboard-tool-icon svg { width: 16px; height: 16px; }
 }

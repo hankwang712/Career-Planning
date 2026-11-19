@@ -416,22 +416,31 @@ function _initCareerNewsBrief(board) {
   }
 
   board.addEventListener("error", (event) => {
-    if (event.target instanceof HTMLImageElement) event.target.hidden = true;
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement)) return;
+    if (image.dataset.fallback && !image.classList.contains("nd-feature-icon")) {
+      image.classList.add("nd-feature-icon");
+      image.src = image.dataset.fallback;
+    } else {
+      image.hidden = true;
+    }
   }, true);
 
   function cloneStory(item, variant) {
     const node = item.cloneNode(true);
     if (variant) node.classList.add(variant);
-    if (variant === "nd-story--lead" && item.dataset.image) {
+    if (variant && item.dataset.fallback) {
       const cover = document.createElement("img");
       cover.className = "nd-feature-image";
-      cover.width = 640;
-      cover.height = 240;
+      cover.classList.toggle("nd-feature-icon", !item.dataset.image);
+      cover.width = 144;
+      cover.height = 128;
       cover.alt = "";
       cover.loading = "lazy";
       cover.decoding = "async";
       cover.referrerPolicy = "no-referrer";
-      cover.src = item.dataset.image;
+      cover.dataset.fallback = item.dataset.fallback;
+      cover.src = item.dataset.image || item.dataset.fallback;
       node.prepend(cover);
     }
     return node;

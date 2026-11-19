@@ -47,6 +47,10 @@
                     </svg>
                     规划报告
                 {% if recruitment_nav %}</a>{% else %}</button>{% endif %}
+                <a href="{{ url_for('site.index', _anchor='careerNewsBoard') }}" data-dashboard-news-link class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8m-8 4h8m-8 4h4"/></svg>
+                    行业资讯
+                </a>
             </div>
 
             <!-- 账号与工作区菜单 -->
