@@ -87,12 +87,11 @@
                                 <h3 id="recruitmentSessionsHeading">平台登录状态</h3>
                                 <button id="recruitmentCheckAll" type="button">检查全部</button>
                             </div>
-                            {% set marks = {'boss': 'BOSS', '51job': '51', 'zhilian': '智联', 'xiaohongshu': '小红书'} %}
                             <ul class="recruitment-session-list">
                                 {% for id, source in collection_sources.items() %}
                                 <li class="recruitment-session" data-source="{{ id }}">
                                     <div class="recruitment-session-heading">
-                                        <span class="recruitment-session-icon" aria-hidden="true">{{ marks[id] }}</span>
+                                        <img class="recruitment-session-icon" src="{{ url_for('static', filename='brand/recruitment/' ~ id ~ '.jpg') }}" width="36" height="36" alt="">
                                         <strong>{{ source[0] }}</strong>
                                     </div>
                                     <div class="recruitment-session-result" role="status" aria-atomic="true" data-state="idle">

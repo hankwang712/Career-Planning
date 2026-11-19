@@ -282,7 +282,9 @@ def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_p
     sessions = page.locator("#recruitmentSessions")
     cards = sessions.locator(".recruitment-session")
     assert cards.count() == 4
-    assert cards.locator(".recruitment-session-icon").count() == 4
+    icons = cards.locator("img.recruitment-session-icon")
+    assert icons.count() == 4
+    assert icons.evaluate_all("(images) => images.every((image) => image.complete && image.naturalWidth > 0)")
     assert cards.get_by_role("link").count() == 4
     sessions.locator('.recruitment-session[data-source="51job"]').get_by_role("button").click()
     sessions.get_by_text("未登录", exact=True).wait_for()

@@ -153,15 +153,8 @@ input:not([type=checkbox]), select {
 }
 .recruitment-session-heading { font-size: 13px; }
 .recruitment-session-icon {
-    display: grid;
-    flex: 0 0 36px;
-    height: 30px;
-    place-items: center;
-    border-radius: 7px;
-    background: var(--platform-color);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
+    flex-shrink: 0;
+    border-radius: 8px;
 }
 .recruitment-session-result { color: var(--muted); font-size: 12px; }
 .recruitment-session-label { display: inline-flex; align-items: center; gap: 6px; }
