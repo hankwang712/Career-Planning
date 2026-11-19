@@ -404,6 +404,32 @@ def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, li
     job.get_by_text("正式工作", exact=True).wait_for()
 
 
+def test_recruitment_ai_drawer_runs_selected_jobs(logged_in_page, live_server):
+    page = logged_in_page
+    url = "https://www.zhipin.com/job_detail/ai.html"
+    requests = []
+    page.route("**/collection/ai/settings?*", lambda route: route.fulfill(json={
+        "settings": {"resume": "", "preferences": "", "weights": {"role": 5, "skills": 5, "experience": 4}},
+        "resume_available": True, "configured": True,
+    }))
+    page.route("**/collection/ai/candidates/match?*", lambda route: route.fulfill(json={
+        "items": [{"source": "boss", "url": url, "title": "待评岗位"}],
+    }))
+
+    def run(route):
+        requests.append(route.request.post_data_json)
+        route.fulfill(json={"result": {"verdict": "scored", "score": 80, "coverage": 3}})
+
+    page.route("**/collection/ai/run/match", run)
+    page.goto(live_server + "/recruitment")
+    page.get_by_role("button", name="配置与评估").click()
+    drawer = page.get_by_role("dialog", name="AI 初评")
+    drawer.get_by_role("checkbox", name="待评岗位").check()
+    drawer.get_by_role("button", name="评估所选岗位").click()
+    drawer.get_by_text("待评岗位 · 80 分 · 3 项有依据").wait_for()
+    assert requests == [{"profile": "general", "source": "boss", "url": url}]
+
+
 def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

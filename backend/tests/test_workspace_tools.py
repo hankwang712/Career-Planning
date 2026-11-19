@@ -50,6 +50,20 @@ def test_model_settings_are_private_and_reload_without_restart(make_account, mon
     assert admin.request("patch", endpoint, json={"AI_CHAT_MODEL": ""}).status_code == 200
     assert llm_env.chat_runtime()[2] == "deployment-model"
 
+    cleaner = {
+        "CLEANER_LLM_BASE_URL": "https://clean.example/v1", "CLEANER_LLM_API_KEY": "cleaner-secret",
+        "CLEANER_LLM_MODEL": "clean-text", "CLEANER_VISION_MODEL": "clean-vision",
+    }
+    assert "招聘清洗模型" in admin.get("/system-settings").get_data(as_text=True)
+    assert user.request("patch", endpoint, json=cleaner).status_code == 403
+    updated = admin.request("patch", endpoint, json=cleaner)
+    assert updated.status_code == 200 and "cleaner-secret" not in updated.get_data(as_text=True)
+    assert llm_env.recruitment_cleaner_runtime()[2] == "clean-text"
+    assert llm_env.recruitment_cleaner_runtime(vision=True)[2] == "clean-vision"
+    assert admin.request("patch", endpoint, json={"USE_MAIN_LLM_FOR_CLEANER": "true"}).status_code == 200
+    assert llm_env.recruitment_cleaner_runtime() == llm_env.chat_runtime()
+    assert llm_env.recruitment_cleaner_runtime(vision=True)[2] == "clean-vision"
+
 
 def test_connection_probes_the_saved_model_without_returning_provider_payload(make_account, monkeypatch):
     admin = make_account("probe-admin")

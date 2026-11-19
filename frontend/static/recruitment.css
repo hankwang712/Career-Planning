@@ -95,7 +95,7 @@ input:not([type=checkbox]), select {
     background: #f8faff;
     color: #18314e;
 }
-.recruitment-stages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.recruitment-stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .recruitment-stage-summary { padding: 12px 16px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 #recruitmentCollect { display: grid; gap: 14px; }
 #recruitmentStart { justify-self: end; }
@@ -320,7 +320,7 @@ input:not([type=checkbox]), select {
 .recruitment-rule-preview-group p { margin-top: 4px; font-size: 12px; }
 .recruitment-filters {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(100px, 140px)) auto;
+    grid-template-columns: minmax(0, 1fr) repeat(4, minmax(96px, 128px)) auto;
     gap: 8px;
     padding: 14px 16px;
     border-bottom: 1px solid #eaf0f7;
@@ -400,6 +400,32 @@ input:not([type=checkbox]), select {
 .recruitment-drawer > header h2 { overflow-wrap: anywhere; }
 .recruitment-drawer > .recruitment-card-body { padding: 16px; }
 #recruitmentCleaningForm > label { display: grid; margin-bottom: 14px; }
+#recruitmentSemanticOpen { margin-top: 14px; }
+.recruitment-ai-content, .recruitment-ai-settings { display: grid; gap: 12px; }
+.recruitment-ai-content h3 { margin: 10px 0 0; font-size: 14px; }
+.recruitment-ai-settings textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #f8faff;
+    font: inherit;
+    resize: vertical;
+}
+.recruitment-card-body .recruitment-ai-weights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.recruitment-ai-candidates { max-height: 260px; overflow: auto; }
+.recruitment-ai-candidates .recruitment-ai-candidate {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+}
+.recruitment-ai-content > button, .recruitment-ai-settings > button { justify-self: start; }
+.recruitment-ai-results { display: grid; gap: 6px; margin: 0; padding-left: 20px; font-size: 13px; }
+.recruitment-ai-evidence { display: grid; gap: 4px; padding: 10px; border-radius: 8px; background: #f5f8fc; overflow-wrap: anywhere; }
+.recruitment-ai-evidence p { white-space: pre-wrap; }
 body:has(.recruitment-drawer[open]) { overflow: hidden; }
 #recruitmentDescription { margin: 12px 0 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .recruitment-detail-status { margin-top: 10px; color: var(--muted); font-size: 13px; }
@@ -414,12 +440,12 @@ body:has(.recruitment-drawer[open]) { overflow: hidden; }
     .recruitment-top > div, .recruitment-main { width: calc(100% - 24px); }
     .recruitment-platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .recruitment-stages { grid-template-columns: minmax(0, 1fr); }
+    .recruitment-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .recruitment-filters input { grid-column: 1 / -1; }
     .recruitment-rows { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
     .recruitment-drawer { border-radius: 0; }
-    .recruitment-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .recruitment-filters input { grid-column: 1 / -1; }
     .recruitment-filters button { grid-column: 3; }
     .recruitment-cleaning-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

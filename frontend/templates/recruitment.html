@@ -186,6 +186,16 @@
                     <div data-clean-status="review"><dt>待核对</dt><dd>—</dd></div>
                 </dl>
             </section>
+            <section class="recruitment-card" aria-labelledby="recruitmentAiTitle">
+                <header>
+                    <div class="recruitment-section-heading">
+                        <span class="recruitment-section-icon" aria-hidden="true">✦</span>
+                        <h2 id="recruitmentAiTitle">AI 初评</h2>
+                    </div>
+                    <button id="recruitmentAiOpen" type="button" aria-haspopup="dialog">配置与评估</button>
+                </header>
+                <p class="recruitment-stage-summary">按求职方向评估已通过清洗的岗位。</p>
+            </section>
             </div>
             <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
                 <header>
@@ -212,6 +222,7 @@
                         <option value="passed">通过</option><option value="rejected">淘汰</option>
                         <option value="review">待核对</option>
                     </select>
+                    <select name="sort" aria-label="排序"><option value="">最新采集</option><option value="match">初评分数</option></select>
                     <button type="submit">筛选</button>
                 </form>
                 <div id="recruitmentRows" class="recruitment-rows"></div>
@@ -239,7 +250,9 @@
                 </div>
                 <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
                 <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
-                <label class="recruitment-rule-auto"><input name="auto" type="checkbox">自动清洗新采集和新导入的记录</label>
+                <label>AI 语义必备条件<textarea name="semantic_required" rows="2" maxlength="2900" placeholder="每行一条，例如：明确接受应届生"></textarea></label>
+                <label>AI 语义排除条件<textarea name="semantic_excluded" rows="2" maxlength="2900" placeholder="每行一条，例如：单休，包括大小周"></textarea></label>
+                <label class="recruitment-rule-auto"><input name="auto" type="checkbox">对新采集和新导入的记录自动运行硬规则</label>
                 <div class="recruitment-actions">
                     <button id="recruitmentCleaningSave" type="button">保存规则</button>
                     <button type="submit">预览现有岗位</button>
@@ -248,7 +261,33 @@
             </fieldset>
             <p id="recruitmentCleaningFeedback" class="recruitment-rule-feedback" role="status"></p>
             <ul id="recruitmentCleaningPreview" class="recruitment-rule-preview" hidden></ul>
+            <button id="recruitmentSemanticOpen" type="button">运行已保存的语义规则</button>
         </form>
+    </dialog>
+    <dialog id="recruitmentAiDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentAiDialogTitle">
+        <header><h2 id="recruitmentAiDialogTitle">AI 初评</h2><form method="dialog"><button>关闭</button></form></header>
+        <div class="recruitment-card-body recruitment-ai-content">
+            <label>评估方向<select id="recruitmentAiProfile" aria-label="评估方向">
+                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+            </select></label>
+            <form id="recruitmentAiSettings" class="recruitment-ai-settings">
+                <label>基准简历<textarea name="resume" maxlength="18000" rows="5" placeholder="留空时使用账号中已解析的简历"></textarea></label>
+                <label>初评偏好<textarea name="preferences" maxlength="2000" rows="3" placeholder="例如 薪资目标、到岗日期、每周可出勤天数"></textarea></label>
+                <fieldset class="recruitment-ai-weights">
+                    <legend>维度权重（0 表示关闭）</legend>
+                    {% for key, name in ai_dimensions.items() %}
+                    <label>{{ name }}<input type="number" data-dimension="{{ key }}" min="0" max="5" step="1" required></label>
+                    {% endfor %}
+                </fieldset>
+                <button type="submit">保存初评配置</button>
+                <p id="recruitmentAiReadiness" class="recruitment-rule-feedback" role="status"></p>
+            </form>
+            <label>搜索待处理岗位<input type="search" id="recruitmentAiSearch" maxlength="100" placeholder="按岗位或公司搜索"></label>
+            <div id="recruitmentAiCandidates" class="recruitment-ai-candidates"></div>
+            <button id="recruitmentAiRun" class="recruitment-primary" type="button" disabled>评估所选岗位</button>
+            <p id="recruitmentAiFeedback" class="recruitment-rule-feedback" role="status"></p>
+            <ul id="recruitmentAiBatchResults" class="recruitment-ai-results"></ul>
+        </div>
     </dialog>
     <dialog id="recruitmentDetail" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentDetailTitle">
         <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
@@ -263,6 +302,16 @@
             <p id="recruitmentMoveFeedback" class="recruitment-detail-status" role="status" hidden></p>
             <p id="recruitmentDetailStatus" class="recruitment-detail-status" role="status" hidden></p>
             <p id="recruitmentDescription"></p>
+            <section id="recruitmentVision" class="recruitment-ai-content" hidden>
+                <h3>小红书配图提取</h3>
+                <label>上传笔记配图<input id="recruitmentVisionFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+                <div class="recruitment-actions">
+                    <button id="recruitmentVisionRead" type="button">读取 Chrome 原帖配图</button>
+                    <button id="recruitmentVisionUpload" type="button">提取上传图片</button>
+                </div>
+                <p id="recruitmentVisionFeedback" class="recruitment-rule-feedback" role="status"></p>
+            </section>
+            <section id="recruitmentAiDetails" class="recruitment-ai-content" aria-label="AI 结果" hidden></section>
             <a id="recruitmentOriginal" class="recruitment-button" target="_blank" rel="noopener noreferrer">查看原帖 ↗</a>
         </div>
     </dialog>

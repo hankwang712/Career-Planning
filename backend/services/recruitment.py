@@ -2,9 +2,10 @@
 
 from contextlib import ExitStack
 from concurrent.futures import ThreadPoolExecutor
+from base64 import b64encode
 import csv
 from hashlib import sha256
-from io import StringIO
+from io import BytesIO, StringIO
 from ipaddress import ip_address
 import json
 import logging
@@ -18,15 +19,15 @@ from urllib.parse import urlsplit
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import db, recruitment_cleaning as cleaning
+from . import db, llm_env, recruitment_ai as ai, recruitment_cleaning as cleaning
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
     CHROME_SOURCES, LOGIN_URLS, SESSION_LABELS, SESSION_MESSAGES, check_platform_login, collect_in_chrome,
-    read_zhilian_detail, use_local_chrome,
+    read_xiaohongshu_images, read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
     CITIES, CITY_CATALOG, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url,
-    read_saved_page, search_url, supports_city,
+    read_saved_page, search_url, supports_city, xiaohongshu_note_url,
 )
 from .user_state import _current_user, _login_required
 
@@ -65,6 +66,7 @@ def init_schema(conn):
         );
     """)
     cleaning.init_schema(conn)
+    ai.init_schema(conn)
 
 
 class CollectRequest(BaseModel):
@@ -94,6 +96,7 @@ def clean_listing(fields):
 def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cleaning_counts=None):
     seen = set()
     records = []
+    note_links = []
     for row in rows:
         row = clean_listing(dict(row))
         url = listing_url(source, str(row.get("url") or "")) if row.get("url") else ""
@@ -109,6 +112,9 @@ def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cl
         values = [str(row.get(key) or "").strip()[:limit] for key, limit in
                   (("company", 250), ("location", 120), ("salary", 120), ("description", 6000))]
         records.append((owner, source, url, title, *values, url, time.time(), profile))
+        if source == "xiaohongshu" and (note_url := xiaohongshu_note_url(str(row.get("note_url") or ""))):
+            if listing_url(source, note_url) == url:
+                note_links.append((owner, source, url, note_url))
     conn.executemany("""
         INSERT INTO recruitment_listings (owner, source, url_key, title, company, location, salary, description, url, updated_at, profile)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -118,6 +124,11 @@ def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cl
             description=excluded.description, url=excluded.url, updated_at=excluded.updated_at,
             profile=CASE WHEN recruitment_listings.profile='general' THEN excluded.profile ELSE recruitment_listings.profile END
     """, records)
+    conn.executemany("""
+        INSERT INTO recruitment_note_links VALUES (?, ?, ?, ?)
+        ON CONFLICT(owner, source, url_key) DO UPDATE SET note_url=excluded.note_url
+        WHERE instr(excluded.note_url, 'xsec_token=') > 0
+    """, note_links)
     counts = cleaning.apply_ingested(conn, owner, source, list(seen))
     if counts and cleaning_counts is not None:
         for status, count in counts.items():
@@ -242,7 +253,7 @@ def page():
                            boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
                            collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},
-                           login_urls=LOGIN_URLS, profiles=cleaning.PROFILES)
+                           login_urls=LOGIN_URLS, profiles=cleaning.PROFILES, ai_dimensions=ai.DIMENSIONS)
 
 
 @blueprint.post(API + "/session/<source>")
@@ -360,6 +371,9 @@ def cleaning_update(action):
             if result["token"] != payload.get("token"):
                 return jsonify(message="岗位或规则已变化，请重新预览后应用。"), 409
             cleaning.write_results(conn, owner, rows)
+        previous = cleaning.load_rules(conn, owner, profile)
+        if (previous.semantic_required, previous.semantic_excluded) != (rules.semantic_required, rules.semantic_excluded):
+            ai.invalidate(conn, owner, profile, "semantic")
         cleaning.save_rules(conn, owner, profile, rules)
         counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(rules=rules.model_dump(), counts=counts)
@@ -372,6 +386,13 @@ def listing_identity(payload):
     if not isinstance(source, str) or source not in SOURCES or not isinstance(value, str) or len(value) > 4096:
         return None, ""
     return source, listing_url(source, value)
+
+
+def semantic_reason(payload):
+    if not payload:
+        return ""
+    result = json.loads(payload)
+    return " · ".join(value for value in (result.get("rule"), result.get("reason"), result.get("evidence")) if value)
 
 
 @blueprint.post(API + "/cleaning/release")
@@ -388,19 +409,23 @@ def cleaning_release():
     conn = db._get_conn()
     with conn:
         conn.execute("BEGIN IMMEDIATE")
-        decision = conn.execute("""
-            SELECT r.status FROM recruitment_cleaning_results r
+        decision = conn.execute(f"""
+            SELECT {cleaning.EFFECTIVE_STATUS} AS status, a.verdict AS semantic,
+                   a.payload AS semantic_payload, r.reason
+            FROM recruitment_cleaning_results r
             JOIN recruitment_listings j USING(owner, source, url_key)
+            {cleaning.SEMANTIC_JOIN}
             WHERE j.owner=? AND j.source=? AND j.url_key=? AND j.profile=?
         """, (owner, source, url, profile)).fetchone()
         if not decision:
             return jsonify(message="该岗位当前没有可放行的清洗结果。"), 404
         if decision["status"] not in {"rejected", "released"}:
             return jsonify(message="该岗位当前无需放行。"), 409
+        reason = decision["reason"] or semantic_reason(decision["semantic_payload"])
         conn.execute("""
-            UPDATE recruitment_cleaning_results SET status='released'
+            UPDATE recruitment_cleaning_results SET status='released', reason=?
             WHERE owner=? AND source=? AND url_key=?
-        """, (owner, source, url))
+        """, (reason, owner, source, url))
         counts = cleaning.stored_counts(conn, owner, profile)
     return jsonify(counts=counts)
 
@@ -439,28 +464,41 @@ def query_rows(owner, limit, offset=0):
         where += " AND j.profile=?"
         args += (profile,)
     status = request.args.get("clean_status", "")
+    effective = cleaning.EFFECTIVE_STATUS
     if status == "unreviewed":
         where += " AND r.status IS NULL"
     elif status == "passed":
-        where += " AND r.status IN ('passed', 'released')"
+        where += f" AND ({effective}) IN ('passed', 'released')"
     elif status in ("rejected", "review"):
-        where += " AND r.status=?"
+        where += f" AND ({effective})=?"
         args += (status,)
     conn = db._get_conn()
-    joined = " FROM recruitment_listings j LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key) WHERE "
+    joined = f""" FROM recruitment_listings j LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        LEFT JOIN recruitment_ai_results m ON m.owner=j.owner AND m.source=j.source AND m.url_key=j.url_key AND m.kind='match'
+        WHERE """
     total = conn.execute("SELECT count(*)" + joined + where, args).fetchone()[0]
     columns = ", ".join("j." + key for key in FIELDS if key != "description")
+    order = "m.score DESC, " if request.args.get("sort") == "match" else ""
     items = conn.execute(
         f"""SELECT {columns}, COALESCE(
                 (SELECT d.description FROM recruitment_job_details d
                  WHERE d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key),
-                j.description) AS description, COALESCE(r.status, 'unreviewed') AS cleaning_status,
-                COALESCE(r.reason, '') AS cleaning_reason, j.profile
+                j.description) AS description, COALESCE({effective}, 'unreviewed') AS cleaning_status,
+                COALESCE(r.reason, '') AS cleaning_reason, j.profile, a.payload AS semantic_payload,
+                m.score AS ai_score, m.verdict AS ai_match_status
             {joined}{where}
-            ORDER BY j.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?""",
+            ORDER BY {order}j.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?""",
         (*args, limit, offset),
     )
-    return [clean_listing(dict(item)) for item in items], total
+    rows = []
+    for item in items:
+        row = dict(item)
+        semantic_payload = row.pop("semantic_payload")
+        if not row["cleaning_reason"] and row["cleaning_status"] in {"rejected", "review"}:
+            row["cleaning_reason"] = semantic_reason(semantic_payload)
+        rows.append(clean_listing(row))
+    return rows, total
 
 
 @blueprint.get(API + "/jobs")
@@ -472,6 +510,210 @@ def jobs():
     count_profile = request.args.get("count_profile", cleaning.DEFAULT_PROFILE)
     return jsonify(items=items, total=total, page=page_number, page_size=20,
                    cleaning_counts=cleaning.stored_counts(db._get_conn(), owner, count_profile))
+
+
+@blueprint.route(API + "/ai/settings", methods=["GET", "POST"])
+@_login_required
+def recruitment_ai_settings():
+    payload = request.get_json(silent=True) if request.method == "POST" else {}
+    profile = (payload.get("profile") if isinstance(payload, dict) else None) if request.method == "POST" else request.args.get("profile")
+    if not isinstance(profile, str) or profile not in cleaning.PROFILES:
+        return jsonify(message="求职方向无效。"), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    settings = ai.load_settings(conn, owner, profile)
+    if request.method == "POST":
+        try:
+            updated = ai.MatchSettings.model_validate(payload.get("settings"))
+        except ValidationError:
+            return jsonify(message="请检查初评配置。"), 400
+        if (not updated.weights.keys() <= ai.DIMENSIONS.keys() or any(value < 0 or value > 5 for value in updated.weights.values())
+                or sum(value > 0 for value in updated.weights.values()) < 3):
+            return jsonify(message="权重需为 0 到 5，至少启用三个维度。"), 400
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if ai.load_settings(conn, owner, profile) != updated:
+                conn.execute("""
+                    INSERT INTO recruitment_ai_settings VALUES (?, ?, ?)
+                    ON CONFLICT(owner, profile) DO UPDATE SET settings=excluded.settings
+                """, (owner, profile, updated.model_dump_json()))
+                ai.invalidate(conn, owner, profile, "match")
+        settings = updated
+    response = jsonify(settings=settings.model_dump(), resume_available=bool(ai.resume_text(owner, settings)),
+                       configured=llm_env.chat_configured())
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@blueprint.get(API + "/ai/candidates/<kind>")
+@_login_required
+def recruitment_ai_candidates(kind):
+    profile = request.args.get("profile")
+    if kind not in ("semantic", "match") or profile not in cleaning.PROFILES:
+        return jsonify(message="初评任务参数无效。"), 400
+    eligible = "r.status='passed'" if kind == "semantic" else f"({cleaning.EFFECTIVE_STATUS}) IN ('passed','released')"
+    conn = db._get_conn()
+    keyword = f"%{request.args.get('q', '').strip()[:100]}%"
+    rows = conn.execute(f"""
+        SELECT j.source, j.url, j.title, j.company, m.verdict, m.score
+        FROM recruitment_listings j
+        JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        LEFT JOIN recruitment_ai_results m ON m.owner=j.owner AND m.source=j.source AND m.url_key=j.url_key AND m.kind=?
+        WHERE j.owner=? AND j.profile=? AND {eligible}
+          AND (j.title LIKE ? OR j.company LIKE ?)
+        ORDER BY m.verdict IS NULL DESC, j.updated_at DESC, j.source, j.url_key LIMIT 50
+    """, (kind, _current_user()["username"], profile, keyword, keyword))
+    return jsonify(items=[dict(row) for row in rows])
+
+
+def ai_listing(conn, identity):
+    return conn.execute(f"""
+        SELECT j.profile, j.title, j.company, j.location, j.salary, j.description,
+               COALESCE(d.description, j.description) AS detail,
+               n.note_url, r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
+               v.payload AS vision_payload
+        FROM recruitment_listings j
+        LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        LEFT JOIN recruitment_job_details d ON d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key
+        LEFT JOIN recruitment_note_links n ON n.owner=j.owner AND n.source=j.source AND n.url_key=j.url_key
+        LEFT JOIN recruitment_ai_results v ON v.owner=j.owner AND v.source=j.source AND v.url_key=j.url_key AND v.kind='vision'
+        WHERE j.owner=? AND j.source=? AND j.url_key=?
+    """, identity).fetchone()
+
+
+def ai_material(row, kind):
+    job = {key: row[key] for key in ("title", "company", "location", "salary", "description")}
+    job["description"] = row["detail"]
+    if kind != "vision" and row["vision_payload"]:
+        extracted = json.loads(row["vision_payload"])["jobs"]
+        if len(extracted) == 1:
+            job.update({key: value for key, value in extracted[0].items() if value})
+        elif len(extracted) > 1:
+            job["description"] = ""
+    return job
+
+
+def image_uploads(files):
+    from PIL import Image
+
+    if len(files) > 4:
+        raise ValueError("请选择最多 4 张图片。")
+    images = []
+    for file in files:
+        data = file.stream.read(2_000_001)
+        if not data or len(data) > 2_000_000:
+            raise ValueError("每张图片须小于 2 MB。")
+        try:
+            with Image.open(BytesIO(data)) as image:
+                mime = {"PNG": "png", "JPEG": "jpeg", "WEBP": "webp"}.get(image.format)
+                if not mime or image.width * image.height > 24_000_000:
+                    raise ValueError("请选择正常尺寸的 PNG、JPEG 或 WebP 图片。")
+                image.verify()
+        except (OSError, Image.DecompressionBombError) as error:
+            raise ValueError("图片无法读取。") from error
+        images.append(f"data:image/{mime};base64,{b64encode(data).decode('ascii')}")
+    return images
+
+
+@blueprint.post(API + "/ai/details")
+@_login_required
+def recruitment_ai_details():
+    source, url = listing_identity(request.get_json(silent=True))
+    if not url:
+        return jsonify(message="岗位记录无效。"), 400
+    identity = (_current_user()["username"], source, url)
+    conn = db._get_conn()
+    if not ai_listing(conn, identity):
+        return jsonify(message="岗位记录不存在。"), 404
+    rows = conn.execute("SELECT kind, payload FROM recruitment_ai_results WHERE owner=? AND source=? AND url_key=?", identity)
+    response = jsonify(results={row["kind"]: json.loads(row["payload"]) for row in rows})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def ai_context(conn, identity, row, kind):
+    owner = identity[0]
+    profile = row["profile"]
+    if kind == "semantic":
+        rules = cleaning.load_rules(conn, owner, profile)
+        return rules, "", ai.fingerprint([rules.semantic_required, rules.semantic_excluded])
+    if kind == "match":
+        settings = ai.load_settings(conn, owner, profile)
+        resume = ai.resume_text(owner, settings)
+        return settings, resume, ai.fingerprint([settings.model_dump(), resume])
+    return None, "", ""
+
+
+@blueprint.post(API + "/ai/run/<kind>")
+@_login_required
+def recruitment_ai_run(kind):
+    if kind not in ai.KINDS:
+        return jsonify(message="任务类型无效。"), 404
+    payload = request.form.to_dict() if request.mimetype == "multipart/form-data" else request.get_json(silent=True)
+    source, url = listing_identity(payload)
+    if not url or (kind == "vision" and source != "xiaohongshu"):
+        return jsonify(message="岗位记录或任务类型无效。"), 400
+    identity = (_current_user()["username"], source, url)
+    conn = db._get_conn()
+    row = ai_listing(conn, identity)
+    if not row:
+        return jsonify(message="岗位记录不存在。"), 404
+    if ((kind == "semantic" and row["hard_status"] != "passed")
+            or (kind == "match" and row["cleaning_status"] not in {"passed", "released"})):
+        return jsonify(message="请先通过规则清洗。"), 409
+    if kind != "vision" and payload.get("profile") != row["profile"]:
+        return jsonify(message="岗位求职方向已变更，请刷新。"), 409
+    settings, resume, context = ai_context(conn, identity, row, kind)
+    if kind == "semantic" and not (settings.semantic_required or settings.semantic_excluded):
+        return jsonify(message="请先保存语义规则。"), 400
+    if kind == "match" and not resume:
+        return jsonify(message="请先配置本方向的基准简历，或上传并解析简历。"), 400
+    runtime = llm_env.chat_runtime() if kind == "match" else llm_env.recruitment_cleaner_runtime(vision=kind == "vision")
+    if not all(runtime):
+        return jsonify(message="模型尚未配置，请查看系统配置。"), 400
+    try:
+        images = image_uploads(request.files.getlist("images")) if kind == "vision" else []
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    if kind == "vision" and not images and (not local_desktop_request() or not use_local_chrome()):
+        return jsonify(message="可上传笔记配图，或在启用本机 Chrome 的页面读取原帖。"), 400
+    if not ai.SLOTS.acquire(blocking=False):
+        return jsonify(message="AI 任务繁忙，请稍后重试。"), 429
+    try:
+        job = ai_material(row, kind)
+        if kind == "vision":
+            note = xiaohongshu_note_url(row["note_url"] or url)
+            if not images and note:
+                images = read_xiaohongshu_images(note)
+            if not images:
+                return jsonify(message="未读取到配图，请在 Chrome 登录后重试，或上传笔记截图。"), 422
+            result = ai.extract_note(runtime, job, images)
+        elif kind == "semantic":
+            result = ai.screen(runtime, job, settings)
+        else:
+            result = ai.match(runtime, job, resume, settings)
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = ai_listing(conn, identity)
+            if not current or tuple(current) != tuple(row) or ai_context(conn, identity, current, kind)[2] != context:
+                return jsonify(message="岗位资料或配置发生变化，请重新运行。"), 409
+            if kind == "vision":
+                conn.execute("""
+                    DELETE FROM recruitment_ai_results WHERE owner=? AND source=? AND url_key=? AND kind IN ('semantic','match')
+                """, identity)
+            elif kind == "semantic" and result["verdict"] != "passed":
+                conn.execute("""
+                    DELETE FROM recruitment_ai_results WHERE owner=? AND source=? AND url_key=? AND kind='match'
+                """, identity)
+            ai.write_result(conn, identity, kind, result)
+        return jsonify(result=result)
+    except Exception as error:
+        logger.warning("Recruitment %s model operation failed (%s)", kind, type(error).__name__)
+        return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
+    finally:
+        ai.SLOTS.release()
 
 
 @blueprint.post(API + "/jobs/zhilian/detail")

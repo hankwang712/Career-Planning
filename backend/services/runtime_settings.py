@@ -9,6 +9,11 @@ GROUPS = (
     ("chat", "对话模型", "用于 AI 对话、简历分析、职业报告和职业访谈。", (
         ("AI_CHAT_BASE_URL", "接口地址"), ("AI_CHAT_API_KEY", "API Key"), ("AI_CHAT_MODEL", "模型名称"),
     )),
+    ("cleaner", "招聘清洗模型", "用于岗位语义清洗和小红书配图提取。文本专用通道未配置时使用对话模型，视觉模型未配置时使用已配置的 OCR 通道。", (
+        ("CLEANER_LLM_BASE_URL", "接口地址"), ("CLEANER_LLM_API_KEY", "API Key"),
+        ("CLEANER_LLM_MODEL", "文本清洗模型"), ("CLEANER_VISION_MODEL", "清洗视觉模型"),
+        ("USE_MAIN_LLM_FOR_CLEANER", "文本强制走主通道（true / false）"),
+    )),
     ("embedding", "技能向量模型", "用于技能文本的语义匹配。未设置专用模型时沿用部署配置。", (
         ("AI_EMBEDDING_BASE_URL", "接口地址"), ("AI_EMBEDDING_API_KEY", "API Key"), ("AI_EMBEDDING_MODEL", "模型名称"),
     )),

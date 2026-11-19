@@ -412,7 +412,100 @@ def test_auto_cleaning_applies_to_imports_and_keeps_uncertain_fields(make_accoun
     assert account.post(endpoint + "/save", json={"rules": {"min_salary_k": 20, "max_salary_k": 10}}).status_code == 400
     assert account.get(endpoint).get_json()["rules"] == {
         **rules, "max_salary_k": None, "min_daily_salary": None, "max_daily_salary": None, "cities": [], "title_exclusions": [],
+        "semantic_required": [], "semantic_excluded": [],
     }
+
+
+def test_recruitment_ai_semantic_and_match_use_separate_models_and_preserve_evidence(make_account, monkeypatch):
+    from services import db, recruitment
+
+    account = make_account("ai-screen")
+    other = make_account("ai-screen-other")
+    cleaner = ("https://cleaner.example", "mock-key", "cleaner")
+    main = ("https://main.example", "mock-key", "main")
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda **_: cleaner)
+    monkeypatch.setattr(recruitment.llm_env, "chat_runtime", lambda: main)
+    first = {"source": "boss", "url": LINKS["boss"], "profile": "internship"}
+    second = {**first, "url": "https://www.zhipin.com/job_detail/another.html"}
+    fabricated = {**first, "url": "https://www.zhipin.com/job_detail/fabricated.html"}
+    assert account.post(API + "/cleaning/save", json={"profile": "internship", "rules": {
+        "auto": True, "semantic_excluded": ["单休，包括大小周"],
+    }}).status_code == 200
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, account.email, "boss", [
+            {**first, "title": "实习甲", "description": "工作制度为大小周"},
+            {**second, "title": "实习乙", "description": "使用Python开发数据接口"},
+            {**fabricated, "title": "实习丙", "description": "描述没有休息安排"},
+        ], profile="internship")
+
+    def model(runtime, _prompt, payload, _images=()):
+        if runtime == cleaner:
+            if payload["job"]["title"] == "实习乙":
+                return {"verdict": "passed"}
+            return {"verdict": "rejected", "rule": "单休，包括大小周", "reason": "岗位采用大小周", "evidence": "大小周"}
+        assert runtime == main
+        evidence = {"score": 4, "reason": "项目经历匹配", "jd_evidence": "Python", "resume_evidence": "Python 项目"}
+        return {"dimensions": {name: evidence for name in ("role", "skills", "experience")}}
+
+    monkeypatch.setattr(recruitment.ai, "request_model", model)
+    assert account.post(API + "/ai/run/semantic", json=first).get_json()["result"]["verdict"] == "rejected"
+    assert account.post(API + "/ai/run/semantic", json=fabricated).get_json()["result"]["verdict"] == "review"
+    assert account.post(API + "/ai/run/semantic", json=second).get_json()["result"]["verdict"] == "passed"
+    assert account.get(API + "/jobs?profile=internship&clean_status=rejected").get_json()["total"] == 1
+    assert account.post(API + "/ai/run/match", json=first).status_code == 409
+    assert other.post(API + "/ai/details", json=second).status_code == 404
+    assert account.post(API + "/ai/settings", json={"profile": "internship", "settings": {
+        "resume": "两段 Python 项目经历", "weights": {"role": 5, "skills": 4, "experience": 1},
+    }}).status_code == 200
+    result = account.post(API + "/ai/run/match", json=second).get_json()["result"]
+    assert result["score"] == 80 and result["coverage"] == 3
+    assert result["dimensions"]["skills"]["jd_evidence"] == "Python"
+    top = account.get(API + "/jobs?sort=match").get_json()["items"][0]
+    assert top["url"] == second["url"] and top["ai_score"] == 80
+    assert account.post(API + "/cleaning/release", json=first).status_code == 200
+    assert account.get(API + "/jobs?profile=internship&clean_status=passed").get_json()["total"] == 2
+    monkeypatch.setattr(recruitment.ai, "request_model", lambda *_: {"verdict": "invalid"})
+    assert account.post(API + "/ai/run/match", json=second).status_code == 502
+    assert account.post(API + "/ai/details", json=second).get_json()["results"]["match"]["score"] == 80
+
+
+def test_recruitment_ai_extracts_multiple_jobs_from_uploaded_note_images(make_account, monkeypatch):
+    from PIL import Image
+    from services import db, recruitment
+
+    account = make_account("vision-note")
+    url = LINKS["xiaohongshu"]
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, account.email, "xiaohongshu", [{"title": "招聘图文", "url": url}])
+    runtime = ("https://vision.example", "mock-key", "vision")
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda **_: runtime)
+
+    def model(selected, _prompt, _payload, images):
+        assert selected == runtime
+        assert images[0].startswith("data:image/png;base64,")
+        return {"jobs": [{"title": "实习岗位", "salary": "300元/天"}, {"title": "全职岗位", "salary": "20K"}]}
+
+    monkeypatch.setattr(recruitment.ai, "request_model", model)
+    image = BytesIO()
+    Image.new("RGB", (20, 20)).save(image, format="PNG")
+    image.seek(0)
+    identity = {"source": "xiaohongshu", "url": url}
+    route = API + "/ai/run/vision"
+    assert account.post(route, data={**identity, "images": (BytesIO(b"not an image"), "note.png")}).status_code == 400
+    result = account.post(route, data={**identity, "images": (image, "note.png")}).get_json()["result"]
+    assert [item["title"] for item in result["jobs"]] == ["实习岗位", "全职岗位"]
+    assert account.post(API + "/ai/details", json=identity).get_json()["results"]["vision"] == result
+
+    seen = []
+    note_link = url + "?xsec_token=example&xsec_source=pc_search"
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, account.email, "xiaohongshu", [{"title": "招聘图文", "url": url, "note_url": note_link}])
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "read_xiaohongshu_images", lambda note: seen.append(note) or ["https://sns-img.xhscdn.com/note.png"])
+    monkeypatch.setattr(recruitment.ai, "request_model", lambda *_: {"jobs": [{"title": "图片岗位"}]})
+    assert account.post(route, json=identity).get_json()["result"]["jobs"][0]["title"] == "图片岗位"
+    assert seen == [note_link]
+    assert account.get(API + "/jobs").get_json()["items"][0]["url"] == url
 
 
 def test_cleaning_profiles_keep_rules_and_decisions_separate(make_account):

@@ -209,6 +209,33 @@ def read_zhilian_detail(url):
         return "unavailable", ""
 
 
+def read_xiaohongshu_images(url):
+    note_id = urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1]
+    expression = r"""JSON.stringify(location.origin === 'https://www.xiaohongshu.com'
+        && /^\/(explore|search_result)\//.test(location.pathname)
+        && location.pathname.replace(/\/$/, '').split('/').at(-1) === """ + json.dumps(note_id) + r"""
+        ? Array.from(document.querySelectorAll('.note-slider img, .note-content .swiper img, .note-container .swiper img'))
+            .map(img => img.currentSrc || img.src).filter(Boolean).slice(0, 16)
+        : [])"""
+    with open_chrome_tab("xiaohongshu", url) as tab:
+        if tab is None:
+            return []
+        deadline = monotonic() + 7
+        while monotonic() < deadline:
+            images = []
+            for image in tab.read(expression, timeout=3):
+                address = urlsplit(image)
+                host = address.hostname or ""
+                if (address.scheme == "https" and not address.username and not address.password and address.port in (None, 443)
+                        and any(host == domain or host.endswith("." + domain) for domain in ("xhscdn.com", "xhsimg.com"))
+                        and len(image) <= 2048 and image not in images):
+                    images.append(image)
+            if images:
+                return images[:8]
+            sleep(1)
+    return []
+
+
 def collect_in_chrome(source, keyword, city, limit, update):
     update("opening", "正在打开已授权的本机 Chrome 搜索标签页。")
     target_url = search_url(source, keyword, city)

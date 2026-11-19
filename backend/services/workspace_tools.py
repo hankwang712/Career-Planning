@@ -20,7 +20,7 @@ blueprint = Blueprint("workspace_tools", __name__)
 recent_requests = deque(maxlen=2000)
 log_lock = Lock()
 probe_lock = Lock()
-TEST_GROUPS = {"chat", "embedding", "news"}
+TEST_GROUPS = {"chat", "cleaner", "embedding", "news"}
 
 
 def extra_env_keys():
@@ -111,6 +111,8 @@ def reveal_model_secret():
 def probe_runtime(group):
     if group == "chat":
         return llm_env.chat_runtime()
+    if group == "cleaner":
+        return llm_env.recruitment_cleaner_runtime()
     if group == "embedding":
         from .skills.embeddings import embedding_runtime
         return embedding_runtime()
@@ -133,7 +135,7 @@ def test_connection(group):
     try:
         with httpx.Client(timeout=8, follow_redirects=False) as transport:
             with OpenAI(base_url=normalize_sdk_base_url(base_url), api_key=key, max_retries=0, http_client=transport) as client:
-                if group == "chat":
+                if group in {"chat", "cleaner"}:
                     reply = client.chat.completions.create(
                         model=model, messages=[{"role": "user", "content": "Reply OK."}], max_tokens=8,
                     )

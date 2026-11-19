@@ -129,6 +129,18 @@ def listing_url(source, href, base=None):
     return urlunsplit(("https", parsed.hostname, parsed.path, urlencode(query), ""))
 
 
+def xiaohongshu_note_url(href, base=None):
+    url = platform_url("xiaohongshu", href, base)
+    if not url:
+        return ""
+    address = urlsplit(url)
+    if address.hostname != "www.xiaohongshu.com" or not re.fullmatch(r"/(?:explore|search_result)/[A-Za-z0-9]+/?", address.path):
+        return ""
+    query = {key: values[0] for key, values in parse_qs(address.query).items()
+             if key in {"xsec_token", "xsec_source"} and len(values[0]) <= 512}
+    return urlunsplit((address.scheme, address.hostname, address.path, urlencode(query), ""))
+
+
 def allowed_request(source, request):
     if platform_url(source, request.url):
         return True
@@ -153,6 +165,8 @@ def cards(page, source, limit):
         url = listing_url(source, row["url"], base)
         if not url:
             continue
+        if source == "xiaohongshu":
+            row["note_url"] = xiaohongshu_note_url(row["url"], base)
         unique.setdefault(url, {**row, "url": url})
     return list(unique.values())[:limit]
 

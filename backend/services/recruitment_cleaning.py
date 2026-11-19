@@ -15,6 +15,9 @@ STATUSES = ("unreviewed", "passed", "rejected", "review")
 Profile = Literal["general", "internship", "full_time"]
 DEFAULT_PROFILE = "general"
 PROFILES = {"general": "通用", "internship": "实习", "full_time": "正式工作"}
+SEMANTIC_JOIN = """LEFT JOIN recruitment_ai_results a
+    ON a.owner=j.owner AND a.source=j.source AND a.url_key=j.url_key AND a.kind='semantic'"""
+EFFECTIVE_STATUS = "CASE WHEN r.status='passed' AND a.verdict IN ('rejected','review') THEN a.verdict ELSE r.status END"
 CITY_SEPARATOR = re.compile(r"[\s·•/／|,，、;；—-]+")
 KNOWN_CITIES = frozenset(CITIES) | {
     "重庆", "天津", "苏州", "无锡", "宁波", "温州", "合肥", "福州", "厦门", "南昌",
@@ -30,6 +33,7 @@ PAY_SCALE = {"k": 1000, "千": 1000, "千元": 1000, "万": 10000, "万元": 100
 DAILY_PAY = re.compile(r"(\d+(?:\.\d+)?)(?:元)?(?:[-~至](\d+(?:\.\d+)?))?(?:元)?(?:/[天日]|每天|每日)")
 RuleTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 SalaryK = Annotated[float, Field(gt=0, le=1000, allow_inf_nan=False)]
+SemanticRule = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
 
 
 class CleaningRules(BaseModel):
@@ -41,6 +45,8 @@ class CleaningRules(BaseModel):
     max_daily_salary: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
     title_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
     company_exclusions: list[RuleTerm] = Field(default_factory=list, max_length=50)
+    semantic_required: list[SemanticRule] = Field(default_factory=list, max_length=12)
+    semantic_excluded: list[SemanticRule] = Field(default_factory=list, max_length=12)
     auto: bool = Field(default=False, strict=True)
 
     @model_validator(mode="after")
@@ -204,11 +210,12 @@ def evaluate(row, rules):
 
 def stored_counts(conn, owner, profile):
     counts = dict.fromkeys(STATUSES, 0)
-    for row in conn.execute("""
-        SELECT COALESCE(r.status, 'unreviewed') AS status, count(*) AS count
+    for row in conn.execute(f"""
+        SELECT COALESCE({EFFECTIVE_STATUS}, 'unreviewed') AS status, count(*) AS count
         FROM recruitment_listings j
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
-        WHERE j.owner=? AND j.profile=? GROUP BY r.status
+        {SEMANTIC_JOIN}
+        WHERE j.owner=? AND j.profile=? GROUP BY 1
     """, (owner, profile)):
         counts["passed" if row["status"] == "released" else row["status"]] += row["count"]
     return counts

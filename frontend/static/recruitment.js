@@ -87,6 +87,7 @@
     setupProfileMove(row, sequence);
     description.textContent = row.description || "可在原站查看详情。";
     byId("recruitmentOriginal").href = row.url;
+    setupJobAi(row, sequence);
     detailStatus.hidden = row.source !== "zhilian";
     dialog.showModal();
     if (row.source !== "zhilian") return;
@@ -141,6 +142,9 @@
     source.dataset.source = row.source;
     header.append(source);
     if (row.profile) header.append(node("span", profileNames.get(row.profile), "recruitment-badge"));
+    if (row.ai_score != null || row.ai_match_status === "review") {
+      header.append(node("span", row.ai_score == null ? "AI · 待补资料" : `AI · ${row.ai_score} 分`, "recruitment-badge"));
+    }
     if (row.updated_at) {
       header.append(node("span", captureDate.format(new Date(row.updated_at * 1000)) + " 采集", "recruitment-row-date"));
     }
@@ -482,6 +486,9 @@
     for (const name of ["min_salary_k", "max_salary_k", "min_daily_salary", "max_daily_salary"]) {
       cleaningForm.elements[name].value = rules[name] ?? "";
     }
+    for (const name of ["semantic_required", "semantic_excluded"]) {
+      cleaningForm.elements[name].value = (rules[name] || []).join("\n");
+    }
     cleaningForm.elements.auto.checked = rules.auto;
     const name = profileNames.get(profileSelect.value);
     byId("recruitmentCleaningMode").textContent = `${name} · ${rules.auto ? "自动清洗已开启" : "手动清洗"}`;
@@ -491,9 +498,11 @@
     const form = new FormData(cleaningForm);
     const terms = (name) => [...new Set(form.get(name).split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean))];
     const salary = (name) => form.get(name) ? Number(form.get(name)) : null;
+    const semantic = (name) => form.get(name).split("\n").map((rule) => rule.trim()).filter(Boolean);
     return {
       cities: terms("cities"), title_exclusions: terms("title_exclusions"), company_exclusions: terms("company_exclusions"),
       min_salary_k: salary("min_salary_k"), max_salary_k: salary("max_salary_k"),
+      semantic_required: semantic("semantic_required"), semantic_excluded: semantic("semantic_excluded"),
       min_daily_salary: salary("min_daily_salary"), max_daily_salary: salary("max_daily_salary"), auto: form.has("auto")
     };
   }
@@ -601,6 +610,251 @@
   profileSelect.addEventListener("change", () => selectProfile(profileSelect.value));
   rulesProfileSelect.addEventListener("change", () => selectProfile(rulesProfileSelect.value));
   void loadRules();
+
+  const aiDialog = byId("recruitmentAiDialog");
+  const aiProfile = byId("recruitmentAiProfile");
+  const aiSettings = byId("recruitmentAiSettings");
+  const aiRun = byId("recruitmentAiRun");
+  const aiCandidates = byId("recruitmentAiCandidates");
+  const aiSearch = byId("recruitmentAiSearch");
+  const aiFeedback = byId("recruitmentAiFeedback");
+  const aiBatchResults = byId("recruitmentAiBatchResults");
+  const weights = [...aiSettings.querySelectorAll("[data-dimension]")];
+  let aiKind = "match";
+  let aiSequence = 0;
+  let aiSettingsSequence = 0;
+  let aiSettingsReady = false;
+  let aiRunning = false;
+  let aiSearchTimer;
+
+  function showAiSettings(data) {
+    aiSettings.elements.resume.value = data.settings.resume;
+    aiSettings.elements.preferences.value = data.settings.preferences;
+    for (const weight of weights) weight.value = data.settings.weights[weight.dataset.dimension] ?? 0;
+    byId("recruitmentAiReadiness").textContent = !data.configured ? "请先在系统配置中设置对话模型。"
+      : !data.resume_available ? "请填写基准简历，或先上传并解析账号简历。" : "模型与基准简历已就绪。";
+    aiSettingsReady = data.configured && data.resume_available;
+  }
+
+  async function loadAiSettings() {
+    const sequence = ++aiSettingsSequence;
+    const profile = aiProfile.value;
+    aiSettingsReady = false;
+    aiSettings.querySelector("button").disabled = true;
+    for (const field of aiSettings.querySelectorAll("input, textarea")) field.disabled = true;
+    try {
+      const data = await api("/ai/settings?profile=" + profile);
+      if (sequence !== aiSettingsSequence) return;
+      showAiSettings(data);
+      aiSettings.querySelector("button").disabled = false;
+      for (const field of aiSettings.querySelectorAll("input, textarea")) field.disabled = false;
+    } catch (error) {
+      if (sequence === aiSettingsSequence) byId("recruitmentAiReadiness").textContent = error.message;
+    } finally {
+      updateAiRun();
+    }
+  }
+
+  function updateAiRun() {
+    const count = aiCandidates.querySelectorAll("input:checked").length;
+    aiRun.disabled = aiRunning || !count || count > 10 || (aiKind === "match" && !aiSettingsReady);
+    if (count > 10) aiFeedback.textContent = "每次最多处理 10 条岗位。";
+    else if (aiFeedback.textContent === "每次最多处理 10 条岗位。") aiFeedback.textContent = "";
+  }
+
+  async function loadAiCandidates() {
+    const sequence = ++aiSequence;
+    aiCandidates.replaceChildren();
+    updateAiRun();
+    try {
+      const query = new URLSearchParams({ profile: aiProfile.value, q: aiSearch.value.trim() });
+      const data = await api(`/ai/candidates/${aiKind}?${query}`);
+      if (sequence !== aiSequence) return;
+      for (const item of data.items) {
+        const label = node("label", "", "recruitment-ai-candidate");
+        const input = node("input");
+        input.type = "checkbox";
+        input.dataset.source = item.source;
+        input.value = item.url;
+        input.disabled = aiRunning;
+        label.append(input, node("span", [item.title, item.company, item.score == null ? "" : item.score + " 分"]
+          .filter(Boolean).join(" · ")));
+        aiCandidates.append(label);
+      }
+      if (!data.items.length) aiCandidates.append(node("p", "暂无已通过规则清洗的岗位。", "recruitment-rule-feedback"));
+    } catch (error) {
+      if (sequence === aiSequence) aiFeedback.textContent = error.message;
+    }
+  }
+
+  function openAi(kind) {
+    if (!aiRunning) {
+      aiKind = kind;
+      aiProfile.value = profileSelect.value;
+      aiSearch.value = "";
+      aiFeedback.textContent = "";
+      aiBatchResults.replaceChildren();
+      aiSettings.hidden = kind !== "match";
+      byId("recruitmentAiDialogTitle").textContent = kind === "match" ? "AI 初评" : "AI 语义清洗";
+      aiRun.textContent = kind === "match" ? "评估所选岗位" : "清洗所选岗位";
+      if (kind === "match") void loadAiSettings();
+      else aiSettingsSequence += 1;
+      void loadAiCandidates();
+    }
+    if (!aiDialog.open) aiDialog.showModal();
+  }
+
+  byId("recruitmentAiOpen").onclick = () => openAi("match");
+  byId("recruitmentSemanticOpen").onclick = () => {
+    if (rulesBusy) return;
+    cleaningDialog.close();
+    openAi("semantic");
+  };
+  aiProfile.addEventListener("change", () => {
+    aiFeedback.textContent = "";
+    aiBatchResults.replaceChildren();
+    if (aiKind === "match") void loadAiSettings();
+    void loadAiCandidates();
+  });
+  aiSearch.addEventListener("input", () => {
+    clearTimeout(aiSearchTimer);
+    aiSearchTimer = setTimeout(() => { if (!aiRunning && aiDialog.open) void loadAiCandidates(); }, 250);
+  });
+  aiCandidates.addEventListener("change", updateAiRun);
+  aiSettings.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const profile = aiProfile.value;
+    const button = aiSettings.querySelector("button");
+    button.disabled = true;
+    try {
+      const settings = {
+        resume: aiSettings.elements.resume.value, preferences: aiSettings.elements.preferences.value,
+        weights: Object.fromEntries(weights.map((weight) => [weight.dataset.dimension, Number(weight.value)]))
+      };
+      const data = await api("/ai/settings", { profile, settings });
+      if (aiKind === "match" && aiProfile.value === profile) {
+        showAiSettings(data);
+        aiFeedback.textContent = "初评配置已保存。";
+        void loadAiCandidates();
+      }
+      void loadJobs();
+    } catch (error) {
+      if (aiProfile.value === profile) aiFeedback.textContent = error.message;
+    } finally {
+      if (aiProfile.value === profile) button.disabled = false;
+      updateAiRun();
+    }
+  });
+
+  function aiResultLabel(result) {
+    if (result.score != null) return `${result.score} 分 · ${result.coverage} 项有依据`;
+    return { passed: "通过", rejected: "淘汰", extracted: "提取完成", review: "待核对" }[result.verdict] || "已完成";
+  }
+
+  aiRun.onclick = async () => {
+    const selected = [...aiCandidates.querySelectorAll("input:checked")];
+    if (aiRun.disabled || !selected.length) return;
+    aiRunning = true;
+    aiProfile.disabled = aiSearch.disabled = true;
+    const save = aiSettings.querySelector("button");
+    const saveWasDisabled = save.disabled;
+    save.disabled = true;
+    for (const input of aiCandidates.querySelectorAll("input")) input.disabled = true;
+    updateAiRun();
+    aiBatchResults.replaceChildren();
+    let completed = 0;
+    for (const item of selected) {
+      aiFeedback.textContent = `正在处理 ${completed + 1} / ${selected.length} 条…`;
+      const title = item.closest("label").textContent;
+      let summary;
+      try {
+        const { result } = await api("/ai/run/" + aiKind, { profile: aiProfile.value, source: item.dataset.source, url: item.value });
+        summary = [aiResultLabel(result), result.reason].filter(Boolean).join(" · ");
+      } catch (error) {
+        summary = error.message;
+      }
+      aiBatchResults.append(node("li", title + " · " + summary));
+      completed += 1;
+    }
+    aiFeedback.textContent = `已处理 ${completed} 条岗位。`;
+    aiRunning = false;
+    aiProfile.disabled = aiSearch.disabled = false;
+    save.disabled = saveWasDisabled;
+    void loadAiCandidates();
+    void loadJobs();
+  };
+
+  function renderJobAi(results) {
+    const section = byId("recruitmentAiDetails");
+    section.replaceChildren();
+    for (const [kind, entry] of Object.entries(results)) {
+      const title = { semantic: "AI 语义清洗", match: "AI 初评", vision: "图片提取结果" }[kind];
+      section.append(node("h3", title + " · " + aiResultLabel(entry)));
+      if (entry.reason) section.append(node("p", entry.reason));
+      if (entry.evidence) section.append(node("p", "岗位原文：" + entry.evidence));
+      for (const part of Object.values(entry.dimensions || {})) {
+        const card = node("div", "", "recruitment-ai-evidence");
+        card.append(node("strong", `${part.label} · ${part.score == null ? "待核对" : part.score + " / 5"}`), node("p", part.reason));
+        if (part.jd_evidence) card.append(node("p", "岗位原文：" + part.jd_evidence));
+        if (part.resume_evidence) card.append(node("p", "简历或偏好依据：" + part.resume_evidence));
+        section.append(card);
+      }
+      for (const job of entry.jobs || []) {
+        const card = node("div", "", "recruitment-ai-evidence");
+        card.append(node("strong", job.title), node("p", [job.company, job.location, job.salary].filter(Boolean).join(" · ")),
+          node("p", job.description));
+        section.append(card);
+      }
+    }
+    section.hidden = !section.childNodes.length;
+  }
+
+  function setupJobAi(row, sequence) {
+    const identity = { source: row.source, url: row.url };
+    const vision = byId("recruitmentVision");
+    const files = byId("recruitmentVisionFiles");
+    const feedback = byId("recruitmentVisionFeedback");
+    const read = byId("recruitmentVisionRead");
+    const upload = byId("recruitmentVisionUpload");
+    const show = (results) => { if (sequence === detailSequence) renderJobAi(results); };
+    let stored = {};
+    show(stored);
+    void api("/ai/details", identity).then(({ results }) => {
+      stored = { ...results, ...stored };
+      show(stored);
+    }).catch(() => {});
+    vision.hidden = row.source !== "xiaohongshu";
+    files.value = "";
+    feedback.textContent = "";
+    read.disabled = upload.disabled = false;
+    async function extract(useFiles) {
+      let payload = identity;
+      if (useFiles) {
+        if (!files.files.length) {
+          feedback.textContent = "请先选择图片。";
+          return;
+        }
+        payload = new FormData();
+        for (const [name, value] of Object.entries(identity)) payload.append(name, value);
+        for (const file of files.files) payload.append("images", file);
+      }
+      read.disabled = upload.disabled = true;
+      feedback.textContent = "正在读取并提取岗位…";
+      try {
+        const { result } = await api("/ai/run/vision", payload);
+        stored = { vision: result };
+        show(stored);
+        if (sequence === detailSequence) feedback.textContent = result.jobs.length ? `识别到 ${result.jobs.length} 个岗位。` : result.reason;
+        void loadJobs();
+      } catch (error) {
+        if (sequence === detailSequence) feedback.textContent = error.message;
+      } finally {
+        if (sequence === detailSequence) read.disabled = upload.disabled = false;
+      }
+    }
+    read.onclick = () => { void extract(false); };
+    upload.onclick = () => { void extract(true); };
+  }
 
   const sessions = byId("recruitmentSessions");
   if (sessions) {
