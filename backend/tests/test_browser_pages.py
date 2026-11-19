@@ -114,7 +114,14 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
         page.wait_for_url("**/recruitment")
         assert page.get_by_role("heading", name="招聘信息采集").is_visible()
         assert page.get_by_text("返回工作台").count() == 0
-        page.get_by_role("link", name="仪表盘").click()
+        navigation = page.get_by_role("navigation", name="主导航")
+        assert [link.strip() for link in navigation.locator(".nav-tab-strip a").all_text_contents()] == [
+            "首页", "岗位探索", "测评中心", "规划报告",
+        ]
+        assert navigation.get_by_role("link", name="岗位探索").get_attribute("aria-current") == "page"
+        navigation.get_by_role("button", name="工作区菜单").click()
+        assert navigation.get_by_role("menuitem", name="个人中心").is_visible()
+        navigation.get_by_role("link", name="首页", exact=True).click()
         page.locator("#dashboard").wait_for(state="visible")
         page.wait_for_function("window.getCurrentUser?.()?.username")
         assert page.locator("#startupScreen, #loginForm, #logoutBtn").count() == 0
@@ -125,6 +132,9 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
         navigation.get_by_role("link", name="岗位探索").click()
         page.wait_for_url("**/recruitment")
         assert page.get_by_role("heading", name="招聘信息采集").is_visible()
+        assert navigation.get_by_role("link", name="岗位探索").get_attribute("aria-current") == "page"
+        page.set_viewport_size({"width": 390, "height": 844})
+        assert page.evaluate("document.documentElement.scrollWidth") == 390
         assert errors == []
     finally:
         page.close()

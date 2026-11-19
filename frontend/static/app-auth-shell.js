@@ -22,39 +22,6 @@ function animateCounter(el, target, suffix = "", duration = 500) {
   requestAnimationFrame(frame);
 }
 
-function closeNavWorkspaceMenu() {
-  const menu = document.getElementById("navWorkspaceMenu");
-  const toggle = document.getElementById("navWorkspaceToggle");
-  if (menu) menu.classList.add("hidden");
-  if (toggle) {
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.classList.remove("nav-workspace-menu-open");
-  }
-}
-
-function initNavWorkspaceMenu() {
-  const shell = document.getElementById("navWorkspaceShell");
-  const toggle = document.getElementById("navWorkspaceToggle");
-  const menu = document.getElementById("navWorkspaceMenu");
-  if (!shell || !toggle || !menu) return;
-  toggle.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = !menu.classList.contains("hidden");
-    if (isOpen) closeNavWorkspaceMenu();
-    else {
-      menu.classList.remove("hidden");
-      toggle.setAttribute("aria-expanded", "true");
-      toggle.classList.add("nav-workspace-menu-open");
-    }
-  });
-  document.addEventListener("click", (e) => {
-    if (!shell.contains(e.target)) closeNavWorkspaceMenu();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeNavWorkspaceMenu();
-  });
-}
-
 function initWorkspace() {
   if (userWorkspaceState.authReadyPromise) return userWorkspaceState.authReadyPromise;
   userWorkspaceState.authReadyPromise = (async () => {

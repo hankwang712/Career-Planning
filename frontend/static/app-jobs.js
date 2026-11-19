@@ -359,7 +359,6 @@ function initAnimations() {
 }
 
 function bindGlobalEvents() {
-  initNavWorkspaceMenu();
 
   const searchInput = document.getElementById("jobSearch");
   if (searchInput) {

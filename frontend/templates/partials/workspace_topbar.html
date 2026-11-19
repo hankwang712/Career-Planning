@@ -1,0 +1,62 @@
+{% set recruitment_nav = recruitment_nav|default(false) %}
+<nav class="app-topbar gradient-bg text-white shadow-lg w-full z-50 {{ 'recruitment-topbar' if recruitment_nav else 'fixed' }}" aria-label="主导航">
+    <div class="topbar-container w-full px-4 lg:px-8">
+        <div class="topbar-row flex items-center min-h-[4.55rem] gap-5 py-2">
+            <!-- 品牌区 -->
+            <a class="topbar-brand flex items-center gap-3 flex-shrink-0" href="{{ url_for('site.home') }}" aria-label="智航生涯首页">
+                <div class="app-brand-mark nav-brand-mark app-brand-mark--img" aria-hidden="true">
+                    <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="" width="40" height="40" decoding="async">
+                </div>
+                <div class="leading-tight">
+                    <h1 class="text-base font-bold whitespace-nowrap">智航生涯</h1>
+                    <p class="text-xs text-purple-200 whitespace-nowrap">探索方向 · 规划未来</p>
+                </div>
+            </a>
+
+            <!-- 导航标签区：flex-1 自适应宽度，单行不换行 -->
+            <div class="nav-tab-strip flex items-center gap-2 flex-1 overflow-x-auto scrollbar-none">
+                {% if recruitment_nav %}<a href="{{ url_for('site.index', _anchor='dashboard') }}"{% else %}<button type="button" onclick="showSection('dashboard')"{% endif %} data-section="dashboard"{% if not recruitment_nav %} aria-current="page"{% endif %} class="nav-item{{ ' active' if not recruitment_nav else '' }} px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                    </svg>
+                    首页
+                {% if recruitment_nav %}</a>{% else %}</button>{% endif %}
+                <a href="{{ url_for('recruitment.page') }}" data-section="jobs"{% if recruitment_nav %} aria-current="page"{% endif %} class="nav-item{{ ' active' if recruitment_nav else '' }} px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="m20 20-4.2-4.2"></path>
+                    </svg>
+                    岗位探索
+                </a>
+                {% if recruitment_nav %}<a href="{{ url_for('site.index', _anchor='profile') }}"{% else %}<button type="button" onclick="showSection('profile')"{% endif %} data-section="profile" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    测评中心
+                {% if recruitment_nav %}</a>{% else %}</button>{% endif %}
+                {% if recruitment_nav %}<a href="{{ url_for('site.index', _anchor='report') }}"{% else %}<button type="button" onclick="showSection('report')"{% endif %} data-section="report" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <path d="M14 2v6h6"></path>
+                        <path d="M8 13h8"></path>
+                        <path d="M8 17h8"></path>
+                    </svg>
+                    规划报告
+                {% if recruitment_nav %}</a>{% else %}</button>{% endif %}
+            </div>
+
+            <!-- 账号与工作区菜单 -->
+            <div class="nav-action-strip flex items-center gap-2 flex-shrink-0">
+                <span id="liveClock"{% if recruitment_nav %} data-local-clock{% endif %} class="topbar-clock" title="当前本地时间">--:--:--</span>
+                <a href="{{ url_for('workspace_tools.settings_page') }}" class="ca-button ca-settings-entry" aria-label="系统配置" title="系统配置">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2" fill="white"/><circle cx="16" cy="12" r="2" fill="white"/><circle cx="10" cy="18" r="2" fill="white"/></svg>
+                </a>
+                {% include "partials/account_menu.html" %}
+            </div>
+        </div>
+    </div>
+</nav>

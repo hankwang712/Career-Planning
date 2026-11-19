@@ -5,21 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>招聘信息采集 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='recruitment.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='product-theme.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='recruitment.js') }}" defer></script>
 </head>
 <body>
-    <header class="recruitment-top">
-        <div>
-            <a class="recruitment-brand" href="{{ url_for('site.home') }}"><img src="{{ url_for('static', filename='brand/icon.png') }}" alt="">智航生涯</a>
-            <nav class="recruitment-nav" aria-label="工作区">
-                <a href="{{ url_for('site.index', _anchor='dashboard') }}">仪表盘</a>
-                <a href="{{ url_for('resume_editor.index') }}">我的简历</a>
-                <a href="{{ url_for('workspace_tools.settings_page') }}">系统配置</a>
-            </nav>
-        </div>
-    </header>
+    {% with recruitment_nav = true %}{% include "partials/workspace_topbar.html" %}{% endwith %}
     <main class="recruitment-main">
         <header class="recruitment-hero">
             <h1>招聘信息采集</h1>

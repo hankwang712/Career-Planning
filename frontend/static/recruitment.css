@@ -31,12 +31,32 @@ button, .recruitment-button {
 button:hover:not(:disabled), .recruitment-button:hover { background: #edf4ff; }
 button:disabled { opacity: .55; cursor: default; }
 :is(a, button, input, select, summary):focus-visible { outline: 2px solid #477ae8; outline-offset: 2px; }
-.recruitment-top { border-bottom: 1px solid var(--border); background: #fff; }
-.recruitment-top > div, .recruitment-main { width: min(1320px, calc(100% - 48px)); margin: 0 auto; }
-.recruitment-top > div { display: flex; justify-content: space-between; align-items: center; min-height: 64px; gap: 12px; }
-.recruitment-brand { display: inline-flex; gap: 9px; align-items: center; color: #18314e; font-weight: 750; }
-.recruitment-brand img { width: 32px; height: 32px; border-radius: 8px; }
-.recruitment-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 14px; font-size: 13px; }
+.recruitment-topbar { position: sticky; z-index: 50; }
+.recruitment-topbar .topbar-row { align-items: center; }
+.recruitment-topbar :is(.topbar-brand, .nav-action-strip) { display: flex; align-items: center; }
+.recruitment-topbar .topbar-brand { white-space: nowrap; }
+.recruitment-topbar .topbar-brand h1 { font-weight: 700; }
+.recruitment-topbar .nav-brand-mark { overflow: hidden; }
+.recruitment-topbar .nav-brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.recruitment-topbar .nav-tab-strip {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.recruitment-topbar .nav-item { flex-shrink: 0; white-space: nowrap; }
+.recruitment-topbar .nav-workspace-shell { position: relative; }
+.recruitment-topbar .hidden { display: none; }
+.recruitment-topbar .ca-settings-entry {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    color: var(--product-muted);
+    border: 1px solid var(--product-border);
+    border-radius: 9px;
+}
+.recruitment-topbar .ca-settings-entry:hover { color: var(--product-accent); background: var(--product-bg); }
+.recruitment-main { width: min(1320px, calc(100% - 48px)); margin: 0 auto; }
 .recruitment-main { padding: 23px 0 36px; }
 .recruitment-card, .recruitment-detail {
     border: 1px solid var(--border);
@@ -469,7 +489,7 @@ body:has(.recruitment-drawer[open]) { overflow: hidden; }
 .recruitment-html-form { display: grid; gap: 12px; }
 .recruitment-html-form p { color: var(--muted); }
 @media (max-width: 700px) {
-    .recruitment-top > div, .recruitment-main { width: calc(100% - 24px); }
+    .recruitment-main { width: calc(100% - 24px); }
     .recruitment-platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .recruitment-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .recruitment-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
