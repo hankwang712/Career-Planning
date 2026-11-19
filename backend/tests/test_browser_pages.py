@@ -260,6 +260,47 @@ def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_s
     assert download.value.suggested_filename == "recruitment.csv"
 
 
+def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_page, live_server, monkeypatch):
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    page = logged_in_page
+    statuses = {
+        "boss": ("ready", "已登录"),
+        "51job": ("not_logged_in", "未登录"),
+        "zhilian": ("verification_required", "需要安全验证"),
+        "xiaohongshu": ("unavailable", "检查失败"),
+    }
+    checked = []
+
+    def session(route):
+        source = route.request.url.rsplit("/", 1)[-1]
+        checked.append(source)
+        state, label = statuses[source]
+        route.fulfill(json={"state": state, "label": label, "message": "Chrome 登录检查结果"})
+
+    page.route("**/api/job-market/collection/session/*", session)
+    page.goto(live_server + "/recruitment")
+    sessions = page.locator("#recruitmentSessions")
+    cards = sessions.locator(".recruitment-session")
+    assert cards.count() == 4
+    assert cards.locator(".recruitment-session-icon").count() == 4
+    assert cards.get_by_role("link").count() == 4
+    sessions.locator('.recruitment-session[data-source="51job"]').get_by_role("button").click()
+    sessions.get_by_text("未登录", exact=True).wait_for()
+    assert checked == ["51job"]
+    assert sessions.get_by_text("未检查", exact=True).count() == 3
+
+    sessions.get_by_role("button", name="检查全部").click()
+    for source, (state, label) in statuses.items():
+        result = sessions.locator(f'.recruitment-session[data-source="{source}"] [data-state="{state}"]')
+        result.get_by_text(label, exact=True).wait_for()
+    assert sorted(checked[1:]) == sorted(statuses)
+    assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+    page.set_viewport_size({"width": 375, "height": 800})
+    assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+    page.get_by_role("checkbox", name="用本机 Chrome 采集").uncheck()
+    assert sessions.is_hidden()
+
+
 def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)

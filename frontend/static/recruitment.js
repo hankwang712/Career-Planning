@@ -257,27 +257,46 @@
   byId("recruitmentPrev").onclick = () => { page -= 1; void loadJobs(); };
   byId("recruitmentNext").onclick = () => { page += 1; void loadJobs(); };
   byId("recruitmentRefresh").onclick = () => { void loadRuns(); void loadJobs(); };
-  const zhilianLogin = byId("recruitmentZhilianLogin");
-  if (zhilianLogin) {
-    const status = byId("recruitmentZhilianStatus");
-    const check = byId("recruitmentCheckZhilian");
-    const zhilian = config.querySelector('input[name="source"][value="zhilian"]');
-    const syncVisibility = () => { zhilianLogin.hidden = !zhilian.checked; };
-    zhilian.addEventListener("change", syncVisibility);
+  const sessions = byId("recruitmentSessions");
+  if (sessions) {
+    const localChrome = config.elements.bossLocal;
+    const checkAll = byId("recruitmentCheckAll");
+    const syncVisibility = () => { sessions.hidden = !localChrome.checked; };
+    localChrome.addEventListener("change", syncVisibility);
     syncVisibility();
-    check.addEventListener("click", async () => {
-      check.disabled = true;
-      status.dataset.state = "checking";
-      status.textContent = "正在检查当前 Chrome 的智联登录状态…";
+    const checks = Array.from(sessions.querySelectorAll(".recruitment-session"), (card) => {
+      const button = card.querySelector("button");
+      const result = card.querySelector(".recruitment-session-result");
+      const label = result.querySelector(".recruitment-session-label");
+      const message = result.querySelector(".recruitment-session-message");
+      function render(state, title, detail = "") {
+        result.dataset.state = state;
+        label.textContent = title;
+        message.textContent = detail;
+        message.hidden = !detail;
+      }
+      async function check() {
+        if (button.disabled) return;
+        button.disabled = true;
+        render("checking", "检查中…");
+        try {
+          const status = await api(`/session/${card.dataset.source}`, {});
+          render(status.state, status.label, status.message);
+        } catch (error) {
+          render("unavailable", "检查失败", error.message);
+        } finally {
+          button.disabled = false;
+        }
+      }
+      button.addEventListener("click", check);
+      return check;
+    });
+    checkAll.addEventListener("click", async () => {
+      checkAll.disabled = true;
       try {
-        const result = await api("/session/zhilian", {});
-        status.dataset.state = result.state;
-        status.textContent = result.message;
-      } catch (error) {
-        status.dataset.state = "unavailable";
-        status.textContent = error.message;
+        await Promise.all(checks.map((check) => check()));
       } finally {
-        check.disabled = false;
+        checkAll.disabled = false;
       }
     });
   }

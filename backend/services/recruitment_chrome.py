@@ -30,7 +30,7 @@ LOGIN_URLS = {
     "xiaohongshu": "https://www.xiaohongshu.com/explore",
 }
 LOGIN_HOSTS = {"passport.zhipin.com", "passport.zhaopin.com", "login.51job.com", "passport.51job.com"}
-ZHILIAN_LOGIN_URL = "https://www.zhaopin.com/jobs/"
+SESSION_URLS = {**LOGIN_URLS, **{source: SOURCES[source][1] for source in ("boss", "51job")}}
 ZHILIAN_LOGIN = r"""(() => {
     if (location.origin !== 'https://www.zhaopin.com') return 'unknown';
     const visitor = document.querySelector('.home-header__c-no-login, .c-login__top__no-login');
@@ -60,13 +60,20 @@ SNAPSHOT = """JSON.stringify({
         : document.querySelector('a.link-wrapper[href^="/user/profile"], .user-avatar, .side-bar-user')?.getClientRects().length
             ? 'ready' : 'unknown'
 })"""
-SESSION_FIELDS = {"boss": "bossLogin", "51job": "job51Login", "xiaohongshu": "xhsLogin"}
-ZHILIAN_LOGIN_MESSAGES = {
-    "ready": "智联已登录，可以开始采集。",
-    "not_logged_in": "尚未登录智联。请在当前 Chrome 登录官网，再检查。",
-    "verification_required": "智联需要安全验证。请在官网完成验证，再检查。",
-    "unknown": "暂未确认智联登录状态。请先在官网确认登录，再检查。",
-    "unavailable": "无法连接本机 Chrome，请确认 Chrome 已打开并授权本机连接。",
+SESSION_FIELDS = {"boss": "bossLogin", "51job": "job51Login", "zhilian": "zhilianLogin", "xiaohongshu": "xhsLogin"}
+SESSION_LABELS = {
+    "ready": "已登录",
+    "not_logged_in": "未登录",
+    "verification_required": "需要安全验证",
+    "unknown": "未能确认",
+    "unavailable": "检查失败",
+}
+SESSION_MESSAGES = {
+    "ready": "当前 Chrome 已登录，可以采集。",
+    "not_logged_in": "请在用于采集的 Chrome 登录后重试。",
+    "verification_required": "请在官网完成验证后重试。",
+    "unknown": "请在官网确认登录后重试。",
+    "unavailable": "请确认 Chrome 已打开并授权连接后重试。",
 }
 
 
@@ -136,36 +143,37 @@ def is_verification(snapshot):
     ))
 
 
-def zhilian_session(snapshot):
-    if is_verification(snapshot):
-        return "verification_required"
-    if urlsplit(snapshot["url"]).hostname == "passport.zhaopin.com":
-        return "not_logged_in"
-    return snapshot.get("zhilianLogin", "unknown")
-
-
 def platform_session(source, snapshot):
-    if source == "zhilian":
-        return zhilian_session(snapshot)
+    url = snapshot["url"]
+    if not url.startswith("https://") or not platform_url(source, url):
+        return "unknown"
     if is_verification(snapshot):
         return "verification_required"
-    address = urlsplit(snapshot["url"])
+    address = urlsplit(url)
     if address.hostname in LOGIN_HOSTS or "请登录" in snapshot["title"]:
         return "not_logged_in"
-    return snapshot.get(SESSION_FIELDS[source], "unknown")
+    state = snapshot.get(SESSION_FIELDS[source])
+    return state if state in ("ready", "not_logged_in") else "unknown"
 
 
-def check_zhilian_login():
+def check_platform_login(source):
     try:
-        with open_chrome_tab("zhilian", ZHILIAN_LOGIN_URL) as tab:
+        with open_chrome_tab(source, SESSION_URLS[source]) as tab:
             if tab is None:
                 return "unavailable"
             deadline = monotonic() + 8
             while monotonic() < deadline:
-                state = zhilian_session(tab.read(SNAPSHOT))
+                try:
+                    state = platform_session(source, tab.read(SNAPSHOT, timeout=min(3, deadline - monotonic())))
+                except httpx.TimeoutException:
+                    continue
+                except httpx.HTTPStatusError as error:
+                    if error.response.status_code != 400:
+                        raise
+                    state = "unknown"
                 if state != "unknown":
                     return state
-                sleep(1)
+                sleep(max(0, min(1, deadline - monotonic())))
             return "unknown"
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         return "unavailable"
@@ -188,7 +196,7 @@ def read_zhilian_detail(url):
             state = "unknown"
             while monotonic() < deadline:
                 snapshot = tab.read(SNAPSHOT)
-                state = zhilian_session(snapshot)
+                state = platform_session("zhilian", snapshot)
                 if state in {"not_logged_in", "verification_required"}:
                     return state, ""
                 if state == "ready":

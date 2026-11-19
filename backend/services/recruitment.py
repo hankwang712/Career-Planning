@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from . import db
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
-    CHROME_SOURCES, LOGIN_URLS, ZHILIAN_LOGIN_MESSAGES, ZHILIAN_LOGIN_URL, check_zhilian_login, collect_in_chrome,
+    CHROME_SOURCES, LOGIN_URLS, SESSION_LABELS, SESSION_MESSAGES, check_platform_login, collect_in_chrome,
     read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
@@ -220,16 +220,18 @@ def page():
     return render_template("recruitment.html", sources=SOURCES, cities=CITIES, boss_local=local_desktop_request(),
                            chrome_available=use_local_chrome(), chrome_sources=CHROME_SOURCES,
                            collection_sources={source: SOURCES[source] for source in CHROME_SOURCES},
-                           zhilian_login_url=ZHILIAN_LOGIN_URL)
+                           login_urls=LOGIN_URLS)
 
 
-@blueprint.post(API + "/session/zhilian")
+@blueprint.post(API + "/session/<source>")
 @_login_required
-def zhilian_login_status():
+def platform_login_status(source):
     if not local_desktop_request() or not use_local_chrome():
         return jsonify(message="请从已启用 Chrome 连接的电脑访问本机采集页。"), 403
-    state = check_zhilian_login()
-    return jsonify(state=state, message=ZHILIAN_LOGIN_MESSAGES[state])
+    if source not in CHROME_SOURCES:
+        return jsonify(message="该平台不支持本机 Chrome 登录检查。"), 404
+    state = check_platform_login(source)
+    return jsonify(state=state, label=SESSION_LABELS[state], message=SESSION_MESSAGES[state])
 
 
 @blueprint.post(API + "/runs")
@@ -334,7 +336,7 @@ def zhilian_job_detail():
     state, detail = read_zhilian_detail(url)
     text = clean_listing({"description": detail})["description"]
     if not text:
-        return jsonify(message=ZHILIAN_LOGIN_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
+        return jsonify(message=SESSION_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
     with conn:
         conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text))
     return jsonify(description=text)

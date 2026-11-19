@@ -82,14 +82,31 @@
                             {% endif %}
                         </div>
                         {% if chrome_available %}
-                        <div id="recruitmentZhilianLogin" class="recruitment-browser-option">
-                            <div class="recruitment-browser-actions">
-                                <strong>智联登录验证</strong>
-                                <a href="{{ zhilian_login_url }}" class="recruitment-button" target="_blank" rel="noopener noreferrer">去智联登录 ↗</a>
-                                <button id="recruitmentCheckZhilian" type="button">检查登录</button>
+                        <section id="recruitmentSessions" class="recruitment-browser-sessions" aria-labelledby="recruitmentSessionsHeading">
+                            <div class="recruitment-session-toolbar">
+                                <h3 id="recruitmentSessionsHeading">平台登录状态</h3>
+                                <button id="recruitmentCheckAll" type="button">检查全部</button>
                             </div>
-                            <p id="recruitmentZhilianStatus" role="status">采集前会检查当前 Chrome 的智联登录状态。</p>
-                        </div>
+                            {% set marks = {'boss': 'BOSS', '51job': '51', 'zhilian': '智联', 'xiaohongshu': '小红书'} %}
+                            <ul class="recruitment-session-list">
+                                {% for id, source in collection_sources.items() %}
+                                <li class="recruitment-session" data-source="{{ id }}">
+                                    <div class="recruitment-session-heading">
+                                        <span class="recruitment-session-icon" aria-hidden="true">{{ marks[id] }}</span>
+                                        <strong>{{ source[0] }}</strong>
+                                    </div>
+                                    <div class="recruitment-session-result" role="status" aria-atomic="true" data-state="idle">
+                                        <strong class="recruitment-session-label">未检查</strong>
+                                        <p class="recruitment-session-message" hidden></p>
+                                    </div>
+                                    <div class="recruitment-session-actions">
+                                        <a href="{{ login_urls[id] }}" class="recruitment-button" aria-label="去{{ source[0] }}登录" target="_blank" rel="noopener noreferrer">去登录 ↗</a>
+                                        <button type="button" aria-label="检查{{ source[0] }}登录">检查登录</button>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </section>
                         {% endif %}
                     </div>
                     {% endif %}

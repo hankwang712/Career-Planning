@@ -121,18 +121,70 @@ input:not([type=checkbox]), select {
 }
 .recruitment-source:has(input:checked) { color: #234b88; background: #f3f7ff; }
 .recruitment-source input { margin: 0; flex-shrink: 0; accent-color: var(--blue); }
-.recruitment-browser-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-    column-gap: 12px;
-}
+.recruitment-browser-options { display: grid; gap: 10px; }
 .recruitment-browser-option { padding: 8px 10px; border-radius: 9px; background: #f5f8fc; }
 .recruitment-browser-option .recruitment-source { padding: 0; border: 0; background: transparent; }
 .recruitment-browser-option p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-.recruitment-browser-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; font-size: 13px; }
-.recruitment-browser-actions :is(a, button) { min-height: 25px; padding: 2px 7px; font-size: 12px; }
-.recruitment-browser-option p[data-state=ready] { color: #0c7358; }
-.recruitment-browser-option p:is([data-state=not_logged_in], [data-state=verification_required]),
+.recruitment-browser-sessions { padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #f8faff; }
+.recruitment-session-toolbar, .recruitment-session-heading, .recruitment-session-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.recruitment-session-toolbar { justify-content: space-between; margin-bottom: 8px; }
+.recruitment-session-toolbar h3 { margin: 0; font-size: 13px; }
+.recruitment-session-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.recruitment-session {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--platform-border);
+    border-radius: 8px;
+    background: #fff;
+}
+.recruitment-session-heading { font-size: 13px; }
+.recruitment-session-icon {
+    display: grid;
+    flex: 0 0 36px;
+    height: 30px;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--platform-color);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+}
+.recruitment-session-result { color: var(--muted); font-size: 12px; }
+.recruitment-session-label { display: inline-flex; align-items: center; gap: 6px; }
+.recruitment-session-label::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentcolor;
+}
+.recruitment-session-result[data-state=ready] { color: #0c7358; }
+.recruitment-session-result[data-state=checking] { color: #2454a2; }
+.recruitment-session-result[data-state=unknown] { color: #8a5607; }
+.recruitment-session-result:is([data-state=not_logged_in], [data-state=verification_required], [data-state=unavailable]) {
+    color: #ac2b42;
+}
+.recruitment-session-message { color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.recruitment-session-actions { flex-wrap: wrap; }
+.recruitment-session-toolbar button, .recruitment-session-actions :is(a, button) {
+    min-height: 28px;
+    padding: 3px 8px;
+    font-size: 12px;
+}
 .recruitment-run-source p:is([data-status=waiting_user], [data-status=login_required], [data-status=login_timeout]) { color: #8a5607; }
 .recruitment-primary { min-width: 112px; min-height: 37px; border-color: var(--blue); background: var(--blue); color: #fff; }
 .recruitment-primary:hover:not(:disabled) { background: #174fc4; }
@@ -262,7 +314,6 @@ input:not([type=checkbox]), select {
     .recruitment-config form { grid-template-columns: minmax(0, 1fr); }
     .recruitment-config form > .recruitment-primary { grid-area: auto; }
     .recruitment-form-grid > :first-child { grid-column: 1 / -1; }
-    .recruitment-browser-options { row-gap: 8px; }
     .recruitment-rows { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 420px) {

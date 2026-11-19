@@ -283,6 +283,8 @@ flowchart LR
 
 「岗位探索 → 招聘信息采集」位于 `/recruitment`，按账号保存岗位、招聘线索和采集记录。实时采集读取各平台公开搜索页，需要 Playwright Chromium 或本机 Chrome、Edge。从运行服务的电脑访问本机地址时，可以选择「用本机浏览器采集 BOSS」，在打开的专用窗口手动登录或完成验证，采集会复用该账号的浏览器配置。其他平台可以在原站打开搜索结果，保存为 HTML 后导入，也可导入 UTF-8 CSV。CSV 兼容 `platform`、`job_link`、`job_title`、`jd_text` 等 Jobhunter AI 原始列名。页面按当前关键词和平台筛选导出，单次最多导出 10,000 条。
 
+启用本机 Chrome 连接（`CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`）后，勾选「用本机 Chrome 采集」可对 BOSS 直聘、前程无忧、智联招聘和小红书分别检查登录，或点击「检查全部」。有登录或验证提示时，在用于采集的同一 Chrome 配置中处理，再重新检查。
+
 本机已运行经过用户授权的 web-access Chrome 桥时，可在 `.env` 中设置 `CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`（兼容旧配置 `CAREER_BOSS_USE_LOCAL_CHROME`）。开启后，BOSS、前程无忧、智联和小红书会分别在后台新开 Chrome 搜索标签页，检测当前浏览器的登录状态。需要手动登录或验证时，每个平台最多等待两分钟，超时会在采集记录中标明。猎聘历史数据仍可查看和导出。远程访问的账号使用公开页采集或导入。
 
 智联实时采集需要确认官网已登录。可使用「智联登录验证」卡片打开官网完成登录，再点击「检查登录」。如智联提示安全验证，在官网完成后可以重新检查；采集任务也会再次校验当前会话。

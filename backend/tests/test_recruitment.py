@@ -231,19 +231,48 @@ def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source,
         assert requests == ["/health", "/new", "/navigate", "/eval", "/eval", "/close"]
 
 
-@pytest.mark.parametrize("state", ["not_logged_in", "ready", "verification_required"])
-def test_zhilian_login_status_only_checks_authorized_local_browser(make_account, monkeypatch, state):
+@pytest.mark.parametrize(("source", "state", "label"), [
+    ("boss", "ready", "已登录"),
+    ("51job", "not_logged_in", "未登录"),
+    ("zhilian", "verification_required", "需要安全验证"),
+    ("xiaohongshu", "unknown", "未能确认"),
+    ("boss", "unavailable", "检查失败"),
+])
+def test_platform_login_status_only_checks_authorized_local_browser(make_account, monkeypatch, source, state, label):
     from services import recruitment
 
-    account = make_account("zhilian-login")
+    account = make_account("platform-login")
     monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
-    monkeypatch.setattr(recruitment, "check_zhilian_login", lambda: state)
-    url = API + "/session/zhilian"
+    checked = []
+
+    def check(selected):
+        checked.append(selected)
+        return state
+
+    monkeypatch.setattr(recruitment, "check_platform_login", check)
+    url = API + "/session/" + source
     assert account.post(url, json={}, environ_overrides={"REMOTE_ADDR": "192.0.2.15"}).status_code == 403
     assert account.client.post(url, json={}).status_code == 403
+    assert account.post(API + "/session/liepin", json={}).status_code == 404
     response = account.post(url, json={})
     assert response.status_code == 200
     assert response.get_json()["state"] == state
+    assert response.get_json()["label"] == label
+    assert checked == [source]
+
+
+@pytest.mark.parametrize(("source", "url", "field", "state", "expected"), [
+    ("boss", "https://www.zhipin.com/web/geek/jobs", "bossLogin", "ready", "ready"),
+    ("51job", "https://we.51job.com/pc/search", "job51Login", "not_logged_in", "not_logged_in"),
+    ("zhilian", "https://passport.zhaopin.com/", "zhilianLogin", "ready", "not_logged_in"),
+    ("xiaohongshu", "https://www.xiaohongshu.com/explore", "xhsLogin", "ready", "ready"),
+    ("xiaohongshu", "https://www.zhipin.com/", "xhsLogin", "ready", "unknown"),
+])
+def test_platform_session_uses_its_own_site_and_signal(source, url, field, state, expected):
+    from services.recruitment_chrome import platform_session
+
+    snapshot = {"url": url, "title": "", "verification": False, field: state}
+    assert platform_session(source, snapshot) == expected
 
 
 def test_zhilian_detail_is_verified_cached_and_included_in_csv(make_account, monkeypatch):
