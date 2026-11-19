@@ -3,16 +3,13 @@ import re
 
 import pytest
 
-# 拆分前 server.py 的全部公开路由；任何一条消失都说明拆分漏了东西。
+# 当前保留的站点路由。
 EXPECTED_ROUTES = {
     "/", "/main.html", "/user-center", "/user-center/career-report/polish", "/resume-report",
     "/test-result", "/test-runner", "/sbti", "/multi-agent-workflow", "/app_data/<path:filename>",
     "/api/auth/status", "/api/auth/login", "/api/auth/register", "/api/auth/logout",
     "/api/llm-status", "/api/bootstrap", "/api/user-state/<scope>",
     "/api/career-news", "/api/news-kb/stats", "/api/news-kb/search",
-    "/api/community-feed", "/api/community-feed/posts", "/api/community-feed/posts/<post_id>",
-    "/api/community-feed/posts/<post_id>/reply", "/api/community-feed/posts/<post_id>/like",
-    "/api/community-feed/posts/<post_id>/view",
     "/api/profile-portrait/generate",
     "/api/resume/upload", "/api/resume/analyze", "/api/resume/analyze/start", "/api/resume/analyze/status",
     "/api/resume/profile",
@@ -29,6 +26,7 @@ EXPECTED_ROUTES = {
 def test_all_expected_routes_are_registered(server):
     registered = {rule.rule for rule in server.app.url_map.iter_rules()}
     assert EXPECTED_ROUTES - registered == set()
+    assert not any(path.startswith("/api/community-feed") for path in registered)
 
 
 def test_route_endpoints_are_unique_per_rule_and_method(server):
@@ -61,7 +59,7 @@ def test_private_pages_redirect_anonymous_visitors_to_login(client, path):
 
 
 @pytest.mark.parametrize("method,path", [
-    ("get", "/api/llm-status"), ("get", "/api/community-feed"), ("post", "/api/community-feed/posts"),
+    ("get", "/api/llm-status"),
     ("get", "/api/user-state/career_report"), ("get", "/api/resume/profile"),
     ("get", "/api/career-report/current"), ("post", "/api/career-report/generate/start"),
     ("post", "/api/career-interview"), ("post", "/api/mbti-clarifier"), ("post", "/api/deep-test-analysis"),
@@ -74,10 +72,39 @@ def test_private_api_rejects_anonymous_requests(client, method, path):
 
 def test_private_responses_are_not_cacheable(make_account):
     account = make_account()
-    response = account.get("/api/community-feed")
+    response = account.get("/api/auth/status")
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_startup_removes_legacy_community_and_system_account(make_account):
+    from werkzeug.security import generate_password_hash
+
+    from services import db
+
+    account = make_account("community-retirement")
+    with db._get_conn() as conn:
+        conn.execute("CREATE TABLE community_forum (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)")
+        conn.execute("INSERT INTO community_forum VALUES (1, '{}')")
+        conn.execute("INSERT INTO users (username, password_hash, role, display_name) VALUES ('system', 'unused', 'super_admin', 'System')")
+        conn.execute("INSERT INTO user_state_sections (username, section, payload) VALUES ('system', 'profile', '{}')")
+        conn.executemany("INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, 'Legacy')", [
+            ("23030134", generate_password_hash("123456")),
+            ("24110403", generate_password_hash("changed-password")),
+        ])
+
+    db.init_db()
+    db.init_db()
+
+    with db._get_conn() as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name='community_forum'").fetchone() is None
+        assert conn.execute("SELECT 1 FROM user_state_sections WHERE username='system'").fetchone() is None
+    assert db.find_user("system") is None
+    assert db.find_user("23030134") is None
+    assert db.find_user("24110403") is not None
+    assert db.find_user(account.email) is not None
+    assert account.get("/api/community-feed").status_code == 404
 
 
 def test_logged_in_user_can_open_private_pages(make_account):

@@ -46,7 +46,7 @@ def test_flask_accepts_same_origin_and_ignores_non_api_paths(client):
 
 
 def test_flask_answers_api_preflight_without_auth(client):
-    response = client.options("/api/community-feed", headers={"Origin": "http://localhost"})
+    response = client.options("/api/auth/status", headers={"Origin": "http://localhost"})
     assert response.status_code == 204
 
 

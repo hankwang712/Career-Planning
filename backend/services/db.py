@@ -5,6 +5,8 @@ import sqlite3
 import threading
 import time
 
+from werkzeug.security import check_password_hash
+
 from .paths import APP_DATA_DIR
 DB_PATH = os.path.join(APP_DATA_DIR, "app.db")
 
@@ -69,15 +71,6 @@ def init_db():
     )
     cur.execute("CREATE INDEX IF NOT EXISTS background_jobs_kind ON background_jobs(kind, status, updated_at)")
 
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS community_forum (
-            id INTEGER PRIMARY KEY CHECK(id = 1),
-            payload TEXT NOT NULL
-        )
-        """
-    )
-
     existing_columns = {row[1] for row in cur.execute("PRAGMA table_info(users)")}
     for column, definition in {
         "disabled": "INTEGER NOT NULL DEFAULT 0",
@@ -138,6 +131,15 @@ def init_db():
         with _get_conn() as conn:
             conn.execute("INSERT OR IGNORE INTO auth_settings VALUES ('legacy_json_imported', '1')")
 
+    # Retire the community and built-in demo accounts after any legacy import.
+    with _get_conn() as conn:
+        conn.execute("DROP TABLE IF EXISTS community_forum")
+    for username in ("23030134", "24110403", "24030115", "24151007"):
+        user = find_user(username)
+        if user and check_password_hash(user["password_hash"], "123456"):
+            delete_user(username)
+    delete_user("system")
+
 
 def _migrate_from_json():
     """One-shot migration from legacy JSON files into SQLite."""
@@ -195,27 +197,6 @@ def _migrate_from_json():
                 pass
         conn.commit()
         conn.close()
-
-    # community_forum.json
-    forum_file = os.path.join(APP_DATA_DIR, "community_forum.json")
-    if os.path.exists(forum_file):
-        try:
-            with open(forum_file, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT OR IGNORE INTO community_forum (id, payload)
-                VALUES (1, ?)
-                """,
-                (json.dumps(data, ensure_ascii=False),),
-            )
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
-
 
 # ---------------------------------------------------------------------------
 # Users
@@ -405,33 +386,3 @@ def load_jobs(kind, since):
 def prune_jobs(before):
     with _get_conn() as conn:
         conn.execute("DELETE FROM background_jobs WHERE updated_at < ? AND status NOT IN ('queued', 'running')", (before,))
-
-
-# ---------------------------------------------------------------------------
-# Community forum
-# ---------------------------------------------------------------------------
-
-def load_community_forum():
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT payload FROM community_forum WHERE id = 1")
-    row = cur.fetchone()
-    if row:
-        try:
-            return json.loads(row["payload"])
-        except json.JSONDecodeError:
-            return {}
-    return None
-
-
-def save_community_forum(payload):
-    conn = _get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO community_forum (id, payload)
-        VALUES (1, ?)
-        """,
-        (json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False),),
-    )
-    conn.commit()

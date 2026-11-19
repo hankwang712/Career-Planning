@@ -303,16 +303,6 @@
                         </svg>
                         规划报告
                     </button>
-                    <button onclick="showSection('forum')" data-section="forum" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
-                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                            <path d="M6 1v3"></path>
-                            <path d="M10 1v3"></path>
-                            <path d="M14 1v3"></path>
-                        </svg>
-                        Offer 茶水间
-                    </button>
                 </div>
 
                 <!-- 账号与工作区菜单 -->
@@ -335,7 +325,6 @@
         {% include "sections/jobs.html" %}
         {% include "sections/profile.html" %}
         {% include "sections/report.html" %}
-        {% include "sections/forum.html" %}
 
     </main>
 
@@ -368,7 +357,6 @@
                         <li><a href="#" onclick="showSection('jobs')" class="hover:text-white transition-all">岗位探索</a></li>
                         <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
                         <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
-                        <li><a href="#" onclick="showSection('forum')" class="hover:text-white transition-all">Offer 茶水间</a></li>
                     </ul>
                 </div>
                 <div>
@@ -531,7 +519,6 @@
     <script src="{{ url_for('static', filename='career-report-workspace.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-link-previews.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='assessment-experience.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}">
     <script src="{{ url_for('static', filename='assessment-center.js') }}" defer></script>
     <script src="{{ url_for('static', filename='assessment-hub.js') }}" defer></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}" defer></script>

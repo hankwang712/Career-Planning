@@ -30,7 +30,6 @@ from services.career import create_blueprint as create_career_blueprint, snapsho
 from services.chat import create_blueprint as create_chat_blueprint
 from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
-from services.community import create_blueprint as create_community_blueprint
 from services.datasets import create_blueprint as create_datasets_blueprint
 from services.interview import create_blueprint as create_interview_blueprint
 from services.job_data import BOSS_INFO_DIR, create_blueprint as create_job_data_blueprint
@@ -57,7 +56,6 @@ from services.user_state import (
     _load_users,
     _login_required,
     _save_user_state,
-    _super_admin_required,
 )
 
 mimetypes.add_type("application/javascript", ".js")
@@ -124,7 +122,6 @@ _restore_background_jobs()
 _auth.init_app(app)
 app.register_blueprint(workspace_tools.blueprint)
 app.register_blueprint(create_datasets_blueprint(_login_required))
-app.register_blueprint(create_community_blueprint(_login_required, _super_admin_required, _current_user))
 app.register_blueprint(create_interview_blueprint(_login_required, _model_runtime))
 app.register_blueprint(create_job_data_blueprint())
 app.register_blueprint(create_portrait_blueprint(_login_required, _current_user, _load_user_state, _save_user_state))

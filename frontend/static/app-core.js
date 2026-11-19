@@ -194,7 +194,7 @@ function emitAuthStateChange() {
 async function requestJson(url, options = {}) {
   const owner = getCurrentUser()?.username || "";
   const epoch = accountRequestEpoch;
-  const accountBound = /^\/api\/(user-state\/|resume\/|career-report\/|career-profile|job-market|profile|account|community-feed|career-interview|llm|resume-llm|deep-test|tools\/)/.test(url);
+  const accountBound = /^\/api\/(user-state\/|resume\/|career-report\/|career-profile|job-market|profile|account|career-interview|llm|resume-llm|deep-test|tools\/)/.test(url);
   const method = String(options.method || "GET").toUpperCase();
   const headers = { ...(options.headers || {}) };
   if ((url.startsWith("/api/auth/") || url.startsWith("/api/career-profile") || url.startsWith("/api/job-market")) && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {

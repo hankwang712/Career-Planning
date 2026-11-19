@@ -64,9 +64,9 @@ flowchart LR
 | :---: | :---: |
 | [![职业规划报告：原文依据、能力差距、行动建议与导出](asserts/career-report.png)](asserts/career-report.png) | [![学习路径：阶段任务、交付物、验收标准与学习打卡](asserts/learning.png)](asserts/learning.png) |
 
-| AI 生涯助手 | Offer 茶水间 |
-| :---: | :---: |
-| [![浅色版生涯助手：连续对话、Markdown 表格与资料入口](asserts/assistant.png)](asserts/assistant.png) | [![Offer 茶水间：面经互助、简历讨论与岗位交流](asserts/community.png)](asserts/community.png) |
+| AI 生涯助手 |
+| :---: |
+| [![浅色版生涯助手：连续对话、Markdown 表格与资料入口](asserts/assistant.png)](asserts/assistant.png) |
 
 <details>
 <summary>📰 查看行业资讯、报告卡片库与多智能体协作流程</summary>
@@ -507,7 +507,6 @@ career-agent/
 │   │   ├── report/               #   报告：store 存储、tracker 行动追踪、writer 写入、jobs 后台任务、api 接口、导出
 │   │   ├── resume/               #   简历：pipeline 提取与分析、jobs 后台任务、api 接口、岗位匹配
 │   │   ├── appctx.py             #   后台线程取 Flask 应用的入口
-│   │   ├── community.py          #   社区（Offer 茶水间）
 │   │   ├── interview.py          #   职业访谈、MBTI 追问、深度测评分析
 │   │   ├── portrait.py           #   用户画像海报
 │   │   ├── job_data.py           #   各城市岗位样本数据

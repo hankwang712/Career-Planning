@@ -296,13 +296,6 @@ def init_app(app):
     with conn:
         conn.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (time.time(),))
         conn.execute("DELETE FROM auth_rate_limits WHERE started_at < ?", (time.time() - 86400,))
-        checked = conn.execute("SELECT 1 FROM auth_settings WHERE name = 'demo_accounts_disabled'").fetchone()
-        if not checked:
-            for username in ("system", "23030134", "24110403", "24030115", "24151007"):
-                user = db.find_user(username)
-                if user and check_password_hash(user["password_hash"], "123456"):
-                    conn.execute("UPDATE users SET disabled = 1 WHERE username = ?", (username,))
-            conn.execute("INSERT INTO auth_settings VALUES ('demo_accounts_disabled', '1')")
 
     @app.before_request
     def protect_auth_requests():
@@ -327,7 +320,7 @@ def init_app(app):
     @app.after_request
     def protect_auth_responses(response):
         private_prefixes = ("/api/auth/", "/api/user-state/", "/api/resume/", "/api/career-report/", "/api/career-profile", "/api/job-market",
-                            "/api/profile-portrait", "/api/account", "/api/community-feed", "/api/system-settings/",
+                            "/api/profile-portrait", "/api/account", "/api/system-settings/",
                             "/api/workspace-logs", "/api/resume-editor/", "/user-center/resumes", "/recruitment", "/app_data/")
         if request.path.startswith(private_prefixes):
             response.headers["Cache-Control"] = "no-store"

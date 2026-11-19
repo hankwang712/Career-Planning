@@ -102,35 +102,6 @@ const liveActivityTemplates = [
   "System detected new job trend changes"
 ];
 
-const COMMUNITY_FORUM_BOARD_META = {
-  all: { label: "全部", icon: "全", chip: "bg-slate-100 text-slate-700 border-slate-200", soft: "bg-slate-50 text-slate-600" },
-  "面经互助": { label: "面经互助", icon: "面", chip: "bg-rose-100 text-rose-700 border-rose-200", soft: "bg-rose-50 text-rose-700" },
-  "简历门诊": { label: "简历门诊", icon: "简", chip: "bg-sky-100 text-sky-700 border-sky-200", soft: "bg-sky-50 text-sky-700" },
-  "实习内推": { label: "实习内推", icon: "推", chip: "bg-amber-100 text-amber-700 border-amber-200", soft: "bg-amber-50 text-amber-700" },
-  "选岗热议": { label: "选岗热议", icon: "岗", chip: "bg-emerald-100 text-emerald-700 border-emerald-200", soft: "bg-emerald-50 text-emerald-700" },
-  "职场日常": { label: "职场日常", icon: "聊", chip: "bg-violet-100 text-violet-700 border-violet-200", soft: "bg-violet-50 text-violet-700" }
-};
-
-const communityForumState = {
-  loading: false,
-  loaded: false,
-  posts: [],
-  boards: [],
-  hotTags: [],
-  stats: {
-    threads: 0,
-    today_posts: 0,
-    active_users: 0,
-    unanswered: 0
-  },
-  board: "all",
-  sort: "hot",
-  query: "",
-  selectedPostId: "",
-  viewedIds: {},
-  view: "list"
-};
-
 const CAREER_INTERVIEW_DIMENSIONS = ["职业兴趣", "工作价值观", "学习方式", "沟通风格", "行动证据", "职业成熟度"];
 
 const CAREER_INTERVIEW_RIASEC_LABELS = [

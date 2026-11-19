@@ -15358,26 +15358,22 @@ nav.gradient-bg .nav-action-strip .action-icon {
 /* CareerScope section palette alignment */
 #jobs,
 #profile,
-#report,
-#forum {
+#report {
     color: var(--cs-text);
 }
 
 #jobs h2,
 #profile h2,
 #report h2,
-#forum h2,
 #jobs h3,
 #profile h3,
-#report h3,
-#forum h3 {
+#report h3 {
     color: var(--cs-primary);
 }
 
 #jobs .glass-surface,
 #profile .glass-surface,
-#report #reportContent,
-#forum .bg-white {
+#report #reportContent {
     border-color: var(--cs-border) !important;
     background: var(--cs-surface-strong) !important;
     box-shadow: 0 1px 2px rgba(20, 29, 43, 0.05), 0 10px 28px rgba(26, 54, 93, 0.05) !important;
@@ -15387,10 +15383,7 @@ nav.gradient-bg .nav-action-strip .action-icon {
 #jobs select:focus,
 #profile input:focus,
 #profile select:focus,
-#profile textarea:focus,
-#forum input:focus,
-#forum select:focus,
-#forum textarea:focus {
+#profile textarea:focus {
     border-color: var(--cs-primary-light) !important;
     box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.14) !important;
     outline: none !important;
@@ -16521,49 +16514,6 @@ nav.gradient-bg .nav-action-strip .action-icon {
 
 #report #reportContent > div:first-child p {
     color: rgba(255, 255, 255, 0.82) !important;
-}
-
-#forum {
-    --forum-accent: #a15c38;
-    --forum-accent-soft: #fff7ed;
-    --forum-accent-border: #fed7aa;
-}
-
-#forum .bg-gradient-to-br {
-    background: linear-gradient(135deg, #ffffff 0%, var(--forum-accent-soft) 100%) !important;
-    border-color: var(--forum-accent-border) !important;
-}
-
-#forum .text-amber-700,
-#forum .hover\:text-amber-600:hover {
-    color: var(--forum-accent) !important;
-}
-
-#forum .bg-amber-100,
-#forum .bg-amber-500,
-#forum button[onclick="submitCommunityPost()"] {
-    background: var(--forum-accent) !important;
-    color: #ffffff !important;
-}
-
-#forum .border-amber-100,
-#forum .focus\:border-amber-300:focus {
-    border-color: var(--forum-accent-border) !important;
-}
-
-#forum .focus\:ring-amber-200:focus {
-    box-shadow: 0 0 0 3px rgba(161, 92, 56, 0.14) !important;
-}
-
-#forum .bg-emerald-50,
-#forum .border-emerald-100 {
-    background: var(--cs-teal-soft) !important;
-    border-color: #b2f5ea !important;
-    color: #2c7a7b !important;
-}
-
-#forum .bg-slate-900 {
-    background: var(--cs-primary) !important;
 }
 
 /* =========================================================

@@ -105,7 +105,6 @@ document.addEventListener("DOMContentLoaded", function () {
   initCharts();
   initAnimations();
   bindGlobalEvents();
-  initCommunityForumEvents();
   initCareerNewsBoard();
   startRealtimeEngine();
   updateReportDates(new Date());
@@ -127,7 +126,7 @@ document.addEventListener("DOMContentLoaded", function () {
     void resumeCareerReportRuntime();
     // 从 URL hash 恢复上次所在 section（支持 return-nav 返回到正确页面）
     try {
-      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "report", "forum"];
+      const VALID_SECTIONS = ["dashboard", "jobs", "profile", "report"];
       const hashId = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
       if (hashId && VALID_SECTIONS.includes(hashId) && hashId !== (appState.currentSection || "dashboard")) {
         showSection(hashId);

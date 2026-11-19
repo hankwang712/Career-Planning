@@ -620,9 +620,11 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
 
 def test_switching_sections_works(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
-    logged_in_page.goto(live_server + "/", wait_until="load")
+    logged_in_page.goto(live_server + "/#forum", wait_until="load")
     logged_in_page.wait_for_timeout(1200)
-    for section in ("jobs", "profile", "community", "dashboard"):
+    assert logged_in_page.locator("#dashboard").is_visible()
+    assert logged_in_page.locator('[data-section="forum"], #forum').count() == 0
+    for section in ("jobs", "profile", "report", "dashboard"):
         logged_in_page.evaluate("section => window.showSection(section)", section)
         logged_in_page.wait_for_timeout(400)
     assert errors == [], "\n".join(errors)

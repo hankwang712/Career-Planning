@@ -151,20 +151,6 @@ function clearPrivateWorkspace() {
   Object.assign(resumeTaskState, { uploadInFlight: false, analyzeInFlight: false, forceInputView: false, deckIndices: {} });
   reportWorkflowSnapshot = null;
   resetCareerInterviewState({ preserveBasics: false });
-  Object.assign(communityForumState, { loading: false, loaded: false, posts: [], boards: [], hotTags: [],
-    stats: {}, board: "all", sort: "hot", query: "", selectedPostId: "", viewedIds: {}, view: "list" });
-  for (const id of ["forumPostTitle", "forumPostTags", "forumPostContent", "forumReplyInput", "forumSearchInput"]) {
-    const input = document.getElementById(id);
-    if (input) input.value = "";
-  }
-  const boardInput = document.getElementById("forumPostBoard");
-  if (boardInput) boardInput.selectedIndex = 0;
-  for (const id of ["forumListView", "forumDetailView", "forumComposeView"]) {
-    document.getElementById(id)?.classList.toggle("hidden", id !== "forumListView");
-  }
-  const detail = document.getElementById("forumThreadDetail");
-  if (detail) detail.innerHTML = "";
-  renderCommunityForum();
   window.closeReportViewer?.();
   window.renderCareerReportPanels?.();
 }
@@ -569,7 +555,7 @@ function markReportGenerated(source = "view") {
 }
 
 function showSection(sectionId) {
-  const sections = ["dashboard", "jobs", "profile", "report", "forum"];
+  const sections = ["dashboard", "jobs", "profile", "report"];
   if (!sections.includes(sectionId)) sectionId = "dashboard";
   if (sectionId === appState.currentSection) return;
   sections.forEach((id) => {
@@ -612,9 +598,6 @@ function showSection(sectionId) {
     void openDatasetBrowser();
   } else {
     window.DatasetBrowser?.pause();
-  }
-  if (sectionId === "forum") {
-    void ensureCommunityForumLoaded();
   }
   if (sectionId === "profile") {
     window.AssessmentCenter?.refresh();

@@ -32,13 +32,7 @@
       section: 'report',
     },
     {
-      title: '⑤ Offer 茶水间 — 复盘与交流',
-      content: '分享求职复盘、面试经验，与同伴交流。',
-      target: '[data-section="forum"]',
-      section: 'forum',
-    },
-    {
-      title: '⑥ 行业快报 — 回到主页末尾',
+      title: '⑤ 行业快报 — 回到主页末尾',
       content: '主页末尾展示行业与职业快报，可按分类浏览资讯、阅读摘要，或加载更多新闻。',
       target: '#careerNewsBoard',
       section: 'dashboard',

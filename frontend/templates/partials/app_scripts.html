@@ -8,6 +8,6 @@
   需要 defer_attr 变量（默认空）：为 " defer" 时所有脚本加 defer。
 #}
 {% set defer_attr = defer_attr|default("") %}
-{% for name in ["app-state", "app-core", "app-resume-blocks", "app-resume-report", "app-resume-panels", "app-resume-judge", "app-resume-profile", "app-career-interview", "app-career-news", "app-profile-portrait", "app-profile-capability", "app-report-workspace", "app-auth-shell", "app-jobs", "app-community", "app-settings-motion", "app-boot"] %}
+{% for name in ["app-state", "app-core", "app-resume-blocks", "app-resume-report", "app-resume-panels", "app-resume-judge", "app-resume-profile", "app-career-interview", "app-career-news", "app-profile-portrait", "app-profile-capability", "app-report-workspace", "app-auth-shell", "app-jobs", "app-settings-motion", "app-boot"] %}
 <script src="{{ url_for('static', filename=name ~ '.js') }}"{{ defer_attr }}></script>
 {% endfor %}
