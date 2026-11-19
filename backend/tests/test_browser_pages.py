@@ -142,16 +142,23 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
 
 def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
     page = logged_in_page
-    page.add_init_script("localStorage.setItem('tg_done', '1')")
     page.goto(live_server + "/main.html")
     overview = page.get_by_role("region", name="职业工作台")
     tools = page.get_by_role("region", name="求职工具")
     assert overview.is_visible() and tools.is_visible()
     assert page.get_by_text("功能示意", exact=True).count() == 0
+    assert overview.get_by_role("button", name="使用引导").count() == 0
+    page.wait_for_function("document.querySelector('.dashboard-workspace-window img').naturalWidth > 0")
     assert tools.get_by_role("link", name="岗位探索").get_attribute("href") == "/recruitment"
     page.get_by_role("button", name="关闭引导").click()
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") == 390
+    entry = page.get_by_role("button", name="新手引导")
+    entry.click()
+    guide = page.get_by_role("dialog", name="新手引导")
+    assert guide.get_by_role("listitem").count() == 6
+    page.keyboard.press("Escape")
+    guide.wait_for(state="hidden")
     search = overview.get_by_role("searchbox", name="搜索岗位")
     search.fill("数据分析")
     with page.expect_request(lambda request: "/api/job-market/collection/jobs?" in request.url) as sent:
@@ -159,6 +166,10 @@ def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
     assert "q=%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90" in sent.value.url
     assert "clean_status=" not in sent.value.url
     assert page.get_by_role("searchbox", name="搜索结果").input_value() == "数据分析"
+    page.get_by_role("link", name="新手引导").click()
+    guide.wait_for()
+    with page.expect_request(lambda request: request.url.endswith("/recruitment")):
+        guide.get_by_role("link", name="进入岗位探索 →").click()
 
 
 def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page, live_server, monkeypatch):

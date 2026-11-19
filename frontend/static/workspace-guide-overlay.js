@@ -146,7 +146,7 @@
       window.setSeenWorkspaceGuide();
       document.body.classList.remove("workspace-guide-open");
       window.updateWorkspaceJourneyVisibility?.();
-      focus?.focus();
+      focus?.focus({ preventScroll: true });
     }, { once: true });
     dialog.showModal();
     document.body.classList.add("workspace-guide-open");
@@ -520,6 +520,11 @@
         const section = button.dataset.guideSection;
         dialog.close();
         window.showSection?.(section);
+        if (button.dataset.guideTarget) {
+          window.requestAnimationFrame(() => {
+            document.getElementById(button.dataset.guideTarget)?.scrollIntoView({ behavior: "instant" });
+          });
+        }
       });
     });
     document.querySelectorAll("[data-open-workspace-guide]").forEach(button => {

@@ -4,7 +4,7 @@
 }
 .ca-setup-guide {
   box-sizing: border-box;
-  width: min(560px, calc(100% - 28px));
+  width: min(720px, calc(100% - 28px));
   max-height: calc(100dvh - 28px);
   margin: auto;
   padding: 24px;
@@ -22,7 +22,7 @@
 }
 .ca-tools-heading h2 { margin: 0; font-size: 1.2rem; font-weight: 750; }
 .ca-tools-heading p, .ca-guide-steps p { margin: 6px 0 10px; color: #50647d; font-size: .875rem; line-height: 1.55; }
-.ca-guide-steps { display: grid; gap: 10px; padding: 0; margin: 14px 0; list-style: none; }
+.ca-guide-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 14px 0; list-style: none; }
 .ca-guide-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid #dfe7f1; border-radius: 13px; background: #f8fafc; }
 .ca-guide-steps h3 { margin: 1px 0; font-size: .95rem; font-weight: 750; }
 .ca-step-number { display: grid; place-items: center; height: 28px; border-radius: 50%; background: #152039; color: white; font-size: .85rem; font-weight: 700; }
@@ -54,4 +54,7 @@ body:has(.ca-console) .assistant-mascot { bottom: 44px; }
 .ca-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 @media (max-width: 650px) {
   .ca-setup-guide { padding: 15px; }
+}
+@media (max-width: 560px) {
+  .ca-guide-steps { grid-template-columns: minmax(0, 1fr); }
 }

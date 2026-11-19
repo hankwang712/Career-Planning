@@ -26,11 +26,6 @@
         {% if recruitment_nav|default(false) or (initial_user and initial_user.can_manage_configs) %}
         <a href="/system-settings" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem">系统配置</a>
         {% endif %}
-        {% if recruitment_nav|default(false) %}
-        <a href="{{ url_for('site.index', _anchor='dashboard') }}" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" data-workspace-guide-link>新手引导</a>
-        {% elif not account_menu_in_center|default(false) %}
-        <button type="button" class="nav-workspace-menu-row" role="menuitem" data-open-workspace-guide onclick="closeNavWorkspaceMenu()">新手引导</button>
-        {% endif %}
     </div>
 </div>
 <script src="{{ url_for('static', filename='workspace-menu.js') }}" defer></script>

@@ -31,10 +31,10 @@ document.addEventListener("DOMContentLoaded", () => {
         toggle.focus();
       }
     });
-    menu.querySelector("[data-workspace-guide-link]")?.addEventListener("click", () => {
-      try { sessionStorage.setItem("app_force_workspace_guide", "1"); } catch (_) {}
-    });
   }
+  document.querySelector("[data-workspace-guide-link]")?.addEventListener("click", () => {
+    try { sessionStorage.setItem("app_force_workspace_guide", "1"); } catch (_) {}
+  });
 
   const clock = document.querySelector("[data-local-clock]");
   if (clock) {

@@ -9,14 +9,16 @@
                     </form>
                     <div class="dashboard-workspace-actions">
                         <button type="button" onclick="showSection('profile')">继续测评 <span aria-hidden="true">→</span></button>
-                        <button type="button" onclick="TourGuide.start()">使用引导</button>
                     </div>
+                    <dl class="dashboard-workspace-metrics" aria-label="当前进度">
+                        <div><dt>画像进度</dt><dd id="profileCompletionRate">—</dd></div>
+                        <div><dt>推荐岗位</dt><dd id="exploredJobsCount">—</dd></div>
+                        <div><dt>待完成任务</dt><dd id="pendingTaskCount">—</dd></div>
+                    </dl>
                 </div>
-                <dl class="dashboard-workspace-metrics" aria-label="当前进度">
-                    <div><dt>画像进度</dt><dd id="profileCompletionRate">—</dd></div>
-                    <div><dt>推荐岗位</dt><dd id="exploredJobsCount">—</dd></div>
-                    <div><dt>待完成任务</dt><dd id="pendingTaskCount">—</dd></div>
-                </dl>
+                <div class="dashboard-workspace-window">
+                    <img src="{{ url_for('static', filename='assets/dashboard/office-window.webp') }}" alt="" fetchpriority="high" decoding="async">
+                </div>
             </section>
 
             <section class="dashboard-workspace-tools" aria-labelledby="careerProcessTitle">

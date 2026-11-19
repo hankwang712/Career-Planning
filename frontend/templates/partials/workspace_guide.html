@@ -1,6 +1,6 @@
 <dialog id="workspaceSetupGuide" class="ca-setup-guide" aria-labelledby="workspaceSetupTitle">
     <header class="ca-tools-heading">
-        <div><h2 id="workspaceSetupTitle">新手引导</h2><p>从设置模型到生成第一份职业报告。</p></div>
+        <div><h2 id="workspaceSetupTitle">新手引导</h2></div>
         <form method="dialog"><button class="ca-button" aria-label="关闭引导">×</button></form>
     </header>
     <ol class="ca-guide-steps">
@@ -11,13 +11,24 @@
             <a class="ca-button primary" href="/system-settings" onclick="closeWorkspaceGuide()">去系统配置 →</a>
         </div></li>
         <li><div class="ca-step-number">2</div><div>
-            <h3>建立职业画像</h3><p>在岗位探索中选择目标方向，再补充简历、测评或职业访谈。先准备手头已有的资料即可。</p>
-            <button type="button" class="ca-button" data-guide-section="jobs">探索岗位 →</button>
-            <button type="button" class="ca-button" data-guide-section="profile">完善画像 →</button>
+            <h3>整理简历</h3><p>导入已有简历，或补充教育与项目经历。</p>
+            <a class="ca-button" href="{{ url_for('resume_editor.index') }}" onclick="closeWorkspaceGuide()">打开简历工作台 →</a>
         </div></li>
         <li><div class="ca-step-number">3</div><div>
-            <h3>生成第一份职业报告</h3><p>在报告工作区确认目标岗位与已有资料，再发起生成。生成后可查看建议和行动清单。</p>
+            <h3>建立职业画像</h3><p>完成测评，了解自己的兴趣、能力和工作偏好。</p>
+            <button type="button" class="ca-button" data-guide-section="profile">进入测评中心 →</button>
+        </div></li>
+        <li><div class="ca-step-number">4</div><div>
+            <h3>探索岗位</h3><p>按城市和关键词采集岗位，再用清洗规则筛选。</p>
+            <a class="ca-button" href="{{ url_for('recruitment.page') }}" onclick="closeWorkspaceGuide()">进入岗位探索 →</a>
+        </div></li>
+        <li><div class="ca-step-number">5</div><div>
+            <h3>生成职业报告</h3><p>确认目标岗位与已有资料，生成报告和行动清单。</p>
             <button type="button" class="ca-button" data-guide-section="report">打开报告工作区 →</button>
+        </div></li>
+        <li><div class="ca-step-number">6</div><div>
+            <h3>浏览行业快报</h3><p>按行业、就业和职业成长等分类查看资讯。</p>
+            <button type="button" class="ca-button" data-guide-section="dashboard" data-guide-target="careerNewsBoard">查看行业快报 →</button>
         </div></li>
     </ol>
     <footer class="ca-tools-heading ca-guide-footer">
