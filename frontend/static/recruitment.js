@@ -13,6 +13,7 @@
     partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
     opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时"
   };
+  const cleaningNames = { unreviewed: "未清洗", passed: "通过", rejected: "淘汰", review: "待核对", released: "已放行" };
   let page = 1;
   let filters = new URLSearchParams();
   let jobsSequence = 0;
@@ -105,7 +106,36 @@
     original.rel = "noopener noreferrer";
     original.setAttribute("aria-label", "查看原帖：" + row.title);
     footer.append(original);
-    el.append(header, title, node("p", meta, "recruitment-row-meta"), footer);
+    el.append(header, title, node("p", meta, "recruitment-row-meta"));
+    if (cleaningNames[row.cleaning_status]) {
+      const decision = node("div", "", "recruitment-cleaning-decision");
+      decision.dataset.cleanStatus = row.cleaning_status;
+      decision.append(node("span", cleaningNames[row.cleaning_status], "recruitment-badge recruitment-cleaning-badge"));
+      if (row.cleaning_reason) {
+        const reason = row.cleaning_status === "released" ? "原淘汰原因：" + row.cleaning_reason : row.cleaning_reason;
+        decision.append(node("p", reason));
+      }
+      if (row.cleaning_status === "rejected") {
+        const release = node("button", "手动放行");
+        release.type = "button";
+        release.addEventListener("click", async () => {
+          release.disabled = true;
+          try {
+            const result = await api("/cleaning/release", { source: row.source, url: row.url });
+            showCleaningCounts(result.counts);
+            notice("已放行：" + row.title);
+            await loadJobs();
+          } catch (error) {
+            notice(error.message, "error");
+          } finally {
+            release.disabled = false;
+          }
+        });
+        decision.append(release);
+      }
+      el.append(decision);
+    }
+    el.append(footer);
     return el;
   }
 
@@ -116,6 +146,7 @@
     try {
       const data = await api("/jobs?" + query);
       if (sequence !== jobsSequence) return;
+      if (data.cleaning_counts) showCleaningCounts(data.cleaning_counts);
       const pages = Math.max(1, Math.ceil(data.total / data.page_size));
       if (page > pages) {
         page = pages;
@@ -192,6 +223,7 @@
       const message = node("p", status === "interrupted" ? statusNames[status] : item.message || statusNames[status]);
       message.dataset.status = status;
       line.append(message);
+      if (item.cleaning) line.append(node("p", "规则清洗 · " + cleaningSummary(item.cleaning)));
       card.append(line);
     }
     return card;
@@ -257,6 +289,128 @@
   byId("recruitmentPrev").onclick = () => { page -= 1; void loadJobs(); };
   byId("recruitmentNext").onclick = () => { page += 1; void loadJobs(); };
   byId("recruitmentRefresh").onclick = () => { void loadRuns(); void loadJobs(); };
+  const cleaningDialog = byId("recruitmentCleaningDialog");
+  const cleaningForm = byId("recruitmentCleaningForm");
+  const cleaningFields = cleaningForm.querySelector("fieldset");
+  const cleaningFeedback = byId("recruitmentCleaningFeedback");
+  const cleaningPreview = byId("recruitmentCleaningPreview");
+  const applyRules = byId("recruitmentCleaningApply");
+  let previewToken = "";
+  let rulesLoaded = false;
+  let rulesBusy = false;
+
+  function showCleaningCounts(counts) {
+    for (const card of byId("recruitmentCleaningCounts").children) {
+      card.querySelector("dd").textContent = counts[card.dataset.cleanStatus];
+    }
+  }
+
+  function cleaningSummary(counts) {
+    return ["passed", "rejected", "review"].map((status) => `${cleaningNames[status]} ${counts[status]}`).join(" · ");
+  }
+
+  function showRules(rules) {
+    for (const name of ["cities", "title_exclusions", "company_exclusions"]) {
+      cleaningForm.elements[name].value = rules[name].join("、");
+    }
+    for (const name of ["min_salary_k", "max_salary_k"]) {
+      cleaningForm.elements[name].value = rules[name] ?? "";
+    }
+    cleaningForm.elements.auto.checked = rules.auto;
+    byId("recruitmentCleaningMode").textContent = rules.auto ? "自动清洗已开启" : "手动清洗";
+  }
+
+  function readRules() {
+    const form = new FormData(cleaningForm);
+    const terms = (name) => [...new Set(form.get(name).split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean))];
+    const salary = (name) => form.get(name) ? Number(form.get(name)) : null;
+    return {
+      cities: terms("cities"), title_exclusions: terms("title_exclusions"), company_exclusions: terms("company_exclusions"),
+      min_salary_k: salary("min_salary_k"), max_salary_k: salary("max_salary_k"), auto: form.has("auto")
+    };
+  }
+
+  function resetPreview() {
+    previewToken = "";
+    applyRules.disabled = true;
+    cleaningPreview.hidden = true;
+    cleaningPreview.replaceChildren();
+  }
+
+  function showPreview(result) {
+    previewToken = result.token;
+    applyRules.disabled = false;
+    for (const [status, samples] of Object.entries(result.samples)) {
+      const group = node("li", "", "recruitment-rule-preview-group");
+      group.dataset.cleanStatus = status;
+      group.append(node("strong", `${cleaningNames[status]} ${result.counts[status]} 条`));
+      for (const sample of samples) {
+        group.append(node("p", [sample.title, sources.get(sample.source), sample.reason].filter(Boolean).join(" · ")));
+      }
+      cleaningPreview.append(group);
+    }
+    cleaningPreview.hidden = false;
+  }
+
+  async function loadRules() {
+    if (rulesLoaded || rulesBusy) return;
+    rulesBusy = true;
+    cleaningFeedback.textContent = "正在读取规则…";
+    try {
+      const data = await api("/cleaning");
+      showRules(data.rules);
+      rulesLoaded = true;
+      cleaningFeedback.textContent = "";
+    } catch (error) {
+      cleaningFeedback.textContent = error.message;
+    } finally {
+      rulesBusy = false;
+      cleaningFields.disabled = !rulesLoaded;
+    }
+  }
+
+  async function runRuleAction(action) {
+    if (rulesBusy || !cleaningForm.reportValidity() || (action === "apply" && !previewToken)) return;
+    const payload = { rules: readRules(), token: previewToken };
+    resetPreview();
+    rulesBusy = true;
+    cleaningFields.disabled = true;
+    cleaningFeedback.textContent = "正在处理…";
+    try {
+      const result = await api("/cleaning/" + action, payload);
+      if (action === "preview") {
+        showPreview(result);
+        cleaningFeedback.textContent = "预览完成，确认后应用到当前账号的现有岗位。";
+      } else {
+        showRules(result.rules);
+        showCleaningCounts(result.counts);
+        cleaningFeedback.textContent = action === "save" ? "规则已保存。" : "已应用清洗规则。";
+        if (action === "apply") void loadJobs();
+      }
+    } catch (error) {
+      cleaningFeedback.textContent = error.message;
+    } finally {
+      cleaningFields.disabled = false;
+      rulesBusy = false;
+    }
+  }
+
+  byId("recruitmentCleaningOpen").onclick = () => {
+    cleaningDialog.showModal();
+    void loadRules();
+  };
+  cleaningForm.addEventListener("input", () => {
+    resetPreview();
+    cleaningFeedback.textContent = "";
+  });
+  cleaningForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void runRuleAction("preview");
+  });
+  byId("recruitmentCleaningSave").onclick = () => { void runRuleAction("save"); };
+  applyRules.onclick = () => { void runRuleAction("apply"); };
+  void loadRules();
+
   const sessions = byId("recruitmentSessions");
   if (sessions) {
     const localChrome = config.elements.bossLocal;
@@ -311,7 +465,7 @@
     data.append("file", file);
     try {
       const result = await api("/import", data);
-      notice(`已保存 ${result.count} 条记录。`);
+      notice(`已保存 ${result.count} 条记录。` + (Object.keys(result.cleaning || {}).length ? cleaningSummary(result.cleaning) : ""));
       page = 1;
       void loadJobs();
     } catch (error) {
@@ -337,7 +491,7 @@
       const result = await api("/import-html", new FormData(htmlForm));
       htmlForm.reset();
       importPage.close();
-      notice(`已保存 ${result.count} 条记录。`);
+      notice(`已保存 ${result.count} 条记录。` + (Object.keys(result.cleaning || {}).length ? cleaningSummary(result.cleaning) : ""));
       page = 1;
       void loadJobs();
     } catch (error) {

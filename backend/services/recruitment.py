@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import db
+from . import db, recruitment_cleaning as cleaning
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
     CHROME_SOURCES, LOGIN_URLS, SESSION_LABELS, SESSION_MESSAGES, check_platform_login, collect_in_chrome,
@@ -63,6 +63,7 @@ def init_schema(conn):
             FOREIGN KEY(owner, source, url_key) REFERENCES recruitment_listings(owner, source, url_key) ON DELETE CASCADE
         );
     """)
+    cleaning.init_schema(conn)
 
 
 class CollectRequest(BaseModel):
@@ -88,7 +89,7 @@ def clean_listing(fields):
     return fields
 
 
-def save_rows(conn, owner, source, rows):
+def save_rows(conn, owner, source, rows, *, cleaning_counts=None):
     seen = set()
     records = []
     for row in rows:
@@ -113,6 +114,10 @@ def save_rows(conn, owner, source, rows):
             salary=CASE WHEN excluded.salary='' THEN recruitment_listings.salary ELSE excluded.salary END,
             description=excluded.description, url=excluded.url, updated_at=excluded.updated_at
     """, records)
+    counts = cleaning.apply_ingested(conn, owner, source, list(seen))
+    if counts and cleaning_counts is not None:
+        for status, count in counts.items():
+            cleaning_counts[status] = cleaning_counts.get(status, 0) + count
     return len(records)
 
 
@@ -134,8 +139,11 @@ def run_chrome_sources(owner, run_id, config, progress):
 
         status, message, rows = collect_in_chrome(source, config.keyword, config.city, config.limit, update)
         with lock, conn:
-            count = save_rows(conn, owner, source, rows)
+            counts = {}
+            count = save_rows(conn, owner, source, rows, cleaning_counts=counts)
             progress[source] = {"status": status, "message": message, "count": count}
+            if counts:
+                progress[source]["cleaning"] = counts
             save_progress(conn, owner, run_id, progress)
 
     with ThreadPoolExecutor(max_workers=len(config.sources), thread_name_prefix="recruitment-chrome") as pool:
@@ -183,8 +191,11 @@ def run_collection(owner, run_id, config, progress):
                     if source == "boss" and config.boss_local:
                         status, message = "blocked", "BOSS 窗口已关闭或无法继续加载，可以重新开始。"
                 with conn:
-                    count = save_rows(conn, owner, source, rows)
+                    counts = {}
+                    count = save_rows(conn, owner, source, rows, cleaning_counts=counts)
                     progress[source] = {"status": status, "message": message, "count": count}
+                    if counts:
+                        progress[source]["cleaning"] = counts
                     save_progress(conn, owner, run_id, progress)
     except Exception:
         logger.exception("Recruitment collection could not finish")
@@ -285,23 +296,103 @@ def runs():
     }} for row in rows])
 
 
+@blueprint.get(API + "/cleaning")
+@_login_required
+def cleaning_overview():
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    return jsonify(rules=cleaning.load_rules(conn, owner).model_dump(), counts=cleaning.stored_counts(conn, owner))
+
+
+@blueprint.post(API + "/cleaning/<action>")
+@_login_required
+def cleaning_update(action):
+    if action not in {"save", "preview", "apply"}:
+        return jsonify(message="清洗操作不存在。"), 404
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("rules"), dict):
+        return jsonify(message="请输入有效的清洗规则。"), 400
+    try:
+        rules = cleaning.CleaningRules.model_validate(payload["rules"])
+    except ValidationError as error:
+        message = ("最低月薪不能高于最高月薪。" if error.errors()[0]["loc"] == ()
+                   else "请输入有效的月薪区间或缩短规则列表。")
+        return jsonify(message=message), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    if action == "preview":
+        with conn:
+            conn.execute("BEGIN")
+            result, _ = cleaning.preview(conn, owner, rules)
+        return jsonify(result)
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if action == "apply":
+            result, rows = cleaning.preview(conn, owner, rules)
+            if result["token"] != payload.get("token"):
+                return jsonify(message="岗位或规则已变化，请重新预览后应用。"), 409
+            cleaning.write_results(conn, owner, rows)
+        cleaning.save_rules(conn, owner, rules)
+        counts = cleaning.stored_counts(conn, owner)
+    return jsonify(rules=rules.model_dump(), counts=counts)
+
+
+@blueprint.post(API + "/cleaning/release")
+@_login_required
+def cleaning_release():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(message="岗位记录无效。"), 400
+    source, value = payload.get("source"), payload.get("url")
+    if not isinstance(source, str) or source not in SOURCES or not isinstance(value, str) or len(value) > 4096:
+        return jsonify(message="岗位记录无效。"), 400
+    url = listing_url(source, value)
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        decision = conn.execute("""
+            SELECT status FROM recruitment_cleaning_results WHERE owner=? AND source=? AND url_key=?
+        """, (owner, source, url)).fetchone()
+        if not decision:
+            return jsonify(message="该岗位当前没有可放行的清洗结果。"), 404
+        if decision["status"] not in {"rejected", "released"}:
+            return jsonify(message="该岗位当前无需放行。"), 409
+        conn.execute("""
+            UPDATE recruitment_cleaning_results SET status='released'
+            WHERE owner=? AND source=? AND url_key=?
+        """, (owner, source, url))
+        counts = cleaning.stored_counts(conn, owner)
+    return jsonify(counts=counts)
+
+
 def query_rows(owner, limit, offset=0):
     source = request.args.get("source", "")
     if source and source not in SOURCES:
         return [], 0
     keyword = f"%{request.args.get('q', '').strip()[:120]}%"
-    where = "owner=? AND (?='' OR source=?) AND (title LIKE ? OR company LIKE ? OR location LIKE ?)"
+    where = "j.owner=? AND (?='' OR j.source=?) AND (j.title LIKE ? OR j.company LIKE ? OR j.location LIKE ?)"
     args = (owner, source, source, keyword, keyword, keyword)
+    status = request.args.get("clean_status", "")
+    if status == "unreviewed":
+        where += " AND r.status IS NULL"
+    elif status == "passed":
+        where += " AND r.status IN ('passed', 'released')"
+    elif status in ("rejected", "review"):
+        where += " AND r.status=?"
+        args += (status,)
     conn = db._get_conn()
-    total = conn.execute("SELECT count(*) FROM recruitment_listings WHERE " + where, args).fetchone()[0]
-    columns = ", ".join(key for key in FIELDS if key != "description")
+    joined = " FROM recruitment_listings j LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key) WHERE "
+    total = conn.execute("SELECT count(*)" + joined + where, args).fetchone()[0]
+    columns = ", ".join("j." + key for key in FIELDS if key != "description")
     items = conn.execute(
         f"""SELECT {columns}, COALESCE(
                 (SELECT d.description FROM recruitment_job_details d
                  WHERE d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key),
-                j.description) AS description
-            FROM recruitment_listings j WHERE {where}
-            ORDER BY updated_at DESC, source, url_key LIMIT ? OFFSET ?""",
+                j.description) AS description, COALESCE(r.status, 'unreviewed') AS cleaning_status,
+                COALESCE(r.reason, '') AS cleaning_reason
+            {joined}{where}
+            ORDER BY j.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?""",
         (*args, limit, offset),
     )
     return [clean_listing(dict(item)) for item in items], total
@@ -311,8 +402,10 @@ def query_rows(owner, limit, offset=0):
 @_login_required
 def jobs():
     page_number = min(10000, max(1, request.args.get("page", 1, type=int)))
-    items, total = query_rows(_current_user()["username"], 20, (page_number - 1) * 20)
-    return jsonify(items=items, total=total, page=page_number, page_size=20)
+    owner = _current_user()["username"]
+    items, total = query_rows(owner, 20, (page_number - 1) * 20)
+    return jsonify(items=items, total=total, page=page_number, page_size=20,
+                   cleaning_counts=cleaning.stored_counts(db._get_conn(), owner))
 
 
 @blueprint.post(API + "/jobs/zhilian/detail")
@@ -350,8 +443,8 @@ def export():
     writer = csv.DictWriter(output, fieldnames=FIELDS)
     writer.writeheader()
     for row in rows:
-        writer.writerow({key: "'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@"))
-                         else value for key, value in row.items()})
+        writer.writerow({key: "'" + row[key] if isinstance(row[key], str) and row[key].lstrip().startswith(("=", "+", "-", "@"))
+                         else row[key] for key in FIELDS})
     return Response("\ufeff" + output.getvalue(), mimetype="text/csv", headers={
         "Content-Disposition": "attachment; filename=recruitment.csv", "X-Export-Total": str(total)
     })
@@ -383,11 +476,13 @@ def import_csv():
                 grouped[source].append(record)
     except (UnicodeDecodeError, csv.Error):
         return jsonify(message="请使用 UTF-8 编码的 CSV。"), 400
+    counts = {}
     with db._get_conn() as conn:
-        count = sum(save_rows(conn, _current_user()["username"], source, rows) for source, rows in grouped.items())
+        count = sum(save_rows(conn, _current_user()["username"], source, rows, cleaning_counts=counts)
+                    for source, rows in grouped.items())
     if not count:
         return jsonify(message="未找到有效结果。请核对平台标识、岗位标题和原站链接。"), 400
-    return jsonify(count=count)
+    return jsonify(count=count, cleaning=counts)
 
 
 @blueprint.post(API + "/import-html")
@@ -411,8 +506,9 @@ def import_html():
         return jsonify(message="暂时无法读取页面，请检查浏览器安装。"), 503
     finally:
         html_import_lock.release()
+    counts = {}
     with db._get_conn() as conn:
-        count = save_rows(conn, _current_user()["username"], source, rows)
+        count = save_rows(conn, _current_user()["username"], source, rows, cleaning_counts=counts)
     if not count:
         return jsonify(message="页面里没有可以读取的公开岗位卡片。请保存已显示搜索结果的页面，或导入 CSV。"), 400
-    return jsonify(count=count)
+    return jsonify(count=count, cleaning=counts)

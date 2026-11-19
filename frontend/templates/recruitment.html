@@ -112,6 +112,24 @@
                     <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
                 </form>
             </section>
+            <section class="recruitment-card recruitment-cleaning" aria-labelledby="recruitmentCleaningTitle">
+                <header>
+                    <div class="recruitment-section-heading">
+                        <span class="recruitment-section-icon" aria-hidden="true">◇</span>
+                        <h2 id="recruitmentCleaningTitle">规则清洗</h2>
+                        <span id="recruitmentCleaningMode" class="recruitment-badge">手动清洗</span>
+                    </div>
+                    <div class="recruitment-actions">
+                        <button id="recruitmentCleaningOpen" type="button">配置与预览</button>
+                    </div>
+                </header>
+                <dl id="recruitmentCleaningCounts" class="recruitment-cleaning-counts">
+                    <div data-clean-status="unreviewed"><dt>未清洗</dt><dd>—</dd></div>
+                    <div data-clean-status="passed"><dt>通过</dt><dd>—</dd></div>
+                    <div data-clean-status="rejected"><dt>淘汰</dt><dd>—</dd></div>
+                    <div data-clean-status="review"><dt>待核对</dt><dd>—</dd></div>
+                </dl>
+            </section>
             <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
                 <header>
                     <div class="recruitment-section-heading">
@@ -129,6 +147,11 @@
                 <form class="recruitment-filters" id="recruitmentFilters" role="search">
                     <input type="search" name="q" maxlength="120" aria-label="搜索结果" placeholder="按岗位、公司或地点搜索">
                     <select name="source" aria-label="筛选平台"><option value="">全部平台</option>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select>
+                    <select name="clean_status" aria-label="清洗状态">
+                        <option value="">全部清洗状态</option><option value="unreviewed">未清洗</option>
+                        <option value="passed">通过</option><option value="rejected">淘汰</option>
+                        <option value="review">待核对</option>
+                    </select>
                     <button type="submit">筛选</button>
                 </form>
                 <div id="recruitmentRows" class="recruitment-rows"></div>
@@ -138,6 +161,28 @@
             </section>
         </div>
     </main>
+    <dialog id="recruitmentCleaningDialog" class="recruitment-detail" aria-labelledby="recruitmentRulesTitle">
+        <header><h2 id="recruitmentRulesTitle">清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
+        <form id="recruitmentCleaningForm" class="recruitment-card-body">
+            <fieldset class="recruitment-rule-fields" disabled>
+                <label>目标城市<input name="cities" maxlength="2500" placeholder="例如 杭州、上海、远程"></label>
+                <div class="recruitment-rule-salary">
+                    <label>最低月薪（K）<input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
+                    <label>最高月薪（K）<input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
+                </div>
+                <label>岗位标题排除词<textarea name="title_exclusions" rows="2" maxlength="4100" placeholder="例如 电话销售、保险代理"></textarea></label>
+                <label>公司排除词<textarea name="company_exclusions" rows="2" maxlength="4100" placeholder="用逗号、顿号或换行分隔"></textarea></label>
+                <label class="recruitment-rule-auto"><input name="auto" type="checkbox">自动清洗新采集和新导入的记录</label>
+                <div class="recruitment-actions">
+                    <button id="recruitmentCleaningSave" type="button">保存规则</button>
+                    <button type="submit">预览现有岗位</button>
+                    <button id="recruitmentCleaningApply" type="button" class="recruitment-primary" disabled>应用到现有岗位</button>
+                </div>
+            </fieldset>
+            <p id="recruitmentCleaningFeedback" class="recruitment-rule-feedback" role="status"></p>
+            <ul id="recruitmentCleaningPreview" class="recruitment-rule-preview" hidden></ul>
+        </form>
+    </dialog>
     <dialog id="recruitmentDetail" class="recruitment-detail" aria-labelledby="recruitmentDetailTitle">
         <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
         <div class="recruitment-card-body">

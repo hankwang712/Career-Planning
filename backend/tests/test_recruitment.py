@@ -52,6 +52,8 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["liepin"]}).status_code == 400
+    auto = {"rules": {"auto": True, "title_exclusions": ["Agent"]}}
+    assert owner.post(API + "/cleaning/save", json=auto).status_code == 200
     active = [source for source in LINKS if source != "liepin"]
     response = owner.post(API + "/runs", json={"keyword": "Agent", "city": "杭州", "sources": active, "limit": 10,
                                                "chrome_local": True})
@@ -64,6 +66,7 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
         time.sleep(.05)
     assert run["status"] == "complete"
     assert set(run["progress"]) == set(active)
+    assert all(item["count"] == 1 and item["cleaning"]["rejected"] == 1 for item in run["progress"].values())
     assert owner.get(API + "/jobs?source=51job").get_json()["total"] == 1
     assert owner.get(API + "/jobs").get_json()["total"] == 4
     assert other.get(API + "/jobs").get_json()["total"] == 0
@@ -302,6 +305,77 @@ def test_zhilian_detail_is_verified_cached_and_included_in_csv(make_account, mon
     assert calls == [url, url]
     assert owner.get(API + "/jobs?source=zhilian").get_json()["items"][0]["description"] == result["description"]
     assert "开发 Agent 应用。" in owner.get(API + "/export?source=zhilian").data.decode("utf-8-sig")
+
+
+def test_cleaning_preview_apply_filter_and_release_are_account_scoped(make_account):
+    from services import db, recruitment
+
+    owner = make_account("cleaning")
+    other = make_account("cleaning-other")
+    endpoint = API + "/cleaning"
+    rows = [
+        {"title": "工程师 A", "location": "杭州·西湖区", "salary": "8–12K", "url": "https://www.zhipin.com/job_detail/a.html"},
+        {"title": "工程师 B", "location": "杭州", "salary": "5-8K", "url": "https://www.zhipin.com/job_detail/b.html"},
+        {"title": "工程师 C", "location": "杭州市", "salary": "300元/天", "url": "https://www.zhipin.com/job_detail/c.html"},
+        {"title": "电话销售", "location": "杭州", "salary": "10-20K", "url": "https://www.zhipin.com/job_detail/d.html"},
+    ]
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, owner.email, "boss", rows)
+        recruitment.save_rows(conn, other.email, "boss", rows[:1])
+    assert owner.get(endpoint).get_json()["rules"]["auto"] is False
+    rules = {"cities": ["杭州"], "min_salary_k": 10, "max_salary_k": 20, "title_exclusions": ["销售"]}
+    preview = owner.post(endpoint + "/preview", json={"rules": rules}).get_json()
+    assert preview["counts"] == {"passed": 1, "rejected": 2, "review": 1}
+    assert owner.get(API + "/jobs?clean_status=unreviewed").get_json()["total"] == 4
+    assert other.post(endpoint + "/apply", json={"rules": rules, "token": preview["token"]}).status_code == 409
+    assert owner.post(endpoint + "/apply", json={"rules": rules, "token": preview["token"]}).status_code == 200
+    rejected = owner.get(API + "/jobs?clean_status=rejected").get_json()["items"]
+    assert {row["title"]: row["cleaning_reason"] for row in rejected} == {
+        "工程师 B": "月薪「5-8K」与目标区间无交集", "电话销售": "标题命中排除词「销售」",
+    }
+    assert "工程师 B" in owner.get(API + "/export?clean_status=rejected").data.decode("utf-8-sig")
+    release = {"source": "boss", "url": rows[1]["url"]}
+    assert other.post(endpoint + "/release", json=release).status_code == 404
+    assert owner.post(endpoint + "/release", json=release).get_json()["counts"]["passed"] == 2
+    assert owner.post(endpoint + "/release", json=release).status_code == 200
+    preview = owner.post(endpoint + "/preview", json={"rules": rules}).get_json()
+    assert preview["counts"]["rejected"] == 1
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, owner.email, "boss", [{**rows[1], "salary": "7K"}])
+    assert owner.post(endpoint + "/apply", json={"rules": rules, "token": preview["token"]}).status_code == 409
+    passed = owner.get(API + "/jobs?clean_status=passed").get_json()["items"]
+    assert any(row["cleaning_status"] == "released" and row["salary"] == "7K" for row in passed)
+    assert other.get(endpoint).get_json()["counts"]["unreviewed"] == 1
+
+
+def test_auto_cleaning_applies_to_imports_and_keeps_uncertain_fields(make_account, monkeypatch):
+    from services import recruitment
+
+    account = make_account("cleaning-auto")
+    endpoint = API + "/cleaning"
+    rules = {"min_salary_k": 10, "company_exclusions": ["猎头"], "auto": True}
+    assert account.post(endpoint + "/save", json={"rules": rules}).status_code == 200
+    csv = "source,title,company,salary,url\nboss,开发,甲,8千-10000元/月,https://www.zhipin.com/job_detail/csv.html\n"
+    reply = account.post(API + "/import", data={"file": (BytesIO(csv.encode()), "jobs.csv")})
+    assert reply.get_json()["cleaning"] == {"passed": 1, "rejected": 0, "review": 0}
+    monkeypatch.setattr(recruitment, "read_saved_page", lambda *_: [
+        {"title": "测试工程师", "company": "示例猎头", "url": LINKS["boss"]},
+    ])
+    reply = account.post(API + "/import-html", data={"source": "boss", "file": (BytesIO(b"<p>job</p>"), "jobs.html")})
+    assert reply.get_json()["cleaning"]["rejected"] == 1
+    assert account.post(endpoint + "/save", json={"rules": {"min_salary_k": 20, "max_salary_k": 10}}).status_code == 400
+    assert account.get(endpoint).get_json()["rules"] == {**rules, "max_salary_k": None, "cities": [], "title_exclusions": []}
+
+
+@pytest.mark.parametrize(("salary", "expected"), [
+    ("8K–12K·13薪", (8000, 12000)), ("1.2-1.8万元/月", (12000, 18000)),
+    ("8千-10000元/月", (8000, 10000)), ("8-12万/年", (None, None)),
+    ("面议", (None, None)), ("300元/天", (None, None)), ("10K起", (None, None)),
+])
+def test_cleaning_only_compares_unambiguous_monthly_salary(salary, expected):
+    from services.recruitment_cleaning import monthly_pay
+
+    assert monthly_pay(salary) == expected
 
 
 def test_encoded_salary_is_hidden_from_results_and_csv_without_erasing_a_known_value(make_account):

@@ -303,6 +303,33 @@ def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_p
     assert sessions.is_hidden()
 
 
+def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment")
+    csv = "source,title,url\nboss,电话销售,https://www.zhipin.com/job_detail/cleaning.html\n"
+    page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
+    job = page.locator(".recruitment-row").filter(has_text="电话销售")
+    job.get_by_text("未清洗", exact=True).wait_for()
+    page.get_by_role("button", name="配置与预览").click()
+    dialog = page.get_by_role("dialog", name="清洗规则")
+    assert dialog.get_by_role("button", name="应用到现有岗位").is_disabled()
+    dialog.get_by_label("岗位标题排除词").fill("销售")
+    dialog.get_by_role("button", name="预览现有岗位").click()
+    dialog.get_by_text("淘汰 1 条", exact=True).wait_for()
+    assert job.get_by_text("未清洗", exact=True).is_visible()
+    dialog.get_by_role("button", name="应用到现有岗位").click()
+    dialog.get_by_text("已应用清洗规则。", exact=True).wait_for()
+    dialog.get_by_role("button", name="关闭").click()
+    page.get_by_label("清洗状态").select_option("rejected")
+    page.get_by_role("button", name="筛选", exact=True).click()
+    job.get_by_text("标题命中排除词「销售」").wait_for()
+    job.get_by_role("button", name="手动放行").click()
+    page.get_by_text("已放行：电话销售").wait_for()
+    page.get_by_label("清洗状态").select_option("passed")
+    page.get_by_role("button", name="筛选", exact=True).click()
+    job.get_by_text("已放行", exact=True).wait_for()
+
+
 def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in_page, live_server):
     page = logged_in_page
     errors = collect_errors(page)
