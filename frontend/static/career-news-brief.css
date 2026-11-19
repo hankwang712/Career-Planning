@@ -192,6 +192,104 @@
   cursor:pointer;
   transition:background-color 180ms,color 180ms;
 }
+
+/* The lead story gets a single accent surface. The remaining stories read as a list. */
+#careerNewsBoard.nd-board .nd-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-auto-rows: auto;
+  gap: 12px 20px;
+  padding: 4px 0 0;
+  overflow: visible;
+}
+#careerNewsBoard.nd-board .nd-deck:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+#careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story--lead { grid-row: span 2; }
+#careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story.nd-story--side { grid-column: 2; }
+#careerNewsBoard.nd-board .nd-story {
+  --news-tone: #365f96;
+  --news-tint: #eaf2fc;
+  --news-line: #d6e4f5;
+  margin: 0;
+  padding: 16px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--dr-line, #e1e8f1);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+}
+#careerNewsBoard.nd-board .nd-story[data-category="ai"],
+#careerNewsBoard.nd-board .nd-filter[data-news-filter="ai"] {
+  --news-tone: #6446a7;
+  --news-tint: #eee8fa;
+  --news-line: #dfd4f3;
+}
+#careerNewsBoard.nd-board .nd-story[data-category="hiring"],
+#careerNewsBoard.nd-board .nd-filter[data-news-filter="hiring"] {
+  --news-tone: #216d61;
+  --news-tint: #e6f3ee;
+  --news-line: #cee7dd;
+}
+#careerNewsBoard.nd-board .nd-story[data-category="growth"],
+#careerNewsBoard.nd-board .nd-filter[data-news-filter="growth"] {
+  --news-tone: #835925;
+  --news-tint: #f8eddf;
+  --news-line: #ead6ba;
+}
+#careerNewsBoard.nd-board .nd-filter[data-news-filter="tech"] { --news-tone: #365f96; --news-tint: #eaf2fc; }
+#careerNewsBoard.nd-board .nd-deck > .nd-story--lead {
+  padding: clamp(16px, 2vw, 26px);
+  border: 1px solid var(--news-line);
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--news-tint), #fff 88%);
+}
+#careerNewsBoard.nd-board .nd-deck > .nd-story--side { margin: 0; background: transparent; }
+#careerNewsBoard.nd-board .nd-story:not(.nd-story--lead):hover { background: #ffffffa8; }
+#careerNewsBoard.nd-board .nd-story .nd-tag {
+  background: var(--news-tint);
+  border: 1px solid var(--news-line);
+  border-radius: 5px;
+  padding: 2px 7px;
+  color: var(--news-tone);
+}
+#careerNewsBoard.nd-board .nd-filter:not(.is-active)[data-news-filter]:not([data-news-filter="all"]) {
+  color: var(--news-tone);
+}
+#careerNewsBoard.nd-board .nd-filter:not(.is-active)[data-news-filter]:not([data-news-filter="all"]):hover {
+  background: var(--news-tint);
+}
+#careerNewsBoard.nd-board .nd-story--lead .nd-story-title {
+  font-size: clamp(1.12rem, 1.7vw, 1.5rem);
+  line-height: 1.45;
+  -webkit-line-clamp: 3;
+}
+#careerNewsBoard.nd-board .nd-story--lead .nd-story-summary { -webkit-line-clamp: 3; }
+#careerNewsBoard.nd-board .nd-story .nd-story-bottom { border-top: 0; padding-top: 2px; }
+#careerNewsBoard.nd-board .nd-story .nd-byline { flex-wrap: nowrap; gap: 7px; font-size: 11px; }
+#careerNewsBoard.nd-board .nd-story .nd-byline time { width: auto; }
+.nd-source-logo { width: 19px; height: 19px; flex: 0 0 19px; border-radius: 4px; object-fit: contain; }
+.nd-source-logo[hidden], .nd-feature-image[hidden] { display: none; }
+.nd-feature-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 6;
+  object-fit: cover;
+  border-radius: 8px;
+  margin: 0 0 13px;
+}
+#careerNewsBoard.nd-board .nd-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+}
+#careerNewsBoard.nd-board .nd-section-label,
+#careerNewsBoard.nd-board .nd-section-label > span { font-size: 12px; letter-spacing: normal; }
+@media (max-width: 760px) {
+  #careerNewsBoard.nd-board .nd-deck,
+  #careerNewsBoard.nd-board .nd-grid { grid-template-columns: minmax(0, 1fr); }
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story--lead { grid-row: auto; }
+  #careerNewsBoard.nd-board .nd-deck:has(> :nth-child(3)) > .nd-story.nd-story--side { grid-column: auto; }
+}
 .nd-deck-nav button:hover:not(:disabled) {
   background:#456cce;
   color:#fff;

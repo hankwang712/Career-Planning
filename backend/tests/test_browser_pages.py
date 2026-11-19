@@ -140,6 +140,40 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
         page.close()
 
 
+def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page, live_server, monkeypatch):
+    from services import site
+
+    cover = "https://images.example.test/cover.jpg"
+    items = [
+        {"title": "AI 开发工具进展", "source_name": "InfoQ", "image_url": cover},
+        {"title": "招聘观察报告", "source_name": "IT之家"},
+        {"title": "科技行业动态", "source_name": "Ars Technica"},
+        {"title": "如何准备面试", "source_name": "The Verge"},
+    ]
+    for index, item in enumerate(items):
+        item.update(url=f"https://example.test/news/{index}", summary="来自原文的摘要",
+                    published_at=f"2026-11-{18-index:02d}T12:00:00+08:00", published_label="11-18 12:00")
+    monkeypatch.setattr(site, "get_career_news_payload", lambda: {"visible_items": items})
+    page = logged_in_page
+    page.goto(live_server + "/main.html")
+    board = page.locator("#careerNewsBoard")
+    lead = board.locator(".nd-deck .nd-story--lead")
+    assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/infoq.png")
+    assert lead.locator(".nd-feature-image").get_attribute("src") == cover
+    sides = board.locator(".nd-deck .nd-story--side")
+    assert sides.first.bounding_box()["x"] == sides.last.bounding_box()["x"]
+    assert sides.last.bounding_box()["x"] > lead.bounding_box()["x"]
+    pause = board.locator("#careerNewsPauseBtn")
+    pause.evaluate("(button) => button.click()")
+    board.locator("#careerNewsNextBtn").evaluate("(button) => button.click()")
+    assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
+    assert lead.locator(".nd-feature-image").count() == 0
+    board.get_by_role("button", name="职业成长").evaluate("(button) => button.click()")
+    assert lead.locator(".nd-tag").inner_text() == "职业成长"
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert board.evaluate("(board) => board.scrollWidth <= board.clientWidth")
+
+
 def test_workspace_exposes_the_functions_other_scripts_call(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
     logged_in_page.goto(live_server + "/main.html", wait_until="load")

@@ -415,11 +415,25 @@ function _initCareerNewsBrief(board) {
     }, 8000);
   }
 
-  function cloneStory(item, variant, index) {
+  board.addEventListener("error", (event) => {
+    if (event.target instanceof HTMLImageElement) event.target.hidden = true;
+  }, true);
+
+  function cloneStory(item, variant) {
     const node = item.cloneNode(true);
     if (variant) node.classList.add(variant);
-    const number = node.querySelector(".nd-story-number");
-    if (number) number.textContent = String(index + 1).padStart(2, "0");
+    if (variant === "nd-story--lead" && item.dataset.image) {
+      const cover = document.createElement("img");
+      cover.className = "nd-feature-image";
+      cover.width = 640;
+      cover.height = 240;
+      cover.alt = "";
+      cover.loading = "lazy";
+      cover.decoding = "async";
+      cover.referrerPolicy = "no-referrer";
+      cover.src = item.dataset.image;
+      node.prepend(cover);
+    }
     return node;
   }
 
@@ -427,9 +441,7 @@ function _initCareerNewsBrief(board) {
     const matched = items.filter(item => category === "all" || item.dataset.category === category);
     matchedCount = matched.length;
     const index = matched.length ? ((focal % matched.length) + matched.length) % matched.length : 0;
-    const featuredIndexes = matched.length >= 3
-      ? [(index + 1) % matched.length, index, (index + 2) % matched.length]
-      : matched.map((_, offset) => (index + offset) % matched.length);
+    const featuredIndexes = matched.slice(0, 3).map((_, offset) => (index + offset) % matched.length);
     const remaining = matched.filter((_, i) => !featuredIndexes.includes(i)).slice(0, Math.max(0, limit - featuredIndexes.length));
     const visibleCount = featuredIndexes.length + remaining.length;
     const fragment = document.createDocumentFragment();
@@ -442,15 +454,15 @@ function _initCareerNewsBrief(board) {
       const deck = document.createElement("div");
       deck.className = "nd-deck";
       deck.setAttribute("aria-label", "焦点新闻");
-      featuredIndexes.forEach(i => deck.append(cloneStory(matched[i], i === index ? "nd-story--lead" : "nd-story--side", i)));
+      featuredIndexes.forEach(i => deck.append(cloneStory(matched[i], i === index ? "nd-story--lead" : "nd-story--side")));
       fragment.append(deck);
       if (remaining.length) {
         const label = document.createElement("div");
         label.className = "nd-section-label";
-        label.innerHTML = '<span>更多新鲜视角</span><span>KEEP EXPLORING</span>';
+        label.textContent = "更多资讯";
         const grid = document.createElement("div");
         grid.className = "nd-grid";
-        remaining.forEach(item => grid.append(cloneStory(item, "", matched.indexOf(item))));
+        remaining.forEach(item => grid.append(cloneStory(item)));
         fragment.append(label, grid);
       }
     } else {

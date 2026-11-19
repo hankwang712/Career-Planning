@@ -463,6 +463,26 @@ def _extract_atom_link(node: ET.Element) -> str:
     return ""
 
 
+def _safe_news_image(url: str) -> str:
+    if not isinstance(url, str) or len(url) > 2048 or any(char.isspace() for char in url):
+        return ""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        host = parsed.hostname or ""
+        if parsed.scheme == "https" and "." in host and not parsed.username and not parsed.password:
+            return url
+    except ValueError:
+        pass
+    return ""
+
+
+def _feed_image(candidates) -> str:
+    for url, media_type in candidates:
+        if (not media_type or media_type == "image" or media_type.startswith("image/")) and (image := _safe_news_image(url)):
+            return image
+    return ""
+
+
 def _parse_feed_entries(xml_bytes: bytes) -> list[dict]:
     """Normalize RSS/Atom via feedparser; retain the XML fallback for old installs."""
     if feedparser is not None:
@@ -472,11 +492,15 @@ def _parse_feed_entries(xml_bytes: bytes) -> list[dict]:
         entries = []
         for entry in feed.entries:
             content = entry.get("content") or []
+            thumbnails = [(item.get("url"), item.get("type", "")) for item in entry.get("media_thumbnail", [])]
+            media = [(item.get("url"), item.get("type") or item.get("medium") or "") for item in entry.get("media_content", [])]
+            enclosures = [(item.get("href"), item["type"]) for item in entry.get("enclosures", []) if item.get("type")]
             entries.append({
                 "title": entry.get("title", ""),
                 "url": entry.get("link", ""),
                 "summary": entry.get("summary") or (content[0].get("value", "") if content else ""),
                 "published": entry.get("published") or entry.get("updated", ""),
+                "image_url": _feed_image(thumbnails + media + enclosures),
             })
         return entries
 
@@ -517,7 +541,13 @@ def _parse_feed_entries(xml_bytes: bytes) -> list[dict]:
                 or node.findtext(f"{ATOM_NAMESPACE}updated")
             )
 
-        entries.append({"title": title, "url": url, "summary": summary, "published": published_raw})
+        media = "{http://search.yahoo.com/mrss/}"
+        thumbnails = [(item.get("url"), "") for item in node.iter(f"{media}thumbnail")]
+        images = [(item.get("url"), item.get("type") or item.get("medium") or "")
+                  for item in node.iter(f"{media}content")]
+        enclosures = [(item.get("url"), item.get("type")) for item in node.findall("enclosure") if item.get("type")]
+        entries.append({"title": title, "url": url, "summary": summary, "published": published_raw,
+                        "image_url": _feed_image(thumbnails + images + enclosures)})
     return entries
 
 
@@ -543,6 +573,7 @@ def _parse_feed_items(source: dict) -> tuple[list[dict], int]:
                 "title": title,
                 "url": url,
                 "summary": summary,
+                "image_url": entry.get("image_url", ""),
                 "source": f"{source['source']} / {source['topic']}",
                 "published_at": published_at.isoformat() if published_at else "",
                 "published_label": published_at.strftime("%m-%d %H:%M") if published_at else "刚刚同步",
@@ -1007,6 +1038,7 @@ def _decorate_news_item(item: dict, store_index: dict[str, str] | None = None) -
     enriched["topic_label"] = topic_label
     enriched["domain_label"] = domain_label
     enriched["preview_image"] = _build_preview_image(str(enriched.get("url") or ""))
+    enriched["image_url"] = _safe_news_image(enriched.get("image_url", ""))
     summary = _normalize_news_summary(str(enriched.get("summary") or ""), enriched["source_name"], topic_label)
     enriched["summary"] = summary if summary else fallback_summary
     return enriched
