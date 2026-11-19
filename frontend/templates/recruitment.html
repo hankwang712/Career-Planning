@@ -129,9 +129,15 @@
                 <div id="rpJobs" class="rp-jobs">
                     <div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div>
                 </div>
-                <div id="rpJobsMore" class="rp-jobsmore" hidden>
-                    <button id="rpJobsMoreBtn" class="rp-btn rp-btn-ghost" type="button">加载更多岗位</button>
-                </div>
+                <nav id="rpJobPager" class="rp-job-pager" aria-label="岗位分页" hidden>
+                    <button id="rpJobPrev" class="rp-btn rp-btn-sm rp-btn-ghost" type="button">上一页</button>
+                    <span id="rpJobPageStatus" role="status"></span>
+                    <button id="rpJobNext" class="rp-btn rp-btn-sm rp-btn-ghost" type="button">下一页</button>
+                    <form id="rpJobPageJump">
+                        <input id="rpJobPageInput" type="number" min="1" step="1" required aria-label="跳转页码">
+                        <button id="rpJobPageGo" class="rp-btn rp-btn-sm rp-btn-ghost" type="submit">跳转</button>
+                    </form>
+                </nav>
             </section>
         </div>
 

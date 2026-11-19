@@ -17,7 +17,7 @@
   const PAGE_SIZE = 100; // 后端 /jobs limit 上限 100
   const MAX_JOBS = 600;
   const TAB_FETCH_CAP = 300;
-  const RENDER_CAP = 60;
+  const BOARD_PAGE_SIZE = 8;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const byId = (id) => document.getElementById(id);
 
@@ -208,11 +208,12 @@
   const state = {
     funnel: null, rail: null, config: null,
     jobs: [], jobsTotal: 0, counts: {}, tabLoadToken: 0,
-    tab: "all", q: "", renderLimit: RENDER_CAP,
+    tab: "all", q: "", page: 1, boardJobs: [], boardTotal: 0,
+    boardLoading: false, boardError: "", boardRequest: 0,
     apiReady: false, loading: true, refreshing: false, failCount: 0, stale: false,
     running: false, runStage: null, runToken: 0, runController: null,
     armed: false, armTimer: 0,
-    selectedFailed: new Set(), failedSource: "",
+    selectedFailed: new Map(), failedSource: "",
     drawer: null, drawerCtx: null, drawerBusy: false, drawerSeq: 0,
     modalJob: null, modalTab: "resume",
     bulkBusy: false, funnelTotal: 0, funnelPrev: {}
@@ -297,14 +298,7 @@
     return "in_progress";
   }
   function filteredJobs() {
-    const q = state.q.trim().toLowerCase();
-    return state.jobs.filter((job) => {
-      if (state.tab !== "all" && job.tab !== state.tab) return false;
-      if (state.tab === "failed" && state.failedSource && job.source !== state.failedSource) return false;
-      if (!q) return true;
-      return [job.title, job.company, sourceLabel(job.source), job.location]
-        .some((value) => String(value || "").toLowerCase().includes(q));
-    });
+    return state.boardJobs.filter((job) => state.tab === "all" || job.tab === state.tab);
   }
   function tabCounts() {
     // 优先用服务端口径（全量），乐观更新时做增量调整；未就绪时回退本地计数。
@@ -616,19 +610,17 @@
       button.querySelector("[data-tab-count]").textContent = counts[key] ? String(counts[key]) : "";
     }
     const total = state.counts?.all ?? state.jobsTotal;
-    byId("rpBoardCount").textContent = total
-      ? (total > state.jobs.length ? `共 ${total} 条 · 已加载 ${state.jobs.length} 条` : `共 ${total} 条`)
-      : "";
+    byId("rpBoardCount").textContent = total ? `共 ${total} 条` : "";
   }
   function setTab(tab, { updateUrl = true } = {}) {
     if (!TABS.includes(tab)) tab = "all";
     state.tab = tab;
-    state.renderLimit = RENDER_CAP;
+    state.page = 1;
     state.selectedFailed.clear();
     state.failedSource = "";
     renderTabs();
     renderTabBanner();
-    renderJobs();
+    void loadBoardPage(1);
     if (updateUrl) syncUrl();
     void ensureTabLoaded(tab);
   }
@@ -675,29 +667,28 @@
         box.checked = state.selectedFailed.size > 0 && state.selectedFailed.size === counts.failed;
         box.addEventListener("change", () => {
           state.selectedFailed = box.checked
-            ? new Set(state.jobs.filter((j) => j.tab === "failed").map(jobId))
-            : new Set();
+            ? new Map([...state.jobs, ...state.boardJobs].filter((j) => j.tab === "failed").map(job => [jobId(job), job]))
+            : new Map();
           renderTabBanner();
           renderJobs();
         });
         selectAll.append(box, document.createTextNode("全选"));
         tools.append(selectAll);
         const chips = node("span", "", "rp-source-chips");
-        const sources = [...new Set(state.jobs.filter((j) => j.tab === "failed").map((j) => j.source))];
+        const sources = [...new Set([...state.jobs, ...state.boardJobs].filter((j) => j.tab === "failed").map((j) => j.source))];
         for (const source of sources) {
           const chip = node("button", sourceLabel(source), "rp-source-chip");
           chip.type = "button";
           chip.setAttribute("aria-pressed", String(state.failedSource === source));
           chip.addEventListener("click", () => {
             state.failedSource = state.failedSource === source ? "" : source;
-            state.renderLimit = RENDER_CAP;
             renderTabBanner();
-            renderJobs();
+            void loadBoardPage(1);
           });
           chips.append(chip);
         }
         tools.append(chips);
-        const selected = () => state.jobs.filter((j) => j.tab === "failed" && state.selectedFailed.has(jobId(j)));
+        const selected = () => [...state.selectedFailed.values()].filter(job => job.tab === "failed");
         const retry = node("button", `批量重试${state.selectedFailed.size ? `（${state.selectedFailed.size}）` : ""}`, "rp-btn rp-btn-sm");
         retry.type = "button";
         retry.disabled = !state.selectedFailed.size || state.bulkBusy;
@@ -889,7 +880,7 @@
     box.checked = state.selectedFailed.has(jobId(job));
     box.setAttribute("aria-label", "选择 " + job.title);
     box.addEventListener("change", () => {
-      if (box.checked) state.selectedFailed.add(jobId(job));
+      if (box.checked) state.selectedFailed.set(jobId(job), job);
       else state.selectedFailed.delete(jobId(job));
       renderTabBanner();
     });
@@ -921,10 +912,20 @@
     const root = byId("rpJobs");
     const list = filteredJobs();
     if (!state.apiReady && state.loading) return; // 骨架保留
+    renderJobPager();
+    if (state.boardLoading || state.boardError) {
+      const empty = node("div", "", "rp-view-empty");
+      empty.append(node("strong", state.boardError || "正在读取岗位…"));
+      if (state.boardError) {
+        empty.append(actionButton("重试", "rp-btn-ghost", () => loadBoardPage(state.page), "refresh"));
+      }
+      root.replaceChildren(empty);
+      return;
+    }
     if (!list.length) {
       const empty = node("div", "", "rp-view-empty");
       empty.append(tile("inbox", "accent"));
-      if (!state.jobs.length) {
+      if (!(state.counts.all ?? state.jobsTotal)) {
         empty.append(node("strong", "流水线里还没有岗位"),
           node("p", "从本地导入种子岗位、CSV 或已保存的搜索页开始。"));
         const button = node("button", "打开本地导入", "rp-btn rp-btn-primary");
@@ -936,14 +937,26 @@
           node("p", state.q ? "换个关键词，或清空搜索框。" : "切换其他状态视图，或启动流水线推进岗位。"));
       }
       root.replaceChildren(empty);
-      byId("rpJobsMore").hidden = true;
       return;
     }
-    const visible = list.slice(0, state.renderLimit);
-    root.replaceChildren(...visible.map((job) =>
+    root.replaceChildren(...list.map((job) =>
       job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job)));
-    byId("rpJobsMore").hidden = list.length <= state.renderLimit;
-    byId("rpJobsMoreBtn").textContent = `加载更多岗位（剩余 ${list.length - state.renderLimit} 条）`;
+  }
+  function boardPageCount() {
+    return Math.max(1, Math.ceil(state.boardTotal / BOARD_PAGE_SIZE));
+  }
+  function renderJobPager() {
+    const pages = boardPageCount();
+    const disabled = state.boardLoading || Boolean(state.boardError);
+    byId("rpJobPager").hidden = pages <= 1;
+    byId("rpJobPrev").disabled = disabled || state.page <= 1;
+    byId("rpJobNext").disabled = disabled || state.page >= pages;
+    byId("rpJobPageStatus").textContent = `第 ${state.page} / ${pages} 页 · ${state.boardTotal} 条`;
+    const input = byId("rpJobPageInput");
+    input.max = String(pages);
+    input.disabled = disabled;
+    if (document.activeElement !== input) input.value = String(state.page);
+    byId("rpJobPageGo").disabled = disabled;
   }
   function renderBoard() {
     renderTabs();
@@ -1139,6 +1152,49 @@
   }
 
   /* ---------- 数据加载与轮询 ---------- */
+  async function loadBoardPage(page, { quiet = false, scroll = false } = {}) {
+    if (quiet && state.boardLoading) return;
+    const token = ++state.boardRequest;
+    const params = new URLSearchParams({ tab: state.tab, limit: String(BOARD_PAGE_SIZE) });
+    if (state.q.trim()) params.set("q", state.q.trim());
+    if (state.tab === "failed" && state.failedSource) params.set("source", state.failedSource);
+    state.page = page;
+    if (!quiet) {
+      state.boardError = "";
+      state.boardLoading = true;
+      renderJobs();
+    }
+    try {
+      let data;
+      while (true) {
+        params.set("offset", String((page - 1) * BOARD_PAGE_SIZE));
+        data = await pipelineApi("/jobs?" + params);
+        if (token !== state.boardRequest) return;
+        const last = Math.max(1, Math.ceil(data.total / BOARD_PAGE_SIZE));
+        if (page <= last) break;
+        page = last;
+      }
+      const known = new Map([...state.jobs, ...state.boardJobs].map(job => [jobId(job), job]));
+      state.boardJobs = (data.items || []).map(row => {
+        const job = normalizeJob(row);
+        return Object.assign(known.get(jobId(job)) || job, job);
+      });
+      if (data.counts) state.counts = { ...data.counts };
+      state.boardTotal = Number(data.total) || 0;
+      state.page = page;
+      state.boardError = "";
+      syncUrl();
+    } catch (error) {
+      if (token !== state.boardRequest) return;
+      if (!quiet || !state.boardJobs.length) state.boardError = error.message || "岗位读取失败。";
+    } finally {
+      if (token === state.boardRequest) {
+        state.boardLoading = false;
+        renderBoard();
+        if (scroll && !state.boardError) document.querySelector(".rp-board-card").scrollIntoView({ behavior: "instant" });
+      }
+    }
+  }
   async function loadJobs() {
     const first = await pipelineApi(`/jobs?tab=all&limit=${PAGE_SIZE}&offset=0`);
     const items = (first.items || []).map(normalizeJob);
@@ -1152,7 +1208,8 @@
       items.push(...rows);
       offset += rows.length;
     }
-    state.jobs = items;
+    const boardJobs = new Map(state.boardJobs.map(job => [jobId(job), job]));
+    state.jobs = items.map(job => boardJobs.get(jobId(job)) || job);
     state.jobsTotal = total;
   }
   async function ensureTabLoaded(tab) {
@@ -1176,7 +1233,8 @@
     }
     if (token !== state.tabLoadToken || !merged.length) return;
     const byIdentity = new Map(state.jobs.map((job) => [jobId(job), job]));
-    for (const job of merged) byIdentity.set(jobId(job), job);
+    const boardJobs = new Map(state.boardJobs.map(job => [jobId(job), job]));
+    for (const job of merged) byIdentity.set(jobId(job), boardJobs.get(jobId(job)) || job);
     state.jobs = [...byIdentity.values()];
     renderBoard();
   }
@@ -1200,7 +1258,8 @@
     const results = await Promise.allSettled([
       pipelineApi("/funnel"),
       pipelineApi("/rail"),
-      loadJobs()
+      loadJobs(),
+      loadBoardPage(state.page, { quiet: true })
     ]);
     const [funnel, rail, jobs] = results;
     let okCount = 0;
@@ -1414,6 +1473,8 @@
     else url.searchParams.delete("tab");
     if (state.q.trim()) url.searchParams.set("q", state.q.trim());
     else url.searchParams.delete("q");
+    if (state.page > 1 && !state.failedSource) url.searchParams.set("page", state.page);
+    else url.searchParams.delete("page");
     if (state.drawer) url.searchParams.set("drawer", state.drawer);
     else url.searchParams.delete("drawer");
     window.history.replaceState(null, "", url);
@@ -1457,14 +1518,17 @@
       const value = event.target.value;
       searchTimer = window.setTimeout(() => {
         state.q = value;
-        state.renderLimit = RENDER_CAP;
-        renderJobs();
-        syncUrl();
+        void loadBoardPage(1);
       }, 300);
     });
-    byId("rpJobsMoreBtn").addEventListener("click", () => {
-      state.renderLimit += RENDER_CAP;
-      renderJobs();
+    const goToPage = page => {
+      if (page >= 1 && page <= boardPageCount() && page !== state.page) void loadBoardPage(page, { scroll: true });
+    };
+    byId("rpJobPrev").addEventListener("click", () => goToPage(state.page - 1));
+    byId("rpJobNext").addEventListener("click", () => goToPage(state.page + 1));
+    byId("rpJobPageJump").addEventListener("submit", event => {
+      event.preventDefault();
+      goToPage(Number(byId("rpJobPageInput").value));
     });
     byId("rpDrawerClose").addEventListener("click", () => closeDrawer());
     document.querySelector("[data-rp-drawer-close]").addEventListener("click", () => closeDrawer());
@@ -1520,6 +1584,8 @@
     if (tab && TABS.includes(tab)) state.tab = tab;
     const q = (params.get("q") || "").trim().slice(0, 120);
     if (q) { state.q = q; byId("rpSearch").value = q; }
+    const page = Number(params.get("page"));
+    if (Number.isSafeInteger(page) && page > 1 && page <= Math.floor(Number.MAX_SAFE_INTEGER / BOARD_PAGE_SIZE)) state.page = page;
     renderTabs();
     renderCommandbar();
     const drawer = params.get("drawer");

@@ -435,6 +435,50 @@ def test_pipeline_job_card_keeps_materials_beside_metadata_on_desktop(browser, l
         context.close()
 
 
+def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("job-board-pages")
+    for index in range(611):
+        add_job(account, f"page-{index:03}", {**JOB_CUSTOM, "title": f"分页样本 {index:03}"})
+
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment")
+        cards = page.locator("#rpJobs .rp-job")
+        pager = page.get_by_role("navigation", name="岗位分页")
+        pager.get_by_text("第 1 / 77 页 · 611 条", exact=True).wait_for()
+        assert cards.count() == 8
+        assert pager.get_by_role("button", name="上一页").is_disabled()
+        pager.get_by_role("button", name="下一页").click()
+        pager.get_by_text("第 2 / 77 页 · 611 条", exact=True).wait_for()
+        assert cards.count() == 8
+
+        pager.get_by_role("spinbutton", name="跳转页码").fill("77")
+        pager.get_by_role("button", name="跳转", exact=True).click()
+        pager.get_by_text("第 77 / 77 页 · 611 条", exact=True).wait_for()
+        assert cards.count() == 3
+        assert pager.get_by_role("button", name="下一页").is_disabled()
+        assert cards.get_by_role("button", name="分页样本 000").is_visible()
+
+        search = page.get_by_role("searchbox", name="搜索岗位")
+        search.fill("分页样本 000")
+        page.wait_for_function("new URLSearchParams(location.search).get('q') === '分页样本 000'")
+        assert cards.count() == 1
+        assert pager.is_hidden()
+        search.fill("")
+        pager.get_by_text("第 1 / 77 页 · 611 条", exact=True).wait_for()
+        pager.get_by_role("button", name="下一页").click()
+        pager.get_by_text("第 2 / 77 页 · 611 条", exact=True).wait_for()
+        page.locator('#rpTabs [data-tab="in_progress"]').click()
+        pager.get_by_text("第 1 / 77 页 · 611 条", exact=True).wait_for()
+        assert cards.count() == 8
+    finally:
+        context.close()
+
+
 def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment")

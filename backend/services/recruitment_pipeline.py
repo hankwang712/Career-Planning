@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from . import db, llm_env, recruitment_ai as ai, recruitment_cleaning as cleaning
 from .llm_calls import normalize_sdk_base_url, safe_create_chat_completion
 from .paths import DATA_DIR
+from .recruitment_sources import SOURCES
 from .user_state import _current_user, _login_required
 
 logger = logging.getLogger(__name__)
@@ -1312,7 +1313,7 @@ TAB_STAGES = {
 }
 
 
-def jobs_payload(conn, owner, tab, keyword, limit, offset):
+def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
     ensure_rows(conn, owner)
     counts = dict.fromkeys(TAB_STAGES, 0)
     for stage, count in conn.execute("SELECT stage, count(*) FROM recruitment_pipeline WHERE owner=? GROUP BY stage", (owner,)):
@@ -1326,8 +1327,18 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset):
         args += list(stages)
     if keyword:
         like = f"%{keyword}%"
-        where += " AND (j.title LIKE ? OR j.company LIKE ? OR j.source LIKE ?)"
-        args += [like, like, like]
+        source_names = {key: item[0] for key, item in SOURCES.items()}
+        source_names.update(city_jobs="城市种子", local="本地导入", csv="CSV 导入", html="网页导入", seed="种子导入")
+        matches = [key for key, name in source_names.items() if keyword.casefold() in name.casefold()]
+        where += " AND (j.title LIKE ? OR j.company LIKE ? OR j.source LIKE ? OR j.location LIKE ?"
+        args += [like] * 4
+        if matches:
+            where += " OR j.source IN (" + ", ".join("?" for _ in matches) + ")"
+            args += matches
+        where += ")"
+    if source:
+        where += " AND p.source=?"
+        args.append(source)
     total = conn.execute(f"SELECT count(*) FROM recruitment_pipeline p JOIN recruitment_listings j USING(owner, source, url_key) WHERE {where}", args).fetchone()[0]
     rows = conn.execute(f"""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.url, j.experience, j.education,
@@ -1501,7 +1512,8 @@ def register_routes(blueprint):
         limit = min(100, max(1, request.args.get("limit", 20, type=int)))
         offset = max(0, request.args.get("offset", 0, type=int))
         keyword = request.args.get("q", "").strip()[:120]
-        return jsonify(jobs_payload(db._get_conn(), owner, tab, keyword, limit, offset))
+        source = request.args.get("source", "").strip()[:80]
+        return jsonify(jobs_payload(db._get_conn(), owner, tab, keyword, limit, offset, source))
 
     @blueprint.get(API + "/job")
     @_login_required

@@ -606,7 +606,12 @@ html .rp-main .rp-source-chip[aria-pressed="true"] { background: var(--dr-ink); 
 html .rp-main .rp-source-chip[aria-pressed="true"]:hover:not(:disabled) { background: var(--dr-ink-hover); border-color: var(--dr-ink-hover); color: #fff; }
 
 .rp-jobs { display: grid; gap: 10px; padding: 14px 18px 18px; }
-.rp-jobsmore { display: flex; justify-content: center; padding: 0 18px 18px; }
+.rp-job-pager,
+.rp-job-pager form { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.rp-job-pager { padding: 0 14px 16px; color: var(--dr-muted); font-size: 12px; }
+.rp-job-pager[hidden] { display: none; }
+.rp-job-pager input { width: 62px; min-height: 30px; text-align: center; }
+.rp-board-card { scroll-margin-top: calc(var(--rp-topbar-h, 76px) + 68px); }
 
 /* 岗位卡（正常型） */
 .rp-job {
