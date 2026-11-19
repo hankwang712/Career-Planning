@@ -382,6 +382,7 @@ function _initCareerNewsBrief(board) {
   const content = document.getElementById("careerNewsBriefContent");
   if (!pool || !content) return;
   const items = [...pool.querySelectorAll(".nd-story")].sort((a, b) => _careerNewsPublishedTs(b) - _careerNewsPublishedTs(a));
+  items.forEach((item, index) => { item.dataset.storyKey = String(index); });
   const filters = [...board.querySelectorAll("[data-news-filter]")];
   const more = document.getElementById("careerNewsMoreBtn");
   const count = document.getElementById("careerNewsShowingCount");
@@ -396,7 +397,8 @@ function _initCareerNewsBrief(board) {
   let inView = !("IntersectionObserver" in window);
   let matchedCount = items.length;
   let timer = null;
-  let outgoingDeck = null;
+  let slide = null;
+  let queuedSlide = 0;
 
   function scheduleAutoPlay() {
     window.clearTimeout(timer);
@@ -408,33 +410,94 @@ function _initCareerNewsBrief(board) {
       pauseButton.setAttribute("aria-label", label);
       pauseButton.title = label;
     }
-    if (manuallyPaused || hovered || !inView || outgoingDeck || document.hidden || !board.isConnected || content.contains(document.activeElement) || matchedCount <= 1) return;
+    if (manuallyPaused || hovered || !inView || slide || document.hidden || !board.isConnected || content.contains(document.activeElement) || matchedCount <= 1) return;
     timer = window.setTimeout(() => {
       timer = null;
-      void switchSpotlight(1);
+      switchSpotlight(1);
     }, 12000);
   }
 
-  async function switchSpotlight(offset) {
-    focal += offset;
-    if (outgoingDeck) return;
-    const deck = content.querySelector(".nd-deck");
-    if (!motionPreference.matches && deck?.animate) {
-      const animation = deck.animate(
-        [{ opacity: getComputedStyle(deck).opacity }, { opacity: 0.35 }],
-        { duration: 150, easing: "ease-in", fill: "forwards" }
-      );
-      outgoingDeck = animation;
-      window.clearTimeout(timer);
-      timer = null;
-      try {
-        await animation.finished;
-      } catch {
-        return;
-      }
-      outgoingDeck = null;
+  function switchSpotlight(direction) {
+    if (slide) {
+      queuedSlide = direction;
+      return;
     }
-    render(true);
+    focal += direction;
+    render(direction);
+  }
+
+  function clearSlide() {
+    if (!slide) return;
+    const { deck, layer, animations } = slide;
+    slide = null;
+    animations.forEach(animation => animation.cancel());
+    deck.classList.remove("nd-deck--sliding");
+    layer.remove();
+  }
+
+  function slideDeck(previous, deck, direction) {
+    const oldHeight = previous.offsetHeight;
+    const oldCards = [...previous.children].map((card, index) => ({
+      card, index, rect: card.getBoundingClientRect()
+    }));
+    const byKey = new Map(oldCards.map(entry => [entry.card.dataset.storyKey, entry]));
+    previous.replaceWith(deck);
+    deck.classList.add("nd-deck--sliding");
+    const bounds = deck.getBoundingClientRect();
+    const host = content.getBoundingClientRect();
+    const horizontal = oldCards.every(({ rect }) => Math.abs(rect.top - oldCards[0].rect.top) < 1);
+    const layer = document.createElement("div");
+    layer.className = "nd-deck-exit-layer";
+    layer.inert = true;
+    layer.setAttribute("aria-hidden", "true");
+    Object.assign(layer.style, {
+      left: `${bounds.left - host.left}px`, top: `${bounds.top - host.top}px`,
+      width: `${bounds.width}px`, height: `${Math.max(bounds.height, oldHeight)}px`
+    });
+    content.append(layer);
+
+    const animations = [];
+    const offset = (x, y) => `translate(${x}px, ${y}px)`;
+    const edge = (rect, end) => horizontal
+      ? offset(end ? bounds.right - rect.left : bounds.left - rect.right, 0)
+      : offset(0, end ? bounds.bottom - rect.top : bounds.top - rect.bottom);
+    const options = { duration: 480, easing: "cubic-bezier(.22,.65,.32,1)", fill: "both" };
+    const stayed = new Set();
+    const targets = [...deck.children].map(card => card.getBoundingClientRect());
+
+    [...deck.children].forEach((card, index) => {
+      const source = byKey.get(card.dataset.storyKey);
+      const target = targets[index];
+      if (source && source.index - index === direction) {
+        stayed.add(source.card);
+        const { rect } = source;
+        animations.push(card.animate([
+          { transform: offset(rect.left - target.left, rect.top - target.top), width: `${rect.width}px` },
+          { transform: offset(0, 0), width: `${target.width}px` }
+        ], options));
+      } else {
+        animations.push(card.animate([{ transform: edge(target, direction > 0) }, { transform: offset(0, 0) }], options));
+      }
+    });
+
+    for (const { card, rect } of oldCards) {
+      if (stayed.has(card)) continue;
+      Object.assign(card.style, {
+        position: "absolute", left: `${rect.left - bounds.left}px`, top: `${rect.top - bounds.top}px`,
+        width: `${rect.width}px`, height: `${rect.height}px`
+      });
+      layer.append(card);
+      animations.push(card.animate([{ transform: offset(0, 0) }, { transform: edge(rect, direction < 0) }], options));
+    }
+    const transition = slide = { deck, layer, animations };
+    void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+      if (slide !== transition) return;
+      clearSlide();
+      const next = queuedSlide;
+      queuedSlide = 0;
+      if (next) switchSpotlight(next);
+      else scheduleAutoPlay();
+    });
   }
 
   board.addEventListener("error", (event) => {
@@ -467,10 +530,10 @@ function _initCareerNewsBrief(board) {
     return node;
   }
 
-  function render(focusOnly = false) {
-    if (!focusOnly && outgoingDeck) {
-      outgoingDeck.cancel();
-      outgoingDeck = null;
+  function render(direction = 0) {
+    if (!direction) {
+      queuedSlide = 0;
+      clearSlide();
     }
     const matched = items.filter(item => category === "all" || item.dataset.category === category);
     matchedCount = matched.length;
@@ -507,9 +570,9 @@ function _initCareerNewsBrief(board) {
     }
     const oldDeck = content.querySelector(".nd-deck");
     const newDeck = fragment.querySelector(".nd-deck");
-    if (focusOnly && oldDeck && newDeck) {
-      newDeck.classList.add("is-switching");
-      oldDeck.replaceWith(newDeck);
+    if (direction && oldDeck && newDeck) {
+      if (!motionPreference.matches && oldDeck.animate && oldDeck.clientWidth) slideDeck(oldDeck, newDeck, direction);
+      else oldDeck.replaceWith(newDeck);
     } else {
       content.replaceChildren(fragment);
     }
@@ -536,8 +599,8 @@ function _initCareerNewsBrief(board) {
   }));
   function loadMore() { limit += 6; render(); }
   more?.addEventListener("click", loadMore);
-  document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => { void switchSpotlight(-1); });
-  document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => { void switchSpotlight(1); });
+  document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => switchSpotlight(-1));
+  document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => switchSpotlight(1));
   pauseButton?.addEventListener("click", () => {
     manuallyPaused = !manuallyPaused;
     scheduleAutoPlay();
@@ -551,7 +614,10 @@ function _initCareerNewsBrief(board) {
   document.addEventListener("visibilitychange", scheduleAutoPlay);
   motionPreference.addEventListener("change", event => {
     manuallyPaused = event.matches;
-    if (event.matches) outgoingDeck?.finish();
+    if (event.matches) {
+      queuedSlide = 0;
+      clearSlide();
+    }
     scheduleAutoPlay();
   });
   if ("IntersectionObserver" in window) {

@@ -213,11 +213,22 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     assert lead.locator(".nd-feature-media").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     assert board.locator("#careerNewsNextBtn").evaluate("""(button) => {
-        const deck = document.querySelector('.nd-deck');
+        const previous = document.querySelector('.nd-deck').children[1];
+        const start = previous.getBoundingClientRect().left;
         button.click();
-        return deck.getAnimations().some(animation =>
-            animation.effect.getKeyframes().some(frame => frame.opacity === '0.35'));
+        const lead = document.querySelector('.nd-deck .nd-story--lead');
+        const animation = lead.getAnimations().find(item =>
+            item.effect.getKeyframes().some(frame => frame.transform));
+        if (!animation || previous.href !== lead.href) return false;
+        animation.currentTime = 0;
+        const initial = lead.getBoundingClientRect().left;
+        animation.currentTime = 240;
+        const midpoint = lead.getBoundingClientRect().left;
+        const target = lead.parentElement.getBoundingClientRect().left;
+        return Math.abs(initial - start) < 1 && target < midpoint && midpoint < initial;
     }""")
+    board.locator(".nd-deck--sliding").wait_for(state="detached")
+    assert board.locator(".nd-deck-exit-layer").count() == 0
     lead.get_by_role("heading", name="招聘观察报告").wait_for()
     assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
     assert lead.locator(".nd-feature-media").count() == 0
