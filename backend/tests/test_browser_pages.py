@@ -149,6 +149,7 @@ def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
     assert page.get_by_text("功能示意", exact=True).count() == 0
     assert overview.get_by_role("button", name="使用引导").count() == 0
     page.wait_for_function("document.querySelector('.dashboard-workspace-panorama').naturalWidth > 0")
+    assert page.locator("#dashboard").evaluate("(el) => getComputedStyle(el).backgroundSize").startswith("28px 28px, 28px 28px")
     assert tools.get_by_role("link", name="岗位探索").get_attribute("href") == "/recruitment"
     page.get_by_role("button", name="关闭引导").click()
     overview.get_by_role("button", name="快速开始").click()
@@ -184,6 +185,7 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
         {"title": "招聘观察报告", "source_name": "IT之家"},
         {"title": "科技行业动态", "source_name": "Ars Technica"},
         {"title": "如何准备面试", "source_name": "The Verge"},
+        {"title": "AI 网络安全动态", "source_name": "IT之家"},
     ]
     for index, item in enumerate(items):
         item.update(url=f"https://example.test/news/{index}", summary="来自原文的摘要",
@@ -203,11 +205,17 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     pause = board.locator("#careerNewsPauseBtn")
     pause.evaluate("(button) => button.click()")
     lead.locator(".nd-feature-image").dispatch_event("error")
-    assert lead.locator(".nd-feature-icon").get_attribute("src").endswith("/ai-sparkles.svg")
+    assert lead.locator(".nd-feature-image").is_hidden()
+    assert lead.get_attribute("data-thumbnail") == "computing"
+    media = lead.locator(".nd-feature-media")
+    assert media.is_visible()
+    assert "news-thumbnails.webp" in media.evaluate("(el) => getComputedStyle(el).backgroundImage")
+    assert board.locator("#careerNewsPool [data-thumbnail='security']").count() == 1
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     board.locator("#careerNewsNextBtn").evaluate("(button) => button.click()")
     assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
-    assert lead.locator(".nd-feature-icon").get_attribute("src").endswith("/role.svg")
+    assert lead.get_attribute("data-thumbnail") == "workplace"
+    assert lead.locator(".nd-feature-image").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     summary = lead.locator(".nd-story-summary").bounding_box()
     byline = lead.locator(".nd-story-bottom").bounding_box()
