@@ -194,8 +194,7 @@ async function onResumeFileSelected(event) {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve(data);
         } else {
-          const error = new Error(data.message || `请求失败：${xhr.status}`);
-          error.status = xhr.status;
+          const error = Object.assign(new Error(data.message || `请求失败：${xhr.status}`), { status: xhr.status });
           reject(error);
         }
       };

@@ -5,7 +5,8 @@
     "dev": "vite",
     "build": "node scripts/sync-vendors.mjs && vite build",
     "sync:vendors": "node scripts/sync-vendors.mjs",
-    "check": "node scripts/check-static.mjs",
+    "check": "node scripts/check-static.mjs && npm run typecheck",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.legacy.json --noEmit",
     "test:unit": "node tests/report-agent-result.cjs && node tests/resume-evidence-scores.cjs",
     "preview": "vite preview",
     "test:browser": "node tests/app-cursor.cjs && node tests/report-agent-console.cjs"
@@ -13,14 +14,15 @@
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "chart.js": "^4.5.0",
-    "fuse.js": "^7.1.0",
-    "gsap": "^3.15.0"
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.27"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
     "playwright": "1.60.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "typescript": "^5.6.3",
     "vite": "^6.2.0"
   }
 }

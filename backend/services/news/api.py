@@ -1,9 +1,15 @@
 """职业资讯与资讯知识库接口。"""
 from flask import Blueprint, jsonify, request
 
-from ..job_data import cache_json_response
 from .career_news import get_career_news_payload
 from .news_kb import get_kb_stats, search_news_kb
+
+
+def cache_json_response(payload, max_age=900, status=200):
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["Cache-Control"] = f"public, max-age={max_age}"
+    return response
 
 
 def create_blueprint():

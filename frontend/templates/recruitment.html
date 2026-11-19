@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>招聘信息采集 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='recruitment.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='product-theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='recruitment.js') }}" defer></script>
 </head>
@@ -225,6 +228,9 @@
             </section>
         </div>
     </main>
+    {% macro rule_icon(name, tone='') -%}
+        <svg class="recruitment-rule-icon {{ tone }}" aria-hidden="true" focusable="false"><use href="#rule-icon-{{ name }}"></use></svg>
+    {%- endmacro %}
     <dialog id="recruitmentCleaningDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentRulesTitle">
         <svg class="recruitment-rule-symbols" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
             <symbol id="rule-icon-brush" viewBox="0 0 24 24"><path d="m13 15 7.4-8.9a1.8 1.8 0 0 0-2.5-2.5L9 11m4 4-4-4m4 4c0 3.6-2.5 5-5.5 5H3c1.7-1.4 2.4-2.7 2.5-4.2C5.7 13 7 11 9 11"/></symbol>
@@ -239,9 +245,6 @@
         </svg>
         <header><h2 id="recruitmentRulesTitle" class="recruitment-rule-heading">{{ rule_icon('brush', 'rule-amber') }}清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentCleaningForm" class="recruitment-card-body">
-    {% macro rule_icon(name, tone='') -%}
-        <svg class="recruitment-rule-icon {{ tone }}" aria-hidden="true" focusable="false"><use href="#rule-icon-{{ name }}"></use></svg>
-    {%- endmacro %}
             <label>清洗方向<select id="recruitmentRulesProfile" aria-label="清洗方向">
                 {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
             </select></label>

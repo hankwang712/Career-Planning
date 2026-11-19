@@ -6,7 +6,9 @@
     <meta name="color-scheme" content="light">
     <title>AI 生涯助手 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png">
+    {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='chat-markdown.js') }}" defer></script>
     <script src="{{ url_for('static', filename='chat-typing.js') }}" defer></script>

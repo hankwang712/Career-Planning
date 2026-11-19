@@ -18,7 +18,6 @@ EXPECTED_ROUTES = {
     "/api/career-report/export", "/api/career-report/feedback", "/api/career-report/source",
     "/api/career-report/snapshot/save", "/api/career-report/snapshot/check",
     "/api/career-report/tracker/sync", "/api/career-report/tracker/item",
-    "/api/cities", "/api/jobs", "/api/jobs/bootstrap", "/api/job-detail",
     "/api/career-interview", "/api/career-interview/finish", "/api/mbti-clarifier", "/api/deep-test-analysis",
 }
 
@@ -120,20 +119,6 @@ def test_polish_page_links_back_to_user_center(make_account):
     account = make_account()
     html = account.get("/user-center/career-report/polish").get_data(as_text=True)
     assert re.search(r'__CAREER_REPORT_POLISH_RETURN__ = "/user-center/workspace#report-workspace"', html)
-
-
-def test_jobs_api_serves_city_data(client):
-    cities = client.get("/api/cities").get_json()
-    assert cities and isinstance(cities, list)
-    jobs = client.get(f"/api/jobs?city={cities[0]}&view=summary").get_json()
-    assert jobs and "job_id" in jobs[0]
-    detail = client.get(f"/api/job-detail?id={jobs[0]['job_id']}")
-    assert detail.status_code == 200
-
-
-@pytest.mark.parametrize("job_id,status", [("", 400), ("no-colon", 400), ("北京:abc", 400), ("不存在的城市:0", 404), ("北京:99999999", 404)])
-def test_job_detail_rejects_bad_ids(client, job_id, status):
-    assert client.get("/api/job-detail", query_string={"id": job_id}).status_code == status
 
 
 def test_news_search_requires_a_query(client):

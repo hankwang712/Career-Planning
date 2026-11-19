@@ -129,7 +129,7 @@ function updateLiveClock() {
   let greeting = "晚上好";
   if (h >= 6 && h < 12) greeting = "早上好";
   if (h >= 12 && h < 18) greeting = "下午好";
-  const dayIndex = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
+  const dayIndex = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000);
   if (title) title.textContent = `${greeting}，${displayName}`;
   if (subtitle) subtitle.textContent = `今天是 ${formatDateCN(now)}，年度第 ${dayIndex} 天，系统正在用最新测评、访谈和基础信息更新你的职业画像。`;
 }
@@ -255,7 +255,7 @@ var showSection = function(sectionId) {
     void refreshResumeProfile(true);
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
-}
+};
 
 function checkReportReadiness() {
   const profile = appState.derivedProfile || deriveUnifiedProfile();
@@ -372,17 +372,3 @@ function shareReport() { showToast("Share link ready", "You can now share this r
 function scheduleConsultation() { showToast("Consultation", "Booking flow is now available.", "info", 1700); }
 
 function showNodeDetail(nodeName) { showToast("Node details", `${nodeName} details are available.`, "info", 1700); }
-
-// --------------------------------------------------
-//  从服务器加载岗位数据
-// --------------------------------------------------
-async function openDatasetBrowser(options = {}) {
-  try {
-    await loadScriptOnce("/static/dataset-browser.js", "dataset-browser");
-    if (appState.currentSection !== "jobs") return;
-    await window.DatasetBrowser?.open(options);
-  } catch (error) {
-    const status = document.getElementById("datasetStatus");
-    if (status) status.textContent = `数据浏览器加载失败，请刷新重试：${error.message}`;
-  }
-}

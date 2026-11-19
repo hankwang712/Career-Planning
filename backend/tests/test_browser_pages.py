@@ -734,6 +734,42 @@ def test_resume_workshop_import_preview_and_reopen(logged_in_page, live_server):
     assert errors == [], "\n".join(errors)
 
 
+def test_resume_form_entries_fill_add_delete_and_reopen(logged_in_page, live_server):
+    page = logged_in_page
+    errors = collect_errors(page)
+    page.goto(live_server + "/user-center/resumes")
+    project = page.locator(".re-section").nth(2)
+    project.get_by_role("button", name="项目经历", exact=True).click()
+    entry = project.locator(".re-entry").first
+    entry.locator("[data-entry=name]").fill("校园二手交易平台")
+    entry.locator("[data-entry=role]").fill("后端负责人")
+    entry.locator("[data-entry=start]").fill("2025.01")
+    entry.locator("[data-entry=end]").fill("2025.06")
+    entry.locator("[data-entry=content]").fill("负责接口开发\n接口性能提升")
+    formatted = "校园二手交易平台 | 后端负责人 | 2025.01–2025.06\n- 负责接口开发\n- 接口性能提升"
+    assert project.locator("[data-section-content]").input_value() == formatted
+    project.get_by_role("button", name="＋ 添加项目经历").click()
+    assert project.locator(".re-entry").count() == 2
+    assert project.locator("[data-entry-index]").nth(1).inner_text() == "项目经历 2"
+    second = project.locator(".re-entry").nth(1)
+    second.locator("[data-entry=name]").fill("推荐系统课程设计")
+    second.get_by_role("button", name="删除这段经历").click()
+    assert project.locator(".re-entry").count() == 1
+    assert project.locator("[data-section-content]").input_value() == formatted
+    page.locator("[name=title]").fill("表单简历")
+    page.get_by_role("button", name="保存", exact=True).click()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    page.reload()
+    page.get_by_text("已保存的简历", exact=True).wait_for()
+    reopened = page.locator(".re-section").nth(2)
+    assert reopened.locator("[data-entry=name]").first.input_value() == "校园二手交易平台"
+    assert reopened.locator("[data-entry=start]").first.input_value() == "2025.01"
+    assert reopened.locator("[data-entry=end]").first.input_value() == "2025.06"
+    assert reopened.locator("[data-entry=content]").first.input_value() == "- 负责接口开发\n- 接口性能提升"
+    assert reopened.locator("[data-section-content]").input_value() == formatted
+    assert errors == [], "\n".join(errors)
+
+
 def test_switching_sections_works(logged_in_page, live_server):
     errors = collect_errors(logged_in_page)
     logged_in_page.goto(live_server + "/main.html#forum", wait_until="load")

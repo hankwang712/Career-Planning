@@ -24,7 +24,7 @@ import httpx
 
 from .vendor.sync_tencent_docs import field_value, is_expired, map_industry, parse_sheet
 from ..utils.recruitment_dates import publication_state
-from .job_sources import deduplicate_jobs, read_jobhunter_jobs
+from .job_sources import deduplicate_jobs, read_jobhunter_jobs, read_recruitment_jobs
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT.parents[2] / "data" / "app_data" / "recruitment-radar"
@@ -597,15 +597,16 @@ def match_score(job, roles=(), cities=(), companies=(), recruitment_types=(), qu
     return score or 1
 
 
-async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
+async def search_jobs(intent, request, limit=30, read_limit=5, publish=None, owner=None):
     async def radar_data():
         try:
             return await sync_jobs(publish=publish)
         except (httpx.HTTPError, OSError, ValueError):
             cached = read_jobs()
-            cached["limitations"].append("公开招聘汇总同步未完成，本轮使用汇总缓存及本地岗位。")
+            cached["limitations"].append("Radar 同步未完成，本轮使用其缓存及本地采集岗位。")
             return {**cached, "status": "partial"}
-    data, market = await asyncio.gather(radar_data(), asyncio.to_thread(read_jobhunter_jobs))
+    data, market, workbench = await asyncio.gather(
+        radar_data(), asyncio.to_thread(read_jobhunter_jobs), asyncio.to_thread(read_recruitment_jobs, owner))
     market_jobs = []
     for row in market["jobs"]:
         job = normalize_job(row, source_type="jobhunter", source_name=row["source_name"], snapshot_at=row["snapshot_at"])
@@ -613,17 +614,25 @@ async def search_jobs(intent, request, limit=30, read_limit=5, publish=None):
             job.update(source_record_id=row["source_record_id"], salary=row.get("salary", ""),
                        published_at_source=row["published_at_source"])
             market_jobs.append(job)
+    workbench_jobs = []
+    for row in workbench["jobs"]:
+        job = normalize_job(row, source_type="recruitment", source_name=row["source_name"], snapshot_at=row["snapshot_at"])
+        if job:
+            job.update(source_record_id=row["source_record_id"], salary=row.get("salary", ""),
+                       published_at_source=row["published_at_source"], detail_state=row["detail_state"])
+            workbench_jobs.append(job)
     radar_count = len(data["jobs"])
-    combined = [*data["jobs"], *market_jobs]
+    combined = [*data["jobs"], *market_jobs, *workbench_jobs]
     data["jobs"] = deduplicate(combined)
-    data["limitations"] = list(dict.fromkeys([*data["limitations"], *market["limitations"]]))
+    data["limitations"] = list(dict.fromkeys([*data["limitations"], *market["limitations"], *workbench["limitations"]]))
     merge_stats = {"radar_records": radar_count, "jobhunter_records": len(market_jobs),
+                   "recruitment_records": len(workbench_jobs),
                    "merged_records": len(data["jobs"]), "duplicates_removed": len(combined) - len(data["jobs"]),
-                   "jobhunter_status": market["status"]}
-    if market["status"] == "unavailable":
+                   "jobhunter_status": market["status"], "recruitment_status": workbench["status"]}
+    if market["status"] == "unavailable" or workbench["status"] == "unavailable":
         data["status"] = "partial"
     if publish:
-        await publish("merge", title="合并公开招聘汇总与本地岗位", **merge_stats)
+        await publish("merge", title="合并公开招聘汇总、本地岗位库与采集岗位", **merge_stats)
     roles = list(dict.fromkeys([*intent.get("roles", []), *intent.get("expanded_roles", [])]))
     excluded = {tuple(row) for row in intent.get("_excluded_records", []) if isinstance(row, (list, tuple)) and len(row) == 5}
     ranked, audits = [], []

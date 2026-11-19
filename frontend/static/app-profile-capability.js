@@ -466,6 +466,6 @@ function renderCapabilityCorrelation(profile, roles) {
   }).join("");
 }
 
-function renderProfileWorkspace() {
+function renderProfileWorkspace(_profile, _roles) {
   window.AssessmentCenter?.refresh();
 }

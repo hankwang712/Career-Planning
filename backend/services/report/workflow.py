@@ -164,7 +164,8 @@ async def _execute(username, report_id, inputs, runtime, callback, profile=None,
         inputs = validate_report_request(supplied, markdown)
         document_metadata = {key: document[key] for key in ("status", "warnings", "processed_pages", "total_pages") if key in document}
 
-    config = {"configurable": {"thread_id": _thread_id(username, report_id)}, "recursion_limit": 100}
+    config = {"configurable": {"thread_id": _thread_id(username, report_id)},
+              "metadata": {"username": username}, "recursion_limit": 100}
     activity_options = {"agent_status_callback": agent_status_callback} if agent_status_callback else {}
     async with _graph(runtime, callback, operation_store=operation_store, **activity_options) as graph:
         continuation = runtime.get("continuation")

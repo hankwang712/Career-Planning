@@ -22,8 +22,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>我的简历 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='resume-editor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='user-center-sidebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='resume-photo-cropper.js') }}" defer></script>
     <script src="{{ url_for('static', filename='resume-editor.js') }}" defer></script>
@@ -113,7 +115,8 @@
                 </div>
             </div>
             <div class="re-section-body" hidden>
-                <div class="re-editor">
+                <div class="re-form" data-form-area hidden></div>
+                <div class="re-editor" data-text-area>
                     <div class="re-format-bar" role="group" aria-label="Markdown 格式">
                         <button type="button" data-format="heading" title="小标题" aria-label="小标题">H</button>
                         <button type="button" data-format="bold" title="粗体" aria-label="粗体"><b>B</b></button>
@@ -129,6 +132,32 @@
                 <div class="re-section-footer"><button type="button" class="re-button re-format-action" data-tidy>{{ icon('wand') }} 自动排版</button></div>
             </div>
         </section>
+    </template>
+    <template id="resumeEntryTemplate">
+        <div class="re-entry">
+            <div class="re-entry-head">
+                <span class="re-entry-index" data-entry-index></span>
+                <div class="re-entry-actions">
+                    <button type="button" class="re-icon-button" data-entry-move="-1" aria-label="上移这段经历" title="上移">↑</button>
+                    <button type="button" class="re-icon-button" data-entry-move="1" aria-label="下移这段经历" title="下移">↓</button>
+                    <button type="button" class="re-icon-button re-danger" data-entry-remove aria-label="删除这段经历" title="删除">{{ icon('trash') }}</button>
+                </div>
+            </div>
+            <div class="re-entry-fields">
+                <label><span data-entry-label="name"></span><input data-entry="name" maxlength="120" autocomplete="off"></label>
+                <label><span data-entry-label="role"></span><input data-entry="role" maxlength="120" autocomplete="off"></label>
+                <label><span data-entry-label="start"></span><input data-entry="start" maxlength="40" autocomplete="off" placeholder="2025.01"></label>
+                <label><span data-entry-label="end"></span><input data-entry="end" maxlength="40" autocomplete="off"></label>
+            </div>
+            <label class="re-entry-content"><span data-entry-label="content"></span><textarea data-entry="content" rows="3" maxlength="12000"></textarea></label>
+        </div>
+    </template>
+    <template id="resumeItemTemplate">
+        <div class="re-entry re-item">
+            <span class="re-entry-index" data-entry-index></span>
+            <input data-entry="text" maxlength="300" autocomplete="off">
+            <button type="button" class="re-icon-button re-danger" data-entry-remove aria-label="删除这一条" title="删除">×</button>
+        </div>
     </template>
     <dialog id="resumeImport" class="re-dialog" aria-labelledby="resumeImportTitle">
         <form id="resumeImportForm">

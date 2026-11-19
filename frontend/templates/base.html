@@ -5,37 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智航生涯｜AI 大学生职业规划智能体</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}" type="image/png" sizes="any">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    {% include "partials/head_fonts.html" %}
     {{ vite_asset_tags('src/entries/workspace.js') }}
     <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
-    <style>
-      :root {
-        --app-font-stack: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-        --app-display-stack: "Space Grotesk", "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", sans-serif;
-        --app-editorial-stack: "Noto Serif SC", "Songti SC", "STSong", serif;
-        --product-accent: #355b82;
-        --product-accent-hover: #274766;
-        --product-bg: #edf2f7;
-        --product-card: #f8fbff;
-        --product-text: #1f2c3a;
-        --product-muted: #617487;
-        --product-border: #d6e0ea;
-      }
-
-      html,
-      body,
-      button,
-      input,
-      textarea,
-      select {
-        font-family: var(--app-font-stack);
-      }
-
-    </style>
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage-refresh.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='career-process.css') }}">
@@ -43,6 +16,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='career-news-brief.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='product-theme.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
     {% include "partials/app_cursor.html" %}
 </head>
 <body class="bg-gray-50 scroll-smooth" data-legacy-features="eager">
@@ -58,7 +32,6 @@
         <!-- 仪表盘 -->
 
         {% include "sections/dashboard.html" %}
-        {% include "sections/jobs.html" %}
         {% include "sections/profile.html" %}
         {% include "sections/report.html" %}
 
@@ -66,7 +39,6 @@
 
     {% include "sections/career_interview_modal.html" %}
 
-    {% include "sections/job_modal.html" %}
     {% include "sections/assessment_modal.html" %}
 
     {% include "partials/workspace_guide.html" %}
@@ -107,9 +79,14 @@
                 <div>
                     <h4 class="font-semibold mb-3">联系我们</h4>
                     <ul class="space-y-2 text-sm text-gray-400">
-                        <li>📧 wanghank712@163.com</li>
-                        <li>📞 400-XXX-XXXX</li>
-                        <li>🏢 杭州市西湖区文一西路88号</li>
+                        <li class="flex items-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                            wanghank712@163.com
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                            杭州市西湖区文一西路88号
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -242,15 +219,14 @@
     </script>
     <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+    <script src="{{ url_for('static', filename='vendor/gsap.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/lenis.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-review.js') }}" defer></script>
     {% set defer_attr = " defer" %}{% include 'partials/app_scripts.html' %}
     <script src="{{ url_for('static', filename='workspace-guide-overlay.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='job-market.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-reader-layout.js') }}" defer></script>
     <script src="{{ url_for('static', filename='career-report-workspace.js') }}" defer></script>
     <script src="{{ url_for('static', filename='report-link-previews.js') }}" defer></script>
@@ -259,7 +235,7 @@
     <script src="{{ url_for('static', filename='assessment-hub.js') }}" defer></script>
     <script src="{{ url_for('static', filename='assessment-pet.js') }}" defer></script>
     <script src="{{ url_for('static', filename='deep-test-hub.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='jobs-analytics.js') }}" defer></script>
     <script src="{{ url_for('static', filename='tour.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
 </body>
 </html>

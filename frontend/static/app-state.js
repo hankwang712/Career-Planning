@@ -17,42 +17,12 @@ const appState = {
   profileCompletion: 0,
   timersStarted: false,
   lastGreetingKey: "",
-  lastJobFilterKey: "",
   dashboardRadarChart: null,
   profileRadarChart: null,
   derivedProfile: null,
   matchingRoles: [],
   focusedRoleId: ""
 };
-
-// 岗位数据（从 /api/jobs 加载）
-let allJobsData = [];
-
-let filteredJobsData = [];
-
-let jobCurrentPage = 1;
-
-const JOB_PAGE_SIZE  = 12;
-
-let fuseIndex = null;
-
-/** 城市招聘全景分析：仅展示 boss_info 城市；由 bootstrap 的 boss_cities 注入 */
-let jobsAnalyticsBossCities = null;
-
-/** 各 boss 城市合并的补充岗位条数，用于全景面板「热门」标注 */
-let jobsAnalyticsCitySupplementExtra = null;
-
-let jobsGeoAssetsPromise = null;
-
-const JOBS_CACHE_TTL_MS = 15 * 60 * 1000;
-
-const JOBS_CACHE_VERSION = "v6";
-
-const JOBS_CITIES_CACHE_KEY = `ms_jobs_cities_${JOBS_CACHE_VERSION}`;
-
-const JOBS_LIST_CACHE_PREFIX = `ms_jobs_list_${JOBS_CACHE_VERSION}_`;
-
-const JOBS_DETAIL_CACHE_PREFIX = `ms_jobs_detail_${JOBS_CACHE_VERSION}_`;
 
 const userWorkspaceState = {
   currentUser: null,

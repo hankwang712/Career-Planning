@@ -77,61 +77,12 @@ function showToast(title, text = "", type = "info", duration = 2200) {
   }, duration);
 }
 
-function loadScriptOnce(src, key) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[data-script-key="${key}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === "true") {
-        resolve();
-        return;
-      }
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error(`Failed to load ${key}`)), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = false;
-    script.dataset.scriptKey = key;
-    script.addEventListener("load", () => {
-      script.dataset.loaded = "true";
-      resolve();
-    }, { once: true });
-    script.addEventListener("error", () => reject(new Error(`Failed to load ${key}`)), { once: true });
-    document.body.appendChild(script);
-  });
-}
-
-async function ensureJobsGeoAssets() {
-  if (window.echarts && typeof window.initializeJobGeoInsights === "function") return;
-  if (!jobsGeoAssetsPromise) {
-    jobsGeoAssetsPromise = (async () => {
-      await loadScriptOnce("/static/vendor/echarts.min.js", "echarts");
-      await loadScriptOnce("/static/vendor/china.js", "china-map");
-      await loadScriptOnce("/static/jobs-geo.js", "jobs-geo");
-    })().catch((error) => {
-      jobsGeoAssetsPromise = null;
-      throw error;
-    });
-  }
-  return jobsGeoAssetsPromise;
-}
-
 function getDefaultCareerInterviewConfig() {
   return {
     base_url: "",
     api_key: "",
     model: "gpt-4o-mini"
   };
-}
-
-function safeJsonParse(raw, fallback) {
-  try {
-    return JSON.parse(raw);
-  } catch (_) {
-    return fallback;
-  }
 }
 
 function getCurrentUser() {
@@ -249,8 +200,7 @@ async function requestFormData(url, formData, options = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(payload.message || `请求失败：${response.status}`);
-    error.status = response.status;
+    const error = Object.assign(new Error(payload.message || `请求失败：${response.status}`), { status: response.status, code: payload.code });
     throw error;
   }
   return payload;
@@ -294,144 +244,4 @@ async function fetchActiveLlmRuntimeConfig(force = false) {
   const cached = userWorkspaceState.llmConfigs.career_interview;
   if (!force && cached && cached.configured) return cached;
   return fetchLlmStatus();
-}
-
-function readSessionCache(key) {
-  let raw = null;
-  try {
-    raw = sessionStorage.getItem(key);
-  } catch (error) {
-    console.warn("sessionStorage read failed", error);
-    return null;
-  }
-  const payload = safeJsonParse(raw, null);
-  if (!payload || typeof payload !== "object") return null;
-  if (Number(payload.expiresAt || 0) < Date.now()) {
-    try {
-      sessionStorage.removeItem(key);
-    } catch (error) {
-      console.warn("sessionStorage remove failed", error);
-    }
-    return null;
-  }
-  return payload.data ?? null;
-}
-
-function isStorageQuotaExceeded(error) {
-  if (!error) return false;
-  const name = String(error.name || "");
-  const code = Number(error.code || 0);
-  if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED") return true;
-  if (code === 22 || code === 1014) return true;
-  return /quota/i.test(String(error.message || ""));
-}
-
-function clearSessionCacheEntries(keysOrPrefixes = []) {
-  if (!Array.isArray(keysOrPrefixes) || keysOrPrefixes.length === 0) return;
-  const markers = keysOrPrefixes.map((item) => String(item || "")).filter(Boolean);
-  if (markers.length === 0) return;
-  const targets = [];
-  for (let i = 0; i < sessionStorage.length; i += 1) {
-    const key = sessionStorage.key(i);
-    if (!key) continue;
-    if (markers.some((marker) => key === marker || key.startsWith(marker))) {
-      targets.push(key);
-    }
-  }
-  targets.forEach((key) => {
-    try {
-      sessionStorage.removeItem(key);
-    } catch (error) {
-      console.warn("sessionStorage cleanup failed", error);
-    }
-  });
-}
-
-function writeSessionCache(key, data, ttlMs = JOBS_CACHE_TTL_MS) {
-  const payload = JSON.stringify({
-    expiresAt: Date.now() + ttlMs,
-    data
-  });
-  try {
-    sessionStorage.setItem(key, payload);
-    return;
-  } catch (error) {
-    if (!isStorageQuotaExceeded(error)) {
-      console.warn("sessionStorage write failed", error);
-      return;
-    }
-  }
-
-  clearSessionCacheEntries([JOBS_LIST_CACHE_PREFIX, JOBS_DETAIL_CACHE_PREFIX, JOBS_CITIES_CACHE_KEY]);
-  try {
-    sessionStorage.setItem(key, payload);
-  } catch (error) {
-    console.warn("sessionStorage quota exceeded, skip cache", error);
-  }
-}
-
-async function fetchJsonWithSessionCache(url, cacheKey, ttlMs = JOBS_CACHE_TTL_MS) {
-  const cached = readSessionCache(cacheKey);
-  if (cached) return cached;
-  const response = await fetch(resolveApiUrl(url), {
-    credentials: "include"
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.message || `Request failed: ${response.status}`);
-  }
-  writeSessionCache(cacheKey, payload, ttlMs);
-  return payload;
-}
-
-function buildJobSearchIndex() {
-  if (!window.Fuse || fuseIndex || allJobsData.length === 0) return;
-  fuseIndex = new Fuse(allJobsData, {
-    keys: [
-      { name: "岗位名称", weight: 0.4 },
-      { name: "公司名称", weight: 0.3 },
-      { name: "技能要求", weight: 0.15 },
-      { name: "职位类别", weight: 0.1 },
-      { name: "公司行业", weight: 0.05 }
-    ],
-    threshold: 0.7,
-    distance: 200,
-    includeScore: true,
-    ignoreLocation: true,
-    minMatchCharLength: 1
-  });
-}
-
-function scheduleGeoInsightsInit(jobs) {
-  if (typeof window.initializeJobGeoInsights !== "function") return;
-  const runner = () => window.initializeJobGeoInsights(jobs);
-  if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(runner, { timeout: 1200 });
-    return;
-  }
-  window.setTimeout(runner, 16);
-}
-
-function scheduleAnalyticsInit(jobs) {
-  if (typeof window.initJobsAnalytics !== "function") return;
-  const opts = {};
-  if (Array.isArray(jobsAnalyticsBossCities) && jobsAnalyticsBossCities.length) {
-    opts.bossCities = jobsAnalyticsBossCities;
-  }
-  if (jobsAnalyticsCitySupplementExtra && typeof jobsAnalyticsCitySupplementExtra === "object") {
-    opts.citySupplementExtra = jobsAnalyticsCitySupplementExtra;
-  }
-  const runner = () => window.initJobsAnalytics(jobs, opts);
-  if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(runner, { timeout: 2000 });
-    return;
-  }
-  window.setTimeout(runner, 200);
-}
-
-async function getJobDetail(jobId) {
-  return fetchJsonWithSessionCache(
-    `/api/job-detail?id=${encodeURIComponent(jobId)}`,
-    `${JOBS_DETAIL_CACHE_PREFIX}${jobId}`
-  );
 }

@@ -3,6 +3,7 @@
 
 function resumeMarkdownSections(raw) {
   const lines = String(raw || "").replace(/\r\n/g, "\n").split("\n");
+  /** @type {{type: string; [key: string]: any}[]} */
   const blocks = [];
   let paragraphLines = [];
   let listItems = [];

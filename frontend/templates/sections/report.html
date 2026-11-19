@@ -30,23 +30,25 @@
 
         <form id="reportWorkflowInput" class="report-workflow-form report-wizard-stage" hidden onsubmit="event.preventDefault(); startCareerReportGeneration();">
             <div class="report-setup-fields">
-                <section class="report-setup-card" aria-labelledby="reportTargetsTitle">
-                    <div class="report-setup-card-heading">
+                <details class="report-setup-card" open aria-labelledby="reportTargetsTitle">
+                    <summary class="report-setup-card-heading">
                         <span class="report-setup-icon" aria-hidden="true"><img src="{{ url_for('static', filename='assets/icons/user-center-report/role.svg') }}" alt=""></span>
                         <h3 id="reportTargetsTitle">目标岗位</h3><span class="report-setup-badge is-required">必填</span>
-                    </div>
+                        <span class="report-setup-toggle" aria-hidden="true"></span>
+                    </summary>
                     <div class="report-setup-card-body">
                         <label>岗位或方向（每行一个，最多五个）
                           <textarea id="reportWorkflowTargets" rows="2" maxlength="1504" placeholder="例如：大模型应用开发工程师" aria-describedby="reportTargetHint" required></textarea>
                             <small id="reportTargetHint"></small>
                         </label>
                     </div>
-                </section>
-                <section class="report-setup-card" aria-labelledby="reportPreferencesTitle">
-                    <div class="report-setup-card-heading">
+                </details>
+                <details class="report-setup-card" open aria-labelledby="reportPreferencesTitle">
+                    <summary class="report-setup-card-heading">
                         <span class="report-setup-icon is-preferences" aria-hidden="true"><img src="{{ url_for('static', filename='assets/icons/user-center-report/fit.svg') }}" alt=""></span>
                         <h3 id="reportPreferencesTitle">求职偏好</h3><span class="report-setup-badge">选填</span>
-                    </div>
+                        <span class="report-setup-toggle" aria-hidden="true"></span>
+                    </summary>
                     <div class="report-setup-card-body">
                         <fieldset class="report-city-options">
                             <legend>意向城市（可多选）</legend>
@@ -75,12 +77,13 @@
                             <textarea id="reportWorkflowPreferences" rows="2" maxlength="4500" placeholder="可补充其他城市、行业或通勤限制"></textarea>
                         </label>
                     </div>
-                </section>
-                <section class="report-setup-card" aria-labelledby="reportScheduleTitle">
-                    <div class="report-setup-card-heading">
+                </details>
+                <details class="report-setup-card" open aria-labelledby="reportScheduleTitle">
+                    <summary class="report-setup-card-heading">
                         <span class="report-setup-icon is-schedule" aria-hidden="true"><img src="{{ url_for('static', filename='assets/icons/user-center-report/time.svg') }}" alt=""></span>
                         <h3 id="reportScheduleTitle">时间安排</h3><span class="report-setup-badge">选填</span>
-                    </div>
+                        <span class="report-setup-toggle" aria-hidden="true"></span>
+                    </summary>
                     <div class="report-setup-card-body report-availability-fields">
                         <label>实习到岗时间
                             <select id="reportWorkflowArrival">
@@ -104,7 +107,7 @@
                             <small id="reportPublishedAfterHint">查找该日期起发布的招聘信息，发布日期未核实的线索会单独标注。</small>
                         </label>
                     </div>
-                </section>
+                </details>
             </div>
             <aside class="report-setup-card report-setup-submit" aria-labelledby="reportSetupSubmitTitle">
                 <div class="report-setup-card-heading">

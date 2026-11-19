@@ -1,13 +1,19 @@
 """Read JobHunter's existing store and merge recruitment leads without writing either source."""
 from contextlib import closing
+from datetime import datetime
 from pathlib import Path
+import os
 import re
 import sqlite3
 import unicodedata
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
-MARKET_DB = Path(__file__).resolve().parents[3] / "data/app_data/job_market.sqlite3"
+_DATA_ROOT = Path(os.environ.get("CAREER_APP_DATA_DIR") or Path(__file__).resolve().parents[3] / "data/app_data")
+MARKET_DB = _DATA_ROOT / "job_market.sqlite3"
+APP_DB = _DATA_ROOT / "app.db"
+RECRUITMENT_SOURCE_LABELS = {"boss": "BOSS 直聘", "51job": "前程无忧", "zhilian": "智联招聘",
+                             "liepin": "猎聘", "xiaohongshu": "小红书招聘线索"}
 TRACKING_KEYS = {"source", "sourcetoken", "from", "ref", "refer", "referer", "sessionid", "spm", "trackingid"}
 
 
@@ -134,4 +140,52 @@ def read_jobhunter_jobs(path=None, limit=10000):
     limitations = ["本地岗位库来自采集记录。公告发布日期和开放状态需另行核实。"] if jobs else []
     if limited:
         limitations.append(f"本地岗位库本轮最多读取最近采集的 {limit} 条记录。")
+    return {"jobs": jobs, "status": "ok" if jobs else "empty", "limitations": limitations}
+
+
+def read_recruitment_jobs(owner, path=None, limit=10000):
+    """Read the recruitment workbench's locally cached listings for one account.
+
+    这些是用户在「招聘信息采集」工作台实时采集并缓存的岗位，构成随采集更新的实时岗位库；
+    已淘汰（rejected）的条目不进入检索。只读，不修改采集缓存。
+    """
+    if not owner:
+        return {"jobs": [], "status": "empty", "limitations": []}
+    path = Path(path or APP_DB)
+    if not path.is_file():
+        return {"jobs": [], "status": "not_collected", "limitations": []}
+    try:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT l.source, l.url_key, l.title, l.company, l.location, l.salary,
+                       l.description, l.url, l.updated_at, d.description AS detail
+                FROM recruitment_listings l
+                LEFT JOIN recruitment_job_details d
+                       ON d.owner = l.owner AND d.source = l.source AND d.url_key = l.url_key
+                LEFT JOIN recruitment_cleaning_results c
+                       ON c.owner = l.owner AND c.source = l.source AND c.url_key = l.url_key
+                WHERE l.owner = ? AND (c.status IS NULL OR c.status <> 'rejected')
+                ORDER BY l.updated_at DESC LIMIT ?
+            """, (owner, limit + 1)).fetchall()
+    except sqlite3.Error:
+        return {"jobs": [], "status": "unavailable", "limitations": ["招聘信息采集缓存暂不可读取，本轮保留其他来源。"]}
+    limited = len(rows) > limit
+    jobs = []
+    for row in rows[:limit]:
+        row = dict(row)
+        updated = row["updated_at"]
+        updated_at = datetime.fromtimestamp(updated).isoformat(timespec="seconds") if updated else ""
+        detail = str(row["detail"] or "").strip()
+        jobs.append({"company": row["company"], "role": row["title"], "city": row["location"],
+            "degree": "", "batch": "", "deadline": "",
+            "url": row["url"], "announcement_url": "", "industry": "",
+            "description": detail or row["description"] or "", "published_at": "",
+            "updated_at": updated_at, "snapshot_at": updated_at,
+            "source_type": "recruitment", "source_name": "招聘信息采集 · " + RECRUITMENT_SOURCE_LABELS.get(row["source"], row["source"]),
+            "source_record_id": row["url_key"], "source_sheet": "", "detail_state": "read" if detail else "not_read",
+            "salary": row["salary"], "published_at_source": "unverified"})
+    limitations = ["招聘信息采集数据来自本机实时采集缓存；采集时间不代表公告发布日期或岗位仍开放。"] if jobs else []
+    if limited:
+        limitations.append(f"招聘信息采集中本轮最多读取最近缓存的 {limit} 条记录，历史岗位覆盖可能不完整。")
     return {"jobs": jobs, "status": "ok" if jobs else "empty", "limitations": limitations}

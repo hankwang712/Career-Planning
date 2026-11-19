@@ -214,8 +214,12 @@ def inline_markup(text):
     return "".join(parts)
 
 
+WORK_TITLES = {"工作经历", "工作经验", "职业经历", "实习经历", "实习经验"}
+
+
 def section_lines(section):
     project = section["title"] in {"项目经历", "项目经验"}
+    work = section["title"] in WORK_TITLES
     education = section["title"] in {"教育经历", "教育背景"}
     previous_blank = False
     for raw in section["content"].splitlines():
@@ -223,7 +227,7 @@ def section_lines(section):
         if not line:
             previous_blank = True
             continue
-        separator = '<p class="project-gap"> </p>' if project and previous_blank else ""
+        separator = '<p class="project-gap"> </p>' if (project or work) and previous_blank else ""
         previous_blank = False
         columns = [cell.strip() for cell in re.split(r"[|｜]", line)]
         if section["title"] == "获奖情况" and len(columns) == 2 and all(col.startswith("- ") for col in columns):
@@ -231,9 +235,9 @@ def section_lines(section):
                 f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt">•　{inline_markup(col[2:])}</td>'
                 for ratio, col in zip((.52, .48), columns)
             ) + '</tr></table>'
-        elif (project or education) and len(columns) == 3 and all(columns) and not re.match(r"^[-*•]|^\d+\.", line):
+        elif (project or work or education) and len(columns) == 3 and all(columns) and not re.match(r"^[-*•]|^\d+\.", line):
             name, role, date = (inline_markup(column) for column in columns)
-            ratios = (0.63, 0.17, 0.20) if project else (0.36, 0.43, 0.21)
+            ratios = (0.63, 0.17, 0.20) if project else (0.52, 0.28, 0.20) if work else (0.36, 0.43, 0.21)
             left, middle, right = (ENTRY_WIDTH * ratio for ratio in ratios)
             yield separator + (f'<table class="entry"><tr><td style="width:{left:.1f}pt"><strong>{name}</strong></td>'
                                f'<td style="width:{middle:.1f}pt" class="role">{role}</td>'
@@ -312,7 +316,9 @@ def document_html(document, compact):
         if not section["content"]:
             continue
         heading = text_markup(section["title"])
-        klass = "project" if section["title"] in {"项目经历", "项目经验"} else "compact-section" if section["title"] in {"获奖情况", "科研成果"} else "section"
+        klass = ("project" if section["title"] in {"项目经历", "项目经验"}
+                 else "work" if section["title"] in WORK_TITLES
+                 else "compact-section" if section["title"] in {"获奖情况", "科研成果"} else "section")
         body.append(f'<div class="{klass}"><h2>{heading}</h2>')
         body.extend(section_lines(section))
         body.append("</div>")
@@ -343,8 +349,8 @@ def document_html(document, compact):
     .entry .date {{text-align: right; padding-right: 0;}}
     .bullet {{padding-left: 13pt; text-indent: -13pt;}}
     .compact-section p, .awards td {{font-size: 9.8pt; line-height: 1.27;}}
-    .project p {{font-size: 10.15pt; line-height: {1.32 if compact else 1.41}; margin-bottom: {1.2 if compact else 2}pt;}}
-    .project .project-gap {{line-height: .45; margin-bottom: 3pt;}}
+    .project p, .work p {{font-size: 10.15pt; line-height: {1.32 if compact else 1.41}; margin-bottom: {1.2 if compact else 2}pt;}}
+    .project .project-gap, .work .project-gap {{line-height: .45; margin-bottom: 3pt;}}
     </style></head><body>{''.join(body)}</body></html>"""
 
 

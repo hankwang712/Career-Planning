@@ -1,5 +1,5 @@
 :root {
-    font: 14px/1.5 system-ui, "Microsoft YaHei", sans-serif;
+    font: 14px/1.5 var(--app-font-stack, system-ui, "Microsoft YaHei", sans-serif);
     color: #19283e;
     background: #f5f7fa;
     --border: #e0e7f0;

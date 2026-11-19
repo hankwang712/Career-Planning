@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>简历深度审计报告</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/index.css" rel="stylesheet" media="print" onload="this.media='all'">
-<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.16/index.css" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
 <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='resume-6html.css') }}">
@@ -929,6 +927,7 @@ body.resume-deep-audit-standalone .main-content {
   50% { transform: translateY(-20px) rotate(10deg); }
 }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
     {% include "partials/app_cursor.html" %}
 </head>
 <body class="resume-deep-audit-standalone">

@@ -13,7 +13,7 @@
     --hover:#f0f5fc;
     --chat-content-width:1080px;
     --chat-gutter:clamp(24px,3vw,56px);
-    font-family:"Plus Jakarta Sans","Noto Sans SC","Microsoft YaHei",sans-serif;
+    font-family:var(--app-font-stack,"Noto Sans SC","Microsoft YaHei",sans-serif);
     font-synthesis:none;
 }
 

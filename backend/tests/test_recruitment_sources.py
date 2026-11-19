@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from backend.advisor.radar import client
-from backend.advisor.radar.job_sources import canonical_url, deduplicate_jobs, read_jobhunter_jobs
+from backend.advisor.radar.job_sources import canonical_url, deduplicate_jobs, read_jobhunter_jobs, read_recruitment_jobs
 from backend.services.job_market.store import MarketStore
 
 
@@ -110,6 +110,81 @@ class CombinedSearchTests(unittest.IsolatedAsyncioTestCase):
                  lead(source_name="JobHunter", snapshot_at="2026-11-10", source_record_id="1", published_at="2020-01-01", published_at_source="jobhunter_listing")]}):
             result = await client.search_jobs({"roles": ["后端"], "published_after": "2026-10-01"}, "后端", read_limit=0)
         self.assertEqual(result["jobs"], [])
+
+
+def recruitment_db(path, owner="tester"):
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE recruitment_listings (
+            owner TEXT, source TEXT, url_key TEXT, title TEXT, company TEXT, location TEXT,
+            salary TEXT, description TEXT, url TEXT, updated_at REAL, PRIMARY KEY(owner, source, url_key));
+        CREATE TABLE recruitment_job_details (
+            owner TEXT, source TEXT, url_key TEXT, description TEXT, PRIMARY KEY(owner, source, url_key));
+        CREATE TABLE recruitment_cleaning_results (
+            owner TEXT, source TEXT, url_key TEXT, status TEXT, reason TEXT, PRIMARY KEY(owner, source, url_key));
+    """)
+    conn.execute("INSERT INTO recruitment_listings VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (owner, "boss", "https://zhipin.com/job/1", "后端工程师", "示例科技", "杭州", "20K",
+                  "短描述", "https://zhipin.com/job/1", 1763000000.0))
+    conn.execute("INSERT INTO recruitment_job_details VALUES (?,?,?,?)",
+                 (owner, "boss", "https://zhipin.com/job/1", "完整岗位描述：负责后端服务。"))
+    conn.execute("INSERT INTO recruitment_listings VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (owner, "boss", "https://zhipin.com/job/2", "淘汰岗位", "某公司", "北京", "",
+                  "描述", "https://zhipin.com/job/2", 1763000001.0))
+    conn.execute("INSERT INTO recruitment_cleaning_results VALUES (?,?,?,?,?)",
+                 (owner, "boss", "https://zhipin.com/job/2", "rejected", "淘汰"))
+    conn.execute("INSERT INTO recruitment_listings VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 ("other", "boss", "https://zhipin.com/job/3", "他人岗位", "他公司", "上海", "",
+                  "描述", "https://zhipin.com/job/3", 1763000002.0))
+    conn.commit()
+    conn.close()
+
+
+class RecruitmentCacheTests(unittest.TestCase):
+    def test_reads_live_cache_excludes_rejected_and_other_owner(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "app.db"
+            recruitment_db(path)
+            result = read_recruitment_jobs("tester", path)
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(len(result["jobs"]), 1)
+            job = result["jobs"][0]
+            self.assertEqual(job["role"], "后端工程师")
+            self.assertEqual(job["source_type"], "recruitment")
+            self.assertEqual(job["description"], "完整岗位描述：负责后端服务。")
+            self.assertEqual(job["detail_state"], "read")
+            self.assertTrue(job["source_name"].startswith("招聘信息采集"))
+            self.assertTrue(job["updated_at"])
+
+    def test_empty_owner_and_missing_store_are_nonfatal(self):
+        self.assertEqual(read_recruitment_jobs(None)["jobs"], [])
+        self.assertEqual(read_recruitment_jobs("")["status"], "empty")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "missing.db"
+            self.assertEqual(read_recruitment_jobs("tester", path)["status"], "not_collected")
+            path.write_text("invalid")
+            self.assertEqual(read_recruitment_jobs("tester", path)["status"], "unavailable")
+
+    def test_limit_caps_records(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "app.db"
+            recruitment_db(path)
+            self.assertEqual(read_recruitment_jobs("tester", path, limit=0)["jobs"], [])
+
+
+class WorkbenchMergeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_search_merges_workbench_cache_for_owner(self):
+        workbench = {"jobs": [lead(source_type="recruitment", source_name="招聘信息采集 · BOSS 直聘",
+                                   source_record_id="k1", published_at_source="unverified", detail_state="read")],
+                     "status": "ok", "limitations": []}
+        with patch.object(client, "sync_jobs", AsyncMock(return_value={"jobs": [], "status": "cached", "limitations": [], "mode": "live_cache"})), \
+             patch.object(client, "read_jobhunter_jobs", return_value={"jobs": [], "status": "empty", "limitations": []}), \
+             patch.object(client, "read_recruitment_jobs", return_value=workbench) as reader:
+            result = await client.search_jobs({"roles": ["后端"]}, "后端", read_limit=0, owner="tester")
+        reader.assert_called_once_with("tester")
+        self.assertEqual(result["merge_stats"]["recruitment_records"], 1)
+        self.assertEqual(len(result["jobs"]), 1)
+        self.assertEqual(result["jobs"][0]["source_type"], "recruitment")
 
 
 if __name__ == "__main__":

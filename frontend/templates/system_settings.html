@@ -97,7 +97,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>系统配置 · 智航生涯</title>
     <link rel="icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+    {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='system-settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
 </head>

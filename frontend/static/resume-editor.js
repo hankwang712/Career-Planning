@@ -16,6 +16,8 @@
   const quickField = document.getElementById("resumeQuickField");
   const badge = document.getElementById("resumeVersionBadge");
   const sectionTemplate = document.getElementById("resumeSectionTemplate");
+  const entryTemplate = document.getElementById("resumeEntryTemplate");
+  const itemTemplate = document.getElementById("resumeItemTemplate");
   const importDialog = document.getElementById("resumeImport");
   const importForm = document.getElementById("resumeImportForm");
   const importStatus = document.getElementById("resumeImportStatus");
@@ -43,6 +45,248 @@
       throw new Error(error.message || "请求未完成，请稍后重试。");
     }
     return response;
+  }
+
+  // 表单式栏目：经历条目（名称/角色/起止时间/内容）与逐条清单。
+  // 表单内容实时序列化回原有 Markdown 文本，预览、导出、导入和改写共用同一份数据。
+  const ENTRY_FORMS = {
+    "项目经历": {
+      kind: "entry", bullets: true,
+      labels: { name: "项目名称", role: "项目角色", start: "开始时间", end: "结束时间", content: "项目内容" },
+      placeholders: { name: "例如：校园二手交易平台", role: "例如：后端负责人", start: "2025.01", end: "2025.06 或 至今", content: "- 负责了什么\n- 取得了什么成果" },
+    },
+    "工作经历": {
+      kind: "entry", bullets: true,
+      labels: { name: "公司名称", role: "担任职位", start: "开始时间", end: "结束时间", content: "工作内容" },
+      placeholders: { name: "例如：某某科技有限公司", role: "例如：数据分析实习生", start: "2025.03", end: "2025.09 或 至今", content: "- 负责了什么\n- 取得了什么成果" },
+    },
+    "教育经历": {
+      kind: "entry", bullets: false,
+      labels: { name: "学校", role: "专业与学历", start: "开始时间", end: "结束时间", content: "补充说明（可选）" },
+      placeholders: { name: "例如：示例大学", role: "例如：计算机科学与技术 · 本科", start: "2022.09", end: "2026.06", content: "GPA、主修课程、荣誉等" },
+    },
+  };
+  const LIST_FORMS = {
+    "获奖情况": { kind: "list", pair: true, placeholder: "例如：国家奖学金（2024.10）" },
+    "资格证书": { kind: "list", pair: false, placeholder: "例如：CET-6（2024.06）" },
+    "科研成果": { kind: "list", pair: false, placeholder: "例如：论文标题 · 期刊 · 2025" },
+  };
+  const FORM_ALIASES = {
+    "项目经验": "项目经历", "工作经验": "工作经历", "职业经历": "工作经历", "实习经历": "工作经历", "实习经验": "工作经历",
+    "教育背景": "教育经历", "获奖经历": "获奖情况", "荣誉奖项": "获奖情况", "职业证书": "资格证书", "学术成果": "科研成果",
+  };
+  const BULLET_LINE = /^([-*•]\s+|\d+\.\s+|#{1,6}\s+)/;
+
+  function schemaFor(title) {
+    const key = FORM_ALIASES[title] || title;
+    return ENTRY_FORMS[key] || LIST_FORMS[key] || null;
+  }
+
+  function sectionSchema(card) {
+    return schemaFor(card.querySelector("[data-section-title]").value.trim());
+  }
+
+  function splitDateRange(text) {
+    const value = text.trim();
+    if (!value) return { start: "", end: "" };
+    for (const sep of ["–", "—", "～", "~", "至"]) {
+      const index = value.indexOf(sep);
+      if (index > 0) return { start: value.slice(0, index).trim(), end: value.slice(index + sep.length).trim() };
+    }
+    let parts = value.split(/\s+-\s+/);
+    if (parts.length === 2) return { start: parts[0].trim(), end: parts[1].trim() };
+    parts = value.split("-");
+    if (parts.length === 2) return { start: parts[0].trim(), end: parts[1].trim() };
+    if (parts.length === 4 && parts.every(part => /^\d+$/.test(part.trim()))) {
+      return { start: parts.slice(0, 2).join("-"), end: parts.slice(2).join("-") };
+    }
+    return { start: value, end: "" };
+  }
+
+  function headerFields(line) {
+    if (BULLET_LINE.test(line) || !/[|｜]/.test(line)) return null;
+    const cols = line.split(/[|｜]/).map(cell => cell.trim());
+    if (cols.length < 2 || cols.length > 3 || !cols.some(Boolean)) return null;
+    if (cols.length === 3) return { name: cols[0], role: cols[1], ...splitDateRange(cols[2]) };
+    if (/\d{4}|至今|present/i.test(cols[1])) return { name: cols[0], role: "", ...splitDateRange(cols[1]) };
+    return { name: cols[0], role: cols[1], start: "", end: "" };
+  }
+
+  function parseEntries(content) {
+    const entries = [];
+    let current = null;
+    let blockStart = true;
+    for (const raw of content.split("\n")) {
+      const line = raw.trim();
+      if (!line) {
+        blockStart = true;
+        if (current) current.lines.push("");
+        continue;
+      }
+      const header = headerFields(line);
+      if (header) {
+        current = { ...header, lines: [] };
+        entries.push(current);
+      } else if (blockStart && !BULLET_LINE.test(line) && line.length <= 120) {
+        current = { name: line, role: "", start: "", end: "", lines: [] };
+        entries.push(current);
+      } else {
+        if (!current) {
+          current = { name: "", role: "", start: "", end: "", lines: [] };
+          entries.push(current);
+        }
+        current.lines.push(line);
+      }
+      blockStart = false;
+    }
+    return entries.map(({ lines, ...entry }) => ({ ...entry, content: lines.join("\n").replace(/^\n+|\n+$/g, "") }));
+  }
+
+  function serializeEntries(entries, schema) {
+    const blocks = [];
+    for (const entry of entries) {
+      const name = entry.name.trim();
+      const role = entry.role.trim();
+      const date = [entry.start.trim(), entry.end.trim()].filter(Boolean).join("–");
+      const cols = [name, role, date];
+      const lines = [];
+      if (cols.every(Boolean)) lines.push(cols.join(" | "));
+      else if (name && (role || date)) lines.push(cols.filter(Boolean).join(" | "));
+      else if (name) lines.push(name);
+      else if (role || date) lines.push(cols.join(" | "));
+      let body = entry.content.replace(/\n[ \t]*\n+/g, "\n").trim();
+      if (schema.bullets) {
+        body = body.split("\n").map(line => {
+          const text = line.trim();
+          return !text || BULLET_LINE.test(text) ? text : "- " + text;
+        }).join("\n");
+      }
+      if (body) lines.push(body);
+      if (lines.length) blocks.push(lines.join("\n"));
+    }
+    return blocks.join("\n\n");
+  }
+
+  function parseItems(content, schema) {
+    const items = [];
+    for (const raw of content.split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      const parts = schema.pair ? line.split(/[|｜]/) : [line];
+      for (const part of parts) {
+        const text = part.trim().replace(/^[-*•]\s+/, "");
+        if (text) items.push(text);
+      }
+    }
+    return items;
+  }
+
+  function serializeItems(items, schema) {
+    const clean = items.map(item => item.trim()).filter(Boolean);
+    if (!schema.pair) return clean.join("\n");
+    const rows = [];
+    for (let index = 0; index < clean.length; index += 2) {
+      rows.push(clean.slice(index, index + 2).map(text => "- " + text).join(" | "));
+    }
+    return rows.join("\n");
+  }
+
+  function blankEntry() {
+    return { name: "", role: "", start: "", end: "", content: "" };
+  }
+
+  function entryCard(card, entry) {
+    const schema = sectionSchema(card);
+    const node = entryTemplate.content.firstElementChild.cloneNode(true);
+    for (const key of ["name", "role", "start", "end", "content"]) {
+      node.querySelector(`[data-entry-label="${key}"]`).textContent = schema.labels[key];
+      const field = node.querySelector(`[data-entry="${key}"]`);
+      field.value = entry[key] || "";
+      field.placeholder = schema.placeholders[key] || "";
+    }
+    return node;
+  }
+
+  function itemCard(card, text) {
+    const node = itemTemplate.content.firstElementChild.cloneNode(true);
+    const field = node.querySelector("[data-entry=text]");
+    field.value = text;
+    field.placeholder = sectionSchema(card).placeholder;
+    return node;
+  }
+
+  function renumberEntries(card) {
+    const schema = sectionSchema(card);
+    const title = card.querySelector("[data-section-title]").value.trim();
+    const nodes = [...card.querySelectorAll("[data-entries] > .re-entry")];
+    nodes.forEach((node, index) => {
+      node.querySelector("[data-entry-index]").textContent = schema.kind === "list" ? `${index + 1}.` : `${title} ${index + 1}`;
+      const up = node.querySelector("[data-entry-move='-1']");
+      const down = node.querySelector("[data-entry-move='1']");
+      if (up) up.disabled = index === 0;
+      if (down) down.disabled = index === nodes.length - 1;
+    });
+  }
+
+  function syncForm(card) {
+    const schema = sectionSchema(card);
+    const nodes = [...card.querySelectorAll("[data-entries] > .re-entry")];
+    const content = schema.kind === "list"
+      ? serializeItems(nodes.map(node => node.querySelector("[data-entry=text]").value), schema)
+      : serializeEntries(nodes.map(node => ({
+        name: node.querySelector("[data-entry=name]").value,
+        role: node.querySelector("[data-entry=role]").value,
+        start: node.querySelector("[data-entry=start]").value,
+        end: node.querySelector("[data-entry=end]").value,
+        content: node.querySelector("[data-entry=content]").value,
+      })), schema);
+    card.querySelector("[data-section-content]").value = content;
+  }
+
+  function buildForm(card) {
+    const schema = sectionSchema(card);
+    const entries = card.querySelector("[data-entries]");
+    const content = card.querySelector("[data-section-content]").value;
+    entries.replaceChildren();
+    if (schema.kind === "list") {
+      const items = parseItems(content, schema);
+      (items.length ? items : [""]).forEach(text => entries.append(itemCard(card, text)));
+    } else {
+      const parsed = parseEntries(content);
+      (parsed.length ? parsed : [blankEntry()]).forEach(entry => entries.append(entryCard(card, entry)));
+    }
+    renumberEntries(card);
+  }
+
+  function applyMode(card) {
+    const form = card.dataset.mode === "form";
+    card.querySelector("[data-form-area]").hidden = !form;
+    card.querySelector("[data-text-area]").hidden = form;
+  }
+
+  function setupSectionForm(card) {
+    const schema = sectionSchema(card);
+    const area = card.querySelector("[data-form-area]");
+    if (!schema) {
+      card.dataset.mode = "text";
+      applyMode(card);
+      return;
+    }
+    if (!area.querySelector("[data-entries]")) {
+      const list = document.createElement("div");
+      list.className = "re-entries";
+      list.dataset.entries = "";
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "re-button re-add-entry";
+      add.dataset.addEntry = "";
+      area.append(list, add);
+    }
+    const title = card.querySelector("[data-section-title]").value.trim();
+    area.querySelector("[data-add-entry]").textContent = schema.kind === "list" ? "＋ 新增一条" : `＋ 添加${title}`;
+    card.dataset.mode = "form";
+    buildForm(card);
+    applyMode(card);
   }
 
   function readDraft() {
@@ -90,9 +334,9 @@
   function appendSection(section, open = false) {
     const card = sectionTemplate.content.firstElementChild.cloneNode(true);
     card.querySelector("[data-section-title]").value = section.title;
+    card.querySelector("[data-section-content]").value = section.content;
     setSectionCaption(card, section.title);
-    const content = card.querySelector("[data-section-content]");
-    content.value = section.content;
+    setupSectionForm(card);
     toggleSection(card, open || Boolean(section.content) || ["个人总结", "专业技能", "附加信息"].includes(section.title));
     container.append(card);
     return card;
@@ -450,7 +694,10 @@
       setSectionCaption(section, name);
       input.hidden = true;
       toggle.hidden = false;
-      if (name !== previous) markChanged();
+      if (name !== previous) {
+        setupSectionForm(section);
+        markChanged();
+      }
       updateMoveButtons();
     };
     input.onkeydown = event => {
@@ -496,6 +743,8 @@
   });
   root.addEventListener("input", event => {
     if (event.target !== quickField && !event.target.hasAttribute("data-section-title")) markChanged();
+    const card = event.target.closest(".re-section");
+    if (card && event.target.closest("[data-form-area]")) syncForm(card);
   });
   root.addEventListener("click", event => {
     const button = event.target.closest("button");
@@ -517,17 +766,46 @@
       renameSection(section);
       return;
     }
+    if (section && button.hasAttribute("data-add-entry")) {
+      const schema = sectionSchema(section);
+      const node = schema.kind === "list" ? itemCard(section, "") : entryCard(section, blankEntry());
+      section.querySelector("[data-entries]").append(node);
+      renumberEntries(section);
+      syncForm(section);
+      markChanged();
+      node.querySelector("input, textarea").focus();
+      return;
+    }
+    if (section && button.hasAttribute("data-entry-remove")) {
+      button.closest(".re-entry").remove();
+      renumberEntries(section);
+      syncForm(section);
+      markChanged();
+      return;
+    }
+    if (section && button.dataset.entryMove) {
+      const node = button.closest(".re-entry");
+      if (button.dataset.entryMove === "-1") node.previousElementSibling?.before(node);
+      else node.nextElementSibling?.after(node);
+      renumberEntries(section);
+      syncForm(section);
+      markChanged();
+      return;
+    }
     if (section && button.dataset.format) {
       applyFormat(section.querySelector("[data-section-content]"), button.dataset.format);
       return;
     }
     if (section && button.hasAttribute("data-tidy")) {
       const area = section.querySelector("[data-section-content]");
+      const formMode = section.dataset.mode === "form";
+      if (formMode) syncForm(section);
       const clean = area.value.replace(/[ \t]+$/gm, "").replace(/^([ \t]*)[•●·]\s*/gm, "$1- ").replace(/\n{3,}/g, "\n\n").trim();
       if (area.value !== clean) {
         area.value = clean;
         markChanged();
       }
+      if (formMode) buildForm(section);
       status.textContent = "栏目格式已整理";
       return;
     }
@@ -565,8 +843,11 @@
         const added = appendSection({ title: button.dataset.restore || "自定义模块", content: "" }, true);
         updateMoveButtons();
         markChanged();
-        if (button.dataset.restore) added.querySelector("[data-section-content]").focus();
-        else renameSection(added);
+        if (button.dataset.restore) {
+          const target = added.dataset.mode === "form"
+            ? added.querySelector("[data-entries] input") : added.querySelector("[data-section-content]");
+          target?.focus();
+        } else renameSection(added);
         break;
       case "add-field":
         addField();

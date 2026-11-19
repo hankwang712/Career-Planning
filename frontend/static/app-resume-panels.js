@@ -630,6 +630,7 @@ function handleResumeStackDeckKey(event, deckId) {
   }
 }
 
+/** @param {Document | HTMLElement} [root] */
 function initResumeStackDecks(root = document) {
   root.querySelectorAll("[data-resume-deck]").forEach((deck) => {
     const deckId = String(deck.dataset.resumeDeck || "").trim();

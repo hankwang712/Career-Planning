@@ -217,6 +217,25 @@ def test_template_aligns_project_metadata_and_renders_markdown(make_account):
         assert any(link.get("uri") == "https://example.com/project" for link in page.get_links())
 
 
+def test_work_experience_entries_render_as_aligned_tables(make_account):
+    account = make_account("resume-work-entry")
+    doc = {
+        "contact": {"name": "林晓"},
+        "sections": [{
+            "title": "工作经历",
+            "content": "Acme Corp | Data Intern | 2025.03–2025.09\n- 整理订单数据\n\nBeta LLC | Backend Intern | 2024.06–2024.12\n- 维护接口",
+        }],
+    }
+    response = account.post("/api/resume-editor/render/pdf", json=doc)
+    assert response.status_code == 200
+    with fitz.open(stream=response.data, filetype="pdf") as pdf:
+        words = pdf[0].get_text("words")
+        points = {word[4]: word[0] for word in words}
+        assert points["Acme"] < 60 and points["Intern"] > 250
+        assert any(word[4].startswith("2025.03") and word[0] > 450 for word in words)
+        assert "整理订单数据" in pdf[0].get_text() and "维护接口" in pdf[0].get_text()
+
+
 def test_pdf_import_uses_header_and_table_geometry_instead_of_flat_text(make_account):
     from pathlib import Path
 

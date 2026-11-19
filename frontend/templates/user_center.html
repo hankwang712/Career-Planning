@@ -9,9 +9,6 @@
       window.__API_BASE__ = window.__API_BASE__ || "";
     </script>
     {{ vite_asset_tags('src/entries/user-center.js') }}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='career-report-editor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-editor-overlay.css') }}">
     <style>
@@ -1078,6 +1075,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='user-center-sidebar.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     {% include "partials/app_cursor.html" %}
 </head>
 <body class="user-center-page" data-page="user-center">
@@ -1467,7 +1466,6 @@
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/fuse.min.js') }}"></script>
     {% include "partials/report_workspace_scripts.html" %}
     <script src="{{ url_for('static', filename='user-center.js') }}"></script>
     <script src="{{ url_for('static', filename='user-center-learning-path.js') }}"></script>

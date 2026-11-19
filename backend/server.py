@@ -30,15 +30,13 @@ from services.career import create_blueprint as create_career_blueprint, snapsho
 from services.chat import create_blueprint as create_chat_blueprint
 from services.chat.api import create_app as create_chat_app
 from services.chat.profile import build_background as build_chat_background
-from services.datasets import create_blueprint as create_datasets_blueprint
 from services.interview import create_blueprint as create_interview_blueprint
-from services.job_data import BOSS_INFO_DIR, create_blueprint as create_job_data_blueprint
 from services.job_market.api import create_blueprint as create_job_market_blueprint
 from services.job_market.collector import Collector as JobMarketCollector
 from services.news import get_career_news_payload
 from services.news.api import create_blueprint as create_news_blueprint
 from services.pages import create_blueprint as create_pages_blueprint
-from services.paths import APP_DATA_DIR, STATIC_DIR, TEMPLATE_DIR
+from services.paths import APP_DATA_DIR, DATA_DIR, STATIC_DIR, TEMPLATE_DIR
 from services.portrait import create_blueprint as create_portrait_blueprint
 from services.report import api as report_api
 from services.report.jobs import CAREER_REPORT_JOBS, _fail_interrupted_report
@@ -121,9 +119,7 @@ _app_db.init_db()
 _restore_background_jobs()
 _auth.init_app(app)
 app.register_blueprint(workspace_tools.blueprint)
-app.register_blueprint(create_datasets_blueprint(_login_required))
 app.register_blueprint(create_interview_blueprint(_login_required, _model_runtime))
-app.register_blueprint(create_job_data_blueprint())
 app.register_blueprint(create_portrait_blueprint(_login_required, _current_user, _load_user_state, _save_user_state))
 app.register_blueprint(create_news_blueprint())
 app.register_blueprint(create_pages_blueprint(_current_user))
@@ -190,7 +186,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print("  职业规划智能体 · FastAPI + Flask 服务")
     print(f"  访问地址：http://{host}:{port}")
-    print("  数据目录：", BOSS_INFO_DIR)
+    print("  数据目录：", DATA_DIR / "jobs")
     print("  用户数据目录：", APP_DATA_DIR)
     print("  PDF 导出引擎：", f"PyMuPDF {fitz.VersionBind}" if fitz is not None else "PyMuPDF 未安装，请安装 requirements.txt")
     print("  按 Ctrl+C 停止")

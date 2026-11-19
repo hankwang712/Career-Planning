@@ -1,0 +1,1239 @@
+/* =========================================================
+   智航生涯 · Chart Room 设计层
+   加载顺序：所有页面样式之后（最后加载），统一令牌与表面质感。
+   方向：海图室 —— 瓷白纸面 + 深海墨色 + 群青主色 + 黄铜信号色。
+   字体：Schibsted Grotesk（展示/数字）· Noto Sans SC（正文）
+        · Noto Serif SC（中文标题），全部自托管（fonts.css）。
+   优先级说明：vite 开发模式会把 styles.css / login.css 等旧样式
+   注入到 <head> 末尾，因此关键选择器带 html 前缀（或 html:root），
+   保证本层不依赖加载顺序取胜。
+   ========================================================= */
+
+/* ---------- 1. 令牌 ---------- */
+html:root {
+  --dr-paper: #f3f5f7;
+  --dr-paper-deep: #eceff3;
+  --dr-surface: #ffffff;
+  --dr-surface-soft: #f7f8fa;
+  --dr-ink: #17233b;
+  --dr-ink-hover: #24345a;
+  --dr-ink-soft: #3d4c66;
+  --dr-muted: #5c6b84;
+  --dr-faint: #8b97ab;
+  --dr-line: #e2e6ec;
+  --dr-line-strong: #cfd6e0;
+  --dr-accent: #2745cf;
+  --dr-accent-hover: #1e37ab;
+  --dr-accent-soft: #eef1fc;
+  --dr-accent-line: #c9d4f2;
+  --dr-brass: #a8823c;
+  --dr-brass-soft: #f6f0e2;
+  --dr-success: #2e8b62;
+  --dr-success-soft: #e9f5ef;
+  --dr-danger: #c4483f;
+  --dr-danger-soft: #fbeeed;
+  --dr-warning: #b97f24;
+  --dr-warning-soft: #faf3e4;
+
+  --dr-radius-lg: 12px;
+  --dr-radius: 10px;
+  --dr-radius-sm: 8px;
+  --dr-shadow-sm: 0 1px 2px rgba(23, 35, 59, 0.05);
+  --dr-shadow-md: 0 1px 2px rgba(23, 35, 59, 0.04), 0 12px 32px -18px rgba(23, 35, 59, 0.16);
+  --dr-shadow-lg: 0 2px 4px rgba(23, 35, 59, 0.04), 0 24px 56px -28px rgba(23, 35, 59, 0.24);
+  --dr-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --dr-ring: 0 0 0 3px rgba(39, 69, 207, 0.14);
+  --dr-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --app-font-stack: "Schibsted Grotesk Variable", "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --app-display-stack: "Schibsted Grotesk Variable", "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --app-editorial-stack: "Noto Serif SC Variable", "Songti SC", "STSong", serif;
+
+  /* 旧令牌统一 remap，各页面样式里的 var() 自动跟随新色板 */
+  --product-accent: var(--dr-accent);
+  --product-accent-hover: var(--dr-accent-hover);
+  --product-bg: var(--dr-paper);
+  --product-card: var(--dr-surface);
+  --product-text: var(--dr-ink);
+  --product-muted: var(--dr-muted);
+  --product-border: var(--dr-line);
+  --cs-primary: var(--dr-accent);
+  --cs-primary-light: #4d68e0;
+  --cs-primary-soft: var(--dr-accent-soft);
+  --cs-bg: var(--dr-paper);
+  --cs-bg-alt: var(--dr-paper-deep);
+  --cs-surface: #ffffff;
+  --cs-surface-strong: #ffffff;
+  --cs-surface-muted: var(--dr-surface-soft);
+  --cs-border: var(--dr-line);
+  --cs-border-light: #edf0f4;
+  --cs-text: var(--dr-ink);
+  --cs-secondary: var(--dr-ink-soft);
+  --cs-muted: var(--dr-muted);
+  --home-bg: var(--dr-paper);
+  --home-surface-soft: var(--dr-surface-soft);
+  --home-text: var(--dr-ink);
+  --home-muted: var(--dr-muted);
+  --home-border: var(--dr-line);
+  --home-accent: var(--dr-accent);
+  --home-accent-hover: var(--dr-accent-hover);
+  --home-accent-soft: var(--dr-accent-soft);
+  --home-shadow: var(--dr-shadow-md);
+  --home-shadow-soft: var(--dr-shadow-sm);
+  --uc-bg: var(--dr-paper);
+  --uc-copy: var(--dr-ink);
+  --uc-muted: var(--dr-muted);
+  --uc-line: var(--dr-line);
+  --uc-line-strong: var(--dr-line-strong);
+  --uc-accent: var(--dr-accent);
+  --uc-accent-strong: var(--dr-accent-hover);
+  --uc-accent-soft: var(--dr-accent-soft);
+  --uc-shadow: var(--dr-shadow-md);
+  --uc-surface: #ffffff;
+  --uc-surface-strong: #ffffff;
+  --uc-danger: var(--dr-danger);
+  --glass-bg: #ffffff;
+  --glass-border: var(--dr-line);
+  --glass-shadow: var(--dr-shadow-md);
+  --ink-1: var(--dr-ink);
+  --ink-2: var(--dr-ink-soft);
+  --login-bg: var(--dr-paper);
+  --login-bg-soft: var(--dr-paper-deep);
+  --panel-bg: #ffffff;
+  --panel-border: var(--dr-line);
+  --panel-shadow: var(--dr-shadow-lg);
+  --ink-strong: var(--dr-ink);
+  --ink-muted: var(--dr-muted);
+  --blue: var(--dr-accent);
+  --blue-strong: var(--dr-accent-hover);
+  --blue-soft: var(--dr-accent-soft);
+  --jade-arch: var(--dr-accent-soft);
+  --border: var(--dr-line);
+  --muted: var(--dr-muted);
+  --bg: var(--dr-paper);
+  --side: #ffffff;
+  --surface: #ffffff;
+  --line: var(--dr-line);
+  --line-strong: var(--dr-line-strong);
+  --text: var(--dr-ink);
+  --text-secondary: var(--dr-ink-soft);
+  --accent: var(--dr-accent);
+  --accent-soft: var(--dr-accent-soft);
+  --hover: var(--dr-surface-soft);
+}
+
+/* ---------- 2. 基础：字体、纸面、焦点 ---------- */
+html body, html button, html input, html textarea, html select {
+  font-family: var(--app-font-stack);
+}
+html * { font-family: var(--app-font-stack); }
+html code, html pre, html kbd, html samp, html .font-mono {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+::selection { background: rgba(39, 69, 207, 0.16); }
+:focus-visible { outline: 2px solid var(--dr-accent); outline-offset: 2px; }
+
+html { scrollbar-color: var(--dr-line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--dr-line-strong);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--dr-faint); background-clip: content-box; }
+
+/* 海图纸面：细网格 + 顶部群青微光。网格只出现在卡片之间的留白里。 */
+body.bg-gray-50,
+body.user-center-page {
+  color: var(--dr-ink);
+  background-color: var(--dr-paper) !important;
+  background-image:
+    linear-gradient(rgba(23, 35, 59, 0.027) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 35, 59, 0.027) 1px, transparent 1px),
+    radial-gradient(ellipse 90% 460px at 80% -120px, rgba(39, 69, 207, 0.055), transparent 70%),
+    linear-gradient(180deg, #f6f8fa 0%, var(--dr-paper) 620px) !important;
+  background-size: 28px 28px, 28px 28px, auto, auto !important;
+  background-attachment: fixed, fixed, scroll, scroll !important;
+}
+.ambient-orb { display: none !important; }
+
+/* ---------- 3. 旧彩虹色 utility 收敛 ---------- */
+.text-purple-600, .text-purple-700, .text-purple-800, .text-indigo-600 { color: var(--dr-accent) !important; }
+.bg-purple-600, .bg-indigo-600 { background-color: var(--dr-accent) !important; }
+.hover\:bg-purple-700:hover, .hover\:bg-indigo-700:hover { background-color: var(--dr-accent-hover) !important; }
+.bg-purple-50, .bg-indigo-50 { background-color: var(--dr-accent-soft) !important; }
+.bg-purple-100 { background-color: #e4e9fa !important; }
+.border-purple-200, .border-purple-300, .border-indigo-200 { border-color: var(--dr-accent-line) !important; }
+.text-green-600, .text-green-700, .text-emerald-600 { color: var(--dr-success) !important; }
+.bg-green-50, .bg-emerald-50 { background-color: var(--dr-success-soft) !important; }
+.border-green-200 { border-color: #cbe5d7 !important; }
+.text-red-600, .text-red-500 { color: var(--dr-danger) !important; }
+.text-gray-400, .text-gray-500 { color: var(--dr-muted) !important; }
+.text-gray-600, .text-gray-700 { color: var(--dr-ink-soft) !important; }
+.text-gray-800, .text-gray-900 { color: var(--dr-ink) !important; }
+.bg-gray-50 { background-color: var(--dr-surface-soft) !important; }
+.bg-gray-100 { background-color: var(--dr-paper-deep) !important; }
+.bg-gray-200 { background-color: var(--dr-line) !important; }
+.border-gray-200, .border-gray-100 { border-color: var(--dr-line) !important; }
+.border-gray-300 { border-color: var(--dr-line-strong) !important; }
+html .gradient-text {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--dr-accent);
+}
+footer#site-footer, footer.bg-gray-800 {
+  background: var(--dr-ink) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+footer#site-footer .border-gray-700 { border-color: rgba(255, 255, 255, 0.12) !important; }
+footer#site-footer .text-gray-400,
+footer#site-footer .text-gray-500 { color: #9aa7bd !important; }
+footer#site-footer h3, footer#site-footer h4 { color: #f4f6fa !important; }
+footer#site-footer a:hover { color: #fff !important; }
+
+/* ---------- 4. 共享表面：锐利边缘 + 分层阴影 ---------- */
+html .glass-surface,
+html .bg-white.rounded-xl,
+html .bg-white.rounded-2xl {
+  background: var(--dr-surface) !important;
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+/* 可交互卡片：悬浮轻抬升；静态面板不做无意义浮动 */
+html .cs-product-feature-card,
+html .cs-career-process-step,
+html .cs-product-card,
+html .career-news-item {
+  transition: transform 0.22s var(--dr-ease), box-shadow 0.22s var(--dr-ease), border-color 0.22s var(--dr-ease);
+}
+html .cs-product-feature-card:hover,
+html .cs-career-process-step:hover,
+html .career-news-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--dr-accent-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-lg);
+}
+
+/* 弹窗容器 */
+html #jobDetailModal > div,
+.modal-overlay > div {
+  border-radius: var(--dr-radius-lg);
+  border: 1px solid var(--dr-line);
+  box-shadow: var(--dr-shadow-lg);
+}
+.modal-overlay { background: rgba(16, 24, 40, 0.45); backdrop-filter: blur(3px); }
+html #jobDetailModal .job-detail-header,
+html #jobDetailModal > div > div:first-child {
+  background: var(--dr-ink) !important;
+  border-radius: var(--dr-radius-lg) var(--dr-radius-lg) 0 0;
+}
+
+/* 主按钮 / 次按钮 / 输入 */
+html .cs-btn-product,
+html .cs-career-process-primary,
+html .report-launch-primary,
+html .cs-hero-search-submit {
+  border-radius: var(--dr-radius-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 0.18s var(--dr-ease), box-shadow 0.18s var(--dr-ease), transform 0.18s var(--dr-ease), border-color 0.18s var(--dr-ease);
+}
+html .cs-btn-product:active,
+html .cs-career-process-primary:active,
+html .report-launch-primary:active { transform: scale(0.985); }
+
+html input[type="text"], html input[type="search"], html input[type="email"],
+html input[type="password"], html input[type="number"], html textarea, html select {
+  border-radius: var(--dr-radius-sm);
+}
+
+/* ---------- 5. 顶部导航 ---------- */
+nav.gradient-bg {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid var(--dr-line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 24px -18px rgba(23, 35, 59, 0.25) !important;
+}
+nav.app-topbar .topbar-brand h1 { color: var(--dr-ink) !important; letter-spacing: 0.01em; }
+nav.app-topbar .topbar-brand .leading-tight > p { color: var(--dr-faint) !important; }
+nav.app-topbar .nav-brand-mark {
+  border-radius: var(--dr-radius-sm);
+  box-shadow: var(--dr-shadow-sm);
+}
+/* 产品式下划线标签：去掉"胶囊容器"网站感 */
+nav.app-topbar .nav-tab-strip {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  gap: 2px;
+}
+nav.app-topbar .nav-item {
+  position: relative;
+  border-radius: var(--dr-radius-sm) !important;
+  color: var(--dr-muted) !important;
+  font-weight: 550;
+}
+nav.app-topbar .nav-item:hover { background: var(--dr-surface-soft) !important; color: var(--dr-ink) !important; }
+nav.app-topbar .nav-item.active {
+  background: transparent !important;
+  color: var(--dr-accent) !important;
+  box-shadow: none !important;
+  font-weight: 650;
+}
+/* 下划线指示器：在所有 tab 上待命，选中时展开（product-theme 的 display:none 需显式覆盖） */
+nav.app-topbar .nav-item::after {
+  content: "";
+  position: absolute;
+  left: 13px; right: 13px; bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--dr-accent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.28s var(--dr-ease);
+}
+nav.app-topbar .nav-item.active::after {
+  display: block;
+  transform: scaleX(1);
+}
+nav.app-topbar .nav-item.active .tab-icon { opacity: 1; }
+nav.app-topbar #liveClock {
+  font-family: var(--app-display-stack);
+  font-variant-numeric: tabular-nums;
+  border-color: var(--dr-line) !important;
+  background: var(--dr-surface-soft) !important;
+  color: var(--dr-muted) !important;
+  border-radius: var(--dr-radius-sm);
+}
+:is(nav.app-topbar, .uc-topbar) .nav-workspace-pill {
+  border-radius: var(--dr-radius);
+  border-color: var(--dr-line);
+}
+:is(nav.app-topbar, .uc-topbar) .nav-workspace-avatar-wrap {
+  background: linear-gradient(140deg, #4d68e0, var(--dr-accent));
+  border-radius: 7px;
+}
+
+/* ---------- 6. 首页 Hero：海图面板 ---------- */
+/* 指挥台 = 深海墨色面板：全站视觉锚点，白卡片落在瓷白纸上，层次立现 */
+html .cs-hero-product,
+html .cs-home-concierge .cs-hero-product {
+  background:
+    radial-gradient(circle 460px at var(--mx, 72%) var(--my, 18%), rgba(125, 149, 255, 0.1), transparent 70%),
+    radial-gradient(ellipse 70% 90% at 88% -20%, rgba(39, 69, 207, 0.28), transparent 60%),
+    linear-gradient(155deg, #1d2c4c 0%, #14213a 72%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--dr-radius-lg);
+  box-shadow: inset 0 2px 0 var(--dr-brass), 0 24px 56px -28px rgba(20, 33, 58, 0.55);
+}
+html .cs-hero-product::before,
+html .cs-home-concierge .cs-hero-product::before {
+  opacity: 0.06;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+.cs-hero-orb { display: none !important; }
+html .cs-hero-product-map { opacity: 0.7; }
+.cs-hero-product-map-svg path { stroke: rgba(255, 255, 255, 0.26); }
+.cs-hero-product-map-svg path:first-of-type { stroke: url(#csMapArcA); }
+#csMapArcA stop:first-child { stop-color: #7d95ff; stop-opacity: 0.55; }
+#csMapArcA stop:last-child { stop-color: #c9a25c; stop-opacity: 0.5; }
+#csMapGlow stop:first-child { stop-color: #7d95ff; stop-opacity: 0.14; }
+html .cs-hero-glass-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html #productHero .cs-hero-product-badge {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #dfe6f5;
+  border-radius: 999px;
+  box-shadow: none;
+  font-weight: 600;
+}
+html .cs-hero-product-dot {
+  background: #c9a25c;
+  box-shadow: 0 0 0 3px rgba(201, 162, 92, 0.2);
+  animation: dr-dot-pulse 2.4s ease-in-out infinite;
+}
+@keyframes dr-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(201, 162, 92, 0.2); }
+  50% { box-shadow: 0 0 0 5px rgba(201, 162, 92, 0.08); }
+}
+/* 英文品牌名降为小标，中文衬线句才是主标题（见 6b 重组） */
+html .cs-hero-brand-title,
+html .cs-home-concierge .cs-hero-brand-title {
+  font-family: var(--app-display-stack);
+  font-weight: 600;
+  color: rgba(223, 230, 245, 0.55);
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  font-size: 0.95rem;
+  max-width: none;
+}
+html .cs-hero-brand-sub-en { color: var(--dr-muted); letter-spacing: 0; }
+html .cs-hero-brand-zh { color: var(--dr-faint); }
+html .cs-hero-kimi-tagline,
+html .cs-home-concierge .cs-hero-kimi-tagline {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  color: #f4f6fa;
+  letter-spacing: 0.01em;
+  font-size: clamp(1.9rem, 3.2vw, 2.7rem);
+  line-height: 1.3;
+}
+html .cs-hero-kimi-em,
+html .cs-home-concierge .cs-hero-kimi-em {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: #c9a25c;
+}
+html .cs-hero-kimi-lead { color: var(--dr-muted); line-height: 1.85; }
+
+html .cs-hero-search-wrap,
+html .cs-hero-search-kimi {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--dr-radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.18s var(--dr-ease), box-shadow 0.18s var(--dr-ease);
+}
+html .cs-hero-search-wrap:focus-within,
+html .cs-hero-search-kimi:focus-within {
+  border-color: #7d95ff;
+  box-shadow: 0 0 0 3px rgba(125, 149, 255, 0.18);
+}
+html .cs-hero-search-icon { color: rgba(223, 230, 245, 0.5); }
+html .cs-hero-search-input { color: #f4f6fa; }
+html .cs-hero-search-input::placeholder { color: rgba(223, 230, 245, 0.4); }
+/* 搜索提交 = 黄铜仪器键；主操作 = 反白（深色面板上的最高对比） */
+html .cs-hero-search-submit {
+  background: #c9a25c;
+  color: #14213a;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px -6px rgba(201, 162, 92, 0.5);
+}
+html .cs-hero-search-submit:hover {
+  background: #d8b26a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 20px -6px rgba(201, 162, 92, 0.55);
+}
+html .cs-home-concierge .cs-btn-product-primary,
+html .cs-home-concierge .cs-kimi-bottom-cta-primary {
+  background: #f4f6fa;
+  color: var(--dr-ink);
+  box-shadow: inset 0 1px 0 #fff, 0 6px 16px -6px rgba(0, 0, 0, 0.4);
+}
+html .cs-home-concierge .cs-btn-product-primary:hover,
+html .cs-home-concierge .cs-kimi-bottom-cta-primary:hover {
+  background: #e6ebf4;
+  box-shadow: inset 0 1px 0 #fff, 0 8px 20px -6px rgba(0, 0, 0, 0.45);
+}
+html .cs-btn-product-secondary,
+html .cs-kimi-bottom-cta-secondary {
+  background: var(--dr-surface);
+  color: var(--dr-ink-soft);
+  border: 1px solid var(--dr-line-strong);
+  box-shadow: var(--dr-shadow-sm);
+}
+html .cs-btn-product-secondary:hover,
+html .cs-kimi-bottom-cta-secondary:hover {
+  background: var(--dr-surface-soft);
+  border-color: var(--dr-accent-line);
+  color: var(--dr-accent);
+}
+html .cs-btn-product-ghost { color: #dfe6f5; border: 1px solid rgba(255, 255, 255, 0.18); }
+html .cs-btn-product-ghost:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+/* 遥测面板：深色玻璃读数格，宽屏时 2×2 立于指挥台右侧 */
+html #productHero .cs-hero-product-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--dr-radius);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+html .cs-product-stat {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.95rem 1.2rem;
+}
+html .cs-product-stat:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.09); }
+html .cs-product-stat-divider { display: none; }
+html #productHero .cs-product-stat-value,
+html .cs-hero-kimi-trust-item strong {
+  font-family: var(--app-display-stack);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #f4f6fa;
+  letter-spacing: -0.02em;
+}
+html #productHero .cs-product-stat-value { font-size: 1.85rem; }
+html #productHero .cs-product-stat-label { color: rgba(223, 230, 245, 0.6); }
+html #productHero .cs-product-stat-label small { color: #c9a25c; }
+html .cs-product-stat-divider { background: rgba(255, 255, 255, 0.09); }
+
+/* 照片卡 */
+html .cs-hero-portrait-card,
+html .cs-hero-photo-card {
+  border-radius: var(--dr-radius-lg);
+  border: 1px solid var(--dr-line);
+  box-shadow: var(--dr-shadow-lg);
+  overflow: hidden;
+}
+html .cs-hero-portrait-backdrop { background: var(--dr-paper-deep); }
+
+/* Career Pulse：深色面板底部的市场信号行 */
+html .cs-hero-pulse-label {
+  color: rgba(223, 230, 245, 0.6);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 600;
+}
+html .cs-hero-pulse-label::before {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-right: 8px;
+  background: var(--dr-brass);
+  vertical-align: 1px;
+}
+html .cs-hero-pulse-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+html .cs-hero-pulse-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid #c9a25c;
+  border-radius: var(--dr-radius-sm);
+  transition: border-color 0.18s var(--dr-ease), background-color 0.18s var(--dr-ease);
+}
+html .cs-hero-pulse-chip:nth-child(even) { border-left-color: #7d95ff; }
+html .cs-hero-pulse-chip:hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.2); }
+html .cs-hero-pulse-chip em { color: #eef1f7; font-style: normal; font-weight: 600; }
+html .cs-hero-pulse-chip small { color: rgba(223, 230, 245, 0.55); }
+html .cs-hero-kimi-trust-item strong { font-size: 1.35rem; }
+html .cs-hero-kimi-trust-item span { color: var(--dr-muted); }
+
+/* ---------- 6b. 仪表盘重组：营销落地页 → 产品指挥台 ----------
+   只动 CSS，不改 DOM：所有 JS/GSAP 绑定的节点原样保留。 */
+/* 清除旧世代遗留的背景罩染 */
+html #dashboard.cs-home-concierge::before,
+html #dashboard.cs-home-concierge::after { background: none !important; }
+
+/* 单栏指挥台：撤掉图库照片与营销文案 */
+html .cs-hero-concierge-panels { grid-template-columns: minmax(0, 1fr); gap: 0; }
+html .cs-hero-product-visual { display: none; }
+html .cs-hero-brand-sub-en,
+html .cs-hero-brand-zh,
+html .cs-hero-kimi-lead,
+html .cs-hero-kimi-actions-secondary,
+html .cs-hero-kimi-trust { display: none; }
+
+/* 重排：状态徽标 → 英文小标 → 中文衬线主标题 → 搜索 → 读数条 → 操作 */
+html .cs-hero-concierge-main { gap: 1.05rem; }
+html .cs-hero-product-badge { order: 0; }
+html .cs-hero-brand-title { order: 1; }
+html .cs-hero-kimi-tagline { order: 2; margin: -0.15rem 0 0.15rem; }
+html .cs-hero-search-row { order: 3; }
+html #productHero .cs-hero-product-stats { order: 4; }
+html .cs-hero-product-actions { order: 5; }
+html .cs-hero-product-inner { max-width: none; gap: 1.4rem; padding: 0 2.2rem 1.8rem; }
+
+/* Career Pulse 降为信号行：深色面板底部，hairline 分隔 */
+html .cs-hero-pulse {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 1.1rem 0 0;
+  border-radius: 0;
+}
+
+/* 路径区 / 新闻区：撤掉大卡片包装，内容卡片直接落在纸面上（三级层次） */
+html .cs-home-concierge .cs-career-process {
+  --process-ink: var(--dr-ink);
+  --process-muted: var(--dr-muted);
+  --process-accent: var(--dr-accent);
+  --process-line: var(--dr-line);
+  margin: 40px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html .cs-home-concierge .cs-career-process-head h2,
+html .cs-career-process-head h2 { font-size: clamp(1.6rem, 2.4vw, 2.1rem); }
+/* 三步卡片统一白面：撤掉旧世代的深青/米色变体 */
+html .cs-career-process .cs-career-process-step--profile,
+html .cs-career-process .cs-career-process-step--plan {
+  background: var(--dr-surface);
+  border-color: var(--dr-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .cs-career-process-step--profile .cs-career-process-number { color: var(--dr-brass); }
+html .cs-career-process-step--profile .cs-career-process-step-head > span:last-child { color: var(--dr-faint); }
+html .cs-home-concierge .cs-career-process-step--profile h3 { color: var(--dr-ink); }
+html .cs-career-process .cs-career-process-step--profile .cs-career-process-step-description { color: var(--dr-muted); }
+html .cs-career-process .cs-career-process-step--profile .cs-career-process-link {
+  border-color: var(--dr-line);
+  color: var(--dr-accent);
+}
+html #careerNewsBoard.nd-board {
+  --nd-ink: var(--dr-ink);
+  --nd-blue: var(--dr-accent);
+  --nd-line: var(--dr-line);
+  --nd-muted: var(--dr-muted);
+  margin: 40px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html #careerNewsBoard .nd-header h3 {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  color: var(--dr-ink);
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+}
+/* 快报 = 编辑式双栏列表：撤掉淡紫海报封面，留标题/来源/时间/序号 */
+html #careerNewsBoard .nd-deck {
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 0 2.4rem;
+  padding: 0;
+}
+html #careerNewsBoard .nd-section-label {
+  color: var(--dr-faint);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 600;
+}
+html #careerNewsBoard .nd-cover { display: none; }
+html #careerNewsBoard .nd-story {
+  padding: 1.05rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--dr-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 0.18s var(--dr-ease);
+}
+html #careerNewsBoard .nd-story:hover {
+  transform: none;
+  background: var(--dr-surface-soft);
+  border-color: var(--dr-line);
+  box-shadow: none;
+}
+html #careerNewsBoard .nd-story-top { margin: 0 0 0.4rem; }
+html #careerNewsBoard .nd-story-number {
+  font-family: var(--app-display-stack);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--dr-brass);
+}
+html #careerNewsBoard .nd-story-title {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--dr-ink);
+  margin-bottom: 0.35rem;
+}
+html #careerNewsBoard .nd-story:hover .nd-story-title { color: var(--dr-accent); }
+html #careerNewsBoard .nd-story-summary { color: var(--dr-muted); font-size: 0.82rem; }
+html #careerNewsBoard .nd-tag {
+  background: var(--dr-surface-soft);
+  border: 1px solid var(--dr-line);
+  color: var(--dr-muted);
+}
+html #careerNewsBoard .nd-source-mark { background: var(--dr-accent-soft); color: var(--dr-accent); }
+html #careerNewsBoard .nd-filter { color: var(--dr-muted); border-radius: 999px; }
+html #careerNewsBoard .nd-filter:hover { background: var(--dr-surface-soft); color: var(--dr-ink); }
+html #careerNewsBoard .nd-filter.is-active { background: var(--dr-ink); color: #fff; box-shadow: none; }
+html #careerNewsBoard .nd-filter.is-active > span { background: rgba(255, 255, 255, 0.16); }
+@media (max-width: 1100px) {
+  html #careerNewsBoard .nd-deck { grid-template-columns: 1fr; }
+}
+
+/* 宽屏指挥台：左意图（标题/搜索/操作），右遥测（2×2 读数面板） */
+@media (min-width: 1000px) {
+  html .cs-hero-concierge-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+    grid-template-rows: auto auto auto 1fr auto;
+    column-gap: 3rem;
+    row-gap: 1.05rem;
+    align-items: start;
+  }
+  html .cs-hero-product-badge { grid-column: 1; grid-row: 1; justify-self: start; }
+  html .cs-hero-brand-title { grid-column: 1; grid-row: 2; }
+  html .cs-hero-kimi-tagline { grid-column: 1; grid-row: 3; }
+  html .cs-hero-search-row { grid-column: 1; grid-row: 4; align-self: end; }
+  html .cs-hero-product-actions { grid-column: 1; grid-row: 5; }
+  html #productHero .cs-hero-product-stats {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    grid-template-columns: 1fr 1fr;
+    align-self: stretch;
+  }
+  html .cs-product-stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  html .cs-product-stat:nth-child(3),
+  html .cs-product-stat:nth-child(7) { border-right: 0; }
+  html .cs-product-stat:nth-child(5),
+  html .cs-product-stat:nth-child(7) { border-bottom: 0; }
+}
+
+/* 区块节奏 */
+html .cs-home-concierge > section { margin-top: 40px; }
+html .cs-home-concierge > section:first-child { margin-top: 0; }
+
+/* ---------- 7. 职业路径 / 功能卡 / 新闻 ---------- */
+html .cs-home-concierge .cs-career-process-head h2,
+html .cs-home-concierge .cs-product-section-header h3,
+html .cs-home-concierge .cs-news-head h3,
+html .cs-career-process-head h2,
+html .cs-product-section-header h3,
+html .cs-news-head h3 {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  color: var(--dr-ink);
+  letter-spacing: 0.01em;
+}
+html .cs-career-process-head h2 span { color: var(--dr-accent); }
+html .cs-career-process-eyebrow,
+html .cs-news-kicker {
+  color: var(--dr-brass);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 600;
+}
+html .cs-career-process-description,
+html .cs-product-section-header p { color: var(--dr-muted); }
+html .cs-career-process-primary {
+  background: var(--dr-ink);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 16px -6px rgba(23, 35, 59, 0.5);
+}
+html .cs-career-process-primary:hover { background: var(--dr-ink-hover); }
+html .cs-career-process-step {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .cs-career-process-number {
+  font-family: var(--app-display-stack);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--dr-brass);
+}
+html .cs-home-concierge .cs-career-process-step h3,
+html .cs-career-process-step h3 { color: var(--dr-ink); font-weight: 650; }
+html .cs-career-process .cs-career-process-step-description,
+html .cs-career-process-step-description { color: var(--dr-muted); }
+html .cs-career-process-link { color: var(--dr-accent); font-weight: 600; }
+html .cs-career-process-link:hover { color: var(--dr-accent-hover); }
+html .cs-process-preview {
+  background: var(--dr-surface-soft);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius-sm);
+}
+html .cs-process-preview-heading span { color: var(--dr-ink-soft); font-weight: 600; }
+html .cs-process-preview-heading small { color: var(--dr-faint); }
+/* 示意小 UI 跟随新色板（旧青绿系是为深卡设计的，白面上会看不见） */
+html .cs-process-radar-grid { stroke: rgba(23, 35, 59, 0.14); }
+html .cs-process-radar-area { fill: rgba(39, 69, 207, 0.13); stroke: var(--dr-accent); }
+html .cs-process-radar-points { fill: var(--dr-accent); }
+html .cs-process-profile-legend > span { color: var(--dr-muted); }
+html .cs-process-profile-legend i { background: var(--dr-accent); }
+html .cs-process-profile-legend > span:nth-child(2) i { background: var(--dr-brass); }
+html .cs-process-profile-legend > span:nth-child(3) i { background: var(--dr-line-strong); }
+html .cs-process-job-mark {
+  background: var(--dr-accent-soft);
+  color: var(--dr-accent);
+  font-family: var(--app-display-stack);
+}
+html .cs-process-plan-track > span { background: var(--dr-line); }
+html .cs-process-plan-track > span:nth-child(1) { background: var(--dr-accent); }
+html .cs-process-plan-track > span:nth-child(2) { background: var(--dr-accent-line); }
+html .cs-process-task-check--done { background: var(--dr-success); border-color: var(--dr-success); color: #fff; }
+html .cs-career-process-footer { border-top: 1px solid var(--dr-line); }
+html .cs-career-process-footer p { color: var(--dr-muted); }
+html .cs-career-process-assistant { color: var(--dr-accent); font-weight: 600; }
+
+html .cs-home-concierge :is(.cs-product-card, .cs-product-feature-card, .cs-kimi-step-card) {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .cs-product-feature-card strong { color: var(--dr-ink); }
+html .cs-product-feature-card span { color: var(--dr-faint); letter-spacing: 0.01em; }
+html .cs-product-feature-card p { color: var(--dr-muted); }
+html .cs-product-feature-card em { color: var(--dr-accent); font-style: normal; font-weight: 600; }
+html .cs-product-feature-icon { border-radius: var(--dr-radius-sm); }
+html .cs-home-concierge .cs-kimi-bottom-cta {
+  background: var(--dr-accent-soft);
+  border: 1px solid var(--dr-accent-line);
+  border-radius: var(--dr-radius);
+}
+html .career-news-item {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-sm);
+}
+
+/* ---------- 8. 岗位 / 报告 / 测评 / 社区 ---------- */
+html .report-launch-hero,
+html .report-setup-card {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .report-launch-title,
+html body #profile .assessment-center-heading h2 {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  color: var(--dr-ink);
+}
+html .report-launch-kicker,
+html body #profile .assessment-center-eyebrow { color: var(--dr-brass); font-weight: 600; }
+html #report .report-launch-primary {
+  background: var(--dr-ink);
+  border-color: var(--dr-ink);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 16px -6px rgba(23, 35, 59, 0.5);
+}
+html #report .report-launch-primary:hover { background: var(--dr-ink-hover); border-color: var(--dr-ink-hover); }
+html .report-launch-secondary { border-color: var(--dr-line-strong); color: var(--dr-ink-soft); }
+html .report-setup-badge { border-radius: 999px; }
+html .report-setup-badge.is-ready { background: var(--dr-success-soft); color: var(--dr-success); border-color: #cbe5d7; }
+html .report-setup-badge.is-required { background: var(--dr-warning-soft); color: var(--dr-warning); border-color: #ecd9b4; }
+html body #profile :is(.assessment-center-card, .assessment-center-history) {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html body #profile .assessment-center-card:hover {
+  border-color: var(--dr-accent-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-lg);
+}
+
+/* ---------- 9. 旅程带：深海墨色仪表带（全站唯一的深色块） ---------- */
+html .workspace-journey-shell {
+  background:
+    radial-gradient(circle at top right, rgba(168, 130, 60, 0.1), transparent 30%),
+    linear-gradient(180deg, #1b2a47, #14213a);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--dr-radius-lg);
+  box-shadow: var(--dr-shadow-lg);
+  backdrop-filter: none;
+}
+html .workspace-journey-kicker { color: var(--dr-brass); letter-spacing: 0.08em; }
+html .workspace-journey-copy h2 { color: #f4f6fa; font-family: var(--app-editorial-stack); font-weight: 600; }
+html .workspace-journey-copy p:last-child { color: rgba(228, 233, 242, 0.72); }
+html .workspace-journey-step {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--dr-radius);
+  color: #eef1f7;
+}
+html .workspace-journey-step:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(168, 130, 60, 0.5);
+}
+html .workspace-journey-step.is-active {
+  background: rgba(39, 69, 207, 0.28);
+  border-color: rgba(120, 146, 255, 0.55);
+}
+
+/* ---------- 10. 个人中心 ---------- */
+.user-center-page .uc-sidebar {
+  background: var(--dr-surface);
+  border-right: 1px solid var(--dr-line);
+}
+.user-center-page .uc-brand-copy strong { color: var(--dr-ink); }
+.user-center-page .uc-nav-link { border-radius: var(--dr-radius-sm); color: var(--dr-muted); }
+.user-center-page .uc-nav-link:hover { background: var(--dr-surface-soft); color: var(--dr-ink); }
+.user-center-page .uc-nav-link.active {
+  background: var(--dr-accent-soft);
+  color: var(--dr-accent);
+  border-color: var(--dr-accent-line);
+  box-shadow: inset 2px 0 0 var(--dr-accent);
+}
+.user-center-page .uc-nav-icon { background: var(--dr-surface-soft); color: var(--dr-muted); border-radius: 7px; }
+.user-center-page .uc-nav-link.active .uc-nav-icon { background: #fff; color: var(--dr-accent); }
+.user-center-page .uc-sidebar-note {
+  background: var(--dr-surface-soft);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+}
+.user-center-page .uc-sidebar-note h2 { color: var(--dr-ink); }
+.user-center-page .uc-sidebar-note p { color: var(--dr-muted); }
+.user-center-page .uc-topbar {
+  border-radius: var(--dr-radius);
+  border: 1px solid var(--dr-line);
+  background: var(--dr-surface);
+  box-shadow: var(--dr-shadow-sm);
+}
+.user-center-page .uc-surface {
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+
+/* 个人中心报告区：按钮与标题归队 */
+html .user-center-page .uc-section-title {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  color: var(--dr-ink);
+  letter-spacing: 0.01em;
+}
+html .career-report-primary-btn,
+html #account-center .career-report-primary-btn {
+  background: var(--dr-ink);
+  border-color: var(--dr-ink);
+  color: #fff;
+  border-radius: var(--dr-radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 16px -6px rgba(23, 35, 59, 0.5);
+}
+html .career-report-primary-btn:hover,
+html #account-center .career-report-primary-btn:hover {
+  background: var(--dr-ink-hover);
+  border-color: var(--dr-ink-hover);
+}
+html body.user-center-page #report-workspace .uc-report-read-btn {
+  background: var(--dr-ink);
+  border-color: var(--dr-ink);
+  border-radius: var(--dr-radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 12px -6px rgba(23, 35, 59, 0.5);
+}
+html body.user-center-page #report-workspace .uc-report-read-btn:hover { background: var(--dr-ink-hover); }
+html body.user-center-page #report-workspace .uc-report-toolbar .uc-report-toolbar-btn--ai {
+  background: var(--dr-accent-soft);
+  border-color: var(--dr-accent-line);
+  color: var(--dr-accent);
+}
+
+/* ---------- 12. 助手 / 招聘 / 设置 / 简历 ---------- */
+/* 共享工作区侧栏（个人中心 / 简历编辑器） */
+.uc-workspace-sidebar .uc-brand-mark {
+  background: linear-gradient(135deg, #1b2a47, var(--dr-accent));
+  border-radius: var(--dr-radius-sm);
+}
+.uc-workspace-sidebar .uc-brand-copy strong { color: var(--dr-ink); }
+.uc-workspace-sidebar .uc-nav-link { border-radius: var(--dr-radius-sm); }
+.uc-workspace-sidebar .uc-nav-link:hover { background: var(--dr-surface-soft); color: var(--dr-ink); }
+.uc-workspace-sidebar .uc-nav-link.active {
+  background: var(--dr-accent-soft);
+  border-color: var(--dr-accent-line);
+  color: var(--dr-accent);
+  box-shadow: inset 2px 0 0 var(--dr-accent);
+}
+/* 助手聊天（assistant.css 全量走令牌，这里只收敛圆角） */
+.new-chat { border-radius: var(--dr-radius-sm); }
+.session-row { border-radius: var(--dr-radius-sm); }
+
+.recruitment-card, .recruitment-detail {
+  border: 1px solid var(--dr-line);
+  border-radius: var(--dr-radius);
+  box-shadow: var(--dr-edge), var(--dr-shadow-sm);
+}
+.recruitment-badge { border-radius: 999px; }
+.recruitment-stage { border-radius: var(--dr-radius-sm); }
+.recruitment-section-icon { border-radius: 7px; }
+.recruitment-button { border-radius: var(--dr-radius-sm); }
+.recruitment-top { border-bottom: 1px solid var(--dr-line); }
+
+.sc-page {
+  --sc-ink: var(--dr-ink);
+  --sc-muted: var(--dr-muted);
+  --sc-border: var(--dr-line);
+  --sc-surface: var(--dr-surface-soft);
+  background: var(--dr-paper);
+  font-family: var(--app-font-stack);
+}
+.sc-card {
+  border-radius: var(--dr-radius);
+  border: 1px solid var(--dr-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-sm);
+}
+.sc-icon { border-radius: var(--dr-radius-sm); background: var(--dr-accent-soft); border-color: var(--dr-accent-line); color: var(--dr-accent); }
+.sc-icon-key { background: var(--dr-ink); border-color: var(--dr-ink); }
+
+/* ---------- 12b. 测评作答 / 结果页 ---------- */
+html body.tr-page {
+  font-family: var(--app-font-stack);
+  background: var(--dr-paper);
+  color: var(--dr-ink);
+}
+html .tr-sidebar {
+  background: linear-gradient(180deg, #1b2a47, #14213a);
+  color: #dbe3f0;
+}
+html .tr-nav-link {
+  border-radius: var(--dr-radius-sm);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6ebf4;
+}
+html .tr-nav-link:hover { border-color: rgba(168, 130, 60, 0.55); background: rgba(255, 255, 255, 0.09); }
+html .tr-nav-link.active { border-color: rgba(120, 146, 255, 0.6); background: rgba(39, 69, 207, 0.32); }
+html .tr-sidebar-note { border-radius: var(--dr-radius); }
+html .tr-topbar { background: rgba(255, 255, 255, 0.96); border-bottom-color: var(--dr-line); backdrop-filter: none; }
+html .tr-surface {
+  border-radius: var(--dr-radius);
+  border-color: var(--dr-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .tr-kicker { color: var(--dr-brass); letter-spacing: 0.04em; text-transform: none; }
+html .tr-head-row h2 { font-family: var(--app-editorial-stack); font-weight: 600; color: var(--dr-ink); }
+html .tr-btn { border-radius: var(--dr-radius-sm); }
+html .tr-btn.primary { background: var(--dr-ink); border-color: var(--dr-ink); }
+html .tr-btn.primary:hover { background: var(--dr-ink-hover); border-color: var(--dr-ink-hover); }
+html .tr-btn.ghost { background: var(--dr-accent-soft); border-color: var(--dr-accent-line); color: var(--dr-accent); }
+/* assessment-experience.css 用 body[data-page] 提升特异性，这里对齐 */
+html body[data-page="test-runner"] .tr-btn.primary { background: var(--dr-ink); border-color: var(--dr-ink); }
+html body[data-page="test-runner"] .tr-btn.primary:hover { background: var(--dr-ink-hover); border-color: var(--dr-ink-hover); }
+html body[data-page="test-runner"] .tr-btn.ghost { background: #fff; color: var(--dr-ink-soft); border-color: var(--dr-line-strong); }
+html body[data-page="test-runner"] .ts-option.selected .ts-option-marker { background: var(--dr-accent); color: #fff; }
+html body[data-page="test-runner"] .ts-progress-head strong { color: var(--dr-ink); }
+
+/* ---------- 12c. 锐评轮 1 收口：cascade 洞孔与语言统一 ---------- */
+/* M-1 主 CTA 归墨色（旧 .cs-career-process 前缀特异性更高） */
+html .cs-career-process .cs-career-process-primary {
+  background: var(--dr-ink);
+  border-color: var(--dr-ink);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 16px -6px rgba(23, 35, 59, 0.5);
+}
+html .cs-career-process .cs-career-process-primary:hover {
+  background: var(--dr-ink-hover);
+  border-color: var(--dr-ink-hover);
+}
+/* M-2 三步卡统一白面 10px（含 --jobs 变体与圆角） */
+html .cs-career-process .cs-career-process-step {
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface);
+  border-color: var(--dr-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-md);
+}
+html .cs-career-process .cs-career-process-step:hover {
+  border-color: var(--dr-accent-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-lg);
+}
+/* M-3 新闻 lead/side 旧卡片壳归零，保持编辑式列表 */
+html #careerNewsBoard .nd-deck .nd-story--side,
+html #careerNewsBoard .nd-deck .nd-story--lead {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--dr-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+/* M-4 「更多新鲜视角」四列海报网格 → 双栏列表 */
+html #careerNewsBoard .nd-grid { grid-template-columns: 1fr 1fr; gap: 0 2.4rem; padding-bottom: 0; }
+html #careerNewsBoard .nd-grid .nd-story { border-radius: 0; padding: 1.05rem 0.2rem; }
+@media (max-width: 1100px) {
+  html #careerNewsBoard .nd-grid { grid-template-columns: 1fr; }
+}
+/* m-1 奇数条孤儿格占满整行 */
+html #careerNewsBoard .nd-deck > .nd-story:last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* m-2/m-3 焦点环与 hover 锁死，残留守旧色点 */
+html nav.app-topbar .nav-item:focus-visible,
+html nav.app-topbar .topbar-brand:focus-visible { outline: 2px solid var(--dr-accent); outline-offset: 2px; }
+html nav.app-topbar .nav-item:hover { background: var(--dr-surface-soft) !important; color: var(--dr-ink) !important; }
+html nav.app-topbar .nav-item.active { background: transparent !important; color: var(--dr-accent) !important; box-shadow: none !important; }
+html .loading-spinner { border-top-color: var(--dr-accent); }
+html .step-indicator.active { background: var(--dr-ink); }
+/* M-6 设置/招聘/简历编辑器的粉彩与糖果功能色 */
+html .sc-icon[data-tone] { background: var(--dr-accent-soft); border-color: var(--dr-accent-line); color: var(--dr-accent); }
+html .recruitment-stages li:nth-child(1) .recruitment-stage-icon,
+html .recruitment-stages li:nth-child(3) .recruitment-stage-icon { background: var(--dr-accent-soft); color: var(--dr-accent); }
+html .recruitment-stages li:nth-child(2) .recruitment-stage-icon { background: var(--dr-brass-soft); color: var(--dr-brass); }
+html .recruitment-stages li:nth-child(4) .recruitment-stage-icon { background: var(--dr-success-soft); color: var(--dr-success); }
+html .re-accent { background: var(--dr-brass); border-color: var(--dr-brass); color: #fff; }
+html .re-accent:hover { background: #8f6d31; border-color: #8f6d31; }
+html .re-pink { color: var(--dr-accent); }
+html .re-green { color: var(--dr-success); }
+/* M-7 测评六卡 tone 收敛为 accent/success/brass 三轨 */
+html #profile .tone-blue,
+html #profile .tone-indigo,
+html #profile .tone-violet { --assessment-accent: var(--dr-accent); --assessment-tint: var(--dr-accent-soft); }
+html #profile .tone-teal { --assessment-accent: var(--dr-success); --assessment-tint: var(--dr-success-soft); }
+html #profile .tone-amber,
+html #profile .tone-rose { --assessment-accent: var(--dr-brass); --assessment-tint: var(--dr-brass-soft); }
+/* M-7 报告步骤条：序号墨/黄铜，横幅群青软底 */
+html .report-step-number {
+  font-family: var(--app-display-stack);
+  font-variant-numeric: tabular-nums;
+  color: var(--dr-brass);
+  border-color: var(--dr-line);
+  border-radius: 8px;
+}
+html .report-stage-nav .is-current .report-step-number {
+  background: var(--dr-ink);
+  border-color: var(--dr-ink);
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(23, 35, 59, 0.25);
+}
+html .report-stage-nav button:not(:disabled):hover { background: var(--dr-accent-soft); }
+html .report-stage-nav .is-current { background: var(--dr-accent-soft); }
+html .report-step-connector { background: var(--dr-line-strong); }
+html .report-step-check { color: var(--dr-success); }
+html #report .report-workflow-form textarea,
+html #report .report-workflow-form select,
+html #report .report-workflow-form input { background: var(--dr-surface); border-color: var(--dr-line); }
+html #report .report-workflow-form :is(textarea, select, input):focus { border-color: var(--dr-accent); box-shadow: var(--dr-ring); }
+/* m-4 控制台纯黑 pill → 墨色仪器面；mascot 气泡归纸面 */
+html .ca-console button,
+html .ca-console section {
+  background: linear-gradient(180deg, #1b2a47, #14213a);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #dfe6f5;
+  box-shadow: 0 8px 20px rgba(20, 33, 58, 0.35);
+}
+html .ca-console header span { color: #c9a25c; }
+html .assistant-mascot-hint {
+  background: var(--dr-surface);
+  color: var(--dr-ink-soft);
+  border: 1px solid var(--dr-line);
+  box-shadow: var(--dr-shadow-md);
+}
+/* m-6 三处主标题补编辑体 */
+html .welcome h1,
+html .sc-page h1,
+html .recruitment-hero h1 {
+  font-family: var(--app-editorial-stack);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- 12d. 锐评轮 2 收口：recruitment 钢蓝方言归令牌 + 圆角残漏 ---------- */
+html .recruitment-top a,
+html .recruitment-main a { color: var(--dr-accent); }
+html .recruitment-top a:hover,
+html .recruitment-main a:hover { color: var(--dr-accent-hover); }
+html .recruitment-main button,
+html .recruitment-button { color: var(--dr-ink-soft); border-color: var(--dr-line-strong); }
+html .recruitment-main button:hover:not(:disabled),
+html .recruitment-button:hover { background: var(--dr-surface-soft); }
+html .recruitment-main :is(a, button, input, select, summary):focus-visible { outline-color: var(--dr-accent); }
+html .recruitment-badge { background: var(--dr-accent-soft); color: var(--dr-accent); }
+html .recruitment-platform {
+  --platform-color: var(--dr-accent);
+  --platform-tint: var(--dr-accent-soft);
+  --platform-border: var(--dr-accent-line);
+  color: var(--dr-ink);
+}
+html .recruitment-run-state:is([data-status="succeeded"], [data-status="complete"]) {
+  background: var(--dr-success-soft);
+  color: var(--dr-success);
+}
+html .recruitment-views button[aria-pressed="true"] { background: var(--dr-ink); }
+html .recruitment-rows { border-radius: 0 0 var(--dr-radius) var(--dr-radius); }
+/* 圆角残漏：报告 setup 卡头 / 简历编辑器 */
+html .report-setup-card-heading,
+html details.report-setup-card > summary.report-setup-card-heading { border-radius: 9px 9px 0 0; }
+html .re-card {
+  border-radius: var(--dr-radius);
+  border-color: var(--dr-line);
+  box-shadow: var(--dr-edge), var(--dr-shadow-sm);
+}
+html .re-action-tray { border-radius: var(--dr-radius-sm); }
+html .re-dialog { border-radius: var(--dr-radius-lg); }
+/* 下划线指示器归群青（压过 product-theme 的 --cs-primary-light） */
+html nav.app-topbar .nav-item.active::after { background: var(--dr-accent); }
+/* 边界闪隐防护 + 纸面网格语言扩展到工作区外页面 */
+html .fade-in { animation-fill-mode: both; }
+html body:has(.recruitment-main),
+html body:has(.sc-main),
+html body:has(.re-shell),
+html body.tr-page {
+  background-image:
+    linear-gradient(rgba(23, 35, 59, 0.027) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 35, 59, 0.027) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 420px at 85% -100px, rgba(39, 69, 207, 0.05), transparent 70%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+/* ---------- 13. 动效 ---------- */
+/* Lenis 惯性滚动所需的基础规则 */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+.dr-pre { opacity: 0; transform: translateY(14px); }
+.dr-in {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.55s var(--dr-ease), transform 0.55s var(--dr-ease);
+}
+.dr-count { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .dr-pre { opacity: 1; transform: none; }
+  .cs-hero-product-dot { animation: none; }
+}
+
+/* ---------- 14. 小屏回落 ---------- */
+@media (max-width: 760px) {
+  html #productHero .cs-product-stat-value { font-size: 1.35rem; }
+  html #productHero .cs-hero-product-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* DOM 里读数之间夹着 divider 节点（已隐藏），按真实位置取 nth-child */
+  html .cs-product-stat:nth-child(3),
+  html .cs-product-stat:nth-child(7) { border-right: 0; }
+  html .cs-product-stat:nth-child(1),
+  html .cs-product-stat:nth-child(3) { border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
+  html .cs-hero-product { border-radius: var(--dr-radius); }
+  html .cs-hero-product-inner { padding: 0 1.2rem 1.3rem; }
+  html .cs-hero-kimi-tagline { font-size: 1.45rem; }
+}
+
+/* ---------- 15. 打印 ---------- */
+@media print {
+  body.bg-gray-50, body.user-center-page {
+    background: #fff !important;
+  }
+  .glass-surface, .cs-hero-product, .uc-surface {
+    box-shadow: none !important;
+    border-color: #d8dde5 !important;
+  }
+  .dr-pre, .dr-in { opacity: 1 !important; transform: none !important; }
+}

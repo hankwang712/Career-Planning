@@ -77,6 +77,10 @@ function renderReportWizard() {
       const feedback = document.getElementById("reportLaunchFeedback");
       if (feedback && !reportGenerationStarting) feedback.hidden = true;
     });
+    // 校验失败的字段若在收起的卡片里，先展开卡片再让浏览器提示
+    form.addEventListener("invalid", (event) => {
+      event.target.closest("details")?.setAttribute("open", "");
+    }, true);
   }
 }
 
@@ -89,7 +93,10 @@ function showReportWizardStage(stage) {
   else renderReportWorkflowReview(getReportRuntimeState());
   const target = document.getElementById(reportResumeUiState.source ? "reportWorkflowTargets" : "reportResumeEditorLink");
   requestAnimationFrame(() => {
-    if (target && stage !== 3) target.focus({ preventScroll: true });
+    if (target && stage !== 3) {
+      target.closest("details")?.setAttribute("open", "");
+      target.focus({ preventScroll: true });
+    }
   });
 }
 
@@ -986,7 +993,7 @@ async function resumeCareerReportRuntime() {
   }
 }
 
-function renderReportResumePanel() {
+function renderReportResumePanel(_state) {
   const running = isCareerReportRunningStatus(getCareerReportStateSafe()?.status);
   document.getElementById("reportWorkflowInput")?.querySelectorAll("input, textarea, select").forEach((field) => {
     field.disabled = running || reportGenerationStarting;
