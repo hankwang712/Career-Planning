@@ -121,6 +121,10 @@ def test_fresh_browser_opens_the_local_workspace(browser, live_server):
         page.get_by_role("button", name="关闭引导").click()
         page.get_by_role("button", name="工作区菜单").click()
         assert page.get_by_role("menuitem", name="个人中心").is_visible()
+        navigation = page.get_by_role("navigation", name="主导航")
+        navigation.get_by_role("link", name="岗位探索").click()
+        page.wait_for_url("**/recruitment")
+        assert page.get_by_role("heading", name="招聘信息采集").is_visible()
         assert errors == []
     finally:
         page.close()

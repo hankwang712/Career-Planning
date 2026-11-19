@@ -76,8 +76,8 @@
                             <rect x="14" y="14" width="7" height="7" rx="1"></rect>
                         </svg>
                         首页
-                    </button>
-                    <button onclick="showSection('jobs')" data-section="jobs" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
+                    </a>
+                    <a href="{{ url_for('recruitment.page') }}" data-section="jobs" class="nav-item px-5 py-2.5 rounded-xl text-[15px] font-semibold transition-all whitespace-nowrap flex-shrink-0">
                         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="7"></circle>
                             <path d="m20 20-4.2-4.2"></path>
@@ -151,7 +151,7 @@
                 <div>
                     <h4 class="font-semibold mb-3">产品服务</h4>
                     <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="#" onclick="showSection('jobs')" class="hover:text-white transition-all">岗位探索</a></li>
+                        <li><a href="{{ url_for('recruitment.page') }}" class="hover:text-white transition-all">岗位探索</a></li>
                         <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
                         <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
                     </ul>
