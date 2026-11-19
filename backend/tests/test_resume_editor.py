@@ -8,39 +8,58 @@ from PIL import Image
 from services.resume import editor_document, pipeline
 
 
-def test_rewrite_creates_only_a_temporary_copy_and_rejects_unsupported_claims(make_account, monkeypatch):
+def test_rewrite_creates_only_a_temporary_copy_and_rejects_unsupported_claims(make_account, monkeypatch, tmp_path):
     from services.resume import rewrite
 
     account = make_account("resume-rewrite")
     route = "/api/resume-editor"
-    original = {"title": "基础简历", "contact": {"name": "林晓", "email": "private@example.com"}, "sections": [
+    skill_file = tmp_path / "resume_rewrite.md"
+    skill_text = "# 改写规则\n\n使用 <FINAL_RESUME> 输出定稿。\n"
+    skill_file.write_text(skill_text, encoding="utf-8", newline="\n")
+    monkeypatch.setenv("RESUME_REWRITE_SKILL_PATH", str(skill_file))
+    original = {"title": "基础简历", "style": "blue", "contact": {"name": "林晓", "email": "private@example.com"}, "sections": [
         {"title": "工作经历", "content": "### 订单开发组 2025.03\n- 使用 Python 编写订单脚本，整理对账记录\n- 配合维护已有接口并处理常见数据问题"},
         {"title": "教育经历", "content": "示例大学 | 本科 | 2022–2026"},
+        {"title": "项目经历", "content": "论坛维护 | 维护成员 | 2023.06\n- 整理社区讨论与使用反馈"},
+        {"title": "专业技能", "content": "Python、数据处理"},
     ]}
     saved = account.post(route + "/drafts", json=original).get_json()
     default = account.get(route + "/rewrite/settings").get_json()
     assert default["settings"]["skill"] == "resume_rewrite"
-    assert "JobHunter" in default["skills"][0]["name"]
+    assert default["skills"][0]["name"] == "简历改写"
+    assert default["prompt"] == skill_text
     monkeypatch.setattr(rewrite.llm_env, "chat_runtime", lambda: ("https://model.invalid", "mock-key", "mock"))
 
     def model(*args, **kwargs):
         raw = args[3][0]["content"]
         assert "private@example.com" not in raw and "林晓" not in raw
-        lines = json.loads(raw)["lines"]
-        assert set(lines) == {"0:1", "0:2"}
-        return {"edits": [
-            {"id": "0:1", "evidence": lines["0:1"]["text"], "text": "- 用 Python 编写订单脚本，整理对账记录"},
-            {"id": "0:2", "evidence": lines["0:2"]["text"], "text": "- 主导 Kubernetes 部署，效率提升 90%"},
-        ]}
+        assert args[4] == skill_text
+        assert "### 论坛维护 | 维护成员 | 2023.06" in raw
+        return """<THINKING>仅用于测试过滤的文本</THINKING>
+<FINAL_RESUME>
+## 🏢 工作经历
+### 订单开发组 2025.03
+- 用 **Python** 编写订单脚本，整理对账记录
+- 维护已有接口，处理常见数据问题
+## 🚀 项目经历
+## 🛠️ 核心技能
+- 主导 Kubernetes 部署，效率提升 90%
+## 🎓 教育背景
+- 无关学校
+</FINAL_RESUME>"""
 
-    monkeypatch.setattr(rewrite, "call_structured_chat", model)
+    monkeypatch.setattr(rewrite, "call_markdown_chat", model)
     result = account.post(route + "/rewrite", json={"document": saved["document"], "job": {
         "title": "数据工程师", "description": "使用 Python 搭建订单数据管道",
     }}).get_json()
-    assert len(result["changes"]) == 1
+    assert [change["section"] for change in result["changes"]] == ["工作经历", "项目经历"]
     assert result["document"]["contact"] == saved["document"]["contact"]
+    assert result["document"]["style"] == "blue"
     assert result["document"]["sections"][1] == saved["document"]["sections"][1]
-    assert "Kubernetes" not in result["document"]["sections"][0]["content"]
+    assert result["document"]["sections"][2]["content"] == ""
+    assert result["document"]["sections"][3] == saved["document"]["sections"][3]
+    assert "**Python**" in result["document"]["sections"][0]["content"]
+    assert "THINKING" not in json.dumps(result)
     assert len(account.get(route + "/drafts").get_json()["drafts"]) == 1
     assert account.get(route + "/drafts/" + saved["id"]).get_json() == saved
     copied = account.post(route + "/drafts", json=result["document"]).get_json()

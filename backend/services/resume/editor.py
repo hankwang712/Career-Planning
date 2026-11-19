@@ -19,7 +19,7 @@ from backend.advisor.utils.resume_grounding import explicit_resume_role
 from services import db, llm_env
 from services.user_state import _current_user, _load_user_state, _login_required, _owned_resume_storage_path
 from . import pipeline, rewrite
-from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, STYLES, choose_layout, clean_document, parse_resume, render_resume
+from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, choose_layout, clean_document, parse_resume, render_resume
 from .editor_pdf import read_layout, read_page_target
 from .matcher import _extract_docx_text
 
@@ -38,13 +38,16 @@ def index():
     has_source = bool(path and Path(path).is_file())
     return render_template("resume_editor.html", contact=CONTACT, sections=list(SECTIONS),
                            has_source=has_source, ai_configured=llm_env.chat_configured(),
-                           max_sections=MAX_SECTIONS, styles=STYLES)
+                           max_sections=MAX_SECTIONS)
 
 
 def rewrite_state(conn, owner, preview_skill=None):
     settings = rewrite.options(conn, owner)
-    response = jsonify(settings=settings, skills=rewrite.skills(conn, owner),
-                       prompt=rewrite.instructions(conn, owner, preview_skill or settings["skill"]))
+    try:
+        prompt = rewrite.instructions(conn, owner, preview_skill or settings["skill"])
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    response = jsonify(settings=settings, skills=rewrite.skills(conn, owner), prompt=prompt)
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -97,8 +100,6 @@ def rewrite_skill_import():
 @blueprint.post("/api/resume-editor/rewrite")
 @_login_required
 def rewrite_resume():
-    from services.recruitment import listing_identity
-
     payload = request.get_json(silent=True)
     job = payload.get("job") if isinstance(payload, dict) else None
     if not isinstance(job, dict) or not all(isinstance(job.get(key), str) and "\x00" not in job[key]
@@ -110,38 +111,26 @@ def rewrite_resume():
     owner = _current_user()["username"]
     conn = db._get_conn()
     settings = rewrite.options(conn, owner)
-    skill = rewrite.instructions(conn, owner, settings["skill"])
+    try:
+        skill = rewrite.instructions(conn, owner, settings["skill"])
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
     if not skill:
         return jsonify(message="请先选择有效的改写 Skill。"), 400
-    diagnosis = {}
-    if settings["diagnosis"] and job.get("source") and job.get("url"):
-        source, url = listing_identity(job)
-        if url:
-            row = conn.execute("""
-                SELECT payload FROM recruitment_ai_results
-                WHERE owner=? AND source=? AND url_key=? AND kind='match'
-            """, (owner, source, url)).fetchone()
-            if row:
-                analysis = json.loads(row["payload"])
-                diagnosis = {key: {"score": item.get("score"), "reason": item.get("reason")}
-                             for key, item in analysis.get("dimensions", {}).items()}
     if not rewrite.SLOTS.acquire(blocking=False):
         return jsonify(message="当前改写任务较多，请稍后重试。"), 429
     try:
         document = clean_document(payload.get("document"))
         try:
             result, changes = rewrite.generate(document, {"title": job_title, "description": description},
-                                               skill, settings["style"], diagnosis)
-        except ValueError:
-            if not rewrite.source_lines(document) or not llm_env.chat_configured():
-                raise
+                                               skill, full=settings["skill"] == rewrite.DEFAULT_ID)
+        except rewrite.RewriteInputError:
+            raise
+        except Exception:
             logger.warning("Resume rewrite could not complete")
             return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
     except ValueError as error:
         return jsonify(message=str(error)), 400
-    except Exception:
-        logger.warning("Resume rewrite could not complete")
-        return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
     finally:
         rewrite.SLOTS.release()
     response = jsonify(document=result, changes=changes)

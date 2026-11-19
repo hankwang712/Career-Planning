@@ -297,20 +297,12 @@
   const skillSelect = document.getElementById("resumeRewriteSkill");
   const skillPrompt = document.getElementById("resumeSkillPrompt");
   let rewriteDocument;
-  let rewriteJob = {};
   let rewriteBusy = false;
 
   function applyRewriteSettings(data) {
     skillSelect.replaceChildren(...data.skills.map(skill => new Option(`${skill.name} · ${skill.origin}`, skill.id)));
     skillSelect.value = data.settings.skill;
-    rewriteForm.elements.style.value = data.settings.style;
-    rewriteForm.elements.diagnosis.checked = data.settings.diagnosis;
     skillPrompt.textContent = data.prompt;
-  }
-
-  function readRewriteSettings() {
-    return { skill: skillSelect.value, style: rewriteForm.elements.style.value,
-      diagnosis: rewriteForm.elements.diagnosis.checked };
   }
 
   async function rewriteAction(task, progress) {
@@ -339,7 +331,6 @@
 
   function setRewriteJob(job) {
     if (!job || typeof job.title !== "string") return;
-    rewriteJob = job;
     rewriteForm.elements.job_title.value = job.title.slice(0, 120);
     rewriteForm.elements.job_description.value = String(job.description || "").slice(0, 12000);
     if (rewriteForm.elements.resume_source && !readDraft().sections.some(section => section.content.trim())) {
@@ -371,7 +362,7 @@
     }, "正在导入 Skill…");
   };
   document.getElementById("resumeRewriteSaveSettings").onclick = () => {
-    const data = readRewriteSettings();
+    const data = { skill: skillSelect.value };
     void rewriteAction(async () => {
       applyRewriteSettings(await (await request("/rewrite/settings", { method: "POST", data })).json());
       rewriteStatus.textContent = "设置已保存。";
@@ -379,9 +370,9 @@
   };
   rewriteForm.addEventListener("submit", event => {
     event.preventDefault();
-    const settings = readRewriteSettings();
+    const settings = { skill: skillSelect.value };
     const job = {
-      ...rewriteJob, title: rewriteForm.elements.job_title.value,
+      title: rewriteForm.elements.job_title.value,
       description: rewriteForm.elements.job_description.value,
     };
     const useUploaded = rewriteForm.elements.resume_source?.value === "uploaded";
@@ -402,7 +393,10 @@
       changes.replaceChildren(...result.changes.map(change => {
         const entry = document.createElement("div");
         entry.className = "re-rewrite-change";
-        for (const [tag, value] of [["strong", change.section], ["p", "原句：" + change.before], ["p", "改写：" + change.after]]) {
+        const entries = [["strong", change.section]];
+        if (change.before) entries.push(["p", "原文：" + change.before]);
+        entries.push(["p", change.after ? "改写：" + change.after : "本版省略"]);
+        for (const [tag, value] of entries) {
           const element = document.createElement(tag);
           element.textContent = value;
           entry.append(element);

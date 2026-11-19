@@ -496,25 +496,26 @@ def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in
     assert errors == []
 
 
-def test_resume_job_handoff_and_temporary_rewrite(logged_in_page, live_server, monkeypatch):
-    import json
+def test_resume_job_handoff_and_temporary_rewrite(logged_in_page, live_server, monkeypatch, tmp_path):
     from services.resume import rewrite
 
+    skill = tmp_path / "resume_rewrite.md"
+    skill.write_text("示例改写规则\n", encoding="utf-8")
+    monkeypatch.setenv("RESUME_REWRITE_SKILL_PATH", str(skill))
     monkeypatch.setattr(rewrite.llm_env, "chat_runtime", lambda: ("https://model.invalid", "mock", "mock"))
 
     def model(*args, **kwargs):
-        payload = json.loads(args[3][0]["content"])
-        key, line = next(iter(payload["lines"].items()))
-        assert payload["job"]["title"] == "数据工程师"
-        return {"edits": [{"id": key, "evidence": line["text"], "text": "使用 Python 整理订单数据并生成对账记录"}]}
+        assert "数据工程师" in args[3][0]["content"]
+        return "<FINAL_RESUME>\n## 工作经历\n- 使用 Python 整理订单数据并生成对账记录\n</FINAL_RESUME>"
 
-    monkeypatch.setattr(rewrite, "call_structured_chat", model)
+    monkeypatch.setattr(rewrite, "call_markdown_chat", model)
     page = logged_in_page
     page.goto(live_server + "/user-center/resumes")
     work = page.get_by_role("button", name="工作经历", exact=True)
     work.click()
     original_line = "使用 Python 处理订单数据并编写日常对账记录"
-    page.locator(".re-section").nth(1).locator("textarea").fill(original_line)
+    work_card = page.locator(".re-section").nth(1)
+    work_card.locator("textarea:visible").first.fill(original_line)
     page.locator("[name=title]").fill("基础简历")
     page.get_by_role("button", name="保存", exact=True).click()
     page.get_by_text("已保存的简历", exact=True).wait_for()
@@ -527,19 +528,20 @@ def test_resume_job_handoff_and_temporary_rewrite(logged_in_page, live_server, m
     page.wait_for_url("**/user-center/resumes?rewrite=1")
     drawer = page.get_by_role("dialog", name="简历改写")
     drawer.wait_for()
+    assert drawer.get_by_text("改写与版式").count() == 0
+    drawer.locator("#resumeRewriteSkill").get_by_role("option", name="简历改写 · 内置规则").wait_for(state="attached")
     bounds = drawer.bounding_box()
     assert abs(bounds["x"] + bounds["width"] - page.viewport_size["width"]) <= 1
     assert drawer.locator("[name=job_title]").input_value() == "数据工程师"
     assert "负责编写订单数据管道" in drawer.locator("[name=job_description]").input_value()
     drawer.get_by_role("button", name="生成改写草稿").click()
     drawer.get_by_text("已生成临时草稿，共 1 处改写。").wait_for()
-    drawer.get_by_text("改写：使用 Python 整理订单数据并生成对账记录").wait_for()
+    drawer.get_by_text("改写：- 使用 Python 整理订单数据并生成对账记录").wait_for()
     drawer.get_by_role("button", name="另存为新版本").click()
     drawer.get_by_text("已另存为新版本，可在「简历版本」中打开编辑。").wait_for()
     drawer.get_by_role("button", name="关闭简历改写").click()
     assert page.locator("[name=title]").input_value() == "基础简历"
-    work.click()
-    assert page.locator(".re-section").nth(1).locator("textarea").input_value() == original_line
+    assert work_card.locator("[data-section-content]").input_value().removeprefix("- ") == original_line
     page.locator("#resumeVersions summary").click()
     page.get_by_role("button", name="基础简历 · 数据工程师改写").wait_for()
 

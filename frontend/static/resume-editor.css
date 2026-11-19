@@ -131,21 +131,10 @@ button:disabled { opacity: .34; cursor: default; }
 .re-rewrite-card summary { cursor: pointer; color: #335075; font-size: 13px; }
 #resumeSkillImport { margin-top: 8px; }
 .re-skill-prompt { padding: 9px; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fa; }
-.re-material-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; padding: 0; border: 0; }
-.re-material-styles .re-material-style {
-  display: grid; justify-items: center; align-content: start; gap: 5px; min-width: 0; margin: 4px 0 0; padding: 8px;
-  border: 1px solid #dde4ec; border-radius: 8px; cursor: pointer;
-}
-.re-material-style:has(input:checked) { border-color: #476890; background: #eef4fc; }
-.re-material-paper { display: grid; align-content: start; gap: 5px; width: 42px; height: 54px; padding: 7px 5px; border: 1px solid #dde4ec; background: #fff; color: #20252b; }
-.re-material-paper i { height: 1px; background: currentColor; opacity: .4; }
-.re-material-paper i:first-child { width: 55%; margin: 0 auto 3px; height: 2px; opacity: 1; }
-[data-style=blue] .re-material-paper { color: #254f77; }
-[data-style=compact] .re-material-paper { color: #283b60; gap: 3px; }
 .re-rewrite-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .re-rewrite-changes { display: grid; gap: 8px; margin: 8px 0 12px; }
 .re-rewrite-change { padding: 8px 10px; border-radius: 7px; background: #f5f7fa; overflow-wrap: anywhere; font-size: 12px; }
-.re-rewrite-change p { margin: 4px 0 0; }
+.re-rewrite-change p { margin: 4px 0 0; white-space: pre-wrap; }
 body:has(.re-rewrite[open]) { overflow: hidden; }
 #resumePreviewInfo { color: #52525b; margin: 11px 18px 0; font-size: 12px; }
 #resumePreviewPages { display: grid; gap: 12px; padding: 14px; }

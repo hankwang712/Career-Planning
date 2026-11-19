@@ -188,20 +188,6 @@
                     <pre id="resumeSkillPrompt" class="re-skill-prompt"></pre>
                 </details>
             </section>
-            <section class="re-rewrite-card">
-                <h3>改写与版式</h3>
-                <label class="re-checkbox"><input name="diagnosis" type="checkbox">参考该岗位已保存的 AI 初评</label>
-                <fieldset class="re-material-styles">
-                    <legend>简历版式</legend>
-                    {% for value, name in styles.items() %}
-                    <label class="re-material-style" data-style="{{ value }}">
-                        <input type="radio" name="style" value="{{ value }}" {% if loop.first %}checked{% endif %}>
-                        <span class="re-material-paper" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-                        <span>{{ name }}</span>
-                    </label>
-                    {% endfor %}
-                </fieldset>
-            </section>
             <div class="re-rewrite-actions">
                 <button id="resumeRewriteSaveSettings" type="button" class="re-button">保存设置</button>
                 <button type="submit" class="re-button re-primary">生成改写草稿</button>
