@@ -279,6 +279,7 @@ def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_p
 
     page.route("**/api/job-market/collection/session/*", session)
     page.goto(live_server + "/recruitment")
+    page.get_by_role("button", name="配置采集").click()
     sessions = page.locator("#recruitmentSessions")
     cards = sessions.locator(".recruitment-session")
     assert cards.count() == 4
@@ -315,6 +316,7 @@ def test_recruitment_city_picker_search_group_and_submission(logged_in_page, liv
 
     page.route("**/api/job-market/collection/runs", runs)
     page.goto(live_server + "/recruitment")
+    page.get_by_role("button", name="配置采集").click()
     toggle = page.locator("#recruitmentCityToggle")
     menu = page.locator("#recruitmentCityMenu")
     toggle.click()
@@ -339,6 +341,7 @@ def test_recruitment_city_picker_search_group_and_submission(logged_in_page, liv
     page.get_by_label("关键词").fill("Agent")
     page.get_by_role("button", name="开始采集").click()
     page.get_by_text("已启动采集。各平台的结果会陆续显示。").wait_for()
+    assert page.get_by_role("dialog", name="采集条件").is_hidden()
     assert requests[0]["city"] == "泉州"
 
 
@@ -372,10 +375,10 @@ def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, 
 def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment")
-    profile = page.get_by_label("求职方向", exact=True)
-    profile.select_option("internship")
     page.get_by_role("button", name="配置与预览").click()
     dialog = page.get_by_role("dialog", name="清洗规则")
+    profile = dialog.get_by_label("清洗方向")
+    profile.select_option("internship")
     dialog.get_by_label("最低日薪（元/天）").fill("200")
     dialog.get_by_role("button", name="保存规则").click()
     dialog.get_by_text("规则已保存。").wait_for()
@@ -385,8 +388,8 @@ def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, li
     job = page.locator(".recruitment-row").filter(has_text="示例岗位")
     job.get_by_text("实习", exact=True).wait_for()
 
-    profile.select_option("full_time")
     page.get_by_role("button", name="配置与预览").click()
+    profile.select_option("full_time")
     dialog.get_by_label("最低月薪（K）").fill("15")
     assert dialog.get_by_label("最低日薪（元/天）").is_hidden()
     dialog.get_by_role("button", name="保存规则").click()
@@ -427,8 +430,18 @@ def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in
     assert login.is_visible()
     start = page.locator("#recruitmentStart")
     platform_choices = page.locator("#recruitmentCollect fieldset")
+    drawer = page.locator("#recruitmentCollectDialog")
+    assert drawer.is_hidden()
+    assert page.locator("#recruitmentCleaningDialog").is_hidden()
+    open_button = page.get_by_role("button", name="配置采集")
+    open_button.click()
+    bounds = drawer.bounding_box()
+    assert abs(bounds["x"] + bounds["width"] - page.viewport_size["width"]) <= 1
     assert start.is_disabled()
-    assert start.bounding_box()["y"] < platform_choices.bounding_box()["y"]
+    assert start.bounding_box()["y"] > platform_choices.bounding_box()["y"]
+    page.keyboard.press("Escape")
+    assert drawer.is_hidden()
+    assert open_button.evaluate("(button) => document.activeElement === button")
 
     latest["status"] = "interrupted"
     page.get_by_role("button", name="刷新", exact=True).click()
@@ -439,6 +452,8 @@ def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in
     assert page.locator("#recruitmentRuns").get_by_text("Agent · 杭州", exact=True).is_visible()
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") == 390
+    open_button.click()
+    assert drawer.bounding_box()["width"] == 390
     assert start.bounding_box()["y"] > platform_choices.bounding_box()["y"]
     assert errors == []
 

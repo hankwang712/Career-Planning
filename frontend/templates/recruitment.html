@@ -54,11 +54,19 @@
                     <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
                 </details>
             </section>
+            <div class="recruitment-stages">
             <section class="recruitment-card recruitment-config" aria-labelledby="recruitmentConfig">
-                <header><div class="recruitment-section-heading">
-                    <span class="recruitment-section-icon" aria-hidden="true">⚙</span>
-                    <h2 id="recruitmentConfig">采集条件</h2>
-                </div></header>
+                <header>
+                    <div class="recruitment-section-heading">
+                        <span class="recruitment-section-icon" aria-hidden="true">⚙</span>
+                        <h2 id="recruitmentConfig">平台采集</h2>
+                    </div>
+                    <button id="recruitmentCollectOpen" type="button" aria-haspopup="dialog">配置采集</button>
+                </header>
+                <p id="recruitmentCollectSummary" class="recruitment-stage-summary">通用 · 不限城市</p>
+            </section>
+            <dialog id="recruitmentCollectDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentCollectTitle">
+                <header><h2 id="recruitmentCollectTitle">采集条件</h2><form method="dialog"><button>关闭</button></form></header>
                 <form id="recruitmentCollect" class="recruitment-card-body">
                     <div class="recruitment-form-grid">
                         <label>关键词<input name="keyword" maxlength="80" placeholder="例如：Agent 开发实习" required></label>
@@ -156,9 +164,10 @@
                         {% endif %}
                     </div>
                     {% endif %}
+                    <p id="recruitmentCollectFeedback" class="recruitment-drawer-feedback" role="status" hidden></p>
                     <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
                 </form>
-            </section>
+            </dialog>
             <section class="recruitment-card recruitment-cleaning" aria-labelledby="recruitmentCleaningTitle">
                 <header>
                     <div class="recruitment-section-heading">
@@ -167,7 +176,7 @@
                         <span id="recruitmentCleaningMode" class="recruitment-badge">通用 · 手动清洗</span>
                     </div>
                     <div class="recruitment-actions">
-                        <button id="recruitmentCleaningOpen" type="button">配置与预览</button>
+                        <button id="recruitmentCleaningOpen" type="button" aria-haspopup="dialog">配置与预览</button>
                     </div>
                 </header>
                 <dl id="recruitmentCleaningCounts" class="recruitment-cleaning-counts">
@@ -177,6 +186,7 @@
                     <div data-clean-status="review"><dt>待核对</dt><dd>—</dd></div>
                 </dl>
             </section>
+            </div>
             <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
                 <header>
                     <div class="recruitment-section-heading">
@@ -211,9 +221,12 @@
             </section>
         </div>
     </main>
-    <dialog id="recruitmentCleaningDialog" class="recruitment-detail" aria-labelledby="recruitmentRulesTitle">
-        <header><div class="recruitment-section-heading"><h2 id="recruitmentRulesTitle">清洗规则</h2><span id="recruitmentRulesProfile" class="recruitment-badge">通用</span></div><form method="dialog"><button>关闭</button></form></header>
+    <dialog id="recruitmentCleaningDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentRulesTitle">
+        <header><h2 id="recruitmentRulesTitle">清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentCleaningForm" class="recruitment-card-body">
+            <label>清洗方向<select id="recruitmentRulesProfile" aria-label="清洗方向">
+                {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+            </select></label>
             <fieldset class="recruitment-rule-fields" disabled>
                 <label>目标城市<input name="cities" maxlength="2500" placeholder="例如 杭州、上海、远程"></label>
                 <div class="recruitment-rule-salary">
@@ -237,7 +250,7 @@
             <ul id="recruitmentCleaningPreview" class="recruitment-rule-preview" hidden></ul>
         </form>
     </dialog>
-    <dialog id="recruitmentDetail" class="recruitment-detail" aria-labelledby="recruitmentDetailTitle">
+    <dialog id="recruitmentDetail" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentDetailTitle">
         <header><h2 id="recruitmentDetailTitle"></h2><form method="dialog"><button>关闭</button></form></header>
         <div class="recruitment-card-body">
             <p id="recruitmentDetailMeta"></p>
@@ -253,7 +266,7 @@
             <a id="recruitmentOriginal" class="recruitment-button" target="_blank" rel="noopener noreferrer">查看原帖 ↗</a>
         </div>
     </dialog>
-    <dialog id="recruitmentImportPage" class="recruitment-detail" aria-labelledby="recruitmentImportPageTitle">
+    <dialog id="recruitmentImportPage" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentImportPageTitle">
         <header><h2 id="recruitmentImportPageTitle">导入已保存的搜索页</h2><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentHtmlForm" class="recruitment-card-body recruitment-html-form">
             <p>在原站打开搜索结果，用浏览器的“网页，仅 HTML”保存，再上传该 HTML 文件。</p>

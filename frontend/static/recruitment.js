@@ -3,7 +3,10 @@
   const API = "/api/job-market/collection";
   const byId = (id) => document.getElementById(id);
   const config = byId("recruitmentCollect");
+  const collectDialog = byId("recruitmentCollectDialog");
+  const collectFeedback = byId("recruitmentCollectFeedback");
   const profileSelect = byId("recruitmentProfile");
+  const rulesProfileSelect = byId("recruitmentRulesProfile");
   const profileNames = new Map(Array.from(profileSelect.options, (option) => [option.value, option.text]));
   const filterForm = byId("recruitmentFilters");
   const sources = new Map(Array.from(filterForm.elements.source.options).map((option) => [option.value, option.text]));
@@ -57,6 +60,17 @@
   function updateStart() {
     start.disabled = submitting || active;
     start.textContent = active ? "正在采集…" : "开始采集";
+  }
+
+  function updateCollectionSummary() {
+    const summary = [profileNames.get(profileSelect.value), byId("recruitmentCityValue").textContent,
+      config.elements.keyword.value.trim()];
+    byId("recruitmentCollectSummary").textContent = summary.filter(Boolean).join(" · ");
+  }
+
+  function showCollectFeedback(message) {
+    collectFeedback.textContent = message;
+    collectFeedback.hidden = !message;
   }
 
   function displaySalary(salary) {
@@ -348,6 +362,7 @@
       button.setAttribute("aria-pressed", button.dataset.city === option.dataset.city);
     }
     showCityCoverage();
+    updateCollectionSummary();
     closeCities(true);
   }
 
@@ -388,14 +403,26 @@
   config.addEventListener("change", (event) => {
     if (event.target.name === "source") showCityCoverage();
   });
+  config.elements.keyword.addEventListener("input", updateCollectionSummary);
+  byId("recruitmentCollectOpen").onclick = () => {
+    showCollectFeedback("");
+    collectDialog.showModal();
+  };
+  collectDialog.addEventListener("close", () => closeCities());
+  for (const drawer of document.querySelectorAll(".recruitment-drawer")) {
+    drawer.addEventListener("click", (event) => {
+      if (event.target === drawer && event.clientX < drawer.getBoundingClientRect().left) drawer.close();
+    });
+  }
 
   config.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (start.disabled) return;
     const data = new FormData(config);
     const platforms = data.getAll("source");
-    if (!platforms.length) return notice("请至少选择一个采集平台。", "error");
+    if (!platforms.length) return showCollectFeedback("请至少选择一个采集平台。");
     submitting = true;
+    showCollectFeedback("");
     updateStart();
     try {
       const chromeSources = config.elements.bossLocal?.dataset.chromeSources;
@@ -406,9 +433,11 @@
         chrome_local: Boolean(data.has("bossLocal") && chromeSources?.split(",").some((source) => platforms.includes(source)))
       });
       active = true;
+      collectDialog.close();
       notice("已启动采集。各平台的结果会陆续显示。");
     } catch (error) {
-      notice(error.message, "error");
+      if (collectDialog.open) showCollectFeedback(error.message);
+      else notice(error.message, "error");
     } finally {
       submitting = false;
       updateStart();
@@ -499,7 +528,6 @@
     resetPreview();
     cleaningFields.disabled = true;
     const profileName = profileNames.get(profile);
-    byId("recruitmentRulesProfile").textContent = profileName;
     byId("recruitmentCleaningMode").textContent = profileName;
     const dailyRules = byId("recruitmentDailyRules");
     dailyRules.hidden = profile !== "internship";
@@ -525,6 +553,7 @@
     rulesBusy = true;
     cleaningFields.disabled = true;
     profileSelect.disabled = true;
+    rulesProfileSelect.disabled = true;
     cleaningFeedback.textContent = "正在处理…";
     try {
       const result = await api("/cleaning/" + action, payload);
@@ -542,11 +571,13 @@
     } finally {
       cleaningFields.disabled = false;
       profileSelect.disabled = false;
+      rulesProfileSelect.disabled = false;
       rulesBusy = false;
     }
   }
 
   byId("recruitmentCleaningOpen").onclick = () => {
+    rulesProfileSelect.value = profileSelect.value;
     cleaningDialog.showModal();
     void loadRules();
   };
@@ -560,10 +591,15 @@
   });
   byId("recruitmentCleaningSave").onclick = () => { void runRuleAction("save"); };
   applyRules.onclick = () => { void runRuleAction("apply"); };
-  profileSelect.addEventListener("change", () => {
+  function selectProfile(profile) {
+    profileSelect.value = profile;
+    rulesProfileSelect.value = profile;
+    updateCollectionSummary();
     void loadRules();
     void loadJobs();
-  });
+  }
+  profileSelect.addEventListener("change", () => selectProfile(profileSelect.value));
+  rulesProfileSelect.addEventListener("change", () => selectProfile(rulesProfileSelect.value));
   void loadRules();
 
   const sessions = byId("recruitmentSessions");
