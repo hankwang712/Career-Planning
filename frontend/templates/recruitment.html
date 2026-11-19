@@ -226,35 +226,49 @@
         </div>
     </main>
     <dialog id="recruitmentCleaningDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentRulesTitle">
-        <header><h2 id="recruitmentRulesTitle">清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
+        <svg class="recruitment-rule-symbols" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <symbol id="rule-icon-brush" viewBox="0 0 24 24"><path d="m13 15 7.4-8.9a1.8 1.8 0 0 0-2.5-2.5L9 11m4 4-4-4m4 4c0 3.6-2.5 5-5.5 5H3c1.7-1.4 2.4-2.7 2.5-4.2C5.7 13 7 11 9 11"/></symbol>
+            <symbol id="rule-icon-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z"/></symbol>
+            <symbol id="rule-icon-salary" viewBox="0 0 24 24"><path d="m6 4 6 7 6-7M6.5 11.5h11M6.5 15.5h11M12 11v9"/></symbol>
+            <symbol id="rule-icon-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18m-9-1v3"/></symbol>
+            <symbol id="rule-icon-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 10-7 10s-7-5-7-10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+            <symbol id="rule-icon-school" viewBox="0 0 24 24"><path d="m2.5 9 9.5-4 9.5 4-9.5 4zM6.5 11v5c3.5 3 7.5 3 11 0v-5m4-2v6"/></symbol>
+            <symbol id="rule-icon-sparkles" viewBox="0 0 24 24"><path d="m11 3 1.6 5.4L18 10l-5.4 1.6L11 17l-1.6-5.4L4 10l5.4-1.6zm7 10 1 2.5 2.5 1L19 17l-1 2.5-1-2.5-2.5-.5 2.5-1zM5 15v5m-2.5-2.5h5"/></symbol>
+            <symbol id="rule-icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+            <symbol id="rule-icon-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15m-12 0 1 14h7l1-14m-7-3h5l1 3M10.5 10v7m3-7v7"/></symbol>
+        </svg>
+        <header><h2 id="recruitmentRulesTitle" class="recruitment-rule-heading">{{ rule_icon('brush', 'rule-amber') }}清洗规则</h2><form method="dialog"><button>关闭</button></form></header>
         <form id="recruitmentCleaningForm" class="recruitment-card-body">
+    {% macro rule_icon(name, tone='') -%}
+        <svg class="recruitment-rule-icon {{ tone }}" aria-hidden="true" focusable="false"><use href="#rule-icon-{{ name }}"></use></svg>
+    {%- endmacro %}
             <label>清洗方向<select id="recruitmentRulesProfile" aria-label="清洗方向">
                 {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
             </select></label>
             <fieldset class="recruitment-rule-fields" disabled>
                 <section class="recruitment-rule-section" aria-labelledby="recruitmentHardRules">
-                    <h3 id="recruitmentHardRules">硬规则</h3>
+                    <h3 id="recruitmentHardRules" class="recruitment-rule-heading">{{ rule_icon('filter', 'rule-blue') }}硬规则</h3>
                     <div class="recruitment-rule-salary">
-                        <label>最低月薪（K）<input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
-                        <label>最高月薪（K）<input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
-                        <label>经验上限（年）<input type="number" name="experience_years_max" min="1" max="50" step="1" placeholder="不限" aria-describedby="recruitmentExperienceHint"></label>
+                        <label><span class="recruitment-rule-caption">{{ rule_icon('salary', 'rule-amber') }}最低月薪（K）</span><input type="number" name="min_salary_k" min="0.01" max="1000" step="0.01"></label>
+                        <label><span class="recruitment-rule-caption">{{ rule_icon('salary', 'rule-amber') }}最高月薪（K）</span><input type="number" name="max_salary_k" min="0.01" max="1000" step="0.01"></label>
+                        <label><span class="recruitment-rule-caption">{{ rule_icon('briefcase', 'rule-violet') }}经验上限（年）</span><input type="number" name="experience_years_max" min="1" max="50" step="1" placeholder="不限" aria-describedby="recruitmentExperienceHint"></label>
                     </div>
                     <p id="recruitmentExperienceHint" class="recruitment-rule-hint">岗位要求的最低经验达到上限时淘汰。</p>
                     <div class="recruitment-rule-salary" id="recruitmentDailyRules" hidden>
                         <label>最低日薪（元/天）<input type="number" name="min_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
                         <label>最高日薪（元/天）<input type="number" name="max_daily_salary" min="0.01" max="100000" step="0.01" disabled></label>
                     </div>
-                    {% for key, label, placeholder in [
-                        ('cities', '目标城市', '输入城市后按回车'),
-                        ('require_education', '学历白名单', '添加可接受的最低学历'),
-                        ('exclude_education', '学历黑名单', '添加需要排除的学历')
+                    {% for key, label, placeholder, icon, tone in [
+                        ('cities', '目标城市', '输入城市后按回车', 'pin', 'rule-green'),
+                        ('require_education', '学历白名单', '添加可接受的最低学历', 'school', 'rule-blue'),
+                        ('exclude_education', '学历黑名单', '添加需要排除的学历', 'school', 'rule-red')
                     ] %}
                     <div class="recruitment-rule-terms" data-rule-terms="{{ key }}">
-                        <label for="recruitment-rule-{{ key }}">{{ label }}</label>
+                        <label class="recruitment-rule-caption" for="recruitment-rule-{{ key }}">{{ rule_icon(icon, tone) }}{{ label }}</label>
                         <div class="recruitment-rule-term-input">
                             <input id="recruitment-rule-{{ key }}" name="{{ key }}" maxlength="2500" placeholder="{{ placeholder }}"
                                 {% if key != 'cities' %}list="recruitmentEducationLevels"{% endif %}>
-                            <button type="button" aria-label="添加{{ label }}">添加</button>
+                            <button class="recruitment-rule-button {{ tone }}" type="button" aria-label="添加{{ label }}">{{ rule_icon('add') }}添加</button>
                         </div>
                         <div class="recruitment-rule-chips"></div>
                     </div>
@@ -269,8 +283,8 @@
                 </section>
                 <section class="recruitment-rule-section" aria-labelledby="recruitmentScoutTitle">
                     <div class="recruitment-rule-section-head">
-                        <h3 id="recruitmentScoutTitle">AI 初筛规则</h3>
-                        <button id="recruitmentScoutAdd" type="button">添加规则</button>
+                        <h3 id="recruitmentScoutTitle" class="recruitment-rule-heading">{{ rule_icon('sparkles', 'rule-violet') }}AI 初筛规则</h3>
+                        <button class="recruitment-rule-button rule-violet" id="recruitmentScoutAdd" type="button">{{ rule_icon('add') }}添加规则</button>
                     </div>
                     <div id="recruitmentScoutExamples" class="recruitment-scout-example" hidden>
                         <span>内置示例。启用或编辑后保存，即可用于初筛。</span>

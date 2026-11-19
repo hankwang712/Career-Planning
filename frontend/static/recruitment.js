@@ -604,6 +604,20 @@
     };
   }
 
+  function scoutAction(label, icon, tone) {
+    const button = node("button", label, "recruitment-rule-button " + tone);
+    button.type = "button";
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "recruitment-rule-icon");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    const use = document.createElementNS(svg.namespaceURI, "use");
+    use.setAttribute("href", "#rule-icon-" + icon);
+    svg.append(use);
+    button.prepend(svg);
+    return button;
+  }
+
   function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
     const row = node("div", "", "recruitment-scout-row");
     if (rule.legacy) row.dataset.legacy = rule.legacy;
@@ -621,9 +635,8 @@
     const status = node("p", "", "recruitment-rule-hint");
     status.setAttribute("role", "status");
     const actions = node("div", "", "recruitment-actions");
-    const generate = node("button", "AI 生成标准");
-    const remove = node("button", "删除规则");
-    remove.type = generate.type = "button";
+    const generate = scoutAction("AI 生成标准", "sparkles", "rule-amber");
+    const remove = scoutAction("删除规则", "trash", "rule-red");
     const wrap = (title, field) => {
       const label = node("label", title);
       label.append(field);

@@ -358,11 +358,54 @@ input:not([type=checkbox]), select {
 .recruitment-cleaning-decision button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 .recruitment-cleaning-badge { background: var(--clean-bg); color: var(--clean-color); }
 .recruitment-card-body .recruitment-rule-fields { display: grid; gap: 10px; }
+.recruitment-rule-symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+.recruitment-rule-icon {
+    display: block;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+.recruitment-rule-fields .recruitment-rule-caption,
+.recruitment-rule-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.rule-amber { --rule-ink: #a34f0c; --rule-tint: #fff3df; --rule-border: #f3d6ad; }
+.rule-blue { --rule-ink: #245bbb; --rule-tint: #eaf2ff; --rule-border: #cfdef8; }
+.rule-violet { --rule-ink: #6940b8; --rule-tint: #f3edff; --rule-border: #e3d5fb; }
+.rule-green { --rule-ink: #16705a; --rule-tint: #e9f7f0; --rule-border: #c8e9dc; }
+.rule-red { --rule-ink: #a03551; --rule-tint: #fdf0f3; --rule-border: #f3d0da; }
+.recruitment-rule-icon { color: var(--rule-ink, currentColor); }
+.recruitment-rule-heading .recruitment-rule-icon {
+    width: 30px;
+    height: 30px;
+    padding: 6px;
+    border-radius: 9px;
+    background: var(--rule-tint);
+}
+#recruitmentCleaningDialog .recruitment-rule-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-color: var(--rule-border);
+    background: var(--rule-tint);
+    color: var(--rule-ink);
+    white-space: nowrap;
+}
+#recruitmentCleaningDialog .recruitment-rule-button:hover:not(:disabled) { border-color: currentColor; }
+.recruitment-rule-button .recruitment-rule-icon { width: 14px; height: 14px; }
 .recruitment-rule-section {
     display: grid;
     gap: 12px;
     padding: 14px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--border);
     background: #fff;
     border-radius: 12px;
 }
