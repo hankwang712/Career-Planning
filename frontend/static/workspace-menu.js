@@ -35,15 +35,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("[data-workspace-guide-link]")?.addEventListener("click", () => {
     try { sessionStorage.setItem("app_force_workspace_guide", "1"); } catch (_) {}
   });
-  const news = document.getElementById("careerNewsBoard");
-  if (news) {
-    document.querySelector("[data-dashboard-news-link]")?.addEventListener("click", async (event) => {
-      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      await window.showSection?.("dashboard");
-      news.scrollIntoView({ behavior: "instant" });
-    });
-  }
 
   const clock = document.querySelector("[data-local-clock]");
   if (clock) {

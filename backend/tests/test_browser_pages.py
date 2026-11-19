@@ -153,8 +153,8 @@ def test_dashboard_search_uses_the_entered_keyword(logged_in_page, live_server):
     assert tools.get_by_role("link", name="岗位探索").get_attribute("href") == "/recruitment"
     page.get_by_role("button", name="关闭引导").click()
     overview.get_by_role("button", name="快速开始").click()
-    page.get_by_role("dialog", name="新手引导").get_by_role("button", name="关闭引导").click()
-    page.get_by_role("link", name="行业资讯", exact=True).click()
+    page.get_by_role("dialog", name="新手引导").get_by_role("button", name="查看行业快报 →").click()
+    assert page.get_by_role("navigation", name="主导航").get_by_role("link", name="行业资讯", exact=True).count() == 0
     page.wait_for_function("document.getElementById('careerNewsBoard').getBoundingClientRect().top < innerHeight / 2")
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") == 390
@@ -212,13 +212,24 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     lead.locator(".nd-feature-image").dispatch_event("error")
     assert lead.locator(".nd-feature-media").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
-    board.locator("#careerNewsNextBtn").evaluate("(button) => button.click()")
+    assert board.locator("#careerNewsNextBtn").evaluate("""(button) => {
+        const deck = document.querySelector('.nd-deck');
+        button.click();
+        return deck.getAnimations().some(animation =>
+            animation.effect.getKeyframes().some(frame => frame.opacity === '0.35'));
+    }""")
+    lead.get_by_role("heading", name="招聘观察报告").wait_for()
     assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
     assert lead.locator(".nd-feature-media").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     summary = lead.locator(".nd-story-summary").bounding_box()
     byline = lead.locator(".nd-story-bottom").bounding_box()
     assert byline["y"] - (summary["y"] + summary["height"]) <= 20
+    page.emulate_media(reduced_motion="reduce")
+    assert board.locator("#careerNewsPrevBtn").evaluate("""(button) => {
+        button.click();
+        return document.querySelector('.nd-story--lead .nd-story-title').textContent === 'AI 开发工具进展';
+    }""")
     board.get_by_role("button", name="职业成长").evaluate("(button) => button.click()")
     assert lead.locator(".nd-tag").inner_text() == "职业成长"
     page.set_viewport_size({"width": 390, "height": 844})

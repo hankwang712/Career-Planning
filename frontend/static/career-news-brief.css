@@ -354,11 +354,11 @@
   font-variant-numeric:tabular-nums;
 }
 .nd-deck.is-switching {
-  animation:nd-deck-enter 320ms ease-out;
+  animation:nd-deck-enter 310ms cubic-bezier(.2,.65,.35,1) both;
 }
 @keyframes nd-deck-enter {
-  from { opacity:.55; transform:translateX(8px); }
-  to { opacity:1; transform:translateX(0); }
+  from { opacity:.35; }
+  to { opacity:1; }
 }
 .nd-deck {
   display:grid;

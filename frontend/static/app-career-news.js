@@ -396,6 +396,7 @@ function _initCareerNewsBrief(board) {
   let inView = !("IntersectionObserver" in window);
   let matchedCount = items.length;
   let timer = null;
+  let outgoingDeck = null;
 
   function scheduleAutoPlay() {
     window.clearTimeout(timer);
@@ -407,12 +408,33 @@ function _initCareerNewsBrief(board) {
       pauseButton.setAttribute("aria-label", label);
       pauseButton.title = label;
     }
-    if (manuallyPaused || hovered || !inView || document.hidden || !board.isConnected || content.contains(document.activeElement) || matchedCount <= 1) return;
+    if (manuallyPaused || hovered || !inView || outgoingDeck || document.hidden || !board.isConnected || content.contains(document.activeElement) || matchedCount <= 1) return;
     timer = window.setTimeout(() => {
       timer = null;
-      focal += 1;
-      render(true);
-    }, 8000);
+      void switchSpotlight(1);
+    }, 12000);
+  }
+
+  async function switchSpotlight(offset) {
+    focal += offset;
+    if (outgoingDeck) return;
+    const deck = content.querySelector(".nd-deck");
+    if (!motionPreference.matches && deck?.animate) {
+      const animation = deck.animate(
+        [{ opacity: getComputedStyle(deck).opacity }, { opacity: 0.35 }],
+        { duration: 150, easing: "ease-in", fill: "forwards" }
+      );
+      outgoingDeck = animation;
+      window.clearTimeout(timer);
+      timer = null;
+      try {
+        await animation.finished;
+      } catch {
+        return;
+      }
+      outgoingDeck = null;
+    }
+    render(true);
   }
 
   board.addEventListener("error", (event) => {
@@ -446,6 +468,10 @@ function _initCareerNewsBrief(board) {
   }
 
   function render(focusOnly = false) {
+    if (!focusOnly && outgoingDeck) {
+      outgoingDeck.cancel();
+      outgoingDeck = null;
+    }
     const matched = items.filter(item => category === "all" || item.dataset.category === category);
     matchedCount = matched.length;
     const index = matched.length ? ((focal % matched.length) + matched.length) % matched.length : 0;
@@ -510,8 +536,8 @@ function _initCareerNewsBrief(board) {
   }));
   function loadMore() { limit += 6; render(); }
   more?.addEventListener("click", loadMore);
-  document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => { focal -= 1; render(true); });
-  document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => { focal += 1; render(true); });
+  document.getElementById("careerNewsPrevBtn")?.addEventListener("click", () => { void switchSpotlight(-1); });
+  document.getElementById("careerNewsNextBtn")?.addEventListener("click", () => { void switchSpotlight(1); });
   pauseButton?.addEventListener("click", () => {
     manuallyPaused = !manuallyPaused;
     scheduleAutoPlay();
@@ -525,6 +551,7 @@ function _initCareerNewsBrief(board) {
   document.addEventListener("visibilitychange", scheduleAutoPlay);
   motionPreference.addEventListener("change", event => {
     manuallyPaused = event.matches;
+    if (event.matches) outgoingDeck?.finish();
     scheduleAutoPlay();
   });
   if ("IntersectionObserver" in window) {
