@@ -452,10 +452,10 @@ def move_profile():
     return jsonify(profile=profile)
 
 
-def query_rows(owner, limit, offset=0):
+def query_rows(owner, limit, offset=0, *, compact=False, include_counts=False):
     source = request.args.get("source", "")
     if source and source not in SOURCES:
-        return [], 0
+        return [], 0, {}
     keyword = f"%{request.args.get('q', '').strip()[:120]}%"
     where = "j.owner=? AND (?='' OR j.source=?) AND (j.title LIKE ? OR j.company LIKE ? OR j.location LIKE ?)"
     args = (owner, source, source, keyword, keyword, keyword)
@@ -463,8 +463,25 @@ def query_rows(owner, limit, offset=0):
     if profile:
         where += " AND j.profile=?"
         args += (profile,)
-    status = request.args.get("clean_status", "")
     effective = cleaning.EFFECTIVE_STATUS
+    scored = f"(({effective}) IN ('passed', 'released') AND m.score IS NOT NULL)"
+    conn = db._get_conn()
+    joined = f""" FROM recruitment_listings j LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        LEFT JOIN recruitment_ai_results m ON m.owner=j.owner AND m.source=j.source AND m.url_key=j.url_key AND m.kind='match'
+        WHERE """
+    counts = {}
+    if include_counts:
+        counts = dict.fromkeys(("all", "unreviewed", "passed", "review", "rejected", "scored"), 0)
+        for item in conn.execute(
+            f"SELECT COALESCE({effective}, 'unreviewed') AS outcome, count(*) AS count, "
+            f"sum(CASE WHEN {scored} THEN 1 ELSE 0 END) AS scored_count {joined}{where} GROUP BY 1", args,
+        ):
+            key = "passed" if item["outcome"] == "released" else item["outcome"]
+            counts[key] += item["count"]
+            counts["all"] += item["count"]
+            counts["scored"] += item["scored_count"]
+    status = request.args.get("clean_status", "")
     if status == "unreviewed":
         where += " AND r.status IS NULL"
     elif status == "passed":
@@ -472,21 +489,20 @@ def query_rows(owner, limit, offset=0):
     elif status in ("rejected", "review"):
         where += f" AND ({effective})=?"
         args += (status,)
-    conn = db._get_conn()
-    joined = f""" FROM recruitment_listings j LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
-        {cleaning.SEMANTIC_JOIN}
-        LEFT JOIN recruitment_ai_results m ON m.owner=j.owner AND m.source=j.source AND m.url_key=j.url_key AND m.kind='match'
-        WHERE """
-    total = conn.execute("SELECT count(*)" + joined + where, args).fetchone()[0]
+    elif status == "scored":
+        where += f" AND {scored}"
+    total = counts.get(status, counts.get("all")) if include_counts else conn.execute(
+        "SELECT count(*)" + joined + where, args,
+    ).fetchone()[0]
     columns = ", ".join("j." + key for key in FIELDS if key != "description")
-    order = "m.score DESC, " if request.args.get("sort") == "match" else ""
-    items = conn.execute(
-        f"""SELECT {columns}, COALESCE(
+    details = "" if compact else """, COALESCE(
                 (SELECT d.description FROM recruitment_job_details d
                  WHERE d.owner=j.owner AND d.source=j.source AND d.url_key=j.url_key),
-                j.description) AS description, COALESCE({effective}, 'unreviewed') AS cleaning_status,
-                COALESCE(r.reason, '') AS cleaning_reason, j.profile, a.payload AS semantic_payload,
-                m.score AS ai_score, m.verdict AS ai_match_status
+                j.description) AS description, COALESCE(r.reason, '') AS cleaning_reason, a.payload AS semantic_payload"""
+    order = "m.score DESC, " if request.args.get("sort") == "match" else ""
+    items = conn.execute(
+        f"""SELECT {columns}, COALESCE({effective}, 'unreviewed') AS cleaning_status, j.profile,
+                m.score AS ai_score, m.verdict AS ai_match_status {details}
             {joined}{where}
             ORDER BY {order}j.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?""",
         (*args, limit, offset),
@@ -494,11 +510,15 @@ def query_rows(owner, limit, offset=0):
     rows = []
     for item in items:
         row = dict(item)
-        semantic_payload = row.pop("semantic_payload")
-        if not row["cleaning_reason"] and row["cleaning_status"] in {"rejected", "review"}:
-            row["cleaning_reason"] = semantic_reason(semantic_payload)
-        rows.append(clean_listing(row))
-    return rows, total
+        if not compact:
+            semantic_payload = row.pop("semantic_payload")
+            if not row["cleaning_reason"] and row["cleaning_status"] in {"rejected", "review"}:
+                row["cleaning_reason"] = semantic_reason(semantic_payload)
+        clean_listing(row)
+        if compact:
+            row.pop("description", None)
+        rows.append(row)
+    return rows, total, counts
 
 
 @blueprint.get(API + "/jobs")
@@ -506,10 +526,27 @@ def query_rows(owner, limit, offset=0):
 def jobs():
     page_number = min(10000, max(1, request.args.get("page", 1, type=int)))
     owner = _current_user()["username"]
-    items, total = query_rows(owner, 20, (page_number - 1) * 20)
+    items, total, counts = query_rows(owner, 20, (page_number - 1) * 20,
+                                     compact=request.args.get("compact") == "1", include_counts=True)
     count_profile = request.args.get("count_profile", cleaning.DEFAULT_PROFILE)
-    return jsonify(items=items, total=total, page=page_number, page_size=20,
+    return jsonify(items=items, total=total, page=page_number, page_size=20, view_counts=counts,
                    cleaning_counts=cleaning.stored_counts(db._get_conn(), owner, count_profile))
+
+
+@blueprint.post(API + "/jobs/detail")
+@_login_required
+def listing_detail():
+    source, url = listing_identity(request.get_json(silent=True))
+    if not url:
+        return jsonify(message="岗位记录无效。"), 400
+    row = ai_listing(db._get_conn(), (_current_user()["username"], source, url))
+    if not row:
+        return jsonify(message="岗位记录不存在。"), 404
+    reason = row["cleaning_reason"]
+    if not reason and row["cleaning_status"] in {"rejected", "review"}:
+        reason = semantic_reason(row["semantic_payload"])
+    return jsonify(description=clean_listing({"description": row["detail"]})["description"],
+                   cleaning_reason=reason or "", cleaning_status=row["cleaning_status"] or "unreviewed")
 
 
 @blueprint.route(API + "/ai/settings", methods=["GET", "POST"])
@@ -572,6 +609,7 @@ def ai_listing(conn, identity):
         SELECT j.profile, j.title, j.company, j.location, j.salary, j.description,
                COALESCE(d.description, j.description) AS detail,
                n.note_url, r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
+               r.reason AS cleaning_reason, a.payload AS semantic_payload,
                v.payload AS vision_payload
         FROM recruitment_listings j
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
@@ -748,7 +786,7 @@ def zhilian_job_detail():
 @blueprint.get(API + "/export")
 @_login_required
 def export():
-    rows, total = query_rows(_current_user()["username"], 10000)
+    rows, total, _ = query_rows(_current_user()["username"], 10000)
     output = StringIO()
     writer = csv.DictWriter(output, fieldnames=FIELDS)
     writer.writeheader()

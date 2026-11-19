@@ -462,6 +462,16 @@ def test_recruitment_ai_semantic_and_match_use_separate_models_and_preserve_evid
     assert result["dimensions"]["skills"]["jd_evidence"] == "Python"
     top = account.get(API + "/jobs?sort=match").get_json()["items"][0]
     assert top["url"] == second["url"] and top["ai_score"] == 80
+    scored = account.get(API + "/jobs?profile=internship&clean_status=scored&compact=1").get_json()
+    assert scored["view_counts"] == {"all": 3, "unreviewed": 0, "passed": 1, "review": 1, "rejected": 1, "scored": 1}
+    assert scored["total"] == 1 and scored["items"][0]["url"] == second["url"]
+    assert {"description", "cleaning_reason"}.isdisjoint(scored["items"][0])
+    assert other.post(API + "/jobs/detail", json=second).status_code == 404
+    detail = account.post(API + "/jobs/detail", json=first).get_json()
+    assert detail["description"] == "工作制度为大小周"
+    assert detail["cleaning_status"] == "rejected" and "大小周" in detail["cleaning_reason"]
+    matched_search = account.get(API + "/jobs?compact=1&q=乙").get_json()
+    assert matched_search["view_counts"]["all"] == 1 and matched_search["view_counts"]["scored"] == 1
     assert account.post(API + "/cleaning/release", json=first).status_code == 200
     assert account.get(API + "/jobs?profile=internship&clean_status=passed").get_json()["total"] == 2
     monkeypatch.setattr(recruitment.ai, "request_model", lambda *_: {"verdict": "invalid"})

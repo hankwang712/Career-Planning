@@ -134,7 +134,8 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_text("对话模型已配置 3/3").wait_for()
         page.get_by_text("配置已保存。").wait_for()
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
-        assert page.locator("#settingsOptionalCount").inner_text().endswith("/3")
+        assert page.locator("#settingsOptionalCount").inner_text().endswith("/6")
+        assert page.locator("#settings-cleaner [data-setting-key]").count() == 3
         assert page.locator("#settings-image, #settings-news, #settings-retrieval").count() == 0
         assert page.locator("#settings-ocr [data-setting-key]").count() == 3
         assert page.locator('[data-setting-key="TESSERACT_CMD"]').count() == 0
@@ -247,6 +248,9 @@ def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_s
         "name": "search.html", "mimeType": "text/html", "buffer": markup.encode()
     })
     dialog.get_by_role("button", name="读取岗位").click()
+    page.get_by_text("暂时没有通过清洗的岗位").wait_for()
+    assert page.get_by_role("button", name="Agent 开发", exact=True).count() == 0
+    page.get_by_role("button", name="查看待清洗岗位").click()
     page.get_by_role("button", name="Agent 开发", exact=True).wait_for()
     page.get_by_role("searchbox", name="搜索结果").fill("样本公司")
     page.get_by_role("button", name="筛选", exact=True).click()
@@ -350,6 +354,7 @@ def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, 
     page.goto(live_server + "/recruitment")
     csv = "source,title,url\nboss,电话销售,https://www.zhipin.com/job_detail/cleaning.html\n"
     page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
+    page.get_by_role("button", name="待清洗", exact=True).click()
     job = page.locator(".recruitment-row").filter(has_text="电话销售")
     job.get_by_text("未清洗", exact=True).wait_for()
     page.get_by_role("button", name="配置与预览").click()
@@ -362,13 +367,15 @@ def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, 
     dialog.get_by_role("button", name="应用到现有岗位").click()
     dialog.get_by_text("已应用清洗规则。", exact=True).wait_for()
     dialog.get_by_role("button", name="关闭").click()
-    page.get_by_label("清洗状态").select_option("rejected")
-    page.get_by_role("button", name="筛选", exact=True).click()
-    job.get_by_text("标题命中排除词「销售」").wait_for()
+    page.get_by_role("button", name="已淘汰", exact=True).click()
+    assert job.get_by_text("标题命中排除词「销售」").count() == 0
+    job.get_by_role("button", name="电话销售").click()
+    detail = page.get_by_role("dialog", name="电话销售")
+    detail.get_by_text("标题命中排除词「销售」").wait_for()
+    detail.get_by_role("button", name="关闭").click()
     job.get_by_role("button", name="手动放行").click()
     page.get_by_text("已放行：电话销售").wait_for()
-    page.get_by_label("清洗状态").select_option("passed")
-    page.get_by_role("button", name="筛选", exact=True).click()
+    page.get_by_role("button", name="优先看", exact=True).click()
     job.get_by_text("已放行", exact=True).wait_for()
 
 
@@ -385,6 +392,7 @@ def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, li
     dialog.get_by_role("button", name="关闭").click()
     csv = "source,title,url\nboss,示例岗位,https://www.zhipin.com/job_detail/profile.html\n"
     page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
+    page.get_by_role("button", name="全部岗位", exact=True).click()
     job = page.locator(".recruitment-row").filter(has_text="示例岗位")
     job.get_by_text("实习", exact=True).wait_for()
 
@@ -445,6 +453,9 @@ def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in
     page.route("**/api/job-market/collection/runs", lambda route: route.fulfill(json={"items": [latest]}))
     page.goto(live_server + "/recruitment")
     page.get_by_text("最近一次 · Agent · 杭州 · 采集中", exact=True).wait_for()
+    stages = page.locator(".recruitment-stages .recruitment-stage")
+    assert stages.count() == 4
+    assert len({stage.bounding_box()["y"] for stage in stages.all()}) == 1
     cards = page.locator(".recruitment-platform")
     assert cards.count() == 4
     assert cards.locator("[data-status=succeeded]").inner_text() == "已采集"
@@ -478,6 +489,7 @@ def test_recruitment_overview_shows_platform_progress_and_login_action(logged_in
     assert page.locator("#recruitmentRuns").get_by_text("Agent · 杭州", exact=True).is_visible()
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") == 390
+    assert len({stage.bounding_box()["y"] for stage in stages.all()}) == 2
     open_button.click()
     assert drawer.bounding_box()["width"] == 390
     assert start.bounding_box()["y"] > platform_choices.bounding_box()["y"]
@@ -509,6 +521,7 @@ def test_resume_job_handoff_and_temporary_rewrite(logged_in_page, live_server, m
     page.goto(live_server + "/recruitment")
     csv = "source,title,description,url\nboss,数据工程师,负责编写订单数据管道,https://www.zhipin.com/job_detail/rewrite.html\n"
     page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
+    page.get_by_role("button", name="全部岗位", exact=True).click()
     page.get_by_role("button", name="数据工程师", exact=True).click()
     page.get_by_role("button", name="按此岗位改写简历").click()
     page.wait_for_url("**/user-center/resumes?rewrite=1")

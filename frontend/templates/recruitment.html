@@ -18,22 +18,24 @@
     </header>
     <main class="recruitment-main">
         <header class="recruitment-hero">
-            <div><h1>招聘信息采集</h1><p>按关键词和城市采集岗位，集中查看各平台结果。</p></div>
+            <h1>招聘信息采集</h1>
         </header>
         <p id="recruitmentFeedback" class="recruitment-feedback" role="status" hidden></p>
         <div class="recruitment-layout">
-            <section class="recruitment-card recruitment-overview" aria-labelledby="recruitmentOverview">
+            <section class="recruitment-card recruitment-workflow" aria-labelledby="recruitmentOverview">
                 <header>
                     <div class="recruitment-section-heading">
                         <span class="recruitment-section-icon" aria-hidden="true">▥</span>
-                        <h2 id="recruitmentOverview">平台采集概况</h2>
+                        <h2 id="recruitmentOverview">招聘流程</h2>
                     </div>
                     <div class="recruitment-actions">
                         <span id="recruitmentLatest" class="recruitment-latest">正在读取采集概况…</span>
                         <button id="recruitmentRefresh" type="button">刷新</button>
                     </div>
                 </header>
-                <ul class="recruitment-platforms">
+                <details id="recruitmentPlatformOverview" class="recruitment-platform-overview">
+                    <summary>平台概况与采集记录</summary>
+                    <ul class="recruitment-platforms">
                     {% for id, source in collection_sources.items() %}
                     <li class="recruitment-platform" data-recruitment-platform="{{ id }}" data-source="{{ id }}">
                         <div class="recruitment-platform-heading">
@@ -48,22 +50,43 @@
                         <a class="recruitment-platform-login" target="_blank" rel="noopener noreferrer" hidden>去登录 ↗</a>
                     </li>
                     {% endfor %}
-                </ul>
-                <details class="recruitment-history">
-                    <summary>采集记录</summary>
-                    <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
+                    </ul>
+                    <details class="recruitment-history">
+                        <summary>采集记录</summary>
+                        <div id="recruitmentRuns" class="recruitment-card-body"><p>正在读取采集记录…</p></div>
+                    </details>
                 </details>
-            </section>
-            <div class="recruitment-stages">
-            <section class="recruitment-card recruitment-config" aria-labelledby="recruitmentConfig">
-                <header>
-                    <div class="recruitment-section-heading">
-                        <span class="recruitment-section-icon" aria-hidden="true">⚙</span>
-                        <h2 id="recruitmentConfig">平台采集</h2>
-                    </div>
-                    <button id="recruitmentCollectOpen" type="button" aria-haspopup="dialog">配置采集</button>
-                </header>
-                <p id="recruitmentCollectSummary" class="recruitment-stage-summary">通用 · 不限城市</p>
+                <ol class="recruitment-stages">
+                    <li>
+                        <button id="recruitmentCollectOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置采集">
+                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">⚙</span><strong>平台采集</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
+                            <span id="recruitmentCollectSummary" class="recruitment-stage-summary">通用 · 不限城市</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button id="recruitmentCleaningOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置与预览">
+                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">◇</span><strong>规则清洗</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
+                            <span id="recruitmentCleaningMode" class="recruitment-stage-summary">通用 · 手动清洗</span>
+                            <span id="recruitmentCleaningCounts" class="recruitment-stage-counts">
+                                {% for key, label in [('unreviewed','未清洗'), ('passed','通过'), ('review','待核对'), ('rejected','淘汰')] %}
+                                <span data-clean-status="{{ key }}">{{ label }} <b>—</b></span>
+                                {% endfor %}
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button id="recruitmentAiOpen" class="recruitment-stage" type="button" aria-haspopup="dialog" aria-label="配置与评估">
+                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">✦</span><strong>AI 初评</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
+                            <span class="recruitment-stage-summary">评估已通过清洗的岗位</span>
+                        </button>
+                    </li>
+                    <li>
+                        <a class="recruitment-stage" href="{{ url_for('resume_editor.index', rewrite=1) }}">
+                            <span class="recruitment-stage-heading"><span class="recruitment-stage-icon" aria-hidden="true">✎</span><strong>简历改写</strong><span class="recruitment-stage-arrow" aria-hidden="true">›</span></span>
+                            <span class="recruitment-stage-summary">打开定向简历草稿</span>
+                        </a>
+                    </li>
+                </ol>
             </section>
             <dialog id="recruitmentCollectDialog" class="recruitment-detail recruitment-drawer" aria-labelledby="recruitmentCollectTitle">
                 <header><h2 id="recruitmentCollectTitle">采集条件</h2><form method="dialog"><button>关闭</button></form></header>
@@ -168,35 +191,6 @@
                     <button id="recruitmentStart" class="recruitment-primary" type="submit">开始采集</button>
                 </form>
             </dialog>
-            <section class="recruitment-card recruitment-cleaning" aria-labelledby="recruitmentCleaningTitle">
-                <header>
-                    <div class="recruitment-section-heading">
-                        <span class="recruitment-section-icon" aria-hidden="true">◇</span>
-                        <h2 id="recruitmentCleaningTitle">规则清洗</h2>
-                        <span id="recruitmentCleaningMode" class="recruitment-badge">通用 · 手动清洗</span>
-                    </div>
-                    <div class="recruitment-actions">
-                        <button id="recruitmentCleaningOpen" type="button" aria-haspopup="dialog">配置与预览</button>
-                    </div>
-                </header>
-                <dl id="recruitmentCleaningCounts" class="recruitment-cleaning-counts">
-                    <div data-clean-status="unreviewed"><dt>未清洗</dt><dd>—</dd></div>
-                    <div data-clean-status="passed"><dt>通过</dt><dd>—</dd></div>
-                    <div data-clean-status="rejected"><dt>淘汰</dt><dd>—</dd></div>
-                    <div data-clean-status="review"><dt>待核对</dt><dd>—</dd></div>
-                </dl>
-            </section>
-            <section class="recruitment-card" aria-labelledby="recruitmentAiTitle">
-                <header>
-                    <div class="recruitment-section-heading">
-                        <span class="recruitment-section-icon" aria-hidden="true">✦</span>
-                        <h2 id="recruitmentAiTitle">AI 初评</h2>
-                    </div>
-                    <button id="recruitmentAiOpen" type="button" aria-haspopup="dialog">配置与评估</button>
-                </header>
-                <p class="recruitment-stage-summary">按求职方向评估已通过清洗的岗位。</p>
-            </section>
-            </div>
             <section class="recruitment-card recruitment-results" aria-labelledby="recruitmentResultsTitle">
                 <header>
                     <div class="recruitment-section-heading">
@@ -208,21 +202,23 @@
                         <button id="recruitmentImport" type="button">导入 CSV</button>
                         <button id="recruitmentSavedPage" type="button">导入网页</button>
                         <input type="file" id="recruitmentFile" accept=".csv,text/csv" hidden>
-                        <a id="recruitmentExport" class="recruitment-button recruitment-export" href="/api/job-market/collection/export">导出 CSV</a>
+                        <a id="recruitmentExport" class="recruitment-button recruitment-export" href="/api/job-market/collection/export?clean_status=passed&amp;sort=match">导出 CSV</a>
                     </div>
                 </header>
+                <nav id="recruitmentViews" class="recruitment-views" aria-label="岗位结果视图">
+                    {% for key, name in [('priority','优先看'), ('all','全部岗位'), ('unreviewed','待清洗'), ('scored','已评分'), ('review','待核对'), ('rejected','已淘汰')] %}
+                    <button type="button" data-view="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+                        {{ name }} <span data-view-count aria-hidden="true"></span>
+                    </button>
+                    {% endfor %}
+                </nav>
                 <form class="recruitment-filters" id="recruitmentFilters" role="search">
                     <input type="search" name="q" maxlength="120" aria-label="搜索结果" placeholder="按岗位、公司或地点搜索">
                     <select name="source" aria-label="筛选平台"><option value="">全部平台</option>{% for id, source in sources.items() %}<option value="{{ id }}">{{ source[0] }}</option>{% endfor %}</select>
                     <select name="profile" aria-label="按求职方向筛选"><option value="">全部方向</option>
                         {% for value, name in profiles.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
                     </select>
-                    <select name="clean_status" aria-label="清洗状态">
-                        <option value="">全部清洗状态</option><option value="unreviewed">未清洗</option>
-                        <option value="passed">通过</option><option value="rejected">淘汰</option>
-                        <option value="review">待核对</option>
-                    </select>
-                    <select name="sort" aria-label="排序"><option value="">最新采集</option><option value="match">初评分数</option></select>
+                    <select name="sort" aria-label="排序"><option value="">默认顺序</option><option value="latest">最新采集</option><option value="match">初评分数</option></select>
                     <button type="submit">筛选</button>
                 </form>
                 <div id="recruitmentRows" class="recruitment-rows"></div>
@@ -301,6 +297,7 @@
             </div>
             <p id="recruitmentMoveFeedback" class="recruitment-detail-status" role="status" hidden></p>
             <p id="recruitmentDetailStatus" class="recruitment-detail-status" role="status" hidden></p>
+            <p id="recruitmentDetailDecision" class="recruitment-detail-status" hidden></p>
             <p id="recruitmentDescription"></p>
             <section id="recruitmentVision" class="recruitment-ai-content" hidden>
                 <h3>小红书配图提取</h3>

@@ -9,6 +9,7 @@
   const rulesProfileSelect = byId("recruitmentRulesProfile");
   const profileNames = new Map(Array.from(profileSelect.options, (option) => [option.value, option.text]));
   const filterForm = byId("recruitmentFilters");
+  const views = byId("recruitmentViews");
   const sources = new Map(Array.from(filterForm.elements.source.options).map((option) => [option.value, option.text]));
   const captureDate = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" });
   const start = byId("recruitmentStart");
@@ -21,6 +22,7 @@
   };
   const cleaningNames = { unreviewed: "未清洗", passed: "通过", rejected: "淘汰", review: "待核对", released: "已放行" };
   let page = 1;
+  let view = "priority";
   let filters = new URLSearchParams();
   let jobsSequence = 0;
   let runSequence = 0;
@@ -82,30 +84,47 @@
     const dialog = byId("recruitmentDetail");
     const description = byId("recruitmentDescription");
     const detailStatus = byId("recruitmentDetailStatus");
+    const decision = byId("recruitmentDetailDecision");
+    const rewrite = byId("recruitmentResumeRewrite");
     byId("recruitmentDetailTitle").textContent = row.title;
     byId("recruitmentDetailMeta").textContent = [sources.get(row.source), row.company, row.location, displaySalary(row.salary)].filter(Boolean).join(" · ");
     setupProfileMove(row, sequence);
-    description.textContent = row.description || "可在原站查看详情。";
+    description.textContent = "";
+    decision.hidden = true;
     byId("recruitmentOriginal").href = row.url;
-    byId("recruitmentResumeRewrite").onclick = () => {
+    rewrite.disabled = true;
+    rewrite.onclick = () => {
       const text = description.textContent;
       const job = { title: row.title, description: text === "可在原站查看详情。" ? "" : text, source: row.source, url: row.url };
       try { sessionStorage.setItem("career:resume-rewrite-job", JSON.stringify(job)); } catch (_) {}
       window.location.assign("/user-center/resumes?rewrite=1");
     };
     setupJobAi(row, sequence);
-    detailStatus.hidden = row.source !== "zhilian";
+    detailStatus.hidden = false;
+    detailStatus.textContent = "正在读取岗位详情…";
     dialog.showModal();
-    if (row.source !== "zhilian") return;
-    detailStatus.textContent = "正在读取智联职位描述…";
     try {
-      const result = await api("/jobs/zhilian/detail", { url: row.url });
+      const result = await api("/jobs/detail", { source: row.source, url: row.url });
       if (sequence !== detailSequence || !dialog.open) return;
-      description.textContent = result.description;
+      description.textContent = result.description || "可在原站查看详情。";
+      if (result.cleaning_reason) {
+        decision.textContent = (result.cleaning_status === "released" ? "原淘汰原因：" : "清洗依据：") + result.cleaning_reason;
+        decision.hidden = false;
+      }
+      if (row.source !== "zhilian") {
+        detailStatus.hidden = true;
+        return;
+      }
+      detailStatus.textContent = "正在读取智联职位描述…";
+      const full = await api("/jobs/zhilian/detail", { url: row.url });
+      if (sequence !== detailSequence || !dialog.open) return;
+      description.textContent = full.description || description.textContent;
       detailStatus.hidden = true;
     } catch (error) {
       if (sequence !== detailSequence || !dialog.open) return;
       detailStatus.textContent = error.message;
+    } finally {
+      if (sequence === detailSequence && dialog.open) rewrite.disabled = !description.textContent;
     }
   }
 
@@ -151,31 +170,21 @@
     if (row.ai_score != null || row.ai_match_status === "review") {
       header.append(node("span", row.ai_score == null ? "AI · 待补资料" : `AI · ${row.ai_score} 分`, "recruitment-badge"));
     }
-    if (row.updated_at) {
-      header.append(node("span", captureDate.format(new Date(row.updated_at * 1000)) + " 采集", "recruitment-row-date"));
-    }
     const title = node("button", row.title, "recruitment-row-title");
     title.type = "button";
     title.addEventListener("click", () => details(row));
     const meta = [row.company, row.location].filter(Boolean).join(" · ");
+    const content = node("div", "", "recruitment-row-content");
     const footer = node("div", "", "recruitment-row-footer");
     const salary = displaySalary(row.salary);
     footer.append(node("strong", salary || "薪资未获取", salary ? "recruitment-salary" : "recruitment-salary is-missing"));
-    const original = node("a", "原帖 ↗", "recruitment-original");
-    original.href = row.url;
-    original.target = "_blank";
-    original.rel = "noopener noreferrer";
-    original.setAttribute("aria-label", "查看原帖：" + row.title);
-    footer.append(original);
-    el.append(header, title, node("p", meta, "recruitment-row-meta"));
+    content.append(header, title);
+    if (meta) content.append(node("p", meta, "recruitment-row-meta"));
+    if (row.updated_at) footer.append(node("span", captureDate.format(new Date(row.updated_at * 1000)) + " 采集", "recruitment-row-date"));
     if (cleaningNames[row.cleaning_status]) {
       const decision = node("div", "", "recruitment-cleaning-decision");
       decision.dataset.cleanStatus = row.cleaning_status;
       decision.append(node("span", cleaningNames[row.cleaning_status], "recruitment-badge recruitment-cleaning-badge"));
-      if (row.cleaning_reason) {
-        const reason = row.cleaning_status === "released" ? "原淘汰原因：" + row.cleaning_reason : row.cleaning_reason;
-        decision.append(node("p", reason));
-      }
       if (row.cleaning_status === "rejected") {
         const release = node("button", "手动放行");
         release.type = "button";
@@ -193,38 +202,68 @@
         });
         decision.append(release);
       }
-      el.append(decision);
+      footer.append(decision);
     }
-    el.append(footer);
+    el.append(content, footer);
     return el;
   }
 
   async function loadJobs() {
     const sequence = ++jobsSequence;
     const query = new URLSearchParams(filters);
+    if (view !== "all") query.set("clean_status", view === "priority" ? "passed" : view);
+    if (!query.has("sort") && ["priority", "scored"].includes(view)) query.set("sort", "match");
+    const exportQuery = query.toString();
     query.set("page", page);
+    query.set("compact", "1");
     query.set("count_profile", profileSelect.value);
     try {
       const data = await api("/jobs?" + query);
       if (sequence !== jobsSequence) return;
       if (data.cleaning_counts) showCleaningCounts(data.cleaning_counts);
+      for (const button of views.querySelectorAll("[data-view]")) {
+        const key = button.dataset.view === "priority" ? "passed" : button.dataset.view;
+        button.querySelector("[data-view-count]").textContent = data.view_counts?.[key] ?? "";
+      }
       const pages = Math.max(1, Math.ceil(data.total / data.page_size));
       if (page > pages) {
         page = pages;
         return loadJobs();
       }
       byId("recruitmentCount").textContent = `${data.total} 条结果`;
-      byId("recruitmentRows").replaceChildren(...(data.items.length ? data.items.map(resultRow) : [
-        node("p", filters.toString() ? "没有匹配的岗位，请调整筛选条件。" : "暂无结果。开始一次采集，或导入已有 CSV。", "recruitment-empty")
-      ]));
+      byId("recruitmentRows").replaceChildren(...(data.items.length ? data.items.map(resultRow) : [emptyView(data.view_counts)]));
       byId("recruitmentPaging").hidden = pages === 1;
       byId("recruitmentPrev").disabled = page === 1;
       byId("recruitmentNext").disabled = page === pages;
       byId("recruitmentPage").textContent = `${page} / ${pages}`;
-      byId("recruitmentExport").href = API + "/export?" + filters;
+      byId("recruitmentExport").href = API + "/export?" + exportQuery;
     } catch (error) {
       if (sequence === jobsSequence) notice(error.message, "error");
     }
+  }
+
+  function selectView(next) {
+    view = next;
+    page = 1;
+    for (const button of views.querySelectorAll("[data-view]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.view === view));
+    }
+    void loadJobs();
+  }
+
+  function emptyView(counts) {
+    const empty = node("div", "", "recruitment-empty recruitment-view-empty");
+    if (view === "priority" && counts?.all > 0) {
+      empty.append(node("strong", "暂时没有通过清洗的岗位"));
+      const pending = counts.unreviewed > 0;
+      const button = node("button", pending ? "查看待清洗岗位" : "查看全部岗位");
+      button.type = "button";
+      button.onclick = () => selectView(pending ? "unreviewed" : "all");
+      empty.append(button);
+    } else {
+      empty.append(node("strong", filters.size ? "当前筛选没有结果" : "当前视图暂无岗位"));
+    }
+    return empty;
   }
 
   function platformStatus(run, item) {
@@ -259,6 +298,12 @@
       const message = card.querySelector(".recruitment-platform-message");
       message.textContent = status === "interrupted" ? "" : item?.message || "";
       message.hidden = !message.textContent || status === "succeeded";
+    }
+    const needsLogin = run?.status === "running" && Object.values(run.progress).some(item => item.status === "waiting_user");
+    const overview = byId("recruitmentPlatformOverview");
+    if (needsLogin && overview.dataset.loginRun !== String(run.id)) {
+      overview.open = true;
+      overview.dataset.loginRun = run.id;
     }
   }
 
@@ -461,6 +506,10 @@
     page = 1;
     void loadJobs();
   });
+  views.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view]");
+    if (button) selectView(button.dataset.view);
+  });
   byId("recruitmentPrev").onclick = () => { page -= 1; void loadJobs(); };
   byId("recruitmentNext").onclick = () => { page += 1; void loadJobs(); };
   byId("recruitmentRefresh").onclick = () => { void loadRuns(); void loadJobs(); };
@@ -477,7 +526,7 @@
 
   function showCleaningCounts(counts) {
     for (const card of byId("recruitmentCleaningCounts").children) {
-      card.querySelector("dd").textContent = counts[card.dataset.cleanStatus];
+      card.querySelector("b").textContent = counts[card.dataset.cleanStatus];
     }
   }
 
