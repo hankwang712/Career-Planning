@@ -183,7 +183,7 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     items = [
         {"title": "AI 开发工具进展", "source_name": "InfoQ", "image_url": cover},
         {"title": "招聘观察报告", "source_name": "IT之家"},
-        {"title": "科技行业动态", "source_name": "Ars Technica"},
+        {"title": "科技行业动态与软件开发团队的工作流程更新研究，进一步分析开发效率和岗位变化", "source_name": "Ars Technica"},
         {"title": "如何准备面试", "source_name": "The Verge"},
         {"title": "AI 网络安全动态", "source_name": "IT之家"},
     ]
@@ -202,20 +202,19 @@ def test_news_features_real_publisher_icons_and_rotates_the_cover(logged_in_page
     assert lead.locator(".nd-feature-image").get_attribute("src") == cover
     sides = board.locator(".nd-deck .nd-story--side")
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
+    assert sides.first.locator(".nd-feature-media").count() == 0
+    cards = board.locator(".nd-deck .nd-story")
+    assert len({round(card.bounding_box()["height"]) for card in cards.all()}) == 1
+    for selector in (".nd-story-title", ".nd-story-summary", ".nd-story-bottom"):
+        assert len({round(card.locator(selector).bounding_box()["y"]) for card in cards.all()}) == 1
     pause = board.locator("#careerNewsPauseBtn")
     pause.evaluate("(button) => button.click()")
     lead.locator(".nd-feature-image").dispatch_event("error")
-    assert lead.locator(".nd-feature-image").is_hidden()
-    assert lead.get_attribute("data-thumbnail") == "computing"
-    media = lead.locator(".nd-feature-media")
-    assert media.is_visible()
-    assert "news-thumbnails.webp" in media.evaluate("(el) => getComputedStyle(el).backgroundImage")
-    assert board.locator("#careerNewsPool [data-thumbnail='security']").count() == 1
+    assert lead.locator(".nd-feature-media").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     board.locator("#careerNewsNextBtn").evaluate("(button) => button.click()")
     assert lead.locator(".nd-source-logo").get_attribute("src").endswith("/ithome.png")
-    assert lead.get_attribute("data-thumbnail") == "workplace"
-    assert lead.locator(".nd-feature-image").count() == 0
+    assert lead.locator(".nd-feature-media").count() == 0
     assert sides.last.bounding_box()["x"] > sides.first.bounding_box()["x"] > lead.bounding_box()["x"]
     summary = lead.locator(".nd-story-summary").bounding_box()
     byline = lead.locator(".nd-story-bottom").bounding_box()

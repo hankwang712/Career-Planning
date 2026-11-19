@@ -18,22 +18,11 @@
     {% else %}
         {% set category = 'tech' %}{% set category_label = '科技行业' %}
     {% endif %}
-    {% if '网络安全' in text or '网安' in text or 'cybersecurity' in text or 'cyber security' in text %}
-        {% set thumbnail = 'security' %}
-    {% elif 'claude code' in text or category == 'tech' %}
-        {% set thumbnail = 'development' %}
-    {% elif category == 'ai' %}
-        {% set thumbnail = 'computing' %}
-    {% else %}
-        {% set thumbnail = 'workplace' %}
-    {% endif %}
     <a class="career-news-item nd-story {{ variant }}" href="{{ item.url }}" target="_blank" rel="noopener noreferrer"
-       data-published="{{ item.published_at }}" data-category="{{ category }}" data-thumbnail="{{ thumbnail }}"{% if item.image_url %} data-image="{{ item.image_url }}"{% endif %}>
-        {% if variant %}
+       data-published="{{ item.published_at }}" data-category="{{ category }}"{% if item.image_url %} data-image="{{ item.image_url }}"{% endif %}>
+        {% if variant and item.image_url %}
         <span class="nd-feature-media" aria-hidden="true">
-            {% if item.image_url %}
             <img class="nd-feature-image" src="{{ item.image_url }}" width="144" height="144" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
-            {% endif %}
         </span>
         {% endif %}
         <div class="nd-story-top">

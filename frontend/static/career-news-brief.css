@@ -207,7 +207,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   grid-auto-rows: auto;
-  align-items: start;
+  align-items: stretch;
   gap: 12px 20px;
   padding: 4px 0 0;
   overflow: visible;
@@ -255,6 +255,10 @@
 }
 #careerNewsBoard.nd-board .nd-filter[data-news-filter="tech"] { --news-tone: #365f96; --news-tint: #eaf2fc; }
 #careerNewsBoard.nd-board .nd-deck > .nd-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr auto;
+  column-gap: 14px;
   margin: 0;
   padding: 14px;
   border: 1px solid var(--dr-line, #e1e8f1);
@@ -284,36 +288,39 @@
   line-height: 1.38;
   -webkit-line-clamp: 3;
 }
-#careerNewsBoard.nd-board .nd-deck .nd-story--lead .nd-story-title { font-size: clamp(1.02rem, 1.3vw, 1.27rem); }
-#careerNewsBoard.nd-board .nd-deck .nd-story-summary { -webkit-line-clamp: 2; }
+#careerNewsBoard.nd-board .nd-deck .nd-story-summary { align-self: start; -webkit-line-clamp: 2; }
+@media (min-width: 961px) {
+  #careerNewsBoard.nd-board .nd-deck .nd-story-title {
+    min-block-size: 2lh;
+    -webkit-line-clamp: 2;
+  }
+}
 #careerNewsBoard.nd-board .nd-story .nd-story-bottom { border-top: 0; padding-top: 2px; }
 #careerNewsBoard.nd-board .nd-deck .nd-story-summary { margin-bottom: 12px; }
 #careerNewsBoard.nd-board .nd-deck .nd-story-bottom { margin-top: 0; }
 #careerNewsBoard.nd-board .nd-story .nd-byline { flex-wrap: nowrap; gap: 7px; font-size: 11px; }
 #careerNewsBoard.nd-board .nd-story .nd-byline time { width: auto; }
 .nd-source-logo { width: 19px; height: 19px; flex: 0 0 19px; border-radius: 4px; object-fit: contain; }
-.nd-source-logo[hidden], .nd-feature-image[hidden] { display: none; }
+.nd-source-logo[hidden] { display: none; }
 #careerNewsBoard.nd-board .nd-deck > .nd-story:has(.nd-feature-media) {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(60px, 23%, 128px);
-  grid-auto-rows: min-content;
-  column-gap: 12px;
 }
 .nd-deck .nd-story > :not(.nd-feature-media) { grid-column: 1; }
+.nd-deck .nd-story-top { grid-row: 1; }
+.nd-deck .nd-story-title { grid-row: 2; }
+.nd-deck .nd-story-summary { grid-row: 3; }
+.nd-deck .nd-story-bottom { grid-row: 4; }
 .nd-feature-media {
   grid-column: 2;
-  grid-row: 1 / span 4;
+  grid-row: 1 / -1;
   align-self: center;
   display: block;
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: 9px;
-  background: var(--news-tint) url("./assets/dashboard/news-thumbnails.webp") 100% 100% / 204% 204% no-repeat;
+  background: var(--news-tint);
 }
-.nd-story[data-thumbnail="development"] .nd-feature-media { background-position: 0 0; }
-.nd-story[data-thumbnail="computing"] .nd-feature-media { background-position: 100% 0; }
-.nd-story[data-thumbnail="security"] .nd-feature-media { background-position: 0 100%; }
 .nd-feature-image {
   display: block;
   width: 100%;
@@ -634,10 +641,6 @@
   color:#bfcee8;
   opacity:.85;
 }
-#careerNewsBoard .nd-deck .nd-story--lead .nd-story-title {
-  font-size:19px;
-  -webkit-line-clamp:3;
-}
 .nd-section-label {
   display:flex;
   align-items:center;
@@ -860,10 +863,6 @@
   }
   .nd-deck .nd-story--lead .nd-cover {
     height:184px;
-  }
-  #careerNewsBoard .nd-deck .nd-story--lead .nd-story-title {
-    font-size:17px;
-    -webkit-line-clamp:2;
   }
   .nd-deck .nd-story--lead .nd-cover-art {
     width:230px;

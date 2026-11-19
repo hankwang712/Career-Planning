@@ -416,28 +416,30 @@ function _initCareerNewsBrief(board) {
   }
 
   board.addEventListener("error", (event) => {
-    if (event.target instanceof HTMLImageElement) event.target.hidden = true;
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement)) return;
+    const media = image.closest(".nd-feature-media");
+    if (media) media.remove();
+    else image.hidden = true;
   }, true);
 
   function cloneStory(item, variant) {
     const node = item.cloneNode(true);
-    if (variant) {
-      node.classList.add(variant);
+    if (variant) node.classList.add(variant);
+    if (variant && item.dataset.image) {
       const media = document.createElement("span");
       media.className = "nd-feature-media";
       media.setAttribute("aria-hidden", "true");
-      if (item.dataset.image) {
-        const cover = document.createElement("img");
-        cover.className = "nd-feature-image";
-        cover.width = 144;
-        cover.height = 144;
-        cover.alt = "";
-        cover.loading = "lazy";
-        cover.decoding = "async";
-        cover.referrerPolicy = "no-referrer";
-        cover.src = item.dataset.image;
-        media.append(cover);
-      }
+      const cover = document.createElement("img");
+      cover.className = "nd-feature-image";
+      cover.width = 144;
+      cover.height = 144;
+      cover.alt = "";
+      cover.loading = "lazy";
+      cover.decoding = "async";
+      cover.referrerPolicy = "no-referrer";
+      cover.src = item.dataset.image;
+      media.append(cover);
       node.prepend(media);
     }
     return node;

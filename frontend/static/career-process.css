@@ -3,8 +3,8 @@
     max-width: none;
     padding: 0 0 40px;
     background:
-        linear-gradient(#17233b07 1px, transparent 1px) center top / 28px 28px,
-        linear-gradient(90deg, #17233b07 1px, transparent 1px) center top / 28px 28px,
+        linear-gradient(#17233b0d 1px, transparent 1px) center top / 28px 28px,
+        linear-gradient(90deg, #17233b0d 1px, transparent 1px) center top / 28px 28px,
         linear-gradient(#edf2ff 0, #f4f6fb 750px, #f6f7fa);
 }
 
