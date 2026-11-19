@@ -627,8 +627,8 @@ html .rp-main .rp-source-chip[aria-pressed="true"]:hover:not(:disabled) { backgr
 
 /* 岗位卡（正常型） */
 .rp-job {
-    display: grid; gap: 9px;
-    padding: 13px 14px;
+    display: grid; gap: 6px;
+    padding: 10px 14px;
     border: 1px solid var(--dr-line);
     border-radius: var(--dr-radius);
     background: var(--dr-surface);
@@ -716,11 +716,13 @@ html .rp-main button.rp-job-title:hover { color: var(--dr-accent); background: n
 }
 .rp-track-tag[data-track="mass"] { background: var(--dr-brass-soft); color: var(--dr-brass); }
 
-.rp-job-materials { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-job-bottom { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 14px; min-width: 0; }
+.rp-job-bottom .rp-job-tags { flex: 1 1 280px; min-width: 0; }
+.rp-job-materials { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
 html .rp-main .rp-material-btn {
     display: inline-flex; align-items: center; gap: 5px;
     min-height: 0;
-    padding: 3px 10px;
+    padding: 3px 7px;
     border: 1px dashed var(--dr-line-strong);
     border-radius: var(--dr-radius-sm);
     background: var(--dr-surface-soft);
@@ -734,8 +736,13 @@ html .rp-main .rp-material-btn:hover:not(:disabled) { border-color: var(--dr-acc
 html .rp-main .rp-material-btn:disabled { opacity: 0.5; cursor: default; }
 .rp-material-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-.rp-job-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.rp-job-foot {
+    display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 5px 8px;
+    min-width: 0; max-width: 100%; margin-inline-start: auto;
+}
 .rp-job-status { display: inline-flex; align-items: center; gap: 7px; color: var(--dr-muted); font-size: 12px; min-width: 0; }
+.rp-job-status-detail { max-width: 24ch; overflow-wrap: anywhere; }
+.rp-job-status .rp-status-badge { flex-shrink: 0; }
 .rp-status-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 2px 9px;
@@ -751,6 +758,7 @@ html .rp-main .rp-material-btn:disabled { opacity: 0.5; cursor: default; }
 .rp-status-badge[data-tone="accent"] { background: var(--dr-accent-soft); color: var(--dr-accent); }
 .rp-status-badge[data-tone="info"] { background: var(--dr-info-soft); color: var(--dr-info); }
 .rp-job-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+html .rp-main .rp-job-actions .rp-btn-sm { min-height: 25px; padding: 2px 8px; font-size: 11.5px; }
 
 /* 淘汰卡 */
 .rp-job.is-rejected { border-color: #eec9c5; }
@@ -1156,6 +1164,7 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
     .rp-drawer { width: 100vw; border-radius: 0; border-left: 0; }
     .rp-drawer-head { border-radius: 0; }
     .rp-job-salary { align-self: flex-start; }
+    .rp-job-foot { width: 100%; margin-inline-start: 0; justify-content: flex-start; }
     .rp-toasts { right: 12px; bottom: 12px; left: 12px; justify-items: stretch; }
     .rp-toast { max-width: none; }
 }

@@ -379,6 +379,35 @@ def test_report_reuses_resume_from_personal_center(logged_in_page, live_server):
     assert page.locator("#reportStageStart").is_enabled()
 
 
+def test_pipeline_job_card_keeps_materials_beside_metadata_on_desktop(browser, live_server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("compact-job-card")
+    add_job(account, "compact-job", JOB_CUSTOM)
+    context = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment")
+        card = page.locator("#rpJobs .rp-job").filter(has_text=JOB_CUSTOM["title"])
+        card.wait_for()
+        tags = card.locator(".rp-job-tags").bounding_box()
+        status = card.locator(".rp-job-status").bounding_box()
+        materials = card.locator(".rp-job-materials").bounding_box()
+        customize = card.get_by_role("button", name="定制面板", exact=True)
+        assert tags["x"] < status["x"] < materials["x"] < customize.bounding_box()["x"]
+        assert abs(tags["y"] + tags["height"] / 2 - materials["y"] - materials["height"] / 2) < 2
+        assert card.bounding_box()["height"] <= 106
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        assert card.evaluate("(el) => el.scrollWidth <= el.clientWidth + 1")
+        assert card.get_by_role("button", name="欢迎语核验").is_visible()
+        customize.click()
+        page.get_by_role("dialog", name="简历改写 · 定制面板").wait_for()
+    finally:
+        context.close()
+
+
 def test_recruitment_page_import_filter_detail_and_export(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment")

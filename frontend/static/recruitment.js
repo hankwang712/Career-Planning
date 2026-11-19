@@ -817,14 +817,15 @@
       top.append(gradeWrap);
     }
     top.append(node("strong", job.salary || "薪资未获取", "rp-job-salary" + (job.salary ? "" : " is-missing")));
-    card.append(top, jobTags(job), materialButtons(job));
+    const bottom = node("div", "", "rp-job-bottom");
     const foot = node("div", "", "rp-job-foot");
     const status = node("span", "", "rp-job-status");
     status.append(statusBadge(job));
-    const detail = job.tab === "rejected" ? job.reason : (job.followStatus || job.reason);
-    if (detail) status.append(node("span", detail));
-    foot.append(status, jobActions(job));
-    card.append(foot);
+    const detail = job.tab === "rejected" ? "" : (job.followStatus || job.reason);
+    if (detail) status.append(node("span", detail, "rp-job-status-detail"));
+    foot.append(status, materialButtons(job), jobActions(job));
+    bottom.append(jobTags(job), foot);
+    card.append(top, bottom);
     return card;
   }
   function rejectedJobCard(job) {
@@ -858,10 +859,8 @@
     if (/^https?:/.test(job.url || "")) {
       actions.append(actionButton("放行并推送", "rp-btn-success", () => releaseJob(job), "check"));
     }
-    const foot = card.querySelector(".rp-job-foot");
-    foot.append(actions);
-    card.insertBefore(reason, card.querySelector(".rp-job-tags"));
-    card.insertBefore(fold, foot);
+    card.querySelector(".rp-job-foot").append(actions);
+    card.append(reason, fold);
     return card;
   }
   const PERSISTENT_HINTS = /物料|缺少|缺失|下架|风控|验证码|非法|引擎|未找到|数据不全|简历失配|手动终止|已终止|未知来源/;
@@ -913,10 +912,9 @@
       actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash"),
       actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate")
     );
-    const foot = card.querySelector(".rp-job-foot");
-    foot.append(actions);
+    card.querySelector(".rp-job-foot").append(actions);
     card.insertBefore(head, card.firstChild);
-    card.insertBefore(diagnosis, foot);
+    card.append(diagnosis);
     return card;
   }
   function renderJobs() {
