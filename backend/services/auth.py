@@ -87,6 +87,7 @@ def init_app(app):
             "/api/resume-editor/import": 13 * 1024 * 1024,
             "/api/job-market/collection/import": 2_010_000,
             "/api/job-market/collection/import-html": 5_010_000,
+            "/api/job-market/collection/pipeline/purge": 2_000_000,
         }.get(path, 256 * 1024 if path.startswith("/api/resume-editor/") else 65536)
         if request.content_length and request.content_length > limit:
             return jsonify(message="提交的内容过大。"), 413

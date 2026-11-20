@@ -619,9 +619,42 @@
   }
 
   /* ---------- 岗位看板 ---------- */
-  let purgeArmed = false;
-  let purgeTimer = 0;
+  let purgeMode = false;
+  let purgeAll = false;
+  const purgeIds = new Map();
   const savingJobs = new Set();
+  function purgeSelected(id) { return purgeAll !== purgeIds.has(id); }
+  function selectForPurge(job, selected) {
+    const id = jobId(job);
+    if (selected === purgeAll) purgeIds.delete(id);
+    else purgeIds.set(id, { source: job.source, url_key: job.url_key });
+  }
+  function purgeCount() {
+    return purgeAll ? Math.max(0, (tabCounts().all || 0) - purgeIds.size) : purgeIds.size;
+  }
+  function renderPurgeTools() {
+    byId("rpPurgeTools").hidden = !purgeMode;
+    if (!purgeMode) return;
+    const jobs = state.boardLoading || state.boardError ? [] : filteredJobs();
+    const selected = jobs.filter(job => purgeSelected(jobId(job))).length;
+    const page = byId("rpPurgePage");
+    page.disabled = state.bulkBusy || !jobs.length;
+    page.checked = selected > 0 && selected === jobs.length;
+    page.indeterminate = selected > 0 && selected < jobs.length;
+    const all = byId("rpPurgeAll");
+    all.disabled = state.bulkBusy || !tabCounts().all;
+    all.textContent = purgeAll ? "取消全选" : "全选全部未保存岗位";
+    const count = purgeCount();
+    byId("rpPurgeCount").textContent = `已选 ${count} 条`;
+    byId("rpPurgeDelete").disabled = state.bulkBusy || !count;
+  }
+  function syncPurgeCheckboxes() {
+    for (const box of byId("rpJobs").querySelectorAll("[data-purge-id]")) {
+      box.checked = purgeSelected(box.dataset.purgeId);
+      box.disabled = state.bulkBusy;
+    }
+    renderPurgeTools();
+  }
   function renderTabs() {
     const counts = tabCounts();
     for (const button of byId("rpTabs").querySelectorAll("[data-tab]")) {
@@ -632,23 +665,24 @@
     const total = state.tab === "saved" ? (counts.saved || 0) : (state.counts?.all ?? state.jobsTotal);
     byId("rpBoardCount").textContent = total ? `共 ${total} 条` : "";
     const purge = byId("rpPurge");
-    purge.disabled = state.bulkBusy || savingJobs.size > 0 || !counts.all;
-    purge.classList.toggle("is-armed", purgeArmed);
-    purge.replaceChildren(icon(purgeArmed ? "alert" : "trash"),
-      document.createTextNode(purgeArmed ? `确认删除 ${counts.all || 0} 条未保存？` : "批量删除"));
+    purge.disabled = state.bulkBusy || savingJobs.size > 0 || state.tab === "saved" || (!purgeMode && !counts.all);
+    purge.setAttribute("aria-expanded", String(purgeMode));
+    purge.replaceChildren(icon(purgeMode ? "x" : "trash"), document.createTextNode(purgeMode ? "退出批量删除" : "批量删除"));
+    renderPurgeTools();
   }
-  function disarmPurge() {
-    purgeArmed = false;
-    window.clearTimeout(purgeTimer);
-    renderTabs();
+  function resetPurgeSelection() {
+    purgeMode = false;
+    purgeAll = false;
+    purgeIds.clear();
   }
   async function purgeUnsaved() {
-    if (state.bulkBusy) return;
+    if (state.bulkBusy || !purgeCount()) return;
     state.bulkBusy = true;
     renderTabs();
-    renderTabBanner();
+    syncPurgeCheckboxes();
     try {
-      const result = await pipelineApi("/purge", {});
+      const result = await pipelineApi("/purge", { all: purgeAll, ids: [...purgeIds.values()] });
+      resetPurgeSelection();
       toast(`已删除 ${result.deleted ?? 0} 条未保存岗位${result.kept ? `，${result.kept} 条已保存岗位保留` : ""}。`, "success");
       state.selectedFailed.clear();
       state.failedSource = "";
@@ -658,12 +692,12 @@
       toast(error.message, "error");
     } finally {
       state.bulkBusy = false;
-      renderTabs();
-      renderTabBanner();
+      renderBoard();
     }
   }
   function setTab(tab, { updateUrl = true } = {}) {
     if (!TABS.includes(tab)) tab = "all";
+    if (tab === "saved") resetPurgeSelection();
     state.tab = tab;
     state.page = 1;
     state.selectedFailed.clear();
@@ -987,6 +1021,7 @@
     const list = filteredJobs();
     if (!state.apiReady && state.loading) return; // 骨架保留
     renderJobPager();
+    renderPurgeTools();
     if (state.boardLoading || state.boardError) {
       const empty = node("div", "", "rp-view-empty");
       empty.append(node("strong", state.boardError || "正在读取岗位…"));
@@ -1013,8 +1048,23 @@
       root.replaceChildren(empty);
       return;
     }
-    root.replaceChildren(...list.map((job) =>
-      job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job)));
+    root.replaceChildren(...list.map((job) => {
+      const card = job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job);
+      if (purgeMode && !job.saved) {
+        const box = node("input", "", "rp-purge-checkbox");
+        box.type = "checkbox";
+        box.setAttribute("aria-label", `选择 ${job.title}`);
+        box.dataset.purgeId = jobId(job);
+        box.checked = purgeSelected(jobId(job));
+        box.disabled = state.bulkBusy;
+        box.addEventListener("change", () => {
+          selectForPurge(job, box.checked);
+          renderPurgeTools();
+        });
+        card.querySelector(".rp-job-top").prepend(box);
+      }
+      return card;
+    }));
   }
   function boardPageCount() {
     return Math.max(1, Math.ceil(state.boardTotal / BOARD_PAGE_SIZE));
@@ -1078,7 +1128,8 @@
     if (savingJobs.has(id) || state.bulkBusy) return;
     const saved = !job.saved;
     savingJobs.add(id);
-    disarmPurge();
+    resetPurgeSelection();
+    renderTabs();
     renderJobs();
     try {
       const result = await pipelineApi("/save", { source: job.source, url_key: job.url_key, saved });
@@ -1616,16 +1667,31 @@
     byId("rpCollectJobs").addEventListener("click", () => openDrawer("scraping"));
     byId("rpPurge").addEventListener("click", () => {
       if (state.bulkBusy) return;
-      if (!purgeArmed) {
-        if (!(state.counts?.all ?? state.jobsTotal)) { toast("没有可删除的未保存岗位。", "warning"); return; }
-        purgeArmed = true;
-        renderTabs();
-        window.clearTimeout(purgeTimer);
-        purgeTimer = window.setTimeout(disarmPurge, 5000);
-        return;
-      }
-      disarmPurge();
-      void purgeUnsaved();
+      if (purgeMode) resetPurgeSelection();
+      else purgeMode = true;
+      renderBoard();
+    });
+    byId("rpPurgePage").addEventListener("change", (event) => {
+      for (const job of filteredJobs()) selectForPurge(job, event.target.checked);
+      syncPurgeCheckboxes();
+    });
+    byId("rpPurgeAll").addEventListener("click", () => {
+      purgeAll = !purgeAll;
+      purgeIds.clear();
+      syncPurgeCheckboxes();
+    });
+    const purgeConfirm = byId("rpPurgeConfirm");
+    byId("rpPurgeDelete").addEventListener("click", () => {
+      const count = purgeCount();
+      if (state.bulkBusy || !count) return;
+      byId("rpPurgeMessage").textContent = purgeAll && !purgeIds.size
+        ? `将删除全部未保存岗位（当前 ${count} 条）。已保存岗位会保留。`
+        : `将删除所选的 ${count} 条未保存岗位。`;
+      purgeConfirm.returnValue = "";
+      purgeConfirm.showModal();
+    });
+    purgeConfirm.addEventListener("close", () => {
+      if (purgeConfirm.returnValue === "delete") void purgeUnsaved();
     });
     byId("rpBootRetry").addEventListener("click", () => {
       byId("rpBootText").textContent = "正在重新连接流水线服务…";

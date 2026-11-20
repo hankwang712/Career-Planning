@@ -393,7 +393,14 @@ def test_saved_view_and_bulk_purge(server, make_account):
     saved = owner.get(PIPE + "/jobs?tab=saved").get_json()
     assert saved["items"][0]["stage"] in ("screened", "deep")
     assert owner.get(PIPE + "/jobs?tab=in_progress").get_json()["counts"]["saved"] == 1
-    body = owner.post(PIPE + "/purge", json={}).get_json()
+    assert owner.post(PIPE + "/purge", json={}).status_code == 400
+    other = add_job(owner, "t:other", JOB_MASS)
+    body = owner.post(PIPE + "/purge", json={"all": False, "ids": [drop, keep]}).get_json()
+    assert body["deleted"] == 1 and body["kept"] == 1
+    assert owner.get(PIPE + "/job", query_string=other).status_code == 200
+    body = owner.post(PIPE + "/purge", json={"all": True, "ids": [other]}).get_json()
+    assert body["deleted"] == 0 and body["kept"] == 1
+    body = owner.post(PIPE + "/purge", json={"all": True}).get_json()
     assert body["deleted"] == 1 and body["kept"] == 1
     assert owner.get(PIPE + "/jobs?tab=all").get_json()["total"] == 0
     assert owner.get(PIPE + "/job", query_string=drop).status_code == 404

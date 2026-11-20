@@ -733,10 +733,30 @@ html .rp-main .rp-job-save.is-saved,
 html .rp-main .rp-job-save.is-saved:hover:not(:disabled) {
     background: var(--dr-brass-soft); border-color: var(--dr-brass); color: var(--dr-brass);
 }
-html .rp-main #rpPurge.is-armed,
-html .rp-main #rpPurge.is-armed:hover:not(:disabled) {
-    background: var(--dr-danger); border-color: var(--dr-danger); color: #fff;
+.rp-purge-tools, .rp-purge-dialog-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.rp-purge-tools {
+    margin: 12px 18px 0;
+    padding: 8px 12px;
+    border: 1px solid var(--dr-line);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-soft);
 }
+.rp-purge-tools label { display: inline-flex; align-items: center; gap: 5px; }
+.rp-purge-tools [role="status"] { margin-inline-start: auto; color: var(--dr-muted); }
+.rp-purge-checkbox { flex: none; margin: 0; }
+.rp-purge-dialog {
+    width: min(420px, calc(100% - 32px));
+    padding: 20px;
+    border: 1px solid var(--dr-line);
+    border-radius: var(--dr-radius-lg);
+    background: var(--dr-surface);
+    color: var(--dr-ink);
+    box-shadow: var(--dr-shadow-lg);
+}
+.rp-purge-dialog::backdrop { background: rgb(23 35 59 / 36%); }
+.rp-purge-dialog h2 { font-size: 17px; }
+.rp-purge-dialog p { margin: 8px 0 16px; color: var(--dr-muted); }
+.rp-purge-dialog-actions { justify-content: flex-end; }
 
 /* 淘汰卡 */
 .rp-job.is-rejected { border-color: #eec9c5; }

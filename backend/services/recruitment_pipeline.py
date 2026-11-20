@@ -204,7 +204,7 @@ def board_day_start():
     return datetime.fromtimestamp(time.time(), BOARD_TIMEZONE).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 
 
-def purge_unsaved(conn, owner, *, before=None):
+def purge_unsaved(conn, owner, *, before=None, identities=(), select_all=True):
     """删除未保存岗位，流水线状态和相关物料随岗位级联删除。"""
     where = ("owner=? AND NOT EXISTS (SELECT 1 FROM recruitment_pipeline p"
              " WHERE p.owner=recruitment_listings.owner AND p.source=recruitment_listings.source"
@@ -213,6 +213,13 @@ def purge_unsaved(conn, owner, *, before=None):
     if before is not None:
         where += " AND updated_at<?"
         args.append(before)
+    if identities:
+        operator = "NOT IN" if select_all else "IN"
+        where += (f" AND (source, url_key) {operator} "
+                  "(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))")
+        args.append(json.dumps(identities, ensure_ascii=False))
+    elif not select_all:
+        return 0
     return conn.execute(f"DELETE FROM recruitment_listings WHERE {where}", args).rowcount
 
 
@@ -1598,11 +1605,21 @@ def register_routes(blueprint):
     @blueprint.post(API + "/purge")
     @_login_required
     def pipeline_purge():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("all"), bool):
+            return jsonify(message="请明确选择要删除的未保存岗位。"), 400
+        select_all = payload["all"]
+        items = payload.get("ids", [])
+        if not isinstance(items, list) or (not select_all and not items):
+            return jsonify(message="请先选择要删除的岗位。"), 400
+        identities = [_identity(item) for item in items]
+        if any(identity is None for identity in identities):
+            return jsonify(message="岗位选择无效。"), 400
         owner = _current_user()["username"]
         conn = db._get_conn()
         with conn:
             conn.execute("BEGIN IMMEDIATE")
-            deleted = purge_unsaved(conn, owner)
+            deleted = purge_unsaved(conn, owner, identities=identities, select_all=select_all)
             kept = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND saved=1",
                                 (owner,)).fetchone()[0]
         return jsonify(deleted=deleted, kept=kept)

@@ -111,8 +111,7 @@
                             <input id="rpSearch" type="search" maxlength="120" placeholder="搜索岗位、公司或来源" aria-label="搜索岗位">
                         </label>
                         <button id="rpCollectJobs" class="rp-btn rp-btn-sm rp-btn-primary" type="button">获取新岗位</button>
-                        <button id="rpPurge" class="rp-btn rp-btn-sm rp-btn-ghost" type="button"
-                                title="删除全部未保存岗位，已保存岗位保留；未保存岗位在次日首次打开时自动清理。">批量删除</button>
+                        <button id="rpPurge" class="rp-btn rp-btn-sm rp-btn-ghost" type="button" aria-expanded="false" aria-controls="rpPurgeTools">批量删除</button>
                         <a id="rpExport" class="rp-btn rp-btn-sm rp-btn-ghost" href="{{ url_for('recruitment.export') }}?clean_status=passed&amp;sort=match">导出 CSV</a>
                     </div>
                 </header>
@@ -128,6 +127,12 @@
                     {% endfor %}
                 </nav>
                 <div id="rpTabBanner" class="rp-tabbanner" hidden></div>
+                <div id="rpPurgeTools" class="rp-purge-tools" hidden>
+                    <label><input id="rpPurgePage" type="checkbox"> 全选本页</label>
+                    <button id="rpPurgeAll" class="rp-btn rp-btn-sm rp-btn-ghost" type="button">全选全部未保存岗位</button>
+                    <span id="rpPurgeCount" role="status"></span>
+                    <button id="rpPurgeDelete" class="rp-btn rp-btn-sm rp-btn-danger" type="button">删除所选</button>
+                </div>
                 <div id="rpJobs" class="rp-jobs">
                     <div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div><div class="rp-skeleton-row"></div>
                 </div>
@@ -145,6 +150,16 @@
             </section>
         </div>
 
+        <dialog id="rpPurgeConfirm" class="rp-purge-dialog" aria-labelledby="rpPurgeTitle" aria-describedby="rpPurgeMessage">
+            <form method="dialog">
+                <h2 id="rpPurgeTitle">删除所选岗位？</h2>
+                <p id="rpPurgeMessage"></p>
+                <div class="rp-purge-dialog-actions">
+                    <button class="rp-btn rp-btn-ghost" value="cancel" autofocus>取消</button>
+                    <button class="rp-btn rp-btn-danger" value="delete">确认删除</button>
+                </div>
+            </form>
+        </dialog>
         <div id="rpBoot" class="rp-boot" hidden>
             <span class="rp-icon-tile" data-tone="accent" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
