@@ -44,58 +44,6 @@
     {% include "partials/workspace_guide.html" %}
     {% include "partials/workspace_console.html" %}
 
-    <footer id="site-footer" class="bg-gray-800 text-white py-8">
-        <div class="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <div>
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 rounded-lg overflow-hidden ring-1 ring-white/15 shrink-0 bg-slate-900">
-                            <img src="{{ url_for('static', filename='brand/icon.png') }}" alt="智航生涯" class="w-full h-full object-cover" width="40" height="40" loading="lazy" decoding="async">
-                        </div>
-                        <div>
-                            <h3 class="font-bold">智航生涯</h3>
-                            <p class="text-xs text-gray-400">AI 大学生职业规划智能体</p>
-                        </div>
-                    </div>
-                    <p class="text-sm text-gray-400">应用创新科技推进现代教育，数据融合推动未来发展</p>
-                </div>
-                <div>
-                    <h4 class="font-semibold mb-3">产品服务</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="{{ url_for('recruitment.page') }}" class="hover:text-white transition-all">岗位探索</a></li>
-                        <li><a href="#" onclick="showSection('profile')" class="hover:text-white transition-all">能力评估</a></li>
-                        <li><a href="#" onclick="showSection('report')" class="hover:text-white transition-all">规划报告</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-semibold mb-3">支持资源</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="#" class="hover:text-white transition-all">使用指南</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">常见问题</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">联系客服</a></li>
-                        <li><a href="#" class="hover:text-white transition-all">反馈建议</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-semibold mb-3">联系我们</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li class="flex items-center gap-2">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
-                            wanghank712@163.com
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                            杭州市西湖区文一西路88号
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-                <p>© <span id="footerYear">2025</span> 智航生涯 版权所有</p>
-            </div>
-        </div>
-    </footer>
-
     <!-- 岗位详情弹窗 -->
     <div id="jobDetailModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">

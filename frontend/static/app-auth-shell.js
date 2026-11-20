@@ -74,12 +74,10 @@ function updateReportDates(baseDate = new Date()) {
   const headerDate = document.getElementById("reportHeaderDate");
   const footerGenerated = document.getElementById("reportFooterGeneratedDate");
   const footerValid = document.getElementById("reportFooterValidDate");
-  const footerYear = document.getElementById("footerYear");
   if (generatedTime) generatedTime.textContent = formatDateCN(baseDate, true);
   if (headerDate) headerDate.textContent = formatDateCN(baseDate);
   if (footerGenerated) footerGenerated.textContent = formatDateCN(baseDate);
   if (footerValid) footerValid.textContent = formatDateCN(validDate);
-  if (footerYear) footerYear.textContent = String(baseDate.getFullYear());
 }
 
 function normalizeGenderLabel(raw) {

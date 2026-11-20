@@ -925,7 +925,9 @@ body.rp-lock { overflow: hidden; }
     display: flex; align-items: center; gap: 7px;
     font-size: 13.5px; font-weight: 650; color: var(--dr-ink);
 }
-.rp-panel-section > h3 svg, .rp-scout-head h3 svg { width: 15px; height: 15px; fill: none; stroke: var(--dr-muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rp-panel-section > h3 > svg, .rp-scout-head h3 > svg { width: 15px; height: 15px; fill: none; stroke: var(--dr-muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rp-panel-section > h3 .rp-icon-tile, .rp-scout-head h3 .rp-icon-tile { width: 24px; height: 24px; border-radius: 6px; }
+.rp-panel-section > h3 .rp-icon-tile svg, .rp-scout-head h3 .rp-icon-tile svg { width: 13px; height: 13px; }
 .rp-panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .rp-panel-grid .rp-span-2 { grid-column: 1 / -1; }
 .rp-panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -1031,8 +1033,60 @@ html .rp-drawer .rp-scout-remove:hover:not(:disabled) { color: var(--dr-danger);
 .rp-rule-preview-group[data-status="review"] { background: var(--dr-warning-soft); color: #7c5a17; }
 .rp-rule-preview-group p { margin-top: 4px; color: var(--dr-muted); }
 .rp-weights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.rp-weights label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--dr-ink-soft); }
-.rp-weights input { width: 64px; flex: none; min-height: 30px; }
+.rp-weight-cell {
+    display: grid; gap: 6px;
+    padding: 9px 10px;
+    border: 1px solid var(--dr-line);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-soft);
+    transition: border-color 0.15s var(--dr-ease), box-shadow 0.15s var(--dr-ease);
+}
+.rp-weight-cell { --rp-cell: var(--dr-accent); }
+.rp-weight-cell[data-tone="info"] { --rp-cell: var(--dr-info); }
+.rp-weight-cell[data-tone="brass"] { --rp-cell: var(--dr-brass); }
+.rp-weight-cell[data-tone="success"] { --rp-cell: var(--dr-success); }
+.rp-weight-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.rp-weight-name {
+    font-size: 12px; font-weight: 600; color: var(--dr-ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rp-weight-cell input { width: 100%; min-height: 30px; }
+.rp-weight-cell:focus-within { border-color: var(--rp-cell); box-shadow: var(--dr-ring); }
+.rp-weight-meter { display: block; height: 3px; border-radius: 999px; background: var(--dr-line); overflow: hidden; }
+.rp-weight-meter b {
+    display: block; height: 100%; width: 0;
+    border-radius: inherit; background: var(--rp-cell);
+    transition: width 0.2s var(--dr-ease);
+}
+@media (prefers-reduced-motion: reduce) { .rp-weight-meter b { transition: none; } }
+.rp-eval-saverow { justify-content: space-between; }
+.rp-eval-saverow .rp-inline-check { flex: 1; min-width: 0; }
+.rp-grade-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.rp-grade-chip {
+    min-height: 28px; padding: 3px 12px;
+    border: 1px solid var(--dr-line-strong);
+    border-radius: 999px;
+    background: var(--dr-surface);
+    color: var(--dr-muted);
+    font-family: inherit; font-size: 12px; font-weight: 650;
+    cursor: pointer;
+    transition: background 0.15s var(--dr-ease), color 0.15s var(--dr-ease), border-color 0.15s var(--dr-ease);
+}
+/* 等级色与看板 .rp-grade 徽章同一套语义：A 成功 / B 信息 / C 警示 / D 中性 / F 危险 */
+.rp-grade-chip { --rp-chip: var(--dr-muted); --rp-chip-soft: var(--dr-muted-soft); --rp-chip-line: var(--dr-line); }
+.rp-grade-chip[data-grade="A"] { --rp-chip: var(--dr-success); --rp-chip-soft: var(--dr-success-soft); --rp-chip-line: #cbe5d7; }
+.rp-grade-chip[data-grade="B"] { --rp-chip: var(--dr-info); --rp-chip-soft: var(--dr-info-soft); --rp-chip-line: var(--dr-info-line); }
+.rp-grade-chip[data-grade="C"] { --rp-chip: var(--dr-warning); --rp-chip-soft: var(--dr-warning-soft); --rp-chip-line: #ecd9b4; }
+.rp-grade-chip[data-grade="F"] { --rp-chip: var(--dr-danger); --rp-chip-soft: var(--dr-danger-soft); --rp-chip-line: #eec9c5; }
+.rp-grade-chip:hover { border-color: var(--rp-chip); color: var(--rp-chip); }
+.rp-grade-chip[aria-pressed="true"] {
+    background: var(--rp-chip-soft); border-color: var(--rp-chip); color: var(--rp-chip);
+}
+.rp-stat-chip[data-grade="A"] { background: var(--dr-success-soft); border-color: #cbe5d7; color: var(--dr-success); }
+.rp-stat-chip[data-grade="B"] { background: var(--dr-info-soft); border-color: var(--dr-info-line); color: var(--dr-info); }
+.rp-stat-chip[data-grade="C"] { background: var(--dr-warning-soft); border-color: #ecd9b4; color: var(--dr-warning); }
+.rp-stat-chip[data-grade="D"] { background: var(--dr-muted-soft); border-color: var(--dr-line); color: var(--dr-muted); }
+.rp-stat-chip[data-grade="F"] { background: var(--dr-danger-soft); border-color: #eec9c5; color: var(--dr-danger); }
 
 /* 抽屉内列表（审批/队列/深评/打招呼） */
 .rp-mini-list { display: grid; gap: 8px; }
@@ -1288,6 +1342,20 @@ html .rp-drawer .rp-scout-remove:hover:not(:disabled) { color: var(--dr-danger);
 .rp-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dr-ink-soft); cursor: pointer; }
 .rp-check input { accent-color: var(--dr-accent); width: 14px; height: 14px; }
 .rp-collect-form { display: grid; gap: 10px; }
+.rp-collect-progress {
+  display: grid; gap: 8px; padding: 12px;
+  border: 1px solid var(--dr-accent-line); border-radius: var(--dr-radius-sm);
+  background: var(--dr-accent-soft); color: var(--dr-ink);
+}
+.rp-collect-progress[hidden] { display: none; }
+.rp-collect-progress-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 10px;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.rp-collect-progress-head span, .rp-collect-progress-source p { color: var(--dr-ink-soft); font-size: 11px; }
+.rp-collect-progress-source { display: grid; gap: 5px; padding: 8px 9px; border-radius: 7px; background: var(--dr-surface); }
+.rp-collect-progress-source p { margin: 0; }
+.rp-collect-meter { display: block; width: 100%; height: 6px; accent-color: var(--dr-accent); }
 .rp-run-history { margin-top: 4px; }
 .rp-run-history-head, .rp-run-head {
   display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer;

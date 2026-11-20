@@ -728,20 +728,6 @@ nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
   border-color: rgba(44, 44, 44, 0.08);
 }
 
-#site-footer {
-  background: #1f1f1f !important;
-}
-
-#site-footer .font-bold,
-#site-footer .font-semibold,
-#site-footer a:hover {
-  color: #fff;
-}
-
-#site-footer .text-gray-400,
-#site-footer .text-gray-500 {
-  color: rgba(255, 255, 255, 0.65) !important;
-}
 
 @media (max-width: 1100px) {
   .cs-hero-concierge-panels {
@@ -1569,18 +1555,6 @@ nav.gradient-bg button[aria-label]:not(.nav-workspace-pill) {
 .cs-kimi-bottom-cta-inner > p,
 .cs-kimi-bottom-cta-trust {
   color: #637688;
-}
-
-#site-footer {
-  background: #172331 !important;
-}
-
-#site-footer .text-purple-600 {
-  color: #8fb0d1 !important;
-}
-
-#site-footer .text-purple-200 {
-  color: rgba(180, 201, 222, 0.72) !important;
 }
 
 @media (max-width: 1100px) {

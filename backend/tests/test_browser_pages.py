@@ -463,7 +463,10 @@ def test_pipeline_start_collection_submits_and_reveals_progress(logged_in_page, 
             return
         route.fulfill(json={"items": [{
             "id": "started-run", "keyword": "Agent实习", "city": "杭州", "status": "running",
-            "started_at": 1795000000, "progress": {"zhilian": {"status": "running", "message": "正在读取职位"}},
+            "started_at": 1795000000, "progress": {"zhilian": {
+                "status": "reading_details", "message": "正在读取职位",
+                "details": {"total": 10, "checked": 3, "available": 2},
+            }},
         }] if submitted else []})
 
     page.route("**/api/job-market/collection/runs", runs)
@@ -477,6 +480,10 @@ def test_pipeline_start_collection_submits_and_reveals_progress(logged_in_page, 
     form.get_by_role("button", name="启动采集", exact=True).click()
     form.get_by_text("已启动采集，可在下方查看各平台进度。").wait_for()
     page.locator('.rp-run-history[open] .rp-run[open]').get_by_text("正在读取职位").wait_for()
+    progress = page.locator(".rp-collect-progress")
+    assert progress.get_by_text("第 4 / 10 条", exact=True).is_visible()
+    assert progress.get_by_text("已读取 2 条 · 剩余 7 条", exact=True).is_visible()
+    assert progress.get_by_role("progressbar", name="智联招聘原站 JD 进度").get_attribute("value") == "3"
     assert len(submitted) == 1
     assert submitted[0]["sources"] == ["zhilian"]
     assert submitted[0]["chrome_local"] is True and submitted[0]["boss_local"] is False
@@ -1492,3 +1499,70 @@ def test_recruitment_header_uses_workspace_grid_and_single_configuration_action(
     assert page.evaluate("document.documentElement.scrollWidth") == 390
     config.click()
     page.get_by_role("dialog").wait_for()
+
+
+def test_recruitment_board_save_purge_and_saved_view(logged_in_page, live_server):
+    page = logged_in_page
+    errors = collect_errors(page)
+    page.goto(live_server + "/recruitment", wait_until="load")
+    page.locator("#rpTabs [data-tab='saved']").wait_for()
+    status = page.evaluate("""async () => {
+      const headers = await (window.CareerAuth?.headers?.() || {});
+      const response = await fetch("/api/job-market/collection/pipeline/seed", {
+        method: "POST", credentials: "include",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ city: "北京", limit: 6 })
+      });
+      return response.status;
+    }""")
+    assert status == 200
+    page.evaluate("window.RP.refresh({ silent: true })")
+    page.wait_for_function("window.RP?.state.counts.all >= 6", timeout=30000)
+    total = page.evaluate("window.RP.state.counts.all")
+    page.locator(".rp-job .rp-job-save").first.click()
+    page.wait_for_function("window.RP.state.counts.saved === 1")
+    page.locator("#rpTabs [data-tab='saved']").click()
+    page.locator(".rp-job").wait_for()
+    assert page.locator(".rp-job").count() == 1
+    assert page.locator(".rp-job .rp-status-badge").inner_text() == "已导入"
+    assert page.locator(".rp-job .rp-job-save.is-saved").count() == 1
+    page.locator("#rpTabs [data-tab='all']").click()
+    page.wait_for_function(f"window.RP.state.counts.all === {total - 1}")
+    page.locator("#rpPurge").click()
+    page.locator("#rpPurgeTools").wait_for(state="visible")
+    page.locator("#rpPurgeAll").click()
+    page.locator("#rpPurgeDelete").click()
+    page.locator("#rpPurgeConfirm").wait_for(state="visible")
+    page.locator("#rpPurgeConfirm button[value='delete']").click()
+    page.wait_for_function("window.RP.state.counts.all === 0 && window.RP.state.counts.saved === 1", timeout=30000)
+    page.get_by_text("当日暂无岗位").wait_for()
+    page.locator("#rpTabs [data-tab='saved']").click()
+    page.locator(".rp-job").wait_for()
+    assert page.locator(".rp-job").count() == 1
+    assert errors == [], "\n".join(errors)
+
+
+def test_recruitment_eval_drawer_weights_and_whitelist_readable(logged_in_page, live_server):
+    page = logged_in_page
+    errors = collect_errors(page)
+    page.goto(live_server + "/recruitment", wait_until="load")
+    page.locator(".rp-step[data-step='evaluating']").click()
+    page.locator(".rp-weights").wait_for()
+    labels = page.locator(".rp-weight-name").evaluate_all(
+        "els => els.map(el => { const r = el.getBoundingClientRect(); return [r.width, r.height]; })")
+    assert len(labels) == 8
+    assert all(w >= 48 and h <= 22 for w, h in labels), labels
+    widths = page.locator(".rp-weight-cell input").evaluate_all(
+        "els => els.map(el => el.getBoundingClientRect().width)")
+    assert all(w >= 80 for w in widths), widths
+    assert page.locator(".rp-weight-cell .rp-icon-tile").count() == 8
+    page.wait_for_function(
+        "() => { const fills = document.querySelectorAll('.rp-weight-meter b');"
+        " return fills.length === 8 && [...fills].every(b => parseFloat(b.style.width) > 0); }")
+    chips = page.locator(".rp-grade-chip")
+    assert chips.count() == 5
+    chips.first.click()
+    assert chips.first.get_attribute("aria-pressed") == "true"
+    chips.first.click()
+    assert chips.first.get_attribute("aria-pressed") == "false"
+    assert errors == [], "\n".join(errors)

@@ -23,14 +23,21 @@
     interview_prob: "面试概率", company_stage: "公司阶段", market_fit: "赛道前景", growth: "成长空间"
   };
   const GRADE_OPTIONS = ["A", "B", "C", "D", "F"];
+  /* 八维仪表簇：每维一枚 line-icon + 色板角色，与漏斗 tile 同一套 tone 语义 */
+  const DIMENSION_META = {
+    role_match: ["target", "accent"], skills_align: ["layers", "info"],
+    seniority: ["graduation", "brass"], compensation: ["banknote", "success"],
+    interview_prob: ["users", "accent"], company_stage: ["building", "info"],
+    market_fit: ["trend", "brass"], growth: ["sprout", "success"]
+  };
 
   /* ---------- 面板小工具 ---------- */
   function alive(token, body) { return token === RP.drawerToken() && body.isConnected; }
-  function section(title, iconName) {
+  function section(title, iconName, tone) {
     const root = node("section", "", "rp-panel-section");
     if (title) {
       const h = node("h3", title);
-      if (iconName) h.prepend(icon(iconName));
+      if (iconName) h.prepend(tile(iconName, tone || "accent", true));
       root.append(h);
     }
     return root;
@@ -178,7 +185,7 @@
         queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
         partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
         opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时",
-        city_unsupported: "城市暂不支持"
+        city_unsupported: "城市暂不支持", reading_details: "读取原站 JD"
       };
       if (!canUseChrome) {
         collectSection.append(note("本机 Chrome 连接未启用。可尝试直接采集公开搜索结果，部分平台可能需要登录。", "warn"));
@@ -300,6 +307,7 @@
           if (!alive(token, body)) return;
           setFeedback(collectFeedback, "已启动采集，可在下方查看各平台进度。", "success");
           openRun = run.id;
+          currentRun = run.id;
           history.open = true;
           void loadRuns();
         } catch (error) {
@@ -309,6 +317,8 @@
       collectSection.append(form);
 
       const history = node("details", "", "rp-run-history");
+      const activeProgress = node("section", "", "rp-collect-progress");
+      activeProgress.hidden = true;
       const historyHead = node("summary", "", "rp-run-history-head");
       const historyCount = node("span", "", "rp-run-history-count");
       const runsWrap = node("div", "正在读取采集记录…", "rp-runs");
@@ -318,6 +328,47 @@
       let runRequest = 0;
       let lastRuns = "";
       let openRun = null;
+      let currentRun = null;
+      const pendingStates = new Set(["queued", "running", "opening", "waiting_user", "reading_details"]);
+      function meter(label, value, total) {
+        const bar = node("progress", "", "rp-collect-meter");
+        bar.setAttribute("aria-label", label);
+        bar.max = Math.max(1, total);
+        bar.value = value;
+        return bar;
+      }
+      function paintProgress(run) {
+        activeProgress.hidden = !run;
+        if (!run) return;
+        const entries = Object.entries(run.progress || {});
+        const running = run.status === "running";
+        const finished = entries.filter(([, item]) => !running || !pendingStates.has(item.status)).length;
+        const head = node("div", "", "rp-collect-progress-head");
+        head.append(node("strong", running ? "采集进度" : statusNames[run.status] || run.status),
+          node("span", `已结束 ${finished} / ${entries.length} 个平台`));
+        const sources = entries.map(([source, item]) => {
+          const row = node("div", "", "rp-collect-progress-source");
+          const title = node("div", "", "rp-collect-progress-head");
+          const label = sourceLabel((meta.collection_sources || {})[source]) || source;
+          const status = !running && pendingStates.has(item.status) ? run.status : item.status;
+          title.append(node("strong", label), node("span", statusNames[status] || status));
+          row.append(title);
+          if (item.details) {
+            const { total, checked, available } = item.details;
+            const remaining = total - checked;
+            const stage = status === "reading_details" ? `第 ${Math.min(checked + 1, total)} / ${total} 条` : `共 ${total} 条`;
+            const result = status === "reading_details"
+              ? `已读取 ${available} 条 · 剩余 ${remaining} 条`
+              : `已读取 ${available} 条 · 未读取 ${total - available} 条`;
+            const counts = node("div", "", "rp-collect-progress-head");
+            counts.append(node("span", stage), node("span", result));
+            row.append(meter(`${label}原站 JD 进度`, checked, total), counts);
+          }
+          if (item.message) row.append(node("p", item.message));
+          return row;
+        });
+        activeProgress.replaceChildren(head, meter("平台采集进度", finished, entries.length), ...sources);
+      }
       const runCard = (run) => {
         const card = node("details", "", "rp-run");
         card.dataset.state = run.status;
@@ -335,10 +386,12 @@
         card.append(head);
         for (const [source, item] of Object.entries(run.progress || {})) {
           const line = node("div", "", "rp-run-source");
-          const itemStatus = run.status === "interrupted" && ["queued", "running", "opening", "waiting_user"].includes(item.status)
+          const itemStatus = run.status === "interrupted" && pendingStates.has(item.status)
             ? "interrupted" : item.status;
           line.append(node("strong", sourceLabel((meta.collection_sources || {})[source]) || source));
-          const loginUrl = ["waiting_user", "login_required", "login_timeout"].includes(itemStatus) && item.login_url;
+          const loginNeeded = ["waiting_user", "login_required", "login_timeout"].includes(itemStatus) ||
+            ["not_logged_in", "verification_required"].includes(item.detail_state);
+          const loginUrl = loginNeeded && item.login_url;
           if (loginUrl || item.search_url) {
             const link = node("a", loginUrl ? "去登录 ↗" : "原站 ↗");
             link.href = loginUrl || item.search_url;
@@ -349,6 +402,7 @@
           const message = node("p", itemStatus === "interrupted" ? statusNames[itemStatus] : (item.message || statusNames[itemStatus] || ""));
           message.dataset.state = itemStatus;
           line.append(message);
+          if (item.details) line.append(node("p", `原站 JD 已读取 ${item.details.available} / ${item.details.total} 条`));
           card.append(line);
         }
         return card;
@@ -362,6 +416,9 @@
           const items = data.items || [];
           const snapshot = JSON.stringify(items);
           if (snapshot !== lastRuns || openRun) {
+            const active = items.find(run => run.status === "running") || items.find(run => run.id === currentRun);
+            if (active) currentRun = active.id;
+            paintProgress(active);
             const expanded = new Set([...runsWrap.querySelectorAll(".rp-run[open]")].map(card => card.dataset.runId));
             const focused = document.activeElement?.closest(".rp-run");
             const cards = items.map(run => {
@@ -377,7 +434,7 @@
               cards.find(card => card.dataset.runId === focused.dataset.runId)?.firstElementChild.focus({ preventScroll: true });
             }
           }
-          if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 3000);
+          if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 2000);
           else void RP.refresh({ silent: true });
         } catch (error) {
           if (request === runRequest && alive(token, body)) {
@@ -386,7 +443,7 @@
           }
         }
       }
-      collectSection.append(history);
+      collectSection.append(activeProgress, history);
       void loadRuns();
 
       const csvSection = section("导入 CSV", "upload");
@@ -886,30 +943,48 @@
       const token = RP.drawerToken();
       const readiness = note("正在读取模型与评估配置…");
       const form = node("form", "", "rp-form");
-      const settingsSection = section("八维评估权重", "sliders");
+      const settingsSection = section("八维评估权重", "sliders", "accent");
       const weights = node("div", "", "rp-weights");
       const weightInputs = new Map();
+      const weightMeters = new Map();
+      function paintMeter(key) {
+        const value = Number(weightInputs.get(key).value);
+        const ratio = Number.isFinite(value) ? Math.min(1, Math.max(0, value / 5)) : 0;
+        weightMeters.get(key).style.width = (ratio * 100) + "%";
+      }
+      function paintMeters() { for (const key of weightInputs.keys()) paintMeter(key); }
       for (const [key, label] of Object.entries(DIMENSION_LABELS)) {
         const number = input("number", { min: "0", max: "5", step: "0.1", required: "required" });
         weightInputs.set(key, number);
-        const wrap = node("label");
-        wrap.append(document.createTextNode(label), number);
+        const [iconName, tone] = DIMENSION_META[key] || ["sliders", "accent"];
+        const wrap = node("label", "", "rp-weight-cell");
+        wrap.dataset.tone = tone;
+        const head = node("span", "", "rp-weight-head");
+        head.append(tile(iconName, tone, true), node("span", label, "rp-weight-name"));
+        const meter = node("i", "", "rp-weight-meter");
+        const fill = node("b");
+        meter.append(fill);
+        weightMeters.set(key, fill);
+        number.addEventListener("input", () => paintMeter(key));
+        wrap.append(head, number, meter);
         weights.append(wrap);
       }
       const heuristic = input("checkbox");
       const heuristicLabel = node("label", "", "rp-inline-check");
-      heuristicLabel.append(heuristic, document.createTextNode("使用启发式评估（按规则打分和诊断）"));
+      heuristicLabel.append(heuristic, document.createTextNode("启发式评估（按规则打分和诊断）"));
       const saveBtn = button("保存评估配置", "", "check");
       saveBtn.type = "submit";
       const settingsFeedback = feedback();
+      const saveRow = node("div", "", "rp-panel-actions rp-eval-saverow");
+      saveRow.append(heuristicLabel, saveBtn);
       settingsSection.append(
-        node("p", "权重 0-5：3 为中性缺失，4 为明确正面，5 极罕见；总分只展示不分流，分流只看 A-F 评级。", "rp-hint"),
-        weights, heuristicLabel, saveBtn, settingsFeedback
+        node("p", "0–5 分：3 中性 · 4 明确正面 · 5 极罕见；总分仅展示，分流只看 A–F 评级。", "rp-hint"),
+        weights, saveRow, settingsFeedback
       );
       form.append(settingsSection);
 
-      const runSection = section("批量评估", "play");
-      runSection.append(node("p", "先对清洗通过和待重评岗位做八维评级。达到精投阈值的岗位自动生成深评诊断，其余进入海投。初评解析失败时保留待重试状态。", "rp-hint"));
+      const runSection = section("批量评估", "play", "info");
+      runSection.append(node("p", "清洗通过与待重评岗位先做八维评级；达精投阈值自动深评，其余进海投。解析失败保留待重试。", "rp-hint"));
       const runFeedback = feedback();
       const runBtn = button("运行 AI 评估", "rp-btn-primary", "play");
       runBtn.addEventListener("click", async () => {
@@ -945,6 +1020,7 @@
         for (const [grade, count] of Object.entries(grades)) {
           if (!count) continue;
           const chip = node("span", "", "rp-stat-chip");
+          chip.dataset.grade = grade;
           chip.append(document.createTextNode(grade + " 级 "), node("b", String(count)));
           chips.push(chip);
         }
@@ -954,7 +1030,9 @@
         stats.replaceChildren(...(scored ? chips : [node("span", "暂无已评分岗位", "rp-stat-chip")]));
       }
       paintStats();
-      runSection.append(runBtn, runFeedback, stats);
+      const runRow = node("div", "", "rp-panel-actions");
+      runRow.append(runBtn);
+      runSection.append(runRow, runFeedback, stats);
       body.append(readiness, form, runSection);
       const paintList = appendEvaluationDetails(body, token);
 
@@ -962,6 +1040,7 @@
       function showConfig(data) {
         const settings = data.settings || {};
         for (const [key, number] of weightInputs) number.value = settings.evaluation_weights?.[key] ?? 1;
+        paintMeters();
         heuristic.checked = Boolean(settings.heuristic_mode);
         if (settings.heuristic_mode) {
           readiness.dataset.tone = "warning";
@@ -1013,21 +1092,27 @@
   });
 
   function appendEvaluationDetails(body, token) {
-    const gate = section("分流阈值与投递白名单", "target");
+    const gate = section("分流阈值与投递白名单", "target", "brass");
     const threshold = select([["A", "A 级（仅 A 走精投）"], ["B", "B 级（A/B 走精投，默认）"], ["C", "C 级（A/B/C 走精投）"]], "B");
     const gradeBoxes = new Map();
-    const gradeRow = node("div", "", "rp-stat-chips");
+    const gradeRow = node("div", "", "rp-grade-chips");
+    gradeRow.setAttribute("role", "group");
+    gradeRow.setAttribute("aria-label", "自动投递等级白名单");
     for (const grade of GRADE_OPTIONS) {
-      const box = input("checkbox");
-      gradeBoxes.set(grade, box);
-      const label = node("label", "", "rp-inline-check");
-      label.append(box, document.createTextNode(grade + " 级"));
-      gradeRow.append(label);
+      const chip = node("button", grade + " 级", "rp-grade-chip");
+      chip.type = "button";
+      chip.dataset.grade = grade;
+      chip.setAttribute("aria-pressed", "false");
+      chip.addEventListener("click", () => {
+        chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
+      });
+      gradeBoxes.set(grade, chip);
+      gradeRow.append(chip);
     }
     const gateFeedback = feedback();
     const gateSave = button("保存阈值配置", "", "check");
     gateSave.addEventListener("click", async () => {
-      const autoDeliver = [...gradeBoxes].filter(([, box]) => box.checked).map(([grade]) => grade);
+      const autoDeliver = [...gradeBoxes].filter(([, chip]) => chip.getAttribute("aria-pressed") === "true").map(([grade]) => grade);
       if (!autoDeliver.length) { setFeedback(gateFeedback, "自动投递等级白名单不能为空。", "error"); return; }
       gateSave.disabled = true;
       try {
@@ -1037,11 +1122,13 @@
         if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
       } finally { gateSave.disabled = false; }
     });
+    const gateRow = node("div", "", "rp-panel-actions rp-eval-saverow");
+    gateRow.append(gradeRow, gateSave);
     gate.append(field("精投分流阈值", threshold),
-      node("p", "自动投递等级白名单（海投轨）：白名单外评级与解析失败件一律拦截进审批。", "rp-hint"),
-      gradeRow, gateSave, gateFeedback);
+      node("p", "海投自动投递白名单：白名单外评级与解析失败件拦截进审批。", "rp-hint"),
+      gateRow, gateFeedback);
 
-    const listSection = section("深评记录", "eye");
+    const listSection = section("深评记录", "eye", "success");
     const list = node("div", "", "rp-mini-list");
     const detail = node("div", "", "rp-deep-keys");
     function paintList() {
@@ -1094,7 +1181,7 @@
       if (!alive(token, body)) return;
       threshold.value = data.settings?.threshold || "B";
       const allowed = data.settings?.auto_deliver_grades || ["C", "D", "F"];
-      for (const [grade, box] of gradeBoxes) box.checked = allowed.includes(grade);
+      for (const [grade, chip] of gradeBoxes) chip.setAttribute("aria-pressed", String(allowed.includes(grade)));
     }).catch(() => {});
     return paintList;
   }

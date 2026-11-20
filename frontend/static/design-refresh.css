@@ -184,16 +184,6 @@ html .gradient-text {
   -webkit-text-fill-color: currentColor;
   color: var(--dr-accent);
 }
-footer#site-footer, footer.bg-gray-800 {
-  background: var(--dr-ink) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-footer#site-footer .border-gray-700 { border-color: rgba(255, 255, 255, 0.12) !important; }
-footer#site-footer .text-gray-400,
-footer#site-footer .text-gray-500 { color: #9aa7bd !important; }
-footer#site-footer h3, footer#site-footer h4 { color: #f4f6fa !important; }
-footer#site-footer a:hover { color: #fff !important; }
-
 /* ---------- 4. 共享表面：锐利边缘 + 分层阴影 ---------- */
 html .glass-surface,
 html .bg-white.rounded-xl,

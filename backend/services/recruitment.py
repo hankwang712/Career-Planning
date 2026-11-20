@@ -51,7 +51,7 @@ def init_schema(conn):
         CREATE TABLE IF NOT EXISTS recruitment_runs (
             id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
             keyword TEXT NOT NULL, city TEXT NOT NULL, started_at REAL NOT NULL,
-            status TEXT NOT NULL, progress TEXT NOT NULL
+            status TEXT NOT NULL, progress TEXT NOT NULL, last_progress_at REAL NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS recruitment_runs_owner ON recruitment_runs(owner, started_at DESC);
         CREATE UNIQUE INDEX IF NOT EXISTS recruitment_active_run ON recruitment_runs(status) WHERE status = 'running';
@@ -68,6 +68,8 @@ def init_schema(conn):
             FOREIGN KEY(owner, source, url_key) REFERENCES recruitment_listings(owner, source, url_key) ON DELETE CASCADE
         );
     """)
+    if "last_progress_at" not in {column[1] for column in conn.execute("PRAGMA table_info(recruitment_runs)")}:
+        conn.execute("ALTER TABLE recruitment_runs ADD COLUMN last_progress_at REAL NOT NULL DEFAULT 0")
     cleaning.init_schema(conn)
     ai.init_schema(conn)
     pipeline.init_schema(conn)
@@ -97,7 +99,7 @@ def clean_listing(fields):
     return fields
 
 
-def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cleaning_counts=None):
+def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cleaning_counts=None, saved_urls=None):
     seen = set()
     records = []
     note_links = []
@@ -141,12 +143,65 @@ def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cl
     if counts and cleaning_counts is not None:
         for status, count in counts.items():
             cleaning_counts[status] = cleaning_counts.get(status, 0) + count
+    if saved_urls is not None:
+        saved_urls.extend(record[2] for record in records)
     return len(records)
 
 
 def save_progress(conn, owner, run_id, progress, status="running"):
-    conn.execute("UPDATE recruitment_runs SET status=?, progress=? WHERE owner=? AND id=? AND status='running'",
-                 (status, json.dumps(progress, ensure_ascii=False), owner, run_id))
+    conn.execute("UPDATE recruitment_runs SET status=?, progress=?, last_progress_at=? "
+                 "WHERE owner=? AND id=? AND status='running'",
+                 (status, json.dumps(progress, ensure_ascii=False), time.time(), owner, run_id))
+
+
+def zhilian_detail_url(value):
+    url = listing_url("zhilian", value) if isinstance(value, str) and len(value) <= 2048 else ""
+    if url and urlsplit(url).hostname == "www.zhaopin.com" and urlsplit(url).path.startswith("/jobdetail/"):
+        return url
+    return ""
+
+
+def save_zhilian_detail(conn, owner, url, text):
+    args = (owner, "zhilian", url)
+    row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
+    if row is None:
+        return ""
+    inserted = conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text)).rowcount
+    if not inserted:
+        return conn.execute("SELECT description FROM recruitment_job_details WHERE owner=? AND source=? AND url_key=?", args).fetchone()[0]
+    rules = cleaning.load_rules(conn, owner, row["profile"])
+    if rules.experience_years_max is not None or rules.require_education or rules.exclude_education:
+        cleaning.apply_ingested(conn, owner, "zhilian", [url])
+    return text
+
+
+def collect_zhilian_details(conn, owner, urls, item, publish):
+    cached = {row[0] for row in conn.execute("""
+        SELECT url_key FROM recruitment_job_details WHERE owner=? AND source='zhilian'
+        AND url_key IN (SELECT value FROM json_each(?)) AND description<>''
+    """, (owner, json.dumps(urls)))}
+    progress = {"total": len(urls), "checked": len(cached), "available": len(cached)}
+    item = {**item, "status": "reading_details", "message": "正在读取原站岗位职责和任职要求。"}
+    publish({**item, "details": dict(progress)})
+    for url in urls:
+        if url in cached:
+            continue
+        state, detail = read_zhilian_detail(url) if zhilian_detail_url(url) else ("no_detail", "")
+        text = clean_listing({"description": detail})["description"]
+        progress["checked"] += 1
+        if text:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                progress["available"] += bool(save_zhilian_detail(conn, owner, url, text))
+        if state in {"not_logged_in", "verification_required", "unavailable"}:
+            item["detail_state"] = state
+            break
+        publish({**item, "details": dict(progress)})
+    missing = progress["total"] - progress["available"]
+    item.update(status="partial" if missing else "succeeded",
+                message=(SESSION_MESSAGES.get(item.get("detail_state"), "部分原站详情未读取。") if missing
+                         else "列表和原站 JD 已保存。"))
+    publish({**item, "details": dict(progress)})
 
 
 def run_chrome_sources(owner, run_id, config, progress):
@@ -155,19 +210,26 @@ def run_chrome_sources(owner, run_id, config, progress):
     def run_source(source):
         conn = db._get_conn()
 
-        def update(status, message):
+        def publish(item):
             with lock, conn:
-                progress[source] = {"status": status, "message": message}
+                progress[source] = item
                 save_progress(conn, owner, run_id, progress)
 
+        def update(status, message):
+            publish({"status": status, "message": message})
+
         status, message, rows = collect_in_chrome(source, config.keyword, config.city, config.limit, update)
-        with lock, conn:
+        urls = []
+        with conn:
             counts = {}
-            count = save_rows(conn, owner, source, rows, profile=config.profile, cleaning_counts=counts)
-            progress[source] = {"status": status, "message": message, "count": count}
-            if counts:
-                progress[source]["cleaning"] = counts
-            save_progress(conn, owner, run_id, progress)
+            count = save_rows(conn, owner, source, rows, profile=config.profile, cleaning_counts=counts, saved_urls=urls)
+        item = {"status": status, "message": message, "count": count}
+        if counts:
+            item["cleaning"] = counts
+        if source == "zhilian" and urls:
+            collect_zhilian_details(conn, owner, urls, item, publish)
+        else:
+            publish(item)
 
     queued = [source for source in config.sources if progress[source]["status"] == "queued"]
     with ThreadPoolExecutor(max_workers=len(queued), thread_name_prefix="recruitment-chrome") as pool:
@@ -226,12 +288,14 @@ def run_collection(owner, run_id, config, progress):
     except Exception:
         logger.exception("Recruitment collection could not finish")
         for source in config.sources:
-            if progress[source]["status"] in {"queued", "running", "opening", "waiting_user"}:
+            if progress[source]["status"] == "reading_details":
+                progress[source].update(status="partial", message="岗位列表已保存，原站详情读取中断。")
+            elif progress[source]["status"] in {"queued", "running", "opening", "waiting_user"}:
                 progress[source] = {"status": "unavailable", "message": "浏览器采集未完成，请检查是否安装 Chromium、Chrome 或 Edge。", "count": 0}
     finally:
         with conn:
             attempted = [item for item in progress.values() if item["status"] != "city_unsupported"]
-            if attempted and all(item.get("count") for item in attempted):
+            if attempted and all(item.get("count") and item["status"] != "partial" for item in attempted):
                 status = "complete"
             elif any(item.get("count") for item in progress.values()):
                 status = "partial"
@@ -307,7 +371,8 @@ def start():
     conn = db._get_conn()
     try:
         with conn:
-            conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE status='running' AND started_at<?", (now - 300,))
+            conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE status='running' "
+                         "AND max(started_at, last_progress_at)<?", (now - 300,))
             conn.execute("""
                 INSERT INTO recruitment_runs (id, owner, keyword, city, started_at, status, progress, profile)
                 VALUES (?, ?, ?, ?, ?, 'running', ?, ?)
@@ -329,7 +394,8 @@ def start():
 def runs():
     owner = _current_user()["username"]
     with db._get_conn() as conn:
-        conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE owner=? AND status='running' AND started_at<?",
+        conn.execute("UPDATE recruitment_runs SET status='interrupted' WHERE owner=? AND status='running' "
+                     "AND max(started_at, last_progress_at)<?",
                      (owner, time.time() - 300))
         rows = conn.execute("SELECT id, keyword, city, started_at, status, progress, profile FROM recruitment_runs "
                             "WHERE owner=? ORDER BY started_at DESC LIMIT 8", (owner,)).fetchall()
@@ -794,9 +860,8 @@ def recruitment_ai_run(kind):
 @_login_required
 def zhilian_job_detail():
     payload = request.get_json(silent=True)
-    value = payload.get("url") if isinstance(payload, dict) else None
-    url = listing_url("zhilian", value) if isinstance(value, str) and len(value) <= 2048 else ""
-    if not url or urlsplit(url).hostname != "www.zhaopin.com" or not urlsplit(url).path.startswith("/jobdetail/"):
+    url = zhilian_detail_url(payload.get("url") if isinstance(payload, dict) else None)
+    if not url:
         return jsonify(message="职位链接无效。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
@@ -814,16 +879,9 @@ def zhilian_job_detail():
         return jsonify(message=SESSION_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
     with conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
-        if row is None:
-            return jsonify(message="岗位记录不存在。"), 404
-        inserted = conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text)).rowcount
-        if inserted:
-            rules = cleaning.load_rules(conn, owner, row["profile"])
-            if rules.experience_years_max is not None or rules.require_education or rules.exclude_education:
-                cleaning.apply_ingested(conn, owner, "zhilian", [url])
-        else:
-            text = conn.execute("SELECT description FROM recruitment_job_details WHERE owner=? AND source=? AND url_key=?", args).fetchone()[0]
+        text = save_zhilian_detail(conn, owner, url, text)
+    if not text:
+        return jsonify(message="岗位记录不存在。"), 404
     return jsonify(description=text)
 
 

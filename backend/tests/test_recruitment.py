@@ -49,6 +49,7 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     monkeypatch.setattr(recruitment, "collect_source", collect)
     monkeypatch.setattr(recruitment, "collect_in_chrome", lambda source, keyword, city, limit, _update:
                         collect(None, source, keyword, city, limit))
+    monkeypatch.setattr(recruitment, "read_zhilian_detail", lambda _: ("ready", "负责编排 Agent 工作流"))
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["liepin"]}).status_code == 400
@@ -406,6 +407,40 @@ def test_zhilian_detail_is_verified_cached_and_included_in_csv(make_account, mon
     assert calls == [url, url]
     assert owner.get(API + "/jobs?source=zhilian").get_json()["items"][0]["description"] == result["description"]
     assert "开发 Agent 应用。" in owner.get(API + "/export?source=zhilian").data.decode("utf-8-sig")
+
+
+def test_zhilian_collection_automatically_caches_details_and_reports_partial_results(make_account, monkeypatch):
+    from services import db, recruitment
+
+    owner = make_account("zhilian-auto-detail")
+    cached, fresh, blocked = ["https://www.zhaopin.com/jobdetail/" + key for key in ("cached", "fresh", "blocked")]
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, owner.email, "zhilian", [{"url": cached, "title": "缓存岗位"}])
+        recruitment.save_zhilian_detail(conn, owner.email, cached, "已缓存的岗位职责")
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda *_: (
+        "succeeded", "", [{"url": url, "title": "Agent 开发"} for url in (cached, fresh, blocked)]
+    ))
+    calls = []
+
+    def read(url):
+        calls.append(url)
+        return ("ready", "负责编排 Agent 工作流") if url == fresh else ("not_logged_in", "")
+
+    monkeypatch.setattr(recruitment, "read_zhilian_detail", read)
+    response = owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["zhilian"], "chrome_local": True})
+    assert response.status_code == 202
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        run = owner.get(API + "/runs").get_json()["items"][0]
+        if run["status"] != "running":
+            break
+        time.sleep(0.02)
+    assert run["status"] == "partial"
+    assert run["progress"]["zhilian"]["details"] == {"total": 3, "checked": 3, "available": 2}
+    assert calls == [fresh, blocked]
+    jobs = {row["url"]: row["description"] for row in owner.get(API + "/jobs?source=zhilian").get_json()["items"]}
+    assert jobs[fresh] == "负责编排 Agent 工作流" and jobs[cached] == "已缓存的岗位职责"
 
 
 def test_cleaning_preview_apply_filter_and_release_are_account_scoped(make_account):
