@@ -771,6 +771,44 @@ def test_pipeline_poll_keeps_unchanged_job_cards_in_place(browser, live_server, 
         context.close()
 
 
+def test_pipeline_platform_filter_combines_with_search_and_pagination(browser, live_server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("job-board-platform")
+    add_job(account, "local-platform", {**JOB_CUSTOM, "title": "城市样本 数据分析"})
+    csv = "source,title,url\n" + "\n".join(
+        f"boss,{'数据分析' if index == 0 else f'后端开发 {index}'},https://www.zhipin.com/job_detail/platform{index}.html"
+        for index in range(9)
+    )
+    assert account.post("/api/job-market/collection/import", data={
+        "file": (BytesIO(csv.encode()), "jobs.csv"),
+    }).status_code == 200
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment")
+        pager = page.get_by_role("navigation", name="岗位分页")
+        pager.get_by_text("第 1 / 2 页 · 10 条", exact=True).wait_for()
+        pager.get_by_role("button", name="下一页").click()
+        pager.get_by_text("第 2 / 2 页 · 10 条", exact=True).wait_for()
+        platform = page.get_by_role("combobox", name="平台筛选")
+        platform.select_option("boss")
+        pager.get_by_text("第 1 / 2 页 · 9 条", exact=True).wait_for()
+        assert set(page.locator("#rpJobs .rp-source-pill").all_text_contents()) == {"BOSS 直聘"}
+        page.get_by_role("searchbox", name="搜索岗位").fill("数据分析")
+        page.locator("#rpBoardCount").get_by_text("共 1 条", exact=True).wait_for()
+        assert page.locator("#rpJobs .rp-job-title").all_text_contents() == ["数据分析"]
+        page.reload()
+        page.locator("#rpBoardCount").get_by_text("共 1 条", exact=True).wait_for()
+        assert platform.input_value() == "boss"
+        platform.select_option("")
+        page.locator("#rpBoardCount").get_by_text("共 2 条", exact=True).wait_for()
+        assert page.evaluate("document.documentElement.scrollWidth === innerWidth")
+    finally:
+        context.close()
+
+
 def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job
 

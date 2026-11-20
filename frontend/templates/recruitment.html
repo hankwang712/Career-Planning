@@ -108,8 +108,11 @@
                     <div class="rp-board-actions">
                         <label class="rp-search">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg>
-                            <input id="rpSearch" type="search" maxlength="120" placeholder="搜索岗位、公司或来源" aria-label="搜索岗位">
+                            <input id="rpSearch" type="search" maxlength="120" placeholder="搜索岗位或公司" aria-label="搜索岗位">
                         </label>
+                        <select id="rpSourceFilter" class="rp-platform-select" aria-label="平台筛选">
+                            <option value="">全部平台</option>
+                        </select>
                         <button id="rpCollectJobs" class="rp-btn rp-btn-sm rp-btn-primary" type="button">获取新岗位</button>
                         <button id="rpPurge" class="rp-btn rp-btn-sm rp-btn-ghost" type="button" aria-expanded="false" aria-controls="rpPurgeTools">批量删除</button>
                         <a id="rpExport" class="rp-btn rp-btn-sm rp-btn-ghost" href="{{ url_for('recruitment.export') }}?clean_status=passed&amp;sort=match">导出 CSV</a>

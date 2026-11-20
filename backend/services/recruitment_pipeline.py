@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from . import db, llm_env, recruitment_ai as ai, recruitment_cleaning as cleaning
 from .llm_calls import normalize_sdk_base_url, safe_create_chat_completion
 from .paths import DATA_DIR
-from .recruitment_sources import SOURCES
 from .user_state import _current_user, _login_required
 
 logger = logging.getLogger(__name__)
@@ -1387,15 +1386,8 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
             args += list(stages)
     if keyword:
         like = f"%{keyword}%"
-        source_names = {key: item[0] for key, item in SOURCES.items()}
-        source_names.update(city_jobs="城市种子", local="本地导入", csv="CSV 导入", html="网页导入", seed="种子导入")
-        matches = [key for key, name in source_names.items() if keyword.casefold() in name.casefold()]
-        where += " AND (j.title LIKE ? OR j.company LIKE ? OR j.source LIKE ? OR j.location LIKE ?"
-        args += [like] * 4
-        if matches:
-            where += " OR j.source IN (" + ", ".join("?" for _ in matches) + ")"
-            args += matches
-        where += ")"
+        where += " AND (j.title LIKE ? OR j.company LIKE ?)"
+        args.extend((like, like))
     if source:
         where += " AND p.source=?"
         args.append(source)

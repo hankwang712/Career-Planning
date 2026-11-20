@@ -213,12 +213,12 @@
   const state = {
     funnel: null, rail: null, config: null,
     jobs: [], jobsTotal: 0, counts: {}, tabLoadToken: 0,
-    tab: "all", q: "", page: 1, boardJobs: [], boardTotal: 0,
+    tab: "all", q: "", source: "", page: 1, boardJobs: [], boardTotal: 0,
     boardLoading: false, boardError: "", boardRequest: 0,
     apiReady: false, loading: true, refreshing: false, failCount: 0, stale: false,
     running: false, runStage: null, runToken: 0, runController: null,
     armed: false, armTimer: 0,
-    selectedFailed: new Map(), failedSource: "",
+    selectedFailed: new Map(),
     drawer: null, drawerCtx: null, drawerBusy: false, drawerSeq: 0,
     modalJob: null, modalTab: "resume",
     bulkBusy: false, funnelTotal: 0, funnelPrev: {}
@@ -660,8 +660,9 @@
       button.setAttribute("aria-pressed", String(key === state.tab));
       button.querySelector("[data-tab-count]").textContent = counts[key] ? String(counts[key]) : "";
     }
-    const total = state.tab === "saved" ? (counts.saved || 0) : (state.counts?.all ?? state.jobsTotal);
-    byId("rpBoardCount").textContent = total ? `共 ${total} 条` : "";
+    const filtered = Boolean(state.q.trim() || state.source);
+    const total = filtered ? state.boardTotal : state.tab === "saved" ? (counts.saved || 0) : (state.counts?.all ?? state.jobsTotal);
+    byId("rpBoardCount").textContent = total || filtered ? `共 ${total} 条` : "";
     const purge = byId("rpPurge");
     purge.disabled = state.bulkBusy || savingJobs.size > 0 || state.tab === "saved" || (!purgeMode && !counts.all);
     purge.setAttribute("aria-expanded", String(purgeMode));
@@ -683,7 +684,6 @@
       resetPurgeSelection();
       toast(`已删除 ${result.deleted ?? 0} 条未保存岗位${result.kept ? `，${result.kept} 条已保存岗位保留` : ""}。`, "success");
       state.selectedFailed.clear();
-      state.failedSource = "";
       await refresh({ silent: true });
       await loadBoardPage(1);
     } catch (error) {
@@ -699,7 +699,6 @@
     state.tab = tab;
     state.page = 1;
     state.selectedFailed.clear();
-    state.failedSource = "";
     renderTabs();
     renderTabBanner();
     void loadBoardPage(1);
@@ -760,20 +759,6 @@
         });
         selectAll.append(box, document.createTextNode("全选"));
         tools.append(selectAll);
-        const chips = node("span", "", "rp-source-chips");
-        const sources = [...new Set([...state.jobs, ...state.boardJobs].filter((j) => j.tab === "failed").map((j) => j.source))];
-        for (const source of sources) {
-          const chip = node("button", sourceLabel(source), "rp-source-chip");
-          chip.type = "button";
-          chip.setAttribute("aria-pressed", String(state.failedSource === source));
-          chip.addEventListener("click", () => {
-            state.failedSource = state.failedSource === source ? "" : source;
-            renderTabBanner();
-            void loadBoardPage(1);
-          });
-          chips.append(chip);
-        }
-        tools.append(chips);
         const selected = () => [...state.selectedFailed.values()].filter(job => job.tab === "failed");
         const retry = node("button", `批量重试${state.selectedFailed.size ? `（${state.selectedFailed.size}）` : ""}`, "rp-btn rp-btn-sm");
         retry.type = "button";
@@ -1045,8 +1030,9 @@
           empty.append(actionButton(`查看已保存（${state.counts.saved}）`, "rp-btn-ghost", () => setTab("saved"), "bookmark"));
         }
       } else {
-        empty.append(node("strong", state.q ? "没有匹配的岗位" : "当前视图暂无岗位"),
-          node("p", state.q ? "换个关键词，或清空搜索框。" : "切换其他状态视图，或启动流水线推进岗位。"));
+        const filtered = Boolean(state.q.trim() || state.source);
+        empty.append(node("strong", filtered ? "没有匹配的岗位" : "当前视图暂无岗位"),
+          node("p", filtered ? "试试其他关键词或平台。" : "切换其他状态视图，或启动流水线推进岗位。"));
       }
       renderJobPlaceholder(root, empty);
       return;
@@ -1341,7 +1327,7 @@
     const token = ++state.boardRequest;
     const params = new URLSearchParams({ tab: state.tab, limit: String(BOARD_PAGE_SIZE) });
     if (state.q.trim()) params.set("q", state.q.trim());
-    if (state.tab === "failed" && state.failedSource) params.set("source", state.failedSource);
+    if (state.source) params.set("source", state.source);
     state.page = page;
     if (!quiet) {
       state.boardError = "";
@@ -1670,7 +1656,9 @@
     else url.searchParams.delete("tab");
     if (state.q.trim()) url.searchParams.set("q", state.q.trim());
     else url.searchParams.delete("q");
-    if (state.page > 1 && !state.failedSource) url.searchParams.set("page", state.page);
+    if (state.source) url.searchParams.set("source", state.source);
+    else url.searchParams.delete("source");
+    if (state.page > 1) url.searchParams.set("page", state.page);
     else url.searchParams.delete("page");
     if (state.drawer) url.searchParams.set("drawer", state.drawer);
     else url.searchParams.delete("drawer");
@@ -1739,14 +1727,17 @@
       if (button) setTab(button.dataset.tab);
     });
     let searchTimer = 0;
-    byId("rpSearch").addEventListener("input", (event) => {
+    const applyBoardFilters = () => {
       window.clearTimeout(searchTimer);
-      const value = event.target.value;
-      searchTimer = window.setTimeout(() => {
-        state.q = value;
-        void loadBoardPage(1);
-      }, 300);
+      state.q = byId("rpSearch").value;
+      state.source = byId("rpSourceFilter").value;
+      void loadBoardPage(1);
+    };
+    byId("rpSearch").addEventListener("input", () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(applyBoardFilters, 300);
     });
+    byId("rpSourceFilter").addEventListener("change", applyBoardFilters);
     const goToPage = page => {
       if (page >= 1 && page <= boardPageCount() && page !== state.page) void loadBoardPage(page, { scroll: true });
     };
@@ -1801,6 +1792,11 @@
     if (tab && TABS.includes(tab)) state.tab = tab;
     const q = (params.get("q") || "").trim().slice(0, 120);
     if (q) { state.q = q; byId("rpSearch").value = q; }
+    const platform = byId("rpSourceFilter");
+    const sources = { ...meta.sources, ...SOURCE_EXTRA };
+    for (const [key, label] of Object.entries(sources)) platform.add(new Option(label, key));
+    const source = params.get("source");
+    if (Object.hasOwn(sources, source)) state.source = platform.value = source;
     const page = Number(params.get("page"));
     if (Number.isSafeInteger(page) && page > 1 && page <= Math.floor(Number.MAX_SAFE_INTEGER / BOARD_PAGE_SIZE)) state.page = page;
     renderTabs();
