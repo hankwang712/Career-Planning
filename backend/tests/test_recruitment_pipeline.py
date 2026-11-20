@@ -120,6 +120,54 @@ def test_seed_idempotent_and_rail(make_account):
     assert all(item["source"] == "city_jobs" for item in jobs["items"])
 
 
+def test_manual_clean_uses_saved_jd_criteria_and_continues_through_batches(make_account, monkeypatch):
+    from services import recruitment_pipeline as pipeline
+
+    owner = make_account("manual-clean")
+    review = add_job(owner, "a-review", JOB_CUSTOM)
+    rejected = add_job(owner, "b-rejected", JOB_CUSTOM)
+    passed = add_job(owner, "c-passed", JOB_MASS)
+    hard_rejected = add_job(owner, "d-hard-rejected", JOB_REJECTED)
+    rule = {"keyword": "后端开发", "condition": "never", "desc": "服务端开发是岗位主要职责时命中"}
+    assert owner.post(API + "/cleaning/save", json={"profile": "general", "rules": {
+        "title_exclusions": ["销售"], "ai_scout_rules": [rule],
+    }}).status_code == 200
+    assert job(owner, rejected)["stage"] == "collected"
+    runtime = ("https://example.test", "key", "cleaner")
+    monkeypatch.setattr(pipeline.llm_env, "recruitment_cleaner_runtime", lambda: runtime)
+    monkeypatch.setattr(pipeline, "LLM_BATCH_LIMIT", 1)
+    verdicts = iter([
+        {"verdict": "review", "reason": "职责待核实"},
+        {"verdict": "rejected", "rule": "后端开发", "evidence": "负责后端服务开发"},
+        {"verdict": "passed"},
+    ])
+
+    def screen(active_runtime, jd, rules):
+        assert active_runtime == runtime
+        assert jd["description"] and rules.ai_scout_rules[0].model_dump() == rule
+        return next(verdicts)
+
+    monkeypatch.setattr(pipeline.ai, "screen", screen)
+    first = run(owner, "clean", use_cleaner=True)
+    assert first["counts"]["review"] == 1 and first["next_cursor"] == ["city_jobs", "a-review"]
+    second = run(owner, "clean", use_cleaner=True, after=first["next_cursor"])
+    assert second["counts"]["rejected"] == 1 and second["next_cursor"] == ["city_jobs", "b-rejected"]
+    third = run(owner, "clean", use_cleaner=True, after=second["next_cursor"])
+    assert third["counts"]["passed"] == 1 and third["counts"]["rejected"] == 1
+    assert third["next_cursor"] is None
+    assert job(owner, review)["cleaning_status"] == "review"
+    assert job(owner, rejected)["stage"] == job(owner, hard_rejected)["stage"] == "rejected"
+    tally = {row["url_key"]: row["cleaning_reason"] for row in owner.get(PIPE + "/jobs?tab=rejected").get_json()["items"]}
+    assert "负责后端服务开发" in tally[rejected["url_key"]]
+    assert job(owner, passed)["stage"] == "cleaned"
+    counts = {stage["key"]: stage["count"] for stage in owner.get(PIPE + "/funnel").get_json()["stages"]}
+    assert counts["cleaned"] == 1 and counts["evaluated"] == 0
+
+    assert owner.post(API + "/cleaning/save", json={"profile": "general", "rules": {}}).status_code == 200
+    assert run(owner, "clean", use_cleaner=True)["counts"]["passed"] == 4
+    assert job(owner, rejected)["stage"] == "cleaned"
+
+
 def test_full_pipeline_heuristic_chain(server, make_account):
     owner = setup_account(server, make_account, "pipeline-full", rules={"title_exclusions": ["销售"]})
     custom = add_job(owner, "t:custom", JOB_CUSTOM)

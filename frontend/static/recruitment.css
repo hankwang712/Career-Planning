@@ -455,6 +455,16 @@ html .rp-main .rp-step[data-state="waiting"] {
     --rp-step-tone: #235383;
     --rp-step-badge: var(--dr-info-soft);
 }
+html .rp-main .rp-step[data-step="cleaning"] { align-content: stretch; grid-template-rows: 1fr auto; cursor: default; }
+html .rp-main .rp-step-config {
+    display: grid; align-content: start; justify-items: start; gap: 6px;
+    min-width: 0; padding: 0;
+    border: 0; border-radius: var(--dr-radius-sm);
+    background: transparent; color: var(--dr-ink);
+    text-align: left; cursor: pointer;
+}
+html .rp-main .rp-step-config:hover .rp-step-title { color: var(--dr-accent-hover); }
+html .rp-main .rp-step .rp-clean-run { width: 100%; min-height: 28px; padding-inline: 6px; }
 .rp-step-head { display: flex; align-items: center; gap: 8px; }
 .rp-step-num {
     display: grid; place-items: center;

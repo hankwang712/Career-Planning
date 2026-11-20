@@ -1037,44 +1037,45 @@ def test_recruitment_city_picker_search_group_and_submission(logged_in_page, liv
     assert requests[0]["city"] == "泉州"
 
 
-def test_recruitment_cleaning_previews_applies_and_releases_job(logged_in_page, live_server):
+def test_recruitment_cleaning_runs_saved_rules_from_stage_card(logged_in_page, live_server):
     page = logged_in_page
-    page.goto(live_server + "/recruitment")
-    csv = "source,title,url\nboss,电话销售,https://www.zhipin.com/job_detail/cleaning.html\n"
-    page.locator("#recruitmentFile").set_input_files({"name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode()})
-    page.get_by_role("button", name="待清洗", exact=True).click()
-    job = page.locator(".recruitment-row").filter(has_text="电话销售")
-    job.get_by_text("未清洗", exact=True).wait_for()
-    page.get_by_role("button", name="配置与预览").click()
-    dialog = page.get_by_role("dialog", name="清洗规则")
-    assert dialog.get_by_role("button", name="应用到现有岗位").is_disabled()
-    assert dialog.get_by_role("button", name="启用示例").is_visible()
-    dialog.get_by_label("目标城市", exact=True).fill("杭州")
-    dialog.get_by_label("目标城市", exact=True).press("Enter")
-    dialog.get_by_role("button", name="移除 杭州").click()
-    dialog.get_by_label("经验上限（年）").fill("5")
-    dialog.get_by_role("button", name="启用示例").click()
-    scout = dialog.locator(".recruitment-scout-row").first
-    scout.get_by_label("判定标准").fill("明确要求每周工作六天时命中")
+    csv = (
+        "source,title,url\n"
+        "boss,电话销售,https://www.zhipin.com/job_detail/cleaning-sales.html\n"
+        "boss,数据开发,https://www.zhipin.com/job_detail/cleaning-data.html\n"
+    )
+    page.goto(live_server + "/recruitment?drawer=scraping")
+    page.get_by_text("手动导入文件", exact=True).click()
+    page.get_by_label("CSV 文件", exact=True).set_input_files({
+        "name": "jobs.csv", "mimeType": "text/csv", "buffer": csv.encode(),
+    })
+    page.get_by_role("button", name="导入 CSV 文件", exact=True).click()
+    page.get_by_text("已保存 2 条记录。", exact=True).wait_for()
+    page.locator("#rpDrawerClose").click()
+    step = page.locator('#rpRail [data-step="cleaning"]')
+    run = step.get_by_role("button", name="执行规则清洗", exact=True)
+    run.wait_for()
+    assert run.is_disabled()
+    step.locator(".rp-step-config").click()
+    dialog = page.get_by_role("dialog", name="规则清洗配置")
+    dialog.locator(".rp-clean-exclusions summary").click()
     dialog.get_by_label("岗位标题排除词").fill("销售")
-    dialog.get_by_role("button", name="预览现有岗位").click()
+    dialog.get_by_role("button", name="预览现有岗位", exact=True).click()
     dialog.get_by_text("淘汰 1 条", exact=True).wait_for()
-    assert job.get_by_text("未清洗", exact=True).is_visible()
-    dialog.get_by_role("button", name="应用到现有岗位").click()
-    dialog.get_by_text("已应用清洗规则。", exact=True).wait_for()
-    assert dialog.get_by_label("经验上限（年）").input_value() == "5"
-    assert scout.get_by_label("判定标准").input_value() == "明确要求每周工作六天时命中"
-    dialog.get_by_role("button", name="关闭").click()
-    page.get_by_role("button", name="已淘汰", exact=True).click()
-    assert job.get_by_text("标题命中排除词「销售」").count() == 0
-    job.get_by_role("button", name="电话销售").click()
-    detail = page.get_by_role("dialog", name="电话销售")
-    detail.get_by_text("标题命中排除词「销售」").wait_for()
-    detail.get_by_role("button", name="关闭").click()
-    job.get_by_role("button", name="手动放行").click()
-    page.get_by_text("已放行：电话销售").wait_for()
-    page.get_by_role("button", name="优先看", exact=True).click()
-    job.get_by_text("已放行", exact=True).wait_for()
+    dialog.get_by_role("button", name="保存规则", exact=True).click()
+    dialog.get_by_text("规则已保存。", exact=True).wait_for()
+    page.locator("#rpDrawerClose").click()
+    page.locator('#rpTabs [data-tab="rejected"]').click()
+    cards = page.locator("#rpJobs .rp-job")
+    cards.filter(has_text="电话销售").wait_for(state="hidden")
+    with page.expect_request("**/pipeline/run") as sent:
+        run.click()
+    assert sent.value.post_data_json["stage"] == "clean" and sent.value.post_data_json["use_cleaner"]
+    page.get_by_text("规则清洗完成。通过 1 条，淘汰 1 条，待核对 0 条。", exact=True).wait_for()
+    step.get_by_text("已清洗", exact=True).wait_for()
+    rejected = cards.filter(has_text="电话销售")
+    rejected.get_by_text("标题命中排除词「销售」", exact=True).wait_for()
+    assert cards.filter(has_text="数据开发").count() == 0
 
 
 def test_recruitment_switches_rule_profiles_and_moves_listing(logged_in_page, live_server):

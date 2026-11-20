@@ -193,7 +193,7 @@
   ];
   const RAIL_STEPS = [
     { key: "scraping", label: "抓取导入", icon: "inbox", result: "已采集" },
-    { key: "cleaning", label: "规则清洗", icon: "filter", run: "clean", result: "清洗通过" },
+    { key: "cleaning", label: "规则清洗", icon: "filter", run: "clean", result: "已清洗" },
     { key: "evaluating", label: "AI 评估", icon: "sparkles", run: "evaluate", result: "已评估" },
     { key: "rewriting", label: "简历改写", icon: "pen", run: "rewrite", result: "已改写" },
     { key: "greeting", label: "打招呼语", icon: "message", run: "greet", result: "已生成" },
@@ -201,6 +201,7 @@
     { key: "delivering", label: "投递队列", icon: "send", result: "已生成投递包", waiting: "待投递" }
   ];
   const activeRailRuns = new Map();
+  let cleaningRun = null;
   const FUNNEL_ICONS = [
     { match: /collect|crawl|scrap|import|seed/, icon: "inbox", tone: "accent" },
     { match: /clean/, icon: "filter", tone: "brass" },
@@ -386,19 +387,21 @@
       const pending = step.key === "delivering" ? (delivery.get("ready") || 0) : step.waiting ? step.count : 0;
       const count = step.key === "delivering" ? (delivery.get("delivered") || 0) : step.waiting ? 0 : step.count;
       let cardState = "idle", label = "未开始";
-      if (activeRailRuns.has(step.run)) [cardState, label] = ["active", "执行中"];
+      if (activeRailRuns.has(step.run) || (step.key === "cleaning" && cleaningRun)) [cardState, label] = ["active", "执行中"];
       else if (needsConfig(step)) [cardState, label] = ["blocked", "待配置"];
       else if (pending) [cardState, label] = ["waiting", step.waiting];
       else if (count) [cardState, label] = ["done", step.result];
       else if (step === next && !activeRailRuns.size && !state.running) [cardState, label] = ["next", "下一步"];
       const detail = pending && count ? `${pending} 条待投递 · ${count} 条已出包`
         : pending || count ? `${pending || count} 条${label === step.result || label === step.waiting ? "" : step.result}` : "";
-      const card = node("button", "", "rp-step");
-      card.type = "button";
+      const isCleaning = step.key === "cleaning";
+      const card = node(isCleaning ? "div" : "button", "", "rp-step");
+      const configButton = isCleaning ? node("button", "", "rp-step-config") : card;
+      configButton.type = "button";
       card.dataset.state = cardState;
       card.dataset.step = step.key;
-      card.setAttribute("aria-label", [step.label, label, detail, "打开阶段面板"].filter(Boolean).join("，"));
-      card.title = step.desc;
+      configButton.setAttribute("aria-label", [step.label, label, detail, "打开阶段面板"].filter(Boolean).join("，"));
+      configButton.title = step.desc;
       const head = node("span", "", "rp-step-head");
       const num = node("span", String(index + 1), "rp-step-num");
       if (cardState === "done") { num.textContent = ""; num.append(icon("check")); }
@@ -407,9 +410,16 @@
       head.append(num, title);
       const badge = node("span", label, "rp-step-chip");
       const summary = pending || count ? node("span", detail, "rp-step-count") : null;
-      card.append(head, badge);
-      if (summary) card.append(summary);
-      card.addEventListener("click", () => openDrawer(step.key));
+      configButton.append(head, badge);
+      if (summary) configButton.append(summary);
+      configButton.addEventListener("click", () => openDrawer(step.key));
+      if (isCleaning) {
+        const runLabel = cleaningRun?.processed ? `已处理 ${cleaningRun.processed} 条…` : cleaningRun ? "正在清洗…" : "执行规则清洗";
+        const run = actionButton(runLabel, "rp-btn-accent rp-clean-run", runSavedCleaning, "play");
+        run.disabled = !steps[0].count || needsConfig(step) || state.running || Boolean(cleaningRun);
+        run.title = needsConfig(step) ? "请先配置并保存规则" : "按岗位所属方向执行已保存的规则";
+        card.append(configButton, run);
+      }
       return card;
     }));
     renderRailNotice(steps.filter(needsConfig), Boolean(steps[0]?.count));
@@ -507,6 +517,9 @@
       const stageLabel = RUN_STAGES.find((s) => s.stage === state.runStage)?.label || "";
       pillState = "running"; pillLabel = stageLabel ? `运行中 · ${stageLabel}` : "运行中";
       actionState = "running"; actionLabel = "终止运行";
+    } else if (cleaningRun) {
+      pillState = "running"; pillLabel = "运行中 · 规则清洗";
+      actionState = "loading"; actionLabel = "正在清洗…"; disabled = true;
     } else if (state.stale) {
       pillState = "stale"; pillLabel = "连接中断 · 自动重试";
       actionState = warnings.length ? "blocked" : "ready";
@@ -564,7 +577,8 @@
       state.runStage = stage;
       renderCommandbar();
       try {
-        await runStage(stage);
+        if (stage === "clean") await runCleaningBatches({}, () => token === state.runToken);
+        else await runStage(stage);
       } catch (error) {
         if (error.name === "AbortError" || token !== state.runToken) aborted = true;
         else { failed = true; toast(`${label}阶段未完成：${error.message}`, "error"); }
@@ -588,14 +602,14 @@
     toast("已请求终止：当前阶段停止后不再继续。", "warning");
     void refresh({ silent: true });
   }
-  async function runStage(stage) {
+  async function runStage(stage, options = {}) {
     const controller = new AbortController();
     state.runController = controller;
     const base = pipelineBase || PIPELINE_BASES[0];
     activeRailRuns.set(stage, (activeRailRuns.get(stage) || 0) + 1);
     renderRail();
     try {
-      return await readJson(await rawRequest(base + "/run", { stage }, "POST", controller.signal));
+      return await readJson(await rawRequest(base + "/run", { stage, ...options }, "POST", controller.signal));
     } catch (error) {
       if (error.name === "AbortError") throw new Error("阶段执行已终止。");
       throw error;
@@ -604,6 +618,44 @@
       if (remaining) activeRailRuns.set(stage, remaining);
       else activeRailRuns.delete(stage);
       renderRail();
+    }
+  }
+  async function runCleaningBatches(options, shouldContinue, onBatch = () => {}) {
+    let after = null;
+    do {
+      const result = await runStage("clean", { ...options, after });
+      onBatch(result);
+      after = result.next_cursor;
+    } while (after && shouldContinue());
+  }
+  async function runSavedCleaning() {
+    if (cleaningRun || state.running || activeRailRuns.size) return;
+    const totals = { processed: 0, passed: 0, rejected: 0, review: 0 };
+    cleaningRun = totals;
+    let modelMissing = false;
+    renderRail();
+    renderCommandbar();
+    try {
+      await runCleaningBatches({ use_cleaner: true }, () => true, (result) => {
+        totals.processed += result.processed || 0;
+        for (const key of ["passed", "rejected", "review"]) totals[key] += result.counts?.[key] || 0;
+        modelMissing ||= result.tier2 === "pending";
+        renderRail();
+      });
+      if (!totals.processed) toast("当前没有可清洗的岗位，请检查是否已保存对应求职方向的规则。");
+      else {
+        const details = `通过 ${totals.passed} 条，淘汰 ${totals.rejected} 条，待核对 ${totals.review} 条。`;
+        toast(modelMissing ? `硬规则已执行，AI 初筛需配置招聘清洗模型。${details}` : `规则清洗完成。${details}`,
+          totals.review ? "warning" : "success");
+      }
+    } catch (error) {
+      const progress = totals.processed ? `（已处理 ${totals.processed} 条）` : "";
+      toast(`规则清洗中断${progress}：${error.message}`, "error");
+    } finally {
+      await refresh({ silent: true });
+      cleaningRun = null;
+      renderRail();
+      renderCommandbar();
     }
   }
   function stageResultMessage(result, label) {

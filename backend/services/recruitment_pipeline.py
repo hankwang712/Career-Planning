@@ -971,7 +971,8 @@ def _job_material(conn, identity):
                p.stage, p.follow_status, p.review_type, p.grade, p.score, p.meta,
                p.screen_payload, p.deep_payload, p.rewrite_payload, p.greeting_payload,
                p.approval, p.delivery_payload, p.failure_payload, p.failure_count, p.updated_at,
-               r.status AS hard_status, r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
+               r.status AS hard_status, r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
+               CASE WHEN a.verdict IN ('rejected', 'review') THEN a.payload END AS semantic_reason_payload
         FROM recruitment_listings j
         JOIN recruitment_pipeline p USING(owner, source, url_key)
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
@@ -1079,7 +1080,7 @@ def _pipeline_candidates(conn, owner, stages, limit, *, cleaned=False, review_ty
     """, (*args, limit)).fetchall()
 
 
-def run_clean(conn, owner, config, limit):
+def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
     ensure_rows(conn, owner)
     rows = conn.execute("""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
@@ -1089,69 +1090,74 @@ def run_clean(conn, owner, config, limit):
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
         LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
         JOIN recruitment_pipeline p USING(owner, source, url_key)
-        WHERE j.owner=? AND p.stage IN ('collected','reeval')
+        WHERE j.owner=? AND (j.source, j.url_key) > (?, ?)
+          AND (p.stage IN ('collected','reeval') OR (? AND (
+               p.stage='cleaned' OR (p.stage='rejected' AND p.follow_status=?))))
+          AND (NOT ? OR EXISTS (
+              SELECT 1 FROM recruitment_cleaning_profiles c WHERE c.owner=j.owner AND c.profile=j.profile
+          ))
         ORDER BY j.source, j.url_key LIMIT ?
-    """, (owner, limit)).fetchall()
+    """, (owner, *after, use_cleaner, FOLLOW_CLEAN_REJECTED, use_cleaner, limit + 1)).fetchall()
     runtime = llm_env.recruitment_cleaner_runtime()
-    llm_ready = all(runtime)
-    # heuristic_mode 是显式开关：开启时全链路跳过 LLM（避免慢端点逐行拖死批量请求）
-    tier2_mode = "heuristic" if config.heuristic_mode else ("llm" if llm_ready else "pending")
+    tier2_mode = "heuristic" if config.heuristic_mode and not use_cleaner else ("llm" if all(runtime) else "pending")
     counts = {"passed": 0, "rejected": 0, "review": 0, "tier2_processed": 0, "tier2_preserved": 0}
     consecutive_failures = 0
-    tier2_short_circuit = False
+    processed = tier2_attempts = tier2_remaining = 0
+    saw_semantic = False
+    last_key = after
     rules_cache = {}
-    tier2_jobs = []
-    for row in rows:
+    for row in rows[:limit]:
         profile = row["profile"]
         if profile not in rules_cache:
             rules_cache[profile] = cleaning.load_rules(conn, owner, profile)
         rules = rules_cache[profile]
         status, reason = cleaning.evaluate(row, rules)
-        cleaning.write_results(conn, owner, [(row["source"], row["url_key"], row["title"], status, reason)])
+        source, url_key = row["source"], row["url_key"]
+        identity = (owner, source, url_key)
+        semantic_verdict = None
+        if status == "passed" and any(rules.semantic_config()):
+            saw_semantic = True
+            if tier2_mode == "llm" and tier2_attempts >= LLM_BATCH_LIMIT:
+                break
+            if tier2_mode == "pending" or consecutive_failures >= 3:
+                status, reason = "review", "等待招聘清洗模型执行 AI 初筛"
+                tier2_remaining += 1
+            else:
+                tier2_attempts += 1
+                try:
+                    job = _job_dict(row)
+                    if tier2_mode == "llm":
+                        result = ai.screen(runtime, job, rules)
+                    else:
+                        meta = _load(row["meta"])
+                        result = heuristic_semantic(job, rules, meta.get("collected_city") or row["location"])
+                    ai.write_result(conn, identity, "semantic", result)
+                    counts["tier2_processed"] += 1
+                    consecutive_failures = 0
+                except Exception as error:
+                    logger.warning("Tier2 semantic screen preserved after failure (%s)", type(error).__name__)
+                    counts["tier2_preserved"] += 1
+                    consecutive_failures += 1
+                    status, reason = "review", "AI 初筛未完成，可重新执行规则清洗"
+                else:
+                    semantic_verdict = result["verdict"]
+        cleaning.write_results(conn, owner, [(source, url_key, row["title"], status, reason)])
+        status = semantic_verdict or status
+        processed += 1
+        last_key = (source, url_key)
         counts["passed" if status == "released" else status] += 1
-        if status in ("rejected",):
-            _update(conn, owner, row["source"], row["url_key"], stage="rejected",
+        if status == "rejected":
+            _update(conn, *identity, stage="rejected",
                     follow_status=FOLLOW_CLEAN_REJECTED, review_type="cleaning", approval="")
         elif status in ("passed", "released"):
-            _update(conn, owner, row["source"], row["url_key"], stage="cleaned", follow_status=FOLLOW_NEW)
-            if any(rules.semantic_config()):
-                tier2_jobs.append((row, rules))
+            _update(conn, *identity, stage="cleaned", follow_status=FOLLOW_NEW)
         else:
-            _update(conn, owner, row["source"], row["url_key"], stage="collected", follow_status=FOLLOW_NEW)
-    # Tier2 语义规则：LLM 优先，未配置走确定性启发式；fail-PRESERVE，连续失败 ≥3 短路本轮
-    tier2_attempts = 0
-    for row, rules in tier2_jobs:
-        if tier2_short_circuit or tier2_mode == "pending":
-            break
-        if tier2_mode == "llm" and tier2_attempts >= LLM_BATCH_LIMIT:
-            break
-        tier2_attempts += 1
-        job = _job_dict(row)
-        try:
-            if tier2_mode == "llm":
-                result = ai.screen(runtime, job, rules)
-            else:
-                meta = _load(row["meta"])
-                result = heuristic_semantic(job, rules, meta.get("collected_city") or row["location"])
-            ai.write_result(conn, (owner, row["source"], row["url_key"]), "semantic", result)
-            counts["tier2_processed"] += 1
-            consecutive_failures = 0
-            if result["verdict"] == "rejected":
-                _update(conn, owner, row["source"], row["url_key"], stage="rejected",
-                        follow_status=FOLLOW_CLEAN_REJECTED, review_type="cleaning")
-            elif result["verdict"] == "review":
-                _update(conn, owner, row["source"], row["url_key"], stage="collected", follow_status=FOLLOW_NEW)
-        except Exception as error:
-            logger.warning("Tier2 semantic screen preserved after failure (%s)", type(error).__name__)
-            counts["tier2_preserved"] += 1
-            consecutive_failures += 1
-            if consecutive_failures >= 3:
-                tier2_short_circuit = True
-    return {"processed": len(rows), "counts": counts,
-            "mode": tier2_mode if tier2_jobs else ("heuristic" if config.heuristic_mode else ("llm" if llm_ready else "heuristic")),
-            "tier2": tier2_mode if tier2_jobs else "not_configured",
-            "tier2_short_circuit": tier2_short_circuit,
-            "tier2_remaining": max(0, len(tier2_jobs) - tier2_attempts)}
+            _update(conn, *identity, stage="collected", follow_status=FOLLOW_NEW)
+    return {"processed": processed, "counts": counts, "mode": tier2_mode if saw_semantic else "heuristic",
+            "tier2": tier2_mode if saw_semantic else "not_configured",
+            "tier2_short_circuit": consecutive_failures >= 3,
+            "tier2_remaining": tier2_remaining,
+            "next_cursor": last_key if processed < len(rows) else None}
 
 
 def _store_deep(conn, owner, row, screen, resume, config, runtime):
@@ -1308,7 +1314,7 @@ def funnel_payload(conn, owner):
         {cleaning.SEMANTIC_JOIN}
         WHERE j.owner=? AND ({cleaning.EFFECTIVE_STATUS}) IN ('passed','released')
     """, (owner,)).fetchone()[0]
-    evaluated = conn.execute("SELECT count(*) FROM recruitment_ai_results WHERE owner=? AND kind='semantic'",
+    evaluated = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND screen_payload<>''",
                              (owner,)).fetchone()[0]
     stages = dict(conn.execute("SELECT stage, count(*) FROM recruitment_pipeline WHERE owner=? GROUP BY stage",
                                (owner,)).fetchall())
@@ -1326,13 +1332,18 @@ def rail_payload(conn, owner, config):
     baseline = baseline_resume(owner, config)
     options = resume_options(owner)
     llm_ready = llm_env.chat_configured()
+    cleaning_rejected = conn.execute(
+        "SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND stage='rejected' AND follow_status=?",
+        (owner, FOLLOW_CLEAN_REJECTED),
+    ).fetchone()[0]
     rewritten = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND rewrite_payload<>''", (owner,)).fetchone()[0]
     greeted = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND greeting_payload<>''", (owner,)).fetchone()[0]
     steps = [
         {"key": "scraping", "label": "抓取导入", "desc": "平台实时采集（本机 Chrome）+ 本地导入",
          "config_state": "configured" if funnel["crawled"] else "required_missing", "count": funnel["crawled"]},
         {"key": "cleaning", "label": "规则清洗", "desc": "Tier1 硬规则 + Tier2 语义规则",
-         "config_state": "configured" if rules_saved else "required_missing", "count": funnel["cleaned"]},
+         "config_state": "configured" if rules_saved else "required_missing",
+         "count": funnel["cleaned"] + cleaning_rejected},
         {"key": "evaluating", "label": "AI评估", "desc": "八维评级，精投岗位自动深评",
          "config_state": "configured" if (llm_ready or config.heuristic_mode) else "required_missing",
          "count": funnel["evaluated"]},
@@ -1399,7 +1410,8 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
                p.saved, p.saved_at,
                p.failure_payload, p.failure_count, p.meta, p.updated_at AS action_at,
                p.deep_payload<>'' AS has_deep, p.rewrite_payload<>'' AS has_rewrite, p.greeting_payload<>'' AS has_greeting,
-               r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
+               r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
+               CASE WHEN a.verdict IN ('rejected', 'review') THEN a.payload END AS semantic_reason_payload
         FROM recruitment_pipeline p
         JOIN recruitment_listings j USING(owner, source, url_key)
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
@@ -1413,6 +1425,9 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
         item["meta"] = _load(item["meta"])
         item["failure"] = _load(item["failure_payload"])
         item.pop("failure_payload", None)
+        semantic_payload = item.pop("semantic_reason_payload")
+        if not item["cleaning_reason"]:
+            item["cleaning_reason"] = ai.semantic_reason(semantic_payload)
         item["cleaning_status"] = item["cleaning_status"] or "unreviewed"
         items.append(item)
     return {"items": items, "total": total, "counts": counts, "tab": tab, "limit": limit, "offset": offset}
@@ -1534,6 +1549,17 @@ def register_routes(blueprint):
         stage = payload.get("stage")
         if stage not in RUNNERS:
             return jsonify(message="阶段无效，可选 clean/evaluate/screen/deep/rewrite/greet。"), 400
+        clean_options = {}
+        if stage == "clean":
+            after = payload.get("after")
+            if after is not None:
+                if not isinstance(after, list) or len(after) != 2 or any(
+                    not isinstance(part, str) or len(part) > 4096 for part in after
+                ):
+                    return jsonify(message="清洗进度无效，请重新执行。"), 400
+                clean_options["after"] = after
+            if payload.get("use_cleaner") is True:
+                clean_options["use_cleaner"] = True
         owner = _current_user()["username"]
         conn = db._get_conn()
         config = load_config(conn, owner)
@@ -1545,7 +1571,7 @@ def register_routes(blueprint):
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
-                result = RUNNERS[stage](conn, owner, config, limit)
+                result = RUNNERS[stage](conn, owner, config, limit, **clean_options)
         finally:
             if llm_ready and stage != "clean":
                 ai.SLOTS.release()
@@ -1631,6 +1657,9 @@ def register_routes(blueprint):
         for key in ("meta", "screen_payload", "deep_payload", "rewrite_payload", "greeting_payload",
                     "delivery_payload", "failure_payload"):
             item[key] = _load(item[key])
+        semantic_payload = item.pop("semantic_reason_payload")
+        if not item["cleaning_reason"]:
+            item["cleaning_reason"] = ai.semantic_reason(semantic_payload)
         item["cleaning_status"] = item["cleaning_status"] or "unreviewed"
         return jsonify(item)
 

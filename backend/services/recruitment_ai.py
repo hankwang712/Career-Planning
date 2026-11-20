@@ -122,6 +122,13 @@ def write_result(conn, identity, kind, result):
     """, (*identity, kind, result["verdict"], result.get("score"), json.dumps(result, ensure_ascii=False)))
 
 
+def semantic_reason(payload):
+    if not payload:
+        return ""
+    result = json.loads(payload)
+    return " · ".join(value for value in (result.get("rule"), result.get("reason"), result.get("evidence")) if value)
+
+
 def request_model(runtime, system, payload, images=()):
     base, key, model = runtime
     content = json.dumps(payload, ensure_ascii=False)

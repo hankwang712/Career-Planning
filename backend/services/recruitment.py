@@ -423,13 +423,6 @@ def listing_identity(payload):
     return source, listing_url(source, value)
 
 
-def semantic_reason(payload):
-    if not payload:
-        return ""
-    result = json.loads(payload)
-    return " · ".join(value for value in (result.get("rule"), result.get("reason"), result.get("evidence")) if value)
-
-
 @blueprint.post(API + "/cleaning/release")
 @_login_required
 def cleaning_release():
@@ -456,7 +449,7 @@ def cleaning_release():
             return jsonify(message="该岗位当前没有可放行的清洗结果。"), 404
         if decision["status"] not in {"rejected", "released"}:
             return jsonify(message="该岗位当前无需放行。"), 409
-        reason = decision["reason"] or semantic_reason(decision["semantic_payload"])
+        reason = decision["reason"] or ai.semantic_reason(decision["semantic_payload"])
         conn.execute("""
             UPDATE recruitment_cleaning_results SET status='released', reason=?
             WHERE owner=? AND source=? AND url_key=?
@@ -549,7 +542,7 @@ def query_rows(owner, limit, offset=0, *, compact=False, include_counts=False):
         if not compact:
             semantic_payload = row.pop("semantic_payload")
             if not row["cleaning_reason"] and row["cleaning_status"] in {"rejected", "review"}:
-                row["cleaning_reason"] = semantic_reason(semantic_payload)
+                row["cleaning_reason"] = ai.semantic_reason(semantic_payload)
         clean_listing(row)
         if compact:
             row.pop("description", None)
@@ -580,7 +573,7 @@ def listing_detail():
         return jsonify(message="岗位记录不存在。"), 404
     reason = row["cleaning_reason"]
     if not reason and row["cleaning_status"] in {"rejected", "review"}:
-        reason = semantic_reason(row["semantic_payload"])
+        reason = ai.semantic_reason(row["semantic_payload"])
     return jsonify(description=clean_listing({"description": row["detail"]})["description"],
                    cleaning_reason=reason or "", cleaning_status=row["cleaning_status"] or "unreviewed")
 
