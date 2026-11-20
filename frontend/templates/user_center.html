@@ -1076,6 +1076,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='report-link-previews.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='report-reader-layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     {% include "partials/app_cursor.html" %}
 </head>
@@ -1087,7 +1088,7 @@
         <div class="uc-main">
             <header class="uc-topbar">
                 <div class="uc-topbar-left">
-                    <a class="uc-back-link" href="{{ url_for('site.index', _anchor='dashboard') }}">← 返回主工作台</a>
+                    <a class="uc-back-link" href="{{ url_for('site.index', _anchor='dashboard') }}" data-return-last="1" data-return-skip-prefix="/user-center">← 返回主工作台</a>
                     <div>
                         <p class="uc-topbar-kicker">个人工作台</p>
                         <h1>我的职业发展</h1>

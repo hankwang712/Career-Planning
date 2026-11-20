@@ -9,6 +9,7 @@
     {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='assistant.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='chat-markdown.js') }}" defer></script>
     <script src="{{ url_for('static', filename='chat-typing.js') }}" defer></script>
@@ -39,7 +40,7 @@
         <nav class="session-list" id="sessionList" aria-label="历史对话"><p class="sidebar-empty">正在加载对话…</p></nav>
         <div class="sidebar-bottom">
             <button class="sidebar-memory" id="openMemory"><svg><use href="#i-memory"/></svg><span>记忆与资料<small>查看简历、记忆和本轮上下文</small></span><span class="memory-count" id="memoryCount">0</span></button>
-            <a class="workspace-return" href="/main.html"><svg><use href="#i-back"/></svg>返回工作台</a>
+            <a class="workspace-return" href="/main.html#dashboard" data-return-last="1"><svg><use href="#i-back"/></svg>返回工作台</a>
             <div class="sidebar-user"><span class="user-avatar" id="userAvatar">我</span><span id="userName">我的工作区</span><span class="private-label">私人对话</span></div>
         </div>
     </aside>

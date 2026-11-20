@@ -33,7 +33,7 @@
         {% if resume_workshop and request.args.get('from_report') == '1' %}
         <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='report') }}">← 返回报告生成台</a>
         {% else %}
-        <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='dashboard') }}">← 返回主工作台</a>
+        <a class="uc-footer-link" href="{{ url_for('site.index', _anchor='dashboard') }}" data-return-last="1" data-return-skip-prefix="/user-center">← 返回主工作台</a>
         {% endif %}
     </div>
 </aside>

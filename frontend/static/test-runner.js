@@ -343,6 +343,10 @@
   }
 
   function toMainProfile() {
+    if (typeof window.goBackToLastInterface === "function") {
+      window.goBackToLastInterface("/main.html#profile");
+      return;
+    }
     window.location.assign("/main.html#profile");
   }
 

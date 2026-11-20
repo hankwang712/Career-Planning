@@ -100,6 +100,7 @@
     {% include "partials/head_fonts.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='system-settings.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='design-refresh.css') }}">
+    <script src="{{ url_for('static', filename='return-nav.js') }}" defer></script>
     <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
@@ -108,7 +109,7 @@
     <header class="sc-top">
         <div class="sc-top-inner">
             <div class="sc-top-title">
-                <a href="{{ url_for('site.index', _anchor='dashboard') }}">← 工作台</a>
+                <a href="{{ url_for('site.index', _anchor='dashboard') }}" data-return-last="1">← 工作台</a>
                 <h1>系统配置</h1>
             </div>
             <div class="sc-top-actions">

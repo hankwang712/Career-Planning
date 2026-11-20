@@ -78,6 +78,19 @@
     }
   }
 
+  /** 个人中心内部的兄弟页面（简历 / 规划报告 / 学习路径等）不应作为「返回主工作台」的目标。 */
+  function isWithinSkipPrefix(url, skipPrefix) {
+    const prefix = String(skipPrefix || "").trim();
+    if (!prefix || !url) return false;
+    try {
+      const pathname = new URL(normalizeFallbackUrl(url), window.location.origin).pathname;
+      const base = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+      return pathname === base || pathname.startsWith(base + "/");
+    } catch (_) {
+      return false;
+    }
+  }
+
   function readReferrerTarget() {
     try {
       if (!document.referrer) return "";
@@ -89,24 +102,23 @@
     }
   }
 
-  function goBackToLastInterface(fallbackUrl) {
+  function goBackToLastInterface(fallbackUrl, options) {
     const current = currentUrl();
     const fallback = normalizeFallbackUrl(fallbackUrl);
+    const skipPrefix = String((options && options.skipPrefix) || "").trim();
     const stack = safeParseStack();
-    while (stack.length && stack[stack.length - 1] === current) {
-      stack.pop();
-    }
-    while (stack.length && isEphemeralTestSurface(stack[stack.length - 1])) {
+    const shouldSkip = (url) => !url || url === current || isBlockedReturnTarget(url) || isEphemeralTestSurface(url) || isWithinSkipPrefix(url, skipPrefix);
+    while (stack.length && shouldSkip(stack[stack.length - 1])) {
       stack.pop();
     }
     let target = stack[stack.length - 1] || "";
-    if (!target || target === current || isBlockedReturnTarget(target) || isEphemeralTestSurface(target)) {
+    if (shouldSkip(target)) {
       const referrerTarget = readReferrerTarget();
-      if (referrerTarget && referrerTarget !== current && !isBlockedReturnTarget(referrerTarget) && !isEphemeralTestSurface(referrerTarget)) {
+      if (!shouldSkip(referrerTarget)) {
         target = referrerTarget;
       }
     }
-    if (!target || target === current || isBlockedReturnTarget(target) || isEphemeralTestSurface(target)) {
+    if (shouldSkip(target)) {
       target = fallback;
     }
     const safeTarget = normalizeFallbackUrl(target);
@@ -120,7 +132,9 @@
       if (node.dataset.returnLastBound === "1") return;
       node.addEventListener("click", (event) => {
         event.preventDefault();
-        goBackToLastInterface(node.getAttribute("href") || "/main.html#profile");
+        goBackToLastInterface(node.getAttribute("href") || "/main.html#profile", {
+          skipPrefix: node.getAttribute("data-return-skip-prefix") || "",
+        });
       });
       node.dataset.returnLastBound = "1";
     });
