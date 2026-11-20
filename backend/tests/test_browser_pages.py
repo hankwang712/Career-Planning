@@ -1068,9 +1068,21 @@ def test_recruitment_cleaning_runs_saved_rules_from_stage_card(logged_in_page, l
     page.locator('#rpTabs [data-tab="rejected"]').click()
     cards = page.locator("#rpJobs .rp-job")
     cards.filter(has_text="电话销售").wait_for(state="hidden")
-    with page.expect_request("**/pipeline/run") as sent:
+    pending = []
+    run_url = "**/pipeline/run"
+    page.route(run_url, lambda route: pending.append(route))
+    with page.expect_request(run_url) as sent:
         run.click()
-    assert sent.value.post_data_json["stage"] == "clean" and sent.value.post_data_json["use_cleaner"]
+    assert sent.value.post_data_json == {"stage": "clean", "use_cleaner": True, "limit": 1, "after": None}
+    step.get_by_text("第 1 / 2 条", exact=True).wait_for()
+    assert step.get_by_text("剩余 2 条", exact=True).is_visible()
+    with page.expect_request(run_url) as next_batch:
+        pending[0].continue_()
+    assert next_batch.value.post_data_json["after"]
+    step.get_by_text("第 2 / 2 条", exact=True).wait_for()
+    assert step.get_by_text("剩余 1 条", exact=True).is_visible()
+    assert step.get_by_role("progressbar", name="岗位清洗进度").get_attribute("value") == "1"
+    pending[1].continue_()
     page.get_by_text("规则清洗完成。通过 1 条，淘汰 1 条，待核对 0 条。", exact=True).wait_for()
     step.get_by_text("已清洗", exact=True).wait_for()
     rejected = cards.filter(has_text="电话销售")

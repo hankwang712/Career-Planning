@@ -414,11 +414,29 @@
       if (summary) configButton.append(summary);
       configButton.addEventListener("click", () => openDrawer(step.key));
       if (isCleaning) {
-        const runLabel = cleaningRun?.processed ? `已处理 ${cleaningRun.processed} 条…` : cleaningRun ? "正在清洗…" : "执行规则清洗";
-        const run = actionButton(runLabel, "rp-btn-accent rp-clean-run", runSavedCleaning, "play");
-        run.disabled = !steps[0].count || needsConfig(step) || state.running || Boolean(cleaningRun);
-        run.title = needsConfig(step) ? "请先配置并保存规则" : "按岗位所属方向执行已保存的规则";
-        card.append(configButton, run);
+        card.append(configButton);
+        if (cleaningRun) {
+          const { total, processed, finished } = cleaningRun;
+          const progress = node("progress", "", "rp-clean-meter");
+          progress.setAttribute("aria-label", "岗位清洗进度");
+          if (total !== null) {
+            progress.max = Math.max(total, 1);
+            progress.value = processed;
+          }
+          const labels = node("div", "", "rp-clean-progress-labels");
+          const current = total === null ? "正在读取岗位…" : finished || !total
+            ? `已处理 ${processed} 条` : `第 ${Math.min(processed + 1, total)} / ${total} 条`;
+          labels.append(node("span", current));
+          if (total !== null) labels.append(node("span", `剩余 ${Math.max(0, total - processed)} 条`));
+          const meter = node("div", "", "rp-clean-progress");
+          meter.append(labels, progress);
+          card.append(meter);
+        } else {
+          const run = actionButton("执行规则清洗", "rp-btn-accent rp-clean-run", runSavedCleaning, "play");
+          run.disabled = !steps[0].count || needsConfig(step) || state.running;
+          run.title = needsConfig(step) ? "请先配置并保存规则" : "按岗位所属方向执行已保存的规则";
+          card.append(run);
+        }
       }
       return card;
     }));
@@ -630,23 +648,36 @@
   }
   async function runSavedCleaning() {
     if (cleaningRun || state.running || activeRailRuns.size) return;
-    const totals = { processed: 0, passed: 0, rejected: 0, review: 0 };
+    const totals = { total: null, processed: 0, passed: 0, rejected: 0, review: 0, skipped: 0, finished: false };
     cleaningRun = totals;
     let modelMissing = false;
+    let modelFailures = 0;
     renderRail();
     renderCommandbar();
     try {
-      await runCleaningBatches({ use_cleaner: true }, () => true, (result) => {
-        totals.processed += result.processed || 0;
-        for (const key of ["passed", "rejected", "review"]) totals[key] += result.counts?.[key] || 0;
-        modelMissing ||= result.tier2 === "pending";
-        renderRail();
-      });
+      const queue = await pipelineApi("/cleaning/queue");
+      totals.total = queue.total;
+      renderRail();
+      if (totals.total) {
+        await runCleaningBatches({ use_cleaner: true, limit: 1 }, () => modelFailures < 3, (result) => {
+          totals.processed += result.processed || 0;
+          totals.total = result.next_cursor ? Math.max(totals.total, totals.processed + 1) : totals.processed;
+          for (const key of ["passed", "rejected", "review", "skipped"]) totals[key] += result.counts?.[key] || 0;
+          modelMissing ||= result.tier2 === "pending";
+          if (result.counts?.tier2_preserved) modelFailures += 1;
+          else if (result.counts?.tier2_processed) modelFailures = 0;
+          renderRail();
+        });
+      }
+      totals.finished = true;
       if (!totals.processed) toast("当前没有可清洗的岗位，请检查是否已保存对应求职方向的规则。");
       else {
-        const details = `通过 ${totals.passed} 条，淘汰 ${totals.rejected} 条，待核对 ${totals.review} 条。`;
-        toast(modelMissing ? `硬规则已执行，AI 初筛需配置招聘清洗模型。${details}` : `规则清洗完成。${details}`,
-          totals.review ? "warning" : "success");
+        const skipped = totals.skipped ? `，跳过已变更岗位 ${totals.skipped} 条` : "";
+        const details = `通过 ${totals.passed} 条，淘汰 ${totals.rejected} 条，待核对 ${totals.review} 条${skipped}。`;
+        const heading = modelFailures >= 3 && totals.total > totals.processed
+          ? `清洗模型连续失败，剩余 ${totals.total - totals.processed} 条未处理。`
+          : modelMissing ? "硬规则已执行，AI 初筛需配置招聘清洗模型。" : "规则清洗完成。";
+        toast(heading + details, totals.review || totals.skipped ? "warning" : "success");
       }
     } catch (error) {
       const progress = totals.processed ? `（已处理 ${totals.processed} 条）` : "";

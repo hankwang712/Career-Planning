@@ -168,6 +168,35 @@ def test_manual_clean_uses_saved_jd_criteria_and_continues_through_batches(make_
     assert job(owner, rejected)["stage"] == "cleaned"
 
 
+def test_cleaning_releases_database_during_model_call_and_skips_changed_rules(make_account, monkeypatch):
+    import sqlite3
+    from services import db, recruitment_pipeline as pipeline
+
+    owner = make_account("cleaning-concurrent")
+    identity = add_job(owner, "concurrent", JOB_CUSTOM)
+    assert owner.post(API + "/cleaning/save", json={"rules": {
+        "ai_scout_rules": [{"keyword": "后端开发", "condition": "never"}],
+    }}).status_code == 200
+    assert owner.get(PIPE + "/cleaning/queue").get_json() == {"total": 1}
+    monkeypatch.setattr(pipeline.llm_env, "recruitment_cleaner_runtime", lambda: ("https://example.test", "key", "cleaner"))
+    updated = []
+
+    def screen(*_):
+        with sqlite3.connect(db.DB_PATH, timeout=0) as other, sqlite3.connect(db.DB_PATH, timeout=0) as reader:
+            other.execute("BEGIN IMMEDIATE")
+            other.execute("UPDATE recruitment_cleaning_profiles SET rules='{}' WHERE owner=?", (owner.email,))
+            reader.row_factory = sqlite3.Row
+            assert pipeline.funnel_payload(reader, owner.email)["stages"][0]["count"] == 1
+        updated.append(True)
+        return {"verdict": "rejected", "reason": "过时的结果"}
+
+    monkeypatch.setattr(pipeline.ai, "screen", screen)
+    result = run(owner, "clean", use_cleaner=True, limit=1)
+    assert updated == [True] and result["counts"]["skipped"] == 1
+    assert job(owner, identity)["stage"] == "collected"
+    assert run(owner, "clean", use_cleaner=True, limit=1)["counts"]["passed"] == 1
+
+
 def test_full_pipeline_heuristic_chain(server, make_account):
     owner = setup_account(server, make_account, "pipeline-full", rules={"title_exclusions": ["销售"]})
     custom = add_job(owner, "t:custom", JOB_CUSTOM)

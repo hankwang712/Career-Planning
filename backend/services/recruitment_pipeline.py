@@ -223,8 +223,17 @@ def purge_unsaved(conn, owner, *, before=None, identities=(), select_all=True):
 
 
 def ensure_rows(conn, owner):
+    before = board_day_start()
+    needs_update = conn.execute("""
+        SELECT 1 FROM recruitment_listings j
+        LEFT JOIN recruitment_pipeline p USING(owner, source, url_key)
+        WHERE j.owner=? AND (p.owner IS NULL OR (p.saved=0 AND j.updated_at<?))
+        LIMIT 1
+    """, (owner, before)).fetchone()
+    if not needs_update:
+        return
     inside = conn.in_transaction
-    purge_unsaved(conn, owner, before=board_day_start())
+    purge_unsaved(conn, owner, before=before)
     conn.execute("""
         INSERT OR IGNORE INTO recruitment_pipeline (owner, source, url_key, stage, follow_status, updated_at)
         SELECT owner, source, url_key, 'collected', ?, ? FROM recruitment_listings WHERE owner=?
@@ -1080,27 +1089,59 @@ def _pipeline_candidates(conn, owner, stages, limit, *, cleaned=False, review_ty
     """, (*args, limit)).fetchall()
 
 
-def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
-    ensure_rows(conn, owner)
-    rows = conn.execute("""
-        SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
-               COALESCE(d.description, j.description) AS description,
-               r.status, r.reason, j.profile, p.meta
+_CLEAN_FIELDS = """j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
+                  COALESCE(d.description, j.description) AS description,
+                  r.status, r.reason, j.profile, p.meta, p.stage, p.updated_at AS pipeline_updated_at"""
+_CLEAN_LISTINGS = """
         FROM recruitment_listings j
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
         LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
         JOIN recruitment_pipeline p USING(owner, source, url_key)
+"""
+_CLEAN_QUEUE = _CLEAN_LISTINGS + """
         WHERE j.owner=? AND (j.source, j.url_key) > (?, ?)
           AND (p.stage IN ('collected','reeval') OR (? AND (
                p.stage='cleaned' OR (p.stage='rejected' AND p.follow_status=?))))
           AND (NOT ? OR EXISTS (
               SELECT 1 FROM recruitment_cleaning_profiles c WHERE c.owner=j.owner AND c.profile=j.profile
           ))
+"""
+
+
+def store_clean_result(conn, identity, row, rules, status, reason, semantic_result):
+    owner, source, url_key = identity
+    # The model runs outside the write transaction. Recheck inputs before committing its result.
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute(f"""
+            SELECT {_CLEAN_FIELDS} {_CLEAN_LISTINGS}
+            WHERE j.owner=? AND j.source=? AND j.url_key=?
+        """, identity).fetchone()
+        if current != row or cleaning.load_rules(conn, owner, row["profile"]) != rules:
+            return None
+        cleaning.write_results(conn, owner, [(source, url_key, row["title"], status, reason)])
+        if semantic_result is not None:
+            ai.write_result(conn, identity, "semantic", semantic_result)
+            status = semantic_result["verdict"]
+        if status == "rejected":
+            _update(conn, *identity, stage="rejected",
+                    follow_status=FOLLOW_CLEAN_REJECTED, review_type="cleaning", approval="")
+        elif status in ("passed", "released"):
+            _update(conn, *identity, stage="cleaned", follow_status=FOLLOW_NEW)
+        else:
+            _update(conn, *identity, stage="collected", follow_status=FOLLOW_NEW)
+        return "passed" if status == "released" else status
+
+
+def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
+    ensure_rows(conn, owner)
+    rows = conn.execute(f"""
+        SELECT {_CLEAN_FIELDS} {_CLEAN_QUEUE}
         ORDER BY j.source, j.url_key LIMIT ?
     """, (owner, *after, use_cleaner, FOLLOW_CLEAN_REJECTED, use_cleaner, limit + 1)).fetchall()
     runtime = llm_env.recruitment_cleaner_runtime()
     tier2_mode = "heuristic" if config.heuristic_mode and not use_cleaner else ("llm" if all(runtime) else "pending")
-    counts = {"passed": 0, "rejected": 0, "review": 0, "tier2_processed": 0, "tier2_preserved": 0}
+    counts = {"passed": 0, "rejected": 0, "review": 0, "skipped": 0, "tier2_processed": 0, "tier2_preserved": 0}
     consecutive_failures = 0
     processed = tier2_attempts = tier2_remaining = 0
     saw_semantic = False
@@ -1114,7 +1155,7 @@ def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
         status, reason = cleaning.evaluate(row, rules)
         source, url_key = row["source"], row["url_key"]
         identity = (owner, source, url_key)
-        semantic_verdict = None
+        semantic_result = None
         if status == "passed" and any(rules.semantic_config()):
             saw_semantic = True
             if tier2_mode == "llm" and tier2_attempts >= LLM_BATCH_LIMIT:
@@ -1127,32 +1168,22 @@ def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
                 try:
                     job = _job_dict(row)
                     if tier2_mode == "llm":
-                        result = ai.screen(runtime, job, rules)
+                        semantic_result = ai.screen(runtime, job, rules)
                     else:
                         meta = _load(row["meta"])
-                        result = heuristic_semantic(job, rules, meta.get("collected_city") or row["location"])
-                    ai.write_result(conn, identity, "semantic", result)
-                    counts["tier2_processed"] += 1
+                        semantic_result = heuristic_semantic(job, rules, meta.get("collected_city") or row["location"])
                     consecutive_failures = 0
                 except Exception as error:
                     logger.warning("Tier2 semantic screen preserved after failure (%s)", type(error).__name__)
                     counts["tier2_preserved"] += 1
                     consecutive_failures += 1
                     status, reason = "review", "AI 初筛未完成，可重新执行规则清洗"
-                else:
-                    semantic_verdict = result["verdict"]
-        cleaning.write_results(conn, owner, [(source, url_key, row["title"], status, reason)])
-        status = semantic_verdict or status
+        outcome = store_clean_result(conn, identity, row, rules, status, reason, semantic_result)
         processed += 1
         last_key = (source, url_key)
-        counts["passed" if status == "released" else status] += 1
-        if status == "rejected":
-            _update(conn, *identity, stage="rejected",
-                    follow_status=FOLLOW_CLEAN_REJECTED, review_type="cleaning", approval="")
-        elif status in ("passed", "released"):
-            _update(conn, *identity, stage="cleaned", follow_status=FOLLOW_NEW)
-        else:
-            _update(conn, *identity, stage="collected", follow_status=FOLLOW_NEW)
+        counts[outcome or "skipped"] += 1
+        if outcome and semantic_result is not None:
+            counts["tier2_processed"] += 1
     return {"processed": processed, "counts": counts, "mode": tier2_mode if saw_semantic else "heuristic",
             "tier2": tier2_mode if saw_semantic else "not_configured",
             "tier2_short_circuit": consecutive_failures >= 3,
@@ -1527,6 +1558,16 @@ def register_routes(blueprint):
         conn = db._get_conn()
         return jsonify(rail_payload(conn, owner, load_config(conn, owner)))
 
+    @blueprint.get(API + "/cleaning/queue")
+    @_login_required
+    def pipeline_cleaning_queue():
+        owner = _current_user()["username"]
+        conn = db._get_conn()
+        ensure_rows(conn, owner)
+        total = conn.execute(f"SELECT count(*) {_CLEAN_QUEUE}",
+                             (owner, "", "", True, FOLLOW_CLEAN_REJECTED, True)).fetchone()[0]
+        return jsonify(total=total)
+
     @blueprint.post(API + "/seed")
     @_login_required
     def pipeline_seed():
@@ -1569,9 +1610,12 @@ def register_routes(blueprint):
         if llm_ready and stage != "clean" and not ai.SLOTS.acquire(blocking=False):
             return jsonify(message="AI 任务繁忙，请稍后重试。"), 429
         try:
-            with conn:
-                conn.execute("BEGIN IMMEDIATE")
-                result = RUNNERS[stage](conn, owner, config, limit, **clean_options)
+            if stage == "clean":
+                result = run_clean(conn, owner, config, limit, **clean_options)
+            else:
+                with conn:
+                    conn.execute("BEGIN IMMEDIATE")
+                    result = RUNNERS[stage](conn, owner, config, limit)
         finally:
             if llm_ready and stage != "clean":
                 ai.SLOTS.release()
