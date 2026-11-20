@@ -18,6 +18,8 @@ PROFILES = {"general": "通用", "internship": "实习", "full_time": "正式工
 SEMANTIC_JOIN = """LEFT JOIN recruitment_ai_results a
     ON a.owner=j.owner AND a.source=j.source AND a.url_key=j.url_key AND a.kind='semantic'"""
 EFFECTIVE_STATUS = "CASE WHEN r.status='passed' AND a.verdict IN ('rejected','review') THEN a.verdict ELSE r.status END"
+ZHILIAN_JD_MISSING = "(j.source='zhilian' AND COALESCE(d.description, '')='')"
+JD_REQUIRED = "待补齐原站 JD，岗位职责和任职要求尚未获取。"
 CITY_SEPARATOR = re.compile(r"[\s·•/／|,，、;；—-]+")
 KNOWN_CITIES = frozenset(CITIES) | {
     "重庆", "天津", "苏州", "无锡", "宁波", "温州", "合肥", "福州", "厦门", "南昌",

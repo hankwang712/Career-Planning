@@ -908,6 +908,36 @@ def test_pipeline_board_prioritizes_visible_page_and_reuses_recent_tab(browser, 
         context.close()
 
 
+def test_pipeline_zhilian_card_shows_original_jd_after_reading(browser, live_server, make_account, monkeypatch):
+    from services import db, recruitment
+
+    account = make_account("pipeline-original-jd")
+    url = "https://www.zhaopin.com/jobdetail/browser-detail"
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, account.email, "zhilian", [{
+            "title": "Agent 开发", "url": url, "description": "列表摘要测试标记",
+        }])
+    full_jd = "岗位职责\n负责 Agent 工具调用和任务编排。"
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "read_zhilian_detail", lambda _: ("ready", full_jd))
+    context = browser.new_context()
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment")
+        card = page.locator("#rpJobs .rp-job").filter(has_text="Agent 开发")
+        card.get_by_text("岗位 JD · 待补齐", exact=True).click()
+        assert card.get_by_text("列表摘要测试标记").count() == 0
+        card.get_by_role("button", name="读取原站 JD", exact=True).click()
+        card.get_by_text("负责 Agent 工具调用和任务编排。", exact=False).wait_for()
+        page.reload()
+        card.get_by_text("查看岗位 JD", exact=True).click()
+        card.get_by_text("负责 Agent 工具调用和任务编排。", exact=False).wait_for()
+        assert card.get_by_role("button", name="读取原站 JD", exact=True).count() == 0
+    finally:
+        context.close()
+
+
 def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job
 

@@ -197,6 +197,51 @@ def test_cleaning_releases_database_during_model_call_and_skips_changed_rules(ma
     assert run(owner, "clean", use_cleaner=True, limit=1)["counts"]["passed"] == 1
 
 
+def test_zhilian_summary_is_not_used_for_semantic_cleaning_or_evaluation(make_account, monkeypatch):
+    from services import db, recruitment, recruitment_pipeline as pipeline
+
+    owner = make_account("pipeline-zhilian-jd")
+    url = "https://www.zhaopin.com/jobdetail/pipeline-detail"
+    with db._get_conn() as conn:
+        recruitment.save_rows(conn, owner.email, "zhilian", [{
+            "url": url, "title": "Agent 开发", "description": "1-1.2万\n大专\n3-5年\nAGENT\nRAG",
+            "education": "大专", "experience": "3-5年",
+        }])
+    identity = {"source": "zhilian", "url_key": url}
+    assert owner.get(PIPE + "/jobs").get_json()["items"][0]["jd_missing"]
+    assert job(owner, identity)["description"] == ""
+    assert owner.post(API + "/ai/run/match", json={"source": "zhilian", "url": url, "profile": "general"}).status_code == 409
+
+    endpoint = API + "/cleaning/save"
+    assert owner.post(endpoint, json={"rules": {"require_education": ["本科"]}}).status_code == 200
+    assert run(owner, "clean", use_cleaner=True)["counts"]["rejected"] == 1
+    assert "大专" in job(owner, identity)["cleaning_reason"]
+    assert owner.post(endpoint, json={"rules": {}}).status_code == 200
+    assert run(owner, "clean", use_cleaner=True)["counts"]["passed"] == 1
+    assert run(owner, "evaluate")["counts"]["missing_jd"] == 1
+
+    rule = {"keyword": "销售", "condition": "never"}
+    assert owner.post(endpoint, json={"rules": {"ai_scout_rules": [rule]}}).status_code == 200
+    calls = []
+    monkeypatch.setattr(pipeline.llm_env, "recruitment_cleaner_runtime", lambda: ("https://example.test", "key", "cleaner"))
+
+    def screen(runtime, jd, rules):
+        calls.append(jd["description"])
+        return {"verdict": "passed"}
+
+    monkeypatch.setattr(pipeline.ai, "screen", screen)
+    assert run(owner, "clean", use_cleaner=True)["counts"]["review"] == 1
+    assert not calls and job(owner, identity)["follow_status"] == "待补齐 JD"
+
+    full_jd = "岗位职责\n负责 Agent 工具调用和任务编排。\n任职要求\n熟悉 Python。"
+    monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
+    monkeypatch.setattr(recruitment, "read_zhilian_detail", lambda _: ("ready", full_jd))
+    assert owner.post(API + "/jobs/zhilian/detail", json={"url": url}).get_json()["description"] == full_jd
+    assert not job(owner, identity)["jd_missing"] and job(owner, identity)["description"] == full_jd
+    assert run(owner, "clean", use_cleaner=True)["counts"]["passed"] == 1
+    assert calls == [full_jd] and run(owner, "evaluate")["counts"]["screened"] == 1
+
+
 def test_full_pipeline_heuristic_chain(server, make_account):
     owner = setup_account(server, make_account, "pipeline-full", rules={"title_exclusions": ["销售"]})
     custom = add_job(owner, "t:custom", JOB_CUSTOM)

@@ -275,6 +275,7 @@
     job.education = raw.education || "";
     job.scale = meta.company_size || "";
     job.description = raw.description || "";
+    job.jdMissing = Boolean(raw.jd_missing);
     job.profile = raw.profile || "general";
     job.stage = raw.stage || "collected";
     job.followStatus = raw.follow_status || "";
@@ -693,8 +694,9 @@
     const processed = result?.processed ?? 0;
     const mode = result?.mode === "llm" ? "模型" : "启发式";
     if (result?.stage === "evaluate") {
-      const { screened, deep, parse_failed: failed } = result.counts;
-      return `${label}完成：初评 ${screened} 条，深评 ${deep} 条${failed ? `，待重试 ${failed} 条` : ""}。`;
+      const { screened, deep, parse_failed: failed, missing_jd: missingJd } = result.counts;
+      const skipped = missingJd ? `，待补齐 JD ${missingJd} 条` : "";
+      return `${label}完成：初评 ${screened} 条，深评 ${deep} 条${failed ? `，待重试 ${failed} 条` : ""}${skipped}。`;
     }
     return `${label}完成：处理 ${processed} 条（${mode}模式）。`;
   }
@@ -989,29 +991,54 @@
     card.append(top, bottom);
     return card;
   }
+  function jobDescriptionFold(job, onPayload) {
+    const fold = node("details", "", "rp-jd-fold");
+    const summary = node("summary", job.jdMissing ? "岗位 JD · 待补齐" : "查看岗位 JD");
+    const hint = "目前只有招聘列表信息。读取原站 JD 后，才能按职责和任职要求分析。";
+    const body = node("p", job.jdMissing ? hint : job.description || "展开后读取岗位描述…");
+    fold.append(summary, body);
+    if (job.jdMissing) {
+      const read = actionButton("读取原站 JD", "rp-btn-ghost rp-jd-read", async () => {
+        read.disabled = true;
+        body.textContent = "正在从原站读取岗位职责和任职要求…";
+        try {
+          const payload = await api("/jobs/zhilian/detail", { url: job.url });
+          job.description = payload.description;
+          job.jdMissing = false;
+          summary.textContent = "查看岗位 JD";
+          body.textContent = job.description;
+          read.remove();
+          payloadCache.delete(jobId(job));
+        } catch (error) {
+          body.textContent = error.message || "原站 JD 读取失败，可打开原帖核对。";
+        } finally { read.disabled = false; }
+      }, "file-text");
+      fold.append(read);
+    }
+    fold.addEventListener("toggle", async () => {
+      if (!fold.open || job.jdMissing || job.description) return;
+      body.textContent = "正在读取岗位描述…";
+      try {
+        const payload = await fetchJobPayload(job);
+        job.description = payload?.description || "";
+        body.textContent = job.description || "暂无岗位描述，可在原站查看。";
+        onPayload?.(payload);
+      } catch (_) {
+        body.textContent = "岗位描述读取失败，可在原站查看。";
+      }
+    });
+    return fold;
+  }
   function rejectedJobCard(job) {
     const card = normalJobCard(job);
     card.classList.add("is-rejected");
     card.querySelector(".rp-job-actions")?.remove();
     const reason = node("div", "", "rp-reject-reason");
     reason.append(icon("alert"), node("span", job.reason || "命中清洗规则或人工淘汰，未记录具体原因。"));
-    const fold = node("details", "", "rp-jd-fold");
-    const summary = node("summary", "查看岗位 JD");
-    const body = node("p", job.description || "展开后读取岗位描述…");
-    fold.append(summary, body);
-    fold.addEventListener("toggle", async () => {
-      if (!fold.open || job.description) return;
-      body.textContent = "正在读取岗位描述…";
-      try {
-        const payload = await fetchJobPayload(job);
-        job.description = payload?.description || "";
-        body.textContent = job.description || "暂无岗位描述，可在原站查看。";
-        if (payload?.cleaning_reason && !job.reason) {
-          job.reason = payload.cleaning_reason;
-          reason.lastChild.textContent = payload.cleaning_reason;
-        }
-      } catch (_) {
-        body.textContent = "岗位描述读取失败，可在原站查看。";
+    const fold = jobDescriptionFold(job, (payload) => {
+      if (payload?.cleaning_reason && !job.reason) {
+        job.reason = payload.cleaning_reason;
+        reason.lastChild.textContent = payload.cleaning_reason;
       }
     });
     const actions = node("div", "", "rp-job-actions");
@@ -1153,6 +1180,7 @@
   }
   function renderJobCard(job) {
     const card = job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job);
+    if (job.source === "zhilian" && job.tab !== "rejected") card.append(jobDescriptionFold(job));
     if (purgeMode && !job.saved) {
       const box = node("input", "", "rp-purge-checkbox");
       box.type = "checkbox";

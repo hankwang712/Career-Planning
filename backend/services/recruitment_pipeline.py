@@ -977,6 +977,7 @@ def _job_material(conn, identity):
     return conn.execute(f"""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
                j.url, j.profile, COALESCE(d.description, j.description) AS description,
+               {cleaning.ZHILIAN_JD_MISSING} AS jd_missing,
                p.stage, p.follow_status, p.review_type, p.grade, p.score, p.meta,
                p.screen_payload, p.deep_payload, p.rewrite_payload, p.greeting_payload,
                p.approval, p.delivery_payload, p.failure_payload, p.failure_count, p.updated_at,
@@ -1065,32 +1066,46 @@ def deliver_one(conn, owner, row, simulate="ok"):
 # 阶段批量执行
 # ---------------------------------------------------------------------------
 
-def _pipeline_candidates(conn, owner, stages, limit, *, cleaned=False, review_type=None):
+def _pipeline_candidate_scope(owner, stages, *, cleaned, review_type, missing_jd):
     placeholders = ", ".join("?" for _ in stages)
     where, args = f"p.owner=? AND p.stage IN ({placeholders})", [owner, *stages]
+    where += f" AND {'' if missing_jd else 'NOT '}{cleaning.ZHILIAN_JD_MISSING}"
     if cleaned:
         where += f" AND ({cleaning.EFFECTIVE_STATUS}) IN ('passed', 'released')"
     if review_type is not None:
         where += " AND p.review_type=?"
         args.append(review_type)
-    return conn.execute(f"""
-        SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
-               j.profile, COALESCE(d.description, j.description) AS description,
-               p.stage, p.review_type, p.grade, p.meta, p.screen_payload, p.deep_payload,
-               p.rewrite_payload, p.greeting_payload, p.failure_count,
-               r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
+    return f"""
         FROM recruitment_listings j
         JOIN recruitment_pipeline p USING(owner, source, url_key)
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
         LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
         {cleaning.SEMANTIC_JOIN}
         WHERE {where}
+    """, args
+
+
+def _pipeline_candidates(conn, owner, stages, limit, *, cleaned=False, review_type=None):
+    scope, args = _pipeline_candidate_scope(owner, stages, cleaned=cleaned, review_type=review_type, missing_jd=False)
+    return conn.execute(f"""
+        SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
+               j.profile, COALESCE(d.description, j.description) AS description,
+               p.stage, p.review_type, p.grade, p.meta, p.screen_payload, p.deep_payload,
+               p.rewrite_payload, p.greeting_payload, p.failure_count,
+               r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
+        {scope}
         ORDER BY p.updated_at, j.source, j.url_key LIMIT ?
     """, (*args, limit)).fetchall()
 
 
-_CLEAN_FIELDS = """j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
+def _missing_jd_count(conn, owner, stages, *, cleaned=False, review_type=None):
+    scope, args = _pipeline_candidate_scope(owner, stages, cleaned=cleaned, review_type=review_type, missing_jd=True)
+    return conn.execute(f"SELECT count(*) {scope}", args).fetchone()[0]
+
+
+_CLEAN_FIELDS = f"""j.source, j.url_key, j.title, j.company, j.location, j.salary, j.experience, j.education,
                   COALESCE(d.description, j.description) AS description,
+                  {cleaning.ZHILIAN_JD_MISSING} AS jd_missing,
                   r.status, r.reason, j.profile, p.meta, p.stage, p.updated_at AS pipeline_updated_at"""
 _CLEAN_LISTINGS = """
         FROM recruitment_listings j
@@ -1129,7 +1144,8 @@ def store_clean_result(conn, identity, row, rules, status, reason, semantic_resu
         elif status in ("passed", "released"):
             _update(conn, *identity, stage="cleaned", follow_status=FOLLOW_NEW)
         else:
-            _update(conn, *identity, stage="collected", follow_status=FOLLOW_NEW)
+            follow = "待补齐 JD" if reason == cleaning.JD_REQUIRED else FOLLOW_NEW
+            _update(conn, *identity, stage="collected", follow_status=follow)
         return "passed" if status == "released" else status
 
 
@@ -1156,6 +1172,8 @@ def run_clean(conn, owner, config, limit, *, after=("", ""), use_cleaner=False):
         source, url_key = row["source"], row["url_key"]
         identity = (owner, source, url_key)
         semantic_result = None
+        if status == "passed" and any(rules.semantic_config()) and row["jd_missing"]:
+            status, reason = "review", cleaning.JD_REQUIRED
         if status == "passed" and any(rules.semantic_config()):
             saw_semantic = True
             if tier2_mode == "llm" and tier2_attempts >= LLM_BATCH_LIMIT:
@@ -1206,9 +1224,11 @@ def run_screen(conn, owner, config, limit, *, include_deep=False):
     pending = _pipeline_candidates(conn, owner, ("screened",), limit, review_type="custom") if include_deep else []
     rows = _pipeline_candidates(conn, owner, ("cleaned", "reeval"), limit - len(pending), cleaned=True)
     counts = {"screened": 0, "custom": 0, "mass": 0, "parse_failed": 0}
+    counts["missing_jd"] = _missing_jd_count(conn, owner, ("cleaned", "reeval"), cleaned=True)
     mode = "heuristic" if config.heuristic_mode else ("llm" if all(runtime) else "heuristic")
     if include_deep:
         counts["deep"] = len(pending)
+        counts["missing_jd"] += _missing_jd_count(conn, owner, ("screened",), review_type="custom")
         for row in pending:
             _store_deep(conn, owner, row, _load(row["screen_payload"]), resume, config, runtime)
     for row in rows:
@@ -1441,11 +1461,13 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
                p.saved, p.saved_at,
                p.failure_payload, p.failure_count, p.meta, p.updated_at AS action_at,
                p.deep_payload<>'' AS has_deep, p.rewrite_payload<>'' AS has_rewrite, p.greeting_payload<>'' AS has_greeting,
+               {cleaning.ZHILIAN_JD_MISSING} AS jd_missing,
                r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
                CASE WHEN a.verdict IN ('rejected', 'review') THEN a.payload END AS semantic_reason_payload
         FROM recruitment_pipeline p
         JOIN recruitment_listings j USING(owner, source, url_key)
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        LEFT JOIN recruitment_job_details d USING(owner, source, url_key)
         {cleaning.SEMANTIC_JOIN}
         WHERE {where}
         ORDER BY {ordering} LIMIT ? OFFSET ?
@@ -1698,6 +1720,8 @@ def register_routes(blueprint):
         if not row:
             return jsonify(message="岗位记录不存在。"), 404
         item = dict(row)
+        if item["jd_missing"]:
+            item["description"] = ""
         for key in ("meta", "screen_payload", "deep_payload", "rewrite_payload", "greeting_payload",
                     "delivery_payload", "failure_payload"):
             item[key] = _load(item[key])

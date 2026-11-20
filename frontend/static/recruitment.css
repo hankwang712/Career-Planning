@@ -793,6 +793,7 @@ html .rp-main .rp-job-save.is-saved:hover:not(:disabled) {
     white-space: pre-wrap; overflow-wrap: anywhere;
     max-height: 220px; overflow: auto;
 }
+.rp-jd-read { margin: 0 11px 10px; }
 
 /* 失败卡 */
 .rp-job.is-failed { border-color: #eec9c5; background: #fffdfc; }

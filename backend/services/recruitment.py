@@ -637,6 +637,7 @@ def ai_listing(conn, identity):
     return conn.execute(f"""
         SELECT j.profile, j.title, j.company, j.location, j.salary, j.description, j.experience, j.education,
                COALESCE(d.description, j.description) AS detail,
+               {cleaning.ZHILIAN_JD_MISSING} AS jd_missing,
                n.note_url, r.status AS hard_status, {cleaning.EFFECTIVE_STATUS} AS cleaning_status,
                r.reason AS cleaning_reason, a.payload AS semantic_payload,
                v.payload AS vision_payload
@@ -729,6 +730,8 @@ def recruitment_ai_run(kind):
     row = ai_listing(conn, identity)
     if not row:
         return jsonify(message="岗位记录不存在。"), 404
+    if kind != "vision" and row["jd_missing"]:
+        return jsonify(message=cleaning.JD_REQUIRED), 409
     if ((kind == "semantic" and row["hard_status"] != "passed")
             or (kind == "match" and row["cleaning_status"] not in {"passed", "released"})):
         return jsonify(message="请先通过规则清洗。"), 409
@@ -810,16 +813,17 @@ def zhilian_job_detail():
     if not text:
         return jsonify(message=SESSION_MESSAGES.get(state, "未读取到职位描述，可能已下架。可到原帖核对。")), 422
     with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
+        if row is None:
+            return jsonify(message="岗位记录不存在。"), 404
         inserted = conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text)).rowcount
         if inserted:
-            row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
             rules = cleaning.load_rules(conn, owner, row["profile"])
             if rules.experience_years_max is not None or rules.require_education or rules.exclude_education:
-                conn.execute("""
-                    DELETE FROM recruitment_cleaning_results
-                    WHERE owner=? AND source=? AND url_key=? AND status <> 'released'
-                """, args)
                 cleaning.apply_ingested(conn, owner, "zhilian", [url])
+        else:
+            text = conn.execute("SELECT description FROM recruitment_job_details WHERE owner=? AND source=? AND url_key=?", args).fetchone()[0]
     return jsonify(description=text)
 
 
