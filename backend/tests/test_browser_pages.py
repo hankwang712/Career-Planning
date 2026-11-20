@@ -544,6 +544,35 @@ def test_pipeline_login_check_shows_authorization_and_official_login(logged_in_p
     assert link.is_hidden()
 
 
+def test_pipeline_internship_salary_uses_daily_fields_and_inline_filters(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment?drawer=cleaning")
+    panel = page.get_by_role("dialog", name="规则清洗配置")
+    direction = panel.get_by_label("清洗方向")
+    direction.select_option("internship")
+    minimum = panel.get_by_label("最低日薪（元/天）")
+    minimum.fill("150")
+    assert panel.get_by_label("最低月薪（K）").is_hidden()
+    panel.locator(".rp-pay-estimate").get_by_text("3,300", exact=False).wait_for()
+    city = panel.get_by_label("目标城市", exact=True)
+    city.fill("杭州")
+    city.press("Enter")
+    panel.locator(".rp-terms-values").get_by_role("button", name="移除 杭州").wait_for()
+    education = panel.get_by_label("学历白名单", exact=True)
+    education.fill("本科")
+    panel.get_by_role("button", name="添加学历白名单", exact=True).click()
+    panel.locator(".rp-terms-values").get_by_role("button", name="移除 本科").wait_for()
+    with page.expect_request("**/collection/cleaning/save") as saved:
+        panel.get_by_role("button", name="保存规则", exact=True).click()
+    rules = saved.value.post_data_json["rules"]
+    assert rules["min_daily_salary"] == 150 and rules["min_salary_k"] is None
+    assert rules["cities"] == ["杭州"] and rules["require_education"] == ["本科"]
+    panel.get_by_text("规则已保存。", exact=True).wait_for()
+    direction.select_option("full_time")
+    panel.get_by_label("最低月薪（K）").wait_for()
+    assert minimum.is_hidden()
+
+
 def test_pipeline_scout_shows_two_examples_and_keeps_custom_rules(logged_in_page, live_server):
     page = logged_in_page
     page.goto(live_server + "/recruitment?drawer=cleaning")

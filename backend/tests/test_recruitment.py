@@ -647,6 +647,26 @@ def test_cleaning_profiles_keep_rules_and_decisions_separate(make_account):
     assert len(moved) == 1 and moved[0]["cleaning_reason"] == "标题命中排除词「实习」"
 
 
+def test_internship_cleaning_compares_daily_and_monthly_pay(make_account):
+    account = make_account("daily-salary")
+    endpoint = API + "/cleaning"
+    rules = {"min_daily_salary": 150, "max_daily_salary": 300, "auto": True}
+    assert account.post(endpoint + "/save", json={"profile": "internship", "rules": rules}).status_code == 200
+    csv = "source,title,salary,url\n" + "\n".join(
+        f"boss,工程实习,{salary},https://www.zhipin.com/job_detail/{index}.html"
+        for index, salary in enumerate(("150元/天", "3300元/月", "3K", "7K", "面议"))
+    )
+    result = account.post(API + "/import", data={
+        "profile": "internship", "file": (BytesIO(csv.encode()), "jobs.csv"),
+    }).get_json()["cleaning"]
+    assert result == {"passed": 2, "rejected": 2, "review": 1}
+    preview = account.post(endpoint + "/preview", json={
+        "profile": "internship", "rules": {"min_salary_k": 3.3, "max_salary_k": 6.6},
+    }).get_json()
+    assert preview["counts"] == result
+    assert account.get(endpoint + "?profile=internship").get_json()["internship_workdays_per_month"] == 22
+
+
 def test_existing_cleaning_rules_and_listings_migrate_to_general():
     import sqlite3
     from services import recruitment

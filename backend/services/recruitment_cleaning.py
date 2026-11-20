@@ -31,6 +31,7 @@ MONTHLY_PAY = re.compile(
 )
 PAY_SCALE = {"k": 1000, "千": 1000, "千元": 1000, "万": 10000, "万元": 10000, "元": 1, None: 1}
 DAILY_PAY = re.compile(r"(\d+(?:\.\d+)?)(?:元)?(?:[-~至](\d+(?:\.\d+)?))?(?:元)?(?:/[天日]|每天|每日)")
+INTERNSHIP_WORKDAYS_PER_MONTH = 22
 RuleTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 SalaryK = Annotated[float, Field(gt=0, le=1000, allow_inf_nan=False)]
 SemanticRule = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
@@ -212,7 +213,29 @@ def daily_pay(value):
     return (low, high) if 0 < low <= high <= 100000 else (None, None)
 
 
-def salary_decision(salary, rules):
+def internship_salary_decision(salary, rules):
+    days = INTERNSHIP_WORKDAYS_PER_MONTH
+    if rules.min_daily_salary is not None or rules.max_daily_salary is not None:
+        minimum, maximum = rules.min_daily_salary, rules.max_daily_salary
+    else:
+        minimum, maximum = (round(value * 1000 / days, 2) if value is not None else None
+                            for value in (rules.min_salary_k, rules.max_salary_k))
+    if minimum is None and maximum is None:
+        return "passed", ""
+    low, high = daily_pay(salary)
+    if low is None:
+        low, high = monthly_pay(salary)
+        if low is None:
+            return "review", "薪资口径或金额待核对"
+        low, high = round(low / days, 2), round(high / days, 2)
+    if (minimum is not None and high < minimum) or (maximum is not None and low > maximum):
+        return "rejected", f"薪资「{salary}」按每月 {days} 个工作日换算后与目标区间无交集"
+    return "passed", ""
+
+
+def salary_decision(salary, rules, *, profile=DEFAULT_PROFILE):
+    if profile == "internship":
+        return internship_salary_decision(salary, rules)
     configured = False
     for label, parser, minimum, maximum, scale in (
         ("月薪", monthly_pay, rules.min_salary_k, rules.max_salary_k, 1000),
@@ -296,7 +319,7 @@ def evaluate(row, rules):
                 return "rejected", f"地点「{row['location']}」不在目标城市"
             if matches is None:
                 missing.append("城市无法确认")
-        status, reason = salary_decision(row["salary"], rules)
+        status, reason = salary_decision(row["salary"], rules, profile=row["profile"])
         if status == "rejected":
             return status, reason
         if status == "review":

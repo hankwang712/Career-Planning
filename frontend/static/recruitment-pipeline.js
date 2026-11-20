@@ -461,6 +461,7 @@
       const form = node("form", "", "rp-form");
       const profile = profileSelect();
       const profileRow = node("div", "", "rp-select-row");
+      profile.setAttribute("aria-label", "清洗方向");
       profileRow.append(node("span", "清洗方向", "rp-hint"), profile);
       const fields = node("fieldset");
       const status = feedback();
@@ -471,21 +472,44 @@
       const minSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const maxSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const expMax = input("number", { min: "1", max: "50", step: "1", placeholder: "不限" });
-      salaryGrid.append(field("最低月薪（K）", minSalary), field("最高月薪（K）", maxSalary), field("经验上限（年）", expMax));
-      const dailyGrid = node("div", "", "rp-panel-grid");
-      dailyGrid.hidden = true;
+      salaryGrid.append(field("最低月薪（K）", minSalary), field("最高月薪（K）", maxSalary));
+      const dailyPay = node("div", "", "rp-daily-pay");
+      dailyPay.hidden = true;
+      const dailyGrid = node("div", "", "rp-panel-grid rp-daily-grid");
       const minDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
       const maxDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
       dailyGrid.append(field("最低日薪（元/天）", minDaily), field("最高日薪（元/天）", maxDaily));
-      hard.append(salaryGrid, node("p", "岗位要求的最低经验达到上限时淘汰；面议薪资放行。", "rp-hint"), dailyGrid);
+      const payEstimate = node("p", "", "rp-pay-estimate");
+      payEstimate.setAttribute("aria-live", "polite");
+      const money = new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 2, minimumFractionDigits: 0 });
+      let workdaysPerMonth = 22;
+      function renderPayEstimate() {
+        const lower = minDaily.value ? money.format(Number(minDaily.value) * workdaysPerMonth) : "";
+        const upper = maxDaily.value ? money.format(Number(maxDaily.value) * workdaysPerMonth) : "";
+        let range = "";
+        if (lower && upper) range = lower === upper ? lower : `${lower}–${upper}`;
+        else if (lower) range = `${lower} 起`;
+        else if (upper) range = `${upper} 以内`;
+        payEstimate.textContent = range ? `月薪约 ${range}（每月 ${workdaysPerMonth} 个工作日）`
+          : `月薪按每月 ${workdaysPerMonth} 个工作日折算。`;
+      }
+      dailyGrid.addEventListener("input", renderPayEstimate);
+      dailyPay.append(dailyGrid, payEstimate);
+      const experience = node("div", "", "rp-panel-grid");
+      experience.append(field("经验上限（年）", expMax));
+      hard.append(salaryGrid, dailyPay, experience, node("p", "岗位要求的最低经验达到上限时淘汰。", "rp-hint"));
 
       const splitTerms = (value) => value.split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean);
       function termsEditor(key, label, placeholder) {
         const wrap = node("div", "", "rp-terms");
         wrap.dataset.terms = key;
         const row = node("div", "", "rp-terms-input");
-        const entry = input("text", { maxlength: "2500", placeholder });
-        const add = button("添加", "rp-btn-sm", "plus");
+        const entry = input("text", { id: `rp-rule-${key}`, maxlength: "2500", placeholder });
+        const add = button("添加", "rp-btn-sm rp-btn-ghost", "plus");
+        add.setAttribute("aria-label", `添加${label}`);
+        const title = node("label", label);
+        title.htmlFor = entry.id;
+        const valuesField = node("div", "", "rp-terms-values");
         const chips = node("div", "", "rp-chips");
         const paint = (values) => {
           chips.replaceChildren(...values.map((value) => {
@@ -510,8 +534,9 @@
         entry.addEventListener("keydown", (event) => {
           if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); commit(); }
         });
-        row.append(entry, add);
-        wrap.append(node("span", label, "rp-hint"), row, chips);
+        valuesField.append(chips, entry);
+        row.append(valuesField, add);
+        wrap.append(title, row);
         wrap._paint = paint;
         wrap._read = () => [...new Set([
           ...[...chips.querySelectorAll("[data-value]")].map((chip) => chip.dataset.value),
@@ -662,8 +687,10 @@
         minSalary.value = rules.min_salary_k ?? "";
         maxSalary.value = rules.max_salary_k ?? "";
         expMax.value = rules.experience_years_max ?? "";
-        minDaily.value = rules.min_daily_salary ?? "";
-        maxDaily.value = rules.max_daily_salary ?? "";
+        const hasDailyBounds = rules.min_daily_salary != null || rules.max_daily_salary != null;
+        const fromLegacyMonthly = (value) => value == null ? "" : (value * 1000 / workdaysPerMonth).toFixed(2);
+        minDaily.value = hasDailyBounds ? (rules.min_daily_salary ?? "") : fromLegacyMonthly(rules.min_salary_k);
+        maxDaily.value = hasDailyBounds ? (rules.max_daily_salary ?? "") : fromLegacyMonthly(rules.max_salary_k);
         const stored = [
           ...(rules.ai_scout_rules || []),
           ...(rules.semantic_required || []).map((keyword) => ({ keyword, condition: "must", desc: "", legacy: "semantic_required" })),
@@ -675,11 +702,14 @@
         scoutList.replaceChildren(...stored.map(scoutRow));
         auto.checked = Boolean(rules.auto);
         const daily = profile.value === "internship";
-        dailyGrid.hidden = !daily;
+        dailyPay.hidden = !daily;
+        salaryGrid.hidden = daily;
+        minSalary.disabled = maxSalary.disabled = daily;
         minDaily.disabled = maxDaily.disabled = !daily;
+        if (daily) renderPayEstimate();
       }
       function readRules() {
-        const number = (el) => el.value ? Number(el.value) : null;
+        const number = (el) => !el.disabled && el.value ? Number(el.value) : null;
         const rows = [...scoutList.children];
         const legacy = (name) => rows.filter((row) => row.dataset.legacy === name).map((row) => readScout(row).keyword);
         return {
@@ -703,6 +733,7 @@
         try {
           const data = await api("/cleaning?profile=" + target);
           if (sequence !== loadSeq || !alive(token, body)) return;
+          workdaysPerMonth = data.internship_workdays_per_month || workdaysPerMonth;
           examples = (data.examples || []).slice(0, 2);
           showRules(data.rules);
           loadedProfile = target;

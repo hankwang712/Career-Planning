@@ -890,10 +890,23 @@ body.rp-lock { overflow: hidden; }
 html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 /* 抽屉内规则编辑器 */
-.rp-terms { display: grid; gap: 6px; }
-.rp-terms-input { display: flex; gap: 7px; }
-.rp-terms-input input { flex: 1; }
-.rp-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.rp-daily-pay { display: grid; gap: 7px; }
+.rp-pay-estimate { color: var(--dr-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rp-terms { display: grid; gap: 5px; }
+.rp-terms > label { color: var(--dr-ink-soft); font-size: 12px; font-weight: 600; }
+.rp-terms-input { display: flex; align-items: flex-start; gap: 7px; }
+.rp-terms-values {
+    display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 4px;
+    min-width: 0; min-height: 36px; padding: 3px 6px;
+    border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm); background: var(--dr-surface);
+}
+.rp-terms-values:focus-within { border-color: var(--dr-accent); box-shadow: var(--dr-ring); }
+html .rp-drawer .rp-terms-values input[type="text"] {
+    flex: 1 1 120px; width: auto; min-height: 28px; padding: 2px 3px;
+    border: 0; background: transparent; outline: none; box-shadow: none;
+}
+html .rp-drawer .rp-terms-input > .rp-btn-sm { min-height: 36px; }
+.rp-chips { display: contents; }
 .rp-chips:empty { display: none; }
 .rp-chip-x {
     display: inline-flex; align-items: center; gap: 5px;

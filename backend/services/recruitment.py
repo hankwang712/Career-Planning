@@ -348,6 +348,7 @@ def cleaning_overview():
     owner = _current_user()["username"]
     conn = db._get_conn()
     return jsonify(rules=cleaning.load_rules(conn, owner, profile).model_dump(), examples=cleaning.SCOUT_EXAMPLES,
+                   internship_workdays_per_month=cleaning.INTERNSHIP_WORKDAYS_PER_MONTH,
                    counts=cleaning.stored_counts(conn, owner, profile))
 
 
