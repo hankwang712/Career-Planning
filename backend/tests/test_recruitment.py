@@ -509,6 +509,32 @@ def test_cleaning_hard_requirements_and_structured_scout(make_account, monkeypat
         assert (result["verdict"], result.get("rule")) == (expected, keyword)
 
 
+def test_cleaning_generates_jd_criterion_from_rule_and_intent(make_account, monkeypatch):
+    from services import recruitment
+
+    account = make_account("scout-description")
+    endpoint = API + "/cleaning/describe"
+    runtime = ("https://example.test", "key", "cleaner")
+    standard = "岗位主要负责服务端接口或业务服务开发时命中；仅与后端团队协作时不命中。"
+    monkeypatch.setattr(recruitment.llm_env, "recruitment_cleaner_runtime", lambda: runtime)
+
+    def describe(active_runtime, prompt, payload):
+        assert active_runtime == runtime
+        assert "岗位描述（JD）" in prompt and "两种条件都要正向描述" in prompt
+        assert payload == {"keyword": "后端开发", "condition": "never", "intent": "主要做后端的不考虑，仅协作可以"}
+        return {"desc": standard}
+
+    monkeypatch.setattr(recruitment.ai, "request_model", describe)
+    result = account.post(endpoint, json={
+        "keyword": "后端开发", "condition": "never",
+        "intent": " 主要做后端的不考虑，仅协作可以 ", "desc": "旧的资料整理标准",
+    })
+    assert result.status_code == 200 and result.get_json() == {"desc": standard}
+    assert account.post(endpoint, json={
+        "keyword": "后端开发", "condition": "never", "intent": "岗" * 601,
+    }).status_code == 400
+
+
 def test_recruitment_ai_semantic_and_match_use_separate_models_and_preserve_evidence(make_account, monkeypatch):
     from services import db, recruitment
 

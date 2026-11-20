@@ -61,6 +61,10 @@ class ScoutRule(BaseModel):
     desc: Annotated[str, StringConstraints(strip_whitespace=True, max_length=600)] = ""
 
 
+class ScoutDescriptionRequest(ScoutRule):
+    intent: Annotated[str, StringConstraints(strip_whitespace=True, max_length=600)] = ""
+
+
 class CleaningRules(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cities: list[RuleTerm] = Field(default_factory=list, max_length=30)

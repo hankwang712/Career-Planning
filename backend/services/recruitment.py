@@ -397,9 +397,9 @@ def cleaning_update(action):
 @_login_required
 def cleaning_describe():
     try:
-        rule = cleaning.ScoutRule.model_validate(request.get_json(silent=True))
+        rule = cleaning.ScoutDescriptionRequest.model_validate(request.get_json(silent=True))
     except ValidationError:
-        return jsonify(message="请先填写规则关键词。"), 400
+        return jsonify(message="请检查规则词、判定条件及筛选意图（最多 600 字）。"), 400
     runtime = llm_env.recruitment_cleaner_runtime()
     if not all(runtime):
         return jsonify(message="请先在系统配置中填写招聘清洗模型。"), 400

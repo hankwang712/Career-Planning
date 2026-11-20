@@ -636,7 +636,7 @@
         return {
           keyword: row.querySelector("input").value.trim(),
           condition: row.querySelector("select").value,
-          desc: row.querySelector("textarea").value.trim()
+          desc: row.querySelector(".rp-scout-standard").value.trim()
         };
       }
       function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
@@ -644,7 +644,8 @@
         if (rule.legacy) row.dataset.legacy = rule.legacy;
         const heading = node("summary");
         const name = node("strong", rule.keyword || "新规则");
-        const constraint = node("small", conditionLabel(rule.condition));
+        const constraint = node("small", conditionLabel(rule.condition), "rp-scout-condition");
+        constraint.dataset.condition = rule.condition;
         heading.append(name, constraint);
         const editor = node("div", "", "rp-scout-editor");
         const controls = node("div", "", "rp-scout-controls");
@@ -652,39 +653,61 @@
         keyword.value = rule.keyword;
         const condition = select([["must", "必须包含"], ["never", "绝不包含"]], rule.condition);
         controls.append(field("规则词", keyword), field("判定条件", condition));
-        const desc = node("textarea");
-        desc.rows = 2; desc.maxLength = 600; desc.value = rule.desc;
-        desc.placeholder = "判定标准：命中/排除的具体依据";
+        const assistant = node("div", "", "rp-scout-assistant");
+        const intent = node("textarea", "", "rp-scout-intent");
+        intent.rows = 2; intent.maxLength = 600;
+        const desc = node("textarea", "", "rp-scout-standard");
+        desc.rows = 4; desc.maxLength = 600; desc.value = rule.desc;
+        desc.placeholder = "由 AI 生成，也可直接填写 JD 中什么情况算命中。";
         const actions = node("div", "", "rp-scout-actions");
-        const generate = button("AI 生成标准", "rp-btn-sm", "sparkles");
+        const footer = node("div", "", "rp-scout-footer");
+        const generate = button("AI 生成标准", "rp-btn-sm rp-btn-accent", "sparkles");
         const remove = button("删除规则", "rp-btn-sm rp-btn-ghost rp-scout-remove", "trash");
         const rowStatus = feedback();
-        row.addEventListener("input", () => {
+        rowStatus.setAttribute("role", "status");
+        function updateCondition() {
+          constraint.textContent = conditionLabel(condition.value);
+          constraint.dataset.condition = condition.value;
+          intent.placeholder = condition.value === "must"
+            ? "例如：希望岗位主要做 Agent 开发，偶尔调用大模型接口不算。"
+            : "例如：不想做以服务端开发为主的岗位，仅与后端团队对接可以接受。";
+        }
+        updateCondition();
+        row.addEventListener("input", (event) => {
+          if (event.target === intent) return;
           delete row.dataset.legacy;
           name.textContent = keyword.value.trim() || "新规则";
-          constraint.textContent = conditionLabel(condition.value);
+          if (event.target === condition) updateCondition();
         });
         remove.addEventListener("click", () => { row.remove(); resetPreview(); scoutAdd.focus(); });
         generate.addEventListener("click", async () => {
           const current = readScout(row);
           if (!current.keyword) { setFeedback(rowStatus, "请先填写规则词。", "error"); keyword.focus(); return; }
+          const draft = intent.value.trim();
           generate.disabled = true;
-          setFeedback(rowStatus, "正在生成…");
+          setFeedback(rowStatus, "正在生成判定标准…");
           try {
-            const result = await api("/cleaning/describe", current);
+            const result = await api("/cleaning/describe", {
+              keyword: current.keyword, condition: current.condition, intent: draft
+            });
+            if (!row.isConnected) return;
             const latest = readScout(row);
-            if (row.isConnected && Object.keys(current).every((key) => current[key] === latest[key])) {
+            if (fields.disabled) {
+              setFeedback(rowStatus, "规则正在处理，请稍后重新生成。", "error");
+            } else if (draft === intent.value.trim() && Object.keys(current).every((key) => current[key] === latest[key])) {
               desc.value = result.desc;
               delete row.dataset.legacy;
               resetPreview();
-              setFeedback(rowStatus, "");
+              setFeedback(rowStatus, "已生成，可继续编辑。", "success");
             } else setFeedback(rowStatus, "生成期间规则已变更，请重新生成。", "error");
           } catch (error) {
             setFeedback(rowStatus, error.message, "error");
           } finally { generate.disabled = false; }
         });
-        actions.append(generate, remove);
-        editor.append(controls, field("判定标准", desc), actions, rowStatus);
+        actions.append(rowStatus, generate);
+        assistant.append(field("筛选意图（选填）", intent), actions);
+        footer.append(remove);
+        editor.append(controls, assistant, field("判定标准", desc), footer);
         row.append(heading, editor);
         return row;
       }
@@ -845,7 +868,9 @@
         }
       }
       form.addEventListener("submit", (event) => { event.preventDefault(); void runAction("preview"); });
-      form.addEventListener("input", resetPreview);
+      form.addEventListener("input", (event) => {
+        if (!event.target.classList.contains("rp-scout-intent")) resetPreview();
+      });
       educationMode.addEventListener("change", resetPreview);
       saveBtn.addEventListener("click", () => void runAction("save"));
       applyBtn.addEventListener("click", () => void runAction("apply"));

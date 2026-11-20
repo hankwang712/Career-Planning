@@ -623,6 +623,51 @@ def test_pipeline_scout_shows_two_examples_and_keeps_custom_rules(logged_in_page
     assert editor.locator(".rp-scout-row[open]").count() == 0
 
 
+def test_pipeline_scout_generation_keeps_draft_separate_from_saved_standard(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment?drawer=cleaning")
+    panel = page.get_by_role("dialog", name="规则清洗配置")
+    panel.get_by_role("button", name="添加规则", exact=True).click()
+    row = panel.locator(".rp-scout-row[open]")
+    row.get_by_label("规则词").fill("后端开发")
+    condition = row.get_by_label("判定条件")
+    condition.select_option("must")
+    assert "希望岗位" in row.get_by_label("筛选意图（选填）").get_attribute("placeholder")
+    condition.select_option("never")
+    intent = row.get_by_label("筛选意图（选填）")
+    draft = "不想做后端，和后端团队协作可以"
+    intent.fill(draft)
+    criterion = row.get_by_label("判定标准")
+    criterion.fill("旧的资料整理标准")
+    pending = []
+    describe_url = "**/collection/cleaning/describe"
+    page.route(describe_url, lambda route: pending.append(route))
+    generate = row.get_by_role("button", name="AI 生成标准", exact=True)
+    with page.expect_request(describe_url) as request:
+        generate.click()
+    assert request.value.post_data_json == {"keyword": "后端开发", "condition": "never", "intent": draft}
+    row.get_by_text("正在生成判定标准…", exact=True).wait_for()
+    assert generate.is_disabled()
+    intent.fill(draft + "。")
+    pending.pop().fulfill(json={"desc": "过时的标准"})
+    row.get_by_text("生成期间规则已变更，请重新生成。", exact=True).wait_for()
+    assert criterion.input_value() == "旧的资料整理标准"
+
+    standard = "负责服务端接口开发时命中，仅与后端团队协作时不命中。"
+    page.unroute(describe_url)
+    page.route(describe_url, lambda route: route.fulfill(json={"desc": standard}))
+    generate.click()
+    row.get_by_text("已生成，可继续编辑。", exact=True).wait_for()
+    assert criterion.input_value() == standard
+    assert intent.input_value() == draft + "。"
+    with page.expect_request("**/collection/cleaning/save") as saved:
+        panel.get_by_role("button", name="保存规则", exact=True).click()
+    assert saved.value.post_data_json["rules"]["ai_scout_rules"] == [
+        {"keyword": "后端开发", "condition": "never", "desc": standard},
+    ]
+    panel.get_by_text("规则已保存。", exact=True).wait_for()
+
+
 def test_pipeline_rail_distinguishes_results_waiting_and_execution(logged_in_page, live_server):
     page = logged_in_page
     page.route("**/pipeline/rail", lambda route: route.fulfill(json={

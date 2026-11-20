@@ -966,13 +966,40 @@ html .rp-drawer .rp-terms-input > .rp-btn-sm { min-height: 36px; }
 .rp-scout-example summary, .rp-scout-row summary { padding: 8px 10px; cursor: pointer; overflow-wrap: anywhere; }
 .rp-scout-example small, .rp-scout-row summary small { margin-inline-start: 6px; color: var(--dr-muted); white-space: nowrap; }
 .rp-scout-example p { padding: 0 8px 8px; color: var(--dr-muted); font-size: 12px; }
+.rp-scout-row[open] { border-color: var(--dr-accent-line); }
+.rp-scout-row[open] summary {
+    background: color-mix(in srgb, var(--dr-accent-soft) 48%, var(--dr-surface));
+    border-radius: var(--dr-radius-sm) var(--dr-radius-sm) 0 0;
+}
+.rp-scout-row summary .rp-scout-condition {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--dr-accent-soft);
+    color: var(--dr-accent-hover);
+    font-size: 11px;
+}
+.rp-scout-row summary .rp-scout-condition[data-condition="never"] {
+    background: var(--dr-brass-soft);
+    color: var(--dr-brass);
+}
 .rp-scout-editor {
-    display: grid; gap: 8px;
-    padding: 11px;
+    display: grid; gap: 12px;
+    padding: 12px;
     border-top: 1px solid var(--dr-line);
 }
 .rp-scout-controls { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
-.rp-scout-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.rp-scout-assistant {
+    display: grid; gap: 9px;
+    padding: 10px;
+    border: 1px solid var(--dr-accent-line);
+    border-radius: var(--dr-radius-sm);
+    background: color-mix(in srgb, var(--dr-accent-soft) 54%, var(--dr-surface));
+}
+.rp-scout-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.rp-scout-actions .rp-feedback { flex: 1 1 140px; }
+.rp-scout-actions .rp-btn { margin-inline-start: auto; }
+.rp-scout-footer { display: flex; justify-content: flex-end; padding-top: 7px; border-top: 1px solid var(--dr-line); }
 html .rp-drawer .rp-scout-remove:hover:not(:disabled) { color: var(--dr-danger); }
 .rp-rule-preview { display: grid; gap: 7px; }
 .rp-rule-preview-group {
