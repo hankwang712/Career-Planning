@@ -63,6 +63,23 @@
     if (value != null) el.value = value;
     return el;
   }
+  /* SOURCES 值为元组（标签+URL+选择器），JSON 后是数组；展示只取标签 */
+  const sourceLabel = (value) => Array.isArray(value) ? String(value[0] || "") : String(value ?? "");
+  const sourceEntries = (map) => Object.entries(map || {}).map(([key, value]) => [key, sourceLabel(value)]);
+  /* 平台 logo（brand/recruitment/<key>.jpg）；缺资产时回退首字 tile */
+  function platformLogo(key, label) {
+    const wrap = node("span", "", "rp-platform-mark");
+    const img = node("img");
+    img.src = `/static/brand/recruitment/${key}.jpg`;
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("error", () => {
+      wrap.replaceChildren(node("span", (label || key).slice(0, 2)));
+      wrap.dataset.fallback = "1";
+    });
+    wrap.append(img);
+    return wrap;
+  }
   function profileSelect(value) {
     return select(Object.entries(meta.profiles), value || PROFILE_KEYS[0]);
   }
@@ -148,29 +165,219 @@
 
   /* ---------- 1. 本地导入（scraping） ---------- */
   RP.registerDrawer("scraping", {
-    title: "本地导入 · 抓取替代", icon: "inbox", tone: "accent",
+    title: "抓取 · 平台采集与本地导入", icon: "search", tone: "accent",
     render(body) {
       const token = RP.drawerToken();
-      body.append(note("本流水线不连接外部招聘平台。抓取阶段由三种本地导入替代：种子岗位库、CSV 文件、已保存的搜索页 HTML。", "info"));
+      body.append(note("实时采集复用本机 Chrome 登录态（Boss直聘 / 前程无忧 / 智联 / 猎聘），与既有采集能力一致；本地导入作为离线补充。投递段仍为本地 dry-run，不向平台自动投递。", "info"));
 
-      const seedSection = section("城市岗位种子库", "database");
-      seedSection.append(node("p", "从内置城市岗位样本（data/jobs）批量建档，幂等去重，导入后自动进入清洗段。", "rp-hint"));
-      const seedFeedback = feedback();
-      const seedBtn = button("导入种子岗位", "rp-btn-primary", "download");
-      seedBtn.addEventListener("click", async () => {
-        seedBtn.disabled = true;
-        try {
-          const result = await withBusy(() => pipelineApi("/seed", {}), seedFeedback, "正在导入种子岗位…");
-          if (!alive(token, body)) return;
-          const count = result?.imported ?? result?.count ?? 0;
-          setFeedback(seedFeedback, `已导入 ${count} 条种子岗位。`, "success");
-          toast(`种子岗位导入完成：${count} 条。`, "success");
-          void RP.refresh({ silent: true });
-        } catch (error) {
-          if (alive(token, body)) setFeedback(seedFeedback, error.message, "error");
-        } finally { seedBtn.disabled = false; }
+      /* 平台实时采集：登录态检查 + 采集表单 + 采集记录（复用现有 /session /runs 端点） */
+      const collectSection = section("平台实时采集", "search");
+      const chromeSources = String(meta.chrome_sources || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const collectEntries = sourceEntries(meta.collection_sources || meta.sources);
+      const statusNames = {
+        queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
+        partial: "部分完成", empty: "无结果", interrupted: "已中断", blocked: "需要验证", unavailable: "暂不可用",
+        opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时",
+        city_unsupported: "城市暂不支持"
+      };
+      if (!meta.chrome_available) {
+        collectSection.append(note("未启用本机 Chrome 连接，实时采集暂不可用；可在系统配置开启，或使用下方本地导入。", "warn"));
+      }
+      const sessionWrap = node("div", "", "rp-sessions");
+      const checks = [];
+      for (const [key, label] of collectEntries) {
+        const card = node("div", "", "rp-session");
+        const head = node("div", "", "rp-session-head");
+        head.append(platformLogo(key, label), node("strong", label));
+        const checkBtn = button("检查登录", "rp-btn-sm rp-btn-ghost", "user-check");
+        const result = node("div", "", "rp-session-result");
+        const stateLabel = node("span", "未检查", "rp-session-label");
+        const stateMsg = node("p", "", "rp-session-message");
+        result.setAttribute("role", "status");
+        stateMsg.hidden = true;
+        result.append(stateLabel, stateMsg);
+        const loginLink = node("a", "打开平台官网", "rp-btn rp-btn-sm rp-btn-ghost");
+        loginLink.target = "_blank";
+        loginLink.rel = "noopener noreferrer";
+        loginLink.hidden = true;
+        const copyBtn = button("复制授权地址", "rp-btn-sm rp-btn-ghost", "copy");
+        copyBtn.hidden = true;
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText("chrome://inspect/#remote-debugging");
+            toast("授权页地址已复制，粘贴到 Chrome 地址栏打开。", "success");
+          } catch (_) {
+            toast("复制失败，请手动输入 chrome://inspect/#remote-debugging", "error");
+          }
+        });
+        const check = async () => {
+          if (checkBtn.disabled) return;
+          checkBtn.disabled = true;
+          delete result.dataset.state;
+          stateLabel.textContent = "检查中…";
+          stateMsg.hidden = true;
+          copyBtn.hidden = true;
+          loginLink.hidden = true;
+          try {
+            const status = await api(`/session/${key}`, {});
+            if (!alive(token, body)) return;
+            result.dataset.state = status.state;
+            stateLabel.textContent = status.label;
+            stateMsg.textContent = status.message || "";
+            stateMsg.hidden = !status.message;
+            if (status.login_url) {
+              loginLink.href = status.login_url;
+              loginLink.hidden = false;
+            }
+            copyBtn.hidden = status.state !== "authorization_required_manual";
+          } catch (error) {
+            if (!alive(token, body)) return;
+            result.dataset.state = "unavailable";
+            stateLabel.textContent = "检查失败";
+            stateMsg.textContent = error.message;
+            stateMsg.hidden = false;
+          } finally { checkBtn.disabled = false; }
+        };
+        checkBtn.addEventListener("click", check);
+        checks.push(check);
+        head.append(checkBtn);
+        card.append(head, result, loginLink, copyBtn);
+        sessionWrap.append(card);
+      }
+      const checkAll = button("检查全部平台", "rp-btn-sm rp-btn-ghost", "shield");
+      checkAll.addEventListener("click", async () => {
+        checkAll.disabled = true;
+        try { await Promise.all(checks.map((check) => check())); } finally { checkAll.disabled = false; }
       });
-      seedSection.append(seedBtn, seedFeedback);
+      collectSection.append(sessionWrap, checkAll);
+
+      const catalog = meta.city_catalog || {};
+      const cityOptions = [["", "全部城市"]];
+      const seenCity = new Set();
+      for (const city of [...(catalog.hot || []), ...(catalog.scopes || []), ...Object.values(catalog.groups || {}).flat()]) {
+        if (!seenCity.has(city)) { seenCity.add(city); cityOptions.push([city, city]); }
+      }
+      const form = node("form", "", "rp-collect-form");
+      const keyword = input("text", { placeholder: "关键词，如 Python 实习", maxlength: 80, required: true });
+      const city = select(cityOptions);
+      const collectProfile = profileSelect();
+      const limit = input("number", { min: 1, max: 30, value: 20 });
+      const checksWrap = node("div", "", "rp-checks");
+      const sourceBoxes = collectEntries.map(([key, label]) => {
+        const wrap = node("label", "", "rp-check");
+        const box = input("checkbox", { value: key });
+        wrap.append(box, platformLogo(key, label), node("span", label));
+        checksWrap.append(wrap);
+        return box;
+      });
+      const localWrap = node("label", "", "rp-check");
+      const localBox = input("checkbox", {});
+      localWrap.append(localBox, node("span", chromeSources.length ? "使用本机 Chrome 登录态（推荐）" : "Boss 本地桌面客户端"));
+      if (meta.boss_local || chromeSources.length) localBox.checked = true;
+      const submit = button("启动采集", "rp-btn-primary", "play");
+      const collectFeedback = feedback();
+      form.append(
+        field("关键词", keyword), field("城市", city), field("归入求职方向", collectProfile),
+        field("每平台上限", limit), checksWrap, localWrap, submit, collectFeedback
+      );
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const sources = sourceBoxes.filter((box) => box.checked).map((box) => box.value);
+        if (!sources.length) { setFeedback(collectFeedback, "请至少选择一个采集平台。", "error"); return; }
+        submit.disabled = true;
+        try {
+          await withBusy(() => api("/runs", {
+            keyword: keyword.value.trim(), city: city.value, limit: Number(limit.value) || 20,
+            sources, profile: collectProfile.value,
+            boss_local: !chromeSources.length && sources.includes("boss") && localBox.checked,
+            chrome_local: Boolean(localBox.checked && chromeSources.some((source) => sources.includes(source)))
+          }), collectFeedback, "正在启动采集…");
+          if (!alive(token, body)) return;
+          setFeedback(collectFeedback, "已启动采集，各平台结果会陆续入库并自动进入清洗段。", "success");
+          toast("采集已启动。", "success");
+          void loadRuns();
+        } catch (error) {
+          if (alive(token, body)) setFeedback(collectFeedback, error.message, "error");
+        } finally { submit.disabled = false; }
+      });
+      collectSection.append(form);
+
+      const history = node("details", "", "rp-run-history");
+      const historyHead = node("summary", "", "rp-run-history-head");
+      const historyCount = node("span", "", "rp-run-history-count");
+      const runsWrap = node("div", "正在读取采集记录…", "rp-runs");
+      historyHead.append(node("span", "采集记录"), historyCount);
+      history.append(historyHead, runsWrap);
+      let runPoll = null;
+      let lastRuns = "";
+      const runCard = (run) => {
+        const card = node("details", "", "rp-run");
+        card.dataset.state = run.status;
+        card.dataset.runId = run.id;
+        const head = node("summary", "", "rp-run-head");
+        const label = node("span", "", "rp-run-label");
+        label.append(
+          node("strong", [run.keyword, run.city].filter(Boolean).join(" · ") || "采集任务"),
+          node("span", new Date(run.started_at * 1000).toLocaleString("zh-CN"), "rp-run-date")
+        );
+        head.append(
+          label,
+          node("span", statusNames[run.status] || run.status, "rp-run-state")
+        );
+        card.append(head);
+        for (const [source, item] of Object.entries(run.progress || {})) {
+          const line = node("div", "", "rp-run-source");
+          const itemStatus = run.status === "interrupted" && ["queued", "running", "opening", "waiting_user"].includes(item.status)
+            ? "interrupted" : item.status;
+          line.append(node("strong", sourceLabel((meta.collection_sources || {})[source]) || source));
+          const loginUrl = ["waiting_user", "login_required", "login_timeout"].includes(itemStatus) && item.login_url;
+          if (loginUrl || item.search_url) {
+            const link = node("a", loginUrl ? "去登录 ↗" : "原站 ↗");
+            link.href = loginUrl || item.search_url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            line.append(link);
+          }
+          const message = node("p", itemStatus === "interrupted" ? statusNames[itemStatus] : (item.message || statusNames[itemStatus] || ""));
+          message.dataset.state = itemStatus;
+          line.append(message);
+          card.append(line);
+        }
+        return card;
+      };
+      async function loadRuns() {
+        clearTimeout(runPoll);
+        try {
+          const data = await api("/runs");
+          if (!alive(token, body)) return;
+          const items = data.items || [];
+          const snapshot = JSON.stringify(items);
+          if (snapshot !== lastRuns) {
+            const expanded = new Set([...runsWrap.querySelectorAll(".rp-run[open]")].map(card => card.dataset.runId));
+            const focused = document.activeElement?.closest(".rp-run");
+            const cards = items.map(run => {
+              const card = runCard(run);
+              card.open = expanded.has(card.dataset.runId);
+              return card;
+            });
+            runsWrap.replaceChildren(...(cards.length ? cards : [node("p", "暂无采集记录。", "rp-hint")]));
+            historyCount.textContent = `${items.length} 条`;
+            lastRuns = snapshot;
+            if (focused && !focused.isConnected) {
+              cards.find(card => card.dataset.runId === focused.dataset.runId)?.firstElementChild.focus({ preventScroll: true });
+            }
+          }
+          if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 3000);
+          else void RP.refresh({ silent: true });
+        } catch (error) {
+          if (alive(token, body)) {
+            if (!lastRuns) runsWrap.replaceChildren(node("p", "暂时无法读取采集记录，正在重试。", "rp-hint"));
+            runPoll = setTimeout(loadRuns, 5000);
+          }
+        }
+      }
+      collectSection.append(history);
+      void loadRuns();
 
       const csvSection = section("导入 CSV", "upload");
       const csvProfile = profileSelect();
@@ -201,7 +408,7 @@
       );
 
       const htmlSection = section("导入已保存的搜索页", "file-text");
-      const htmlSource = select(Object.entries(meta.sources));
+      const htmlSource = select(sourceEntries(meta.sources));
       const htmlProfile = profileSelect();
       const htmlFile = input("file", { accept: ".html,.htm,text/html" });
       const htmlFeedback = feedback();
@@ -230,7 +437,9 @@
         field("来源平台", htmlSource), field("归入求职方向", htmlProfile), field("HTML 文件", htmlFile), htmlBtn, htmlFeedback
       );
 
-      body.append(seedSection, csvSection, htmlSection);
+      const files = node("details", "", "rp-import-files");
+      files.append(node("summary", "手动导入文件"), csvSection, htmlSection);
+      body.append(collectSection, files);
     }
   });
 

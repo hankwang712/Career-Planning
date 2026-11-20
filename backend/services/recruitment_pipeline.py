@@ -6,12 +6,14 @@
 """
 
 import csv
+from datetime import datetime
 from io import StringIO
 import json
 import logging
 import re
 import time
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from flask import Response, current_app, jsonify, request
 from openai import OpenAI
@@ -25,6 +27,7 @@ from .user_state import _current_user, _login_required
 
 logger = logging.getLogger(__name__)
 API = "/api/job-market/collection/pipeline"
+BOARD_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 STAGES = ("collected", "cleaned", "screened", "deep", "rewritten", "greeted",
           "approval", "queued", "delivered", "rejected", "failed", "reeval")
@@ -156,6 +159,8 @@ def init_schema(conn):
             failure_payload TEXT NOT NULL DEFAULT '',
             failure_count INTEGER NOT NULL DEFAULT 0,
             delivery_lock INTEGER NOT NULL DEFAULT 0,
+            saved INTEGER NOT NULL DEFAULT 0,
+            saved_at REAL NOT NULL DEFAULT 0,
             meta TEXT NOT NULL DEFAULT '{}',
             updated_at REAL NOT NULL,
             PRIMARY KEY(owner, source, url_key),
@@ -168,6 +173,14 @@ def init_schema(conn):
             settings TEXT NOT NULL, updated_at REAL NOT NULL
         );
     """)
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        columns = {column[1] for column in conn.execute("PRAGMA table_info(recruitment_pipeline)")}
+        for column, definition in (("saved", "INTEGER NOT NULL DEFAULT 0"), ("saved_at", "REAL NOT NULL DEFAULT 0")):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE recruitment_pipeline ADD COLUMN {column} {definition}")
+        # 索引依赖迁移后的列，必须放在 ALTER 之后（旧库升级路径）。
+        conn.execute("CREATE INDEX IF NOT EXISTS recruitment_pipeline_saved ON recruitment_pipeline(owner, saved, saved_at DESC)")
 
 
 def load_config(conn, owner):
@@ -187,8 +200,25 @@ def save_config(conn, owner, config):
     """, (owner, config.model_dump_json(), time.time()))
 
 
+def board_day_start():
+    return datetime.fromtimestamp(time.time(), BOARD_TIMEZONE).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def purge_unsaved(conn, owner, *, before=None):
+    """删除未保存岗位，流水线状态和相关物料随岗位级联删除。"""
+    where = ("owner=? AND NOT EXISTS (SELECT 1 FROM recruitment_pipeline p"
+             " WHERE p.owner=recruitment_listings.owner AND p.source=recruitment_listings.source"
+             " AND p.url_key=recruitment_listings.url_key AND p.saved=1)")
+    args = [owner]
+    if before is not None:
+        where += " AND updated_at<?"
+        args.append(before)
+    return conn.execute(f"DELETE FROM recruitment_listings WHERE {where}", args).rowcount
+
+
 def ensure_rows(conn, owner):
     inside = conn.in_transaction
+    purge_unsaved(conn, owner, before=board_day_start())
     conn.execute("""
         INSERT OR IGNORE INTO recruitment_pipeline (owner, source, url_key, stage, follow_status, updated_at)
         SELECT owner, source, url_key, 'collected', ?, ? FROM recruitment_listings WHERE owner=?
@@ -1264,6 +1294,7 @@ RUNNERS = {"clean": run_clean, "evaluate": run_evaluate, "screen": run_screen, "
 # ---------------------------------------------------------------------------
 
 def funnel_payload(conn, owner):
+    ensure_rows(conn, owner)
     total = conn.execute("SELECT count(*) FROM recruitment_listings WHERE owner=?", (owner,)).fetchone()[0]
     cleaned = conn.execute(f"""
         SELECT count(*) FROM recruitment_listings j
@@ -1285,7 +1316,6 @@ def funnel_payload(conn, owner):
 
 def rail_payload(conn, owner, config):
     funnel = {item["key"]: item["count"] for item in funnel_payload(conn, owner)["stages"]}
-    seeded = conn.execute("SELECT 1 FROM recruitment_listings WHERE owner=? LIMIT 1", (owner,)).fetchone()
     rules_saved = conn.execute("SELECT 1 FROM recruitment_cleaning_profiles WHERE owner=? LIMIT 1", (owner,)).fetchone()
     baseline = baseline_resume(owner, config)
     options = resume_options(owner)
@@ -1293,8 +1323,8 @@ def rail_payload(conn, owner, config):
     rewritten = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND rewrite_payload<>''", (owner,)).fetchone()[0]
     greeted = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND greeting_payload<>''", (owner,)).fetchone()[0]
     steps = [
-        {"key": "scraping", "label": "抓取导入", "desc": "本地种子与 CSV/HTML 导入",
-         "config_state": "configured" if seeded else "required_missing", "count": funnel["crawled"]},
+        {"key": "scraping", "label": "抓取导入", "desc": "平台实时采集（本机 Chrome）+ 本地导入",
+         "config_state": "configured" if funnel["crawled"] else "required_missing", "count": funnel["crawled"]},
         {"key": "cleaning", "label": "规则清洗", "desc": "Tier1 硬规则 + Tier2 语义规则",
          "config_state": "configured" if rules_saved else "required_missing", "count": funnel["cleaned"]},
         {"key": "evaluating", "label": "AI评估", "desc": "八维评级，精投岗位自动深评",
@@ -1317,6 +1347,7 @@ def rail_payload(conn, owner, config):
 
 TAB_STAGES = {
     "all": None,
+    "saved": None,
     "rejected": ("rejected",),
     "in_progress": ("collected", "cleaned", "screened", "deep", "rewritten", "greeted"),
     "reeval": ("reeval",),
@@ -1329,16 +1360,24 @@ TAB_STAGES = {
 
 def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
     ensure_rows(conn, owner)
+    # 已保存岗位只出现在 saved 视图；其余视图与计数只统计未保存岗位。
     counts = dict.fromkeys(TAB_STAGES, 0)
-    for stage, count in conn.execute("SELECT stage, count(*) FROM recruitment_pipeline WHERE owner=? GROUP BY stage", (owner,)):
+    for stage, saved, count in conn.execute(
+            "SELECT stage, saved, count(*) FROM recruitment_pipeline WHERE owner=? GROUP BY stage, saved", (owner,)):
         for name, stages in TAB_STAGES.items():
-            if stages is None or stage in stages:
+            if name == "saved":
+                counts[name] += count if saved else 0
+            elif not saved and (stages is None or stage in stages):
                 counts[name] += count
     where, args = "p.owner=?", [owner]
-    stages = TAB_STAGES.get(tab)
-    if stages:
-        where += " AND p.stage IN (" + ", ".join("?" for _ in stages) + ")"
-        args += list(stages)
+    if tab == "saved":
+        where += " AND p.saved=1"
+    else:
+        where += " AND p.saved=0"
+        stages = TAB_STAGES.get(tab)
+        if stages:
+            where += " AND p.stage IN (" + ", ".join("?" for _ in stages) + ")"
+            args += list(stages)
     if keyword:
         like = f"%{keyword}%"
         source_names = {key: item[0] for key, item in SOURCES.items()}
@@ -1354,9 +1393,11 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
         where += " AND p.source=?"
         args.append(source)
     total = conn.execute(f"SELECT count(*) FROM recruitment_pipeline p JOIN recruitment_listings j USING(owner, source, url_key) WHERE {where}", args).fetchone()[0]
+    ordering = "p.saved_at DESC, j.source, j.url_key" if tab == "saved" else "p.updated_at DESC, j.source, j.url_key"
     rows = conn.execute(f"""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.url, j.experience, j.education,
                j.updated_at, p.stage, p.follow_status, p.review_type, p.grade, p.score, p.approval,
+               p.saved, p.saved_at,
                p.failure_payload, p.failure_count, p.meta, p.updated_at AS action_at,
                p.deep_payload<>'' AS has_deep, p.rewrite_payload<>'' AS has_rewrite, p.greeting_payload<>'' AS has_greeting,
                r.reason AS cleaning_reason, {cleaning.EFFECTIVE_STATUS} AS cleaning_status
@@ -1365,7 +1406,7 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
         LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
         {cleaning.SEMANTIC_JOIN}
         WHERE {where}
-        ORDER BY p.updated_at DESC, j.source, j.url_key LIMIT ? OFFSET ?
+        ORDER BY {ordering} LIMIT ? OFFSET ?
     """, (*args, limit, offset)).fetchall()
     items = []
     for row in rows:
@@ -1528,6 +1569,43 @@ def register_routes(blueprint):
         keyword = request.args.get("q", "").strip()[:120]
         source = request.args.get("source", "").strip()[:80]
         return jsonify(jobs_payload(db._get_conn(), owner, tab, keyword, limit, offset, source))
+
+    @blueprint.post(API + "/save")
+    @_login_required
+    def pipeline_save():
+        payload = request.get_json(silent=True)
+        identity = _identity(payload)
+        if not identity or not isinstance(payload.get("saved"), bool):
+            return jsonify(message="保存参数无效。"), 400
+        saved = payload["saved"]
+        owner = _current_user()["username"]
+        conn = db._get_conn()
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            ensure_rows(conn, owner)
+            stamp = time.time() if saved else 0
+            updated = conn.execute("""
+                UPDATE recruitment_pipeline SET saved=?, saved_at=?
+                WHERE owner=? AND source=? AND url_key=?
+            """, (int(saved), stamp, owner, *identity)).rowcount
+            if not updated:
+                return jsonify(message="岗位记录不存在。"), 404
+            expired = not saved and bool(conn.execute("""
+                DELETE FROM recruitment_listings WHERE owner=? AND source=? AND url_key=? AND updated_at<?
+            """, (owner, *identity, board_day_start())).rowcount)
+        return jsonify(saved=saved, saved_at=stamp, expired=expired)
+
+    @blueprint.post(API + "/purge")
+    @_login_required
+    def pipeline_purge():
+        owner = _current_user()["username"]
+        conn = db._get_conn()
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            deleted = purge_unsaved(conn, owner)
+            kept = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND saved=1",
+                                (owner,)).fetchone()[0]
+        return jsonify(deleted=deleted, kept=kept)
 
     @blueprint.get(API + "/job")
     @_login_required

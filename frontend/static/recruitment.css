@@ -544,6 +544,7 @@ html .rp-main .rp-tab:hover:not(:disabled) { background: var(--dr-surface-soft);
 .rp-tab[data-tab="queued"] { --rp-tab-bg: var(--dr-accent); }
 .rp-tab[data-tab="delivered"] { --rp-tab-bg: var(--dr-success); }
 .rp-tab[data-tab="failed"] { --rp-tab-bg: var(--dr-danger-deep); }
+.rp-tab[data-tab="saved"] { --rp-tab-bg: var(--dr-brass); }
 html .rp-main .rp-tab[aria-pressed="true"] { background: var(--rp-tab-bg); color: #fff; }
 html .rp-main .rp-tab[aria-pressed="true"]:hover:not(:disabled) { background: var(--rp-tab-bg); color: #fff; filter: brightness(1.08); }
 html .rp-main .rp-tab[aria-pressed="true"] .rp-tab-count { background: rgba(255, 255, 255, 0.18); color: #fff; }
@@ -728,6 +729,14 @@ html .rp-main .rp-material-btn:disabled { opacity: 0.5; cursor: default; }
 .rp-status-badge[data-tone="info"] { background: var(--dr-info-soft); color: var(--dr-info); }
 .rp-job-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 html .rp-main .rp-job-actions .rp-btn-sm { min-height: 25px; padding: 2px 8px; font-size: 11.5px; }
+html .rp-main .rp-job-save.is-saved,
+html .rp-main .rp-job-save.is-saved:hover:not(:disabled) {
+    background: var(--dr-brass-soft); border-color: var(--dr-brass); color: var(--dr-brass);
+}
+html .rp-main #rpPurge.is-armed,
+html .rp-main #rpPurge.is-armed:hover:not(:disabled) {
+    background: var(--dr-danger); border-color: var(--dr-danger); color: #fff;
+}
 
 /* 淘汰卡 */
 .rp-job.is-rejected { border-color: #eec9c5; }
@@ -818,6 +827,8 @@ body.rp-lock { overflow: hidden; }
     overscroll-behavior: contain;
     display: grid; gap: 14px; align-content: start;
 }
+.rp-import-files > summary { padding: 10px 12px; color: var(--dr-ink-soft); cursor: pointer; font-weight: 650; }
+.rp-import-files > .rp-panel-section { margin-top: 10px; }
 .rp-panel-section {
     display: grid; gap: 11px;
     padding: 14px;
@@ -1134,3 +1145,81 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
     .rp-toasts { right: 12px; bottom: 12px; left: 12px; justify-items: stretch; }
     .rp-toast { max-width: none; }
 }
+
+/* ---------- 平台实时采集（抓取抽屉） ---------- */
+.rp-sessions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.rp-session {
+  border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-soft); padding: 10px 12px;
+}
+.rp-session-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rp-session-head strong { font-size: 12px; color: var(--dr-ink); font-weight: 650; }
+.rp-session-result { margin-top: 6px; }
+.rp-session-label { font-size: 11px; font-weight: 600; color: var(--dr-muted); }
+.rp-session-result[data-state="ready"] .rp-session-label { color: var(--dr-success); }
+.rp-session-result[data-state="not_logged_in"] .rp-session-label,
+.rp-session-result[data-state="verification_required"] .rp-session-label,
+.rp-session-result[data-state="authorization_required"] .rp-session-label,
+.rp-session-result[data-state="authorization_required_manual"] .rp-session-label { color: var(--dr-warning); }
+.rp-session-result[data-state="bridge_unavailable"] .rp-session-label,
+.rp-session-result[data-state="unavailable"] .rp-session-label { color: var(--dr-danger); }
+.rp-session-message { margin: 4px 0 0; font-size: 11px; color: var(--dr-muted); line-height: 1.6; }
+.rp-session > .rp-btn-sm { margin-top: 6px; }
+.rp-session > [hidden] { display: none; }
+.rp-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 8px; }
+.rp-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dr-ink-soft); cursor: pointer; }
+.rp-check input { accent-color: var(--dr-accent); width: 14px; height: 14px; }
+.rp-collect-form { display: grid; gap: 10px; }
+.rp-run-history { margin-top: 4px; }
+.rp-run-history-head, .rp-run-head {
+  display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer;
+}
+.rp-run-history-head::-webkit-details-marker, .rp-run-head::-webkit-details-marker { display: none; }
+.rp-run-history-head::before, .rp-run-head::before {
+  content: ""; width: 6px; height: 6px; border: solid var(--dr-muted); border-width: 0 1.5px 1.5px 0;
+  flex: none; transform: rotate(-45deg);
+}
+.rp-run-history[open] > .rp-run-history-head::before, .rp-run[open] > .rp-run-head::before { transform: rotate(45deg); }
+.rp-run-history-head {
+  padding: 8px 10px; border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-soft); color: var(--dr-ink); font-size: 12px; font-weight: 650;
+}
+.rp-run-history-count { margin-inline-start: auto; color: var(--dr-muted); font-weight: 500; }
+.rp-runs { display: grid; gap: 8px; margin-top: 8px; color: var(--dr-muted); font-size: 12px; }
+.rp-run {
+  border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface); padding: 10px 12px;
+}
+.rp-run-label { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rp-run-head strong { font-size: 12px; color: var(--dr-ink); font-weight: 650; }
+.rp-run-state {
+  flex: none; white-space: nowrap; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--dr-surface-soft); color: var(--dr-muted); border: 1px solid var(--dr-line);
+}
+.rp-run[data-state="running"] .rp-run-state { background: var(--dr-accent-soft); color: var(--dr-accent); border-color: var(--dr-accent-line); }
+.rp-run[data-state="succeeded"] .rp-run-state, .rp-run[data-state="complete"] .rp-run-state { background: var(--dr-success-soft); color: var(--dr-success); border-color: #cbe5d7; }
+.rp-run[data-state="interrupted"] .rp-run-state, .rp-run[data-state="failed"] .rp-run-state { background: var(--dr-danger-soft); color: var(--dr-danger); border-color: #eccfcc; }
+.rp-run-date { font-size: 10px; color: var(--dr-faint); }
+.rp-run-source { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dr-line); display: grid; gap: 3px; }
+.rp-run-source strong { font-size: 11px; color: var(--dr-ink-soft); font-weight: 600; }
+.rp-run-source a { font-size: 11px; color: var(--dr-accent); text-decoration: none; justify-self: start; }
+.rp-run-source a:hover { text-decoration: underline; }
+.rp-run-source p { margin: 0; font-size: 11px; color: var(--dr-muted); line-height: 1.6; }
+.rp-run-source p[data-state="waiting_user"], .rp-run-source p[data-state="login_required"], .rp-run-source p[data-state="login_timeout"] { color: var(--dr-warning); }
+.rp-run-source p[data-state="interrupted"], .rp-run-source p[data-state="unavailable"] { color: var(--dr-danger); }
+.rp-run-source p[data-state="succeeded"], .rp-run-source p[data-state="complete"] { color: var(--dr-success); }
+@media (max-width: 760px) {
+  .rp-sessions { grid-template-columns: 1fr; }
+}
+
+/* 平台 logo */
+.rp-platform-mark {
+  width: 26px; height: 26px; border-radius: 7px; overflow: hidden; flex: none;
+  border: 1px solid var(--dr-line); background: #fff;
+  display: inline-grid; place-items: center;
+}
+.rp-platform-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rp-platform-mark[data-fallback] { background: var(--dr-accent-soft); color: var(--dr-accent); font-size: 10px; font-weight: 700; }
+.rp-session-head strong { flex: 1; min-width: 0; }
+.rp-check .rp-platform-mark { width: 18px; height: 18px; border-radius: 5px; }
+.rp-check .rp-platform-mark[data-fallback] { font-size: 8px; }

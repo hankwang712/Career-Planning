@@ -305,9 +305,64 @@ def test_platform_login_status_only_checks_authorized_local_browser(make_account
     assert account.post(API + "/session/liepin", json={}).status_code == 404
     response = account.post(url, json={})
     assert response.status_code == 200
-    assert response.get_json()["state"] == state
-    assert response.get_json()["label"] == label
+    status = response.get_json()
+    assert status["state"] == state
+    assert status["label"] == label
+    assert status.get("login_url") == (
+        recruitment.LOGIN_URLS[source] if state in {"not_logged_in", "verification_required", "unknown"} else None
+    )
     assert checked == [source]
+
+
+@pytest.mark.parametrize(("bridge_state", "expected", "paths"), [
+    ("idle", "ready", ["/health", "/new", "/navigate", "/eval", "/close"]),
+    ("unapproved", "authorization_required", ["/health", "/new"]),
+    ("unapproved_no_chrome", "authorization_required_manual", ["/health", "/new"]),
+    ("offline", "bridge_unavailable", ["/health"]),
+])
+def test_check_platform_login_connects_idle_bridge_or_opens_authorization(monkeypatch, bridge_state, expected, paths):
+    import json
+
+    import httpx
+
+    from services import recruitment_chrome
+
+    requests = []
+    authorization = []
+    target = recruitment_chrome.SESSION_URLS["boss"]
+    tab_id = "3" * 32
+
+    def route(request):
+        path = request.url.path
+        requests.append(path)
+        if path == "/health":
+            if bridge_state == "offline":
+                raise httpx.ConnectError("Bridge is offline", request=request)
+            return httpx.Response(200, json={"connected": False})
+        if path == "/new":
+            assert request.url.params["url"] == "about:blank"
+            if bridge_state.startswith("unapproved"):
+                return httpx.Response(500, json={"error": "Chrome is unavailable"})
+            return httpx.Response(200, json={"targetId": tab_id})
+        assert request.url.params["target"] == tab_id
+        if path == "/navigate":
+            assert request.url.params["url"] == target
+        if path == "/eval":
+            snapshot = {"url": target, "title": "", "verification": False, "bossLogin": "ready"}
+            return httpx.Response(200, json={"value": json.dumps(snapshot)})
+        return httpx.Response(200, json={})
+
+    def open_authorization():
+        authorization.append(True)
+        return bridge_state == "unapproved"
+
+    client = httpx.Client
+    monkeypatch.setattr(recruitment_chrome.httpx, "Client",
+                        lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(route)))
+    monkeypatch.setattr(recruitment_chrome, "open_chrome_authorization", open_authorization)
+    assert recruitment_chrome.check_platform_login("boss") == expected
+    assert requests == paths
+    assert len(authorization) == int(bridge_state.startswith("unapproved"))
 
 
 @pytest.mark.parametrize(("source", "url", "field", "state", "expected"), [

@@ -374,6 +374,65 @@ def test_stop_at_review_false_auto_delivers(server, make_account):
     assert job(owner, identity)["stage"] == "delivered"
 
 
+def test_saved_view_and_bulk_purge(server, make_account):
+    owner = setup_account(server, make_account, "pipeline-saved")
+    keep = add_job(owner, "t:keep", JOB_CUSTOM)
+    drop = add_job(owner, "t:drop", JOB_MASS)
+    run(owner, "clean")
+    assert owner.post(PIPE + "/save", json={**keep, "saved": "yes"}).status_code == 400
+    assert owner.post(PIPE + "/save", json={"source": "city_jobs", "url_key": "t:none", "saved": True}).status_code == 404
+    assert owner.post(PIPE + "/save", json={**keep, "saved": True}).get_json()["saved"] is True
+    jobs = owner.get(PIPE + "/jobs?tab=all").get_json()
+    assert jobs["counts"]["all"] == 1 and jobs["counts"]["saved"] == 1
+    assert jobs["total"] == 1 and jobs["items"][0]["url_key"] == drop["url_key"]
+    saved = owner.get(PIPE + "/jobs?tab=saved").get_json()
+    assert saved["total"] == 1 and saved["items"][0]["url_key"] == keep["url_key"]
+    assert saved["items"][0]["saved"] == 1 and saved["items"][0]["saved_at"] > 0
+    # 已保存岗位继续流转，saved 视图标注当前阶段
+    run(owner, "evaluate")
+    saved = owner.get(PIPE + "/jobs?tab=saved").get_json()
+    assert saved["items"][0]["stage"] in ("screened", "deep")
+    assert owner.get(PIPE + "/jobs?tab=in_progress").get_json()["counts"]["saved"] == 1
+    body = owner.post(PIPE + "/purge", json={}).get_json()
+    assert body["deleted"] == 1 and body["kept"] == 1
+    assert owner.get(PIPE + "/jobs?tab=all").get_json()["total"] == 0
+    assert owner.get(PIPE + "/job", query_string=drop).status_code == 404
+    assert owner.get(PIPE + "/job", query_string=keep).status_code == 200
+    from services import db
+    with db._get_conn() as conn:
+        for table in ("recruitment_pipeline", "recruitment_cleaning_results"):
+            assert conn.execute(f"SELECT count(*) FROM {table} WHERE owner=? AND url_key=?",
+                                (owner.email, drop["url_key"])).fetchone()[0] == 0
+    assert owner.post(PIPE + "/save", json={**keep, "saved": False}).get_json()["saved"] is False
+    back = owner.get(PIPE + "/jobs?tab=all").get_json()
+    assert back["total"] == 1 and back["counts"]["saved"] == 0
+
+
+def test_daily_cleanup_keeps_only_saved_jobs(server, make_account):
+    from services import db, recruitment_pipeline as pipeline
+
+    owner = make_account("pipeline-day")
+    keep = add_job(owner, "t:keep", JOB_CUSTOM)
+    old = add_job(owner, "t:old", JOB_MASS)
+    assert owner.post(PIPE + "/save", json={**keep, "saved": True}).status_code == 200
+    yesterday = pipeline.board_day_start() - 1
+    with db._get_conn() as conn:
+        conn.execute("UPDATE recruitment_listings SET updated_at=? WHERE owner=?", (yesterday, owner.email))
+    assert owner.get(PIPE + "/funnel").get_json()["stages"][0]["count"] == 1
+    jobs = owner.get(PIPE + "/jobs?tab=all").get_json()
+    assert jobs["counts"]["all"] == 0 and jobs["counts"]["saved"] == 1
+    assert owner.get(PIPE + "/job", query_string=old).status_code == 404
+    saved = owner.get(PIPE + "/jobs?tab=saved").get_json()
+    assert saved["total"] == 1 and saved["items"][0]["url_key"] == keep["url_key"]
+    # 当天新获取的岗位不受跨天清理影响
+    add_job(owner, "t:fresh", JOB_MASS)
+    jobs = owner.get(PIPE + "/jobs?tab=all").get_json()
+    assert jobs["counts"]["all"] == 1 and jobs["counts"]["saved"] == 1
+    assert owner.post(PIPE + "/save", json={**keep, "saved": False}).get_json()["expired"] is True
+    assert owner.get(PIPE + "/job", query_string=keep).status_code == 404
+    assert owner.get(PIPE + "/jobs?tab=all").get_json()["total"] == 1
+
+
 STUDENT_RESUME = """求职意向：Python/AI 应用开发（后端/Agent/AIGC 方向）
 教育经历
 华东某大学 计算机科学与技术 本科 2026 应届

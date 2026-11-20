@@ -4,7 +4,11 @@ from contextlib import contextmanager
 import json
 import logging
 import os
+from pathlib import Path
 import re
+import shutil
+import subprocess
+from threading import Lock
 from time import monotonic, sleep
 from urllib.parse import parse_qs, urlsplit
 
@@ -15,6 +19,9 @@ from .recruitment_sources import SOURCES, cards, platform_url, search_url
 
 logger = logging.getLogger(__name__)
 BRIDGE_URL = "http://127.0.0.1:3456"
+CHROME_AUTHORIZATION_URL = "chrome://inspect/#remote-debugging"
+_authorization_lock = Lock()
+_authorization_opened_at = float("-inf")
 TAB_ID = re.compile(r"[0-9a-fA-F]{32}")
 CHROME_SOURCES = {
     "boss": ("www.zhipin.com", "/web/geek/jobs"),
@@ -67,19 +74,59 @@ SESSION_LABELS = {
     "verification_required": "需要安全验证",
     "unknown": "未能确认",
     "unavailable": "检查失败",
+    "authorization_required": "等待 Chrome 授权",
+    "authorization_required_manual": "需要 Chrome 授权",
+    "bridge_unavailable": "本机 Chrome 连接未启动",
 }
 SESSION_MESSAGES = {
     "ready": "当前 Chrome 已登录，可以采集。",
     "not_logged_in": "请在用于采集的 Chrome 登录后重试。",
     "verification_required": "请在官网完成验证后重试。",
     "unknown": "请在官网确认登录后重试。",
-    "unavailable": "请确认 Chrome 已打开并授权连接后重试。",
+    "unavailable": "暂时无法读取招聘页面，请稍后重试。",
+    "authorization_required": "已打开 Chrome 授权页。请允许远程调试，如 Chrome 提示确认连接，也请确认。完成后再点「检查登录」。",
+    "authorization_required_manual": "请在 Chrome 地址栏打开 chrome://inspect/#remote-debugging，允许远程调试后重试。",
+    "bridge_unavailable": "启动本机 Chrome 连接服务后再检查登录。",
 }
 
 
 def use_local_chrome():
     configured = os.getenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", os.getenv("CAREER_BOSS_USE_LOCAL_CHROME", ""))
     return configured.strip().lower() in {"1", "true"}
+
+
+def find_chrome_executable():
+    for name in ("chrome.exe", "google-chrome", "google-chrome-stable", "chromium"):
+        if executable := shutil.which(name):
+            return executable
+    for name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+        if root := os.getenv(name):
+            executable = Path(root) / "Google" / "Chrome" / "Application" / "chrome.exe"
+            if executable.is_file():
+                return str(executable)
+    executable = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    return str(executable) if executable.is_file() else None
+
+
+def open_chrome_authorization():
+    global _authorization_opened_at
+    with _authorization_lock:
+        # A parallel check of all platforms should open only one authorization page.
+        if monotonic() - _authorization_opened_at < 10:
+            return True
+        executable = find_chrome_executable()
+        if not executable:
+            return False
+        try:
+            subprocess.Popen(
+                [executable, CHROME_AUTHORIZATION_URL],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            logger.warning("Could not open the Chrome authorization page")
+            return False
+        _authorization_opened_at = monotonic()
+        return True
 
 
 class ChromeTab:
@@ -113,16 +160,17 @@ def open_chrome_tab(source, target_url):
     with httpx.Client(base_url=BRIDGE_URL, timeout=15, trust_env=False) as client:
         health = client.get("/health", timeout=3)
         health.raise_for_status()
-        if health.json().get("connected") is not True:
-            yield None
-            return
+        # The bridge connects lazily on /new, so an idle /health is not a failed connection.
+        connected = health.json().get("connected") is True
         # Get the owned tab ID first; a slow site must not leave an untracked tab behind.
         response = client.get("/new", params={"url": "about:blank"})
+        if response.status_code == 500 and not connected:
+            yield None
+            return
         response.raise_for_status()
         identifier = str(response.json().get("targetId") or "")
         if not TAB_ID.fullmatch(identifier):
-            yield None
-            return
+            raise ValueError("Chrome bridge returned an invalid tab ID")
         tab = ChromeTab(client, identifier, source)
         try:
             try:
@@ -160,7 +208,7 @@ def check_platform_login(source):
     try:
         with open_chrome_tab(source, SESSION_URLS[source]) as tab:
             if tab is None:
-                return "unavailable"
+                return "authorization_required" if open_chrome_authorization() else "authorization_required_manual"
             deadline = monotonic() + 8
             while monotonic() < deadline:
                 try:
@@ -175,6 +223,8 @@ def check_platform_login(source):
                     return state
                 sleep(max(0, min(1, deadline - monotonic())))
             return "unknown"
+    except (httpx.ConnectError, httpx.ConnectTimeout):
+        return "bridge_unavailable"
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         return "unavailable"
 

@@ -21,6 +21,12 @@
         'profiles': profiles,
         'sources': sources,
         'dimensions': ai_dimensions,
+        'collection_sources': collection_sources,
+        'login_urls': login_urls,
+        'chrome_available': chrome_available,
+        'chrome_sources': chrome_sources,
+        'boss_local': boss_local,
+        'city_catalog': city_catalog,
         'settings_url': url_for('workspace_tools.settings_page'),
         'resumes_url': '/user-center/resumes',
         'export_url': url_for('recruitment.export')
@@ -104,12 +110,15 @@
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg>
                             <input id="rpSearch" type="search" maxlength="120" placeholder="搜索岗位、公司或来源" aria-label="搜索岗位">
                         </label>
+                        <button id="rpCollectJobs" class="rp-btn rp-btn-sm rp-btn-primary" type="button">获取新岗位</button>
+                        <button id="rpPurge" class="rp-btn rp-btn-sm rp-btn-ghost" type="button"
+                                title="删除全部未保存岗位，已保存岗位保留；未保存岗位在次日首次打开时自动清理。">批量删除</button>
                         <a id="rpExport" class="rp-btn rp-btn-sm rp-btn-ghost" href="{{ url_for('recruitment.export') }}?clean_status=passed&amp;sort=match">导出 CSV</a>
                     </div>
                 </header>
                 <nav id="rpTabs" class="rp-tabs" aria-label="岗位状态视图">
                     {% for key, label in [
-                        ('all', '全部'), ('rejected', '淘汰'), ('in_progress', '评估·改写·投递中'),
+                        ('all', '全部'), ('saved', '已保存'), ('rejected', '淘汰'), ('in_progress', '评估·改写·投递中'),
                         ('reeval', '待重评'), ('approval', '待审批'), ('queued', '待投递'),
                         ('delivered', '已投递'), ('failed', '执行失败')
                     ] %}

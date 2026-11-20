@@ -81,6 +81,7 @@
     funnel: '<path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z"/>',
     link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2"/>',
     "user-check": '<circle cx="10" cy="8" r="3.5"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h4"/><path d="m15 17 2 2 4-4"/>',
+    bookmark: '<path d="M6 4h12v16l-6-4-6 4z"/>',
     target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>'
   };
   function icon(name, className) {
@@ -167,6 +168,10 @@
         continue;
       }
       pipelineBase = base;
+      if (response.status === 404 && (path === "/purge" || path === "/save") &&
+          !response.headers.get("content-type")?.includes("application/json")) {
+        throw new Error("当前运行的后端还未加载岗位保存和清理接口。请重启工作台服务后刷新页面。");
+      }
       return readJson(response);
     }
     throw lastError || Object.assign(new Error("流水线接口尚未就绪。"), { status: 404 });
@@ -180,7 +185,7 @@
   };
   const STAGE_ORDER = ["collected", "cleaned", "screened", "deep", "rewritten", "greeted", "approval", "queued", "delivered"];
   const IN_PROGRESS = new Set(["collected", "cleaned", "screened", "deep", "rewritten", "greeted"]);
-  const TABS = ["all", "rejected", "in_progress", "reeval", "approval", "queued", "delivered", "failed"];
+  const TABS = ["all", "saved", "rejected", "in_progress", "reeval", "approval", "queued", "delivered", "failed"];
   const RUN_STAGES = [
     { stage: "clean", label: "规则清洗" }, { stage: "evaluate", label: "AI 评估" },
     { stage: "rewrite", label: "简历改写" },
@@ -285,10 +290,16 @@
     job.hasDeep = Boolean(raw.has_deep);
     job.hasRewrite = Boolean(raw.has_rewrite);
     job.hasGreeting = Boolean(raw.has_greeting);
+    job.saved = Boolean(raw.saved);
+    job.savedAt = raw.saved_at || 0;
     job.tab = TABS.includes(raw.tab) ? raw.tab : tabOf(job);
     return job;
   }
   function tabOf(job) {
+    if (job.saved) return "saved";
+    return stageTabOf(job);
+  }
+  function stageTabOf(job) {
     if (job.stage === "rejected" || job.status === "rejected") return "rejected";
     if (job.stage === "failed" || job.status === "failed") return "failed";
     if (job.stage === "reeval") return "reeval";
@@ -298,13 +309,16 @@
     return "in_progress";
   }
   function filteredJobs() {
-    return state.boardJobs.filter((job) => state.tab === "all" || job.tab === state.tab);
+    return state.boardJobs.filter((job) => state.tab === "all" ? !job.saved : job.tab === state.tab);
   }
   function tabCounts() {
     // 优先用服务端口径（全量），乐观更新时做增量调整；未就绪时回退本地计数。
     if (state.counts && Object.keys(state.counts).length) return { ...state.counts };
     const counts = Object.fromEntries(TABS.map((tab) => [tab, 0]));
-    for (const job of state.jobs) { counts.all += 1; counts[job.tab] = (counts[job.tab] || 0) + 1; }
+    for (const job of state.jobs) {
+      if (!job.saved) counts.all += 1;
+      counts[job.tab] += 1;
+    }
     return counts;
   }
   function adjustCounts(from, to, n = 1) {
@@ -605,6 +619,9 @@
   }
 
   /* ---------- 岗位看板 ---------- */
+  let purgeArmed = false;
+  let purgeTimer = 0;
+  const savingJobs = new Set();
   function renderTabs() {
     const counts = tabCounts();
     for (const button of byId("rpTabs").querySelectorAll("[data-tab]")) {
@@ -612,8 +629,38 @@
       button.setAttribute("aria-pressed", String(key === state.tab));
       button.querySelector("[data-tab-count]").textContent = counts[key] ? String(counts[key]) : "";
     }
-    const total = state.counts?.all ?? state.jobsTotal;
+    const total = state.tab === "saved" ? (counts.saved || 0) : (state.counts?.all ?? state.jobsTotal);
     byId("rpBoardCount").textContent = total ? `共 ${total} 条` : "";
+    const purge = byId("rpPurge");
+    purge.disabled = state.bulkBusy || savingJobs.size > 0 || !counts.all;
+    purge.classList.toggle("is-armed", purgeArmed);
+    purge.replaceChildren(icon(purgeArmed ? "alert" : "trash"),
+      document.createTextNode(purgeArmed ? `确认删除 ${counts.all || 0} 条未保存？` : "批量删除"));
+  }
+  function disarmPurge() {
+    purgeArmed = false;
+    window.clearTimeout(purgeTimer);
+    renderTabs();
+  }
+  async function purgeUnsaved() {
+    if (state.bulkBusy) return;
+    state.bulkBusy = true;
+    renderTabs();
+    renderTabBanner();
+    try {
+      const result = await pipelineApi("/purge", {});
+      toast(`已删除 ${result.deleted ?? 0} 条未保存岗位${result.kept ? `，${result.kept} 条已保存岗位保留` : ""}。`, "success");
+      state.selectedFailed.clear();
+      state.failedSource = "";
+      await refresh({ silent: true });
+      await loadBoardPage(1);
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      state.bulkBusy = false;
+      renderTabs();
+      renderTabBanner();
+    }
   }
   function setTab(tab, { updateUrl = true } = {}) {
     if (!TABS.includes(tab)) tab = "all";
@@ -642,7 +689,11 @@
       bar.append(button);
       return button;
     };
-    if (state.tab === "queued" && counts.queued > 0) {
+    if (state.tab === "saved") {
+      bar.dataset.tone = "info";
+      if (!counts.saved) { bar.hidden = true; return; }
+      bar.append(node("p", "保存的岗位跨天保留，卡片显示当前处理状态。取消保存时，仅当天采集的岗位会回到「全部」。"));
+    } else if (state.tab === "queued" && counts.queued > 0) {
       const queuedJobs = state.jobs.filter((j) => j.tab === "queued");
       bar.dataset.tone = "accent";
       bar.append(node("p", `${counts.queued} 个岗位已通过审批，进入待投递队列。`));
@@ -731,6 +782,7 @@
     add("users", job.scale);
     add("clock", job.crawledAt ? fmtTime(job.crawledAt) + " 采集" : "");
     add("clock", job.updatedAt && job.updatedAt !== job.crawledAt ? fmtTime(job.updatedAt) + " 动作" : "");
+    add("bookmark", job.saved && job.savedAt ? fmtTime(job.savedAt) + " 保存" : "");
     const track = node("span", job.track === "mass" ? "海投" : "精投", "rp-track-tag");
     track.dataset.track = job.track;
     tags.append(track);
@@ -756,25 +808,43 @@
     button.addEventListener("click", handler);
     return button;
   }
+  function saveButton(job) {
+    const button = actionButton(job.saved ? "取消保存" : "保存",
+      "rp-btn-ghost rp-job-save" + (job.saved ? " is-saved" : ""), () => toggleSave(job), "bookmark");
+    button.title = job.saved
+      ? "取消保存：当天采集的岗位回到「全部」，早前的岗位会移除。"
+      : "保存：岗位跨天保留在「已保存」视图，并标注当前阶段。";
+    button.disabled = savingJobs.has(jobId(job)) || state.bulkBusy;
+    return button;
+  }
   function jobActions(job) {
     const actions = node("div", "", "rp-job-actions");
-    actions.append(actionButton("定制面板", "rp-btn-ghost", () => openDrawer("rewriting", { job }), "sliders"));
-    if (job.tab === "approval") {
+    // 已保存视图按当前阶段提供操作，保存开关始终在首位。
+    const tab = job.tab === "saved" ? stageTabOf(job) : job.tab;
+    actions.append(saveButton(job), actionButton("定制面板", "rp-btn-ghost", () => openDrawer("rewriting", { job }), "sliders"));
+    if (tab === "approval") {
       actions.append(
         actionButton("拒绝", "rp-btn-danger", () => decide(job, "reject"), "x"),
         actionButton("重评", "rp-btn-ghost", () => decide(job, "reeval"), "rotate"),
         actionButton("放行", "rp-btn-success", () => decide(job, "approve"), "check")
       );
-    } else if (job.tab === "queued") {
+    } else if (tab === "queued") {
       actions.append(
         actionButton("终止投递", "rp-btn-ghost", () => abandonDelivery(job), "stop"),
         actionButton("立即投递", "rp-btn-accent", () => deliverJobs([job]), "send")
       );
-    } else if (job.tab === "delivered") {
+    } else if (tab === "delivered") {
       actions.append(actionButton("投递详情", "rp-btn-ghost", () => openDrawer("delivering", { job }), "eye"));
-    } else if (job.tab === "reeval") {
+    } else if (tab === "reeval") {
       actions.append(actionButton("重新评估", "rp-btn-accent", () => runScreenBatch(), "rotate"));
-    } else if (job.tab === "in_progress" && job.hasGreeting) {
+    } else if (tab === "failed") {
+      actions.append(
+        actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash"),
+        actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate")
+      );
+    } else if (tab === "rejected" && /^https?:/.test(job.url || "")) {
+      actions.append(actionButton("放行并推送", "rp-btn-success", () => releaseJob(job), "check"));
+    } else if (tab === "in_progress" && job.hasGreeting) {
       actions.append(actionButton("补发打招呼", "rp-btn-ghost", () => regreet(), "message"));
     }
     return actions;
@@ -849,7 +919,7 @@
     });
     const actions = node("div", "", "rp-job-actions");
     // 岗位已处淘汰终态：确认淘汰只做本地确认；放行仅对仍有原站链接的平台记录开放。
-    actions.append(actionButton("确认淘汰", "rp-btn-danger", () => toast("已确认淘汰，岗位保留在淘汰视图。"), "x"));
+    actions.append(saveButton(job), actionButton("确认淘汰", "rp-btn-danger", () => toast("已确认淘汰，岗位保留在淘汰视图。"), "x"));
     if (/^https?:/.test(job.url || "")) {
       actions.append(actionButton("放行并推送", "rp-btn-success", () => releaseJob(job), "check"));
     }
@@ -902,6 +972,7 @@
     const actions = node("div", "", "rp-job-actions");
     const diagBtn = actionButton("AI 诊断", "rp-btn-ghost", () => { diagnosis.hidden = !diagnosis.hidden; }, "sparkles");
     actions.append(
+      saveButton(job),
       diagBtn,
       actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash"),
       actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate")
@@ -928,13 +999,13 @@
     if (!list.length) {
       const empty = node("div", "", "rp-view-empty");
       empty.append(tile("inbox", "accent"));
-      if (!(state.counts.all ?? state.jobsTotal)) {
-        empty.append(node("strong", "流水线里还没有岗位"),
-          node("p", "从本地导入种子岗位、CSV 或已保存的搜索页开始。"));
-        const button = node("button", "打开本地导入", "rp-btn rp-btn-primary");
-        button.type = "button";
-        button.addEventListener("click", () => openDrawer("scraping"));
-        empty.append(button);
+      if (state.tab === "saved" && !state.counts.saved) {
+        empty.append(node("strong", "暂无已保存岗位"), node("p", "在岗位卡片上点「保存」，之后可在这里继续跟进。"));
+      } else if (state.tab !== "saved" && !(state.counts.all ?? state.jobsTotal)) {
+        empty.append(node("strong", "当日暂无岗位"), node("p", "点击「获取新岗位」开始实时采集。"));
+        if (state.counts.saved) {
+          empty.append(actionButton(`查看已保存（${state.counts.saved}）`, "rp-btn-ghost", () => setTab("saved"), "bookmark"));
+        }
       } else {
         empty.append(node("strong", state.q ? "没有匹配的岗位" : "当前视图暂无岗位"),
           node("p", state.q ? "换个关键词，或清空搜索框。" : "切换其他状态视图，或启动流水线推进岗位。"));
@@ -1002,13 +1073,36 @@
       pipelineApi("/approve", { source: job.source, url_key: job.url_key, decision }), messages[decision])
       .catch(() => {});
   }
+  async function toggleSave(job) {
+    const id = jobId(job);
+    if (savingJobs.has(id) || state.bulkBusy) return;
+    const saved = !job.saved;
+    savingJobs.add(id);
+    disarmPurge();
+    renderJobs();
+    try {
+      const result = await pipelineApi("/save", { source: job.source, url_key: job.url_key, saved });
+      toast(saved ? "已移至「已保存」。" : result.expired ? "已取消保存并移除早前采集的岗位。" : "已取消保存。", "success");
+      await loadBoardPage(state.page, { quiet: true });
+      void refresh({ silent: true });
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      savingJobs.delete(id);
+      renderBoard();
+    }
+  }
   function deliverJobs(jobs) {
     if (!jobs.length || state.bulkBusy) return Promise.resolve();
     state.bulkBusy = true;
     renderTabBanner();
     const ids = jobs.map((job) => ({ source: job.source, url_key: job.url_key }));
     const before = jobs.map((job) => ({ job, stage: job.stage, tab: job.tab, followStatus: job.followStatus }));
-    for (const job of jobs) { job.stage = "delivered"; job.tab = "delivered"; job.followStatus = "已投递"; adjustCounts("queued", "delivered"); }
+    for (const job of jobs) {
+      const from = job.tab;
+      job.stage = "delivered"; job.tab = job.saved ? "saved" : "delivered"; job.followStatus = "已投递";
+      adjustCounts(from, job.tab);
+    }
     renderBoard();
     return pipelineApi("/deliver_dry", { ids })
       .then((result) => {
@@ -1021,8 +1115,9 @@
       })
       .catch((error) => {
         for (const item of before) {
+          const optimistic = item.job.tab;
           item.job.stage = item.stage; item.job.tab = item.tab; item.job.followStatus = item.followStatus;
-          adjustCounts("delivered", "queued");
+          adjustCounts(optimistic, item.tab);
         }
         renderBoard();
         toast(error.message, "error");
@@ -1212,6 +1307,16 @@
       if (!rows.length) break;
       items.push(...rows);
       offset += rows.length;
+    }
+    // 已保存岗位跨天保留：并入本地状态，供各面板按阶段选岗（不计入当日看板）。
+    const savedWant = Math.min(Number(first.counts?.saved) || 0, TAB_FETCH_CAP);
+    let savedOffset = 0;
+    while (savedOffset < savedWant) {
+      const next = await pipelineApi(`/jobs?tab=saved&limit=${PAGE_SIZE}&offset=${savedOffset}`);
+      const rows = (next.items || []).map(normalizeJob);
+      if (!rows.length) break;
+      items.push(...rows);
+      savedOffset += rows.length;
     }
     const boardJobs = new Map(state.boardJobs.map(job => [jobId(job), job]));
     state.jobs = items.map(job => boardJobs.get(jobId(job)) || job);
@@ -1508,6 +1613,20 @@
       }
     });
     byId("rpRailRefresh").addEventListener("click", () => refresh());
+    byId("rpCollectJobs").addEventListener("click", () => openDrawer("scraping"));
+    byId("rpPurge").addEventListener("click", () => {
+      if (state.bulkBusy) return;
+      if (!purgeArmed) {
+        if (!(state.counts?.all ?? state.jobsTotal)) { toast("没有可删除的未保存岗位。", "warning"); return; }
+        purgeArmed = true;
+        renderTabs();
+        window.clearTimeout(purgeTimer);
+        purgeTimer = window.setTimeout(disarmPurge, 5000);
+        return;
+      }
+      disarmPurge();
+      void purgeUnsaved();
+    });
     byId("rpBootRetry").addEventListener("click", () => {
       byId("rpBootText").textContent = "正在重新连接流水线服务…";
       void refresh();

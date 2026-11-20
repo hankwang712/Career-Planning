@@ -274,7 +274,10 @@ def platform_login_status(source):
     if source not in CHROME_SOURCES:
         return jsonify(message="该平台不支持本机 Chrome 登录检查。"), 404
     state = check_platform_login(source)
-    return jsonify(state=state, label=SESSION_LABELS[state], message=SESSION_MESSAGES[state])
+    status = dict(state=state, label=SESSION_LABELS[state], message=SESSION_MESSAGES[state])
+    if state in {"not_logged_in", "verification_required", "unknown"}:
+        status["login_url"] = LOGIN_URLS[source]
+    return jsonify(status)
 
 
 @blueprint.post(API + "/runs")

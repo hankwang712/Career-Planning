@@ -449,6 +449,67 @@ def test_pipeline_job_card_keeps_materials_beside_metadata_on_desktop(browser, l
         context.close()
 
 
+def test_pipeline_collection_history_is_collapsed_and_keeps_open_records(logged_in_page, live_server):
+    page = logged_in_page
+    reads = 0
+
+    def history(route):
+        nonlocal reads
+        reads += 1
+        status = "running" if reads == 1 else "complete"
+        route.fulfill(json={"items": [
+            {"id": "first", "keyword": "后端开发", "city": "杭州", "status": status, "started_at": 1795000000,
+             "progress": {"boss": {"status": status, "message": "第一条平台详情" if reads == 1 else "第一条采集完成"}}},
+            {"id": "second", "keyword": "数据分析", "city": "上海", "status": "complete", "started_at": 1794990000,
+             "progress": {"boss": {"status": "succeeded", "message": "第二条平台详情"}}},
+        ]})
+
+    page.route("**/api/job-market/collection/runs", history)
+    page.goto(live_server + "/recruitment?drawer=scraping")
+    record_history = page.locator(".rp-run-history")
+    assert record_history.locator("summary").first.is_visible()
+    record_history.get_by_text("2 条", exact=True).wait_for(timeout=5000)
+    assert record_history.get_attribute("open") is None
+    record_history.get_by_text("采集记录", exact=True).click()
+    first = record_history.locator('.rp-run[data-run-id="first"]')
+    second = record_history.locator('.rp-run[data-run-id="second"]')
+    assert first.get_attribute("open") is None and second.get_attribute("open") is None
+    first.locator("summary").click()
+    first.get_by_text("第一条平台详情", exact=True).wait_for(timeout=2000)
+    first.get_by_text("第一条采集完成", exact=True).wait_for(timeout=8000)
+    assert second.locator(".rp-run-source").is_hidden()
+    record_history.get_by_text("采集记录", exact=True).click()
+    assert first.is_hidden()
+
+
+def test_pipeline_login_check_shows_authorization_and_official_login(logged_in_page, live_server):
+    page = logged_in_page
+    statuses = iter([
+        {"state": "authorization_required", "label": "等待 Chrome 授权", "message": "已打开 Chrome 授权页"},
+        {"state": "not_logged_in", "label": "未登录", "login_url": "https://www.zhipin.com/web/user/"},
+        {"state": "ready", "label": "已登录"},
+    ])
+
+    def check(route):
+        assert route.request.method == "POST"
+        route.fulfill(json=next(statuses))
+
+    page.route("**/api/job-market/collection/session/boss", check)
+    page.goto(live_server + "/recruitment?drawer=scraping")
+    card = page.locator(".rp-session").filter(has_text="BOSS 直聘")
+    check_button = card.get_by_role("button", name="检查登录")
+    check_button.click()
+    card.get_by_text("等待 Chrome 授权", exact=True).wait_for()
+    assert card.get_by_role("button", name="复制授权地址").is_hidden()
+    check_button.click()
+    link = card.get_by_role("link", name="打开平台官网")
+    link.wait_for()
+    assert link.get_attribute("href") == "https://www.zhipin.com/web/user/"
+    check_button.click()
+    card.get_by_text("已登录", exact=True).wait_for()
+    assert link.is_hidden()
+
+
 def test_pipeline_evaluation_drawer_runs_screen_and_deep_together(browser, live_server, server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job, run, setup_account
 
@@ -471,6 +532,37 @@ def test_pipeline_evaluation_drawer_runs_screen_and_deep_together(browser, live_
         result = response.value.json()
         assert result["stage"] == "evaluate" and result["counts"]["screened"] == result["counts"]["deep"] == 1
         drawer.get_by_role("button", name="查看七键分析", exact=True).wait_for()
+    finally:
+        context.close()
+
+
+def test_pipeline_board_saves_and_clears_unsaved_jobs(browser, live_server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("job-board-saved")
+    add_job(account, "saved-example", {**JOB_CUSTOM, "title": "保留样本岗位"})
+    add_job(account, "daily-example", {**JOB_CUSTOM, "title": "当日样本岗位"})
+    context = browser.new_context(viewport={"width": 1280, "height": 850})
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.goto(live_server + "/recruitment")
+        cards = page.locator("#rpJobs .rp-job")
+        kept = cards.filter(has_text="保留样本岗位")
+        kept.get_by_role("button", name="保存", exact=True).click()
+        kept.wait_for(state="hidden")
+        page.get_by_role("button", name="批量删除", exact=True).click()
+        page.get_by_role("button", name="确认删除 1 条未保存？", exact=True).click()
+        page.get_by_text("当日暂无岗位", exact=True).wait_for()
+        page.reload()
+        page.locator('#rpTabs [data-tab="saved"]').click()
+        kept.wait_for()
+        assert kept.get_by_text("新线索", exact=True).is_visible()
+        assert cards.filter(has_text="当日样本岗位").count() == 0
+        page.get_by_role("button", name="获取新岗位", exact=True).click()
+        assert page.get_by_role("button", name="启动采集", exact=True).is_visible()
+        assert page.get_by_text("手动导入文件", exact=True).is_visible()
+        assert page.get_by_role("button", name="导入种子岗位").count() == 0
     finally:
         context.close()
 
@@ -566,44 +658,40 @@ def test_recruitment_checks_each_platform_and_keeps_results_separate(logged_in_p
     monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
     page = logged_in_page
     statuses = {
-        "boss": ("ready", "已登录"),
-        "51job": ("not_logged_in", "未登录"),
-        "zhilian": ("verification_required", "需要安全验证"),
-        "xiaohongshu": ("unavailable", "检查失败"),
+        "boss": ("BOSS 直聘", "ready", "已登录"),
+        "51job": ("前程无忧", "not_logged_in", "未登录"),
+        "zhilian": ("智联招聘", "verification_required", "需要安全验证"),
+        "xiaohongshu": ("小红书招聘线索", "unavailable", "检查失败"),
     }
     checked = []
 
     def session(route):
         source = route.request.url.rsplit("/", 1)[-1]
         checked.append(source)
-        state, label = statuses[source]
+        _, state, label = statuses[source]
         route.fulfill(json={"state": state, "label": label, "message": "Chrome 登录检查结果"})
 
     page.route("**/api/job-market/collection/session/*", session)
-    page.goto(live_server + "/recruitment")
-    page.get_by_role("button", name="配置采集").click()
-    sessions = page.locator("#recruitmentSessions")
-    cards = sessions.locator(".recruitment-session")
+    page.goto(live_server + "/recruitment?drawer=scraping")
+    sessions = page.locator(".rp-sessions")
+    cards = sessions.locator(".rp-session")
     assert cards.count() == 4
-    icons = cards.locator("img.recruitment-session-icon")
+    icons = cards.locator(".rp-platform-mark img")
     assert icons.count() == 4
     assert icons.evaluate_all("(images) => images.every((image) => image.complete && image.naturalWidth > 0)")
-    assert cards.get_by_role("link").count() == 4
-    sessions.locator('.recruitment-session[data-source="51job"]').get_by_role("button").click()
+    cards.filter(has_text="前程无忧").get_by_role("button", name="检查登录").click()
     sessions.get_by_text("未登录", exact=True).wait_for()
     assert checked == ["51job"]
     assert sessions.get_by_text("未检查", exact=True).count() == 3
 
-    sessions.get_by_role("button", name="检查全部").click()
-    for source, (state, label) in statuses.items():
-        result = sessions.locator(f'.recruitment-session[data-source="{source}"] [data-state="{state}"]')
+    page.get_by_role("button", name="检查全部平台").click()
+    for platform, state, label in statuses.values():
+        result = cards.filter(has_text=platform).locator(f'[data-state="{state}"]')
         result.get_by_text(label, exact=True).wait_for()
     assert sorted(checked[1:]) == sorted(statuses)
     assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     page.set_viewport_size({"width": 375, "height": 800})
     assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
-    page.get_by_role("checkbox", name="用本机 Chrome 采集").uncheck()
-    assert sessions.is_hidden()
 
 
 def test_recruitment_city_picker_search_group_and_submission(logged_in_page, live_server):
