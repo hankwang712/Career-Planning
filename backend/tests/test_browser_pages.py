@@ -484,6 +484,17 @@ def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_serve
         cards = page.locator("#rpJobs .rp-job")
         pager = page.get_by_role("navigation", name="岗位分页")
         pager.get_by_text("第 1 / 77 页 · 611 条", exact=True).wait_for()
+        for width in (1440, 390):
+            page.set_viewport_size({"width": width, "height": 844})
+            assert pager.evaluate("""(nav, wide) => {
+                const selectors = wide ? ['#rpJobPrev', '#rpJobNext', '#rpJobPageInput', '#rpJobPageGo']
+                                       : ['#rpJobPageInput', '#rpJobPageGo'];
+                const centers = selectors.map(selector => {
+                    const rect = nav.querySelector(selector).getBoundingClientRect();
+                    return rect.top + rect.height / 2;
+                });
+                return Math.max(...centers) - Math.min(...centers) < 1 && nav.scrollWidth <= nav.clientWidth;
+            }""", width == 1440)
         assert cards.count() == 8
         assert pager.get_by_role("button", name="上一页").is_disabled()
         pager.get_by_role("button", name="下一页").click()

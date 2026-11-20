@@ -581,10 +581,17 @@ html .rp-main .rp-source-chip[aria-pressed="true"]:hover:not(:disabled) { backgr
 
 .rp-jobs { display: grid; gap: 10px; padding: 14px 18px 18px; }
 .rp-job-pager,
-.rp-job-pager form { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
-.rp-job-pager { padding: 0 14px 16px; color: var(--dr-muted); font-size: 12px; }
+.rp-job-page-controls,
+.rp-job-pager form { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.rp-job-pager { flex-wrap: wrap; column-gap: 14px; padding: 0 14px 16px; color: var(--dr-muted); font-size: 12px; }
 .rp-job-pager[hidden] { display: none; }
-.rp-job-pager input { width: 62px; min-height: 30px; text-align: center; }
+.rp-job-page-controls { text-align: center; }
+html .rp-main .rp-job-pager input[type="number"] {
+    width: 76px;
+    min-height: 30px;
+    padding: 3px 8px;
+    text-align: center;
+}
 .rp-board-card { scroll-margin-top: calc(var(--rp-topbar-h) + 12px); }
 
 /* 岗位卡（正常型） */
