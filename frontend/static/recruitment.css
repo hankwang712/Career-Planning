@@ -617,10 +617,9 @@ html .rp-main .rp-job-pager input[type="number"] {
     border-radius: var(--dr-radius);
     background: var(--dr-surface);
     box-shadow: var(--dr-shadow-sm);
-    transition: transform 0.2s var(--dr-ease), box-shadow 0.2s var(--dr-ease), border-color 0.2s var(--dr-ease);
-    animation: rp-card-in 0.28s var(--dr-ease) both;
+    transition: box-shadow 0.2s var(--dr-ease), border-color 0.2s var(--dr-ease);
 }
-.rp-job:hover { transform: translateY(-2px); border-color: var(--dr-accent-line); box-shadow: var(--dr-edge), var(--dr-shadow-lg); }
+.rp-job:hover { border-color: var(--dr-accent-line); box-shadow: var(--dr-edge), var(--dr-shadow-lg); }
 .rp-job-top { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
 .rp-job-logo {
     display: grid; place-items: center;
@@ -1128,10 +1127,6 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
     from { background-position: 120% 0; }
     to { background-position: -120% 0; }
 }
-@keyframes rp-card-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: none; }
-}
 @keyframes rp-toast-in {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: none; }
@@ -1144,7 +1139,7 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
 @keyframes rp-spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-    .rp-job, .rp-toast, .rp-skeleton-tile, .rp-skeleton-step, .rp-skeleton-row { animation: none; }
+    .rp-toast, .rp-skeleton-tile, .rp-skeleton-step, .rp-skeleton-row { animation: none; }
     .rp-step[data-state="active"] .rp-step-num,
     .rp-runpill[data-state="running"] .rp-runpill-dot,
     html .rp-main .rp-mainaction[data-state="armed"] { animation: none; }

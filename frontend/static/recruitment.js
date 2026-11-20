@@ -846,7 +846,6 @@
     button.title = job.saved
       ? "取消保存：当天采集的岗位回到「全部」，早前的岗位会移除。"
       : "保存：岗位跨天保留在「已保存」视图，并标注当前阶段。";
-    button.disabled = savingJobs.has(jobId(job)) || state.bulkBusy;
     return button;
   }
   function jobActions(job) {
@@ -1014,6 +1013,12 @@
     card.append(diagnosis);
     return card;
   }
+  // 后台轮询保留原有卡片，避免打断键盘焦点和页面的滚动锚点。
+  const renderedJobs = new Map();
+  function renderJobPlaceholder(root, placeholder) {
+    renderedJobs.clear();
+    if (!root.firstElementChild?.isEqualNode(placeholder)) root.replaceChildren(placeholder);
+  }
   function renderJobs() {
     const root = byId("rpJobs");
     const list = filteredJobs();
@@ -1026,7 +1031,7 @@
       if (state.boardError) {
         empty.append(actionButton("重试", "rp-btn-ghost", () => loadBoardPage(state.page), "refresh"));
       }
-      root.replaceChildren(empty);
+      renderJobPlaceholder(root, empty);
       return;
     }
     if (!list.length) {
@@ -1043,26 +1048,56 @@
         empty.append(node("strong", state.q ? "没有匹配的岗位" : "当前视图暂无岗位"),
           node("p", state.q ? "换个关键词，或清空搜索框。" : "切换其他状态视图，或启动流水线推进岗位。"));
       }
-      root.replaceChildren(empty);
+      renderJobPlaceholder(root, empty);
       return;
     }
-    root.replaceChildren(...list.map((job) => {
-      const card = job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job);
-      if (purgeMode && !job.saved) {
-        const box = node("input", "", "rp-purge-checkbox");
-        box.type = "checkbox";
-        box.setAttribute("aria-label", `选择 ${job.title}`);
-        box.dataset.purgeId = jobId(job);
-        box.checked = purgeSelected(jobId(job));
-        box.disabled = state.bulkBusy;
-        box.addEventListener("change", () => {
-          selectForPurge(job, box.checked);
-          renderPurgeTools();
-        });
-        card.querySelector(".rp-job-top").prepend(box);
+    if (!renderedJobs.size) root.replaceChildren();
+    const visible = new Set(list.map(jobId));
+    for (const [id, entry] of renderedJobs) {
+      if (!visible.has(id)) {
+        entry.card.remove();
+        renderedJobs.delete(id);
       }
-      return card;
-    }));
+    }
+    list.forEach((job, index) => {
+      const id = jobId(job);
+      const previous = renderedJobs.get(id);
+      // JD 正文由折叠区按需加载；加载完成后已经直接更新了卡片。
+      const signature = JSON.stringify([{ ...job, description: undefined }, purgeMode]);
+      let card = previous?.card;
+      if (!previous || previous.job !== job || previous.signature !== signature) {
+        card = renderJobCard(job);
+        if (previous) {
+          const fold = card.querySelector(".rp-jd-fold");
+          if (fold && previous.card.querySelector(".rp-jd-fold[open]")) fold.open = true;
+          const diagnosis = card.querySelector(".rp-diagnosis");
+          if (diagnosis && previous.card.querySelector(".rp-diagnosis:not([hidden])")) diagnosis.hidden = false;
+          previous.card.replaceWith(card);
+        }
+        renderedJobs.set(id, { job, signature, card });
+      }
+      const anchor = root.children[index];
+      if (anchor !== card) root.insertBefore(card, anchor || null);
+      card.querySelector(".rp-job-save").disabled = savingJobs.has(id) || state.bulkBusy;
+      const failed = card.querySelector(".rp-failed-head input");
+      if (failed) failed.checked = state.selectedFailed.has(id);
+    });
+    if (purgeMode) syncPurgeCheckboxes();
+  }
+  function renderJobCard(job) {
+    const card = job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job);
+    if (purgeMode && !job.saved) {
+      const box = node("input", "", "rp-purge-checkbox");
+      box.type = "checkbox";
+      box.setAttribute("aria-label", `选择 ${job.title}`);
+      box.dataset.purgeId = jobId(job);
+      box.addEventListener("change", () => {
+        selectForPurge(job, box.checked);
+        renderPurgeTools();
+      });
+      card.querySelector(".rp-job-top").prepend(box);
+    }
+    return card;
   }
   function boardPageCount() {
     return Math.max(1, Math.ceil(state.boardTotal / BOARD_PAGE_SIZE));
@@ -1326,7 +1361,10 @@
       const known = new Map([...state.jobs, ...state.boardJobs].map(job => [jobId(job), job]));
       state.boardJobs = (data.items || []).map(row => {
         const job = normalizeJob(row);
-        return Object.assign(known.get(jobId(job)) || job, job);
+        const current = known.get(jobId(job));
+        if (!current) return job;
+        if (!job.description && current.crawledAt === job.crawledAt) job.description = current.description;
+        return Object.assign(current, job);
       });
       if (data.counts) state.counts = { ...data.counts };
       state.boardTotal = Number(data.total) || 0;

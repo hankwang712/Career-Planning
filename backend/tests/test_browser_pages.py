@@ -651,6 +651,51 @@ def test_pipeline_board_saves_and_clears_unsaved_jobs(browser, live_server, make
         context.close()
 
 
+def test_pipeline_poll_keeps_unchanged_job_cards_in_place(browser, live_server, make_account):
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("job-board-poll")
+    add_job(account, "unchanged", {**JOB_CUSTOM, "title": "稳定样本岗位"})
+    add_job(account, "updated", {**JOB_CUSTOM, "title": "待更新样本岗位"})
+    context = browser.new_context(viewport={"width": 1280, "height": 720})
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        page.clock.install()
+        page.goto(live_server + "/recruitment")
+        cards = page.locator("#rpJobs .rp-job")
+        unchanged = cards.filter(has_text="稳定样本岗位")
+        title = unchanged.get_by_role("button", name="稳定样本岗位")
+        title.focus()
+        unchanged.evaluate("card => window.checkedJobCard = card")
+        y = page.evaluate("window.scrollY")
+
+        def is_board_page(url):
+            return "/pipeline/jobs?" in url and "limit=8&" in url
+
+        with page.expect_response(lambda response: is_board_page(response.url)):
+            page.clock.fast_forward(12000)
+        page.locator("#rpRailRefresh:enabled").wait_for()
+        assert unchanged.evaluate("card => card === window.checkedJobCard")
+        assert title.evaluate("button => button === document.activeElement")
+        assert page.evaluate("window.scrollY") == y
+
+        def update_job(route):
+            data = route.fetch().json()
+            for job in data["items"]:
+                if job["url_key"] == "updated":
+                    job["title"] = "已更新样本岗位"
+            route.fulfill(json=data)
+
+        page.route(is_board_page, update_job)
+        page.clock.fast_forward(12000)
+        cards.get_by_role("button", name="已更新样本岗位").wait_for()
+        assert unchanged.evaluate("card => card === window.checkedJobCard")
+        assert title.evaluate("button => button === document.activeElement")
+    finally:
+        context.close()
+
+
 def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job
 
