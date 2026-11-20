@@ -544,6 +544,44 @@ def test_pipeline_login_check_shows_authorization_and_official_login(logged_in_p
     assert link.is_hidden()
 
 
+def test_pipeline_rail_distinguishes_results_waiting_and_execution(logged_in_page, live_server):
+    page = logged_in_page
+    page.route("**/pipeline/rail", lambda route: route.fulfill(json={
+        "warnings": ["rewriting"], "llm_configured": True,
+        "steps": [
+            {"key": "scraping", "count": 75, "config_state": "configured"},
+            {"key": "cleaning", "count": 0, "config_state": "configured"},
+            {"key": "evaluating", "count": 0, "config_state": "configured"},
+            {"key": "rewriting", "count": 0, "config_state": "required_missing"},
+            {"key": "review", "count": 3, "config_state": "auto"},
+            {"key": "delivering", "count": 2, "config_state": "configured"},
+        ],
+    }))
+    page.route("**/pipeline/funnel", lambda route: route.fulfill(json={"stages": [
+        {"key": "crawled", "count": 75}, {"key": "ready", "count": 2}, {"key": "delivered", "count": 0},
+    ]}))
+    page.goto(live_server + "/recruitment")
+    rail = page.locator("#rpRail")
+    for step, state, label in (
+        ("scraping", "done", "已采集"), ("cleaning", "next", "下一步"),
+        ("evaluating", "idle", "未开始"), ("rewriting", "blocked", "待配置"),
+        ("review", "waiting", "待审批"), ("delivering", "waiting", "待投递"),
+    ):
+        rail.locator(f'[data-step="{step}"][data-state="{state}"]').get_by_text(label, exact=True).wait_for()
+    assert rail.locator('[data-step="scraping"]').get_by_text("75 条", exact=True).is_visible()
+    assert rail.evaluate("""el => new Set([...el.querySelectorAll('.rp-step')]
+        .map(step => getComputedStyle(step).backgroundColor)).size""") == 5
+
+    pending_requests = []
+    page.route("**/pipeline/run", lambda route: pending_requests.append(route))
+    with page.expect_request("**/pipeline/run"):
+        page.evaluate("void window.RP.runStage('clean')")
+    rail.locator('[data-step="cleaning"][data-state="active"]').get_by_text("执行中", exact=True).wait_for()
+    assert len(pending_requests) == 1
+    pending_requests[0].fulfill(json={"stage": "clean", "processed": 0})
+    rail.locator('[data-step="cleaning"][data-state="next"]').wait_for()
+
+
 def test_pipeline_evaluation_drawer_runs_screen_and_deep_together(browser, live_server, server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job, run, setup_account
 

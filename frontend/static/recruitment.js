@@ -192,14 +192,15 @@
     { stage: "greet", label: "打招呼语" }
   ];
   const RAIL_STEPS = [
-    { key: "scraping", label: "本地导入", icon: "inbox", run: null },
-    { key: "cleaning", label: "规则清洗", icon: "filter", run: "clean" },
-    { key: "evaluating", label: "AI 评估", icon: "sparkles", run: "evaluate" },
-    { key: "rewriting", label: "简历改写", icon: "pen", run: "rewrite" },
-    { key: "greeting", label: "打招呼语", icon: "message", run: "greet" },
-    { key: "review", label: "待审批", icon: "shield", run: null },
-    { key: "delivering", label: "投递队列", icon: "send", run: null }
+    { key: "scraping", label: "抓取导入", icon: "inbox", result: "已采集" },
+    { key: "cleaning", label: "规则清洗", icon: "filter", run: "clean", result: "清洗通过" },
+    { key: "evaluating", label: "AI 评估", icon: "sparkles", run: "evaluate", result: "已评估" },
+    { key: "rewriting", label: "简历改写", icon: "pen", run: "rewrite", result: "已改写" },
+    { key: "greeting", label: "打招呼语", icon: "message", run: "greet", result: "已生成" },
+    { key: "review", label: "人工审批", icon: "shield", waiting: "待审批" },
+    { key: "delivering", label: "投递队列", icon: "send", result: "已生成投递包", waiting: "待投递" }
   ];
+  const activeRailRuns = new Map();
   const FUNNEL_ICONS = [
     { match: /collect|crawl|scrap|import|seed/, icon: "inbox", tone: "accent" },
     { match: /clean/, icon: "filter", tone: "brass" },
@@ -376,55 +377,46 @@
     if (!state.rail) return;
     const steps = railSteps();
     const warnings = Array.isArray(state.rail.warnings) ? state.rail.warnings : [];
-    const denominator = Math.max(state.funnelTotal || 0, ...steps.map((s) => s.count), 1);
-    const activeKey = state.running
-      ? RAIL_STEPS.find((s) => s.run === state.runStage)?.key
-      : steps.find((s) => s.count === 0 && s.config_state !== "required_missing")?.key;
+    const delivery = new Map((state.funnel?.stages || []).map(stage => [stage.key, stage.count]));
+    const needsConfig = (step) => step.key !== "scraping" &&
+      (step.config_state === "required_missing" || warnings.includes(step.key));
+    const next = steps.find(step => !step.waiting && !step.count);
     const root = byId("rpRail");
     root.replaceChildren(...steps.map((step, index) => {
-      const blocked = step.config_state === "required_missing" || warnings.includes(step.key);
-      const done = !blocked && step.count > 0;
-      const cardState = blocked ? "blocked" : step.key === activeKey ? "active" : done ? "done" : "idle";
+      const pending = step.key === "delivering" ? (delivery.get("ready") || 0) : step.waiting ? step.count : 0;
+      const count = step.key === "delivering" ? (delivery.get("delivered") || 0) : step.waiting ? 0 : step.count;
+      let cardState = "idle", label = "未开始";
+      if (activeRailRuns.has(step.run)) [cardState, label] = ["active", "执行中"];
+      else if (needsConfig(step)) [cardState, label] = ["blocked", "待配置"];
+      else if (pending) [cardState, label] = ["waiting", step.waiting];
+      else if (count) [cardState, label] = ["done", step.result];
+      else if (step === next && !activeRailRuns.size && !state.running) [cardState, label] = ["next", "下一步"];
+      const detail = pending && count ? `${pending} 条待投递 · ${count} 条已出包`
+        : pending || count ? `${pending || count} 条${label === step.result || label === step.waiting ? "" : step.result}` : "";
       const card = node("button", "", "rp-step");
       card.type = "button";
       card.dataset.state = cardState;
       card.dataset.step = step.key;
-      card.setAttribute("aria-label", `${step.label}，打开配置面板`);
+      card.setAttribute("aria-label", [step.label, label, detail, "打开阶段面板"].filter(Boolean).join("，"));
+      card.title = step.desc;
       const head = node("span", "", "rp-step-head");
       const num = node("span", String(index + 1), "rp-step-num");
       if (cardState === "done") { num.textContent = ""; num.append(icon("check")); }
       const title = node("span", "", "rp-step-title");
       title.append(icon(step.icon), node("span", step.label));
       head.append(num, title);
-      const chipText = { configured: "已配置", auto: "自动流转", required_missing: "待配置" }[step.config_state] || "自动流转";
-      const chip = node("span", blocked && step.config_state !== "required_missing" ? "待配置" : chipText, "rp-step-chip");
-      chip.dataset.config = blocked ? "required_missing" : step.config_state;
-      const desc = node("span", step.desc || defaultStepDesc(step.key), "rp-step-desc");
-      desc.title = desc.textContent;
-      const count = node("span", "", "rp-step-count");
-      count.append(node("b", String(step.count)), document.createTextNode(" 条经过"));
-      const progress = node("span", "", "rp-step-progress");
-      const bar = node("i");
-      bar.style.width = Math.min(100, Math.round(step.count / denominator * 100)) + "%";
-      progress.append(bar);
-      card.append(head, chip, desc, count, progress);
+      const badge = node("span", label, "rp-step-chip");
+      const summary = pending || count ? node("span", detail, "rp-step-count") : null;
+      card.append(head, badge);
+      if (summary) card.append(summary);
       card.addEventListener("click", () => openDrawer(step.key));
       return card;
     }));
-    renderRailNotice(steps, warnings);
+    renderRailNotice(steps.filter(needsConfig), Boolean(steps[0]?.count));
     renderResumePill();
   }
-  function defaultStepDesc(key) {
-    return {
-      scraping: "CSV / 网页 / 种子库本地导入", cleaning: "硬规则 + AI 初筛规则",
-      evaluating: "八维评级，精投岗位自动深评",
-      rewriting: "基准简历定向改写", greeting: "高情商开场白",
-      review: "人工审批：放行 / 拒绝 / 重评", delivering: "本地队列 · dry-run 投递包"
-    }[key] || "";
-  }
-  function renderRailNotice(steps, warnings) {
+  function renderRailNotice(missing, hasJobs) {
     const root = byId("rpRailNotice");
-    const missing = steps.filter((s) => warnings.includes(s.key) || s.config_state === "required_missing");
     const bar = node("div", "", "rp-railnotice-bar");
     if (missing.length) {
       bar.dataset.tone = "warning";
@@ -437,11 +429,11 @@
         links.append(link);
       }
       bar.append(links);
-    } else {
+    } else if (hasJobs) {
       bar.dataset.tone = "success";
       bar.append(icon("check-circle"), node("span", "全部阶段就绪，可以启动本轮流水线。"));
     }
-    root.replaceChildren(bar);
+    root.replaceChildren(...(bar.childNodes.length ? [bar] : []));
   }
   function renderResumePill() {
     const slot = byId("rpResumePill");
@@ -556,7 +548,7 @@
   async function runPipeline() {
     if (!state.apiReady) return;
     if (!(state.funnelTotal > 0) && !state.jobs.length) {
-      toast("暂无岗位，请先导入种子岗位或本地文件。", "warning");
+      toast("暂无岗位，请先获取新岗位。", "warning");
       openDrawer("scraping");
       return;
     }
@@ -571,7 +563,6 @@
       const { stage, label } = RUN_STAGES[i];
       state.runStage = stage;
       renderCommandbar();
-      renderRail();
       try {
         await runStage(stage);
       } catch (error) {
@@ -601,11 +592,18 @@
     const controller = new AbortController();
     state.runController = controller;
     const base = pipelineBase || PIPELINE_BASES[0];
+    activeRailRuns.set(stage, (activeRailRuns.get(stage) || 0) + 1);
+    renderRail();
     try {
       return await readJson(await rawRequest(base + "/run", { stage }, "POST", controller.signal));
     } catch (error) {
       if (error.name === "AbortError") throw new Error("阶段执行已终止。");
       throw error;
+    } finally {
+      const remaining = activeRailRuns.get(stage) - 1;
+      if (remaining) activeRailRuns.set(stage, remaining);
+      else activeRailRuns.delete(stage);
+      renderRail();
     }
   }
   function stageResultMessage(result, label) {

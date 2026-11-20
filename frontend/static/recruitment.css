@@ -408,14 +408,19 @@ html .rp-main .rp-railnotice-bar button.rp-noticelink:hover { color: var(--dr-in
     scrollbar-width: thin;
 }
 html .rp-main .rp-step {
+    --rp-step-surface: var(--dr-surface-soft);
+    --rp-step-line: var(--dr-line);
+    --rp-step-tone: var(--dr-muted);
+    --rp-step-badge: var(--dr-muted-soft);
     position: relative;
-    flex: 1 0 168px;
-    min-width: 168px;
+    flex: 1 0 142px;
+    min-width: 142px;
+    min-height: 112px;
     display: grid; align-content: start; gap: 7px;
     padding: 12px 12px 14px;
-    border: 1px solid var(--dr-line);
+    border: 1px solid var(--rp-step-line);
     border-radius: var(--dr-radius);
-    background: var(--dr-surface);
+    background: var(--rp-step-surface);
     color: var(--dr-ink);
     text-align: left;
     white-space: normal;
@@ -427,13 +432,38 @@ html .rp-main .rp-step {
 html .rp-main .rp-step:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: var(--dr-edge), var(--dr-shadow-lg);
-    border-color: var(--dr-accent-line);
-    background: var(--dr-surface);
+    border-color: var(--rp-step-tone);
+    background: var(--rp-step-surface);
     color: var(--dr-ink);
 }
-html .rp-main .rp-step[data-state="active"] { border-color: var(--dr-accent); box-shadow: var(--dr-ring), var(--dr-shadow-sm); }
-html .rp-main .rp-step[data-state="blocked"] { border-color: #e3c68f; }
-html .rp-main .rp-step[data-state="done"] { border-color: #cbe5d7; }
+html .rp-main .rp-step[data-state="done"] {
+    --rp-step-surface: var(--dr-success-soft);
+    --rp-step-line: #baddcb;
+    --rp-step-tone: #216748;
+    --rp-step-badge: #d2edde;
+    box-shadow: inset 0 3px var(--dr-success);
+}
+html .rp-main .rp-step[data-state="active"],
+html .rp-main .rp-step[data-state="next"] {
+    --rp-step-surface: var(--dr-accent-soft);
+    --rp-step-line: var(--dr-accent);
+    --rp-step-tone: var(--dr-accent-hover);
+    --rp-step-badge: #dce4fc;
+}
+html .rp-main .rp-step[data-state="active"] { box-shadow: var(--dr-ring), inset 0 3px var(--dr-accent); }
+html .rp-main .rp-step[data-state="next"] { border-style: dashed; }
+html .rp-main .rp-step[data-state="blocked"] {
+    --rp-step-surface: var(--dr-warning-soft);
+    --rp-step-line: #e3c68f;
+    --rp-step-tone: #795619;
+    --rp-step-badge: #f2e4c4;
+}
+html .rp-main .rp-step[data-state="waiting"] {
+    --rp-step-surface: var(--dr-info-soft);
+    --rp-step-line: var(--dr-info-line);
+    --rp-step-tone: #235383;
+    --rp-step-badge: #dbe8f6;
+}
 .rp-step-head { display: flex; align-items: center; gap: 8px; }
 .rp-step-num {
     display: grid; place-items: center;
@@ -449,7 +479,9 @@ html .rp-main .rp-step[data-state="done"] { border-color: #cbe5d7; }
 .rp-step-num svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 html .rp-main .rp-step[data-state="done"] .rp-step-num { background: var(--dr-success); border-color: var(--dr-success); color: #fff; }
 html .rp-main .rp-step[data-state="active"] .rp-step-num { background: var(--dr-accent); border-color: var(--dr-accent); color: #fff; animation: rp-breathe 1.8s ease-in-out infinite; }
-html .rp-main .rp-step[data-state="blocked"] .rp-step-num { background: var(--dr-warning); border-color: var(--dr-warning); color: #fff; }
+html .rp-main .rp-step:is([data-state="blocked"], [data-state="next"], [data-state="waiting"]) .rp-step-num {
+    background: var(--rp-step-badge); border-color: var(--rp-step-line); color: var(--rp-step-tone);
+}
 .rp-step-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; font-weight: 650; }
 .rp-step-title svg { width: 15px; height: 15px; flex: none; fill: none; stroke: var(--dr-muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .rp-step-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -458,29 +490,11 @@ html .rp-main .rp-step[data-state="blocked"] .rp-step-num { background: var(--dr
     display: inline-flex; align-items: center; gap: 5px;
     padding: 2px 8px;
     border-radius: 999px;
-    font-size: 10.5px; font-weight: 650;
-    background: var(--dr-muted-soft); color: var(--dr-muted);
+    font-size: 11.5px; font-weight: 700;
+    background: var(--rp-step-badge); color: var(--rp-step-tone);
 }
-.rp-step-chip[data-config="configured"] { background: var(--dr-success-soft); color: var(--dr-success); }
-.rp-step-chip[data-config="required_missing"] { background: var(--dr-warning-soft); color: var(--dr-warning); animation: rp-breathe 2s ease-in-out infinite; }
-.rp-step-desc {
-    color: var(--dr-muted); font-size: 11.5px; line-height: 1.45;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.rp-step-count { color: var(--dr-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.rp-step-count b { color: var(--dr-brass); font-weight: 700; }
-.rp-step-progress {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 1.5px;
-    background: var(--dr-line);
-}
-.rp-step-progress i {
-    display: block; height: 100%;
-    background: var(--dr-accent);
-    transition: width 0.5s var(--dr-ease);
-}
-html .rp-main .rp-step[data-state="done"] .rp-step-progress i { background: var(--dr-success); }
-html .rp-main .rp-step[data-state="blocked"] .rp-step-progress i { background: var(--dr-warning); }
+.rp-step[data-state="active"] .rp-step-chip { background: var(--dr-accent); color: white; }
+.rp-step-count { color: var(--rp-step-tone); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
 
 /* ---------- 岗位看板 ---------- */
 .rp-boardcount { color: var(--dr-faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1132,7 +1146,6 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
 @media (prefers-reduced-motion: reduce) {
     .rp-job, .rp-toast, .rp-skeleton-tile, .rp-skeleton-step, .rp-skeleton-row { animation: none; }
     .rp-step[data-state="active"] .rp-step-num,
-    .rp-step-chip[data-config="required_missing"],
     .rp-runpill[data-state="running"] .rp-runpill-dot,
     html .rp-main .rp-mainaction[data-state="armed"] { animation: none; }
     .rp-drawer, .rp-drawer-overlay, .rp-modal, .rp-modal-overlay { transition: none; }
