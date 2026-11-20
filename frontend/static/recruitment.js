@@ -151,13 +151,13 @@
     return readJson(await rawRequest(API + path, body, method));
   }
   let pipelineBase = null;
-  async function pipelineApi(path, body, method) {
+  async function pipelineApi(path, body, method, signal) {
     const detect = !pipelineBase && /^\/(funnel|rail|jobs)/.test(path);
     const bases = pipelineBase ? [pipelineBase] : detect ? PIPELINE_BASES : [PIPELINE_BASES[0]];
     let lastError;
     for (const base of bases) {
       let response;
-      try { response = await rawRequest(base + path, body, method); }
+      try { response = await rawRequest(base + path, body, method, signal); }
       catch (error) {
         if (error.name === "AbortError") throw error;
         lastError = error;
@@ -782,8 +782,6 @@
     state.tab = tab;
     state.page = 1;
     state.selectedFailed.clear();
-    renderTabs();
-    renderTabBanner();
     void loadBoardPage(1);
     if (updateUrl) syncUrl();
     void ensureTabLoaded(tab);
@@ -1405,57 +1403,93 @@
   }
 
   /* ---------- 数据加载与轮询 ---------- */
+  const recentBoardPages = new Map();
+  let boardController = null;
+  let boardViewKey = "";
+  let jobsLoading = null;
+
+  function showBoardPage(data, page, key) {
+    const known = new Map([...state.jobs, ...state.boardJobs].map(job => [jobId(job), job]));
+    state.boardJobs = (data.items || []).map(row => {
+      const job = normalizeJob(row);
+      const current = known.get(jobId(job));
+      if (!current) return job;
+      if (!job.description && current.crawledAt === job.crawledAt) job.description = current.description;
+      return Object.assign(current, job);
+    });
+    if (data.counts) state.counts = { ...data.counts };
+    state.boardTotal = Number(data.total) || 0;
+    state.page = page;
+    state.boardError = "";
+    boardViewKey = key;
+  }
+
   async function loadBoardPage(page, { quiet = false, scroll = false } = {}) {
-    if (quiet && state.boardLoading) return;
+    if (quiet && boardController) return;
+    boardController?.abort();
+    const controller = new AbortController();
+    boardController = controller;
     const token = ++state.boardRequest;
     const params = new URLSearchParams({ tab: state.tab, limit: String(BOARD_PAGE_SIZE) });
     if (state.q.trim()) params.set("q", state.q.trim());
     if (state.source) params.set("source", state.source);
+    const pageKey = (number) => `${params}#${number}`;
+    const key = pageKey(page);
     state.page = page;
     if (!quiet) {
       state.boardError = "";
-      state.boardLoading = true;
-      renderJobs();
+      const cached = recentBoardPages.get(key);
+      if (boardViewKey !== key && cached && Date.now() - cached.at < 30_000) showBoardPage(cached.data, page, key);
+      state.boardLoading = boardViewKey !== key;
+      renderBoard();
     }
     try {
       let data;
       while (true) {
         params.set("offset", String((page - 1) * BOARD_PAGE_SIZE));
-        data = await pipelineApi("/jobs?" + params);
+        data = await pipelineApi("/jobs?" + params, undefined, "GET", controller.signal);
         if (token !== state.boardRequest) return;
         const last = Math.max(1, Math.ceil(data.total / BOARD_PAGE_SIZE));
         if (page <= last) break;
         page = last;
       }
-      const known = new Map([...state.jobs, ...state.boardJobs].map(job => [jobId(job), job]));
-      state.boardJobs = (data.items || []).map(row => {
-        const job = normalizeJob(row);
-        const current = known.get(jobId(job));
-        if (!current) return job;
-        if (!job.description && current.crawledAt === job.crawledAt) job.description = current.description;
-        return Object.assign(current, job);
-      });
-      if (data.counts) state.counts = { ...data.counts };
-      state.boardTotal = Number(data.total) || 0;
-      state.page = page;
-      state.boardError = "";
+      params.delete("offset");
+      const loadedKey = pageKey(page);
+      showBoardPage(data, page, loadedKey);
+      recentBoardPages.delete(loadedKey);
+      recentBoardPages.set(loadedKey, { data, at: Date.now() });
+      if (recentBoardPages.size > 12) recentBoardPages.delete(recentBoardPages.keys().next().value);
+      hideBoot();
       syncUrl();
+      return true;
     } catch (error) {
-      if (token !== state.boardRequest) return;
-      if (!quiet || !state.boardJobs.length) state.boardError = error.message || "岗位读取失败。";
+      if (token !== state.boardRequest || error.name === "AbortError") return;
+      if (boardViewKey !== key) state.boardError = error.message || "岗位读取失败。";
+      else if (!quiet) toast("岗位列表暂时无法更新，保留上次读取的结果。", "warning");
     } finally {
       if (token === state.boardRequest) {
+        boardController = null;
         state.boardLoading = false;
         renderBoard();
         if (scroll && !state.boardError) document.querySelector(".rp-board-card").scrollIntoView({ behavior: "instant" });
       }
     }
   }
+
+  function refreshJobChoices() {
+    if (!jobsLoading) {
+      jobsLoading = loadJobs()
+        .then(() => ensureTabLoaded(state.tab))
+        .catch(() => {})
+        .finally(() => { jobsLoading = null; renderBoard(); });
+    }
+    return jobsLoading;
+  }
   async function loadJobs() {
     const first = await pipelineApi(`/jobs?tab=all&limit=${PAGE_SIZE}&offset=0`);
     const items = (first.items || []).map(normalizeJob);
     const total = Number(first.total ?? items.length) || items.length;
-    if (first.counts && typeof first.counts === "object") state.counts = { ...first.counts };
+    if (!boardViewKey && first.counts) state.counts = { ...first.counts };
     let offset = items.length;
     while (offset < Math.min(total, MAX_JOBS)) {
       const next = await pipelineApi(`/jobs?tab=all&limit=${PAGE_SIZE}&offset=${offset}`);
@@ -1479,8 +1513,8 @@
     state.jobsTotal = total;
   }
   async function ensureTabLoaded(tab) {
-    // tabs/搜索为前端过滤；目标视图加载不全时按 tab 补拉合并，保证计数与列表一致。
-    if (tab === "all") return;
+    // Bulk actions need their full candidate list. The board itself is paged by the server.
+    if (!["approval", "queued", "failed"].includes(tab)) return;
     const want = state.counts?.[tab] || 0;
     const have = state.jobs.filter((job) => job.tab === tab).length;
     if (!want || have >= want) return;
@@ -1515,7 +1549,7 @@
     byId("rpBoot").hidden = true;
     document.querySelector(".rp-stack").hidden = false;
   }
-  async function refresh({ silent = false } = {}) {
+  async function refresh({ silent = false, poll = false } = {}) {
     if (state.refreshing) return;
     state.refreshing = true;
     const refreshBtn = byId("rpRailRefresh");
@@ -1524,20 +1558,19 @@
     const results = await Promise.allSettled([
       pipelineApi("/funnel"),
       pipelineApi("/rail"),
-      loadJobs(),
       loadBoardPage(state.page, { quiet: true })
     ]);
-    const [funnel, rail, jobs] = results;
+    const [funnel, rail, board] = results;
     let okCount = 0;
     if (funnel.status === "fulfilled" && funnel.value) { state.funnel = funnel.value; okCount += 1; }
     if (rail.status === "fulfilled" && rail.value) { state.rail = rail.value; okCount += 1; }
-    if (jobs.status === "fulfilled") okCount += 1;
+    if (board.status === "fulfilled" && board.value) okCount += 1;
     state.refreshing = false;
     refreshBtn.classList.remove("rp-spin");
     refreshBtn.disabled = false;
     if (okCount === 0) {
       state.failCount += 1;
-      const error = funnel.reason || rail.reason || jobs.reason;
+      const error = funnel.reason || rail.reason;
       if (!state.apiReady) {
         state.loading = false;
         renderCommandbar();
@@ -1561,19 +1594,22 @@
     renderRail();
     renderBoard();
     renderCommandbar();
-    if (!silent && !state.jobs.length) toast("流水线已就绪，先导入岗位再启动本轮。");
+    if (!silent && !(state.counts.all || state.counts.saved)) toast("流水线已就绪，先导入岗位再启动本轮。");
+    if (!poll) await refreshJobChoices();
+    else void ensureTabLoaded(state.tab);
   }
   let pollTimer = 0;
   function schedulePoll() {
     window.clearTimeout(pollTimer);
     pollTimer = window.setTimeout(async () => {
-      if (!document.hidden) await refresh({ silent: true });
+      if (!document.hidden) await refresh({ silent: true, poll: true });
       schedulePoll();
     }, POLL_MS);
   }
 
   /* ---------- 抽屉框架 ---------- */
   const drawers = new Map();
+  const jobChoiceDrawers = new Set(["evaluating", "rewriting", "greeting", "review", "delivering"]);
   let lastFocus = null;
   function registerDrawer(key, definition) { drawers.set(key, definition); }
   function drawerToken() { return state.drawerSeq; }
@@ -1597,8 +1633,19 @@
     document.body.classList.add("rp-lock");
     requestAnimationFrame(() => root.classList.add("is-open"));
     syncUrl();
-    try { definition.render(body, ctx || {}); }
-    catch (error) { body.replaceChildren(node("p", "面板渲染失败：" + error.message, "rp-feedback")); }
+    const render = () => {
+      try { definition.render(body, ctx || {}); }
+      catch (error) { body.replaceChildren(node("p", "面板渲染失败：" + error.message, "rp-feedback")); }
+    };
+    if (jobChoiceDrawers.has(key) && !state.jobs.length && (state.counts.all || state.counts.saved)) {
+      const token = drawerToken();
+      body.append(node("p", "正在读取岗位…", "rp-feedback"));
+      void refreshJobChoices().then(() => {
+        if (drawerToken() !== token) return;
+        body.replaceChildren();
+        render();
+      });
+    } else render();
     byId("rpDrawerClose").focus();
   }
   function closeDrawer({ force = false } = {}) {

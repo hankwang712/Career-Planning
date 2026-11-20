@@ -860,6 +860,54 @@ def test_pipeline_platform_filter_combines_with_search_and_pagination(browser, l
         context.close()
 
 
+def test_pipeline_board_prioritizes_visible_page_and_reuses_recent_tab(browser, live_server, make_account):
+    from urllib.parse import parse_qs, urlsplit
+    from test_recruitment_pipeline import JOB_CUSTOM, add_job
+
+    account = make_account("pipeline-board-speed")
+    add_job(account, "board-speed", {**JOB_CUSTOM, "title": "可先显示的岗位"})
+    context = browser.new_context()
+    try:
+        context.add_cookies([{"name": "session", "value": account.client.get_cookie("session").value, "url": live_server}])
+        page = context.new_page()
+        choice_requests = []
+        cached_refreshes = []
+        hold_refresh = False
+
+        def intercept(route):
+            params = parse_qs(urlsplit(route.request.url).query)
+            if params.get("limit") == ["100"]:
+                choice_requests.append(route)
+            elif hold_refresh and params.get("tab") == ["in_progress"]:
+                cached_refreshes.append(route)
+            else:
+                route.continue_()
+
+        page.route("**/pipeline/jobs?*", intercept)
+        page.goto(live_server + "/recruitment")
+        card = page.locator("#rpJobs .rp-job").filter(has_text="可先显示的岗位")
+        card.wait_for()
+        progress_tab = page.locator('#rpTabs [data-tab="in_progress"]')
+        with page.expect_response(lambda res: "tab=in_progress" in res.url and "limit=8" in res.url):
+            progress_tab.click()
+        card.wait_for()
+        page.locator('#rpTabs [data-tab="all"]').click()
+        hold_refresh = True
+        with page.expect_request(lambda req: "tab=in_progress" in req.url and "limit=8" in req.url):
+            progress_tab.click()
+        card.wait_for(timeout=3000)
+        assert len(choice_requests) == 1
+        with page.expect_response(lambda res: "tab=in_progress" in res.url and res.status == 500):
+            cached_refreshes.pop().fulfill(status=500, json={"message": "暂时不可用"})
+        card.wait_for()
+        choice_requests.pop().continue_()
+        hold_refresh = False
+        page.evaluate("window.RP.refresh({ silent: true, poll: true })")
+        assert not choice_requests
+    finally:
+        context.close()
+
+
 def test_pipeline_job_board_paginates_beyond_the_local_cache(browser, live_server, make_account):
     from test_recruitment_pipeline import JOB_CUSTOM, add_job
 
