@@ -307,6 +307,7 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         save.click()
         page.get_by_text("对话模型已配置 3/3").wait_for()
         page.get_by_text("配置已保存。").wait_for()
+        assert page.get_by_role("button", name="移除网页值").count() == 0
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
         assert page.locator("#settingsOptionalCount").inner_text().endswith("/6")
         assert page.locator("#settings-cleaner [data-setting-key]").count() == 3

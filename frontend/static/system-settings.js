@@ -84,8 +84,8 @@
         hideSecret(button);
         return;
       }
-      if (!input.value && (pending.has(key) || !fields[key]?.configured)) {
-        result.textContent = pending.has(key) ? "该密钥已标记移除。" : "此密钥尚未配置。";
+      if (!input.value && !fields[key]?.configured) {
+        result.textContent = "此密钥尚未配置。";
         return;
       }
       if (!input.value) {
@@ -132,7 +132,6 @@
     if (input) {
       input.value = field.value || "";
       input.placeholder = input.type === "password" && field.configured ? "已配置 · 输入新密钥可替换" : "";
-      form.querySelector(`[data-reset="${key}"]`).hidden = !field.override;
     }
   }
 
@@ -179,17 +178,6 @@
       fieldStatus(status, fields[name].configured ? "已配置" : "未配置", fields[name].configured ? "ready" : "empty");
     }
     if (submit) updateSaveState();
-  });
-  form.addEventListener("click", event => {
-    const key = event.target.dataset.reset;
-    if (!key || !fields[key]?.override) return;
-    const eye = eyeButtons.find(button => button.dataset.reveal === key);
-    if (eye) hideSecret(eye);
-    form.elements.namedItem(key).value = "";
-    pending.set(key, "");
-    resetProbe(event.target.closest("[data-settings-group]").querySelector("[data-test-group]"));
-    fieldStatus(document.getElementById("state-" + key), "待移除", "pending");
-    updateSaveState();
   });
   form.addEventListener("submit", event => {
     event.preventDefault();

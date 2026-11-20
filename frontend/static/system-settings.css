@@ -138,7 +138,6 @@ a[data-status="partial"] .sc-dot { background: var(--dr-warning); }
 .sc-probe-actions[data-state="success"] .sc-probe { color: var(--sc-success-ink); border-color: var(--sc-success-line); }
 .sc-probe-actions[data-state="success"] .sc-probe:hover { background: var(--dr-success-soft); }
 .sc-probe:disabled { cursor: wait; opacity: .65; }
-.sc-reset { margin-top: 5px; padding: 2px 0; border: 0; background: transparent; color: var(--sc-danger-ink); font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline; }
 .sc-save-button { flex: none; padding: 8px 13px; background: var(--dr-accent); border-color: var(--dr-accent); color: white; font-size: 12px; font-weight: 650; }
 .sc-button.sc-save-button:hover:not(:disabled) { background: var(--dr-accent-hover); border-color: var(--dr-accent-hover); }
 .sc-save-button:disabled { background: var(--dr-paper-deep); border-color: var(--dr-line); color: var(--dr-muted); cursor: default; box-shadow: none; }
