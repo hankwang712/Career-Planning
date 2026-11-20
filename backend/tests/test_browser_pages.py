@@ -554,19 +554,41 @@ def test_pipeline_internship_salary_uses_daily_fields_and_inline_filters(logged_
     minimum.fill("150")
     assert panel.get_by_label("最低月薪（K）").is_hidden()
     panel.locator(".rp-pay-estimate").get_by_text("3,300", exact=False).wait_for()
+    assert panel.get_by_role("heading", name="薪资与经验").is_visible()
+    assert panel.get_by_role("heading", name="城市与学历").is_visible()
+    assert panel.get_by_label("岗位标题排除词").is_hidden()
+    assert panel.get_by_role("button", name="应用到现有岗位", exact=True).is_hidden()
+    assert panel.locator(".rp-drawer-body").evaluate("""body => {
+        const footer = body.querySelector('.rp-clean-actions');
+        body.scrollTop = 0;
+        const before = footer.getBoundingClientRect().bottom;
+        body.scrollTop = 180;
+        const after = footer.getBoundingClientRect().bottom;
+        return body.scrollTop > 0 && Math.abs(before - after) < 2 && Math.abs(after - body.getBoundingClientRect().bottom) < 2;
+    }""")
     city = panel.get_by_label("目标城市", exact=True)
     city.fill("杭州")
     city.press("Enter")
     panel.locator(".rp-terms-values").get_by_role("button", name="移除 杭州").wait_for()
     education = panel.get_by_label("学历白名单", exact=True)
+    assert education.is_hidden()
+    panel.get_by_label("学历筛选方式").select_option("require")
     education.fill("本科")
+    assert panel.get_by_label("学历黑名单", exact=True).is_hidden()
     panel.get_by_role("button", name="添加学历白名单", exact=True).click()
     panel.locator(".rp-terms-values").get_by_role("button", name="移除 本科").wait_for()
+    panel.get_by_role("button", name="预览现有岗位", exact=True).click()
+    apply = panel.get_by_role("button", name="应用到现有岗位", exact=True)
+    apply.wait_for()
+    panel.locator(".rp-clean-exclusions summary").click()
+    panel.get_by_label("岗位标题排除词").fill("电话销售")
+    assert apply.is_hidden()
     with page.expect_request("**/collection/cleaning/save") as saved:
         panel.get_by_role("button", name="保存规则", exact=True).click()
     rules = saved.value.post_data_json["rules"]
     assert rules["min_daily_salary"] == 150 and rules["min_salary_k"] is None
     assert rules["cities"] == ["杭州"] and rules["require_education"] == ["本科"]
+    assert rules["title_exclusions"] == ["电话销售"]
     panel.get_by_text("规则已保存。", exact=True).wait_for()
     direction.select_option("full_time")
     panel.get_by_label("最低月薪（K）").wait_for()

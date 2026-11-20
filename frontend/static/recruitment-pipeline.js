@@ -458,24 +458,32 @@
     title: "规则清洗配置", icon: "filter", tone: "brass",
     render(body) {
       const token = RP.drawerToken();
-      const form = node("form", "", "rp-form");
+      const form = node("form", "", "rp-form rp-clean-form");
       const profile = profileSelect();
-      const profileRow = node("div", "", "rp-select-row");
+      const profileRow = node("div", "", "rp-select-row rp-clean-profile");
       profile.setAttribute("aria-label", "清洗方向");
-      profileRow.append(node("span", "清洗方向", "rp-hint"), profile);
+      profileRow.append(node("strong", "清洗方向"), profile);
       const fields = node("fieldset");
       const status = feedback();
+      status.setAttribute("role", "status");
 
-      /* 硬规则 */
-      const hard = section("硬规则", "filter");
-      const salaryGrid = node("div", "", "rp-panel-grid");
+      function ruleGroup(title, iconName, tone) {
+        const group = section(title);
+        group.classList.add("rp-clean-group");
+        group.dataset.tone = tone;
+        group.firstElementChild.prepend(tile(iconName, tone, true));
+        return group;
+      }
+
+      const pay = ruleGroup("薪资与经验", "banknote", "success");
+      const salaryGrid = node("div", "", "rp-panel-grid rp-clean-salary-range");
       const minSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const maxSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const expMax = input("number", { min: "1", max: "50", step: "1", placeholder: "不限" });
       salaryGrid.append(field("最低月薪（K）", minSalary), field("最高月薪（K）", maxSalary));
       const dailyPay = node("div", "", "rp-daily-pay");
       dailyPay.hidden = true;
-      const dailyGrid = node("div", "", "rp-panel-grid rp-daily-grid");
+      const dailyGrid = node("div", "", "rp-panel-grid rp-clean-salary-range");
       const minDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
       const maxDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
       dailyGrid.append(field("最低日薪（元/天）", minDaily), field("最高日薪（元/天）", maxDaily));
@@ -495,9 +503,9 @@
       }
       dailyGrid.addEventListener("input", renderPayEstimate);
       dailyPay.append(dailyGrid, payEstimate);
-      const experience = node("div", "", "rp-panel-grid");
-      experience.append(field("经验上限（年）", expMax));
-      hard.append(salaryGrid, dailyPay, experience, node("p", "岗位要求的最低经验达到上限时淘汰。", "rp-hint"));
+      const experience = node("div", "", "rp-clean-experience");
+      experience.append(field("经验上限（年）", expMax), node("p", "岗位要求的最低经验达到上限时淘汰。", "rp-hint"));
+      pay.append(salaryGrid, dailyPay, experience);
 
       const splitTerms = (value) => value.split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean);
       function termsEditor(key, label, placeholder) {
@@ -517,7 +525,7 @@
             chip.type = "button";
             chip.dataset.value = value;
             chip.setAttribute("aria-label", "移除 " + value);
-            chip.addEventListener("click", () => { chip.remove(); entry.focus(); });
+            chip.addEventListener("click", () => { chip.remove(); resetPreview(); entry.focus(); });
             return chip;
           }));
         };
@@ -528,6 +536,7 @@
           ])];
           paint(values);
           entry.value = "";
+          resetPreview();
           entry.focus();
         };
         add.addEventListener("click", commit);
@@ -547,19 +556,42 @@
       const cities = termsEditor("cities", "目标城市", "输入城市后回车添加");
       const requireEdu = termsEditor("require_education", "学历白名单", "添加可接受的最低学历");
       const excludeEdu = termsEditor("exclude_education", "学历黑名单", "添加需要排除的学历");
+      const qualifications = ruleGroup("城市与学历", "graduation", "info");
+      const educationMode = select([["none", "不限"], ["require", "学历白名单"], ["exclude", "学历黑名单"]], "none");
+      function renderEducationMode() {
+        requireEdu.hidden = educationMode.value !== "require";
+        excludeEdu.hidden = educationMode.value !== "exclude";
+      }
+      educationMode.addEventListener("change", renderEducationMode);
+      renderEducationMode();
+      qualifications.append(cities, field("学历筛选方式", educationMode), requireEdu, excludeEdu);
+
       const titleExcl = node("textarea");
       titleExcl.rows = 2; titleExcl.maxLength = 4100; titleExcl.placeholder = "例如 电话销售、保险代理";
       const companyExcl = node("textarea");
       companyExcl.rows = 2; companyExcl.maxLength = 4100; companyExcl.placeholder = "用逗号、顿号或换行分隔";
+      const exclusions = node("details", "", "rp-panel-section rp-clean-group rp-clean-exclusions");
+      exclusions.dataset.tone = "brass";
+      const exclusionHead = node("summary");
+      const exclusionCount = node("small", "", "rp-clean-exclusion-count");
+      exclusionHead.append(tile("filter", "brass", true), node("strong", "排除词"), exclusionCount, icon("chevron-down"));
+      const exclusionFields = node("div", "", "rp-panel-grid rp-clean-exclusion-fields");
+      exclusionFields.append(field("岗位标题排除词", titleExcl), field("公司排除词", companyExcl));
+      exclusions.append(exclusionHead, exclusionFields);
+      function renderExclusionCount() {
+        const count = splitTerms(titleExcl.value).length + splitTerms(companyExcl.value).length;
+        exclusionCount.textContent = count ? `${count} 项` : "";
+        exclusionCount.hidden = !count;
+      }
+      exclusionFields.addEventListener("input", renderExclusionCount);
+      renderExclusionCount();
+
       const auto = input("checkbox");
-      const autoLabel = node("label", "", "rp-inline-check");
-      autoLabel.append(auto, document.createTextNode("对新采集和新导入的记录自动运行硬规则"));
-      hard.append(cities, requireEdu, excludeEdu,
-        node("p", "学历白名单和黑名单任选一种。", "rp-hint"),
-        field("岗位标题排除词", titleExcl, true), field("公司排除词", companyExcl, true), autoLabel);
+      const autoLabel = node("label", "", "rp-inline-check rp-clean-auto");
+      autoLabel.append(auto, document.createTextNode("新采集或导入的岗位自动执行硬规则"));
 
       /* AI 初筛规则 */
-      const scout = section("AI 初筛规则", "sparkles");
+      const scout = ruleGroup("AI 初筛规则", "sparkles", "accent");
       const scoutHead = node("div", "", "rp-scout-head");
       const scoutAdd = button("添加规则", "rp-btn-sm rp-btn-ghost", "plus");
       scoutHead.append(scout.firstElementChild, scoutAdd);
@@ -612,7 +644,7 @@
           name.textContent = keyword.value.trim() || "新规则";
           constraint.textContent = conditionLabel(condition.value);
         });
-        remove.addEventListener("click", () => { row.remove(); scoutAdd.focus(); });
+        remove.addEventListener("click", () => { row.remove(); resetPreview(); scoutAdd.focus(); });
         generate.addEventListener("click", async () => {
           const current = readScout(row);
           if (!current.keyword) { setFeedback(rowStatus, "请先填写规则词。", "error"); keyword.focus(); return; }
@@ -624,6 +656,7 @@
             if (row.isConnected && Object.keys(current).every((key) => current[key] === latest[key])) {
               desc.value = result.desc;
               delete row.dataset.legacy;
+              resetPreview();
               setFeedback(rowStatus, "");
             } else setFeedback(rowStatus, "生成期间规则已变更，请重新生成。", "error");
           } catch (error) {
@@ -646,25 +679,27 @@
       exampleEnable.addEventListener("click", () => {
         scoutList.replaceChildren(...examples.map(scoutRow));
         exampleNotice.hidden = true;
+        resetPreview();
         const first = scoutList.firstElementChild;
         if (first) { first.open = true; first.querySelector("input").focus(); }
       });
       scout.append(scoutHead, exampleNotice, scoutList);
 
       /* 操作与预览 */
-      const actions = section(null);
-      const saveBtn = button("保存规则", "", "check");
+      const actions = node("div", "", "rp-clean-actions");
+      const saveBtn = button("保存规则", "rp-btn-primary", "check");
       const previewBtn = button("预览现有岗位", "", "eye");
       previewBtn.type = "submit";
       const applyBtn = button("应用到现有岗位", "rp-btn-primary", "check");
       applyBtn.disabled = true;
+      applyBtn.hidden = true;
       const actionRow = node("div", "", "rp-panel-actions");
-      actionRow.append(saveBtn, previewBtn, applyBtn);
+      actionRow.append(previewBtn, saveBtn, applyBtn);
       const previewList = node("div", "", "rp-rule-preview");
       previewList.hidden = true;
-      actions.append(actionRow, status, previewList);
+      actions.append(status, actionRow);
 
-      fields.append(hard, scout, actions);
+      fields.append(pay, qualifications, exclusions, scout, autoLabel, previewList, actions);
       form.append(profileRow, fields);
       body.append(form);
 
@@ -675,15 +710,20 @@
       function resetPreview() {
         previewToken = "";
         applyBtn.disabled = true;
+        applyBtn.hidden = true;
+        saveBtn.classList.add("rp-btn-primary");
         previewList.hidden = true;
         previewList.replaceChildren();
       }
       function showRules(rules) {
         titleExcl.value = (rules.title_exclusions || []).join("、");
         companyExcl.value = (rules.company_exclusions || []).join("、");
+        renderExclusionCount();
         cities._paint(rules.cities || []);
         requireEdu._paint(rules.require_education || []);
         excludeEdu._paint(rules.exclude_education || []);
+        educationMode.value = rules.require_education?.length ? "require" : rules.exclude_education?.length ? "exclude" : "none";
+        renderEducationMode();
         minSalary.value = rules.min_salary_k ?? "";
         maxSalary.value = rules.max_salary_k ?? "";
         expMax.value = rules.experience_years_max ?? "";
@@ -713,7 +753,9 @@
         const rows = [...scoutList.children];
         const legacy = (name) => rows.filter((row) => row.dataset.legacy === name).map((row) => readScout(row).keyword);
         return {
-          cities: cities._read(), require_education: requireEdu._read(), exclude_education: excludeEdu._read(),
+          cities: cities._read(),
+          require_education: educationMode.value === "require" ? requireEdu._read() : [],
+          exclude_education: educationMode.value === "exclude" ? excludeEdu._read() : [],
           title_exclusions: splitTerms(titleExcl.value), company_exclusions: splitTerms(companyExcl.value),
           min_salary_k: number(minSalary), max_salary_k: number(maxSalary),
           experience_years_max: number(expMax),
@@ -756,6 +798,8 @@
           if (action === "preview") {
             previewToken = result.token;
             applyBtn.disabled = false;
+            applyBtn.hidden = false;
+            saveBtn.classList.remove("rp-btn-primary");
             previewList.replaceChildren(...Object.entries(result.samples || {}).map(([cleanStatus, samples]) => {
               const group = node("div", "", "rp-rule-preview-group");
               group.dataset.status = cleanStatus;
@@ -767,10 +811,10 @@
             }));
             previewList.hidden = false;
             setFeedback(status, "预览完成，确认后应用到该方向岗位。", "success");
+            previewList.scrollIntoView({ block: "nearest" });
           } else {
             showRules(result.rules);
             setFeedback(status, action === "save" ? "规则已保存。" : "已应用清洗规则。", "success");
-            toast(action === "save" ? "清洗规则已保存。" : "清洗规则已应用到现有岗位。", "success");
             void RP.refresh({ silent: true });
           }
         } catch (error) {
@@ -782,6 +826,7 @@
       }
       form.addEventListener("submit", (event) => { event.preventDefault(); void runAction("preview"); });
       form.addEventListener("input", resetPreview);
+      educationMode.addEventListener("change", resetPreview);
       saveBtn.addEventListener("click", () => void runAction("save"));
       applyBtn.addEventListener("click", () => void runAction("apply"));
       profile.addEventListener("change", () => void loadRules());
