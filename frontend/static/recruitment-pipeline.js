@@ -554,17 +554,37 @@
         return wrap;
       }
       const cities = termsEditor("cities", "目标城市", "输入城市后回车添加");
-      const requireEdu = termsEditor("require_education", "学历白名单", "添加可接受的最低学历");
-      const excludeEdu = termsEditor("exclude_education", "学历黑名单", "添加需要排除的学历");
+      const requireEdu = termsEditor("require_education", "最低学历", "例如 本科");
+      const excludeEdu = termsEditor("exclude_education", "要排除的学历", "例如 博士");
+      const degreeOptions = node("datalist");
+      degreeOptions.id = "rp-degree-options";
+      for (const degree of ["初中", "中专", "高中", "大专", "本科", "硕士", "博士"]) {
+        degreeOptions.append(new Option(degree));
+      }
+      for (const editor of [requireEdu, excludeEdu]) {
+        editor.querySelector("input").setAttribute("list", degreeOptions.id);
+      }
       const qualifications = ruleGroup("城市与学历", "graduation", "info");
-      const educationMode = select([["none", "不限"], ["require", "学历白名单"], ["exclude", "学历黑名单"]], "none");
+      const educationMode = select([["none", "不限岗位学历"], ["require", "按最低学历筛选"], ["exclude", "排除指定学历要求"]], "none");
+      const educationField = field("岗位学历要求", educationMode);
+      educationField.firstElementChild.id = "rp-education-label";
+      educationMode.setAttribute("aria-labelledby", "rp-education-label");
+      const educationHelp = node("p", "", "rp-education-help");
+      educationHelp.id = "rp-education-help";
+      educationMode.setAttribute("aria-describedby", educationHelp.id);
+      const educationDescriptions = {
+        none: "这一项看的是招聘方写的学历要求。未注明学历的岗位会保留。",
+        require: "例如选「本科」，要求为「大专」的岗位会被淘汰。选择多项时，以最低的一项为门槛。",
+        exclude: "例如选「博士」，学历要求包含「博士」的岗位会被淘汰，即使同时列出了其他学历。"
+      };
       function renderEducationMode() {
         requireEdu.hidden = educationMode.value !== "require";
         excludeEdu.hidden = educationMode.value !== "exclude";
+        educationHelp.textContent = educationDescriptions[educationMode.value];
       }
       educationMode.addEventListener("change", renderEducationMode);
       renderEducationMode();
-      qualifications.append(cities, field("学历筛选方式", educationMode), requireEdu, excludeEdu);
+      qualifications.append(cities, educationField, educationHelp, requireEdu, excludeEdu, degreeOptions);
 
       const titleExcl = node("textarea");
       titleExcl.rows = 2; titleExcl.maxLength = 4100; titleExcl.placeholder = "例如 电话销售、保险代理";

@@ -874,6 +874,7 @@ body.rp-lock { overflow: hidden; }
 .rp-clean-group[data-tone="accent"] { --rp-clean-tint: #f0edfc; }
 .rp-clean-group .rp-icon-tile { width: 24px; height: 24px; border-radius: 6px; }
 .rp-clean-group .rp-icon-tile svg { width: 13px; height: 13px; stroke: currentColor; }
+.rp-education-help { color: var(--dr-muted); font-size: 12px; line-height: 1.55; }
 .rp-clean-form .rp-clean-salary-range { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rp-clean-experience { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: 10px; align-items: end; }
 .rp-clean-experience p { padding-block: 4px 8px; }

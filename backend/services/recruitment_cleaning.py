@@ -81,7 +81,7 @@ class CleaningRules(BaseModel):
     @model_validator(mode="after")
     def check_salary_order(self):
         if self.require_education and self.exclude_education:
-            raise ValueError("学历白名单和黑名单只能启用一个。")
+            raise ValueError("请在按最低学历筛选和排除指定学历中选择一种。")
         if len({comparable_text(rule.keyword) for rule in self.ai_scout_rules}) != len(self.ai_scout_rules):
             raise ValueError("AI 规则关键词不能重复。")
         if self.min_salary_k is not None and self.max_salary_k is not None and self.min_salary_k > self.max_salary_k:
@@ -294,7 +294,7 @@ def education_rejection(row, rules):
     if rules.require_education and levels and not any(term in value for term in rules.require_education):
         thresholds = set().union(*(education_levels(term) for term in rules.require_education))
         if thresholds and min(map(EDUCATION_RANK.get, levels)) < min(map(EDUCATION_RANK.get, thresholds)):
-            return f"学历要求「{value[:80]}」低于白名单门槛"
+            return f"学历要求「{value[:80]}」低于设定的最低学历"
     return ""
 
 
