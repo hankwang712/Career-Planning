@@ -535,19 +535,26 @@
 
       /* AI 初筛规则 */
       const scout = section("AI 初筛规则", "sparkles");
-      const scoutHead = node("div", "", "rp-panel-actions");
-      const scoutAdd = button("添加规则", "rp-btn-sm", "plus");
-      scoutHead.append(scoutAdd);
-      const exampleNotice = node("div", "", "rp-panel-note");
-      exampleNotice.dataset.tone = "warning";
+      const scoutHead = node("div", "", "rp-scout-head");
+      const scoutAdd = button("添加规则", "rp-btn-sm rp-btn-ghost", "plus");
+      scoutHead.append(scout.firstElementChild, scoutAdd);
+      const exampleNotice = node("div", "", "rp-scout-samples");
       exampleNotice.hidden = true;
-      const exampleText = node("span", "当前展示内置示例，启用或编辑后保存即可用于初筛。");
-      const exampleEnable = button("启用示例", "rp-btn-sm");
-      exampleNotice.append(exampleText, exampleEnable);
+      const exampleHead = node("div", "", "rp-scout-head");
+      const exampleEnable = button("使用示例", "rp-btn-sm rp-btn-ghost");
+      const exampleList = node("div", "", "rp-scout-examples");
+      exampleHead.append(node("strong", "规则示例"), exampleEnable);
+      exampleNotice.append(exampleHead, exampleList);
       const scoutList = node("div", "", "rp-scout-list");
       let examples = [];
-      let examplesOnly = false;
-      function enableExamples() { examplesOnly = false; exampleNotice.hidden = true; }
+      const conditionLabel = (condition) => condition === "must" ? "必须包含" : "绝不包含";
+      function scoutExample(rule) {
+        const example = node("details", "", "rp-scout-example");
+        const summary = node("summary");
+        summary.append(node("strong", rule.keyword), node("small", conditionLabel(rule.condition)));
+        example.append(summary, node("p", rule.desc));
+        return example;
+      }
       function readScout(row) {
         return {
           keyword: row.querySelector("input").value.trim(),
@@ -556,9 +563,13 @@
         };
       }
       function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
-        const row = node("div", "", "rp-scout-row");
+        const row = node("details", "", "rp-scout-row");
         if (rule.legacy) row.dataset.legacy = rule.legacy;
-        row.dataset.condition = rule.condition;
+        const heading = node("summary");
+        const name = node("strong", rule.keyword || "新规则");
+        const constraint = node("small", conditionLabel(rule.condition));
+        heading.append(name, constraint);
+        const editor = node("div", "", "rp-scout-editor");
         const controls = node("div", "", "rp-scout-controls");
         const keyword = input("text", { maxlength: "240", placeholder: "规则词，例如 单休" });
         keyword.value = rule.keyword;
@@ -569,10 +580,14 @@
         desc.placeholder = "判定标准：命中/排除的具体依据";
         const actions = node("div", "", "rp-scout-actions");
         const generate = button("AI 生成标准", "rp-btn-sm", "sparkles");
-        const remove = button("删除规则", "rp-btn-sm rp-btn-danger", "trash");
+        const remove = button("删除规则", "rp-btn-sm rp-btn-ghost rp-scout-remove", "trash");
         const rowStatus = feedback();
-        row.addEventListener("input", () => { delete row.dataset.legacy; row.dataset.condition = condition.value; enableExamples(); });
-        remove.addEventListener("click", () => { row.remove(); enableExamples(); scoutAdd.focus(); });
+        row.addEventListener("input", () => {
+          delete row.dataset.legacy;
+          name.textContent = keyword.value.trim() || "新规则";
+          constraint.textContent = conditionLabel(condition.value);
+        });
+        remove.addEventListener("click", () => { row.remove(); scoutAdd.focus(); });
         generate.addEventListener("click", async () => {
           const current = readScout(row);
           if (!current.keyword) { setFeedback(rowStatus, "请先填写规则词。", "error"); keyword.focus(); return; }
@@ -584,7 +599,6 @@
             if (row.isConnected && Object.keys(current).every((key) => current[key] === latest[key])) {
               desc.value = result.desc;
               delete row.dataset.legacy;
-              enableExamples();
               setFeedback(rowStatus, "");
             } else setFeedback(rowStatus, "生成期间规则已变更，请重新生成。", "error");
           } catch (error) {
@@ -592,17 +606,24 @@
           } finally { generate.disabled = false; }
         });
         actions.append(generate, remove);
-        row.append(controls, field("判定标准", desc), actions, rowStatus);
+        editor.append(controls, field("判定标准", desc), actions, rowStatus);
+        row.append(heading, editor);
         return row;
       }
       scoutAdd.addEventListener("click", () => {
         if (scoutList.children.length >= 24) { setFeedback(status, "每个方向最多保存 24 条 AI 初筛规则。", "error"); return; }
-        enableExamples();
+        exampleNotice.hidden = true;
         const row = scoutRow();
+        row.open = true;
         scoutList.append(row);
         row.querySelector("input").focus();
       });
-      exampleEnable.addEventListener("click", enableExamples);
+      exampleEnable.addEventListener("click", () => {
+        scoutList.replaceChildren(...examples.map(scoutRow));
+        exampleNotice.hidden = true;
+        const first = scoutList.firstElementChild;
+        if (first) { first.open = true; first.querySelector("input").focus(); }
+      });
       scout.append(scoutHead, exampleNotice, scoutList);
 
       /* 操作与预览 */
@@ -648,9 +669,10 @@
           ...(rules.semantic_required || []).map((keyword) => ({ keyword, condition: "must", desc: "", legacy: "semantic_required" })),
           ...(rules.semantic_excluded || []).map((keyword) => ({ keyword, condition: "never", desc: "", legacy: "semantic_excluded" }))
         ];
-        examplesOnly = !stored.length && !!examples.length;
-        exampleNotice.hidden = !examplesOnly;
-        scoutList.replaceChildren(...(examplesOnly ? examples : stored).map(scoutRow));
+        const showExamples = !stored.length && examples.length > 0;
+        exampleNotice.hidden = !showExamples;
+        exampleList.replaceChildren(...(showExamples ? examples.map(scoutExample) : []));
+        scoutList.replaceChildren(...stored.map(scoutRow));
         auto.checked = Boolean(rules.auto);
         const daily = profile.value === "internship";
         dailyGrid.hidden = !daily;
@@ -658,7 +680,7 @@
       }
       function readRules() {
         const number = (el) => el.value ? Number(el.value) : null;
-        const rows = examplesOnly ? [] : [...scoutList.children];
+        const rows = [...scoutList.children];
         const legacy = (name) => rows.filter((row) => row.dataset.legacy === name).map((row) => readScout(row).keyword);
         return {
           cities: cities._read(), require_education: requireEdu._read(), exclude_education: excludeEdu._read(),
@@ -681,7 +703,7 @@
         try {
           const data = await api("/cleaning?profile=" + target);
           if (sequence !== loadSeq || !alive(token, body)) return;
-          examples = data.examples || [];
+          examples = (data.examples || []).slice(0, 2);
           showRules(data.rules);
           loadedProfile = target;
           setFeedback(status, "");

@@ -544,6 +544,28 @@ def test_pipeline_login_check_shows_authorization_and_official_login(logged_in_p
     assert link.is_hidden()
 
 
+def test_pipeline_scout_shows_two_examples_and_keeps_custom_rules(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/recruitment?drawer=cleaning")
+    samples = page.locator(".rp-scout-example")
+    samples.first.wait_for()
+    assert samples.count() == 2
+    assert samples.locator("summary strong").all_text_contents() == ["单休", "外包"]
+    editor = page.locator(".rp-scout-list")
+    assert editor.locator(".rp-scout-row").count() == 0
+    page.get_by_role("button", name="使用示例", exact=True).click()
+    editor.locator(".rp-scout-row[open]").wait_for()
+    assert editor.locator(".rp-scout-row").count() == 2
+    page.get_by_role("button", name="添加规则", exact=True).click()
+    editor.locator(".rp-scout-row").last.get_by_label("规则词").fill("排除纯销售岗位")
+    page.get_by_role("button", name="保存规则", exact=True).click()
+    page.get_by_text("规则已保存。", exact=True).wait_for()
+    page.reload()
+    editor.locator("summary").filter(has_text="排除纯销售岗位").wait_for()
+    assert editor.locator(".rp-scout-row").count() == 3
+    assert editor.locator(".rp-scout-row[open]").count() == 0
+
+
 def test_pipeline_rail_distinguishes_results_waiting_and_execution(logged_in_page, live_server):
     page = logged_in_page
     page.route("**/pipeline/rail", lambda route: route.fulfill(json={
@@ -570,7 +592,9 @@ def test_pipeline_rail_distinguishes_results_waiting_and_execution(logged_in_pag
         rail.locator(f'[data-step="{step}"][data-state="{state}"]').get_by_text(label, exact=True).wait_for()
     assert rail.locator('[data-step="scraping"]').get_by_text("75 条", exact=True).is_visible()
     assert rail.evaluate("""el => new Set([...el.querySelectorAll('.rp-step')]
-        .map(step => getComputedStyle(step).backgroundColor)).size""") == 5
+        .map(step => getComputedStyle(step).backgroundColor)).size""") == 2
+    assert rail.evaluate("""el => new Set([...el.querySelectorAll('.rp-step-chip')]
+        .map(badge => getComputedStyle(badge).backgroundColor)).size""") == 5
 
     pending_requests = []
     page.route("**/pipeline/run", lambda route: pending_requests.append(route))

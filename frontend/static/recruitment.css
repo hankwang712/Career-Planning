@@ -408,7 +408,7 @@ html .rp-main .rp-railnotice-bar button.rp-noticelink:hover { color: var(--dr-in
     scrollbar-width: thin;
 }
 html .rp-main .rp-step {
-    --rp-step-surface: var(--dr-surface-soft);
+    --rp-step-surface: var(--dr-surface);
     --rp-step-line: var(--dr-line);
     --rp-step-tone: var(--dr-muted);
     --rp-step-badge: var(--dr-muted-soft);
@@ -427,42 +427,33 @@ html .rp-main .rp-step {
     cursor: pointer;
     overflow: hidden;
     box-shadow: var(--dr-shadow-sm);
-    transition: transform 0.2s var(--dr-ease), box-shadow 0.2s var(--dr-ease), border-color 0.2s var(--dr-ease);
+    transition: box-shadow 0.2s var(--dr-ease), border-color 0.2s var(--dr-ease);
 }
 html .rp-main .rp-step:hover:not(:disabled) {
-    transform: translateY(-2px);
     box-shadow: var(--dr-edge), var(--dr-shadow-lg);
     border-color: var(--rp-step-tone);
     background: var(--rp-step-surface);
     color: var(--dr-ink);
 }
 html .rp-main .rp-step[data-state="done"] {
-    --rp-step-surface: var(--dr-success-soft);
-    --rp-step-line: #baddcb;
     --rp-step-tone: #216748;
-    --rp-step-badge: #d2edde;
-    box-shadow: inset 0 3px var(--dr-success);
+    --rp-step-badge: var(--dr-success-soft);
 }
 html .rp-main .rp-step[data-state="active"],
 html .rp-main .rp-step[data-state="next"] {
-    --rp-step-surface: var(--dr-accent-soft);
-    --rp-step-line: var(--dr-accent);
+    --rp-step-surface: color-mix(in srgb, var(--dr-accent-soft) 45%, var(--dr-surface));
+    --rp-step-line: var(--dr-accent-line);
     --rp-step-tone: var(--dr-accent-hover);
     --rp-step-badge: #dce4fc;
 }
-html .rp-main .rp-step[data-state="active"] { box-shadow: var(--dr-ring), inset 0 3px var(--dr-accent); }
-html .rp-main .rp-step[data-state="next"] { border-style: dashed; }
+html .rp-main .rp-step[data-state="active"] { border-color: var(--dr-accent); }
 html .rp-main .rp-step[data-state="blocked"] {
-    --rp-step-surface: var(--dr-warning-soft);
-    --rp-step-line: #e3c68f;
     --rp-step-tone: #795619;
-    --rp-step-badge: #f2e4c4;
+    --rp-step-badge: var(--dr-warning-soft);
 }
 html .rp-main .rp-step[data-state="waiting"] {
-    --rp-step-surface: var(--dr-info-soft);
-    --rp-step-line: var(--dr-info-line);
     --rp-step-tone: #235383;
-    --rp-step-badge: #dbe8f6;
+    --rp-step-badge: var(--dr-info-soft);
 }
 .rp-step-head { display: flex; align-items: center; gap: 8px; }
 .rp-step-num {
@@ -479,7 +470,7 @@ html .rp-main .rp-step[data-state="waiting"] {
 .rp-step-num svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 html .rp-main .rp-step[data-state="done"] .rp-step-num { background: var(--dr-success); border-color: var(--dr-success); color: #fff; }
 html .rp-main .rp-step[data-state="active"] .rp-step-num { background: var(--dr-accent); border-color: var(--dr-accent); color: #fff; animation: rp-breathe 1.8s ease-in-out infinite; }
-html .rp-main .rp-step:is([data-state="blocked"], [data-state="next"], [data-state="waiting"]) .rp-step-num {
+html .rp-main .rp-step[data-state="next"] .rp-step-num {
     background: var(--rp-step-badge); border-color: var(--rp-step-line); color: var(--rp-step-tone);
 }
 .rp-step-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; font-weight: 650; }
@@ -876,11 +867,11 @@ body.rp-lock { overflow: hidden; }
 .rp-inline-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--dr-ink-soft); cursor: pointer; }
 .rp-select-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rp-select-row select { width: auto; min-width: 180px; flex: 1; }
-.rp-panel-section > h3 {
+.rp-panel-section > h3, .rp-scout-head h3 {
     display: flex; align-items: center; gap: 7px;
     font-size: 13.5px; font-weight: 650; color: var(--dr-ink);
 }
-.rp-panel-section > h3 svg { width: 15px; height: 15px; fill: none; stroke: var(--dr-muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rp-panel-section > h3 svg, .rp-scout-head h3 svg { width: 15px; height: 15px; fill: none; stroke: var(--dr-muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .rp-panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .rp-panel-grid .rp-span-2 { grid-column: 1 / -1; }
 .rp-panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -917,17 +908,22 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
 }
 .rp-chip-x:hover { border-color: var(--dr-danger); color: var(--dr-danger); background: var(--dr-danger-soft); }
 .rp-scout-list { display: grid; gap: 9px; }
-.rp-scout-row {
+.rp-scout-list:empty { display: none; }
+.rp-scout-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rp-scout-samples { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm); background: var(--dr-surface-soft); }
+.rp-scout-examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.rp-scout-example, .rp-scout-row { border: 1px solid var(--dr-line); border-radius: var(--dr-radius-sm); background: var(--dr-surface); }
+.rp-scout-example summary, .rp-scout-row summary { padding: 8px 10px; cursor: pointer; overflow-wrap: anywhere; }
+.rp-scout-example small, .rp-scout-row summary small { margin-inline-start: 6px; color: var(--dr-muted); white-space: nowrap; }
+.rp-scout-example p { padding: 0 8px 8px; color: var(--dr-muted); font-size: 12px; }
+.rp-scout-editor {
     display: grid; gap: 8px;
     padding: 11px;
-    border: 1px solid var(--dr-line);
-    border-left: 3px solid var(--dr-danger);
-    border-radius: var(--dr-radius-sm);
-    background: var(--dr-surface-soft);
+    border-top: 1px solid var(--dr-line);
 }
-.rp-scout-row[data-condition="must"] { border-left-color: var(--dr-success); }
 .rp-scout-controls { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
 .rp-scout-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+html .rp-drawer .rp-scout-remove:hover:not(:disabled) { color: var(--dr-danger); }
 .rp-rule-preview { display: grid; gap: 7px; }
 .rp-rule-preview-group {
     padding: 9px 12px;
