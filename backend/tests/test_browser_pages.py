@@ -348,6 +348,12 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_role("link", name="PostgreSQL / pgvector").click()
         page.get_by_text("POSTGRES_PASSWORD", exact=True).wait_for()
         assert page.locator('[data-group-link="postgres"]').get_attribute("aria-current") == "location"
+        assert page.locator(".sc-group details[open]").count() == 1
+        assert page.locator("#settings-chat details[open]").count() == 0
+        page.locator("#settings-cleaner summary").click()
+        assert page.locator("#settings-cleaner details[open]").count() == 1
+        assert page.locator(".sc-group details[open]").count() == 1
+        assert page.locator('[data-group-link="cleaner"]').get_attribute("aria-current") == "location"
         assert 0 <= save.bounding_box()["y"] < 88
         page.get_by_role("button", name="›_ 白盒控制台").click()
         page.locator("[data-console-filter]").fill("PATCH")

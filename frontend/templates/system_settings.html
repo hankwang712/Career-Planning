@@ -36,7 +36,7 @@
 {% set writable = can_edit and not deployment %}
 {% set testable = writable and id in test_groups %}
 <section id="settings-{{ id }}" data-settings-group="{{ id }}" class="sc-card sc-group{{ ' sc-has-test' if testable }}">
-    <details {% if id == 'chat' %}open{% endif %}>
+    <details name="system-settings-groups"{% if id == 'chat' %} open{% endif %}>
         <summary>
             <span class="sc-icon">{{ icon(id) }}</span>
             <span class="sc-group-copy">
