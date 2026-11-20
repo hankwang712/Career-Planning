@@ -168,11 +168,11 @@
     title: "抓取 · 平台采集与本地导入", icon: "search", tone: "accent",
     render(body) {
       const token = RP.drawerToken();
-      body.append(note("实时采集复用本机 Chrome 登录态（Boss直聘 / 前程无忧 / 智联 / 猎聘），与既有采集能力一致；本地导入作为离线补充。投递段仍为本地 dry-run，不向平台自动投递。", "info"));
 
       /* 平台实时采集：登录态检查 + 采集表单 + 采集记录（复用现有 /session /runs 端点） */
       const collectSection = section("平台实时采集", "search");
-      const chromeSources = String(meta.chrome_sources || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const chromeSources = Object.keys(meta.chrome_sources || {});
+      const canUseChrome = meta.chrome_available && chromeSources.length > 0;
       const collectEntries = sourceEntries(meta.collection_sources || meta.sources);
       const statusNames = {
         queued: "等待中", running: "采集中", succeeded: "已采集", complete: "已完成",
@@ -180,8 +180,8 @@
         opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时",
         city_unsupported: "城市暂不支持"
       };
-      if (!meta.chrome_available) {
-        collectSection.append(note("未启用本机 Chrome 连接，实时采集暂不可用；可在系统配置开启，或使用下方本地导入。", "warn"));
+      if (!canUseChrome) {
+        collectSection.append(note("本机 Chrome 连接未启用。可尝试直接采集公开搜索结果，部分平台可能需要登录。", "warn"));
       }
       const sessionWrap = node("div", "", "rp-sessions");
       const checks = [];
@@ -272,29 +272,35 @@
       });
       const localWrap = node("label", "", "rp-check");
       const localBox = input("checkbox", {});
-      localWrap.append(localBox, node("span", chromeSources.length ? "使用本机 Chrome 登录态（推荐）" : "Boss 本地桌面客户端"));
-      if (meta.boss_local || chromeSources.length) localBox.checked = true;
+      localWrap.append(localBox, node("span", canUseChrome ? "使用本机 Chrome 登录态（推荐）" : "使用 BOSS 本地登录态"));
+      localWrap.hidden = !canUseChrome && !meta.boss_local;
+      localBox.checked = Boolean(canUseChrome || meta.boss_local);
       const submit = button("启动采集", "rp-btn-primary", "play");
+      submit.type = "submit";
       const collectFeedback = feedback();
+      collectFeedback.setAttribute("role", "status");
       form.append(
         field("关键词", keyword), field("城市", city), field("归入求职方向", collectProfile),
         field("每平台上限", limit), checksWrap, localWrap, submit, collectFeedback
       );
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const term = keyword.value.trim();
+        if (!term) { setFeedback(collectFeedback, "请输入采集关键词。", "error"); keyword.focus(); return; }
         const sources = sourceBoxes.filter((box) => box.checked).map((box) => box.value);
         if (!sources.length) { setFeedback(collectFeedback, "请至少选择一个采集平台。", "error"); return; }
         submit.disabled = true;
         try {
-          await withBusy(() => api("/runs", {
-            keyword: keyword.value.trim(), city: city.value, limit: Number(limit.value) || 20,
+          const run = await withBusy(() => api("/runs", {
+            keyword: term, city: city.value, limit: Number(limit.value) || 20,
             sources, profile: collectProfile.value,
-            boss_local: !chromeSources.length && sources.includes("boss") && localBox.checked,
-            chrome_local: Boolean(localBox.checked && chromeSources.some((source) => sources.includes(source)))
+            boss_local: Boolean(!canUseChrome && meta.boss_local && sources.includes("boss") && localBox.checked),
+            chrome_local: Boolean(canUseChrome && localBox.checked && chromeSources.some((source) => sources.includes(source)))
           }), collectFeedback, "正在启动采集…");
           if (!alive(token, body)) return;
-          setFeedback(collectFeedback, "已启动采集，各平台结果会陆续入库并自动进入清洗段。", "success");
-          toast("采集已启动。", "success");
+          setFeedback(collectFeedback, "已启动采集，可在下方查看各平台进度。", "success");
+          openRun = run.id;
+          history.open = true;
           void loadRuns();
         } catch (error) {
           if (alive(token, body)) setFeedback(collectFeedback, error.message, "error");
@@ -309,7 +315,9 @@
       historyHead.append(node("span", "采集记录"), historyCount);
       history.append(historyHead, runsWrap);
       let runPoll = null;
+      let runRequest = 0;
       let lastRuns = "";
+      let openRun = null;
       const runCard = (run) => {
         const card = node("details", "", "rp-run");
         card.dataset.state = run.status;
@@ -347,17 +355,19 @@
       };
       async function loadRuns() {
         clearTimeout(runPoll);
+        const request = ++runRequest;
         try {
           const data = await api("/runs");
-          if (!alive(token, body)) return;
+          if (request !== runRequest || !alive(token, body)) return;
           const items = data.items || [];
           const snapshot = JSON.stringify(items);
-          if (snapshot !== lastRuns) {
+          if (snapshot !== lastRuns || openRun) {
             const expanded = new Set([...runsWrap.querySelectorAll(".rp-run[open]")].map(card => card.dataset.runId));
             const focused = document.activeElement?.closest(".rp-run");
             const cards = items.map(run => {
               const card = runCard(run);
-              card.open = expanded.has(card.dataset.runId);
+              card.open = run.id === openRun || expanded.has(run.id);
+              if (run.id === openRun) openRun = null;
               return card;
             });
             runsWrap.replaceChildren(...(cards.length ? cards : [node("p", "暂无采集记录。", "rp-hint")]));
@@ -370,7 +380,7 @@
           if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 3000);
           else void RP.refresh({ silent: true });
         } catch (error) {
-          if (alive(token, body)) {
+          if (request === runRequest && alive(token, body)) {
             if (!lastRuns) runsWrap.replaceChildren(node("p", "暂时无法读取采集记录，正在重试。", "rp-hint"));
             runPoll = setTimeout(loadRuns, 5000);
           }

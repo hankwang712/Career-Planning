@@ -449,6 +449,40 @@ def test_pipeline_job_card_keeps_materials_beside_metadata_on_desktop(browser, l
         context.close()
 
 
+def test_pipeline_start_collection_submits_and_reveals_progress(logged_in_page, live_server, monkeypatch):
+    from services import recruitment
+
+    monkeypatch.setattr(recruitment, "use_local_chrome", lambda: True)
+    page = logged_in_page
+    submitted = []
+
+    def runs(route):
+        if route.request.method == "POST":
+            submitted.append(route.request.post_data_json)
+            route.fulfill(status=202, json={"id": "started-run"})
+            return
+        route.fulfill(json={"items": [{
+            "id": "started-run", "keyword": "Agent实习", "city": "杭州", "status": "running",
+            "started_at": 1795000000, "progress": {"zhilian": {"status": "running", "message": "正在读取职位"}},
+        }] if submitted else []})
+
+    page.route("**/api/job-market/collection/runs", runs)
+    page.goto(live_server + "/recruitment?drawer=scraping")
+    form = page.locator(".rp-collect-form")
+    form.get_by_label("关键词").fill("Agent实习")
+    form.get_by_label("城市").select_option("杭州")
+    form.get_by_label("每平台上限").fill("10")
+    form.get_by_role("checkbox", name="智联招聘").check()
+    assert form.get_by_role("checkbox", name="使用本机 Chrome 登录态（推荐）").is_checked()
+    form.get_by_role("button", name="启动采集", exact=True).click()
+    form.get_by_text("已启动采集，可在下方查看各平台进度。").wait_for()
+    page.locator('.rp-run-history[open] .rp-run[open]').get_by_text("正在读取职位").wait_for()
+    assert len(submitted) == 1
+    assert submitted[0]["sources"] == ["zhilian"]
+    assert submitted[0]["chrome_local"] is True and submitted[0]["boss_local"] is False
+    assert submitted[0]["keyword"] == "Agent实习" and submitted[0]["city"] == "杭州" and submitted[0]["limit"] == 10
+
+
 def test_pipeline_collection_history_is_collapsed_and_keeps_open_records(logged_in_page, live_server):
     page = logged_in_page
     reads = 0
