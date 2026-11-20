@@ -36,7 +36,7 @@
 <section id="settings-{{ id }}" data-settings-group="{{ id }}" class="sc-card sc-group{{ ' sc-has-test' if testable }}">
     <details {% if id == 'chat' %}open{% endif %}>
         <summary>
-            <span class="sc-icon" data-tone="{{ id }}">{{ icon(id) }}</span>
+            <span class="sc-icon">{{ icon(id) }}</span>
             <span class="sc-group-copy">
                 <span class="sc-group-name">
                     <strong>{{ title }}</strong>
@@ -104,7 +104,7 @@
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
 </head>
-<body class="sc-page">
+<body class="sc-page bg-gray-50">
     <header class="sc-top">
         <div class="sc-top-inner">
             <div class="sc-top-title">

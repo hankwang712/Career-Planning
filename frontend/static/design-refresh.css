@@ -976,22 +976,6 @@ html body.user-center-page #report-workspace .uc-report-toolbar .uc-report-toolb
 .recruitment-button { border-radius: var(--dr-radius-sm); }
 .recruitment-top { border-bottom: 1px solid var(--dr-line); }
 
-.sc-page {
-  --sc-ink: var(--dr-ink);
-  --sc-muted: var(--dr-muted);
-  --sc-border: var(--dr-line);
-  --sc-surface: var(--dr-surface-soft);
-  background: var(--dr-paper);
-  font-family: var(--app-font-stack);
-}
-.sc-card {
-  border-radius: var(--dr-radius);
-  border: 1px solid var(--dr-line);
-  box-shadow: var(--dr-edge), var(--dr-shadow-sm);
-}
-.sc-icon { border-radius: var(--dr-radius-sm); background: var(--dr-accent-soft); border-color: var(--dr-accent-line); color: var(--dr-accent); }
-.sc-icon-key { background: var(--dr-ink); border-color: var(--dr-ink); }
-
 /* ---------- 12b. 测评作答 / 结果页 ---------- */
 html body.tr-page {
   font-family: var(--app-font-stack);
@@ -1077,8 +1061,7 @@ html nav.app-topbar .nav-item:hover { background: var(--dr-surface-soft) !import
 html nav.app-topbar .nav-item.active { background: transparent !important; color: var(--dr-accent) !important; box-shadow: none !important; }
 html .loading-spinner { border-top-color: var(--dr-accent); }
 html .step-indicator.active { background: var(--dr-ink); }
-/* M-6 设置/招聘/简历编辑器的粉彩与糖果功能色 */
-html .sc-icon[data-tone] { background: var(--dr-accent-soft); border-color: var(--dr-accent-line); color: var(--dr-accent); }
+/* 招聘与简历编辑器功能色 */
 html .recruitment-stages li:nth-child(1) .recruitment-stage-icon,
 html .recruitment-stages li:nth-child(3) .recruitment-stage-icon { background: var(--dr-accent-soft); color: var(--dr-accent); }
 html .recruitment-stages li:nth-child(2) .recruitment-stage-icon { background: var(--dr-brass-soft); color: var(--dr-brass); }
@@ -1176,7 +1159,6 @@ html .re-dialog { border-radius: var(--dr-radius-lg); }
 html nav.app-topbar .nav-item.active::after { background: var(--dr-accent); }
 /* 边界闪隐防护 + 纸面网格语言扩展到工作区外页面 */
 html .fade-in { animation-fill-mode: both; }
-html body:has(.sc-main),
 html body:has(.re-shell),
 html body.tr-page {
   background-image:
