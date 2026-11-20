@@ -15,7 +15,7 @@
     <script src="{{ url_for('static', filename='recruitment.js') }}" defer></script>
     <script src="{{ url_for('static', filename='recruitment-pipeline.js') }}" defer></script>
 </head>
-<body>
+<body class="bg-gray-50">
     {% with recruitment_nav = true %}{% include "partials/workspace_topbar.html" %}{% endwith %}
     <script type="application/json" id="rpMeta">{{ {
         'profiles': profiles,
@@ -26,18 +26,11 @@
         'export_url': url_for('recruitment.export')
     } | tojson }}</script>
     <main class="recruitment-main rp-main">
-        <header class="rp-commandbar" id="rpCommandbar">
-            <div class="rp-commandbar-inner">
-                <a class="rp-back" href="{{ url_for('site.index', _anchor='dashboard') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>
-                    返回工作台
-                </a>
-                <div class="rp-titleblock recruitment-hero">
-                    <h1>岗位全链路流水线</h1>
-                    <p>导入 · 清洗 · 评估 · 改写 · 审批 · 投递，全程本地运行</p>
-                </div>
-                <span id="rpRunPill" class="rp-runpill" data-state="loading" role="status">
-                    <i class="rp-runpill-dot" aria-hidden="true"></i><span id="rpRunPillText">正在读取…</span>
+        <header class="rp-page-header">
+            <h1 class="rp-page-title">岗位全链路流水线</h1>
+            <div class="rp-page-actions">
+                <span id="rpRunPill" class="rp-runpill" role="status" hidden>
+                    <i class="rp-runpill-dot" aria-hidden="true"></i><span id="rpRunPillText"></span>
                 </span>
                 <button id="rpMainAction" class="rp-btn rp-mainaction" type="button" data-state="loading" disabled>正在读取…</button>
             </div>

@@ -1,7 +1,7 @@
 /* =========================================================
    岗位全链路流水线 · Chart Room 页面层
    令牌全部来自 design-refresh.css（--dr-*）；本文件只补页面令牌。
-   结构：sticky 指挥顶栏 → 阻塞横幅 → 漏斗卡 → 执行轨道卡 → 岗位看板卡
+   结构：页头 → 阻塞横幅 → 漏斗卡 → 执行轨道卡 → 岗位看板卡
         + 右滑配置抽屉 + 物料预览弹窗 + toast。
    特异性约定：基础控件用 html :is(.rp-main, .rp-drawer, ...) 前缀，
    保证压过 design-refresh.css 的 html .recruitment-main button 等旧规则。
@@ -27,7 +27,7 @@ button, input, select, textarea { font: inherit; }
 html .rp-main {
     width: min(1280px, calc(100% - 48px));
     margin: 0 auto;
-    padding: 0 0 56px;
+    padding: 18px 0 56px;
     color: var(--dr-ink);
     font-size: 14px;
     line-height: 1.55;
@@ -177,53 +177,29 @@ html :is(.rp-main, .rp-drawer, .rp-modal) :is(a, button, input, select, textarea
     white-space: nowrap;
 }
 
-/* ---------- sticky 指挥顶栏 ---------- */
+/* ---------- 页头 ---------- */
 .recruitment-topbar { position: sticky; top: 0; z-index: 50; }
 .recruitment-topbar .nav-tab-strip { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 
-.rp-commandbar {
-    position: sticky;
-    top: var(--rp-topbar-h);
-    z-index: 40;
-    margin: 0 -8px;
-    padding: 10px 8px;
-    background: color-mix(in srgb, var(--dr-paper) 88%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-bottom: 1px solid transparent;
-    transition: border-color 0.2s var(--dr-ease), box-shadow 0.2s var(--dr-ease);
-}
-.rp-commandbar.is-stuck {
-    border-bottom-color: var(--dr-line);
-    box-shadow: 0 8px 20px -16px rgba(23, 35, 59, 0.3);
-}
-.rp-commandbar-inner {
+.rp-page-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
-    min-height: 52px;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-bottom: 16px;
+    padding: 16px 22px;
 }
-html .rp-main a.rp-back {
-    display: inline-flex; align-items: center; gap: 4px;
-    flex: none;
-    padding: 6px 10px;
-    border: 1px solid var(--dr-line);
-    border-radius: var(--dr-radius-sm);
-    background: var(--dr-surface);
-    color: var(--dr-muted);
-    font-size: 12px; font-weight: 600;
-    box-shadow: var(--dr-shadow-sm);
+.rp-page-title {
+    font-size: clamp(19px, 2vw, 25px);
+    line-height: 1.18;
 }
-html .rp-main a.rp-back:hover { color: var(--dr-accent); border-color: var(--dr-accent-line); background: var(--dr-surface); }
-.rp-back svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.rp-titleblock { min-width: 0; margin-right: auto; }
-.rp-titleblock h1 {
-    font-size: clamp(19px, 2.4vw, 24px);
-    line-height: 1.25;
-    color: var(--dr-ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.rp-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
 }
-.rp-titleblock p { color: var(--dr-faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .rp-runpill {
     display: inline-flex; align-items: center; gap: 7px;
@@ -238,10 +214,8 @@ html .rp-main a.rp-back:hover { color: var(--dr-accent); border-color: var(--dr-
     white-space: nowrap;
 }
 .rp-runpill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-.rp-runpill[data-state="ready"] { color: var(--dr-success); border-color: #cbe5d7; background: var(--dr-success-soft); }
 .rp-runpill[data-state="running"] { color: var(--dr-accent); border-color: var(--dr-accent-line); background: var(--dr-accent-soft); }
 .rp-runpill[data-state="running"] .rp-runpill-dot { animation: rp-breathe 1.6s ease-in-out infinite; }
-.rp-runpill[data-state="blocked"] { color: var(--dr-warning); border-color: #ecd9b4; background: var(--dr-warning-soft); }
 .rp-runpill[data-state="stale"] { color: var(--dr-warning); border-color: #ecd9b4; background: var(--dr-warning-soft); }
 
 html .rp-main .rp-mainaction { min-width: 132px; min-height: 40px; font-size: 13.5px; }
@@ -611,7 +585,7 @@ html .rp-main .rp-source-chip[aria-pressed="true"]:hover:not(:disabled) { backgr
 .rp-job-pager { padding: 0 14px 16px; color: var(--dr-muted); font-size: 12px; }
 .rp-job-pager[hidden] { display: none; }
 .rp-job-pager input { width: 62px; min-height: 30px; text-align: center; }
-.rp-board-card { scroll-margin-top: calc(var(--rp-topbar-h, 76px) + 68px); }
+.rp-board-card { scroll-margin-top: calc(var(--rp-topbar-h) + 12px); }
 
 /* 岗位卡（正常型） */
 .rp-job {
@@ -1133,14 +1107,11 @@ html .rp-drawer .rp-panel-note a { color: inherit; font-weight: 700; text-decora
     .rp-funnel-arrow { display: none; }
 }
 @media (max-width: 860px) {
-    .rp-commandbar-inner { flex-wrap: wrap; gap: 8px 10px; }
-    .rp-titleblock { flex-basis: 100%; order: -1; margin-right: 0; }
-    .rp-titleblock p { display: none; }
-    .rp-runpill { margin-left: auto; }
     .rp-compare { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {
     html .rp-main { width: calc(100% - 24px); }
+    .rp-page-header { padding: 14px; }
     .rp-funnel-tile { flex: 1 1 calc(50% - 6px); min-width: 0; }
     .rp-card-head { padding: 12px 14px; }
     .rp-funnel, .rp-rail, .rp-jobs { padding-left: 14px; padding-right: 14px; }

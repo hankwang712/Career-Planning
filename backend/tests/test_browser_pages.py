@@ -966,3 +966,23 @@ def test_resume_scores_preserve_unknown_in_actual_page(logged_in_page, live_serv
     assert "待验证" in result["metrics"] and "null%" not in result["metrics"]
     assert result["zero"] == "0%" and result["unknown"] == "待验证"
     assert errors == [], "\n".join(errors)
+
+
+def test_recruitment_header_uses_workspace_grid_and_single_configuration_action(logged_in_page, live_server):
+    page = logged_in_page
+    page.goto(live_server + "/main.html#report")
+    report_grid = page.locator("body").evaluate("el => getComputedStyle(el).backgroundSize")
+    assert report_grid.startswith("28px 28px, 28px 28px")
+
+    page.goto(live_server + "/recruitment")
+    assert page.locator("body").evaluate("el => getComputedStyle(el).backgroundSize") == report_grid
+    header = page.locator(".rp-page-header")
+    assert header.get_by_role("heading", name="岗位全链路流水线").is_visible()
+    config = header.get_by_role("button", name="待配置", exact=False)
+    config.wait_for()
+    assert header.get_by_text("待配置", exact=False).count() == 1
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth") == 390
+    config.click()
+    page.get_by_role("dialog").wait_for()

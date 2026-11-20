@@ -494,9 +494,9 @@
     const pillText = byId("rpRunPillText");
     const action = byId("rpMainAction");
     const warnings = warningsList();
-    let pillState, pillLabel, actionState, actionLabel, disabled = false;
+    let pillState, pillLabel = "", actionState, actionLabel, disabled = false;
     if (state.loading && !state.apiReady) {
-      pillState = "loading"; pillLabel = "正在读取…"; actionState = "loading"; actionLabel = "正在读取…"; disabled = true;
+      actionState = "loading"; actionLabel = "正在读取…"; disabled = true;
     } else if (state.running) {
       const stageLabel = RUN_STAGES.find((s) => s.stage === state.runStage)?.label || "";
       pillState = "running"; pillLabel = stageLabel ? `运行中 · ${stageLabel}` : "运行中";
@@ -504,16 +504,15 @@
     } else if (state.stale) {
       pillState = "stale"; pillLabel = "连接中断 · 自动重试";
       actionState = warnings.length ? "blocked" : "ready";
-      actionLabel = warnings.length ? `待配置 ${warnings.length}` : "启动流水线";
+      actionLabel = warnings.length ? `待配置 ${warnings.length} 项` : "启动流水线";
     } else if (warnings.length) {
-      pillState = "blocked"; pillLabel = `待配置 ${warnings.length} 项`;
-      actionState = "blocked"; actionLabel = `待配置 ${warnings.length}`;
+      actionState = "blocked"; actionLabel = `待配置 ${warnings.length} 项`;
     } else {
-      pillState = "ready"; pillLabel = "就绪 · 本地运行";
       actionState = state.armed ? "armed" : "ready";
       actionLabel = state.armed ? "再次点击确认启动" : "启动流水线";
     }
-    pill.dataset.state = pillState;
+    pill.dataset.state = pillState || "";
+    pill.hidden = !pillLabel;
     pillText.textContent = pillLabel;
     action.dataset.state = actionState;
     action.disabled = disabled;
@@ -1565,22 +1564,13 @@
         slot.querySelector(".rp-resume-pill")?.setAttribute("aria-expanded", "false");
       }
     });
-    // sticky 指挥栏：跟随工作台顶栏高度 + 吸附描边
+    // 看板滚动定位需要避开主导航。
     const topbar = document.querySelector(".recruitment-topbar");
-    const commandbar = byId("rpCommandbar");
     const measure = () => {
       if (topbar) document.documentElement.style.setProperty("--rp-topbar-h", topbar.offsetHeight + "px");
     };
     measure();
     window.addEventListener("resize", measure);
-    const sentinel = node("div");
-    sentinel.style.cssText = "position:absolute;top:0;height:1px;width:1px;pointer-events:none;";
-    document.body.prepend(sentinel);
-    if ("IntersectionObserver" in window) {
-      new IntersectionObserver(([entry]) => {
-        commandbar.classList.toggle("is-stuck", !entry.isIntersecting);
-      }, { threshold: 0 }).observe(sentinel);
-    }
   }
 
   function boot() {

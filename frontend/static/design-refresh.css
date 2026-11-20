@@ -811,6 +811,7 @@ html .career-news-item {
 
 /* ---------- 8. 岗位 / 报告 / 测评 / 社区 ---------- */
 html .report-launch-hero,
+html .rp-page-header,
 html .report-setup-card {
   background: var(--dr-surface);
   border: 1px solid var(--dr-line);
@@ -818,6 +819,7 @@ html .report-setup-card {
   box-shadow: var(--dr-edge), var(--dr-shadow-md);
 }
 html .report-launch-title,
+html .rp-page-title,
 html body #profile .assessment-center-heading h2 {
   font-family: var(--app-editorial-stack);
   font-weight: 600;
@@ -1129,10 +1131,9 @@ html .assistant-mascot-hint {
   border: 1px solid var(--dr-line);
   box-shadow: var(--dr-shadow-md);
 }
-/* m-6 三处主标题补编辑体 */
+/* 主标题补编辑体 */
 html .welcome h1,
-html .sc-page h1,
-html .recruitment-hero h1 {
+html .sc-page h1 {
   font-family: var(--app-editorial-stack);
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -1175,7 +1176,6 @@ html .re-dialog { border-radius: var(--dr-radius-lg); }
 html nav.app-topbar .nav-item.active::after { background: var(--dr-accent); }
 /* 边界闪隐防护 + 纸面网格语言扩展到工作区外页面 */
 html .fade-in { animation-fill-mode: both; }
-html body:has(.recruitment-main),
 html body:has(.sc-main),
 html body:has(.re-shell),
 html body.tr-page {
