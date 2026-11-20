@@ -621,3 +621,34 @@ def test_heuristic_matches_data_fixture_if_present(server, make_account):
             actual_grade = row["grade"]
         assert abs(GRADE_RANK[actual_grade] - GRADE_RANK[expected_grade]) <= 1, (
             f"{sample['id']}: 启发式 {actual_grade} 与 fixture {expected_grade} 偏差超过 1 级")
+
+
+def test_baseline_resume_follows_resume_workshop(server, make_account):
+    owner = setup_account(server, make_account, "pipeline-workshop")
+    assert owner.get(PIPE + "/config").get_json()["settings"]["baseline_resume_id"] == "fp-baseline"
+    document = {
+        "title": "王帅工作简历",
+        "contact": {"name": "王帅", "target": "Python后端开发", "phone": "", "email": ""},
+        "sections": [
+            {"title": "工作经历", "content": "云杉科技 2021-2026 Python后端开发工程师（5年）\n负责订单服务开发，日常使用 Python、Flask、MySQL、Redis、Docker、Linux 交付服务。"},
+            {"title": "专业技能", "content": "Python、Flask、MySQL、Redis、Docker、Linux"},
+        ],
+    }
+    created = owner.post("/api/resume-editor/drafts", json=document)
+    assert created.status_code == 201, created.get_json()
+    draft_id = created.get_json()["id"]
+    # 旧配置指向解析上传库：读取配置时迁移到工作坊唯一草稿
+    settings = owner.get(PIPE + "/config").get_json()
+    assert settings["settings"]["baseline_resume_id"] == draft_id
+    assert settings["resume_baseline"]["enabled"] is True
+    assert settings["resume_baseline"]["name"] == "王帅工作简历"
+    assert [item["id"] for item in settings["resume_baseline"]["options"]] == [draft_id]
+    identity = add_job(owner, "t:custom", JOB_CUSTOM)
+    run(owner, "clean")
+    assert run(owner, "evaluate")["counts"]["screened"] == 1
+    assert job(owner, identity)["stage"] == "deep"
+    result = run(owner, "rewrite")
+    assert result["processed"] == 1 and result["baseline"]["id"] == draft_id
+    rewrite = job(owner, identity)["rewrite_payload"]
+    assert rewrite["baseline_name"] == "王帅工作简历"
+    assert "云杉科技 2021-2026" in rewrite["markdown"]

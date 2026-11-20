@@ -184,12 +184,23 @@ def init_schema(conn):
 
 def load_config(conn, owner):
     row = conn.execute("SELECT settings FROM recruitment_pipeline_config WHERE owner=?", (owner,)).fetchone()
+    config = None
     if row:
         try:
-            return PipelineConfig.model_validate_json(row["settings"])
+            config = PipelineConfig.model_validate_json(row["settings"])
         except ValidationError:
             logger.warning("Invalid pipeline config for %s, falling back to defaults", owner)
-    return PipelineConfig()
+    if config is None:
+        config = PipelineConfig()
+    # 基准简历跟随简历工作坊：旧配置指向解析上传库而工作坊已有草稿时迁移过去（仅一份草稿时自动接上）。
+    drafts = _resume_drafts(conn, owner)
+    if drafts and config.baseline_resume_id and config.baseline_resume_id not in {item["id"] for item in drafts}:
+        inside = conn.in_transaction
+        config.baseline_resume_id = drafts[0]["id"] if len(drafts) == 1 else ""
+        save_config(conn, owner, config)
+        if not inside and conn.in_transaction:
+            conn.commit()
+    return config
 
 
 def save_config(conn, owner, config):
@@ -297,7 +308,7 @@ def grade_from_total(total):
 
 
 # ---------------------------------------------------------------------------
-# 基准简历（resume_documents 库，无启用标志，由 baseline_resume_id 指定）
+# 基准简历：简历工作坊草稿（resume_drafts）为准；无草稿的旧账号回退解析上传库
 # ---------------------------------------------------------------------------
 
 def _resume_repository():
@@ -305,7 +316,34 @@ def _resume_repository():
     return getattr(getattr(service, "documents", None), "repository", None)
 
 
+def draft_text(document):
+    """与报告模块同口径：求职意向 + 各分区正文，供评估与改写读取。"""
+    sections = [f"## {section['title']}\n{section['content']}" for section in document.get("sections", [])
+                if str(section.get("content") or "").strip()]
+    target = (document.get("contact") or {}).get("target")
+    if target:
+        sections.insert(0, f"求职意向：{target}")
+    return "\n\n".join(sections)
+
+
+def _resume_drafts(conn, owner):
+    drafts = []
+    for row in conn.execute("SELECT id, title, document FROM resume_drafts WHERE owner=? ORDER BY updated_at DESC, id DESC",
+                            (owner,)):
+        try:
+            document = json.loads(row["document"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        text = draft_text(document)
+        if text.strip():
+            drafts.append({"id": row["id"], "title": row["title"] or "未命名简历", "chars": len(text), "text": text})
+    return drafts
+
+
 def resume_options(owner):
+    drafts = _resume_drafts(db._get_conn(), owner)
+    if drafts:
+        return [{"id": item["id"], "title": item["title"], "chars": item["chars"]} for item in drafts]
     repo = _resume_repository()
     if repo is None:
         return []
@@ -321,6 +359,9 @@ def resume_options(owner):
 def baseline_resume(owner, config):
     if not config.baseline_resume_id:
         return None
+    for item in _resume_drafts(db._get_conn(), owner):
+        if item["id"] == config.baseline_resume_id:
+            return {"id": item["id"], "name": item["title"], "text": item["text"]}
     repo = _resume_repository()
     if repo is None:
         return None
