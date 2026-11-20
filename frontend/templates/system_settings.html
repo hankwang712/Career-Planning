@@ -3,7 +3,9 @@
 
 {% macro icon(kind) -%}
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-{% if kind == 'key' %}<circle cx="8" cy="15.5" r="4.5"/><path d="m11.3 12.3 8-8m-2 2 2 2m-4 0 2 2"/>
+{% if kind == 'layers' %}<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5"/>
+{% elif kind == 'key' %}<circle cx="8" cy="15.5" r="4.5"/><path d="m11.3 12.3 8-8m-2 2 2 2m-4 0 2 2"/>
+{% elif kind == 'cube' %}<path d="m12 3 8 4.5v9l-8 4.5-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5M12 12v9"/>
 {% elif kind == 'chat' %}<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3m6-3v3m-6 14v3m6-3v3m4-13h3m-3 6h3M2 9h3m-3 6h3m4-3h6m-3-3v6"/>
 {% elif kind in ('image', 'ocr') %}<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 4-4 3 3 4-5 5 6"/>
 {% elif kind in ('embedding', 'rag-models') %}<circle cx="5" cy="12" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="m7 11 9-5m-9 7 9 5"/>
@@ -41,9 +43,8 @@
                 <span class="sc-group-name">
                     <strong>{{ title }}</strong>
                     <span class="sc-pill{{ ' sc-pill-required' if id == 'chat' }}">{{ '部署配置' if deployment else '必填' if id == 'chat' else '选填' }}</span>
-                    {% if id == 'chat' %}<span class="sc-pill" data-group-ready hidden></span>{% endif %}
+                    <small class="sc-group-status" data-group-count>–/{{ fields|length }}</small>
                 </span>
-                <small data-group-count>–/{{ fields|length }} 项已配置</small>
             </span>
             <span class="sc-chevron">{{ icon('chevron') }}</span>
         </summary>
@@ -108,35 +109,46 @@
         <div class="sc-top-inner">
             <div class="sc-top-title">
                 <a href="{{ url_for('site.index', _anchor='dashboard') }}">← 工作台</a>
-                <div><h1>系统配置</h1><p>API 密钥与服务配置</p></div>
+                <h1>系统配置</h1>
             </div>
             <div class="sc-top-actions">
                 <p id="settingsResult" class="sc-result" role="status"></p>
                 {% if can_edit %}
                 <button id="settingsSave" type="submit" form="systemModelSettings" class="sc-button sc-save-button" disabled>{{ icon('save') }} 保存配置</button>
+                {% else %}
+                <span class="sc-pill">只读查看</span>
                 {% endif %}
             </div>
         </div>
     </header>
     <main class="sc-main">
-        <section class="sc-card sc-overview">
-            <div class="sc-overview-content">
-                <span class="sc-icon sc-icon-key">{{ icon('key') }}</span>
+        <section class="sc-overview" aria-labelledby="settingsOverviewTitle">
+            <div class="sc-overview-heading">
+                <span class="sc-icon sc-icon-overview">{{ icon('layers') }}</span>
                 <div>
-                    <h2>服务凭据与模型配置 <span class="sc-pill">{{ '服务端保存' if can_edit else '只读查看' }}</span></h2>
-                    <p>带 <b class="sc-required">*</b> 的字段是启用 AI 功能所需的配置，其余服务按需启用。{% if can_edit %}密钥默认隐藏，可点击眼睛查看。{% endif %}</p>
-                    <p id="settingsMissing" class="sc-missing" aria-live="polite"></p>
+                    <h2 id="settingsOverviewTitle">服务与模型配置 <span class="sc-pill" id="settingsReadiness" hidden></span></h2>
+                    <p>管理对话模型、岗位清洗模型与部署环境。</p>
                 </div>
             </div>
-            <dl class="sc-metrics">
-                <div><dt>必填</dt><dd id="settingsRequiredCount">–/3</dd></div>
-                <div><dt>选填</dt><dd id="settingsOptionalCount">–</dd></div>
-            </dl>
-            <div class="sc-overview-track" aria-hidden="true"><span id="settingsOverviewBar"></span></div>
+            <div class="sc-metrics">
+                <div class="sc-card sc-metric sc-metric-required">
+                    <span class="sc-icon">{{ icon('key') }}</span>
+                    <dl><dt>必填配置</dt><dd id="settingsRequiredCount">–</dd></dl>
+                </div>
+                <div class="sc-card sc-metric sc-metric-optional">
+                    <span class="sc-icon">{{ icon('cube') }}</span>
+                    <dl><dt>选填配置</dt><dd id="settingsOptionalCount">–</dd></dl>
+                </div>
+                <div class="sc-card sc-metric sc-metric-total" id="settingsCompletion">
+                    <span class="sc-completion-ring"><span id="settingsCompletionPercent">–</span></span>
+                    <dl><dt>AI 服务配置进度</dt><dd id="settingsCompletionCount">–</dd></dl>
+                </div>
+            </div>
+            <p id="settingsMissing" class="sc-missing" aria-live="polite"></p>
         </section>
         <div class="sc-layout">
             <aside class="sc-sidebar">
-                <nav aria-label="配置分组">
+                <nav class="sc-card" aria-label="配置分组">
                     {{ nav_group(groups, 'AI 服务') }}
                     {{ nav_group(deployment_groups, '部署环境') }}
                 </nav>

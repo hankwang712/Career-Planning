@@ -309,7 +309,14 @@ def test_workspace_setup_and_console_in_browser(browser, live_server, make_accou
         page.get_by_text("配置已保存。").wait_for()
         assert page.get_by_role("button", name="移除网页值").count() == 0
         assert page.locator("#settingsRequiredCount").inner_text() == "3/3"
-        assert page.locator("#settingsOptionalCount").inner_text().endswith("/6")
+        optional_ready, optional_total = map(int, page.locator("#settingsOptionalCount").inner_text().split("/"))
+        assert optional_total == 6
+        assert page.locator("#settingsCompletionCount").inner_text() == f"{3 + optional_ready}/9 项已配置"
+        assert page.locator("#settingsCompletionPercent").inner_text() == f"{round(100 * (3 + optional_ready) / 9)}%"
+        assert page.locator("#settingsReadiness").inner_text() == "必填已配齐"
+        assert page.locator("#settingsMissing").is_hidden()
+        assert page.locator("#settings-chat [data-group-count]").inner_text() == "已配置 3/3"
+        assert page.locator("#settings-cleaner summary [data-group-count]").is_visible()
         assert page.locator("#settings-cleaner [data-setting-key]").count() == 3
         assert page.locator("#settings-image, #settings-news, #settings-retrieval").count() == 0
         assert page.locator("#settings-ocr [data-setting-key]").count() == 3

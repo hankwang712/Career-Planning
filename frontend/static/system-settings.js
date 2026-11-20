@@ -21,18 +21,29 @@
   }
 
   function updateProgress() {
-    const ready = tally(required);
+    const requiredReady = tally(required);
+    const optionalReady = tally(optional);
     const missing = required.filter(node => !fields[node.dataset.settingKey]?.configured);
-    const available = required.length;
-    document.getElementById("settingsProgress").value = ready;
-    document.getElementById("settingsProgressText").textContent = `对话模型已配置 ${ready}/${available}`;
-    document.getElementById("settingsRequiredCount").textContent = `${ready}/${available}`;
-    document.getElementById("settingsOptionalCount").textContent = `${tally(optional)}/${optional.length}`;
+    const configured = requiredReady + optionalReady;
+    const total = required.length + optional.length;
+    const percent = total ? Math.round(configured * 100 / total) : 0;
+    const readiness = document.getElementById("settingsReadiness");
+    readiness.dataset.status = missing.length ? "partial" : "ready";
+    readiness.textContent = missing.length ? "必填待补齐" : "必填已配齐";
+    readiness.hidden = false;
+    const progress = document.getElementById("settingsProgress");
+    progress.max = required.length;
+    progress.value = requiredReady;
+    document.getElementById("settingsProgressText").textContent = `对话模型已配置 ${requiredReady}/${required.length}`;
+    document.getElementById("settingsRequiredCount").textContent = `${requiredReady}/${required.length}`;
+    document.getElementById("settingsOptionalCount").textContent = `${optionalReady}/${optional.length}`;
+    const completion = document.getElementById("settingsCompletion");
+    completion.style.setProperty("--sc-completion", `${percent}%`);
+    completion.dataset.status = configured === total ? "ready" : "partial";
+    document.getElementById("settingsCompletionPercent").textContent = `${percent}%`;
+    document.getElementById("settingsCompletionCount").textContent = `${configured}/${total} 项已配置`;
     document.getElementById("settingsMissing").textContent = missing.length
       ? "还缺必填项：" + missing.map(node => node.dataset.label).join("、") : "";
-    const bar = document.getElementById("settingsOverviewBar");
-    bar.style.width = `${100 * ready / available}%`;
-    bar.dataset.status = missing.length ? "partial" : "ready";
     for (const card of cards) {
       const nodes = [...card.querySelectorAll("[data-setting-key]")];
       const configured = tally(nodes);
@@ -41,13 +52,9 @@
       const link = groupLinks.find(item => item.dataset.groupLink === card.dataset.settingsGroup);
       link.dataset.status = state;
       link.querySelector("[data-nav-count]").textContent = count;
-      card.querySelector("[data-group-count]").textContent = count + " 项已配置";
-      const badge = card.querySelector("[data-group-ready]");
-      if (badge) {
-        badge.hidden = false;
-        badge.dataset.status = missing.length ? "partial" : "ready";
-        badge.textContent = missing.length ? `缺 ${missing.length} 项` : "✓ 已配齐";
-      }
+      const status = card.querySelector("[data-group-count]");
+      status.dataset.status = state;
+      status.textContent = `${configured ? "已配置" : "未配置"} ${count}`;
     }
   }
 
