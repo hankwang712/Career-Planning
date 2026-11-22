@@ -1,12 +1,12 @@
-﻿<div align="center">
+<div align="center">
 
 # 🧭 智航生涯 · Career Planning
 
-**从认识自己，到选择方向，再到落实下一步行动。**
+**从岗位机会到投递执行，把求职跑成一条可追踪的流水线。**
 
-职业测评 · 岗位探索 · 简历分析 · AI 规划报告 · 生涯对话
+岗位采集 · 规则清洗 · AI 评估 · 定向改写 · 打招呼 · 投递队列
 
-[功能一览](#features) · [快速启动](#quickstart) · [系统架构](#architecture) · [配置服务](#configuration) · [知识图谱初始化](#lightrag-setup) · [项目目录](#development)
+[岗位流水线](#pipeline) · [功能一览](#features) · [界面一览](#screens) · [快速启动](#quickstart) · [系统架构](#architecture) · [配置服务](#configuration) · [项目目录](#development)
 
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](requirements.txt)
 [![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](package.json)
@@ -19,9 +19,41 @@
 
 </div>
 
-![智航生涯工作台](asserts/workspace.png)
+![岗位全链路流水线](asserts/pipeline.png)
 
-智航生涯是一个职业探索与求职准备工作台，结合个人经历、测评结果和岗位数据，帮助用户比较职业方向、生成规划报告并制定行动计划。
+智航生涯是一个在本机运行的个人求职与职业规划工作台。默认进入「岗位探索」，把公开渠道采集到的岗位依次经过规则清洗、八维 AI 评估、定向简历改写、打招呼语和投递队列；模型未配置时，启发式规则也能把全链路跑通。测评、简历、规划报告、学习路径和 AI 生涯助手共用同一套工作区数据。
+
+<a id="pipeline"></a>
+
+## 🚀 岗位全链路流水线
+
+```mermaid
+flowchart LR
+    A[抓取导入] --> B[规则清洗] --> C[AI 评估] --> D[简历改写] --> E[打招呼语]
+    E --> F{投递闸}
+    F -->|通过| G[待投递]
+    F -->|拦截| H[人工审批]
+    H -->|拒绝| X[淘汰]
+    H -->|重评| C
+    H -->|放行| G
+    G --> I[dry-run 投递]
+    I --> J[成功投递]
+    I --> K[执行失败]
+```
+
+每个阶段都可以单独执行，产物写入本机 SQLite，状态直接反映在漏斗、执行导航和岗位看板上。
+
+| 阶段 | 做什么 | 主要产物 |
+| --- | --- | --- |
+| 抓取导入 | 从招聘平台实时采集，或导入 CSV / 已保存的搜索页 | 岗位记录与采集记录 |
+| 规则清洗 | 硬条件过滤 + 语义规则判定 | 清洗结果、淘汰原因、待核对标记 |
+| AI 评估 | 八维加权评级；精投岗位继续深评 | 分数、A–F 评级、深评报告 |
+| 简历改写 | 以基准简历为底稿按岗位定向改写 | 定向简历稿 |
+| 打招呼语 | 精投生成；海投使用人工母本 | 150–250 字招呼语 |
+| 人工审批 | 处理被投递闸拦截的岗位 | 放行 / 拒绝 / 重评 |
+| 投递队列 | 本地 dry-run，生成投递包 | 投递记录、JSON / CSV 投递包 |
+
+模型不是流水线的必要条件：未配置对话模型时，清洗、评估、改写、打招呼和投递都能用确定性的启发式规则完成；配置后可在各抽屉中切换为模型模式。
 
 <a id="features"></a>
 
@@ -29,61 +61,54 @@
 
 | 模块 | 可以做什么 |
 | --- | --- |
-| 🧩 测评中心 | MBTI、霍兰德、深层 MBTI、老友记角色、情绪主导、SBTI 六项测评。保存答题进度、查看历史结果，基础测评支持最近两次结果对比。 |
-| 🔎 岗位探索 | 直接进入招聘信息采集工作台：从 BOSS 直聘、前程无忧、智联招聘、猎聘及小红书实时采集岗位，经规则清洗与 AI 初评后在本机缓存为实时岗位库，供规划报告招聘雷达检索，也可筛选并导出 CSV。 |
-| 📄 简历分析 | 上传 PDF、DOCX 等简历，诊断经历深度、表达问题与证据缺口，给出有原文依据的修改建议。扫描文档可通过 OCR 读取。 |
-| 📝 简历编辑与导出 | 在个人中心的「我的简历」里按表单填写经历：项目、工作、教育逐条录入名称、角色、起止时间和内容，可增删与排序，自动转换为排版格式；获奖、证书等按条目清单填写；个人总结、技能等自由文本栏目保留文本编辑。支持粘贴或识别 PDF、DOCX 和扫描图片，保存多份可继续编辑的简历。开启 AI 可辅助识别陌生栏目。智能排版、预览、A4 PDF 和 PNG 共用服务端版式，多页图片打包为 ZIP。 |
-| 🗺️ 职业规划报告 | 结合简历、目标和偏好分阶段生成报告，支持补充信息、确认方向、编辑润色、版本查看与 Word / PDF 导出。 |
-| ✅ 行动与学习计划 | 根据阶段、目标和可投入时间安排近期任务，延伸到中长期成长路线。为准备事项提供交付成果与验收标准。 |
-| 💬 AI 生涯助手 | 围绕职业选择、简历、面试和学习规划持续对话。聊天只读取基础画像（学校、专业、学历、毕业时间、求职偏好）与已确认的记忆，相关时才参考过往对话；支持无痕对话和图片输入。 |
-| 📰 资讯与社区 | 查看职业资讯、相关新闻，发布求职经验、岗位讨论及回复。 |
-| 👤 个人中心 | 默认打开简历编辑器，可在侧栏切换到规划报告、学习路径和账户设置。 |
+| 🚀 岗位全链路流水线 | 从四个招聘平台实时采集岗位，经硬规则与 AI 语义清洗、八维评级、定向简历改写、打招呼和人工审批后进入 dry-run 投递队列；支持保存、批量删除、CSV 导出和每日清理。 |
+| 🧩 测评中心 | MBTI、霍兰德、深层 MBTI、老友记角色、情绪主导、SBTI 六项测评。保存答题进度与完成记录，基础测评支持最近两次结果对比；记录保存在当前浏览器。 |
+| 🗺️ 规划报告 | 设定最多五个目标岗位、求职偏好和时间安排，并行调用简历分析、岗位分析与招聘雷达；按需补充信息、确认方向后生成报告。支持历史版本、报告阅读、PDF / DOCX 导出与 AI 智能润色。 |
+| 📈 成长规划 | 按阶段和目标管理学习任务，提供交付物、验收标准与进入条件；支持今日打卡、连续天数、经验值和热力图。 |
+| 📄 我的简历 | 表单化编辑个人信息、教育、工作、项目、技能与自定义栏目；支持多份简历、版本保存、PDF / DOCX / 图片导入与 OCR、照片裁剪、智能排版、A4 PDF / PNG 导出和岗位定向改写。 |
+| 💬 AI 生涯助手 | 围绕职业方向、简历、面试和学习计划持续对话。记忆面板区分资料来源、长期记忆与本轮上下文；支持无痕对话、图片输入和 Markdown 表格。 |
+| 📰 行业快报 | 按「AI 与前沿、科技行业、就业观察、职业成长」浏览每日资讯，保留来源与发布时间。 |
+| ⚙️ 系统配置 | 分组管理对话模型、招聘清洗模型、技能向量模型和部署环境；支持连通性测试、进度总览与单个密钥查看。 |
 
-```mermaid
-flowchart LR
-    A[了解自己<br/>测评与个人经历] --> B[探索方向<br/>岗位与简历分析]
-    B --> C[比较并确认目标<br/>职业规划报告]
-    C --> D[付诸行动<br/>学习与求职计划]
-    D --> E[回顾与调整<br/>报告记录与生涯对话]
-    E --> B
-```
+首页（职业工作台）汇总画像进度、推荐岗位、待完成任务和四类求职工具，并提供行业快报、新手引导和请求控制台。
 
-## 🖼️ 主要功能界面
+<a id="screens"></a>
 
-主要业务界面截图更新于 **2026-11-11**，使用 **system 账号**当前界面与已有内容。下方 LightRAG 图谱保留独立样本演示。
+## 🖼️ 界面一览
 
-| 实时岗位与行情 | 城市招聘分析 |
+截图取自本机个人工作区，联系方式已脱敏；界面以实际运行版本为准。
+
+| 全链路看板 | 平台采集 |
 | :---: | :---: |
-| [![实时岗位与行情：来源、采集时间、薪资与筛选](asserts/jobs.png)](asserts/jobs.png) | [![城市招聘分析：全国地图与城市岗位画像](asserts/city-analysis.png)](asserts/city-analysis.png) |
+| [![全链路看板：漏斗、执行导航与岗位状态](asserts/pipeline.png)](asserts/pipeline.png) | [![平台采集：登录检查、关键词、城市与手动导入](asserts/pipeline-collect.png)](asserts/pipeline-collect.png) |
 
-| 六项职业与人格测评 | 简历材料与报告生成台 |
+| 规则清洗 | AI 评估 |
 | :---: | :---: |
-| [![测评中心：六项测评与完成记录](asserts/assessments.png)](asserts/assessments.png) | [![报告生成台：简历上传、目标方向与求职偏好](asserts/resume-analysis.png)](asserts/resume-analysis.png) |
+| [![规则清洗：硬规则与 AI 语义规则](asserts/pipeline-cleaning.png)](asserts/pipeline-cleaning.png) | [![AI 评估：八维权重、批次执行与分流](asserts/pipeline-evaluation.png)](asserts/pipeline-evaluation.png) |
 
-| 职业规划报告 | 学习路径与任务板 |
+| 定向简历改写 | 打招呼语 |
 | :---: | :---: |
-| [![职业规划报告：原文依据、能力差距、行动建议与导出](asserts/career-report.png)](asserts/career-report.png) | [![学习路径：阶段任务、交付物、验收标准与学习打卡](asserts/learning.png)](asserts/learning.png) |
+| [![简历改写：基准简历与定向稿对比](asserts/pipeline-rewrite.png)](asserts/pipeline-rewrite.png) | [![打招呼语：海投母本与批量生成](asserts/pipeline-greeting.png)](asserts/pipeline-greeting.png) |
 
-| AI 生涯助手 |
-| :---: |
-| [![浅色版生涯助手：连续对话、Markdown 表格与资料入口](asserts/assistant.png)](asserts/assistant.png) |
+| 人工审批 | 投递队列 |
+| :---: | :---: |
+| [![人工审批：投递闸与放行队列](asserts/pipeline-approval.png)](asserts/pipeline-approval.png) | [![投递队列：dry-run、投递包与失败重试](asserts/pipeline-delivery.png)](asserts/pipeline-delivery.png) |
 
-<details>
-<summary>📰 查看行业资讯、报告卡片库与多智能体协作流程</summary>
+| 职业工作台 | 测评中心 |
+| :---: | :---: |
+| [![职业工作台：求职工具与行业快报](asserts/workspace.png)](asserts/workspace.png) | [![测评中心：六项测评与完成记录](asserts/assessments.png)](asserts/assessments.png) |
 
-**职业与行业快报**：按主题浏览技术、就业与职业成长资讯，保留来源和发布时间。
+| 规划报告 | 报告中心 |
+| :---: | :---: |
+| [![规划报告：目标岗位、求职偏好与时间安排](asserts/report-wizard.png)](asserts/report-wizard.png) | [![报告中心：最新版本与历史版本](asserts/report-center.png)](asserts/report-center.png) |
 
-[![职业规划与计算机行业快报](asserts/career-news.png)](asserts/career-news.png)
+| 我的简历 | 成长规划 |
+| :---: | :---: |
+| [![我的简历：表单化编辑与多版本管理](asserts/resume-editor.png)](asserts/resume-editor.png) | [![成长规划：学习任务板、打卡与热力图](asserts/learning.png)](asserts/learning.png) |
 
-**我的报告**：从报告卡片库打开已保存的报告，或对照历史版本。
-
-[![我的报告卡片库：已保存报告与历史版本入口](asserts/report-library.png)](asserts/report-library.png)
-
-**报告协作流程**：从简历分析、岗位证据到目标确认、行动规划与报告合成，页面展示各阶段的执行状态。
-
-[![多智能体报告协作流程](asserts/agent-workflow.png)](asserts/agent-workflow.png)
-
-</details>
+| AI 生涯助手 | 系统配置 |
+| :---: | :---: |
+| [![AI 生涯助手：记忆与资料、无痕对话](asserts/assistant.png)](asserts/assistant.png) | [![系统配置：模型与服务分组](asserts/settings.png)](asserts/settings.png) |
 
 <details>
 <summary>🕸️ 查看 LightRAG 岗位知识图谱</summary>
@@ -96,28 +121,11 @@ flowchart LR
 
 </details>
 
-<details>
-<summary>🗃️ 查看数据集与规模</summary>
-
-数据经清洗、去重与统一字段处理后，形成 **81,296 条岗位记录 + 3,600 条分类知识**。以下数量对应当前仓库数据快照：
-
-| 数据分类 | 最终记录数 |
-| --- | ---: |
-| 城市招聘样本 | 4,037 |
-| 补充城市岗位 | 2,685 |
-| 公开招聘快照 | 74,574 |
-| 职业分类知识 | 1,827 |
-| 行业分类知识 | 1,773 |
-
-数据位于 `data/cleaned/merged/`，保留来源记录。招聘快照不代表岗位仍在招聘。
-
-</details>
-
 <a id="quickstart"></a>
 
 ## 🚀 快速启动
 
-推荐 **Python 3.12 + Node.js 22 + uv**。需要 LightRAG 图谱时，再安装 Docker Desktop（Windows / macOS）或 Docker Engine + Compose 插件（Linux）。以下命令均在项目根目录执行。
+推荐 **Python 3.12 + Node.js 22 + uv**。需要实时采集时，准备本机 Chrome / Edge 或 Playwright Chromium；需要 LightRAG 图谱时，再安装 Docker Desktop（Windows / macOS）或 Docker Engine + Compose 插件（Linux）。以下命令均在项目根目录执行。
 
 | 工具 | 负责什么 |
 | --- | --- |
@@ -162,7 +170,6 @@ uv pip install -r requirements.txt
 npm ci
 ```
 
-
 ### 3. 配置环境和 Docker 服务
 
 首次使用时复制配置文件（已有 `.env` 时跳过复制），再编辑其中的配置：
@@ -179,7 +186,7 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-主站账户、报告和对话使用 SQLite，可先直接启动体验。需要聊天缓存或图谱时，先在 `.env` 填写 `POSTGRES_PASSWORD`，然后创建 Compose 使用的外部数据卷并启动服务：
+主站账户、简历、岗位、报告和对话使用 SQLite，可先直接启动体验。需要岗位图谱时，先在 `.env` 填写 `POSTGRES_PASSWORD`，然后创建 Compose 使用的外部数据卷并启动服务：
 
 ```bash
 docker --version
@@ -192,7 +199,6 @@ docker compose --profile graph up -d --wait postgres
 docker compose --profile graph ps
 ```
 
-
 PostgreSQL 默认连接 `127.0.0.1:5432`。Docker 创建的是基础服务，图谱数据还需按[知识图谱初始化](#lightrag-setup)导入。
 
 ### 4. 构建并启动主站
@@ -202,11 +208,11 @@ npm run build
 npm start
 ```
 
-打开 **<http://localhost:8080>**。AI 对话、简历分析和报告生成需要配置模型。
+打开 **<http://localhost:8080>**，默认进入「岗位探索」流水线；顶部「首页」切到职业工作台。AI 评估、简历改写、打招呼、规划和对话需要配置模型。
 
 ### 5. 配置 AI 模型
 
-启动后直接进入本机个人工作区的「岗位探索」。从顶栏打开「系统配置」，填写对话模型的接口地址、API Key 和模型名称，保存后可测试连通性。岗位浏览和测评可直接使用，技能向量按需配置。仪表盘的工作区菜单可重新打开新手引导，页面右下角的控制台可查看近期请求的状态与耗时。
+从顶栏打开「系统配置」，填写对话模型的接口地址、API Key 和模型名称，保存后可测试连通性。岗位浏览、采集、测评和启发式流水线可直接使用；招聘清洗模型与技能向量模型按需配置。
 
 已有数据目录启动时会沿用上次使用的工作区存储，原有简历、测评、报告、已保存岗位和聊天记录可直接访问。
 
@@ -235,17 +241,23 @@ USE_VITE_DEV_SERVER=true npm start
 flowchart TB
     UI[浏览器工作台<br/>Jinja2 · JavaScript · Vite]
     WEB[统一 Web 服务 · 默认 8080<br/>Uvicorn]
-    FLASK[Flask<br/>页面 · 账户 · 岗位 · 简历 · 报告]
+    FLASK[Flask<br/>页面 · 账户 · 简历 · 报告 · 岗位]
     CHAT[FastAPI<br/>聊天接口与上下文管理]
+    PIPE[岗位流水线<br/>采集 · 清洗 · 评估 · 改写 · 打招呼 · 投递]
+    CHROME[本机 Chrome<br/>登录态与搜索页]
     GRAPH[LangGraph 报告工作流]
     LLM[OpenAI 兼容模型接口]
-    DB[(SQLite<br/>账户 · 报告 · 对话 · 检查点)]
+    DB[(SQLite<br/>账户 · 简历 · 岗位 · 报告 · 对话 · 检查点)]
     MEMORY[聊天记忆管理器<br/>基础画像 · 会话笔记 · 背景摘要]
     RAG[岗位图谱研究模块<br/>LightRAG · PostgreSQL / pgvector]
     UI --> WEB
     WEB --> FLASK
     WEB --> CHAT
+    FLASK --> PIPE
     FLASK --> GRAPH
+    PIPE --> CHROME
+    PIPE --> LLM
+    PIPE --> DB
     GRAPH --> LLM
     GRAPH --> RAG
     GRAPH --> DB
@@ -275,37 +287,6 @@ flowchart LR
 
 简历、目标岗位和招聘雷达并行分析，结果汇总后进入职业决策与行动规划。工作流保存检查点，支持失败重试、用户补充信息后继续执行。
 
-招聘雷达合并 Radar 公开招聘汇总与本地岗位库，按公司、岗位、城市、招聘批次和职位 ID 去重后筛选，再读取招聘链接核对内容。合并保留各来源及日期，不修改原始岗位库。岗位采集时间不代表公告发布日期或仍开放。本地岗位尚未采集或岗位库暂不可用时，会说明缺项并继续使用 Radar。独立测试台启动命令：`python backend/tools/recruitment_lab/app.py`，访问 <http://127.0.0.1:8766/>。数据工作台位于 `/radar`，可手动同步、筛选及导入岗位。模型与可选正文提取服务使用根目录 `.env` 配置。
-
-岗位探索直接打开招聘信息采集工作台（`/recruitment`），在本机保存岗位、招聘线索和采集记录；清洗后的岗位缓存会作为实时岗位库并入规划报告的招聘雷达检索。实时采集读取各平台公开搜索页，需要 Playwright Chromium 或本机 Chrome、Edge。从运行服务的电脑访问本机地址时，可以选择「用本机浏览器采集 BOSS」，在打开的专用窗口手动登录或完成验证，采集会复用工作区的浏览器配置。其他平台可以在原站打开搜索结果，保存为 HTML 后导入，也可导入 UTF-8 CSV。CSV 兼容 `platform`、`job_link`、`job_title`、`jd_text` 等常见列名。
-
-每天从看板点击「获取新岗位」，选择关键词、城市和平台后启动采集。CSV 和 HTML 位于「手动导入文件」。按北京时间跨天后，工作台清理早前采集且未保存的岗位。「批量删除」支持逐条勾选、全选本页，以及跨页全选全部未保存岗位。手动保存的岗位只在「已保存」中显示，卡片保留当前处理状态及物料。取消保存当天采集的岗位会将其移回看板，早前采集的岗位则会移除。
-
-岗位列表默认打开「优先看」，展示通过清洗或手动放行的岗位，已评分岗位按初评分数优先排列。可以切换到「全部岗位」或其他状态查看对应结果。点击岗位名称可查看职位描述、清洗依据和原帖，也可进入对应岗位的简历改写。CSV 随当前视图和筛选条件导出，单次最多导出 10,000 条。
-
-启用本机 Chrome 连接（`CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`）后，勾选「用本机 Chrome 采集」可对 BOSS 直聘、前程无忧、智联招聘和小红书分别检查登录，或点击「检查全部」。有登录或验证提示时，在用于采集的同一 Chrome 配置中处理，再重新检查。
-
-采集城市支持搜索、热门和拼音首字母分组。仓库内置城市分组及各平台对应的城市编码。平台缺少所选城市编码时会跳过并提示。小红书将所选城市或范围加入搜索关键词。
-
-「规则清洗」的硬规则支持目标城市、薪资区间、经验上限、按岗位最低学历筛选或排除指定学历要求，以及标题和公司排除词。可预览样例和数量，再应用到现有岗位。可让新采集和 CSV、网页导入自动运行硬规则。淘汰项保留原始记录与原因，可手动放行。月薪或城市无法确认时标为待核对。小红书招聘线索支持标题和公司关键词规则。
-
-在「规则清洗」抽屉中选择通用、实习或正式工作，各方向独立设置和预览规则。实习方向只填写日薪区间，页面按每月 22 个工作日显示参考月薪，清洗时也按该口径比较标注月薪的实习岗位。采集和 CSV 导入使用当前方向，网页导入可单独选择。旧规则和记录归入通用，可在岗位详情中调整归类。同一平台的同一岗位链接仅保留一条，已归入实习或正式工作的记录会保留当前方向。
-
-- **AI 初筛**：逐条设置规则词、「必须包含」或「绝不包含」以及判定标准。可手写标准，也可用已配置的清洗模型生成。内置示例须启用或编辑并保存才生效。保存后，选择通过硬规则的岗位运行初筛。禁止项命中时可查看原文依据，判定存疑的岗位标为待核对。
-- **图片提取**：在小红书岗位详情读取已授权 Chrome 中的原帖配图，或上传笔记截图。提取的多个岗位会在该笔记下逐条显示。
-- **AI 初评**：按求职方向保存简历、偏好和维度权重，再手动选择已清洗通过或放行的岗位。至少三个启用的维度具备可核对依据时计算总分，可在岗位列表按分数排序。初评会将职位描述和基准简历发给当前对话模型服务商。
-
-### 岗位定向简历改写
-
-从「我的简历」打开「简历改写」，或从岗位详情点「按此岗位改写简历」。右侧抽屉可选择 Skill、填写目标岗位和职位描述，再核对临时草稿。草稿沿用原简历的版式，可预览、导出 PDF 或另存为新版本。
-
-内置「简历改写」读取已连接的完整 `resume_rewrite.md`。可在 `.env` 中通过 `RESUME_REWRITE_SKILL_PATH` 指定该文件。生成时按 Skill 的格式提取定稿，校验技术词、数字及工作经历标题，保留原简历的联系信息和教育经历。还可上传 UTF-8 Markdown、填写公开 GitHub 地址或通过本机绝对路径导入自定义 Skill，导入后自动选用。
-
-本机已运行经过用户授权的 web-access Chrome 桥时，可在 `.env` 中设置 `CAREER_RECRUITMENT_USE_LOCAL_CHROME=1`（兼容旧配置 `CAREER_BOSS_USE_LOCAL_CHROME`）。开启后，BOSS、前程无忧、智联和小红书会分别在后台新开 Chrome 搜索标签页，检测当前浏览器的登录状态。需要手动登录或验证时，每个平台最多等待两分钟，超时会在采集记录中标明。猎聘历史数据仍可查看和导出。
-
-智联实时采集需要确认官网已登录。可使用「智联登录验证」卡片打开官网完成登录，再点击「检查登录」。如智联提示安全验证，在官网完成后可以重新检查；采集任务也会再次校验当前会话。
-点击已采集的智联岗位时，系统会用本机已登录的 Chrome 读取原站职位描述。成功读取的描述会保存到本地，也会用于 CSV 导出。
-
 <a id="configuration"></a>
 
 ## ⚙️ 模型与可选服务配置
@@ -314,180 +295,40 @@ flowchart LR
 
 | 配置 | 何时需要 | 配置方式 |
 | --- | --- | --- |
-| 对话模型 | 聊天、简历分析、职业规划报告、职业访谈、招聘 AI 初评 | 「系统配置」或 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
-| 招聘清洗模型 | 岗位语义清洗；手动提取笔记配图时复用同一模型 | 「系统配置」或 `CLEANER_LLM_BASE_URL`、`CLEANER_LLM_API_KEY`、`CLEANER_LLM_MODEL`。清洗配置未填完整时沿用对话模型。图片提取需要当前模型支持图文输入。 |
-| 图片模型 | 画像海报 | `TEXT_TO_IMAGE_API_KEY`，可选 `TEXT_TO_IMAGE_BASE_URL`。 |
-| 新闻 embedding | 新闻语义检索 | 参考 [新闻配置示例](.env.example)。 |
+| 对话模型 | 聊天、简历分析、规划报告，以及流水线的 AI 评估 / 深评 / 简历改写 / 打招呼语 | 「系统配置」或 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL`。 |
+| 招聘清洗模型 | 规则清洗的 AI 语义判定；配置不完整时沿用对话模型 | 「系统配置」或 `CLEANER_LLM_BASE_URL`、`CLEANER_LLM_API_KEY`、`CLEANER_LLM_MODEL`。 |
+| 技能向量模型 | 技能对齐与岗位检索 | 「系统配置」或 `AI_EMBEDDING_BASE_URL`、`AI_EMBEDDING_API_KEY`、`AI_EMBEDDING_MODEL`。 |
+| OCR | 扫描简历与图片导入识别；也可使用部署环境的 Tesseract | 「系统配置」或 `AI_OCR_BASE_URL`、`AI_OCR_API_KEY`、`AI_OCR_MODEL`。 |
+| 新闻 embedding | 行业快报语义检索 | 参考 [新闻配置示例](.env.example)。 |
 
 部署配置示例见 [.env.example](.env.example)。网页设置写入应用数据目录的 `model-settings.sqlite3`。密钥默认隐藏，系统管理员可以点击眼睛查看单个模型密钥。网页可编辑项在保存后生效，优先于进程环境和 `.env`，移除网页值可恢复部署配置。系统配置页也列出数据库、LightRAG 和外部 OCR 环境项，这些部署字段由环境管理。连通性测试使用已保存的模型配置，向服务商发送一条固定测试文本。白盒控制台只保留进程内近期请求的接口模板、状态和耗时，服务重启后清空。
 
-### 聊天记忆参数
+### 实时采集配置
 
-聊天记忆开箱即用，以下参数可用环境变量 `CHAT_MEMORY_<名称大写>` 覆盖，均为正整数。
+| 配置项 | 作用 |
+| --- | --- |
+| `CAREER_RECRUITMENT_USE_LOCAL_CHROME=1` | 启用本机 Chrome 登录态检查与后台采集（兼容旧配置 `CAREER_BOSS_USE_LOCAL_CHROME`）。 |
+| `RESUME_REWRITE_SKILL_PATH` | 指定个人中心「简历改写」使用的 Skill 文件；也可在页面中导入自定义 Skill。 |
 
-| 参数 | 默认值 | 作用 |
-| --- | --- | --- |
-| `DAILY_TOKENS` | 300000 | 每用户每日 token 配额。超额后暂停后台整理，达到两倍时才限制聊天。 |
-| `ARCHIVE_DAYS` | 180 | 会话多少天未更新后归档：保留笔记，删除消息原文与图片。 |
-| `IMAGE_DAYS` | 90 | 图片保留天数，过期后删除图片并在消息里留文字占位。 |
-| `EVENT_DAYS` | 365 | 记忆变更审计记录的保留天数。 |
-| `WINDOW_TOKENS` | 12000 | 近期消息窗口的 token 预算，以整轮对话为单位取舍。 |
-| `HISTORY_WAIT_MS` | 2500 | 挑选相关旧会话的最长等待时间，超时改用关键词匹配。 |
-
-队列积压与库体积可通过 `GET /api/chat/health` 查看，该接口不含用户数据。
+启用本机 Chrome 连接后，采集抽屉会为前程无忧、BOSS 直聘、智联招聘和小红书分别提供「检查登录」。需要手动登录或验证时，每个平台最多等待两分钟，超时会在采集记录中标明。采集会复用工作区的浏览器配置；关闭专用窗口或清除该配置后，需要重新登录。
 
 ### 按需启用服务
 
 | 服务 | 启用条件 | 说明 |
 | --- | --- | --- |
-| 岗位图谱 | 本地 LightRAG、PostgreSQL / pgvector、模型配置和岗位材料 | 按下方[初始化说明](#lightrag-setup)安装固定版本并应用职业模块补丁，再调用 LLM 抽取。 |
-| OCR | 安装 Tesseract 程序及所需语言数据 | 仅安装 Python 的 `pytesseract` 包不够。 |
-
-**服务维护**（首次创建环境见[快速启动](#quickstart)）：
-
-```bash
-docker compose --profile graph ps
-docker compose --profile graph logs --tail=100 postgres
-docker compose --profile graph stop
-docker compose --profile graph up -d --wait postgres
-```
-
-`stop` 停止服务，`up` 重新启动并复用数据卷。已有数据库中修改用户、密码或库名时，仅编辑 `.env` 不会修改已初始化的数据，需同步调整数据库。备份时同时保留 PostgreSQL 数据和下方职业事实库。
-
-<a id="lightrag-setup"></a>
-
-## 🕸️ LightRAG 知识图谱初始化与追加
-
-<div>
-<p><strong>首次克隆后，LightRAG 图谱为空，需要调用 LLM 抽取岗位材料。</strong>仓库中的岗位数据和图谱截图不等于已导入的知识库。当前未随仓库发布预处理数据库。</p>
-<p>下列流程会调用你配置的文本模型抽取岗位、技能、任务和任职条件，再调用 embedding 接口生成向量，写入本地事实库和 PostgreSQL。建议先用少量 JD 验证接口，再扩大导入。模型调用会产生对应服务商的费用。</p>
-</div>
-
-### 1. 安装项目使用的 LightRAG
-
-首次安装，在项目根目录执行：
-
-```bash
-git clone https://github.com/HKUDS/LightRAG.git artifacts/research/LightRAG
-git -C artifacts/research/LightRAG checkout aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a
-git -C artifacts/research/LightRAG apply --check ../patches/career-module.patch
-git -C artifacts/research/LightRAG apply ../patches/career-module.patch
-uv pip install -e "./artifacts/research/LightRAG[api]" asyncpg pgvector
-```
-
-补丁已包含职业模块；已有修改版请跳过克隆、切换提交和应用补丁。
-
-可选：使用图谱网页需安装 [Bun](https://bun.sh/docs/installation)，并构建 WebUI：
-
-```bash
-cd artifacts/research/LightRAG/lightrag_webui
-bun install --frozen-lockfile
-bun run build
-cd ../../../..
-```
-
-### 2. 配置文本模型、embedding 和数据库
-
-在根目录 `.env` 填写以下配置（模板见 [.env.example](.env.example)）：
-
-| 配置项 | 用途 |
-| --- | --- |
-| `LLM_BINDING_HOST`、`LLM_BINDING_API_KEY`、`LLM_MODEL` | OpenAI 兼容文本接口，用于职业事实抽取。 |
-| `EMBEDDING_BINDING_HOST`、`EMBEDDING_BINDING_API_KEY`、`EMBEDDING_MODEL` | embedding 接口，用于向量化。 |
-| `EMBEDDING_DIM`、`EMBEDDING_TOKEN_LIMIT` | 与所选 embedding 模型的实际维度、输入上限保持一致。 |
-| `POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DATABASE` | 与 Compose 启动的数据库一致。宿主机默认使用 `127.0.0.1:5432`。 |
-
-主站的 `AI_CHAT_*` 不会自动替代这里的 `LLM_*` / `EMBEDDING_*`。确认 PostgreSQL 服务健康。以下命令显式指定 `--workspace career_jd`，导入、查询和网页使用同一空间。
-
-### 3. 准备 UTF-8 岗位文件
-
-在项目根目录创建 `job_descriptions.txt`。每条岗位使用下列字段和空行，多条之间用**恰好 80 个等号**分隔：
-
-```text
-岗位名称：Python后端开发
-企业：示例公司
-城市：上海
-学历：本科
-
-岗位描述：
-负责 Python API 开发，要求熟悉 FastAPI、PostgreSQL 和 Docker。
-================================================================================
-
-岗位名称：数据分析师
-企业：另一家示例公司
-城市：杭州
-学历：本科
-
-岗位描述：
-使用 SQL 和 Python 分析业务数据，编写分析报告。
-```
-
-这是格式示例。实际导入时换成自己的岗位原文。`job_descriptions.txt` 默认不提交 Git。现有 `data/cleaned/merged/` 数据需整理为以上格式后导入，脚本不会自动扫描整个数据目录。
-
-### 4. 预览、抽取和查看结果
-
-先预览 2 条，检查格式（不调用模型、不连接数据库）：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py import --input job_descriptions.txt --workspace career_jd --limit 2 --preview
-```
-
-再抽取 2 条验证模型、向量和数据库配置：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py import --schema career --input job_descriptions.txt --workspace career_jd --limit 2
-uv run --no-project python artifacts/research/job_graph.py career status --workspace career_jd
-uv run --no-project python artifacts/research/job_graph.py career roles --workspace career_jd
-```
-
-确认成功后导入全部岗位。默认 `--limit 0` 表示读取到文件末尾。同一顺序、同一内容生成稳定记录 ID，已抽取成功的记录会复用事实，不重复进行 LLM 抽取：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py import --schema career --input job_descriptions.txt --workspace career_jd
-```
-
-可选启动图谱网页（完成 WebUI 构建后），访问 <http://127.0.0.1:9622>：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py serve --schema career --workspace career_jd
-```
-
-### 5. 后续追加岗位与失败重试
-
-将新岗位追加到原文件末尾，保留旧记录的顺序和内容，再运行同一条全量导入命令即可。也可用 `--start` 从指定序号继续，例如旧文件有 200 条，新增 20 条：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py import --schema career --input job_descriptions.txt --workspace career_jd --start 201 --limit 20
-```
-
-失败记录默认不会自动重试。修复接口或配置后显式重试，服务限流时可将抽取并发降为 1：
-
-```bash
-uv run --no-project python artifacts/research/job_graph.py import --schema career --input job_descriptions.txt --workspace career_jd --retry-failed --extract-workers 1
-```
-
-职业事实保存在 `artifacts/research/.job_graph/career.sqlite3`，图和向量保存在 PostgreSQL，运行文件位于 `artifacts/research/jd_rag_storage/`。保留事实库才能在后续导入时复用结果。这些运行数据默认不提交 Git。不要在同一空间随意换用重新排序的文件、岗位分类目录或不同维度的 embedding 模型。独立实验请更换 `--workspace`，更换模型维度时还需隔离数据库。完整参数见 `uv run --no-project python artifacts/research/job_graph.py import --help`。
-
-安装与部署写法参考 [FastAPI 全栈模板](https://github.com/fastapi/full-stack-fastapi-template/blob/master/backend/README.md)、[LightRAG](https://github.com/HKUDS/LightRAG) 和 [Docker Compose 官方指南](https://docs.docker.com/compose/gettingstarted/)，命令按本仓库实际入口整理。
+| 岗位图谱 | 本地 LightRAG、PostgreSQL / pgvector、模型配置和岗位材料 | 使用 `artifacts/research/job_graph.py` 抽取与导入。 |
+| OCR | 安装 Tesseract 程序及所需语言数据，或配置 `AI_OCR_*` | 仅安装 Python 的 `pytesseract` 包不够。 |
+| PostgreSQL | 岗位图谱或持久化图存储 | 由 Compose 的 `graph` profile 启动。 |
 
 ## 🧪 开发与测试
 
 ```bash
 uv pip install pytest                 # 测试依赖，不在 requirements.txt 里
 uv run --no-project python -m pytest  # 后端测试（约 30 秒）
-npm run check                         # 前端静态检查：脚本语法、重复函数、模板引用的文件是否存在
+npm run check                         # 前端静态检查与 TypeScript 类型检查
 npm run test:unit                     # 前端单元测试
 npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwright 的 Chromium
-# backend/tests/test_browser_pages.py 也会用真实浏览器打开各页面，检查脚本无报错；没有 Chromium 时自动跳过
 ```
-
-- **容器部署**：`docker compose up --build -d` 构建镜像并只启动主站，访问 `http://127.0.0.1:8080`，存活探针为 `/healthz`。前端在构建阶段编译，镜像包含 Python 依赖和 Tesseract 中文 OCR；模型密钥读取根目录 `.env`。需要 PostgreSQL / pgvector 时，先填写 `POSTGRES_PASSWORD` 并创建外部卷 `research_career_pgdata`，再用 `docker compose --profile graph up --build -d` 同时启动应用与数据库；也可用 `docker compose --profile graph up -d --wait postgres` 只启动数据库。
-- **已有容器迁移**：应用数据卷固定复用旧名称 `career-app_career_appdata`，数据库继续复用 `research_career_pgdata`。如果此前用旧应用配置启动过容器，先执行 `docker compose -p career-app stop app` 停止旧应用，再执行新的启动命令，避免端口冲突；不要删除数据卷。
-- **前端脚本**：工作台主脚本是一组普通脚本（共享全局作用域），不是 ES 模块。`app-state.js` 放全局状态与常量并最先加载，`app-boot.js` 放加载时执行的语句并最后加载，中间各 `app-*.js` 按功能放函数声明。新增函数放进对应功能文件、新增顶层常量放 `app-state.js`；`npm run check` 会拦截跨文件的重名函数、重复的 `const`/`let` 和没列入加载列表的文件。
-- 后端测试使用临时数据目录并关闭后台采集与资讯预热，不会读写 `data/app_data`，也不访问外网或使用 `.env` 里的模型密钥。
-- 手动试跑时可设置 `CAREER_APP_DATA_DIR` 指向独立目录，避免动到真实数据；`CAREER_PREWARM=0` 跳过资讯预热，`JOB_MARKET_SCHEDULER=0` 关闭岗位定时采集。
-- Word 导出优先使用外部的 `docx_mcp`（环境变量 `CAREER_REPORT_DOCX_PYTHON` 指定解释器），不可用或失败时自动改用内置的 python-docx 转换，所以全新环境也能导出。
-- `.github/workflows/ci.yml` 是一份持续集成配置（后端测试、前端检查与构建），但 `.gitignore` 默认排除 `/.github/workflows/`，所以它只留在本地；想在 GitHub 上启用，删掉那条忽略规则后提交即可。
 
 <a id="development"></a>
 
@@ -496,26 +337,31 @@ npm run test:browser --workspace frontend   # 浏览器测试，需要 Playwrigh
 ```text
 career-agent/
 ├── backend/
-│   ├── server.py                 # 主站入口：只做装配（创建应用、注册蓝图、启动），约 200 行
+│   ├── server.py                 # 主站入口：创建应用、注册蓝图、启动
 │   ├── advisor/                  # Agent、提示词、报告工作流与招聘雷达
-│   ├── services/                 # 业务服务
-│   │   ├── chat/                 #   聊天接口与三层记忆
-│   │   ├── user_state.py         #   工作区状态层：存储标识、状态文件与私有目录
-│   │   ├── site.py  webshell.py  #   首页与启动数据；静态资源、Vite 标签、CORS 与压缩
-│   │   ├── report/               #   报告：store 存储、tracker 行动追踪、writer 写入、jobs 后台任务、api 接口、导出
-│   │   ├── resume/               #   简历：pipeline 提取与分析、jobs 后台任务、api 接口、岗位匹配
-│   │   ├── appctx.py             #   后台线程取 Flask 应用的入口
-│   │   ├── interview.py          #   职业访谈、MBTI 追问、深度测评分析
-│   │   ├── portrait.py           #   用户画像海报
-│   │   ├── pages.py  news/       #   独立页面与资讯
-│   │   ├── llm_calls.py          #   大模型调用：重试与结构化 JSON 修复
-│   │   └── cors.py               #   Flask 与聊天接口共用的跨域策略
+│   ├── services/
+│   │   ├── recruitment.py        # 招聘采集页面与平台接口
+│   │   ├── recruitment_pipeline.py # 岗位全链路状态机、评估、改写、投递
+│   │   ├── recruitment_cleaning.py # 硬规则与语义清洗
+│   │   ├── recruitment_ai.py     # 清洗 / 初筛 / 深评的模型调用
+│   │   ├── recruitment_chrome.py # 本机 Chrome 登录态与采集
+│   │   ├── recruitment_sources.py # 平台入口、字段选择器与城市编码
+│   │   ├── chat/                 # 聊天接口与三层记忆
+│   │   ├── resume/               # 简历：解析、编辑器、改写、岗位匹配
+│   │   ├── report/               # 报告：存储、追踪、写入、任务、导出
+│   │   ├── job_market/           # 本地岗位库与采集调度
+│   │   ├── user_state.py         # 工作区状态层：存储标识、状态文件与私有目录
+│   │   ├── site.py  webshell.py  # 首页与启动数据；静态资源、Vite 标签与压缩
+│   │   ├── pages.py  news/       # 独立页面与行业资讯
+│   │   ├── interview.py          # 职业访谈与深度测评分析
+│   │   ├── llm_calls.py          # 大模型调用：重试与结构化 JSON 修复
+│   │   └── cors.py               # Flask 与聊天接口共用的跨域策略
 │   ├── tests/                    # 后端测试（pytest）
 │   ├── tools/                    # 招聘测试台与数据工作台
 │   └── scripts/                  # 启动、管理员与数据构建脚本
 ├── frontend/
 │   ├── templates/                # 页面与可复用 Jinja2 片段
-│   ├── static/                   # 业务脚本、样式、媒体与构建资源；主脚本按功能拆成 app-*.js（顺序见 templates/partials/app_scripts.html），页面间共用顺序见 report_workspace_scripts.html
+│   ├── static/                   # 业务脚本、样式、媒体与构建资源
 │   ├── scripts/                  # 前端静态检查与依赖同步
 │   ├── tests/                    # 前端单元与浏览器测试
 │   ├── src/entries/              # Vite 多页面入口
@@ -528,7 +374,7 @@ career-agent/
 │   ├── knowledge/                # 职业与行业分类资料
 │   ├── onet/                     # O*NET 职业资料
 │   ├── public/                   # 测评题库等公开资源
-│   └── app_data/                 # 数据库、上传文件、报告及对话
+│   └── app_data/                 # 数据库、上传文件、报告、岗位缓存及对话
 ├── asserts/                      # README 页面截图
 ├── deploy/                       # Nginx 示例与静态导出目录
 ├── .github/workflows/ci.yml      # 持续集成配置（本地文件，被 .gitignore 排除）
@@ -538,20 +384,12 @@ career-agent/
 └── compose.yml                   # 主站容器部署及可选 PostgreSQL / pgvector
 ```
 
-## 技能匹配与检索
-
-简历与岗位先抽取有原文依据的技能，再通过标准词表、向量候选和模型确认对齐。技能覆盖率只表示简历文本体现的比例，不代表胜任概率；未对齐短语与未知能力保留待核实。
-
-岗位检索使用 BM25、向量及可用的 LightRAG 候选，经 RRF 融合与多因子重排。默认复用 `.env` 中的 `EMBEDDING_*` 配置；`JOB_RETRIEVAL_GRAPH_ENABLED=0` 可关闭图通道，`JOB_JD_SOURCE_PATH` 可指定本地 JD 导出。
-
-使用 `python backend/scripts/evaluate_job_retrieval.py --cases judgments.json --dense` 对配置的本地语料评估。标注文件由调用者提供，格式为 `[{"query":"查询", "relevance":{"来源路径#record=1":3}}]`，相关性等级为 0–4；工具同时检查 NDCG@10、Recall@100，出现排序或召回回退时返回非零退出码。评估输出和向量缓存属于本地生成内容，不纳入仓库。
-
 ## 致谢
 
 本项目参考并使用了以下开源项目，感谢作者的分享：
 
 - [JobHunter](https://github.com/Bynlk/JobHunter)：招聘信息采集。
-- [Jobhunter AI](https://github.com/jolie-z/jobhunter-ai/tree/main/backend)：五个招聘平台的搜索入口、字段规则与采集工作台参考。
+- [Jobhunter AI](https://github.com/jolie-z/jobhunter-ai/tree/main/backend)：招聘平台的搜索入口、字段规则与采集工作台参考。
 - [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)：校招数据聚合与招聘雷达。
 - [LightRAG](https://github.com/HKUDS/LightRAG)：岗位知识图谱与检索。
 
