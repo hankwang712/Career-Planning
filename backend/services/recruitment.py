@@ -24,7 +24,7 @@ from . import recruitment_pipeline as pipeline
 from .paths import APP_DATA_DIR
 from .recruitment_chrome import (
     CHROME_SOURCES, LOGIN_URLS, SESSION_LABELS, SESSION_MESSAGES, check_platform_login, collect_in_chrome,
-    read_xiaohongshu_images, read_zhilian_detail, use_local_chrome,
+    read_platform_detail, read_xiaohongshu_images, read_zhilian_detail, use_local_chrome,
 )
 from .recruitment_sources import (
     CITIES, CITY_CATALOG, SOURCES, collect_local_boss, collect_source, launch_browser, listing_url,
@@ -44,6 +44,14 @@ CSV_ALIASES = {"platform": "source", "job_title": "title", "company_name": "comp
                "education_req": "education", "work_address": "location"}
 html_import_lock = threading.Lock()
 UNRENDERABLE_TEXT = re.compile(r"[\ue000-\uf8ff\U000f0000-\U0010fffd\ufffd]")
+JOB51_NOISE = re.compile(r"(?:\s*(?:去聊聊|立即投递|投递|举报|分享|微信扫码分享)\s*)+$")
+XHS_SEEKER_MARKERS = re.compile(r"求捞|求内推|求带|找实习|找工作|求职记录|投递记录|面经|待业|蹲一个.*实习|女大.*实习|男大.*实习")
+XHS_HIRING_MARKERS = re.compile(r"招聘|招人|诚聘|急招|热招|内推码|直招|直聘|岗位|HC|简历投递|欢迎投递|团队招|组内招|招.*实习|招.*工程师|招.*开发|招.*算法")
+
+
+def is_xiaohongshu_seeker_post(title, description=""):
+    text = f"{title or ''} {description or ''}"
+    return bool(XHS_SEEKER_MARKERS.search(text) and not XHS_HIRING_MARKERS.search(text))
 
 
 def init_schema(conn):
@@ -86,14 +94,17 @@ class CollectRequest(BaseModel):
     chrome_local: bool = Field(default=False, strict=True)
 
 
-def clean_listing(fields):
+def clean_listing(fields, source=""):
     for key in ("title", "company", "location", "salary", "description", "experience", "education"):
         value = str(fields.get(key) or "").strip()
-        if key == "salary" and UNRENDERABLE_TEXT.search(value):
+        if key == "salary" and (UNRENDERABLE_TEXT.search(value) or "*" in value):
             fields[key] = ""
         elif key == "description":
             lines = [line.strip() for line in value.splitlines() if not UNRENDERABLE_TEXT.search(line)]
-            fields[key] = "\n".join(lines).strip()
+            cleaned = "\n".join(lines).strip()
+            if source == "51job":
+                cleaned = JOB51_NOISE.sub("", cleaned).strip()
+            fields[key] = cleaned
         else:
             fields[key] = UNRENDERABLE_TEXT.sub("", value)
     return fields
@@ -104,13 +115,15 @@ def save_rows(conn, owner, source, rows, *, profile=cleaning.DEFAULT_PROFILE, cl
     records = []
     note_links = []
     for row in rows:
-        row = clean_listing(dict(row))
+        row = clean_listing(dict(row), source)
         url = listing_url(source, str(row.get("url") or "")) if row.get("url") else ""
         title = str(row.get("title") or "").strip()[:250]
         if not title and source == "xiaohongshu":
             description = str(row.get("description") or "").strip()
             title = (description.splitlines() or [""])[0][:250]
         if not url or not title:
+            continue
+        if source == "xiaohongshu" and is_xiaohongshu_seeker_post(title, row.get("description", "")):
             continue
         if url in seen:
             continue
@@ -156,52 +169,88 @@ def save_progress(conn, owner, run_id, progress, status="running"):
 
 def zhilian_detail_url(value):
     url = listing_url("zhilian", value) if isinstance(value, str) and len(value) <= 2048 else ""
-    if url and urlsplit(url).hostname == "www.zhaopin.com" and urlsplit(url).path.startswith("/jobdetail/"):
+    if not url:
+        return ""
+    parsed = urlsplit(url)
+    if parsed.hostname == "www.zhaopin.com" and parsed.path.startswith("/jobdetail/"):
+        return url
+    if parsed.hostname == "xiaoyuan.zhaopin.com" and parsed.path.startswith(("/job/", "/jobdetail/")):
         return url
     return ""
 
 
-def save_zhilian_detail(conn, owner, url, text):
-    args = (owner, "zhilian", url)
-    row = conn.execute("SELECT profile FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
+def save_job_detail(conn, owner, source, url, text, salary=""):
+    args = (owner, source, url)
+    row = conn.execute("SELECT profile, salary FROM recruitment_listings WHERE owner=? AND source=? AND url_key=?", args).fetchone()
     if row is None:
         return ""
+    cleaned_salary = clean_listing({"salary": salary}, source)["salary"] if salary else ""
+    if cleaned_salary and not (row["salary"] or "").strip():
+        conn.execute(
+            "UPDATE recruitment_listings SET salary=? WHERE owner=? AND source=? AND url_key=?",
+            (cleaned_salary[:120], *args),
+        )
     inserted = conn.execute("INSERT OR IGNORE INTO recruitment_job_details VALUES (?, ?, ?, ?)", (*args, text)).rowcount
     if not inserted:
         return conn.execute("SELECT description FROM recruitment_job_details WHERE owner=? AND source=? AND url_key=?", args).fetchone()[0]
-    rules = cleaning.load_rules(conn, owner, row["profile"])
-    if rules.experience_years_max is not None or rules.require_education or rules.exclude_education:
-        cleaning.apply_ingested(conn, owner, "zhilian", [url])
+    cleaning.apply_ingested(conn, owner, source, [url])
     return text
 
 
-def collect_zhilian_details(conn, owner, urls, item, publish):
+def save_zhilian_detail(conn, owner, url, text):
+    return save_job_detail(conn, owner, "zhilian", url, text)
+
+
+def collect_platform_details(conn, owner, source, urls, item, publish):
     cached = {row[0] for row in conn.execute("""
-        SELECT url_key FROM recruitment_job_details WHERE owner=? AND source='zhilian'
+        SELECT url_key FROM recruitment_job_details WHERE owner=? AND source=?
         AND url_key IN (SELECT value FROM json_each(?)) AND description<>''
-    """, (owner, json.dumps(urls)))}
+    """, (owner, source, json.dumps(urls)))}
+    note_urls = {}
+    if source == "xiaohongshu":
+        note_urls = dict(conn.execute("""
+            SELECT url_key, note_url FROM recruitment_note_links WHERE owner=? AND source='xiaohongshu'
+            AND url_key IN (SELECT value FROM json_each(?))
+        """, (owner, json.dumps(urls))).fetchall())
     progress = {"total": len(urls), "checked": len(cached), "available": len(cached)}
     item = {**item, "status": "reading_details", "message": "正在读取原站岗位职责和任职要求。"}
     publish({**item, "details": dict(progress)})
     for url in urls:
         if url in cached:
             continue
-        state, detail = read_zhilian_detail(url) if zhilian_detail_url(url) else ("no_detail", "")
-        text = clean_listing({"description": detail})["description"]
+        if source == "zhilian":
+            state, detail = read_zhilian_detail(url) if zhilian_detail_url(url) else ("no_detail", "")
+            salary = ""
+        else:
+            target = note_urls.get(url, url) if source == "xiaohongshu" else url
+            state, detail, salary = read_platform_detail(source, target)
+        cleaned = clean_listing({"description": detail, "salary": salary}, source)
+        text = cleaned["description"]
         progress["checked"] += 1
         if text:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
-                progress["available"] += bool(save_zhilian_detail(conn, owner, url, text))
+                progress["available"] += bool(save_job_detail(conn, owner, source, url, text, salary=cleaned["salary"]))
         if state in {"not_logged_in", "verification_required", "unavailable"}:
             item["detail_state"] = state
             break
         publish({**item, "details": dict(progress)})
     missing = progress["total"] - progress["available"]
-    item.update(status="partial" if missing else "succeeded",
-                message=(SESSION_MESSAGES.get(item.get("detail_state"), "部分原站详情未读取。") if missing
-                         else "列表和原站 JD 已保存。"))
+    strict_partial = source == "zhilian" or item.get("detail_state") in {"not_logged_in", "verification_required"}
+    if missing and strict_partial:
+        item.update(
+            status="partial",
+            message=SESSION_MESSAGES.get(item.get("detail_state"), "部分原站详情未读取。"),
+        )
+    elif progress["available"]:
+        item.update(status="succeeded", message="列表和原站 JD 已保存。")
+    else:
+        item.update(status="succeeded", message=item.get("message") or f"已读取 {progress['total']} 条岗位。")
     publish({**item, "details": dict(progress)})
+
+
+def collect_zhilian_details(conn, owner, urls, item, publish):
+    return collect_platform_details(conn, owner, "zhilian", urls, item, publish)
 
 
 def run_chrome_sources(owner, run_id, config, progress):
@@ -218,7 +267,9 @@ def run_chrome_sources(owner, run_id, config, progress):
         def update(status, message):
             publish({"status": status, "message": message})
 
-        status, message, rows = collect_in_chrome(source, config.keyword, config.city, config.limit, update)
+        status, message, rows = collect_in_chrome(
+            source, config.keyword, config.city, config.limit, update, profile=config.profile
+        )
         urls = []
         with conn:
             counts = {}
@@ -226,8 +277,8 @@ def run_chrome_sources(owner, run_id, config, progress):
         item = {"status": status, "message": message, "count": count}
         if counts:
             item["cleaning"] = counts
-        if source == "zhilian" and urls:
-            collect_zhilian_details(conn, owner, urls, item, publish)
+        if urls and source in {"zhilian", "boss", "51job", "xiaohongshu"}:
+            collect_platform_details(conn, owner, source, urls, item, publish)
         else:
             publish(item)
 
@@ -261,19 +312,22 @@ def run_collection(owner, run_id, config, progress):
                 try:
                     if config.boss_local and source == "boss" and use_local_chrome():
                         status, message, rows = collect_in_chrome(
-                            source, config.keyword, config.city, config.limit, browser_status
+                            source, config.keyword, config.city, config.limit, browser_status, profile=config.profile
                         )
                     elif source == "zhilian":
                         status, message, rows = "login_required", "智联采集需要启用本机 Chrome 并完成登录检查。", []
                     elif source == "boss" and config.boss_local:
                         profile = APP_DATA_DIR / "recruitment_profiles" / sha256(owner.encode()).hexdigest() / "boss"
                         status, message, rows = collect_local_boss(
-                            playwright, profile, config.keyword, config.city, config.limit, browser_status
+                            playwright, profile, config.keyword, config.city, config.limit, browser_status,
+                            profile=config.profile,
                         )
                     else:
                         if browser is None:
                             browser = browsers.enter_context(launch_browser(playwright))
-                        status, message, rows = collect_source(browser, source, config.keyword, config.city, config.limit)
+                        status, message, rows = collect_source(
+                            browser, source, config.keyword, config.city, config.limit, profile=config.profile
+                        )
                 except BrowserError:
                     status, message, rows = "unavailable", "页面加载未完成，请尝试原站搜索。", []
                     if source == "boss" and config.boss_local:
@@ -400,7 +454,11 @@ def runs():
         rows = conn.execute("SELECT id, keyword, city, started_at, status, progress, profile FROM recruitment_runs "
                             "WHERE owner=? ORDER BY started_at DESC LIMIT 8", (owner,)).fetchall()
     return jsonify(items=[{**dict(row), "progress": {
-        source: {**item, "search_url": search_url(source, row["keyword"], row["city"]), "login_url": LOGIN_URLS.get(source)}
+        source: {
+            **item,
+            "search_url": search_url(source, row["keyword"], row["city"], row["profile"]),
+            "login_url": LOGIN_URLS.get(source),
+        }
         for source, item in json.loads(row["progress"]).items()
     }} for row in rows])
 

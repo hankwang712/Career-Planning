@@ -52,9 +52,9 @@ DIMENSIONS = {
     "compensation": "薪资契合", "interview_prob": "面试概率", "company_stage": "公司阶段",
     "market_fit": "赛道前景", "growth": "成长空间",
 }
-DEFAULT_WEIGHTS = {"role_match": 1.0, "skills_align": 1.0, "seniority": 0.8,
-                   "compensation": 0.8, "interview_prob": 0.8, "company_stage": 0.2,
-                   "market_fit": 0.5, "growth": 0.5}
+DEFAULT_WEIGHTS = {"role_match": 5, "skills_align": 5, "seniority": 4,
+                   "compensation": 4, "interview_prob": 4, "company_stage": 1,
+                   "market_fit": 2, "growth": 2}
 NEUTRAL_DIMS = ("company_stage", "market_fit", "growth")
 DEEP_KEYS = ("extracted_skills", "ats_ability_analysis", "resume_audit", "dream_picture",
              "strong_fit_assessment", "risk_red_flags", "deep_action_plan")
@@ -1428,14 +1428,20 @@ def rail_payload(conn, owner, config):
         "SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND stage='rejected' AND follow_status=?",
         (owner, FOLLOW_CLEAN_REJECTED),
     ).fetchone()[0]
+    cleaning_pending = conn.execute("""
+        SELECT count(*)
+        FROM recruitment_pipeline p
+        LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        WHERE p.owner=? AND p.stage='collected' AND COALESCE(r.status, 'unreviewed')='unreviewed'
+    """, (owner,)).fetchone()[0]
     rewritten = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND rewrite_payload<>''", (owner,)).fetchone()[0]
     greeted = conn.execute("SELECT count(*) FROM recruitment_pipeline WHERE owner=? AND greeting_payload<>''", (owner,)).fetchone()[0]
     steps = [
-        {"key": "scraping", "label": "抓取导入", "desc": "平台实时采集（本机 Chrome）+ 本地导入",
+        {"key": "scraping", "label": "抓取导入", "desc": "平台实时采集（本机 Chrome）",
          "config_state": "configured" if funnel["crawled"] else "required_missing", "count": funnel["crawled"]},
         {"key": "cleaning", "label": "规则清洗", "desc": "Tier1 硬规则 + Tier2 语义规则",
          "config_state": "configured" if rules_saved else "required_missing",
-         "count": funnel["cleaned"] + cleaning_rejected},
+         "count": funnel["cleaned"], "pending": cleaning_pending},
         {"key": "evaluating", "label": "AI评估", "desc": "八维评级，精投岗位自动深评",
          "config_state": "configured" if (llm_ready or config.heuristic_mode) else "required_missing",
          "count": funnel["evaluated"]},
@@ -1457,6 +1463,7 @@ def rail_payload(conn, owner, config):
 TAB_STAGES = {
     "all": None,
     "saved": None,
+    "review": None,
     "rejected": ("rejected",),
     "in_progress": ("collected", "cleaned", "screened", "deep", "rewritten", "greeted"),
     "reeval": ("reeval",),
@@ -1469,24 +1476,49 @@ TAB_STAGES = {
 
 def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
     ensure_rows(conn, owner)
+    review_expr = f"(p.stage IN ('collected', 'cleaned') AND COALESCE({cleaning.EFFECTIVE_STATUS}, 'unreviewed')='review')"
     # 已保存岗位只出现在 saved 视图；其余视图与计数只统计未保存岗位。
+    # 待核实岗位（cleaning_status='review'）单独归入 review 视图，不再计入 in_progress。
     counts = dict.fromkeys(TAB_STAGES, 0)
-    for stage, saved, count in conn.execute(
-            "SELECT stage, saved, count(*) FROM recruitment_pipeline WHERE owner=? GROUP BY stage, saved", (owner,)):
+    for stage, saved, is_review, count in conn.execute(f"""
+        SELECT p.stage, p.saved, CASE WHEN {review_expr} THEN 1 ELSE 0 END AS is_review, count(*)
+        FROM recruitment_pipeline p
+        JOIN recruitment_listings j USING(owner, source, url_key)
+        LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        WHERE p.owner=?
+        GROUP BY p.stage, p.saved, is_review
+    """, (owner,)):
         for name, stages in TAB_STAGES.items():
             if name == "saved":
                 counts[name] += count if saved else 0
-            elif not saved and (stages is None or stage in stages):
+            elif saved:
+                continue
+            elif name == "all":
+                counts[name] += count
+            elif name == "review":
+                counts[name] += count if is_review else 0
+            elif name == "in_progress":
+                if stage in stages and not is_review:
+                    counts[name] += count
+            elif stages and stage in stages:
                 counts[name] += count
     where, args = "p.owner=?", [owner]
     if tab == "saved":
         where += " AND p.saved=1"
     else:
         where += " AND p.saved=0"
-        stages = TAB_STAGES.get(tab)
-        if stages:
-            where += " AND p.stage IN (" + ", ".join("?" for _ in stages) + ")"
+        if tab == "review":
+            where += f" AND {review_expr}"
+        elif tab == "in_progress":
+            stages = TAB_STAGES["in_progress"]
+            where += f" AND p.stage IN ({', '.join('?' for _ in stages)}) AND NOT {review_expr}"
             args += list(stages)
+        else:
+            stages = TAB_STAGES.get(tab)
+            if stages:
+                where += " AND p.stage IN (" + ", ".join("?" for _ in stages) + ")"
+                args += list(stages)
     if keyword:
         like = f"%{keyword}%"
         where += " AND (j.title LIKE ? OR j.company LIKE ?)"
@@ -1494,7 +1526,14 @@ def jobs_payload(conn, owner, tab, keyword, limit, offset, source=""):
     if source:
         where += " AND p.source=?"
         args.append(source)
-    total = conn.execute(f"SELECT count(*) FROM recruitment_pipeline p JOIN recruitment_listings j USING(owner, source, url_key) WHERE {where}", args).fetchone()[0]
+    total = conn.execute(f"""
+        SELECT count(*)
+        FROM recruitment_pipeline p
+        JOIN recruitment_listings j USING(owner, source, url_key)
+        LEFT JOIN recruitment_cleaning_results r USING(owner, source, url_key)
+        {cleaning.SEMANTIC_JOIN}
+        WHERE {where}
+    """, args).fetchone()[0]
     ordering = "p.saved_at DESC, j.source, j.url_key" if tab == "saved" else "p.updated_at DESC, j.source, j.url_key"
     rows = conn.execute(f"""
         SELECT j.source, j.url_key, j.title, j.company, j.location, j.salary, j.url, j.experience, j.education,

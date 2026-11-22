@@ -203,10 +203,16 @@ def monthly_pay(value):
     if not match:
         return None, None
     low, low_unit, high, high_unit, period = match.groups()
-    if not period and not {low_unit, high_unit} & {"k", "千", "千元"}:
-        return None, None
+    units = {low_unit, high_unit}
     minimum = float(low) * PAY_SCALE[low_unit or high_unit]
     maximum = float(high or low) * PAY_SCALE[high_unit or low_unit]
+    if not period:
+        if units & {"k", "千", "千元"}:
+            pass
+        elif units & {"万", "万元"} and maximum < 100_000:
+            pass
+        else:
+            return None, None
     return (minimum, maximum) if 0 < minimum <= maximum <= 10_000_000 else (None, None)
 
 

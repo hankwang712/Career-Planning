@@ -14,7 +14,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from .recruitment_sources import SOURCES, cards, platform_url, search_url
+from .recruitment_sources import (
+    JOB51_APPLY_FILTER, JOB51_WORK_TYPES, SOURCES, cards, platform_url, search_url,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,7 @@ TAB_ID = re.compile(r"[0-9a-fA-F]{32}")
 CHROME_SOURCES = {
     "boss": ("www.zhipin.com", "/web/geek/jobs"),
     "51job": ("we.51job.com", "/pc/search"),
-    "zhilian": ("www.zhaopin.com", "/jobs"),
+    "zhilian": ("xiaoyuan.zhaopin.com", "/search/index"),
     "xiaohongshu": ("www.xiaohongshu.com", "/search_result"),
 }
 LOGIN_WAIT_SECONDS = 120
@@ -39,17 +41,60 @@ LOGIN_URLS = {
 LOGIN_HOSTS = {"passport.zhipin.com", "passport.zhaopin.com", "login.51job.com", "passport.51job.com"}
 SESSION_URLS = {**LOGIN_URLS, **{source: SOURCES[source][1] for source in ("boss", "51job")}}
 ZHILIAN_LOGIN = r"""(() => {
-    if (location.origin !== 'https://www.zhaopin.com') return 'unknown';
-    const visitor = document.querySelector('.home-header__c-no-login, .c-login__top__no-login');
-    if (visitor?.getClientRects().length) return 'not_logged_in';
-    const account = document.querySelector('.c-login__top__name, .c-login__top__img, .home-header__c-login');
-    if (account?.getClientRects().length) return 'ready';
-    const header = document.querySelector('.home-header__right, .c-login__top, header');
-    const controls = Array.from(header?.querySelectorAll('a, button, [role="button"]') || []);
-    const label = (node) => node.textContent.trim().replace(/\s+/g, '');
-    if (controls.some(node => ['退出', '退出登录'].includes(label(node)))) return 'ready';
-    if (controls.some(node => ['登录', '登录/注册', '登录／注册'].includes(label(node)) && node.getClientRects().length))
+    if (!['https://www.zhaopin.com', 'https://xiaoyuan.zhaopin.com'].includes(location.origin)) return 'unknown';
+    const visible = el => Boolean(el?.getClientRects?.().length);
+    const label = (node) => (node.textContent || '').trim().replace(/\s+/g, '');
+    const visitor = document.querySelector('.home-header__c-no-login, .c-login__top__no-login, .xy-header__login');
+    if (visible(visitor)) return 'not_logged_in';
+    const header = document.querySelector('.home-header__right, .c-login__top, header, [class*="header"]');
+    const controls = Array.from(header?.querySelectorAll('a, button, [role="button"], span') || []);
+    if (controls.some(node => visible(node) && ['登录', '登录/注册', '登录／注册'].includes(label(node))))
         return 'not_logged_in';
+    const account = document.querySelector('.c-login__top__name, .c-login__top__img, .home-header__c-login, .user-info, .user-name, .user-avatar, [class*="user-name"], [class*="avatar"]');
+    if (visible(account)) return 'ready';
+    if (controls.some(node => visible(node) && ['退出', '退出登录', '个人中心', '我的简历', '消息'].includes(label(node)))) return 'ready';
+    if (location.origin === 'https://xiaoyuan.zhaopin.com' && document.querySelectorAll("a[href*='/job/'], a[href*='/jobdetail/'], .job-card, .fn-job-item, .job-item").length > 0)
+        return 'ready';
+    return 'unknown';
+})()"""
+BOSS_LOGIN = r"""(() => {
+    if (location.origin !== 'https://www.zhipin.com') return 'unknown';
+    const visible = el => Boolean(el?.getClientRects?.().length);
+    const clean = el => (el?.innerText || el?.textContent || '').trim().replace(/\s+/g, '');
+    if (visible(document.querySelector('.btn-sign, .header-login-btn, .login-dialog-wrapper, .sign-form-wrapper')))
+        return 'not_logged_in';
+    const header = document.querySelector('#header, header, .header-inner, .user-nav');
+    const controls = Array.from(header?.querySelectorAll('a, button') || []);
+    if (controls.some(el => visible(el) && /^(登录|注册|登录\/注册|登录／注册)$/.test(clean(el))))
+        return 'not_logged_in';
+    if (Array.from(document.querySelectorAll('a, button')).some(el => visible(el) && clean(el) === '登录查看完整内容'))
+        return 'not_logged_in';
+    if (visible(document.querySelector('.nav-figure, .user-nav .nav-figure img, .user-nav .label-text, .nav-chat, a[href*="/web/geek/chat"], a[href*="/web/geek/resume"]')))
+        return 'ready';
+    return 'unknown';
+})()"""
+JOB51_LOGIN = r"""(() => {
+    if (!['https://we.51job.com', 'https://jobs.51job.com'].includes(location.origin)) return 'unknown';
+    const visible = el => Boolean(el?.getClientRects?.().length);
+    const clean = el => (el?.innerText || el?.textContent || '').trim().replace(/\s+/g, '');
+    if (Array.from(document.querySelectorAll('header a, header button, .top-nav a, .header a, a, button')).some(
+        el => visible(el) && ['登录/注册', '登录／注册', '登录'].includes(clean(el))))
+        return 'not_logged_in';
+    if (visible(document.querySelector('.user-info, .header-avatar, .uname, a[href*="my.51job.com"]')))
+        return 'ready';
+    return 'unknown';
+})()"""
+XHS_LOGIN = r"""(() => {
+    if (location.origin !== 'https://www.xiaohongshu.com') return 'unknown';
+    const visible = el => Boolean(el?.getClientRects?.().length);
+    const clean = el => (el?.innerText || el?.textContent || '').trim().replace(/\s+/g, '');
+    if (visible(document.querySelector('button.login-btn, .login-container .qrcode, .login-modal')))
+        return 'not_logged_in';
+    if (Array.from(document.querySelectorAll('.side-bar button, .side-bar a, header button, header a')).some(
+        el => visible(el) && ['登录', '登录/注册'].includes(clean(el))))
+        return 'not_logged_in';
+    if (visible(document.querySelector('a.link-wrapper[href^="/user/profile"], .user-avatar, .side-bar-user')))
+        return 'ready';
     return 'unknown';
 })()"""
 SNAPSHOT = """JSON.stringify({
@@ -57,15 +102,9 @@ SNAPSHOT = """JSON.stringify({
     title: document.title,
     verification: !!document.querySelector('#nc_1_n1z')?.getClientRects().length,
     zhilianLogin: """ + ZHILIAN_LOGIN + """,
-    bossLogin: document.querySelector('.btn-sign')?.getClientRects().length ? 'not_logged_in'
-        : document.querySelector('.user-nav')?.getClientRects().length ? 'ready' : 'unknown',
-    job51Login: document.querySelector('.user-info, .header-avatar')?.getClientRects().length ? 'ready'
-        : Array.from(document.querySelectorAll('a, button')).some(el =>
-            el.getClientRects().length && ['登录/注册', '登录／注册', '登录'].includes(el.innerText.trim()))
-            ? 'not_logged_in' : 'unknown',
-    xhsLogin: document.querySelector('button.login-btn, .login-container .qrcode')?.getClientRects().length ? 'not_logged_in'
-        : document.querySelector('a.link-wrapper[href^="/user/profile"], .user-avatar, .side-bar-user')?.getClientRects().length
-            ? 'ready' : 'unknown'
+    bossLogin: """ + BOSS_LOGIN + """,
+    job51Login: """ + JOB51_LOGIN + """,
+    xhsLogin: """ + XHS_LOGIN + """
 })"""
 SESSION_FIELDS = {"boss": "bossLogin", "51job": "job51Login", "zhilian": "zhilianLogin", "xiaohongshu": "xhsLogin"}
 SESSION_LABELS = {
@@ -230,12 +269,14 @@ def check_platform_login(source):
 
 
 def read_zhilian_detail(url):
-    expected_path = urlsplit(url).path.rstrip("/")
+    parsed = urlsplit(url)
+    expected_origin = f"{parsed.scheme}://{parsed.netloc}"
+    expected_path = parsed.path.rstrip("/")
     expression = (
-        "JSON.stringify(location.origin === 'https://www.zhaopin.com' "
+        f"JSON.stringify(location.origin === {json.dumps(expected_origin)} "
         f"&& location.pathname.replace(/\\/$/, '') === {json.dumps(expected_path)} "
         f"&& {ZHILIAN_LOGIN} === 'ready' "
-        "? document.querySelector('.describtion-card__detail-content, .description-card__detail-content')"
+        "? document.querySelector('.describtion-card__detail-content, .description-card__detail-content, .job-detail__content, .job-content')"
         "?.innerText.trim().slice(0, 12000) || '' : '')"
     )
     try:
@@ -257,6 +298,112 @@ def read_zhilian_detail(url):
             return ("no_detail" if state == "ready" else "unknown"), ""
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         return "unavailable", ""
+
+
+def read_boss_detail(url):
+    expected_path = urlsplit(url).path.rstrip("/")
+    expression = (
+        "JSON.stringify(location.origin === 'https://www.zhipin.com' "
+        f"&& location.pathname.replace(/\\/$/, '') === {json.dumps(expected_path)} "
+        f"&& {BOSS_LOGIN} === 'ready' ? {{"
+        "description: (document.querySelector('.job-sec-text, .job-detail-section .text, [class*=\"job-sec-text\"]')?.innerText || '').trim().slice(0, 12000), "
+        "salary: (document.querySelector('.job-primary .info-primary .salary, .info-primary .salary, .salary')?.innerText || '').trim().slice(0, 120)"
+        "} : null)"
+    )
+    try:
+        with open_chrome_tab("boss", url) as tab:
+            if tab is None:
+                return "unavailable", "", ""
+            deadline = monotonic() + 8
+            state = "unknown"
+            while monotonic() < deadline:
+                snapshot = tab.read(SNAPSHOT)
+                state = platform_session("boss", snapshot)
+                if state in {"not_logged_in", "verification_required"}:
+                    return state, "", ""
+                if state == "ready":
+                    data = tab.read(expression)
+                    if isinstance(data, dict) and data.get("description"):
+                        salary = str(data.get("salary") or "").strip()
+                        if "*" in salary:
+                            salary = ""
+                        return "ready", str(data["description"]).strip(), salary
+                sleep(1)
+            return ("no_detail" if state == "ready" else "unknown"), "", ""
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return "unavailable", "", ""
+
+
+def read_51job_detail(url):
+    parsed = urlsplit(url)
+    expected_origin = f"{parsed.scheme}://{parsed.netloc}"
+    expected_path = parsed.path.rstrip("/")
+    expression = (
+        f"JSON.stringify(location.origin === {json.dumps(expected_origin)} "
+        f"&& location.pathname.replace(/\\/$/, '') === {json.dumps(expected_path)} ? {{"
+        "description: (document.querySelector('.bmsg.job_msg, .job_msg, .job-detail-content, .job-detail, [class*=\"job_msg\"]')?.innerText || '').trim().slice(0, 12000), "
+        "salary: (document.querySelector('.cn strong, .job-salary, .sal')?.innerText || '').trim().slice(0, 120)"
+        "} : null)"
+    )
+    try:
+        with open_chrome_tab("51job", url) as tab:
+            if tab is None:
+                return "unavailable", "", ""
+            deadline = monotonic() + 8
+            while monotonic() < deadline:
+                snapshot = tab.read(SNAPSHOT)
+                state = platform_session("51job", snapshot)
+                if state == "verification_required":
+                    return state, "", ""
+                data = tab.read(expression)
+                if isinstance(data, dict) and data.get("description"):
+                    return "ready", str(data["description"]).strip(), str(data.get("salary") or "").strip()
+                sleep(1)
+            return "no_detail", "", ""
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return "unavailable", "", ""
+
+
+def read_xiaohongshu_detail(url):
+    note_id = urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1]
+    expression = (
+        "JSON.stringify(location.origin === 'https://www.xiaohongshu.com' "
+        "&& /^\\/(explore|search_result)\\//.test(location.pathname) "
+        f"&& location.pathname.replace(/\\/$/, '').split('/').at(-1) === {json.dumps(note_id)} ? ("
+        "[document.querySelector('#detail-title, .note-content .title')?.innerText?.trim(), "
+        "document.querySelector('#detail-desc, .note-scroller .desc, .note-text, [class*=\"note-desc\"]')?.innerText?.trim()]"
+        ".filter(Boolean).join('\\n').slice(0, 12000)) : '')"
+    )
+    try:
+        with open_chrome_tab("xiaohongshu", url) as tab:
+            if tab is None:
+                return "unavailable", "", ""
+            deadline = monotonic() + 8
+            while monotonic() < deadline:
+                snapshot = tab.read(SNAPSHOT)
+                state = platform_session("xiaohongshu", snapshot)
+                if state in {"not_logged_in", "verification_required"}:
+                    return state, "", ""
+                text = tab.read(expression)
+                if text:
+                    return "ready", str(text).strip(), ""
+                sleep(1)
+            return "no_detail", "", ""
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return "unavailable", "", ""
+
+
+def read_platform_detail(source, url):
+    if source == "zhilian":
+        state, text = read_zhilian_detail(url)
+        return state, text, ""
+    if source == "boss":
+        return read_boss_detail(url)
+    if source == "51job":
+        return read_51job_detail(url)
+    if source == "xiaohongshu":
+        return read_xiaohongshu_detail(url)
+    return "no_detail", "", ""
 
 
 def read_xiaohongshu_images(url):
@@ -286,10 +433,13 @@ def read_xiaohongshu_images(url):
     return []
 
 
-def collect_in_chrome(source, keyword, city, limit, update):
+def collect_in_chrome(source, keyword, city, limit, update, profile="general"):
     update("opening", "正在打开已授权的本机 Chrome 搜索标签页。")
-    target_url = search_url(source, keyword, city)
+    target_url = search_url(source, keyword, city, profile)
     expected = parse_qs(urlsplit(target_url).query)
+    job51_label = JOB51_WORK_TYPES.get(profile) if source == "51job" else None
+    job51_filter_done = not job51_label
+    job51_filter_deadline = None
     deadline = monotonic() + LOGIN_WAIT_SECONDS
     try:
         with open_chrome_tab(source, target_url) as tab:
@@ -318,6 +468,23 @@ def collect_in_chrome(source, keyword, city, limit, update):
                     and all(parse_qs(address.query).get(key) == value for key, value in expected.items())
                 )
                 if same_search and state == "ready":
+                    if not job51_filter_done:
+                        now = monotonic()
+                        if job51_filter_deadline is None:
+                            job51_filter_deadline = now + 4
+                        filter_state = tab.read(
+                            f"JSON.stringify(({JOB51_APPLY_FILTER})({json.dumps(job51_label)}))",
+                            timeout=max(0.1, min(3, deadline - now)),
+                        )
+                        if filter_state == "clicked":
+                            job51_filter_done = True
+                            sleep(max(0, min(1.5, deadline - monotonic())))
+                            continue
+                        if filter_state == "applied" or monotonic() >= job51_filter_deadline:
+                            job51_filter_done = True
+                        else:
+                            sleep(max(0, min(0.6, deadline - monotonic())))
+                            continue
                     rows = cards(tab, source, limit)
                     if rows:
                         return "succeeded", f"从本机 Chrome 读取 {len(rows)} 条岗位。", rows

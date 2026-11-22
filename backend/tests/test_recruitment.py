@@ -42,14 +42,15 @@ def test_collection_stores_each_platform_and_keeps_account_data_private(make_acc
     monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
     monkeypatch.setattr(recruitment, "launch_browser", lambda _: nullcontext(object()))
 
-    def collect(_browser, source, keyword, city, limit):
+    def collect(_browser, source, keyword, city, limit, profile="general"):
         assert (keyword, city, limit) == ("Agent", "杭州", 10)
         return "succeeded", "读取 1 条结果。", [{"title": "Agent 开发", "url": LINKS[source], "location": city}]
 
     monkeypatch.setattr(recruitment, "collect_source", collect)
-    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda source, keyword, city, limit, _update:
-                        collect(None, source, keyword, city, limit))
+    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda source, keyword, city, limit, _update, profile="general":
+                        collect(None, source, keyword, city, limit, profile))
     monkeypatch.setattr(recruitment, "read_zhilian_detail", lambda _: ("ready", "负责编排 Agent 工作流"))
+    monkeypatch.setattr(recruitment, "read_platform_detail", lambda _source, _url: ("ready", "负责编排 Agent 工作流", "20-35K"))
     assert owner.get("/recruitment").status_code == 200
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["unknown"]}).status_code == 400
     assert owner.post(API + "/runs", json={"keyword": "Agent", "sources": ["liepin"]}).status_code == 400
@@ -92,6 +93,55 @@ def test_city_catalog_uses_each_platform_code():
     assert query["keyword"] == ["远程 Agent 招聘"]
 
 
+def test_search_url_applies_job_type_filters_by_profile():
+    from urllib.parse import parse_qs, urlsplit
+    from services.recruitment_sources import search_url
+
+    boss_general = parse_qs(urlsplit(search_url("boss", "Agent", "杭州", "general")).query)
+    boss_full = parse_qs(urlsplit(search_url("boss", "Agent", "杭州", "full_time")).query)
+    boss_intern = parse_qs(urlsplit(search_url("boss", "Agent", "杭州", "internship")).query)
+    assert "jobType" not in boss_general
+    assert boss_full["jobType"] == ["1901"]
+    assert boss_intern["jobType"] == ["1902"]
+
+    zhilian_general = urlsplit(search_url("zhilian", "Agent", "", "general"))
+    zhilian_full = search_url("zhilian", "Agent", "", "full_time")
+    zhilian_intern = search_url("zhilian", "Agent", "", "internship")
+    assert zhilian_general.hostname == "xiaoyuan.zhaopin.com"
+    assert zhilian_general.path == "/search/index"
+    assert parse_qs(zhilian_general.query) == {"refcode": ["4404"], "query": ["Agent"], "cateType": ["major"]}
+    assert "position=2%2C5" in zhilian_full
+    assert parse_qs(urlsplit(zhilian_intern).query)["position"] == ["4"]
+
+    assert search_url("51job", "Agent", "杭州", "full_time") == search_url("51job", "Agent", "杭州", "general")
+    assert search_url("xiaohongshu", "Agent", "杭州", "internship") == search_url("xiaohongshu", "Agent", "杭州", "general")
+
+
+def test_boss_detail_backfills_salary_and_xhs_filters_seeker_posts(make_account):
+    from services import db, recruitment
+
+    owner = make_account("detail-and-xhs")
+    assert recruitment.is_xiaohongshu_seeker_post("杭州找实习｜27届女大 😭 手搓 Agent")
+    assert not recruitment.is_xiaohongshu_seeker_post("杭州招 AI Agent 实习生，欢迎投递")
+    with db._get_conn() as conn:
+        saved = recruitment.save_rows(conn, owner.email, "xiaohongshu", [
+            {"url": LINKS["xiaohongshu"], "title": "杭州找实习｜27届女大 😭 手搓 Agent"},
+            {"url": "https://www.xiaohongshu.com/explore/6611223344556677889900bb", "title": "字节 Agent 团队急招实习生"},
+        ])
+        assert saved == 1
+        recruitment.save_rows(conn, owner.email, "boss", [
+            {"url": LINKS["boss"], "title": "AI Agent 研发", "salary": "**-**元", "description": "卡片摘要"},
+        ])
+        recruitment.save_job_detail(conn, owner.email, "boss", LINKS["boss"], "岗位职责：负责 Agent 编排。", salary="25-40K")
+        row = conn.execute(
+            "SELECT salary FROM recruitment_listings WHERE owner=? AND source='boss' AND url_key=?",
+            (owner.email, LINKS["boss"]),
+        ).fetchone()
+        assert row["salary"] == "25-40K"
+    jobs = owner.get(API + "/jobs?source=boss").get_json()["items"]
+    assert jobs[0]["description"] == "岗位职责：负责 Agent 编排。"
+
+
 def test_collection_skips_platform_without_city_code(make_account, monkeypatch):
     from services import recruitment
 
@@ -99,11 +149,12 @@ def test_collection_skips_platform_without_city_code(make_account, monkeypatch):
     monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
     called = []
 
-    def collect(source, keyword, city, limit, _update):
+    def collect(source, keyword, city, limit, _update, profile="general"):
         called.append((source, city))
         return "succeeded", "读取 1 条结果。", [{"title": "Agent 开发", "url": LINKS[source], "location": city}]
 
     monkeypatch.setattr(recruitment, "collect_in_chrome", collect)
+    monkeypatch.setattr(recruitment, "read_platform_detail", lambda _source, _url: ("ready", "完整岗位职责", ""))
     config = {"keyword": "Agent", "city": "泉州", "sources": ["boss"], "chrome_local": True}
     assert owner.post(API + "/runs", json=config).status_code == 400
     assert owner.post(API + "/runs", json={**config, "city": "不存在", "sources": ["xiaohongshu"]}).status_code == 400
@@ -144,9 +195,9 @@ def test_local_boss_waits_in_account_profile_and_rejects_remote_launch(make_acco
     account = make_account("local-boss")
     seen_profiles = []
 
-    def local_boss(_playwright, profile, keyword, city, limit, update):
+    def local_boss(_playwright, profile_dir, keyword, city, limit, update, profile="general"):
         assert (keyword, city, limit) == ("Agent", "杭州", 10)
-        seen_profiles.append(profile)
+        seen_profiles.append(profile_dir)
         update("waiting_user", "等待手动验证")
         return "succeeded", "读取 1 条岗位。", [{"title": "Agent 开发", "url": LINKS["boss"]}]
 
@@ -222,12 +273,15 @@ def test_boss_reads_search_page_only_after_manual_verification(monkeypatch, tmp_
 @pytest.mark.parametrize(("source", "host", "target", "route_url", "login"), [
     ("boss", "www.zhipin.com", "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100",
      "https://www.zhipin.com/web/geek/jobs?query=Agent&city=101210100", "unknown"),
-    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
-     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "ready"),
-    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
-     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "not_logged_in"),
-    ("zhilian", "www.zhaopin.com", "https://www.zhaopin.com/jobs?kw=Agent&jl=653",
-     "https://www.zhaopin.com/jobs/?kw=Agent&jl=653", "after_login"),
+    ("zhilian", "xiaoyuan.zhaopin.com",
+     "https://xiaoyuan.zhaopin.com/search/index?refcode=4404&query=Agent&cateType=major&jl=653",
+     "https://xiaoyuan.zhaopin.com/search/index/?refcode=4404&query=Agent&cateType=major&jl=653", "ready"),
+    ("zhilian", "xiaoyuan.zhaopin.com",
+     "https://xiaoyuan.zhaopin.com/search/index?refcode=4404&query=Agent&cateType=major&jl=653",
+     "https://xiaoyuan.zhaopin.com/search/index/?refcode=4404&query=Agent&cateType=major&jl=653", "not_logged_in"),
+    ("zhilian", "xiaoyuan.zhaopin.com",
+     "https://xiaoyuan.zhaopin.com/search/index?refcode=4404&query=Agent&cateType=major&jl=653",
+     "https://xiaoyuan.zhaopin.com/search/index/?refcode=4404&query=Agent&cateType=major&jl=653", "after_login"),
 ])
 def test_chrome_bridge_reads_and_closes_only_its_search_tab(monkeypatch, source, host, target, route_url, login):
     import json
@@ -418,7 +472,7 @@ def test_zhilian_collection_automatically_caches_details_and_reports_partial_res
         recruitment.save_rows(conn, owner.email, "zhilian", [{"url": cached, "title": "缓存岗位"}])
         recruitment.save_zhilian_detail(conn, owner.email, cached, "已缓存的岗位职责")
     monkeypatch.setenv("CAREER_RECRUITMENT_USE_LOCAL_CHROME", "1")
-    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda *_: (
+    monkeypatch.setattr(recruitment, "collect_in_chrome", lambda *_, **__: (
         "succeeded", "", [{"url": url, "title": "Agent 开发"} for url in (cached, fresh, blocked)]
     ))
     calls = []
@@ -755,6 +809,8 @@ def test_existing_cleaning_rules_and_listings_migrate_to_general():
 
 @pytest.mark.parametrize(("salary", "expected"), [
     ("8K–12K·13薪", (8000, 12000)), ("1.2-1.8万元/月", (12000, 18000)),
+    ("1.5-2.6万", (15000, 26000)), ("1.2-2万·14薪", (12000, 20000)),
+    ("15-30万", (None, None)),
     ("8千-10000元/月", (8000, 10000)), ("8-12万/年", (None, None)),
     ("面议", (None, None)), ("300元/天", (None, None)), ("10K起", (None, None)),
 ])
