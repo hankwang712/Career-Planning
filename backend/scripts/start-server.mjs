@@ -26,6 +26,14 @@ const viteBin = useViteDevServer
 
 const host = process.env.CAREER_CONTAINER === "1" ? "0.0.0.0" : "127.0.0.1";
 const port = process.env.PORT || "8080";
+const useLocalChrome =
+  process.env.CAREER_CONTAINER !== "1" &&
+  ["1", "true"].includes(
+    String(process.env.CAREER_RECRUITMENT_USE_LOCAL_CHROME || process.env.CAREER_BOSS_USE_LOCAL_CHROME || "")
+      .trim()
+      .toLowerCase()
+  );
+const chromeBridgeScript = path.join(__dirname, "chrome-bridge.mjs");
 
 // 强制 Node.js 标准流使用 UTF-8，避免 Windows 控制台中文乱码
 process.stdout.setDefaultEncoding("utf8");
@@ -102,6 +110,13 @@ if (useViteDevServer) {
 } else {
   log("Using built frontend assets from frontend/static/dist");
 }
+if (useLocalChrome) {
+  log("Starting local Chrome bridge on http://127.0.0.1:3456");
+}
+
+const chromeBridgeProc = useLocalChrome
+  ? spawnTagged(process.execPath, [chromeBridgeScript], "chrome-bridge")
+  : null;
 
 const pythonProc = spawnTagged(
   pythonCmd,
@@ -128,7 +143,7 @@ let shuttingDown = false;
 function shutdown(reasonCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  for (const proc of [pythonProc, viteProc].filter(Boolean)) {
+  for (const proc of [pythonProc, viteProc, chromeBridgeProc].filter(Boolean)) {
     if (proc && !proc.killed) {
       proc.kill("SIGTERM");
     }
