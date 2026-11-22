@@ -9,6 +9,29 @@
   const { node, icon, tile, toast, api, pipelineApi, meta, state } = RP;
 
   const PROFILE_KEYS = Object.keys(meta.profiles || { general: "通用" });
+  const ACTIVE_PROFILE_KEY = "rp_active_profile";
+  function rememberedProfile() {
+    try {
+      const saved = localStorage.getItem(ACTIVE_PROFILE_KEY);
+      if (saved && PROFILE_KEYS.includes(saved)) return saved;
+    } catch (_) { /* ignore storage errors */ }
+    const jobs = state.jobs?.length ? state.jobs : (state.boardJobs || []);
+    if (jobs.length) {
+      const counts = new Map();
+      for (const job of jobs) {
+        if (job.profile && PROFILE_KEYS.includes(job.profile)) {
+          counts.set(job.profile, (counts.get(job.profile) || 0) + 1);
+        }
+      }
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (top) return top;
+    }
+    return PROFILE_KEYS[0];
+  }
+  function setRememberedProfile(value) {
+    if (!value || !PROFILE_KEYS.includes(value)) return;
+    try { localStorage.setItem(ACTIVE_PROFILE_KEY, value); } catch (_) { /* ignore */ }
+  }
   const DEEP_KEYS = [
     ["extracted_skills", "技能提取"],
     ["ats_ability_analysis", "ATS 能力分析"],
@@ -170,14 +193,46 @@
     return chip;
   }
 
-  /* ---------- 1. 本地导入（scraping） ---------- */
+  /* ---------- 1. 平台实时采集（scraping） ---------- */
+  const INLINE_SVGS = {
+    chrome: '<svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="rpChromeClip"><circle cx="12" cy="12" r="10"/></clipPath></defs><g clip-path="url(#rpChromeClip)"><circle cx="12" cy="12" r="10" fill="#4285F4"/><path d="M2 2h20v10H12a5 5 0 0 0-4.33 2.5L2 4.6Z" fill="#EA4335"/><path d="M2 4.6 7.67 14.5A5 5 0 0 0 12 17l-4 7H2Z" fill="#34A853"/><path d="M12 7h10v17H8l4-7a5 5 0 0 0 4.33-7.5Z" fill="#FBBC05"/></g><circle cx="12" cy="12" r="4.5" fill="#fff"/><circle cx="12" cy="12" r="3.4" fill="#4285F4"/></svg>',
+    pulse: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 10h3.2l2-5 3.6 10 2.2-5h4"/></svg>',
+    trash: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5m-6 0 .7 10.2a1.3 1.3 0 0 0 1.3 1.3h4a1.3 1.3 0 0 0 1.3-1.3L14 5.5"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
+    pencil: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.8 3.6a1.9 1.9 0 0 1 2.7 2.7L7.3 15.5l-3.8 1 1-3.8 9.3-9.1Z"/></svg>',
+    pin: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17.2s5.2-4.6 5.2-8.7a5.2 5.2 0 1 0-10.4 0c0 4.1 5.2 8.7 5.2 8.7Z"/><circle cx="10" cy="8.5" r="1.8"/></svg>',
+    briefcase: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="6" width="14.4" height="10.2" rx="2"/><path d="M7 6V4.6A1.6 1.6 0 0 1 8.6 3h2.8A1.6 1.6 0 0 1 13 4.6V6M2.8 10.5h14.4"/></svg>',
+    grid: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="3.2" width="5.4" height="5.4" rx="1.2"/><rect x="11.4" y="3.2" width="5.4" height="5.4" rx="1.2"/><rect x="3.2" y="11.4" width="5.4" height="5.4" rx="1.2"/><rect x="11.4" y="11.4" width="5.4" height="5.4" rx="1.2"/></svg>',
+    cap: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.2 8.2 10 4.5l7.8 3.7L10 11.9 2.2 8.2Z"/><path d="M5.4 9.8v3.8c0 1.2 2.1 2.2 4.6 2.2s4.6-1 4.6-2.2V9.8"/><path d="M17.8 8.4v4.4"/></svg>',
+    bolt: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5 4.8 11h4.7L9 17.5 15.2 9h-4.7L11 2.5Z"/></svg>',
+    chart: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 15.5v-4M10 15.5v-8M15.5 15.5v-11"/></svg>',
+    doc: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.8h6.2l3.8 3.8v10.6a1.3 1.3 0 0 1-1.3 1.3H5.5a1.3 1.3 0 0 1-1.3-1.3V4.1a1.3 1.3 0 0 1 1.3-1.3Z"/><path d="M11.5 2.8V6.8h4M7.2 10.5h5.6M7.2 13.8h3.8"/></svg>',
+    ban: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="m5.2 5.2 9.6 9.6"/></svg>',
+    code: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.8 6.5-3.6 3.5 3.6 3.5M13.2 6.5l3.6 3.5-3.6 3.5M11.2 4.5l-2.4 11"/></svg>',
+    monitor: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="3.8" width="14.4" height="9.8" rx="1.6"/><path d="M7.2 16.5h5.6M10 13.6v2.9"/></svg>',
+    grip: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="4" r="1.1"/><circle cx="10.5" cy="4" r="1.1"/><circle cx="5.5" cy="8" r="1.1"/><circle cx="10.5" cy="8" r="1.1"/><circle cx="5.5" cy="12" r="1.1"/><circle cx="10.5" cy="12" r="1.1"/></svg>'
+  };
+  const PLATFORM_TAGLINES = {
+    "51job": "综合类招聘平台 · 岗位覆盖广",
+    boss: "互联网招聘 · 沟通高效",
+    xiaohongshu: "新兴招聘渠道 · 实习机会多",
+    zhilian: "传统招聘平台 · 企业资源丰富"
+  };
+  function inlineIcon(name, cls) {
+    const wrap = node("span", "", "rp-inline-svg" + (cls ? " " + cls : ""));
+    wrap.innerHTML = INLINE_SVGS[name] || "";
+    return wrap;
+  }
+  function compactTime(ts) {
+    const d = new Date(ts * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   RP.registerDrawer("scraping", {
-    title: "抓取 · 平台采集与本地导入", icon: "search", tone: "accent",
+    title: "抓取 · 平台实时采集", icon: "search", tone: "accent",
     render(body) {
       const token = RP.drawerToken();
-
-      /* 平台实时采集：登录态检查 + 采集表单 + 采集记录（复用现有 /session /runs 端点） */
-      const collectSection = section("平台实时采集", "search");
       const chromeSources = Object.keys(meta.chrome_sources || {});
       const canUseChrome = meta.chrome_available && chromeSources.length > 0;
       const collectEntries = sourceEntries(meta.collection_sources || meta.sources);
@@ -187,29 +242,102 @@
         opening: "打开浏览器", waiting_user: "等待登录或验证", login_required: "需要登录", login_timeout: "登录超时",
         city_unsupported: "城市暂不支持", reading_details: "读取原站 JD"
       };
-      if (!canUseChrome) {
-        collectSection.append(note("本机 Chrome 连接未启用。可尝试直接采集公开搜索结果，部分平台可能需要登录。", "warn"));
+
+      /* 顶部 Hero 横幅（融合 3D 玻璃拟态插画 + 特性胶囊） */
+      const hero = node("header", "", "rp-collect-hero");
+      const heroTop = node("div", "", "rp-collect-hero-top");
+      const heroBadge = node("span", "", "rp-collect-hero-icon");
+      heroBadge.append(icon("search"));
+      const heroText = node("div", "", "rp-collect-hero-text");
+      heroText.append(
+        node("h2", "抓取 · 平台实时采集"),
+        node("p", "多平台职位信息实时采集 · 统一清洗 · 高效入库")
+      );
+      heroTop.append(heroBadge, heroText);
+      const heroPills = node("div", "", "rp-collect-hero-pills");
+      for (const [svgName, label] of [
+        ["bolt", "多平台聚合"], ["layers", "实时采集"], ["shield", "去重校验"], ["chart", "数据可溯"]
+      ]) {
+        const pill = node("span", "", "rp-hero-pill");
+        pill.append(svgName === "layers" || svgName === "shield" ? icon(svgName) : inlineIcon(svgName), node("span", label));
+        heroPills.append(pill);
       }
+      hero.append(heroTop, heroPills);
+
+      /* 主体白卡：采集平台 + 采集设置 */
+      const mainCard = node("section", "", "rp-collect-card");
+      if (!canUseChrome) {
+        mainCard.append(note("本机 Chrome 连接未启用，当前仅采集公开搜索结果。", "warning"));
+      }
+
+      const selectedSources = new Set(collectEntries.map(([key]) => key));
+      const platformToolbar = node("div", "", "rp-collect-toolbar");
+      const platformTitleWrap = node("div", "", "rp-collect-toolbar-title");
+      const selectedCountBadge = node("span", `${selectedSources.size} / ${collectEntries.length}`, "rp-count-pill");
+      platformTitleWrap.append(icon("layers"), node("strong", "采集平台"), selectedCountBadge);
+      const toolbarActions = node("div", "", "rp-collect-toolbar-actions");
+      const selectAllBtn = button("清空", "rp-btn-sm rp-btn-ghost rp-tool-btn");
+      selectAllBtn.prepend(inlineIcon("trash"));
+      const checkAll = button("检查全部", "rp-btn-sm rp-btn-ghost rp-tool-btn", "shield");
+      toolbarActions.append(selectAllBtn, checkAll);
+      platformToolbar.append(platformTitleWrap, toolbarActions);
+
       const sessionWrap = node("div", "", "rp-sessions");
       const checks = [];
+      const cardSyncers = [];
+      let syncSubmitLabel = () => {};
+
+      function syncSelectionUI() {
+        const count = selectedSources.size;
+        selectedCountBadge.textContent = `${count} / ${collectEntries.length}`;
+        selectedCountBadge.dataset.active = count > 0 ? "1" : "0";
+        selectAllBtn.lastChild.textContent = count === collectEntries.length ? "清空" : "全选";
+        for (const sync of cardSyncers) sync();
+        syncSubmitLabel();
+      }
+
       for (const [key, label] of collectEntries) {
         const card = node("div", "", "rp-session");
-        const head = node("div", "", "rp-session-head");
-        head.append(platformLogo(key, label), node("strong", label));
-        const checkBtn = button("检查登录", "rp-btn-sm rp-btn-ghost", "user-check");
+        card.setAttribute("role", "checkbox");
+        card.setAttribute("tabindex", "0");
+        card.setAttribute("aria-checked", "true");
+        card.dataset.selected = "1";
+
+        const top = node("div", "", "rp-session-top");
+        const logo = platformLogo(key, label);
+        const info = node("div", "", "rp-session-info");
+        info.append(
+          node("strong", label),
+          node("span", PLATFORM_TAGLINES[key] || "招聘渠道", "rp-session-sub")
+        );
+        const pick = node("span", "", "rp-session-pick");
+        pick.append(icon("check"));
+        top.append(logo, info, pick);
+
+        const foot = node("div", "", "rp-session-foot");
         const result = node("div", "", "rp-session-result");
-        const stateLabel = node("span", "未检查", "rp-session-label");
-        const stateMsg = node("p", "", "rp-session-message");
         result.setAttribute("role", "status");
+        const dot = node("span", "", "rp-session-dot");
+        const stateLabel = node("span", "未检查", "rp-session-label");
+        result.append(dot, stateLabel);
+        const checkBtn = button("检测", "rp-btn-sm rp-btn-ghost rp-session-check");
+        checkBtn.prepend(inlineIcon("pulse"));
+        foot.append(result, checkBtn);
+
+        const extra = node("div", "", "rp-session-extra");
+        extra.hidden = true;
+        const stateMsg = node("p", "", "rp-session-message");
         stateMsg.hidden = true;
-        result.append(stateLabel, stateMsg);
-        const loginLink = node("a", "打开平台官网", "rp-btn rp-btn-sm rp-btn-ghost");
+        const extraActions = node("div", "", "rp-session-extra-actions");
+        const loginLink = node("a", "打开官网 ↗", "rp-btn rp-btn-sm rp-btn-ghost");
         loginLink.target = "_blank";
         loginLink.rel = "noopener noreferrer";
         loginLink.hidden = true;
+        loginLink.addEventListener("click", (event) => event.stopPropagation());
         const copyBtn = button("复制授权地址", "rp-btn-sm rp-btn-ghost", "copy");
         copyBtn.hidden = true;
-        copyBtn.addEventListener("click", async () => {
+        copyBtn.addEventListener("click", async (event) => {
+          event.stopPropagation();
           try {
             await navigator.clipboard.writeText("chrome://inspect/#remote-debugging");
             toast("授权页地址已复制，粘贴到 Chrome 地址栏打开。", "success");
@@ -217,178 +345,388 @@
             toast("复制失败，请手动输入 chrome://inspect/#remote-debugging", "error");
           }
         });
+        extraActions.append(loginLink, copyBtn);
+        extra.append(stateMsg, extraActions);
+
+        const syncCard = () => {
+          const on = selectedSources.has(key);
+          card.dataset.selected = on ? "1" : "0";
+          card.setAttribute("aria-checked", on ? "true" : "false");
+        };
+        cardSyncers.push(syncCard);
+
+        const toggleSelect = () => {
+          if (selectedSources.has(key)) selectedSources.delete(key);
+          else selectedSources.add(key);
+          syncSelectionUI();
+        };
+        card.addEventListener("click", toggleSelect);
+        card.addEventListener("keydown", (event) => {
+          if (event.key === " " || event.key === "Enter") {
+            event.preventDefault();
+            toggleSelect();
+          }
+        });
+
         const check = async () => {
           if (checkBtn.disabled) return;
           checkBtn.disabled = true;
-          delete result.dataset.state;
+          card.dataset.state = "checking";
+          result.dataset.state = "checking";
           stateLabel.textContent = "检查中…";
           stateMsg.hidden = true;
           copyBtn.hidden = true;
           loginLink.hidden = true;
+          extra.hidden = true;
           try {
             const status = await api(`/session/${key}`, {});
             if (!alive(token, body)) return;
+            card.dataset.state = status.state;
             result.dataset.state = status.state;
             stateLabel.textContent = status.label;
-            stateMsg.textContent = status.message || "";
-            stateMsg.hidden = !status.message;
+            const showMsg = Boolean(status.message && status.state !== "ready");
+            stateMsg.textContent = showMsg ? status.message : "";
+            stateMsg.hidden = !showMsg;
             if (status.login_url) {
               loginLink.href = status.login_url;
               loginLink.hidden = false;
             }
             copyBtn.hidden = status.state !== "authorization_required_manual";
+            extra.hidden = !showMsg && loginLink.hidden && copyBtn.hidden;
           } catch (error) {
             if (!alive(token, body)) return;
+            card.dataset.state = "unavailable";
             result.dataset.state = "unavailable";
             stateLabel.textContent = "检查失败";
             stateMsg.textContent = error.message;
             stateMsg.hidden = false;
+            extra.hidden = false;
           } finally { checkBtn.disabled = false; }
         };
-        checkBtn.addEventListener("click", check);
+        checkBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          void check();
+        });
         checks.push(check);
-        head.append(checkBtn);
-        card.append(head, result, loginLink, copyBtn);
+        card.append(top, foot, extra);
         sessionWrap.append(card);
       }
-      const checkAll = button("检查全部平台", "rp-btn-sm rp-btn-ghost", "shield");
+
+      selectAllBtn.addEventListener("click", () => {
+        if (selectedSources.size === collectEntries.length) selectedSources.clear();
+        else for (const [key] of collectEntries) selectedSources.add(key);
+        syncSelectionUI();
+      });
       checkAll.addEventListener("click", async () => {
         checkAll.disabled = true;
         try { await Promise.all(checks.map((check) => check())); } finally { checkAll.disabled = false; }
       });
-      collectSection.append(sessionWrap, checkAll);
+
+      /* 采集设置区 */
+      const settingsHead = node("div", "", "rp-collect-subhead");
+      settingsHead.append(inlineIcon("gear"), node("strong", "采集设置"));
 
       const catalog = meta.city_catalog || {};
       const cityOptions = [["", "全部城市"]];
       const seenCity = new Set();
-      for (const city of [...(catalog.hot || []), ...(catalog.scopes || []), ...Object.values(catalog.groups || {}).flat()]) {
-        if (!seenCity.has(city)) { seenCity.add(city); cityOptions.push([city, city]); }
+      for (const cityName of [...(catalog.hot || []), ...(catalog.scopes || []), ...Object.values(catalog.groups || {}).flat()]) {
+        if (!seenCity.has(cityName)) { seenCity.add(cityName); cityOptions.push([cityName, cityName]); }
       }
       const form = node("form", "", "rp-collect-form");
-      const keyword = input("text", { placeholder: "关键词，如 Python 实习", maxlength: 80, required: true });
+
+      const keyword = input("text", { placeholder: "关键词，如 Agent、Python 实习、大模型", maxlength: 80, required: true });
+      const keywordInputWrap = node("div", "", "rp-input-with-icon");
+      keywordInputWrap.append(icon("search"), keyword);
+      const keywordRow = node("div", "", "rp-hfield");
+      const kwLabel = node("label", "", "rp-hlabel");
+      kwLabel.append(inlineIcon("pencil"), node("span", "关键词"));
+      keywordRow.append(kwLabel, keywordInputWrap);
+
       const city = select(cityOptions);
-      const collectProfile = profileSelect();
+      const cityLabel = node("label", "", "rp-hlabel");
+      cityLabel.append(inlineIcon("pin"), node("span", "城市"));
+      const cityCell = node("div", "", "rp-hfield");
+      cityCell.append(cityLabel, city);
+
       const limit = input("number", { min: 1, max: 30, value: 20 });
-      const checksWrap = node("div", "", "rp-checks");
-      const sourceBoxes = collectEntries.map(([key, label]) => {
-        const wrap = node("label", "", "rp-check");
-        const box = input("checkbox", { value: key });
-        wrap.append(box, platformLogo(key, label), node("span", label));
-        checksWrap.append(wrap);
-        return box;
+      const stepper = node("div", "", "rp-stepper");
+      const minusBtn = node("button", "−", "rp-step-btn");
+      minusBtn.type = "button";
+      minusBtn.setAttribute("aria-label", "减少上限");
+      const plusBtn = node("button", "+", "rp-step-btn");
+      plusBtn.type = "button";
+      plusBtn.setAttribute("aria-label", "增加上限");
+      const stepLimit = (delta) => {
+        const current = Number(limit.value) || 20;
+        limit.value = String(Math.max(1, Math.min(30, current + delta)));
+      };
+      minusBtn.addEventListener("click", () => stepLimit(-5));
+      plusBtn.addEventListener("click", () => stepLimit(5));
+      stepper.append(limit, minusBtn, plusBtn);
+      const limitLabel = node("label", "", "rp-hlabel");
+      limitLabel.append(icon("layers"), node("span", "每平台上限"));
+      const limitCell = node("div", "", "rp-hfield");
+      limitCell.append(limitLabel, stepper);
+
+      const cityLimitRow = node("div", "", "rp-collect-row");
+      cityLimitRow.append(cityCell, limitCell);
+
+      /* 求职方向：三段式带图标卡片 */
+      const profileOrder = ["full_time", "general", "internship"].filter((k) => k in (meta.profiles || {}));
+      const orderedProfiles = profileOrder.length ? profileOrder : PROFILE_KEYS;
+      const profileIcons = { full_time: "briefcase", general: "grid", internship: "cap" };
+      let selectedProfile = rememberedProfile();
+      if (!orderedProfiles.includes(selectedProfile)) selectedProfile = orderedProfiles[0];
+      const profileSeg = node("div", "", "rp-segmented");
+      profileSeg.setAttribute("role", "group");
+      profileSeg.setAttribute("aria-label", "求职方向");
+      const segButtons = orderedProfiles.map((key) => {
+        const label = (meta.profiles || {})[key] || key;
+        const btn = node("button", "", "rp-seg-btn");
+        btn.type = "button";
+        btn.dataset.value = key;
+        btn.setAttribute("aria-pressed", key === selectedProfile ? "true" : "false");
+        btn.append(inlineIcon(profileIcons[key] || "grid"), node("span", label));
+        btn.addEventListener("click", () => {
+          selectedProfile = key;
+          setRememberedProfile(key);
+          for (const item of segButtons) {
+            item.setAttribute("aria-pressed", item.dataset.value === selectedProfile ? "true" : "false");
+          }
+        });
+        profileSeg.append(btn);
+        return btn;
       });
-      const localWrap = node("label", "", "rp-check");
+      const dirLabel = node("span", "", "rp-hlabel");
+      dirLabel.append(inlineIcon("briefcase"), node("span", "求职方向"));
+      const profileRow = node("div", "", "rp-hfield");
+      profileRow.append(dirLabel, profileSeg);
+
+      const localWrap = node("label", "", "rp-switch-row");
       const localBox = input("checkbox", {});
-      localWrap.append(localBox, node("span", canUseChrome ? "使用本机 Chrome 登录态（推荐）" : "使用 BOSS 本地登录态"));
+      const switchTrack = node("span", "", "rp-switch-track");
+      const chromeBadge = inlineIcon("chrome", "rp-chrome-svg");
+      const infoTip = node("span", "", "rp-info-tip");
+      infoTip.append(icon("info"));
+      infoTip.title = "复用本机 Chrome 已登录的招聘平台账号，获取完整薪资与原站 JD";
+      localWrap.append(
+        localBox,
+        switchTrack,
+        chromeBadge,
+        node("span", canUseChrome ? "使用本机 Chrome 登录态" : "使用 BOSS 本地登录态"),
+        infoTip
+      );
       localWrap.hidden = !canUseChrome && !meta.boss_local;
       localBox.checked = Boolean(canUseChrome || meta.boss_local);
-      const submit = button("启动采集", "rp-btn-primary", "play");
+
+      const submit = button("启动采集", "rp-collect-submit", "play");
       submit.type = "submit";
+      const submitText = submit.lastChild;
+      syncSubmitLabel = () => {
+        const count = selectedSources.size;
+        if (submitText) submitText.textContent = count > 0 ? `启动采集 · ${count} 个平台` : "启动采集";
+      };
+      syncSelectionUI();
+
       const collectFeedback = feedback();
       collectFeedback.setAttribute("role", "status");
-      form.append(
-        field("关键词", keyword), field("城市", city), field("归入求职方向", collectProfile),
-        field("每平台上限", limit), checksWrap, localWrap, submit, collectFeedback
-      );
+      form.append(keywordRow, cityLimitRow, profileRow, localWrap, submit, collectFeedback);
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const term = keyword.value.trim();
         if (!term) { setFeedback(collectFeedback, "请输入采集关键词。", "error"); keyword.focus(); return; }
-        const sources = sourceBoxes.filter((box) => box.checked).map((box) => box.value);
-        if (!sources.length) { setFeedback(collectFeedback, "请至少选择一个采集平台。", "error"); return; }
+        const sources = [...selectedSources];
+        if (!sources.length) { setFeedback(collectFeedback, "请先选择至少一个采集平台。", "error"); return; }
         submit.disabled = true;
         try {
           const run = await withBusy(() => api("/runs", {
             keyword: term, city: city.value, limit: Number(limit.value) || 20,
-            sources, profile: collectProfile.value,
+            sources, profile: selectedProfile,
             boss_local: Boolean(!canUseChrome && meta.boss_local && sources.includes("boss") && localBox.checked),
             chrome_local: Boolean(canUseChrome && localBox.checked && chromeSources.some((source) => sources.includes(source)))
           }), collectFeedback, "正在启动采集…");
           if (!alive(token, body)) return;
-          setFeedback(collectFeedback, "已启动采集，可在下方查看各平台进度。", "success");
+          setFeedback(collectFeedback, "", "");
           openRun = run.id;
           currentRun = run.id;
-          history.open = true;
           void loadRuns();
         } catch (error) {
           if (alive(token, body)) setFeedback(collectFeedback, error.message, "error");
         } finally { submit.disabled = false; }
       });
-      collectSection.append(form);
 
-      const history = node("details", "", "rp-run-history");
+      mainCard.append(platformToolbar, sessionWrap, settingsHead, form);
+
+      /* 实时进度面板 + 采集记录白卡 */
       const activeProgress = node("section", "", "rp-collect-progress");
       activeProgress.hidden = true;
-      const historyHead = node("summary", "", "rp-run-history-head");
-      const historyCount = node("span", "", "rp-run-history-count");
+
+      const historyCard = node("section", "", "rp-history-card");
+      const historyHead = node("div", "", "rp-history-head");
+      const historyTitle = node("div", "", "rp-history-title");
+      historyTitle.append(inlineIcon("doc"), node("strong", "采集记录"));
+      const historyToggle = node("button", "", "rp-history-toggle");
+      historyToggle.type = "button";
+      const historyCount = node("span", "共 0 条", "rp-run-history-count");
+      historyToggle.append(historyCount, node("span", "›", "rp-history-chevron"));
+      historyHead.append(historyTitle, historyToggle);
       const runsWrap = node("div", "正在读取采集记录…", "rp-runs");
-      historyHead.append(node("span", "采集记录"), historyCount);
-      history.append(historyHead, runsWrap);
+      let showAllRuns = false;
+      let latestItems = [];
+      historyCard.append(historyHead, runsWrap);
+
       let runPoll = null;
       let runRequest = 0;
       let lastRuns = "";
       let openRun = null;
       let currentRun = null;
       const pendingStates = new Set(["queued", "running", "opening", "waiting_user", "reading_details"]);
-      function meter(label, value, total) {
-        const bar = node("progress", "", "rp-collect-meter");
-        bar.setAttribute("aria-label", label);
-        bar.max = Math.max(1, total);
-        bar.value = value;
-        return bar;
+
+      function progressBar(percent, tone, animated) {
+        const track = node("div", "", "rp-prog-track");
+        track.setAttribute("role", "progressbar");
+        track.setAttribute("aria-valuemin", "0");
+        track.setAttribute("aria-valuemax", "100");
+        track.setAttribute("aria-valuenow", String(Math.round(percent)));
+        const fill = node("div", "", "rp-prog-fill" + (animated ? " is-animated" : ""));
+        if (tone) fill.dataset.tone = tone;
+        fill.style.width = `${Math.max(4, Math.min(100, Math.round(percent)))}%`;
+        track.append(fill);
+        return track;
       }
+
+      function sourcePercent(status, item) {
+        if (status === "queued") return 8;
+        if (status === "opening") return 24;
+        if (status === "waiting_user") return 42;
+        if (status === "running") return 68;
+        if (status === "reading_details") {
+          const total = Math.max(1, item.details?.total || 1);
+          const checked = item.details?.checked || 0;
+          return 70 + Math.round((checked / total) * 30);
+        }
+        return 100;
+      }
+
+      function statusTone(status) {
+        if (status === "succeeded" || status === "complete") return "success";
+        if (status === "waiting_user" || status === "partial" || status === "login_required") return "warning";
+        if (status === "blocked" || status === "unavailable" || status === "interrupted" || status === "login_timeout") return "danger";
+        if (status === "empty" || status === "city_unsupported") return "muted";
+        return "accent";
+      }
+
       function paintProgress(run) {
         activeProgress.hidden = !run;
         if (!run) return;
         const entries = Object.entries(run.progress || {});
         const running = run.status === "running";
+        activeProgress.dataset.state = run.status;
         const finished = entries.filter(([, item]) => !running || !pendingStates.has(item.status)).length;
+        const totalJobs = entries.reduce((sum, [, item]) => sum + (Number(item.count) || 0), 0);
+        const totalPct = !entries.length ? 100 : !running ? 100 : Math.round(
+          entries.reduce((sum, [, item]) => sum + sourcePercent(item.status, item), 0) / entries.length
+        );
+
         const head = node("div", "", "rp-collect-progress-head");
-        head.append(node("strong", running ? "采集进度" : statusNames[run.status] || run.status),
-          node("span", `已结束 ${finished} / ${entries.length} 个平台`));
+        const headLeft = node("div", "", "rp-collect-progress-title");
+        const liveDot = node("span", "", "rp-prog-dot" + (running ? " is-live" : ""));
+        liveDot.dataset.tone = statusTone(run.status);
+        const titleText = [run.keyword, run.city].filter(Boolean).join(" · ") || "实时采集";
+        headLeft.append(liveDot, node("strong", running ? `采集中 · ${titleText}` : `${statusNames[run.status] || run.status} · ${titleText}`));
+        const headRight = node("div", "", "rp-collect-progress-stats");
+        headRight.append(
+          node("span", `${finished}/${entries.length} 平台`, "rp-prog-meta"),
+          node("span", totalJobs ? `${totalJobs} 条` : `${totalPct}%`, "rp-prog-pct")
+        );
+        head.append(headLeft, headRight);
+
+        const overallTone = running ? "accent" : statusTone(run.status);
+        const overallBar = progressBar(totalPct, overallTone, running);
+
         const sources = entries.map(([source, item]) => {
           const row = node("div", "", "rp-collect-progress-source");
-          const title = node("div", "", "rp-collect-progress-head");
-          const label = sourceLabel((meta.collection_sources || {})[source]) || source;
           const status = !running && pendingStates.has(item.status) ? run.status : item.status;
-          title.append(node("strong", label), node("span", statusNames[status] || status));
-          row.append(title);
+          const tone = statusTone(status);
+          const isWorking = running && pendingStates.has(status);
+          row.dataset.tone = tone;
+
+          const top = node("div", "", "rp-collect-progress-rowhead");
+          const label = sourceLabel((meta.collection_sources || {})[source]) || source;
+          const left = node("div", "", "rp-collect-progress-brand");
+          left.append(platformLogo(source, label), node("strong", label));
+          const right = node("div", "", "rp-collect-progress-right");
+          if (item.count > 0) right.append(node("span", `${item.count} 条`, "rp-prog-count"));
+          const pill = node("span", statusNames[status] || status, "rp-prog-pill");
+          pill.dataset.tone = tone;
+          right.append(pill);
+          top.append(left, right);
+          row.append(top);
+
+          const pct = sourcePercent(status, item);
+          const miniBar = progressBar(pct, tone, isWorking);
+          miniBar.classList.add("is-sm");
+          row.append(miniBar);
+
           if (item.details) {
             const { total, checked, available } = item.details;
-            const remaining = total - checked;
-            const stage = status === "reading_details" ? `第 ${Math.min(checked + 1, total)} / ${total} 条` : `共 ${total} 条`;
-            const result = status === "reading_details"
-              ? `已读取 ${available} 条 · 剩余 ${remaining} 条`
-              : `已读取 ${available} 条 · 未读取 ${total - available} 条`;
-            const counts = node("div", "", "rp-collect-progress-head");
-            counts.append(node("span", stage), node("span", result));
-            row.append(meter(`${label}原站 JD 进度`, checked, total), counts);
+            const detailLine = node("div", "", "rp-collect-progress-sub");
+            detailLine.append(
+              node("span", status === "reading_details" ? `原站 JD ${Math.min(checked + 1, total)}/${total}` : `原站 JD 共 ${total} 条`),
+              node("span", `已读取 ${available} 条`)
+            );
+            row.append(detailLine);
           }
-          if (item.message) row.append(node("p", item.message));
+          if (item.message && (tone === "warning" || tone === "danger" || status === "waiting_user")) {
+            const msgLine = node("p", item.message, "rp-prog-msg");
+            if (item.login_url && ["waiting_user", "login_required", "login_timeout"].includes(status)) {
+              const link = node("a", "去登录 ↗");
+              link.href = item.login_url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              msgLine.append(" ", link);
+            }
+            row.append(msgLine);
+          }
           return row;
         });
-        activeProgress.replaceChildren(head, meter("平台采集进度", finished, entries.length), ...sources);
+
+        activeProgress.replaceChildren(head, overallBar, ...sources);
       }
-      const runCard = (run) => {
+
+      const runRow = (run) => {
         const card = node("details", "", "rp-run");
         card.dataset.state = run.status;
         card.dataset.runId = run.id;
+        const entries = Object.entries(run.progress || {});
+        const totalJobs = entries.reduce((sum, [, item]) => sum + (Number(item.count) || 0), 0);
+        const profileName = (meta.profiles || {})[run.profile] || "";
+        const kwText = [run.keyword, profileName && run.profile !== "general" ? profileName : ""].filter(Boolean).join("、") || "采集任务";
+
         const head = node("summary", "", "rp-run-head");
-        const label = node("span", "", "rp-run-label");
-        label.append(
-          node("strong", [run.keyword, run.city].filter(Boolean).join(" · ") || "采集任务"),
-          node("span", new Date(run.started_at * 1000).toLocaleString("zh-CN"), "rp-run-date")
-        );
+        const statusDot = node("span", "", "rp-run-status-ico");
+        statusDot.dataset.tone = statusTone(run.status);
+        statusDot.append(icon(run.status === "complete" || run.status === "succeeded" ? "check" : "info"));
+        const viewChip = node("span", "查看", "rp-run-view");
         head.append(
-          label,
-          node("span", statusNames[run.status] || run.status, "rp-run-state")
+          statusDot,
+          node("span", compactTime(run.started_at), "rp-run-date"),
+          node("strong", kwText, "rp-run-kw"),
+          node("span", run.city || "全国", "rp-run-city"),
+          node("span", `${entries.length} 个平台`, "rp-run-platforms"),
+          node("span", `共 ${totalJobs} 条`, "rp-run-total"),
+          viewChip
         );
         card.append(head);
-        for (const [source, item] of Object.entries(run.progress || {})) {
+
+        const detailWrap = node("div", "", "rp-run-details");
+        for (const [source, item] of entries) {
           const line = node("div", "", "rp-run-source");
           const itemStatus = run.status === "interrupted" && pendingStates.has(item.status)
             ? "interrupted" : item.status;
-          line.append(node("strong", sourceLabel((meta.collection_sources || {})[source]) || source));
+          const top = node("div", "", "rp-run-source-top");
+          top.append(node("strong", sourceLabel((meta.collection_sources || {})[source]) || source));
           const loginNeeded = ["waiting_user", "login_required", "login_timeout"].includes(itemStatus) ||
             ["not_logged_in", "verification_required"].includes(item.detail_state);
           const loginUrl = loginNeeded && item.login_url;
@@ -397,16 +735,38 @@
             link.href = loginUrl || item.search_url;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
-            line.append(link);
+            top.append(link);
           }
+          line.append(top);
           const message = node("p", itemStatus === "interrupted" ? statusNames[itemStatus] : (item.message || statusNames[itemStatus] || ""));
           message.dataset.state = itemStatus;
           line.append(message);
           if (item.details) line.append(node("p", `原站 JD 已读取 ${item.details.available} / ${item.details.total} 条`));
-          card.append(line);
+          detailWrap.append(line);
         }
+        card.append(detailWrap);
         return card;
       };
+
+      function paintHistory(items) {
+        const expanded = new Set([...runsWrap.querySelectorAll(".rp-run[open]")].map(card => card.dataset.runId));
+        const visible = showAllRuns ? items : items.slice(0, 3);
+        const cards = visible.map(run => {
+          const card = runRow(run);
+          card.open = run.id === openRun || expanded.has(run.id);
+          if (run.id === openRun) openRun = null;
+          return card;
+        });
+        runsWrap.replaceChildren(...(cards.length ? cards : [node("p", "暂无采集记录。", "rp-hint")]));
+        historyCount.textContent = `共 ${items.length} 条`;
+        historyToggle.dataset.expanded = showAllRuns ? "1" : "0";
+      }
+
+      historyToggle.addEventListener("click", () => {
+        showAllRuns = !showAllRuns;
+        paintHistory(latestItems);
+      });
+
       async function loadRuns() {
         clearTimeout(runPoll);
         const request = ++runRequest;
@@ -414,27 +774,20 @@
           const data = await api("/runs");
           if (request !== runRequest || !alive(token, body)) return;
           const items = data.items || [];
+          latestItems = items;
           const snapshot = JSON.stringify(items);
           if (snapshot !== lastRuns || openRun) {
             const active = items.find(run => run.status === "running") || items.find(run => run.id === currentRun);
             if (active) currentRun = active.id;
             paintProgress(active);
-            const expanded = new Set([...runsWrap.querySelectorAll(".rp-run[open]")].map(card => card.dataset.runId));
             const focused = document.activeElement?.closest(".rp-run");
-            const cards = items.map(run => {
-              const card = runCard(run);
-              card.open = run.id === openRun || expanded.has(run.id);
-              if (run.id === openRun) openRun = null;
-              return card;
-            });
-            runsWrap.replaceChildren(...(cards.length ? cards : [node("p", "暂无采集记录。", "rp-hint")]));
-            historyCount.textContent = `${items.length} 条`;
+            paintHistory(items);
             lastRuns = snapshot;
             if (focused && !focused.isConnected) {
-              cards.find(card => card.dataset.runId === focused.dataset.runId)?.firstElementChild.focus({ preventScroll: true });
+              runsWrap.querySelector(`[data-run-id="${focused.dataset.runId}"] > summary`)?.focus({ preventScroll: true });
             }
           }
-          if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 2000);
+          if (items.some((run) => run.status === "running")) runPoll = setTimeout(loadRuns, 1500);
           else void RP.refresh({ silent: true });
         } catch (error) {
           if (request === runRequest && alive(token, body)) {
@@ -443,107 +796,77 @@
           }
         }
       }
-      collectSection.append(activeProgress, history);
+
+      body.append(hero, mainCard, activeProgress, historyCard);
       void loadRuns();
-
-      const csvSection = section("导入 CSV", "upload");
-      const csvProfile = profileSelect();
-      const csvFile = input("file", { accept: ".csv,text/csv" });
-      const csvFeedback = feedback();
-      const csvBtn = button("导入 CSV 文件", "", "upload");
-      csvBtn.addEventListener("click", async () => {
-        const file = csvFile.files[0];
-        if (!file) { setFeedback(csvFeedback, "请先选择 CSV 文件（不超过 2 MB）。", "error"); return; }
-        const data = new FormData();
-        data.append("file", file);
-        data.append("profile", csvProfile.value);
-        csvBtn.disabled = true;
-        try {
-          const result = await withBusy(() => api("/import", data), csvFeedback, "正在读取 CSV…");
-          if (!alive(token, body)) return;
-          setFeedback(csvFeedback, `已保存 ${result.count} 条记录。`, "success");
-          toast(`CSV 导入完成：${result.count} 条。`, "success");
-          csvFile.value = "";
-          void RP.refresh({ silent: true });
-        } catch (error) {
-          if (alive(token, body)) setFeedback(csvFeedback, error.message, "error");
-        } finally { csvBtn.disabled = false; }
-      });
-      csvSection.append(
-        node("p", "表头需包含链接列（url / job_link），以及标题或描述列；兼容常见平台导出格式。", "rp-hint"),
-        field("归入求职方向", csvProfile), field("CSV 文件", csvFile), csvBtn, csvFeedback
-      );
-
-      const htmlSection = section("导入已保存的搜索页", "file-text");
-      const htmlSource = select(sourceEntries(meta.sources));
-      const htmlProfile = profileSelect();
-      const htmlFile = input("file", { accept: ".html,.htm,text/html" });
-      const htmlFeedback = feedback();
-      const htmlBtn = button("读取页面岗位", "", "upload");
-      htmlBtn.addEventListener("click", async () => {
-        const file = htmlFile.files[0];
-        if (!file) { setFeedback(htmlFeedback, "请先选择浏览器保存的 HTML 文件（不超过 5 MB）。", "error"); return; }
-        const data = new FormData();
-        data.append("file", file);
-        data.append("source", htmlSource.value);
-        data.append("profile", htmlProfile.value);
-        htmlBtn.disabled = true;
-        try {
-          const result = await withBusy(() => api("/import-html", data), htmlFeedback, "正在读取页面…");
-          if (!alive(token, body)) return;
-          setFeedback(htmlFeedback, `已保存 ${result.count} 条记录。`, "success");
-          toast(`页面导入完成：${result.count} 条。`, "success");
-          htmlFile.value = "";
-          void RP.refresh({ silent: true });
-        } catch (error) {
-          if (alive(token, body)) setFeedback(htmlFeedback, error.message, "error");
-        } finally { htmlBtn.disabled = false; }
-      });
-      htmlSection.append(
-        node("p", "在原站打开搜索结果后，用浏览器「网页，仅 HTML」保存，再上传该文件；读取在本地完成。", "rp-hint"),
-        field("来源平台", htmlSource), field("归入求职方向", htmlProfile), field("HTML 文件", htmlFile), htmlBtn, htmlFeedback
-      );
-
-      const files = node("details", "", "rp-import-files");
-      files.append(node("summary", "手动导入文件"), csvSection, htmlSection);
-      body.append(collectSection, files);
     }
   });
 
   /* ---------- 2. 规则清洗（cleaning，复用现有 cleaning 引擎） ---------- */
   RP.registerDrawer("cleaning", {
-    title: "规则清洗配置", icon: "filter", tone: "brass",
+    title: "规则清洗配置", icon: "filter", tone: "accent",
     render(body) {
       const token = RP.drawerToken();
       const form = node("form", "", "rp-form rp-clean-form");
-      const profile = profileSelect();
+
+      /* 顶部标题区 */
+      const hero = node("header", "", "rp-clean-hero");
+      const heroIcon = node("span", "", "rp-clean-hero-icon");
+      heroIcon.append(icon("filter"));
+      const heroText = node("div", "", "rp-clean-hero-text");
+      heroText.append(
+        node("h2", "规则清洗配置"),
+        node("p", "配置筛选条件，自动过滤不匹配的岗位")
+      );
+      hero.append(heroIcon, heroText);
+
+      const profile = profileSelect(rememberedProfile());
       const profileRow = node("div", "", "rp-select-row rp-clean-profile");
       profile.setAttribute("aria-label", "清洗方向");
-      profileRow.append(node("strong", "清洗方向"), profile);
+      profile.addEventListener("change", () => setRememberedProfile(profile.value));
+      const profileSelectWrap = node("div", "", "rp-clean-profile-select");
+      profileSelectWrap.append(inlineIcon("briefcase"), profile);
+      profileRow.append(node("strong", "清洗方向"), profileSelectWrap);
       const fields = node("fieldset");
       const status = feedback();
       status.setAttribute("role", "status");
 
-      function ruleGroup(title, iconName, tone) {
-        const group = section(title);
-        group.classList.add("rp-clean-group");
+      function ruleGroup(title, subtitle, iconName, tone, decor) {
+        const group = node("section", "", "rp-panel-section rp-clean-group");
         group.dataset.tone = tone;
-        group.firstElementChild.prepend(tile(iconName, tone, true));
+        const head = node("div", "", "rp-clean-card-head");
+        const iconTile = node("span", "", "rp-clean-card-icon");
+        iconTile.dataset.tone = tone;
+        iconTile.append(iconName === "briefcase" || iconName === "cap" ? inlineIcon(iconName) : icon(iconName));
+        const copy = node("div", "", "rp-clean-card-copy");
+        copy.append(node("h3", title));
+        if (subtitle) copy.append(node("p", subtitle));
+        head.append(iconTile, copy);
+        if (decor) {
+          const deco = node("span", "", "rp-clean-card-decor");
+          deco.innerHTML = decor;
+          head.append(deco);
+        }
+        group.append(head);
         return group;
       }
 
-      const pay = ruleGroup("薪资与经验", "banknote", "success");
+      const PAY_DECOR = '<svg viewBox="0 0 64 42" fill="none" aria-hidden="true"><rect x="34" y="6" width="22" height="28" rx="4" fill="#10b981" fill-opacity=".16"/><rect x="14" y="16" width="26" height="20" rx="4" fill="#10b981" fill-opacity=".22"/><circle cx="27" cy="26" r="5" fill="#10b981" fill-opacity=".3"/></svg>';
+      const CITY_DECOR = '<svg viewBox="0 0 76 44" fill="none" aria-hidden="true"><path d="M12 42V22h10v20M26 42V12h12v30M42 42V6l4-4 4 4v36M54 42V18h12v24" fill="#3b82f6" fill-opacity=".16"/></svg>';
+
+      const pay = ruleGroup("薪资与经验", "设置薪资范围和经验要求", "briefcase", "success", PAY_DECOR);
+      const payBody = node("div", "", "rp-clean-card-body");
       const salaryGrid = node("div", "", "rp-panel-grid rp-clean-salary-range");
       const minSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const maxSalary = input("number", { min: "0.01", max: "1000", step: "0.01", placeholder: "不限" });
       const expMax = input("number", { min: "1", max: "50", step: "1", placeholder: "不限" });
-      salaryGrid.append(field("最低月薪（K）", minSalary), field("最高月薪（K）", maxSalary));
+      salaryGrid.append(field("最低月薪 (K)", minSalary), field("最高月薪 (K)", maxSalary));
       const dailyPay = node("div", "", "rp-daily-pay");
       dailyPay.hidden = true;
       const dailyGrid = node("div", "", "rp-panel-grid rp-clean-salary-range");
       const minDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
       const maxDaily = input("number", { min: "0.01", max: "100000", step: "0.01", placeholder: "不限" });
-      dailyGrid.append(field("最低日薪（元/天）", minDaily), field("最高日薪（元/天）", maxDaily));
+      dailyGrid.append(field("最低日薪 (元/天)", minDaily), field("最高日薪 (元/天)", maxDaily));
       const payEstimate = node("p", "", "rp-pay-estimate");
       payEstimate.setAttribute("aria-live", "polite");
       const money = new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -561,18 +884,21 @@
       dailyGrid.addEventListener("input", renderPayEstimate);
       dailyPay.append(dailyGrid, payEstimate);
       const experience = node("div", "", "rp-clean-experience");
-      experience.append(field("经验上限（年）", expMax), node("p", "岗位要求的最低经验达到上限时淘汰。", "rp-hint"));
-      pay.append(salaryGrid, dailyPay, experience);
+      experience.append(field("经验上限 (年)", expMax));
+      payBody.append(salaryGrid, dailyPay, experience);
+      pay.append(payBody);
 
       const splitTerms = (value) => value.split(/[,，、\n]+/).map((term) => term.trim()).filter(Boolean);
-      function termsEditor(key, label, placeholder) {
+      function termsEditor(key, label, placeholder, iconName) {
         const wrap = node("div", "", "rp-terms");
         wrap.dataset.terms = key;
         const row = node("div", "", "rp-terms-input");
         const entry = input("text", { id: `rp-rule-${key}`, maxlength: "2500", placeholder });
-        const add = button("添加", "rp-btn-sm rp-btn-ghost", "plus");
+        const add = button("添加", "rp-btn-sm rp-btn-ghost rp-terms-add", "plus");
         add.setAttribute("aria-label", `添加${label}`);
-        const title = node("label", label);
+        const title = node("label", "", "rp-terms-label");
+        if (iconName) title.append(inlineIcon(iconName));
+        title.append(node("span", label));
         title.htmlFor = entry.id;
         const valuesField = node("div", "", "rp-terms-values");
         const chips = node("div", "", "rp-chips");
@@ -610,7 +936,7 @@
         ])];
         return wrap;
       }
-      const cities = termsEditor("cities", "目标城市", "输入城市后回车添加");
+      const cities = termsEditor("cities", "目标城市", "输入城市后回车", "pin");
       const requireEdu = termsEditor("require_education", "最低学历", "例如 本科");
       const excludeEdu = termsEditor("exclude_education", "要排除的学历", "例如 博士");
       const degreeOptions = node("datalist");
@@ -621,57 +947,70 @@
       for (const editor of [requireEdu, excludeEdu]) {
         editor.querySelector("input").setAttribute("list", degreeOptions.id);
       }
-      const qualifications = ruleGroup("城市与学历", "graduation", "info");
+      const qualifications = ruleGroup("城市与学历", "限定目标城市和学历要求", "cap", "info", CITY_DECOR);
+      const qualBody = node("div", "", "rp-clean-card-body");
       const educationMode = select([["none", "不限岗位学历"], ["require", "按最低学历筛选"], ["exclude", "排除指定学历要求"]], "none");
-      const educationField = field("岗位学历要求", educationMode);
-      educationField.firstElementChild.id = "rp-education-label";
+      const educationField = node("label", "", "rp-field");
+      const eduLabel = node("span", "", "rp-terms-label");
+      eduLabel.id = "rp-education-label";
+      eduLabel.append(inlineIcon("cap"), node("span", "岗位学历要求"));
       educationMode.setAttribute("aria-labelledby", "rp-education-label");
+      educationField.append(eduLabel, educationMode);
       const educationHelp = node("p", "", "rp-education-help");
       educationHelp.id = "rp-education-help";
       educationMode.setAttribute("aria-describedby", educationHelp.id);
       const educationDescriptions = {
-        none: "这一项看的是招聘方写的学历要求。未注明学历的岗位会保留。",
-        require: "例如选「本科」，要求为「大专」的岗位会被淘汰。选择多项时，以最低的一项为门槛。",
-        exclude: "例如选「博士」，学历要求包含「博士」的岗位会被淘汰，即使同时列出了其他学历。"
+        none: "",
+        require: "例如选「本科」，要求为「大专」的岗位会被淘汰。",
+        exclude: "例如选「博士」，学历要求包含「博士」的岗位会被淘汰。"
       };
       function renderEducationMode() {
         requireEdu.hidden = educationMode.value !== "require";
         excludeEdu.hidden = educationMode.value !== "exclude";
-        educationHelp.textContent = educationDescriptions[educationMode.value];
+        const help = educationDescriptions[educationMode.value];
+        educationHelp.textContent = help;
+        educationHelp.hidden = !help;
       }
       educationMode.addEventListener("change", renderEducationMode);
       renderEducationMode();
-      qualifications.append(cities, educationField, educationHelp, requireEdu, excludeEdu, degreeOptions);
+      qualBody.append(cities, educationField, educationHelp, requireEdu, excludeEdu, degreeOptions);
+      qualifications.append(qualBody);
+
+      /* 两列并排主卡片容器 */
+      const topPair = node("div", "", "rp-clean-pair");
+      topPair.append(pay, qualifications);
 
       const titleExcl = node("textarea");
       titleExcl.rows = 2; titleExcl.maxLength = 4100; titleExcl.placeholder = "例如 电话销售、保险代理";
       const companyExcl = node("textarea");
       companyExcl.rows = 2; companyExcl.maxLength = 4100; companyExcl.placeholder = "用逗号、顿号或换行分隔";
-      const exclusions = node("details", "", "rp-panel-section rp-clean-group rp-clean-exclusions");
-      exclusions.dataset.tone = "brass";
+      const exclusions = node("details", "", "rp-panel-section rp-clean-exclusions");
       const exclusionHead = node("summary");
-      const exclusionCount = node("small", "", "rp-clean-exclusion-count");
-      exclusionHead.append(tile("filter", "brass", true), node("strong", "排除词"), exclusionCount, icon("chevron-down"));
+      const exclusionCount = node("span", "(0)", "rp-clean-exclusion-count");
+      exclusionHead.append(inlineIcon("ban", "rp-clean-ban-ico"), node("strong", "排除词"), exclusionCount, icon("chevron-down"));
       const exclusionFields = node("div", "", "rp-panel-grid rp-clean-exclusion-fields");
       exclusionFields.append(field("岗位标题排除词", titleExcl), field("公司排除词", companyExcl));
       exclusions.append(exclusionHead, exclusionFields);
       function renderExclusionCount() {
         const count = splitTerms(titleExcl.value).length + splitTerms(companyExcl.value).length;
-        exclusionCount.textContent = count ? `${count} 项` : "";
-        exclusionCount.hidden = !count;
+        exclusionCount.textContent = `(${count})`;
       }
       exclusionFields.addEventListener("input", renderExclusionCount);
       renderExclusionCount();
 
       const auto = input("checkbox");
+      auto.checked = false;
       const autoLabel = node("label", "", "rp-inline-check rp-clean-auto");
-      autoLabel.append(auto, document.createTextNode("新采集或导入的岗位自动执行硬规则"));
+      autoLabel.hidden = true;
+      autoLabel.append(auto, document.createTextNode("新采集或导入的岗位自动执行该规则"));
 
       /* AI 初筛规则 */
-      const scout = ruleGroup("AI 初筛规则", "sparkles", "accent");
+      const scout = node("section", "", "rp-panel-section rp-clean-scout");
       const scoutHead = node("div", "", "rp-scout-head");
-      const scoutAdd = button("添加规则", "rp-btn-sm rp-btn-ghost", "plus");
-      scoutHead.append(scout.firstElementChild, scoutAdd);
+      const scoutTitle = node("h3", "AI 初筛规则");
+      scoutTitle.prepend(icon("sparkles"));
+      const scoutAdd = button("添加规则", "rp-btn-sm rp-btn-ghost rp-scout-add-btn", "plus");
+      scoutHead.append(scoutTitle, scoutAdd);
       const exampleNotice = node("div", "", "rp-scout-samples");
       exampleNotice.hidden = true;
       const exampleHead = node("div", "", "rp-scout-head");
@@ -682,6 +1021,7 @@
       const scoutList = node("div", "", "rp-scout-list");
       let examples = [];
       const conditionLabel = (condition) => condition === "must" ? "必须包含" : "绝不包含";
+      const SCOUT_ICONS = ["code", "layers", "monitor"];
       function scoutExample(rule) {
         const example = node("details", "", "rp-scout-example");
         const summary = node("summary");
@@ -696,14 +1036,19 @@
           desc: row.querySelector(".rp-scout-standard").value.trim()
         };
       }
-      function scoutRow(rule = { keyword: "", condition: "never", desc: "" }) {
+      function scoutRow(rule = { keyword: "", condition: "never", desc: "" }, idx = 0) {
         const row = node("details", "", "rp-scout-row");
         if (rule.legacy) row.dataset.legacy = rule.legacy;
         const heading = node("summary");
+        const iconName = SCOUT_ICONS[idx % SCOUT_ICONS.length];
+        const rowIcon = node("span", "", "rp-scout-row-icon");
+        rowIcon.append(iconName === "layers" ? icon("layers") : inlineIcon(iconName));
         const name = node("strong", rule.keyword || "新规则");
         const constraint = node("small", conditionLabel(rule.condition), "rp-scout-condition");
         constraint.dataset.condition = rule.condition;
-        heading.append(name, constraint);
+        const chevron = icon("chevron-down");
+        chevron.classList.add("rp-scout-chevron");
+        heading.append(inlineIcon("grip", "rp-scout-grip"), rowIcon, name, constraint, chevron);
         const editor = node("div", "", "rp-scout-editor");
         const controls = node("div", "", "rp-scout-controls");
         const keyword = input("text", { maxlength: "240", placeholder: "规则词，例如 单休" });
@@ -771,13 +1116,13 @@
       scoutAdd.addEventListener("click", () => {
         if (scoutList.children.length >= 24) { setFeedback(status, "每个方向最多保存 24 条 AI 初筛规则。", "error"); return; }
         exampleNotice.hidden = true;
-        const row = scoutRow();
+        const row = scoutRow(undefined, scoutList.children.length);
         row.open = true;
         scoutList.append(row);
         row.querySelector("input").focus();
       });
       exampleEnable.addEventListener("click", () => {
-        scoutList.replaceChildren(...examples.map(scoutRow));
+        scoutList.replaceChildren(...examples.map((rule, i) => scoutRow(rule, i)));
         exampleNotice.hidden = true;
         resetPreview();
         const first = scoutList.firstElementChild;
@@ -787,10 +1132,10 @@
 
       /* 操作与预览 */
       const actions = node("div", "", "rp-clean-actions");
-      const saveBtn = button("保存规则", "rp-btn-primary", "check");
-      const previewBtn = button("预览现有岗位", "", "eye");
+      const saveBtn = button("保存规则", "rp-btn-primary rp-clean-save-btn", "check");
+      const previewBtn = button("预览现有岗位", "rp-clean-preview-btn", "eye");
       previewBtn.type = "submit";
-      const applyBtn = button("应用到现有岗位", "rp-btn-primary", "check");
+      const applyBtn = button("应用到现有岗位", "rp-btn-primary rp-clean-save-btn", "check");
       applyBtn.disabled = true;
       applyBtn.hidden = true;
       const actionRow = node("div", "", "rp-panel-actions");
@@ -799,8 +1144,8 @@
       previewList.hidden = true;
       actions.append(status, actionRow);
 
-      fields.append(pay, qualifications, exclusions, scout, autoLabel, previewList, actions);
-      form.append(profileRow, fields);
+      fields.append(topPair, exclusions, scout, autoLabel, previewList, actions);
+      form.append(hero, profileRow, fields);
       body.append(form);
 
       let previewToken = "";
@@ -840,7 +1185,7 @@
         exampleNotice.hidden = !showExamples;
         exampleList.replaceChildren(...(showExamples ? examples.map(scoutExample) : []));
         scoutList.replaceChildren(...stored.map(scoutRow));
-        auto.checked = Boolean(rules.auto);
+        auto.checked = false;
         const daily = profile.value === "internship";
         dailyPay.hidden = !daily;
         salaryGrid.hidden = daily;
@@ -942,31 +1287,59 @@
     render(body) {
       const token = RP.drawerToken();
       const readiness = note("正在读取模型与评估配置…");
+      readiness.classList.add("rp-eval-readiness");
       const form = node("form", "", "rp-form");
       const settingsSection = section("八维评估权重", "sliders", "accent");
       const weights = node("div", "", "rp-weights");
       const weightInputs = new Map();
       const weightMeters = new Map();
-      function paintMeter(key) {
-        const value = Number(weightInputs.get(key).value);
-        const ratio = Number.isFinite(value) ? Math.min(1, Math.max(0, value / 5)) : 0;
-        weightMeters.get(key).style.width = (ratio * 100) + "%";
+      const weightShares = new Map();
+      const WEIGHT_PRESETS = [
+        ["实习/校招", { role_match: 5, skills_align: 5, seniority: 2, compensation: 2, interview_prob: 4, company_stage: 1, market_fit: 4, growth: 4 }],
+        ["正式工作", { role_match: 5, skills_align: 5, seniority: 4, compensation: 4, interview_prob: 4, company_stage: 2, market_fit: 3, growth: 3 }],
+        ["均衡默认", { role_match: 5, skills_align: 5, seniority: 4, compensation: 4, interview_prob: 4, company_stage: 1, market_fit: 2, growth: 2 }]
+      ];
+      function paintMeters() {
+        let sum = 0;
+        for (const number of weightInputs.values()) {
+          const val = Number(number.value);
+          if (Number.isFinite(val) && val > 0) sum += val;
+        }
+        for (const [key, number] of weightInputs) {
+          const value = Number(number.value);
+          const safe = Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0;
+          weightMeters.get(key).style.width = ((safe / 5) * 100) + "%";
+          const pct = sum > 0 ? Math.round((safe / sum) * 100) : 0;
+          weightShares.get(key).textContent = `${pct}%`;
+        }
       }
-      function paintMeters() { for (const key of weightInputs.keys()) paintMeter(key); }
+      const presetBar = node("div", "", "rp-weight-presets");
+      for (const [presetLabel, presetValues] of WEIGHT_PRESETS) {
+        const presetBtn = button(presetLabel, "rp-btn-sm rp-btn-ghost");
+        presetBtn.addEventListener("click", () => {
+          for (const [key, number] of weightInputs) number.value = String(presetValues[key] ?? 3);
+          paintMeters();
+        });
+        presetBar.append(presetBtn);
+      }
       for (const [key, label] of Object.entries(DIMENSION_LABELS)) {
-        const number = input("number", { min: "0", max: "5", step: "0.1", required: "required" });
+        const number = input("number", { min: "0", max: "5", step: "1", required: "required" });
         weightInputs.set(key, number);
         const [iconName, tone] = DIMENSION_META[key] || ["sliders", "accent"];
         const wrap = node("label", "", "rp-weight-cell");
         wrap.dataset.tone = tone;
+        const top = node("div", "", "rp-weight-top");
         const head = node("span", "", "rp-weight-head");
-        head.append(tile(iconName, tone, true), node("span", label, "rp-weight-name"));
+        const share = node("span", "0%", "rp-weight-share");
+        weightShares.set(key, share);
+        head.append(tile(iconName, tone, true), node("span", label, "rp-weight-name"), share);
+        top.append(head, number);
         const meter = node("i", "", "rp-weight-meter");
         const fill = node("b");
         meter.append(fill);
         weightMeters.set(key, fill);
-        number.addEventListener("input", () => paintMeter(key));
-        wrap.append(head, number, meter);
+        number.addEventListener("input", paintMeters);
+        wrap.append(top, meter);
         weights.append(wrap);
       }
       const heuristic = input("checkbox");
@@ -978,7 +1351,8 @@
       const saveRow = node("div", "", "rp-panel-actions rp-eval-saverow");
       saveRow.append(heuristicLabel, saveBtn);
       settingsSection.append(
-        node("p", "0–5 分：3 中性 · 4 明确正面 · 5 极罕见；总分仅展示，分流只看 A–F 评级。", "rp-hint"),
+        node("p", "权重 0–5 整数（自动按占比换算百分制）；A ≥ 85 · B ≥ 70 · C ≥ 55 · D ≥ 40。", "rp-hint"),
+        presetBar,
         weights, saveRow, settingsFeedback
       );
       form.append(settingsSection);
@@ -986,7 +1360,7 @@
       const runSection = section("批量评估", "play", "info");
       runSection.append(node("p", "清洗通过与待重评岗位先做八维评级；达精投阈值自动深评，其余进海投。解析失败保留待重试。", "rp-hint"));
       const runFeedback = feedback();
-      const runBtn = button("运行 AI 评估", "rp-btn-primary", "play");
+      const runBtn = button("运行 AI 评估", "rp-btn-accent rp-eval-run-btn", "play");
       runBtn.addEventListener("click", async () => {
         runBtn.disabled = true;
         try {
@@ -1030,16 +1404,22 @@
         stats.replaceChildren(...(scored ? chips : [node("span", "暂无已评分岗位", "rp-stat-chip")]));
       }
       paintStats();
-      const runRow = node("div", "", "rp-panel-actions");
-      runRow.append(runBtn);
-      runSection.append(runRow, runFeedback, stats);
+      const runRow = node("div", "", "rp-panel-actions rp-eval-runrow");
+      runRow.append(runBtn, stats);
+      runSection.append(runRow, runFeedback);
       body.append(readiness, form, runSection);
       const paintList = appendEvaluationDetails(body, token);
 
       let loadSeq = 0;
       function showConfig(data) {
         const settings = data.settings || {};
-        for (const [key, number] of weightInputs) number.value = settings.evaluation_weights?.[key] ?? 1;
+        const rawWeights = settings.evaluation_weights || {};
+        const values = Object.values(rawWeights).map(Number).filter(Number.isFinite);
+        const isLegacyScale = values.length > 0 && Math.max(...values) <= 1;
+        for (const [key, number] of weightInputs) {
+          const val = rawWeights[key] ?? 3;
+          number.value = String(isLegacyScale ? Math.round(Number(val) * 5) : Math.round(Number(val)));
+        }
         paintMeters();
         heuristic.checked = Boolean(settings.heuristic_mode);
         if (settings.heuristic_mode) {

@@ -187,7 +187,7 @@
   };
   const STAGE_ORDER = ["collected", "cleaned", "screened", "deep", "rewritten", "greeted", "approval", "queued", "delivered"];
   const IN_PROGRESS = new Set(["collected", "cleaned", "screened", "deep", "rewritten", "greeted"]);
-  const TABS = ["all", "saved", "rejected", "in_progress", "reeval", "approval", "queued", "delivered", "failed"];
+  const TABS = ["all", "review", "saved", "rejected", "in_progress", "reeval", "approval", "queued", "delivered", "failed"];
   const RUN_STAGES = [
     { stage: "clean", label: "规则清洗" }, { stage: "evaluate", label: "AI 评估" },
     { stage: "rewrite", label: "简历改写" },
@@ -286,6 +286,7 @@
     job.score = score != null && score !== "" && Number.isFinite(Number(score)) ? Number(score) : null;
     job.track = raw.review_type === "mass" ? "mass" : "precision";
     job.reason = raw.cleaning_reason || failure.reason || "";
+    job.cleaningStatus = raw.cleaning_status || "";
     job.error = failure.error || "";
     job.failureKind = failure.kind || "";
     job.retryable = failure.retryable;
@@ -311,6 +312,7 @@
     if (job.stage === "approval") return "approval";
     if (job.stage === "queued") return "queued";
     if (job.stage === "delivered") return "delivered";
+    if ((job.stage === "collected" || job.stage === "cleaned") && job.cleaningStatus === "review") return "review";
     return "in_progress";
   }
   function filteredJobs() {
@@ -374,7 +376,14 @@
     const steps = Array.isArray(state.rail?.steps) ? state.rail.steps : [];
     return RAIL_STEPS.map((base) => {
       const remote = steps.find((s) => s.key === base.key) || {};
-      return { ...base, label: remote.label || base.label, desc: remote.desc || "", config_state: remote.config_state || "auto", count: Number(remote.count) || 0 };
+      return {
+        ...base,
+        label: remote.label || base.label,
+        desc: remote.desc || "",
+        config_state: remote.config_state || "auto",
+        count: Number(remote.count) || 0,
+        pending: Number(remote.pending) || 0
+      };
     });
   }
   function renderRail() {
@@ -384,20 +393,24 @@
     const delivery = new Map((state.funnel?.stages || []).map(stage => [stage.key, stage.count]));
     const needsConfig = (step) => step.key !== "scraping" &&
       (step.config_state === "required_missing" || warnings.includes(step.key));
-    const next = steps.find(step => !step.waiting && !step.count);
+    const next = steps.find(step => (step.key === "cleaning" && step.pending > 0) || (!step.waiting && !step.count));
     const root = byId("rpRail");
     root.replaceChildren(...steps.map((step, index) => {
-      const pending = step.key === "delivering" ? (delivery.get("ready") || 0) : step.waiting ? step.count : 0;
+      const isCleaning = step.key === "cleaning";
+      const cleaningPending = isCleaning ? step.pending : 0;
+      const pending = step.key === "delivering" ? (delivery.get("ready") || 0) : step.waiting ? step.count : cleaningPending;
       const count = step.key === "delivering" ? (delivery.get("delivered") || 0) : step.waiting ? 0 : step.count;
       let cardState = "idle", label = "未开始";
-      if (activeRailRuns.has(step.run) || (step.key === "cleaning" && cleaningRun)) [cardState, label] = ["active", "执行中"];
+      if (activeRailRuns.has(step.run) || (isCleaning && cleaningRun)) [cardState, label] = ["active", "执行中"];
       else if (needsConfig(step)) [cardState, label] = ["blocked", "待配置"];
+      else if (isCleaning && cleaningPending > 0) [cardState, label] = [step === next && !activeRailRuns.size && !state.running ? "next" : "waiting", "待清洗"];
       else if (pending) [cardState, label] = ["waiting", step.waiting];
       else if (count) [cardState, label] = ["done", step.result];
       else if (step === next && !activeRailRuns.size && !state.running) [cardState, label] = ["next", "下一步"];
-      const detail = pending && count ? `${pending} 条待投递 · ${count} 条已出包`
+      const detail = isCleaning && cleaningPending > 0
+        ? (count ? `${cleaningPending} 条待清洗 · 已过 ${count} 条` : `${cleaningPending} 条待清洗`)
+        : pending && count ? `${pending} 条待投递 · ${count} 条已出包`
         : pending || count ? `${pending || count} 条${label === step.result || label === step.waiting ? "" : step.result}` : "";
-      const isCleaning = step.key === "cleaning";
       const card = node(isCleaning ? "div" : "button", "", "rp-step");
       const configButton = isCleaning ? node("button", "", "rp-step-config") : card;
       configButton.type = "button";
@@ -805,7 +818,11 @@
       bar.append(button);
       return button;
     };
-    if (state.tab === "saved") {
+    if (state.tab === "review" && counts.review > 0) {
+      bar.dataset.tone = "warning";
+      bar.append(node("p", `${counts.review} 个岗位处于待核实状态，可单条点「放行并推送」或一键批量放行进入评估。`));
+      addButton(`一键放行全部（${counts.review}）`, "rp-btn-primary", () => bulkReleaseReview(), "check");
+    } else if (state.tab === "saved") {
       bar.dataset.tone = "info";
       if (!counts.saved) { bar.hidden = true; return; }
       bar.append(node("p", "保存的岗位跨天保留，卡片显示当前处理状态。取消保存时，仅当天采集的岗位会回到「全部」。"));
@@ -911,18 +928,19 @@
     return button;
   }
   function saveButton(job) {
-    const button = actionButton(job.saved ? "取消保存" : "保存",
-      "rp-btn-ghost rp-job-save" + (job.saved ? " is-saved" : ""), () => toggleSave(job), "bookmark");
+    const button = actionButton("",
+      "rp-btn-ghost rp-iconbtn rp-job-save" + (job.saved ? " is-saved" : ""), () => toggleSave(job), "bookmark");
+    button.setAttribute("aria-label", job.saved ? "取消保存" : "保存岗位");
     button.title = job.saved
       ? "取消保存：当天采集的岗位回到「全部」，早前的岗位会移除。"
-      : "保存：岗位跨天保留在「已保存」视图，并标注当前阶段。";
+      : "保存：岗位跨天保留在「已保存」视图。";
     return button;
   }
   function jobActions(job) {
     const actions = node("div", "", "rp-job-actions");
     // 已保存视图按当前阶段提供操作，保存开关始终在首位。
     const tab = job.tab === "saved" ? stageTabOf(job) : job.tab;
-    actions.append(saveButton(job), actionButton("定制面板", "rp-btn-ghost", () => openDrawer("rewriting", { job }), "sliders"));
+    actions.append(saveButton(job), actionButton("定制", "rp-btn-ghost", () => openDrawer("rewriting", { job }), "sliders"));
     if (tab === "approval") {
       actions.append(
         actionButton("拒绝", "rp-btn-danger", () => decide(job, "reject"), "x"),
@@ -931,66 +949,144 @@
       );
     } else if (tab === "queued") {
       actions.append(
-        actionButton("终止投递", "rp-btn-ghost", () => abandonDelivery(job), "stop"),
-        actionButton("立即投递", "rp-btn-accent", () => deliverJobs([job]), "send")
+        actionButton("终止", "rp-btn-ghost", () => abandonDelivery(job), "stop"),
+        actionButton("投递", "rp-btn-accent", () => deliverJobs([job]), "send")
       );
     } else if (tab === "delivered") {
-      actions.append(actionButton("投递详情", "rp-btn-ghost", () => openDrawer("delivering", { job }), "eye"));
+      actions.append(actionButton("详情", "rp-btn-ghost", () => openDrawer("delivering", { job }), "eye"));
     } else if (tab === "reeval") {
-      actions.append(actionButton("重新评估", "rp-btn-accent", () => runScreenBatch(), "rotate"));
+      actions.append(actionButton("重评", "rp-btn-accent", () => runScreenBatch(), "rotate"));
     } else if (tab === "failed") {
       actions.append(
         actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash"),
         actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate")
       );
-    } else if (tab === "rejected" && /^https?:/.test(job.url || "")) {
-      actions.append(actionButton("放行并推送", "rp-btn-success", () => releaseJob(job), "check"));
+    } else if ((tab === "rejected" || tab === "review") && /^https?:/.test(job.url || "")) {
+      actions.append(actionButton("放行", "rp-btn-success", () => releaseJob(job), "check"));
     } else if (tab === "in_progress" && job.hasGreeting) {
-      actions.append(actionButton("补发打招呼", "rp-btn-ghost", () => regreet(), "message"));
+      actions.append(actionButton("补发招呼", "rp-btn-ghost", () => regreet(), "message"));
     }
     return actions;
   }
+  const SHORT_SOURCE_LABELS = {
+    boss: "BOSS", "51job": "前程无忧", zhilian: "智联", xiaohongshu: "小红书", liepin: "猎聘"
+  };
+  const RING_GRADIENTS = {
+    A: ["#10b981", "#059669"],
+    B: ["#3b82f6", "#6366f1"],
+    C: ["#f59e0b", "#ea580c"],
+    D: ["#94a3b8", "#64748b"],
+    F: ["#f43f5e", "#dc2626"]
+  };
+  let ringUid = 0;
+  function matchRing(grade, score) {
+    const wrap = node("div", "", "rp-match-ring");
+    if (!grade && score == null) return wrap;
+    const pct = score != null ? Math.max(0, Math.min(100, Number(score))) : ({ A: 92, B: 78, C: 62, D: 48, F: 28 }[grade] || 0);
+    const resolvedGrade = grade || (pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F");
+    const [c1, c2] = RING_GRADIENTS[resolvedGrade] || RING_GRADIENTS.B;
+    const gid = `rpRingG${++ringUid}`;
+    const radius = 15.5;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - pct / 100);
+    wrap.dataset.grade = resolvedGrade;
+    wrap.title = [grade ? `${grade} 级` : "", score != null ? `${score} 分` : ""].filter(Boolean).join(" · ");
+    wrap.innerHTML =
+      `<span class="rp-ring-dial">` +
+      `<svg viewBox="0 0 38 38" aria-hidden="true">` +
+      `<defs><linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs>` +
+      `<circle class="rp-ring-core" cx="19" cy="19" r="12.5"/>` +
+      `<circle class="rp-ring-bg" cx="19" cy="19" r="${radius}"/>` +
+      `<circle class="rp-ring-fg" cx="19" cy="19" r="${radius}" stroke="url(#${gid})" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"/>` +
+      `</svg>` +
+      `<span class="rp-ring-letter">${resolvedGrade}</span>` +
+      `</span>` +
+      (score != null ? `<span class="rp-ring-score">${score}</span>` : "");
+    return wrap;
+  }
   function normalJobCard(job) {
-    const card = node("article", "", "rp-job");
-    const top = node("div", "", "rp-job-top");
-    const logo = node("span", sourceLabel(job.source).slice(0, 2), "rp-job-logo");
-    logo.dataset.source = job.source;
-    const head = node("div", "", "rp-job-head");
-    const company = node("div", "", "rp-job-company");
-    company.append(node("strong", job.company || "未知公司"), node("span", sourceLabel(job.source), "rp-source-pill"));
+    const card = node("article", "", "rp-job rp-job-row");
+    const main = node("div", "", "rp-job-top rp-job-grid");
+
+    /* 1. 岗位信息 */
+    const info = node("div", "", "rp-job-info");
+    const titleLine = node("div", "", "rp-job-title-line");
+    const title = node("button", job.title, "rp-job-title");
+    title.type = "button";
+    title.addEventListener("click", () => openDrawer("rewriting", { job }));
+    titleLine.append(title);
+    if (job.salary) titleLine.append(node("span", job.salary, "rp-job-salary-inline"));
+    const subLine = node("div", "", "rp-job-sub");
+    const subParts = [job.company || "未知公司", job.experience, job.education].filter(Boolean);
+    subLine.append(node("span", subParts.join(" · "), "rp-job-sub-text"));
     if (job.url && /^https?:/.test(job.url)) {
       const link = node("a", "原帖", "rp-job-link");
       link.href = job.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.append(icon("external"));
-      company.append(link);
+      subLine.append(link);
     }
-    const title = node("button", job.title, "rp-job-title");
-    title.type = "button";
-    title.addEventListener("click", () => openDrawer("rewriting", { job }));
-    head.append(company, title);
-    top.append(logo, head);
-    if (job.grade || job.score != null) {
-      const gradeWrap = node("div", "", "rp-job-grade");
-      if (job.grade) {
-        const badge = node("span", job.grade, "rp-grade");
-        badge.dataset.grade = job.grade;
-        gradeWrap.append(badge);
-      }
-      if (job.score != null) gradeWrap.append(node("span", `${job.score} 分`, "rp-job-score"));
-      top.append(gradeWrap);
+    if (state.tab === "review" && job.reason) {
+      const tag = node("span", "", "rp-review-pill");
+      tag.append(icon("info"), node("span", job.reason));
+      subLine.append(tag);
     }
-    top.append(node("strong", job.salary || "薪资未获取", "rp-job-salary" + (job.salary ? "" : " is-missing")));
-    const bottom = node("div", "", "rp-job-bottom");
-    const foot = node("div", "", "rp-job-foot");
-    const status = node("span", "", "rp-job-status");
-    status.append(statusBadge(job));
-    const detail = job.tab === "rejected" ? "" : (job.followStatus || job.reason);
-    if (detail) status.append(node("span", detail, "rp-job-status-detail"));
-    foot.append(status, materialButtons(job), jobActions(job));
-    bottom.append(jobTags(job), foot);
-    card.append(top, bottom);
+    const jdFold = job.source === "zhilian" && state.tab !== "all" && state.tab !== "rejected"
+      ? jobDescriptionFold(job)
+      : null;
+    if (jdFold) {
+      jdFold.hidden = true;
+      const jdBtn = node("button", job.jdMissing ? "补齐 JD" : "查看 JD", "rp-jd-inline-btn");
+      jdBtn.type = "button";
+      jdBtn.addEventListener("click", () => {
+        jdFold.hidden = !jdFold.hidden;
+        jdFold.open = !jdFold.hidden;
+        jdBtn.classList.toggle("is-open", !jdFold.hidden);
+      });
+      subLine.append(jdBtn);
+    }
+    info.append(titleLine, subLine);
+
+    /* 2. 平台 */
+    const platformCol = node("div", "", "rp-col-platform");
+    const pill = node("span", SHORT_SOURCE_LABELS[job.source] || sourceLabel(job.source), "rp-source-pill");
+    pill.dataset.source = job.source;
+    platformCol.append(pill);
+
+    /* 3. 城市 */
+    const cityCol = node("div", "", "rp-col-city");
+    const cityText = (job.location || "").split(/[·•\s-]+/)[0] || "—";
+    if (cityText !== "—") cityCol.append(icon("map-pin"));
+    cityCol.append(node("span", cityText));
+
+    /* 4. 匹配度圆环（未评估留空） */
+    const matchCol = node("div", "", "rp-col-match");
+    matchCol.append(matchRing(job.grade, job.score));
+
+    /* 5. 当前状态 */
+    const statusCol = node("div", "", "rp-col-status");
+    if (job.tab === "review") {
+      const badge = node("span", "待核实", "rp-status-badge");
+      badge.dataset.tone = "warning";
+      statusCol.append(badge);
+    } else {
+      statusCol.append(statusBadge(job));
+    }
+
+    /* 6. 更新时间 */
+    const timeCol = node("div", "", "rp-col-time");
+    timeCol.textContent = fmtTime(job.updatedAt || job.crawledAt) || "—";
+
+    /* 7. 操作 */
+    const foot = node("div", "", "rp-job-foot rp-col-actions");
+    const hasMaterials = job.hasRewrite || job.hasGreeting;
+    if (hasMaterials) foot.append(materialButtons(job));
+    foot.append(jobActions(job));
+
+    main.append(info, platformCol, cityCol, matchCol, statusCol, timeCol, foot);
+    card.append(main);
+    if (jdFold) card.append(jdFold);
     return card;
   }
   function jobDescriptionFold(job, onPayload) {
@@ -1148,6 +1244,14 @@
       return;
     }
     if (!renderedJobs.size) root.replaceChildren();
+    let tableHead = root.querySelector(":scope > .rp-table-head");
+    if (!tableHead) {
+      tableHead = node("div", "", "rp-table-head rp-job-grid");
+      for (const heading of ["岗位信息", "平台", "城市", "匹配度", "当前状态", "更新时间", "操作"]) {
+        tableHead.append(node("span", heading));
+      }
+      root.prepend(tableHead);
+    }
     const visible = new Set(list.map(jobId));
     for (const [id, entry] of renderedJobs) {
       if (!visible.has(id)) {
@@ -1159,7 +1263,7 @@
       const id = jobId(job);
       const previous = renderedJobs.get(id);
       // JD 正文由折叠区按需加载；加载完成后已经直接更新了卡片。
-      const signature = JSON.stringify([{ ...job, description: undefined }, purgeMode]);
+      const signature = JSON.stringify([{ ...job, description: undefined }, purgeMode, state.tab]);
       let card = previous?.card;
       if (!previous || previous.job !== job || previous.signature !== signature) {
         card = renderJobCard(job);
@@ -1172,7 +1276,7 @@
         }
         renderedJobs.set(id, { job, signature, card });
       }
-      const anchor = root.children[index];
+      const anchor = root.children[index + 1];
       if (anchor !== card) root.insertBefore(card, anchor || null);
       card.querySelector(".rp-job-save").disabled = savingJobs.has(id) || state.bulkBusy;
       const failed = card.querySelector(".rp-failed-head input");
@@ -1181,8 +1285,11 @@
     if (purgeMode) syncPurgeCheckboxes();
   }
   function renderJobCard(job) {
-    const card = job.tab === "rejected" ? rejectedJobCard(job) : job.tab === "failed" ? failedJobCard(job) : normalJobCard(job);
-    if (job.source === "zhilian" && job.tab !== "rejected") card.append(jobDescriptionFold(job));
+    const card = job.tab === "rejected" && state.tab === "rejected"
+      ? rejectedJobCard(job)
+      : job.tab === "failed" && state.tab === "failed"
+        ? failedJobCard(job)
+        : normalJobCard(job);
     if (purgeMode && !job.saved) {
       const box = node("input", "", "rp-purge-checkbox");
       box.type = "checkbox";
@@ -1340,10 +1447,33 @@
       .finally(() => { state.bulkBusy = false; renderTabBanner(); });
   }
   function releaseJob(job) {
-    // 放行清洗淘汰：复用现有 /cleaning/release（仅平台来源记录支持）。
+    // 放行清洗淘汰或待核实：复用现有 /cleaning/release（仅平台来源记录支持）。
     return api("/cleaning/release", { source: job.source, url: job.url, profile: job.profile || "general" })
-      .then(() => { toast("已放行清洗淘汰结果，岗位将重新参与流转。", "success"); void refresh({ silent: true }); })
+      .then(() => { toast("已放行，岗位将进入下一步流转。", "success"); void refresh({ silent: true }); })
       .catch((error) => { toast(error.message, "error"); });
+  }
+  async function bulkReleaseReview() {
+    if (state.bulkBusy) return;
+    state.bulkBusy = true;
+    renderTabBanner();
+    try {
+      const data = await pipelineApi("/jobs?tab=review&limit=200&offset=0", undefined, "GET");
+      const targets = (data.items || []).filter((item) => /^https?:/.test(item.url || ""));
+      let released = 0;
+      for (const item of targets) {
+        try {
+          await api("/cleaning/release", { source: item.source, url: item.url, profile: item.profile || "general" });
+          released += 1;
+        } catch (_) { /* 跳过单条失败 */ }
+      }
+      toast(released ? `已批量放行 ${released} 个待核实岗位。` : "没有可放行的待核实岗位。", released ? "success" : "warning");
+      await refresh({ silent: true });
+    } catch (error) {
+      toast(error.message || "批量放行失败。", "error");
+    } finally {
+      state.bulkBusy = false;
+      renderTabBanner();
+    }
   }
   async function bulkApprove(jobs) {
     if (!jobs.length || state.bulkBusy) return;
