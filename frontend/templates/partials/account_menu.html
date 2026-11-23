@@ -16,12 +16,6 @@
             </svg>
             <span class="nav-workspace-menu-row-text">{{ '我的简历' if account_menu_in_center|default(false) else '个人中心' }}</span>
         </a>
-        {% if account_menu_in_center|default(false) %}
-    <a href="#account-center" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem" onclick="closeNavWorkspaceMenu()">
-        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="3"/><path d="M8 18v-1a4 4 0 0 1 8 0v1"/></svg>
-        <span class="nav-workspace-menu-row-text">工作区外观</span>
-    </a>
-    {% endif %}
         {% if initial_user and initial_user.can_manage_configs %}
         <div class="nav-workspace-menu-divider" role="presentation"></div>
         <a href="/system-settings" class="nav-workspace-menu-row nav-workspace-menu-link" role="menuitem">系统配置</a>

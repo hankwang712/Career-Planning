@@ -262,4 +262,165 @@
   window.addEventListener("hashchange", syncHash);
   syncHash();
   void load();
+
+  /* 一键环境体检 + SQLite 备份 + LLM Token 审计 */
+  const diagList = document.getElementById("diagList");
+  const diagSummaryPill = document.getElementById("diagSummaryPill");
+  const navDiagCount = document.getElementById("navDiagCount");
+  const navUsageCount = document.getElementById("navUsageCount");
+  const usageSummary = document.getElementById("usageSummary");
+  const runDiagBtn = document.getElementById("runDiagBtn");
+  const runBackupBtn = document.getElementById("runBackupBtn");
+
+  function renderDiagnostics(data) {
+    if (diagList && Array.isArray(data.checks)) {
+      const okCount = data.checks.filter(c => c.ok).length;
+      const total = data.checks.length;
+      if (diagSummaryPill) {
+        diagSummaryPill.textContent = okCount === total ? `全部通过 ${okCount}/${total}` : `已就绪 ${okCount}/${total}`;
+        diagSummaryPill.dataset.state = okCount === total ? "ok" : "warn";
+      }
+      if (navDiagCount) navDiagCount.textContent = `${okCount}/${total}`;
+      diagList.replaceChildren(...data.checks.map(item => {
+        const row = document.createElement("div");
+        row.className = "sc-diag-item";
+        const copy = document.createElement("div");
+        copy.className = "sc-diag-copy";
+        const title = document.createElement("strong");
+        title.textContent = item.label;
+        const detail = document.createElement("span");
+        detail.textContent = item.detail;
+        copy.append(title, detail);
+        if (!item.ok && item.fix) {
+          const fix = document.createElement("div");
+          fix.className = "sc-diag-fix";
+          fix.textContent = `修复建议：${item.fix}`;
+          copy.append(fix);
+        }
+        const pill = document.createElement("span");
+        pill.className = "sc-diag-pill";
+        pill.dataset.ok = item.ok ? "1" : "0";
+        pill.textContent = item.ok ? "正常" : "待处理";
+        row.append(copy, pill);
+        return row;
+      }));
+    }
+    if (usageSummary && data.usage) {
+      const t = data.usage.today || {};
+      const w = data.usage.window || {};
+      if (navUsageCount) navUsageCount.textContent = `${t.calls || 0}次`;
+      usageSummary.replaceChildren();
+      const kpis = document.createElement("div");
+      kpis.className = "sc-usage-kpis";
+      for (const [label, val] of [
+        ["今日调用次数", `${t.calls || 0} 次`],
+        ["今日 Token 消耗", `${(t.total_tokens || 0).toLocaleString()}`],
+        ["今日平均耗时", t.avg_latency_ms ? `${(t.avg_latency_ms / 1000).toFixed(2)}s` : "—"],
+        ["近 7 日总 Token", `${(w.total_tokens || 0).toLocaleString()}`],
+      ]) {
+        const box = document.createElement("div");
+        box.className = "sc-usage-kpi";
+        const s1 = document.createElement("span");
+        s1.textContent = label;
+        const s2 = document.createElement("strong");
+        s2.textContent = val;
+        box.append(s1, s2);
+        kpis.append(box);
+      }
+      usageSummary.append(kpis);
+      const feats = data.usage.by_feature || [];
+      if (feats.length) {
+        const row = document.createElement("div");
+        row.className = "sc-usage-feats";
+        for (const f of feats.slice(0, 6)) {
+          const chip = document.createElement("span");
+          chip.className = "sc-usage-feat-chip";
+          const b = document.createElement("b");
+          b.textContent = `${f.calls}次 / ${f.total_tokens.toLocaleString()} tok`;
+          chip.append(document.createTextNode(`${f.feature} `), b);
+          row.append(chip);
+        }
+        usageSummary.append(row);
+      }
+    }
+  }
+
+  async function loadDiagnostics() {
+    if (!diagList) return;
+    try {
+      const res = await fetch("/api/system-settings/diagnostics", { cache: "no-store" });
+      if (res.ok) renderDiagnostics(await res.json());
+    } catch { /* ignore */ }
+  }
+  if (runDiagBtn) {
+    runDiagBtn.addEventListener("click", async () => {
+      runDiagBtn.disabled = true;
+      runDiagBtn.textContent = "体检中…";
+      await loadDiagnostics();
+      runDiagBtn.disabled = false;
+      runDiagBtn.textContent = "一键体检";
+    });
+  }
+  if (runBackupBtn) {
+    runBackupBtn.addEventListener("click", async () => {
+      runBackupBtn.disabled = true;
+      runBackupBtn.textContent = "备份中…";
+      try {
+        const res = await fetch("/api/system-settings/backup", {
+          method: "POST", headers: await window.CareerAuth.headers(), cache: "no-store"
+        });
+        const data = await res.json();
+        result.textContent = data.result?.ok ? `已创建备份：${data.result.latest}（共 ${data.result.count} 份）` : "备份失败";
+        await loadDiagnostics();
+      } catch {
+        result.textContent = "备份请求失败。";
+      } finally {
+        runBackupBtn.disabled = false;
+        runBackupBtn.textContent = "立即备份";
+      }
+    });
+  }
+  void loadDiagnostics();
+
+  /* 常用厂商一键预设（填充 Base URL & Model，不改动已有 API Key） */
+  const presetBar = document.getElementById("chatProviderPresets");
+  if (presetBar) {
+    presetBar.addEventListener("click", event => {
+      const btn = event.target.closest("[data-preset-url]");
+      if (!btn) return;
+      const urlInput = form.elements.namedItem("AI_CHAT_BASE_URL");
+      const modelInput = form.elements.namedItem("AI_CHAT_MODEL");
+      if (urlInput) {
+        urlInput.value = btn.dataset.presetUrl || "";
+        urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (modelInput) {
+        modelInput.value = btn.dataset.presetModel || "";
+        modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      result.textContent = `已填入 ${btn.textContent} 预设，请核对 API Key 后点击保存。`;
+    });
+  }
+
+  /* 底部悬浮「未保存变更条」 */
+  const dirtyBar = document.createElement("div");
+  dirtyBar.className = "sc-dirty-bar";
+  dirtyBar.hidden = true;
+  const dirtyText = document.createElement("span");
+  const discardBtn = document.createElement("button");
+  discardBtn.type = "button"; discardBtn.className = "sc-dirty-discard"; discardBtn.textContent = "放弃修改";
+  const quickSaveBtn = document.createElement("button");
+  quickSaveBtn.type = "button"; quickSaveBtn.className = "sc-dirty-save"; quickSaveBtn.textContent = "保存配置";
+  dirtyBar.append(dirtyText, discardBtn, quickSaveBtn);
+  document.body.append(dirtyBar);
+
+  function syncDirtyBar() {
+    const count = pending.size;
+    dirtyBar.hidden = count === 0;
+    if (count > 0) dirtyText.textContent = `有 ${count} 项未保存修改`;
+  }
+  form.addEventListener("input", () => setTimeout(syncDirtyBar, 0));
+  form.addEventListener("submit", () => setTimeout(syncDirtyBar, 400));
+  discardBtn.addEventListener("click", () => { pending.clear(); void load(); syncDirtyBar(); });
+  quickSaveBtn.addEventListener("click", () => { if (submit && !submit.disabled) submit.click(); });
 })();

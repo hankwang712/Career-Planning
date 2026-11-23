@@ -47,7 +47,43 @@ function renderReportWizard() {
   if (noticeLink) noticeLink.hidden = checking || Boolean(error);
   if (retry) retry.hidden = checking || !error;
   const sourceLabel = document.getElementById("reportResumeSourceLabel");
-  if (sourceLabel) sourceLabel.textContent = source?.title || "";
+  const sourceSelect = document.getElementById("reportResumeSourceSelect");
+  const options = Array.isArray(reportResumeUiState.options) && reportResumeUiState.options.length
+    ? reportResumeUiState.options
+    : (source ? [source] : []);
+  if (sourceSelect) {
+    if (options.length) {
+      const signature = options.map((item) => `${item.id || ""}:${item.title || ""}`).join("|");
+      if (sourceSelect.dataset.signature !== signature) {
+        sourceSelect.dataset.signature = signature;
+        sourceSelect.innerHTML = options.map((item) => {
+          const suffix = item.kind === "upload" ? "（上传简历）" : "";
+          const label = `${item.title || "未命名简历"}${suffix}`;
+          return `<option value="${escHtml(item.id || "")}">${escHtml(label)}</option>`;
+        }).join("");
+      }
+      sourceSelect.value = source?.id || options[0]?.id || "";
+      sourceSelect.hidden = false;
+      sourceSelect.disabled = locked;
+      if (!sourceSelect.dataset.bound) {
+        sourceSelect.dataset.bound = "1";
+        sourceSelect.addEventListener("change", () => {
+          const nextId = sourceSelect.value;
+          const nextSource = (reportResumeUiState.options || []).find((item) => item.id === nextId);
+          if (!nextSource) return;
+          reportResumeUiState.selectedId = nextSource.id;
+          reportResumeUiState.source = nextSource;
+          renderReportWizard();
+        });
+      }
+    } else {
+      sourceSelect.hidden = true;
+    }
+  }
+  if (sourceLabel) {
+    sourceLabel.textContent = source?.title || "";
+    sourceLabel.hidden = Boolean(sourceSelect && !sourceSelect.hidden);
+  }
   const targets = document.getElementById("reportWorkflowTargets");
   const suggestedTargets = source?.targets || [];
   if (targets && !targets.dataset.edited) targets.value = suggestedTargets.join("\n");
@@ -842,6 +878,7 @@ function buildCareerReportGenerationPayload() {
     profile_snapshot: profile,
     role_rankings: role_rankings,
     focus_role_id: focusId,
+    resume_source_id: reportResumeUiState.selectedId || reportResumeUiState.source?.id || "",
     availability: arrival || days ? { arrival: arrival || "undecided", days_per_week: Number(days || 0) } : null,
     workflow: {
       targets,
@@ -1021,11 +1058,24 @@ async function refreshReportResumePanel() {
   reportResumeUiState.pending = true;
   renderReportWizard();
   try {
-    const { source } = await requestJson("/api/career-report/resume-source");
-    if (epoch === accountRequestEpoch) Object.assign(reportResumeUiState, { source, error: "" });
+    const data = await requestJson("/api/career-report/resume-source");
+    if (epoch === accountRequestEpoch) {
+      const options = Array.isArray(data.options) && data.options.length
+        ? data.options
+        : (data.source ? [data.source] : []);
+      const prevId = reportResumeUiState.selectedId;
+      const matched = prevId ? options.find((item) => item.id === prevId) : null;
+      const activeSource = matched || data.source || options[0] || null;
+      Object.assign(reportResumeUiState, {
+        source: activeSource,
+        options,
+        selectedId: activeSource?.id || "",
+        error: "",
+      });
+    }
   } catch (error) {
     if (epoch === accountRequestEpoch && error.code !== "ACCOUNT_CHANGED") {
-      Object.assign(reportResumeUiState, { source: null, error: error.message || "请稍后重试。" });
+      Object.assign(reportResumeUiState, { source: null, options: [], selectedId: "", error: error.message || "请稍后重试。" });
     }
   } finally {
     if (epoch === accountRequestEpoch) {

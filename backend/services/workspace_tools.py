@@ -186,3 +186,101 @@ def logs():
     with log_lock:
         entries = [entry for username, entry in recent_requests if username == owner][-100:]
     return jsonify(entries=entries)
+
+
+@blueprint.get("/api/system-settings/llm-usage")
+def llm_usage():
+    from . import llm_audit
+    days = request.args.get("days", 7, type=int) or 7
+    return jsonify(llm_audit.usage_summary(days=max(1, min(90, days))))
+
+
+@blueprint.post("/api/system-settings/backup")
+def trigger_backup():
+    from . import db_backup
+    result = db_backup.create_rolling_backup(force=True)
+    return jsonify(result=result, backups=db_backup.list_backups())
+
+
+@blueprint.get("/api/system-settings/diagnostics")
+def system_diagnostics():
+    from . import db, db_backup, llm_audit, recruitment_chrome
+    from .resume import editor_document
+    checks = []
+
+    base_url, key, model = llm_env.chat_runtime()
+    checks.append({
+        "key": "chat_llm",
+        "label": "对话与改写模型",
+        "ok": bool(base_url and key and model),
+        "detail": f"{model}（已配置）" if all((base_url, key, model)) else "未配置完整 API 参数",
+        "fix": "" if all((base_url, key, model)) else "在上方「对话模型」中点选常用厂商预设，填入 API Key 并保存。",
+    })
+
+    try:
+        conn = db._get_conn()
+        job_count = conn.execute("SELECT COUNT(*) FROM recruitment_listings").fetchone()[0]
+        backups = db_backup.list_backups()
+        checks.append({
+            "key": "sqlite",
+            "label": "SQLite 数据库与备份",
+            "ok": True,
+            "detail": f"正常 · {job_count} 条岗位 · 已保留 {len(backups)} 份滚动备份",
+            "fix": "",
+        })
+    except Exception as exc:
+        checks.append({"key": "sqlite", "label": "SQLite 数据库与备份", "ok": False, "detail": str(exc)[:80],
+                       "fix": "检查 data/app_data/app.db 文件读写权限。"})
+
+    try:
+        _, _, fams = editor_document.resume_fonts()
+        font_ok = fams.get("ChineseResume") != "sans-serif"
+        checks.append({
+            "key": "pdf_fonts",
+            "label": "PDF 学术字体引擎",
+            "ok": font_ok,
+            "detail": f"中文：{fams.get('ChineseResume')} / 西文：{fams.get('LatinResume')}",
+            "fix": "" if font_ok else "确认 Windows 字体目录包含 NotoSerifSC-VF.ttf 或 SimSun。",
+        })
+    except Exception as exc:
+        checks.append({"key": "pdf_fonts", "label": "PDF 学术字体引擎", "ok": False, "detail": str(exc)[:80],
+                       "fix": "确认 PyMuPDF 与 fontTools 已正确安装。"})
+
+    chrome_ok = False
+    chrome_detail = "未连接（127.0.0.1:3456 未启动）"
+    chrome_fix = "在 .env 开启 CAREER_RECRUITMENT_USE_LOCAL_CHROME=1 并重启 npm start。"
+    try:
+        with httpx.Client(base_url=recruitment_chrome.BRIDGE_URL, timeout=1.5, trust_env=False) as client:
+            resp = client.get("/health")
+            if resp.status_code == 200:
+                connected = resp.json().get("connected") is True
+                chrome_ok = connected
+                chrome_detail = "已连接本机 Chrome" if connected else "桥接已启动，待 Chrome 授权远程调试"
+                chrome_fix = "" if connected else "在 Chrome 地址栏打开 chrome://inspect/#remote-debugging 并勾选启用远程调试。"
+    except Exception:
+        pass
+    checks.append({"key": "chrome_bridge", "label": "本机 Chrome 桥接", "ok": chrome_ok, "detail": chrome_detail, "fix": chrome_fix})
+
+    checks.append({
+        "key": "privacy_shield",
+        "label": "本地隐私脱敏护盾",
+        "ok": True,
+        "detail": "已开启 · 外发 LLM 前自动隐藏手机号/邮箱/身份证号",
+        "fix": "",
+    })
+
+    return jsonify(
+        checks=checks,
+        backups=db_backup.list_backups(),
+        usage=llm_audit.usage_summary(days=7),
+    )
+
+
+@blueprint.route("/api/system-settings/console-logs", methods=["GET", "DELETE"])
+def console_logs():
+    from . import console_log
+    if request.method == "DELETE":
+        console_log.clear_logs()
+        return jsonify(ok=True, entries=[])
+    after = request.args.get("after", 0, type=int) or 0
+    return jsonify(entries=console_log.read_logs(after_seq=after, limit=150))

@@ -3,19 +3,25 @@
         <div>
             <p class="assessment-center-eyebrow">ASSESSMENTS</p>
             <h2>测评中心</h2>
-            <p>从六个测评中任选一项，按自己的节奏了解自己。</p>
         </div>
-        <span class="assessment-center-count">6 项测评 · 随时开始</span>
+        <div class="assessment-center-controls">
+            <div id="assessmentCategoryTabs" class="assessment-category-tabs" role="tablist" aria-label="测评分类">
+                <button type="button" class="assessment-cat-tab active" data-cat="all" aria-selected="true">全部</button>
+                <button type="button" class="assessment-cat-tab" data-cat="career" aria-selected="false">职业核心</button>
+                <button type="button" class="assessment-cat-tab" data-cat="fun" aria-selected="false">趣味人格</button>
+                <button type="button" class="assessment-cat-tab" data-cat="done" aria-selected="false">已完成</button>
+            </div>
+            <span id="assessmentCenterSummary" class="assessment-center-count">6 项测评</span>
+        </div>
     </header>
     <div class="assessment-center-layout">
         <div id="assessmentTestGrid" class="assessment-center-grid" aria-label="全部六项测评"></div>
         <aside class="assessment-center-history" aria-labelledby="assessmentHistoryTitle">
             <div class="assessment-center-history-head">
-                <div><p class="assessment-center-eyebrow">YOUR HISTORY</p><h3 id="assessmentHistoryTitle">测评记录</h3></div>
+                <div><p class="assessment-center-eyebrow">HISTORY</p><h3 id="assessmentHistoryTitle">测评记录</h3></div>
                 <span id="assessmentHistoryCount" class="assessment-center-history-count">0 条</span>
             </div>
-            <p class="assessment-center-history-note">仅记录完成时间与简要结果，保存在当前浏览器。</p>
-            <label class="assessment-center-filter"><span>筛选测评</span><select id="assessmentHistoryFilter" aria-controls="assessmentHistoryList"><option value="all">全部测评</option></select></label>
+            <label class="assessment-center-filter"><span>筛选</span><select id="assessmentHistoryFilter" aria-controls="assessmentHistoryList"><option value="all">全部测评</option></select></label>
             <div id="assessmentHistoryList" class="assessment-center-history-list" aria-live="polite"></div>
         </aside>
     </div>

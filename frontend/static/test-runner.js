@@ -1,12 +1,88 @@
 (function () {
-  const TYT_ASSET_BASE = "/static/trueyouteller";
-
   const COVER_MAP = {
-    friends: `${TYT_ASSET_BASE}/miniGames/friends.png`,
-    insideout: `${TYT_ASSET_BASE}/miniGames/insideOut.png`,
-    deep: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
-    sbti: `${TYT_ASSET_BASE}/brand/trueyouteller.png`,
+    friends: "/static/brand/assessments/friends.svg",
+    insideout: "/static/brand/assessments/insideout.svg",
+    deep: "/static/brand/assessments/deep.jpg",
+    sbti: "/static/brand/assessments/sbti.svg",
   };
+  const PET_GIFS = {
+    idle: "/static/pet/clawd-mini-idle.gif",
+    happy: "/static/pet/clawd-mini-happy.gif",
+    cheer: "/static/pet/clawd-happy.gif",
+    alert: "/static/pet/clawd-mini-alert.gif",
+  };
+  const PET_LINES = {
+    answer: ["选得很干脆 ✨", "节奏很棒 💪", "又推进一题！", "越来越了解自己了 🌟", "继续保持 👍"],
+    q25: "已完成 25%，进入状态啦 🌱",
+    q50: "过半啦！50% 达成 ⚡",
+    q75: "已完成 75%，马上揭晓画像 🔥",
+    q90: "最后冲刺，胜利在望 🎯",
+    poke: ["我在陪你答题呢 😊", "按数字键 1–5 选得更快哦 ⌨️", "凭第一直觉选最准 ✨", "加油，很快就能看结果啦 🎉"],
+  };
+  let streakCount = 0;
+  let reachedMilestones = new Set();
+  let petTimer = null;
+
+  function triggerPet(mood, text, ms = 2200) {
+    const img = document.getElementById("tsPetImg");
+    const bubble = document.getElementById("tsPetBubble");
+    if (bubble && text) bubble.textContent = text;
+    if (img && PET_GIFS[mood]) {
+      img.src = PET_GIFS[mood];
+      window.clearTimeout(petTimer);
+      petTimer = window.setTimeout(() => { img.src = PET_GIFS.idle; }, ms);
+    }
+  }
+
+  function updateStreakAndMilestones() {
+    const badge = document.getElementById("tsStreakBadge");
+    if (badge) {
+      badge.hidden = streakCount < 3;
+      badge.textContent = `连续 ${streakCount} 题 🔥`;
+    }
+    const total = Math.max(1, totalCount());
+    const pct = Math.round((answeredCount() / total) * 100);
+    const toast = document.getElementById("tsMilestoneToast");
+    for (const [mark, key] of [[90, "q90"], [75, "q75"], [50, "q50"], [25, "q25"]]) {
+      if (pct >= mark && !reachedMilestones.has(mark)) {
+        reachedMilestones.add(mark);
+        const msg = PET_LINES[key];
+        if (toast) {
+          toast.textContent = msg;
+          toast.classList.add("is-celebrate");
+          window.setTimeout(() => toast.classList.remove("is-celebrate"), 2600);
+        }
+        triggerPet("cheer", msg, 3200);
+        return;
+      }
+    }
+    if (streakCount > 0 && streakCount % 5 === 0) {
+      const line = PET_LINES.answer[Math.floor(Math.random() * PET_LINES.answer.length)];
+      triggerPet("happy", line, 1800);
+    }
+  }
+
+  function renderQuestionMap() {
+    const map = document.getElementById("tsQuestionMap");
+    if (!map || map.hidden) return;
+    const list = visibleQuestions();
+    map.replaceChildren(...list.map((item, i) => {
+      const key = state.testType === "sbti" ? String(item.id || "") : Number(item.id);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ts-map-cell";
+      if (state.answers[key] !== undefined) btn.classList.add("is-done");
+      if (i === state.idx) btn.classList.add("is-current");
+      btn.textContent = String(i + 1);
+      btn.addEventListener("click", () => {
+        cancelAdvance();
+        state.idx = i;
+        saveDraft();
+        renderQuestion();
+      });
+      return btn;
+    }));
+  }
 
   const META = {
     deep: {
@@ -237,9 +313,14 @@
       btn.setAttribute("aria-pressed", String(String(selectedValue) === String(value)));
       btn.addEventListener("click", () => {
         if (advanceTimer || state.submitting) return;
+        const wasUnanswered = state.answers[qId] === undefined;
         state.answers[qId] = value;
         if (isSbti && qId === "drink_gate_q1" && Number(value) !== 3) {
           delete state.answers.drink_gate_q2;
+        }
+        if (wasUnanswered) {
+          streakCount += 1;
+          updateStreakAndMilestones();
         }
         renderQuestion();
         saveDraft();
@@ -314,8 +395,15 @@
       viewResultBtn.hidden = !state.hasResult;
     }
 
+    const card = document.querySelector(".ts-question-card");
+    if (card) {
+      card.classList.remove("ts-card-enter");
+      void card.offsetWidth;
+      card.classList.add("ts-card-enter");
+    }
     updateProgress();
     renderOptions(q);
+    renderQuestionMap();
   }
 
   function initQuestions(keepUrl) {
@@ -407,10 +495,25 @@
 
   function bindEvents() {
     document.getElementById("tsAutoAdvance")?.addEventListener("change", () => { cancelAdvance(); renderQuestion(); });
+    document.getElementById("tsMapToggle")?.addEventListener("click", (e) => {
+      const map = document.getElementById("tsQuestionMap");
+      if (!map) return;
+      map.hidden = !map.hidden;
+      e.currentTarget.setAttribute("aria-expanded", String(!map.hidden));
+      if (!map.hidden) renderQuestionMap();
+    });
+    document.getElementById("tsPetCard")?.addEventListener("click", () => {
+      const line = PET_LINES.poke[Math.floor(Math.random() * PET_LINES.poke.length)];
+      triggerPet("happy", line, 2200);
+    });
     document.addEventListener("keydown", event => {
       if (event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
       const options = document.querySelectorAll("#tsOptions button");
-      if (/^[1-9]$/.test(event.key) && options[Number(event.key) - 1]) { event.preventDefault(); options[Number(event.key) - 1].click(); }
+      if (/^[1-9]$/.test(event.key) && options[Number(event.key) - 1]) { event.preventDefault(); options[Number(event.key) - 1].click(); return; }
+      const letterIdx = "abcd".indexOf(event.key.toLowerCase());
+      if (letterIdx >= 0 && options[letterIdx]) { event.preventDefault(); options[letterIdx].click(); return; }
+      if (event.key === "ArrowLeft") { document.getElementById("tsPrevBtn")?.click(); }
+      else if (event.key === "ArrowRight") { document.getElementById("tsNextBtn")?.click(); }
     });
     document.querySelectorAll(".tr-nav-link").forEach((btn) => {
       btn.addEventListener("click", () => {

@@ -1,233 +1,17 @@
-/* 岗位全链路流水线 · 面板层
-   右滑抽屉 7 面板：本地导入 / 规则清洗 / AI 评估 /
-   简历改写 / 打招呼语 / 审批操作 / 投递队列 + 物料预览渲染。
-   依赖 recruitment.js 暴露的 window.RP；流水线配置走 /pipeline/config。 */
 (() => {
   "use strict";
   const RP = window.RP;
-  if (!RP) return;
+  if (!RP || !RP.ui) return;
   const { node, icon, tile, toast, api, pipelineApi, meta, state } = RP;
-
-  const PROFILE_KEYS = Object.keys(meta.profiles || { general: "通用" });
-  const ACTIVE_PROFILE_KEY = "rp_active_profile";
-  function rememberedProfile() {
-    try {
-      const saved = localStorage.getItem(ACTIVE_PROFILE_KEY);
-      if (saved && PROFILE_KEYS.includes(saved)) return saved;
-    } catch (_) { /* ignore storage errors */ }
-    const jobs = state.jobs?.length ? state.jobs : (state.boardJobs || []);
-    if (jobs.length) {
-      const counts = new Map();
-      for (const job of jobs) {
-        if (job.profile && PROFILE_KEYS.includes(job.profile)) {
-          counts.set(job.profile, (counts.get(job.profile) || 0) + 1);
-        }
-      }
-      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-      if (top) return top;
-    }
-    return PROFILE_KEYS[0];
-  }
-  function setRememberedProfile(value) {
-    if (!value || !PROFILE_KEYS.includes(value)) return;
-    try { localStorage.setItem(ACTIVE_PROFILE_KEY, value); } catch (_) { /* ignore */ }
-  }
-  const DEEP_KEYS = [
-    ["extracted_skills", "技能提取"],
-    ["ats_ability_analysis", "ATS 能力分析"],
-    ["resume_audit", "简历审计"],
-    ["dream_picture", "理想画像"],
-    ["strong_fit_assessment", "强匹配评估"],
-    ["risk_red_flags", "风险红旗"],
-    ["deep_action_plan", "深度行动建议"]
-  ];
-  const DIMENSION_LABELS = {
-    role_match: "职责匹配", skills_align: "技能重合", seniority: "职级资历", compensation: "薪资契合",
-    interview_prob: "面试概率", company_stage: "公司阶段", market_fit: "赛道前景", growth: "成长空间"
-  };
-  const GRADE_OPTIONS = ["A", "B", "C", "D", "F"];
-  /* 八维仪表簇：每维一枚 line-icon + 色板角色，与漏斗 tile 同一套 tone 语义 */
-  const DIMENSION_META = {
-    role_match: ["target", "accent"], skills_align: ["layers", "info"],
-    seniority: ["graduation", "brass"], compensation: ["banknote", "success"],
-    interview_prob: ["users", "accent"], company_stage: ["building", "info"],
-    market_fit: ["trend", "brass"], growth: ["sprout", "success"]
-  };
-
-  /* ---------- 面板小工具 ---------- */
-  function alive(token, body) { return token === RP.drawerToken() && body.isConnected; }
-  function section(title, iconName, tone) {
-    const root = node("section", "", "rp-panel-section");
-    if (title) {
-      const h = node("h3", title);
-      if (iconName) h.prepend(tile(iconName, tone || "accent", true));
-      root.append(h);
-    }
-    return root;
-  }
-  function note(text, tone) {
-    const el = node("p", text, "rp-panel-note");
-    if (tone) el.dataset.tone = tone;
-    return el;
-  }
-  function feedback() { return node("p", "", "rp-feedback"); }
-  function setFeedback(el, message, tone) {
-    el.textContent = message || "";
-    if (tone) el.dataset.tone = tone;
-    else delete el.dataset.tone;
-  }
-  function field(labelText, control, span2) {
-    const label = node("label", "", "rp-field" + (span2 ? " rp-span-2" : ""));
-    label.append(node("span", labelText), control);
-    return label;
-  }
-  function input(type, attrs = {}) {
-    const el = node("input");
-    el.type = type;
-    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-    return el;
-  }
-  function select(options, value) {
-    const el = node("select");
-    for (const [key, label] of options) el.append(new Option(label, key));
-    if (value != null) el.value = value;
-    return el;
-  }
-  /* SOURCES 值为元组（标签+URL+选择器），JSON 后是数组；展示只取标签 */
-  const sourceLabel = (value) => Array.isArray(value) ? String(value[0] || "") : String(value ?? "");
-  const sourceEntries = (map) => Object.entries(map || {}).map(([key, value]) => [key, sourceLabel(value)]);
-  /* 平台 logo（brand/recruitment/<key>.jpg）；缺资产时回退首字 tile */
-  function platformLogo(key, label) {
-    const wrap = node("span", "", "rp-platform-mark");
-    const img = node("img");
-    img.src = `/static/brand/recruitment/${key}.jpg`;
-    img.alt = "";
-    img.loading = "lazy";
-    img.addEventListener("error", () => {
-      wrap.replaceChildren(node("span", (label || key).slice(0, 2)));
-      wrap.dataset.fallback = "1";
-    });
-    wrap.append(img);
-    return wrap;
-  }
-  function profileSelect(value) {
-    return select(Object.entries(meta.profiles), value || PROFILE_KEYS[0]);
-  }
-  function button(label, cls, iconName) {
-    const el = node("button", label, "rp-btn " + (cls || ""));
-    el.type = "button";
-    if (iconName) el.prepend(icon(iconName));
-    return el;
-  }
-  function emptyBlock(title, desc, actionLabel, onAction) {
-    const el = node("div", "", "rp-empty");
-    el.append(tile("inbox", "accent"), node("strong", title));
-    if (desc) el.append(node("p", desc));
-    if (actionLabel) {
-      const action = button(actionLabel, "rp-btn-primary");
-      action.addEventListener("click", onAction);
-      el.append(action);
-    }
-    return el;
-  }
-  function gradeBadge(grade) {
-    const el = node("span", grade || "—", "rp-grade");
-    if (grade) el.dataset.grade = grade;
-    return el;
-  }
-  function payloadOf(payload, ...keys) {
-    if (!payload) return null;
-    for (const key of keys) {
-      if (payload[key] != null && payload[key] !== "") return payload[key];
-    }
-    return null;
-  }
-  async function copyText(text, okMessage) {
-    if (!text) { toast("没有可复制的内容。", "warning"); return; }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast(okMessage || "已复制到剪贴板。", "success");
-    } catch (_) {
-      const area = node("textarea");
-      area.value = text;
-      area.style.cssText = "position:fixed;opacity:0;";
-      document.body.append(area);
-      area.select();
-      try { document.execCommand("copy"); toast(okMessage || "已复制到剪贴板。", "success"); }
-      catch (__) { toast("复制失败，请手动选择文本。", "error"); }
-      area.remove();
-    }
-  }
-  function miniJob(job, { checkbox = false, checked = false, onCheck } = {}) {
-    const row = node("div", "", "rp-mini-job");
-    const head = node("div", "", "rp-mini-job-head");
-    if (checkbox) {
-      const box = input("checkbox");
-      box.checked = checked;
-      box.setAttribute("aria-label", "选择 " + job.title);
-      box.addEventListener("change", () => onCheck?.(box.checked));
-      head.append(box);
-    }
-    head.append(node("span", job.title, "rp-mini-job-title"));
-    if (job.grade) head.append(gradeBadge(job.grade));
-    const metaLine = node("p", [job.company, RP.sourceLabel(job.source), job.salary, job.score != null ? job.score + " 分" : ""]
-      .filter(Boolean).join(" · "), "rp-mini-job-meta");
-    row.append(head, metaLine);
-    return row;
-  }
-  async function withBusy(task, feedbackEl, busyMessage) {
-    RP.setDrawerBusy(true);
-    if (feedbackEl) setFeedback(feedbackEl, busyMessage || "正在处理…");
-    try { return await task(); }
-    finally { RP.setDrawerBusy(false); }
-  }
-  function loadConfig() { return pipelineApi("/config", undefined, "GET"); }
-  async function saveConfig(patch, feedbackEl, okMessage) {
-    const result = await withBusy(() => pipelineApi("/config", patch), feedbackEl, "正在保存配置…");
-    toast(okMessage || "流水线配置已保存。", "success");
-    void RP.refresh({ silent: true });
-    return result;
-  }
-  function modeChip(mode) {
-    const chip = node("span", mode === "llm" ? "模型生成" : "启发式生成", "rp-stat-chip");
-    return chip;
-  }
-
-  /* ---------- 1. 平台实时采集（scraping） ---------- */
-  const INLINE_SVGS = {
-    chrome: '<svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="rpChromeClip"><circle cx="12" cy="12" r="10"/></clipPath></defs><g clip-path="url(#rpChromeClip)"><circle cx="12" cy="12" r="10" fill="#4285F4"/><path d="M2 2h20v10H12a5 5 0 0 0-4.33 2.5L2 4.6Z" fill="#EA4335"/><path d="M2 4.6 7.67 14.5A5 5 0 0 0 12 17l-4 7H2Z" fill="#34A853"/><path d="M12 7h10v17H8l4-7a5 5 0 0 0 4.33-7.5Z" fill="#FBBC05"/></g><circle cx="12" cy="12" r="4.5" fill="#fff"/><circle cx="12" cy="12" r="3.4" fill="#4285F4"/></svg>',
-    pulse: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 10h3.2l2-5 3.6 10 2.2-5h4"/></svg>',
-    trash: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5m-6 0 .7 10.2a1.3 1.3 0 0 0 1.3 1.3h4a1.3 1.3 0 0 0 1.3-1.3L14 5.5"/></svg>',
-    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
-    pencil: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.8 3.6a1.9 1.9 0 0 1 2.7 2.7L7.3 15.5l-3.8 1 1-3.8 9.3-9.1Z"/></svg>',
-    pin: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17.2s5.2-4.6 5.2-8.7a5.2 5.2 0 1 0-10.4 0c0 4.1 5.2 8.7 5.2 8.7Z"/><circle cx="10" cy="8.5" r="1.8"/></svg>',
-    briefcase: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="6" width="14.4" height="10.2" rx="2"/><path d="M7 6V4.6A1.6 1.6 0 0 1 8.6 3h2.8A1.6 1.6 0 0 1 13 4.6V6M2.8 10.5h14.4"/></svg>',
-    grid: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="3.2" width="5.4" height="5.4" rx="1.2"/><rect x="11.4" y="3.2" width="5.4" height="5.4" rx="1.2"/><rect x="3.2" y="11.4" width="5.4" height="5.4" rx="1.2"/><rect x="11.4" y="11.4" width="5.4" height="5.4" rx="1.2"/></svg>',
-    cap: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.2 8.2 10 4.5l7.8 3.7L10 11.9 2.2 8.2Z"/><path d="M5.4 9.8v3.8c0 1.2 2.1 2.2 4.6 2.2s4.6-1 4.6-2.2V9.8"/><path d="M17.8 8.4v4.4"/></svg>',
-    bolt: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5 4.8 11h4.7L9 17.5 15.2 9h-4.7L11 2.5Z"/></svg>',
-    chart: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 15.5v-4M10 15.5v-8M15.5 15.5v-11"/></svg>',
-    doc: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.8h6.2l3.8 3.8v10.6a1.3 1.3 0 0 1-1.3 1.3H5.5a1.3 1.3 0 0 1-1.3-1.3V4.1a1.3 1.3 0 0 1 1.3-1.3Z"/><path d="M11.5 2.8V6.8h4M7.2 10.5h5.6M7.2 13.8h3.8"/></svg>',
-    ban: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="m5.2 5.2 9.6 9.6"/></svg>',
-    code: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.8 6.5-3.6 3.5 3.6 3.5M13.2 6.5l3.6 3.5-3.6 3.5M11.2 4.5l-2.4 11"/></svg>',
-    monitor: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="3.8" width="14.4" height="9.8" rx="1.6"/><path d="M7.2 16.5h5.6M10 13.6v2.9"/></svg>',
-    grip: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="4" r="1.1"/><circle cx="10.5" cy="4" r="1.1"/><circle cx="5.5" cy="8" r="1.1"/><circle cx="10.5" cy="8" r="1.1"/><circle cx="5.5" cy="12" r="1.1"/><circle cx="10.5" cy="12" r="1.1"/></svg>'
-  };
-  const PLATFORM_TAGLINES = {
-    "51job": "综合类招聘平台 · 岗位覆盖广",
-    boss: "互联网招聘 · 沟通高效",
-    xiaohongshu: "新兴招聘渠道 · 实习机会多",
-    zhilian: "传统招聘平台 · 企业资源丰富"
-  };
-  function inlineIcon(name, cls) {
-    const wrap = node("span", "", "rp-inline-svg" + (cls ? " " + cls : ""));
-    wrap.innerHTML = INLINE_SVGS[name] || "";
-    return wrap;
-  }
-  function compactTime(ts) {
-    const d = new Date(ts * 1000);
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
+  const {
+    PROFILE_KEYS, rememberedProfile, setRememberedProfile,
+    DEEP_KEYS, DIMENSION_LABELS, GRADE_OPTIONS, DIMENSION_META,
+    alive, section, note, feedback, setFeedback, field, input, select,
+    sourceLabel, sourceEntries, platformLogo, profileSelect, button,
+    emptyBlock, gradeBadge, payloadOf, copyText, miniJob, withBusy,
+    loadConfig, saveConfig, modeChip,
+    INLINE_SVGS, PLATFORM_TAGLINES, inlineIcon, compactTime,
+  } = RP.ui;
 
   RP.registerDrawer("scraping", {
     title: "抓取 · 平台实时采集", icon: "search", tone: "accent",
@@ -1509,21 +1293,95 @@
       gateRow, gateFeedback);
 
     const listSection = section("深评记录", "eye", "success");
-    const list = node("div", "", "rp-mini-list");
+    listSection.classList.add("rp-deep-section");
+    const list = node("div", "", "rp-deep-list");
     const detail = node("div", "", "rp-deep-keys");
+    const DEEP_CARD_ICONS = [
+      ["layers", "blue"],
+      ["code", "green"],
+      ["monitor", "blue"],
+      ["bolt", "green"],
+      ["grid", "blue"]
+    ];
+    const DEEP_KEY_ICONS = {
+      extracted_skills: ["layers", "green"],
+      ats_ability_analysis: ["chart", "green"],
+      resume_audit: ["doc", "blue"],
+      dream_picture: ["briefcase", "blue"],
+      strong_fit_assessment: ["bolt", "teal"],
+      risk_red_flags: ["ban", "amber"],
+      deep_action_plan: ["chart", "indigo"]
+    };
+    let activeJobKey = "";
+
+    function extractSkillChips(value) {
+      if (Array.isArray(value)) {
+        const items = value.map((v) => String(v || "").trim()).filter(Boolean);
+        return items.length && items.every((s) => s.length <= 24) ? items.slice(0, 16) : null;
+      }
+      if (typeof value === "string") {
+        const cleaned = value.trim();
+        if (!cleaned || cleaned.length > 260) return null;
+        const parts = cleaned
+          .replace(/^[\s•·\-*]+/gm, "")
+          .split(/[,，、;；\n|]+/)
+          .map((s) => s.trim())
+          .filter((s) => s && s.length <= 24);
+        return parts.length >= 2 ? [...new Set(parts)].slice(0, 16) : null;
+      }
+      return null;
+    }
+
     function paintList() {
       const jobs = state.jobs.filter(job => job.hasDeep).slice(0, 8);
       if (!jobs.length) {
         list.replaceChildren(emptyBlock("暂无深评记录", "运行 AI 评估后，可在这里查看精投岗位的诊断。"));
         return;
       }
-      list.replaceChildren(...jobs.map((job) => {
-        const row = miniJob(job);
-        const actions = node("div", "", "rp-mini-job-actions");
-        const view = button("查看七键分析", "rp-btn-sm rp-btn-ghost", "eye");
-        view.addEventListener("click", async () => {
+      list.replaceChildren(...jobs.map((job, idx) => {
+        const keyId = `${job.source}:${job.url_key || job.url}`;
+        const [cardIcon, iconTone] = DEEP_CARD_ICONS[idx % DEEP_CARD_ICONS.length];
+        const card = node("article", "", "rp-deep-card");
+        card.dataset.active = keyId === activeJobKey ? "1" : "0";
+
+        const avatar = node("span", "", "rp-deep-avatar");
+        avatar.dataset.tone = iconTone;
+        avatar.append(cardIcon === "layers" ? icon("layers") : inlineIcon(cardIcon));
+
+        const mid = node("div", "", "rp-deep-mid");
+        mid.append(node("strong", job.title, "rp-deep-title"));
+
+        const metaRow = node("div", "", "rp-deep-meta");
+        const companyText = [job.company || "未知公司", RP.sourceLabel(job.source)].filter(Boolean).join(" · ");
+        const companySpan = node("span", "", "rp-deep-meta-item");
+        companySpan.append(inlineIcon("briefcase"), node("span", companyText));
+        metaRow.append(companySpan);
+        if (job.salary) {
+          const salSpan = node("span", "", "rp-deep-meta-item");
+          salSpan.append(icon("banknote"), node("span", job.salary));
+          metaRow.append(node("i", "", "rp-deep-sep"), salSpan);
+        }
+        if (job.score != null) {
+          const scoreSpan = node("span", "", "rp-deep-meta-item");
+          scoreSpan.append(inlineIcon("chart"), node("span", `${job.score} 分`));
+          metaRow.append(node("i", "", "rp-deep-sep"), scoreSpan);
+        }
+
+        const view = button("查看七维分析", "rp-deep-view-btn", "eye");
+        mid.append(metaRow, view);
+
+        const right = node("div", "", "rp-deep-right");
+        if (job.grade) right.append(gradeBadge(job.grade));
+        right.append(node("span", "›", "rp-deep-arrow"));
+
+        const openDeep = async () => {
+          if (view.disabled) return;
+          activeJobKey = keyId;
+          for (const el of list.querySelectorAll(".rp-deep-card")) {
+            el.dataset.active = el === card ? "1" : "0";
+          }
           view.disabled = true;
-          detail.replaceChildren(node("p", "正在读取深评结果…", "rp-hint"));
+          detail.replaceChildren(node("p", "正在读取七维分析…", "rp-hint"));
           try {
             const payload = await RP.fetchJobPayload(job);
             if (!alive(token, body)) return;
@@ -1536,21 +1394,43 @@
             for (const [key, label] of DEEP_KEYS) {
               const value = deep[key];
               if (value == null || value === "") continue;
+              const [kIcon, kTone] = DEEP_KEY_ICONS[key] || ["layers", "green"];
               const fold = node("details", "", "rp-deep-key");
-              fold.append(node("summary", label));
-              const doc = node("div", "", "rp-doc");
-              RP.renderDoc(doc, RP.payloadText(value));
-              fold.append(doc);
+              if (key === "extracted_skills") fold.open = true;
+              const sum = node("summary", "", "rp-deep-key-head");
+              const ico = node("span", "", "rp-deep-key-ico");
+              ico.dataset.tone = kTone;
+              ico.append(kIcon === "layers" ? icon("layers") : inlineIcon(kIcon));
+              sum.append(ico, node("strong", label), node("span", "›", "rp-deep-key-chevron"));
+              fold.append(sum);
+              const skillChips = key === "extracted_skills" ? extractSkillChips(value) : null;
+              if (skillChips) {
+                const chipBox = node("div", "", "rp-deep-skills");
+                const chipIcons = ["code", "layers", "chart", "code", "grid"];
+                skillChips.forEach((skill, sIdx) => {
+                  const pill = node("span", "", "rp-deep-skill-pill");
+                  const cName = chipIcons[sIdx % chipIcons.length];
+                  pill.append(cName === "layers" ? icon("layers") : inlineIcon(cName), node("span", skill));
+                  chipBox.append(pill);
+                });
+                fold.append(chipBox);
+              } else {
+                const doc = node("div", "", "rp-doc");
+                RP.renderDoc(doc, RP.payloadText(value));
+                fold.append(doc);
+              }
               detail.append(fold);
             }
             if (!detail.childNodes.length) detail.append(note("深评结果为空。", "warning"));
+            detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
           } catch (error) {
             if (alive(token, body)) detail.replaceChildren(note(error.message, "danger"));
           } finally { view.disabled = false; }
-        });
-        actions.append(view);
-        row.append(actions);
-        return row;
+        };
+        view.addEventListener("click", (event) => { event.stopPropagation(); void openDeep(); });
+        card.addEventListener("click", () => { void openDeep(); });
+        card.append(avatar, mid, right);
+        return card;
       }));
     }
     paintList();
@@ -1566,541 +1446,5 @@
     return paintList;
   }
 
-  /* ---------- 5. 简历改写（rewriting，基准简历 + 对比） ---------- */
-  RP.registerDrawer("rewriting", {
-    title: "简历改写 · 定制面板", icon: "pen", tone: "accent",
-    render(body, ctx) {
-      const token = RP.drawerToken();
-      body.append(note("以基准简历 + 岗位 JD 生成定向改写稿。真实性边界：不虚构经历、不注入原简历没有的技术、经历一段不裁、无量化不编数据。", "info"));
 
-      const baselineSection = section("基准简历", "file-text");
-      const baselineSelect = select([["", "正在读取简历库…"]]);
-      const baselineInfo = node("p", "", "rp-hint");
-      const baselineFeedback = feedback();
-      baselineSelect.addEventListener("change", async () => {
-        if (!baselineSelect.value) return;
-        baselineSelect.disabled = true;
-        try {
-          await saveConfig({ baseline_resume_id: baselineSelect.value }, baselineFeedback, "基准简历已切换。");
-          if (alive(token, body)) void loadCompare();
-        } catch (error) {
-          if (alive(token, body)) setFeedback(baselineFeedback, error.message, "error");
-        } finally { baselineSelect.disabled = false; }
-      });
-      const baselineLink = node("a", "去简历库上传/解析 ↗");
-      baselineLink.href = meta.resumes_url;
-      baselineSection.append(field("选择基准简历", baselineSelect), baselineInfo, baselineLink, baselineFeedback);
-
-      const picker = section("选择岗位", "briefcase");
-      const eligible = state.jobs.filter((job) => RP.stageIndex(job.stage) >= RP.stageIndex("screened") && job.tab !== "rejected" && job.tab !== "failed");
-      if (ctx.job && !eligible.some((job) => RP.jobId(job) === RP.jobId(ctx.job))) eligible.unshift(ctx.job);
-      const jobSelect = select(eligible.slice(0, 200).map((job) => [RP.jobId(job), `${job.title} · ${job.company || RP.sourceLabel(job.source)}`]),
-        ctx.job ? RP.jobId(ctx.job) : eligible[0] ? RP.jobId(eligible[0]) : null);
-      const currentJob = () => eligible.find((job) => RP.jobId(job) === jobSelect.value) || null;
-      const runFeedback = feedback();
-      const runBtn = button("生成定向改写（批量阶段）", "rp-btn-primary", "pen");
-      runBtn.addEventListener("click", async () => {
-        runBtn.disabled = true;
-        try {
-          const result = await withBusy(() => RP.runStage("rewrite"), runFeedback, "正在生成定向改写稿…");
-          if (!alive(token, body)) return;
-          setFeedback(runFeedback, RP.stageResultMessage(result, "简历改写"), "success");
-          toast(RP.stageResultMessage(result, "简历改写"), "success");
-          void RP.refresh({ silent: true });
-          void loadCompare();
-        } catch (error) {
-          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
-        } finally { runBtn.disabled = false; }
-      });
-      picker.append(field("目标岗位", jobSelect), runBtn, runFeedback);
-      if (!eligible.length) picker.append(note("暂无可改写的岗位：先完成初评，或从看板选择岗位。", "warning"));
-
-      const compareSection = section("改写对比", "eye");
-      const compare = node("div", "", "rp-compare");
-      const baseCol = node("div", "", "rp-compare-col");
-      const rewriteCol = node("div", "", "rp-compare-col");
-      baseCol.append(node("h4", "基准简历"));
-      rewriteCol.append(node("h4", "定向改写稿"));
-      const baseDoc = node("div", "", "rp-doc");
-      const rewriteDoc = node("div", "", "rp-doc");
-      baseCol.append(baseDoc);
-      rewriteCol.append(rewriteDoc);
-      compare.append(baseCol, rewriteCol);
-      const rewriteMeta = node("div", "", "rp-stat-chips");
-      const downgrades = node("details", "", "rp-deep-key");
-      downgrades.hidden = true;
-      const compareActions = node("div", "", "rp-panel-actions");
-      const copyBtn = button("复制改写稿", "rp-btn-sm", "copy");
-      let rewriteText = "";
-      copyBtn.addEventListener("click", () => copyText(rewriteText, "改写稿已复制。"));
-      compareActions.append(copyBtn);
-      compareSection.append(compare, rewriteMeta, downgrades, compareActions);
-      body.append(baselineSection, picker, compareSection);
-
-      let baselineOptions = [];
-      loadConfig().then((data) => {
-        if (!alive(token, body)) return;
-        const baseline = data.resume_baseline || {};
-        baselineOptions = baseline.options || [];
-        baselineSelect.replaceChildren(...baselineOptions.map((option) =>
-          new Option(`${option.title}（${option.chars} 字）`, option.id)));
-        if (!baselineOptions.length) {
-          baselineSelect.replaceChildren(new Option("简历库暂无已解析文档", ""));
-          baselineInfo.textContent = "请先在简历库上传并解析简历，再选择基准。";
-        } else {
-          const current = baselineOptions.find((option) => option.title === baseline.name);
-          baselineSelect.value = current?.id || baselineOptions[0].id;
-          baselineInfo.textContent = baseline.enabled
-            ? `当前基准：${baseline.name}。初评与改写均以该简历为底稿。`
-            : "尚未选定基准简历：选择后保存，改写阶段才可执行。";
-        }
-      }).catch((error) => {
-        if (alive(token, body)) setFeedback(baselineFeedback, error.message, "error");
-      });
-
-      let compareSeq = 0;
-      async function loadCompare() {
-        const sequence = ++compareSeq;
-        const job = currentJob();
-        const selected = baselineOptions.find((option) => option.id === baselineSelect.value);
-        baseDoc.replaceChildren();
-        if (selected) {
-          baseDoc.append(node("h5", selected.title));
-          baseDoc.append(node("p", `已解析简历文档 · ${selected.chars} 字。全文请在简历库查看，改写稿不会裁剪经历条目。`));
-        } else {
-          baseDoc.append(node("p", "尚未选定基准简历。", "rp-doc-empty"));
-        }
-        const baseLink = node("a", "在简历库中查看 ↗");
-        baseLink.href = meta.resumes_url;
-        baseDoc.append(baseLink);
-        rewriteDoc.replaceChildren(node("p", job ? "正在读取改写稿…" : "请先选择岗位。", "rp-doc-empty"));
-        rewriteMeta.replaceChildren();
-        downgrades.hidden = true;
-        rewriteText = "";
-        copyBtn.disabled = true;
-        if (!job) return;
-        try {
-          const payload = await RP.fetchJobPayload(job);
-          if (sequence !== compareSeq || !alive(token, body)) return;
-          const rewrite = payloadOf(payload, "rewrite_payload", "rewrite");
-          rewriteDoc.replaceChildren();
-          rewriteText = RP.payloadText(rewrite);
-          if (rewriteText) RP.renderDoc(rewriteDoc, rewriteText);
-          else rewriteDoc.append(node("p", "尚未生成改写稿，点击上方按钮生成。", "rp-doc-empty"));
-          copyBtn.disabled = !rewriteText;
-          if (rewrite && typeof rewrite === "object") {
-            rewriteMeta.append(modeChip(rewrite.mode));
-            if (rewrite.baseline_name) rewriteMeta.append(node("span", `基准：${rewrite.baseline_name}`, "rp-stat-chip"));
-            const list = Array.isArray(rewrite.downgrades) ? rewrite.downgrades : [];
-            if (list.length) {
-              downgrades.hidden = false;
-              downgrades.replaceChildren(node("summary", `真实性边界降级记录（${list.length}）`));
-              const doc = node("div", "", "rp-doc");
-              for (const item of list) {
-                doc.append(node("p", `${item.original} → ${item.replaced} · ${item.reason || ""}`));
-              }
-              downgrades.append(doc);
-            }
-          }
-        } catch (error) {
-          if (sequence === compareSeq) rewriteDoc.replaceChildren(node("p", error.message, "rp-doc-empty"));
-        }
-      }
-      jobSelect.addEventListener("change", () => void loadCompare());
-      void loadCompare();
-    }
-  });
-
-  /* ---------- 6. 打招呼语（greeting，海投母本 + 预览核验） ---------- */
-  RP.registerDrawer("greeting", {
-    title: "打招呼语预览", icon: "message", tone: "success",
-    render(body) {
-      const token = RP.drawerToken();
-      body.append(note("高情商开场白：150-250 字、2-3 个匹配理由、禁弱势词。精投轨由模型/模板生成；海投轨只认下方人工母本，母本为空时岗位转人工复核，禁止现场编造。", "info"));
-
-      const masterSection = section("海投母本（人工配置）", "pen");
-      const master = node("textarea");
-      master.rows = 4; master.maxLength = 2000;
-      master.placeholder = "填写海投轨统一使用的打招呼母本；留空时海投岗位停在人工复核。";
-      const masterFeedback = feedback();
-      const masterSave = button("保存母本", "", "check");
-      masterSave.addEventListener("click", async () => {
-        masterSave.disabled = true;
-        try {
-          await saveConfig({ mass_greeting: master.value }, masterFeedback, "海投母本已保存。");
-          if (alive(token, body)) setFeedback(masterFeedback, "海投母本已保存。", "success");
-        } catch (error) {
-          if (alive(token, body)) setFeedback(masterFeedback, error.message, "error");
-        } finally { masterSave.disabled = false; }
-      });
-      masterSection.append(master, masterSave, masterFeedback);
-
-      const runSection = section("批量生成", "play");
-      const runFeedback = feedback();
-      const runBtn = button("生成打招呼语", "rp-btn-primary", "play");
-      runBtn.addEventListener("click", async () => {
-        runBtn.disabled = true;
-        try {
-          const result = await withBusy(() => RP.runStage("greet"), runFeedback, "正在批量生成…");
-          if (!alive(token, body)) return;
-          setFeedback(runFeedback, RP.stageResultMessage(result, "打招呼语"), "success");
-          toast(RP.stageResultMessage(result, "打招呼语"), "success");
-          void RP.refresh({ silent: true });
-          paintList();
-        } catch (error) {
-          if (alive(token, body)) setFeedback(runFeedback, error.message, "error");
-        } finally { runBtn.disabled = false; }
-      });
-      runSection.append(runBtn, runFeedback);
-
-      const previewSection = section("生成稿预览", "eye");
-      const list = node("div", "", "rp-mini-list");
-      const preview = node("div", "", "rp-panel-section");
-      const textBox = node("div", "", "rp-greeting-text");
-      const gate = feedback();
-      const actions = node("div", "", "rp-panel-actions");
-      const copyBtn = button("复制欢迎语", "rp-btn-sm", "copy");
-      let greetingText = "";
-      copyBtn.addEventListener("click", () => copyText(greetingText, "欢迎语已复制。"));
-      actions.append(copyBtn);
-      preview.append(textBox, gate, actions);
-      preview.hidden = true;
-
-      function showGreeting(greeting) {
-        const text = RP.payloadText(greeting);
-        greetingText = text;
-        preview.hidden = false;
-        textBox.textContent = text || "（空）";
-        const illegal = !text.trim() || /❌|生成失败/.test(text) || (greeting && greeting.legal === false);
-        if (illegal) setFeedback(gate, "未通过合法性闸：内容为空或含失败标记，严禁外发。", "error");
-        else {
-          const length = text.replace(/\s/g, "").length;
-          setFeedback(gate, `合法性闸通过 · ${length} 字${length < 150 || length > 250 ? "（建议 150-250 字）" : ""}，外发前请人工核验。`, "success");
-        }
-        copyBtn.disabled = illegal;
-      }
-      function paintList() {
-        const jobs = state.jobs.filter((job) => job.hasGreeting || RP.stageIndex(job.stage) >= RP.stageIndex("greeted")).slice(0, 10);
-        if (!jobs.length) {
-          list.replaceChildren(emptyBlock("暂无打招呼语", "运行生成后，这里会列出可预览的岗位。"));
-          preview.hidden = true;
-          return;
-        }
-        list.replaceChildren(...jobs.map((job) => {
-          const row = miniJob(job);
-          const rowActions = node("div", "", "rp-mini-job-actions");
-          const view = button("预览", "rp-btn-sm rp-btn-ghost", "eye");
-          view.addEventListener("click", async () => {
-            view.disabled = true;
-            try {
-              const payload = await RP.fetchJobPayload(job);
-              if (!alive(token, body)) return;
-              showGreeting(payloadOf(payload, "greeting_payload", "greeting"));
-            } catch (error) {
-              if (alive(token, body)) toast(error.message, "error");
-            } finally { view.disabled = false; }
-          });
-          rowActions.append(view);
-          row.append(rowActions);
-          return row;
-        }));
-      }
-      paintList();
-      previewSection.append(list, preview);
-      body.append(masterSection, runSection, previewSection);
-
-      loadConfig().then((data) => {
-        if (alive(token, body)) master.value = data.settings?.mass_greeting || "";
-      }).catch(() => {});
-    }
-  });
-
-  /* ---------- 7. 审批操作（review） ---------- */
-  RP.registerDrawer("review", {
-    title: "审批操作", icon: "shield", tone: "warning",
-    render(body) {
-      const token = RP.drawerToken();
-      body.append(note("精投轨走简历人工复核；海投轨按公司规模闸拦截（默认 ≥1000 人）。放行需物料齐备（定制简历稿 + 合法欢迎语），拒绝为终态，重评打回评估段。", "info"));
-      const head = section("待审批队列", "user-check");
-      const countLine = node("p", "", "rp-hint");
-      const bulkBtn = button("一键放行全部", "rp-btn-primary", "check");
-      const list = node("div", "", "rp-mini-list");
-      function paint() {
-        const jobs = state.jobs.filter((job) => job.tab === "approval");
-        countLine.textContent = jobs.length ? `共 ${jobs.length} 个岗位等待审批。` : "";
-        bulkBtn.disabled = !jobs.length || state.bulkBusy;
-        bulkBtn.textContent = jobs.length ? `一键放行全部（${jobs.length}）` : "一键放行全部";
-        if (!jobs.length) {
-          list.replaceChildren(emptyBlock("审批队列已清空", "启动流水线或等待岗位流转到审批段。"));
-          return;
-        }
-        list.replaceChildren(...jobs.slice(0, 50).map((job) => {
-          const row = miniJob(job);
-          row.append(node("p", [job.track === "mass" ? "海投轨" : "精投轨", job.followStatus, job.reason].filter(Boolean).join(" · "), "rp-mini-job-meta"));
-          const actions = node("div", "", "rp-mini-job-actions");
-          const reject = button("拒绝", "rp-btn-sm rp-btn-danger", "x");
-          const reeval = button("重评", "rp-btn-sm rp-btn-ghost", "rotate");
-          const approve = button("放行", "rp-btn-sm rp-btn-success", "check");
-          reject.addEventListener("click", async () => { await RP.decide(job, "reject"); if (alive(token, body)) paint(); });
-          reeval.addEventListener("click", async () => { await RP.decide(job, "reeval"); if (alive(token, body)) paint(); });
-          approve.addEventListener("click", async () => { await RP.decide(job, "approve"); if (alive(token, body)) paint(); });
-          actions.append(reject, reeval, approve);
-          row.append(actions);
-          return row;
-        }));
-      }
-      bulkBtn.addEventListener("click", async () => {
-        const jobs = state.jobs.filter((job) => job.tab === "approval");
-        bulkBtn.disabled = true;
-        let done = 0;
-        for (const job of jobs) {
-          try {
-            await pipelineApi("/approve", { source: job.source, url_key: job.url_key, decision: "approve" });
-            job.stage = "queued"; job.tab = "queued"; job.followStatus = "待投递";
-            RP.adjustCounts("approval", "queued");
-            done += 1;
-          } catch (error) { toast(`放行中断：${error.message}`, "error"); break; }
-        }
-        RP.renderBoard();
-        void RP.refresh({ silent: true });
-        if (done) toast(`已放行 ${done} 个岗位。`, "success");
-        if (alive(token, body)) paint();
-      });
-      paint();
-      head.append(countLine, bulkBtn, list);
-      body.append(head);
-    }
-  });
-
-  /* ---------- 8. 投递队列（delivering，dry-run + 投递包） ---------- */
-  RP.registerDrawer("delivering", {
-    title: "投递队列 · dry-run", icon: "send", tone: "accent",
-    render(body, ctx) {
-      const token = RP.drawerToken();
-      body.append(note("投递为本地 dry-run：模拟执行并生成投递包（JSON/CSV 导出），不向外部平台发起请求。失败台账按持久/瞬时故障分诊，自动重试最多 2 次。", "info"));
-
-      const gate = section("投递闸配置", "sliders");
-      const headcount = input("number", { min: "1", max: "10000000", step: "1" });
-      const stopAtReview = input("checkbox");
-      const stopLabel = node("label", "", "rp-inline-check");
-      stopLabel.append(stopAtReview, document.createTextNode("停在待投递队列等待手动/波次 dry-run（推荐）"));
-      const gateFeedback = feedback();
-      const gateSave = button("保存投递闸配置", "", "check");
-      gateSave.addEventListener("click", async () => {
-        gateSave.disabled = true;
-        try {
-          await saveConfig({
-            mass_apply_max_headcount: Number(headcount.value) || 1000,
-            stop_at_review: stopAtReview.checked
-          }, gateFeedback, "投递闸配置已保存。");
-          if (alive(token, body)) setFeedback(gateFeedback, "投递闸配置已保存。", "success");
-        } catch (error) {
-          if (alive(token, body)) setFeedback(gateFeedback, error.message, "error");
-        } finally { gateSave.disabled = false; }
-      });
-      gate.append(field("海投拦截门槛（公司规模上限，人）", headcount), stopLabel, gateSave, gateFeedback);
-
-      const selected = new Set();
-      const queueSection = section("待投递", "send");
-      const queueList = node("div", "", "rp-mini-list");
-      const queueActions = node("div", "", "rp-panel-actions");
-      const deliverBtn = button("dry-run 投递所选", "rp-btn-accent", "send");
-      const exportBtn = button("全部投递并导出 CSV", "rp-btn-ghost", "download");
-      const deliverFeedback = feedback();
-      function syncDeliverBtn() {
-        deliverBtn.disabled = !selected.size || state.bulkBusy;
-        deliverBtn.textContent = selected.size ? `dry-run 投递所选（${selected.size}）` : "dry-run 投递所选";
-      }
-      function paintQueue() {
-        const jobs = state.jobs.filter((job) => job.tab === "queued");
-        syncDeliverBtn();
-        if (!jobs.length) {
-          queueList.replaceChildren(emptyBlock("待投递队列为空", "审批放行后岗位会进入这里。"));
-          return;
-        }
-        queueList.replaceChildren(...jobs.slice(0, 50).map((job) => {
-          const row = miniJob(job, {
-            checkbox: true,
-            checked: selected.has(RP.jobId(job)),
-            onCheck: (checked) => {
-              if (checked) selected.add(RP.jobId(job));
-              else selected.delete(RP.jobId(job));
-              syncDeliverBtn();
-            }
-          });
-          const actions = node("div", "", "rp-mini-job-actions");
-          const deliver = button("立即投递", "rp-btn-sm rp-btn-accent", "send");
-          deliver.addEventListener("click", async () => {
-            await RP.deliverJobs([job]);
-            if (alive(token, body)) { paintQueue(); paintDelivered(); }
-          });
-          const cancel = button("终止投递", "rp-btn-sm rp-btn-ghost", "stop");
-          cancel.addEventListener("click", async () => {
-            await RP.abandonDelivery(job);
-            if (alive(token, body)) paintQueue();
-          });
-          actions.append(cancel, deliver);
-          row.append(actions);
-          return row;
-        }));
-      }
-      deliverBtn.addEventListener("click", async () => {
-        const jobs = state.jobs.filter((job) => job.tab === "queued" && selected.has(RP.jobId(job)));
-        selected.clear();
-        await RP.deliverJobs(jobs);
-        if (alive(token, body)) { paintQueue(); paintDelivered(); }
-      });
-      exportBtn.addEventListener("click", async () => {
-        exportBtn.disabled = true;
-        setFeedback(deliverFeedback, "正在执行 dry-run 并导出投递包…");
-        try {
-          await RP.exportDeliveryCsv();
-          if (!alive(token, body)) return;
-          setFeedback(deliverFeedback, "投递包 CSV 已导出（含本轮 dry-run 结果）。", "success");
-          toast("投递包 CSV 已导出。", "success");
-          void RP.refresh({ silent: true });
-          paintQueue();
-          paintDelivered();
-        } catch (error) {
-          if (alive(token, body)) setFeedback(deliverFeedback, error.message, "error");
-        } finally { exportBtn.disabled = false; }
-      });
-      queueActions.append(deliverBtn, exportBtn);
-      queueSection.append(queueActions, deliverFeedback, queueList);
-
-      const deliveredSection = section("已投递 · 投递包", "check-circle");
-      const deliveredList = node("div", "", "rp-mini-list");
-      const packageView = node("div", "", "rp-panel-section");
-      packageView.hidden = true;
-      function renderPackage(delivery) {
-        packageView.replaceChildren();
-        const pkg = delivery?.package;
-        if (!pkg) {
-          packageView.append(RP.payloadText(delivery)
-            ? (() => { const doc = node("div", "", "rp-doc"); RP.renderDoc(doc, RP.payloadText(delivery)); return doc; })()
-            : note("投递包为空：该岗位可能由早期 dry-run 生成。", "warning"));
-          return;
-        }
-        const chips = node("div", "", "rp-stat-chips");
-        for (const text of [
-          pkg.grade ? `评级 ${pkg.grade}` : "", pkg.score != null ? `${pkg.score} 分` : "",
-          pkg.track === "mass" ? "海投轨" : "精投轨", "dry-run 模拟投递",
-          delivery.delivered_at ? "投递时间 " + RP.fmtTime(delivery.delivered_at) : ""
-        ].filter(Boolean)) chips.append(node("span", text, "rp-stat-chip"));
-        packageView.append(chips);
-        if (pkg.greeting) {
-          packageView.append(node("h3", "破冰欢迎语"));
-          const box = node("div", "", "rp-greeting-text");
-          box.textContent = pkg.greeting;
-          packageView.append(box);
-        }
-        if (pkg.resume_markdown) {
-          packageView.append(node("h3", "投递简历（改写稿）"));
-          const doc = node("div", "", "rp-doc");
-          RP.renderDoc(doc, pkg.resume_markdown);
-          packageView.append(doc);
-        }
-      }
-      async function openPackage(job) {
-        packageView.hidden = false;
-        packageView.replaceChildren(node("p", "正在读取投递包…", "rp-hint"));
-        try {
-          const payload = await RP.fetchJobPayload(job);
-          if (!alive(token, body)) return;
-          renderPackage(payloadOf(payload, "delivery_payload", "delivery"));
-        } catch (error) {
-          if (alive(token, body)) packageView.replaceChildren(note(error.message, "danger"));
-        }
-      }
-      function paintDelivered() {
-        const jobs = state.jobs.filter((job) => job.tab === "delivered");
-        if (!jobs.length) {
-          deliveredList.replaceChildren(emptyBlock("暂无投递记录", "dry-run 投递完成后会在这里留档。"));
-          return;
-        }
-        deliveredList.replaceChildren(...jobs.slice(0, 30).map((job) => {
-          const row = miniJob(job);
-          row.append(node("p", job.updatedAt ? "投递时间 " + RP.fmtTime(job.updatedAt) : "", "rp-mini-job-meta"));
-          const actions = node("div", "", "rp-mini-job-actions");
-          const view = button("查看投递包", "rp-btn-sm rp-btn-ghost", "eye");
-          view.addEventListener("click", () => openPackage(job));
-          actions.append(view);
-          row.append(actions);
-          return row;
-        }));
-      }
-      deliveredSection.append(deliveredList, packageView);
-      paintQueue();
-      paintDelivered();
-      body.append(gate, queueSection, deliveredSection);
-
-      loadConfig().then((data) => {
-        if (!alive(token, body)) return;
-        headcount.value = data.settings?.mass_apply_max_headcount ?? 1000;
-        stopAtReview.checked = data.settings?.stop_at_review !== false;
-      }).catch(() => {});
-      if (ctx.job && ctx.job.tab === "delivered") void openPackage(ctx.job);
-    }
-  });
-
-  /* ---------- 物料预览弹窗渲染 ---------- */
-  RP.registerMaterialsRenderer((body, job, payload, tab) => {
-    body.append(node("p", [job.company, RP.sourceLabel(job.source), job.location, job.salary].filter(Boolean).join(" · "), "rp-modal-meta"));
-    if (tab === "resume") {
-      const rewrite = payloadOf(payload, "rewrite_payload", "rewrite");
-      const text = RP.payloadText(rewrite);
-      if (!text) {
-        body.append(emptyBlock("尚未生成定向改写稿", "改写以基准简历为底稿，结合该岗位 JD 生成。", "去生成改写", () => {
-          RP.closeMaterials();
-          RP.openDrawer("rewriting", { job });
-        }));
-        return;
-      }
-      if (rewrite && typeof rewrite === "object") {
-        const chips = node("div", "", "rp-stat-chips");
-        chips.append(modeChip(rewrite.mode));
-        if (rewrite.baseline_name) chips.append(node("span", `基准：${rewrite.baseline_name}`, "rp-stat-chip"));
-        body.append(chips);
-      }
-      const doc = node("div", "", "rp-doc");
-      RP.renderDoc(doc, text);
-      const actions = node("div", "", "rp-modal-actions");
-      const copy = button("复制全文", "rp-btn-sm", "copy");
-      copy.addEventListener("click", () => copyText(text, "改写稿已复制。"));
-      const open = button("打开定制面板", "rp-btn-sm rp-btn-ghost", "sliders");
-      open.addEventListener("click", () => { RP.closeMaterials(); RP.openDrawer("rewriting", { job }); });
-      actions.append(copy, open);
-      body.append(doc, actions);
-      const list = Array.isArray(rewrite?.downgrades) ? rewrite.downgrades : [];
-      if (list.length) {
-        const fold = node("details", "", "rp-deep-key");
-        fold.append(node("summary", `真实性边界降级记录（${list.length}）`));
-        const foldDoc = node("div", "", "rp-doc");
-        for (const item of list) foldDoc.append(node("p", `${item.original} → ${item.replaced} · ${item.reason || ""}`));
-        fold.append(foldDoc);
-        body.append(fold);
-      }
-      body.append(note("本地改写稿预览，无外部原件；外发前请人工核验真实性边界。", "info"));
-    } else {
-      const greeting = payloadOf(payload, "greeting_payload", "greeting");
-      const text = RP.payloadText(greeting);
-      if (!text) {
-        body.append(emptyBlock("尚未生成破冰欢迎语", "生成后可在这里核验合法性并复制。", "去生成欢迎语", () => {
-          RP.closeMaterials();
-          RP.openDrawer("greeting");
-        }));
-        return;
-      }
-      const box = node("div", "", "rp-greeting-text");
-      box.textContent = text;
-      const illegal = /❌|生成失败/.test(text) || (greeting && greeting.legal === false);
-      const gate = note(illegal ? "未通过合法性闸：内容为空或含失败标记，严禁外发。" : "合法性闸通过，外发前请人工核验匹配理由。", illegal ? "danger" : "success");
-      const actions = node("div", "", "rp-modal-actions");
-      const copy = button("复制欢迎语", "rp-btn-sm", "copy");
-      copy.disabled = illegal;
-      copy.addEventListener("click", () => copyText(text, "欢迎语已复制。"));
-      actions.append(copy);
-      body.append(box, gate, actions);
-    }
-  });
 })();

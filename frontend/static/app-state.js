@@ -286,7 +286,7 @@ const resumeTaskState = {
   reportObserver: null
 };
 
-const reportResumeUiState = { pending: false, loaded: false, source: null, error: "" };
+const reportResumeUiState = { pending: false, loaded: false, source: null, options: [], selectedId: "", error: "" };
 
 let reportGenerationStarting = false;
 

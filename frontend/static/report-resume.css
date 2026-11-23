@@ -16,7 +16,7 @@
 }
 
 #report .report-launch-page {
-    --report-setup-width: 1160px;
+    --report-setup-width: 100%;
     gap: 16px;
 }
 
@@ -104,9 +104,9 @@
 
 #report .report-launch-page > .report-workflow-form {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(235px, 268px);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
     align-items: start;
-    gap: 18px;
+    gap: 20px;
     width: min(100%, var(--report-setup-width));
     margin: 0 auto;
     padding: 0;
@@ -215,6 +215,33 @@ details.report-setup-card:not([open]) .report-setup-toggle { transform: rotate(4
     gap: 8px;
     color: #4d637d;
     font-size: 12px;
+}
+#report .report-setup-source-title {
+    margin: 0;
+    color: #4d637d;
+    font-size: 12px;
+    font-weight: 500;
+}
+#report .report-resume-select {
+    margin-top: 8px;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #d5e2f2;
+    border-radius: 9px;
+    background: #fff;
+    color: #203b57;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    cursor: pointer;
+    text-overflow: ellipsis;
+}
+#report .report-resume-select:hover:not(:disabled) {
+    border-color: #9bb8e8;
+}
+#report .report-resume-select:disabled {
+    opacity: .65;
+    cursor: not-allowed;
 }
 #report #reportResumeSourceLabel {
     margin: 7px 0 0;

@@ -40,20 +40,20 @@ JOB_REJECTED = {
 }
 
 
-def add_job(owner, key, spec):
+def add_job(owner, key, spec, source="city_jobs"):
     from services import db
     with db._get_conn() as conn:
         conn.execute("""
             INSERT INTO recruitment_listings
                 (owner, source, url_key, title, company, location, salary, description, experience, education, url, updated_at, profile)
-            VALUES (?, 'city_jobs', ?, ?, ?, ?, ?, ?, ?, ?, '', ?, 'general')
-        """, (owner.email, key, spec["title"], spec["company"], spec["location"], spec["salary"],
-              spec["description"], spec["experience"], spec["education"], time.time()))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'general')
+        """, (owner.email, source, key, spec["title"], spec["company"], spec["location"], spec["salary"],
+              spec["description"], spec["experience"], spec["education"], spec.get("url", ""), time.time()))
         conn.execute("""
             INSERT INTO recruitment_pipeline (owner, source, url_key, stage, follow_status, meta, updated_at)
-            VALUES (?, 'city_jobs', ?, 'collected', '新线索', ?, ?)
-        """, (owner.email, key, json.dumps(spec.get("meta", {}), ensure_ascii=False), time.time()))
-    return {"source": "city_jobs", "url_key": key}
+            VALUES (?, ?, ?, 'collected', '新线索', ?, ?)
+        """, (owner.email, source, key, json.dumps(spec.get("meta", {}), ensure_ascii=False), time.time()))
+    return {"source": source, "url_key": key}
 
 
 def set_baseline(server, owner, text=RESUME_TEXT, fingerprint="fp-baseline"):
@@ -652,3 +652,76 @@ def test_baseline_resume_follows_resume_workshop(server, make_account):
     rewrite = job(owner, identity)["rewrite_payload"]
     assert rewrite["baseline_name"] == "王帅工作简历"
     assert "云杉科技 2021-2026" in rewrite["markdown"]
+
+
+def test_deliver_draft_supports_boss_zhilian_and_51job(server, make_account, monkeypatch):
+    from services import db, recruitment_chrome
+
+    owner = setup_account(server, make_account, "pipeline-draft-platforms")
+    calls = []
+
+    def fake_open(source, url, greeting):
+        calls.append((source, url, greeting))
+        return {"ok": True, "status": "draft_filled", "message": f"已在 {source} 填入草稿（未发送）", "url": url}
+
+    monkeypatch.setattr(recruitment_chrome, "open_platform_draft_chat", fake_open)
+
+    cases = [
+        ("boss", "https://www.zhipin.com/job_detail/demo-boss.html"),
+        ("zhilian", "https://xiaoyuan.zhaopin.com/job/demo-zl"),
+        ("51job", "https://jobs.51job.com/hangzhou/demo-51.html"),
+    ]
+    for source, url in cases:
+        identity = add_job(owner, url, {**JOB_CUSTOM, "url": url}, source=source)
+        with db._get_conn() as conn:
+            conn.execute(
+                "UPDATE recruitment_pipeline SET stage='queued', greeting_payload=? WHERE owner=? AND source=? AND url_key=?",
+                ('{"text":"您好，我对贵司岗位很感兴趣，具备 Python 与 LangGraph 项目经验。","legal":true}', owner.email, source, identity["url_key"]),
+            )
+        resp = owner.post(PIPE + "/deliver_draft", json=identity)
+        assert resp.status_code == 200, resp.get_json()
+        body = resp.get_json()
+        assert body["ok"] is True and body["status"] == "draft_filled"
+        # Draft-only must NEVER auto-mark as delivered
+        assert job(owner, identity)["stage"] == "queued"
+    assert [c[0] for c in calls] == ["boss", "zhilian", "51job"]
+
+    # Unsupported platform (xiaohongshu) is rejected cleanly
+    xhs = add_job(owner, "https://www.xiaohongshu.com/explore/demo", {**JOB_CUSTOM, "url": "https://www.xiaohongshu.com/explore/demo"}, source="xiaohongshu")
+    assert owner.post(PIPE + "/deliver_draft", json=xhs).status_code == 400
+
+
+def test_combat_room_restore_cherrypick_and_sse_tasks(server, make_account):
+    owner = setup_account(server, make_account, "pipeline-combat-sse")
+    identity = add_job(owner, "t:combat", JOB_CUSTOM, source="boss")
+    run(owner, "clean")
+    run(owner, "evaluate")
+
+    # 1. Cherry-pick rewrite save
+    saved_rw = owner.post(PIPE + "/rewrite/save", json={**identity, "markdown": "## 个人简历\n- 精修版本"})
+    assert saved_rw.status_code == 200 and saved_rw.get_json()["rewrite"]["mode"] == "manual_cherrypick"
+
+    # 2. Job-specific interview prep
+    prep = owner.post(PIPE + "/interview-prep", json=identity)
+    assert prep.status_code == 200 and len(prep.get_json()["prep"]["tech_questions"]) >= 1
+
+    # 3. Reject + 5s Undo restore
+    assert owner.post(PIPE + "/approve", json={**identity, "decision": "reject"}).status_code == 200
+    assert job(owner, identity)["stage"] == "rejected"
+    restored = owner.post(PIPE + "/restore", json={"items": [{**identity, "stage": "deep", "follow_status": "已深评"}]})
+    assert restored.status_code == 200 and restored.get_json()["restored"] == 1
+    assert job(owner, identity)["stage"] == "deep"
+
+    # 4. Async SSE task start & active query
+    started = owner.post(PIPE + "/tasks/start", json={"stage": "rewrite", "ids": [identity]})
+    assert started.status_code == 202
+    task_id = started.get_json()["task"]["task_id"]
+    deadline = time.time() + 5
+    final_status = "running"
+    while time.time() < deadline:
+        snap = owner.get(PIPE + "/tasks/active").get_json()
+        if snap["latest"] and snap["latest"]["task_id"] == task_id and snap["latest"]["status"] != "running":
+            final_status = snap["latest"]["status"]
+            break
+        time.sleep(0.1)
+    assert final_status == "completed"

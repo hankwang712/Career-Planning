@@ -31,12 +31,12 @@
             <nav class="tr-nav" aria-label="测试类型导航">
                 <button type="button" class="tr-nav-link active" data-test="deep">深层 MBTI</button>
                 <button type="button" class="tr-nav-link" data-test="friends">老友记角色</button>
-                <button type="button" class="tr-nav-link" data-test="insideout">头脑特工队</button>
+                <button type="button" class="tr-nav-link" data-test="insideout">情绪主导</button>
                 <button type="button" class="tr-nav-link" data-test="sbti">SBTI 人格扩展</button>
             </nav>
 
             <div class="tr-sidebar-footer">
-                <a class="tr-footer-link" href="/main.html#profile" data-return-last="1">返回主界面</a>
+                <a class="tr-footer-link" href="/main.html#profile" data-return-last="1">← 返回测评中心</a>
             </div>
         </aside>
 
@@ -75,16 +75,26 @@
 
                         <div class="ts-progress-wrap">
                             <div class="ts-progress-head">
-                                <strong id="tsProgressText">进度 0 / 0</strong>
-                                <label class="ax-auto-label"><input type="checkbox" id="tsAutoAdvance" checked>自动下一题</label>
+                                <div class="ts-progress-left">
+                                    <strong id="tsProgressText">进度 0 / 0</strong>
+                                    <span id="tsStreakBadge" class="ts-streak-badge" hidden>连续 0 题 🔥</span>
+                                </div>
+                                <div class="ts-progress-right">
+                                    <button type="button" id="tsMapToggle" class="tr-btn ghost ts-map-btn" aria-expanded="false">题卡</button>
+                                    <label class="ax-auto-label"><input type="checkbox" id="tsAutoAdvance" checked>自动下一题</label>
+                                </div>
                             </div>
                             <div class="ts-progress-track" role="progressbar" aria-label="作答进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                                 <div id="tsProgressFill" class="ts-progress-fill"></div>
+                                <span class="ts-tick" style="left:25%"></span>
+                                <span class="ts-tick" style="left:50%"></span>
+                                <span class="ts-tick" style="left:75%"></span>
                             </div>
                             <div class="ts-progress-caption">
                                 <span id="tsAnsweredText">已作答 0 / 0</span>
-                                <span>按日常感受选择即可</span>
+                                <span id="tsMilestoneToast" class="ts-milestone-toast">按 1–5 键或 ← / → 快捷作答</span>
                             </div>
+                            <div id="tsQuestionMap" class="ts-question-map" hidden></div>
                         </div>
 
                         <article class="ts-question-card">

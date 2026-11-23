@@ -50,6 +50,16 @@
         </summary>
         <div class="sc-group-body">
             <p class="sc-description">{{ description }}</p>
+            {% if id == 'chat' %}
+            <div class="sc-preset-bar" id="chatProviderPresets">
+                <span class="sc-preset-label">常用厂商预设：</span>
+                <button type="button" class="sc-preset-chip" data-preset-url="https://api.deepseek.com/v1" data-preset-model="deepseek-chat">DeepSeek</button>
+                <button type="button" class="sc-preset-chip" data-preset-url="https://dashscope.aliyuncs.com/compatible-mode/v1" data-preset-model="qwen-plus">阿里云百炼</button>
+                <button type="button" class="sc-preset-chip" data-preset-url="https://api.siliconflow.cn/v1" data-preset-model="deepseek-ai/DeepSeek-V3">硅基流动</button>
+                <button type="button" class="sc-preset-chip" data-preset-url="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-plus">智谱 GLM</button>
+                <button type="button" class="sc-preset-chip" data-preset-url="https://api.moonshot.cn/v1" data-preset-model="moonshot-v1-32k">Moonshot Kimi</button>
+            </div>
+            {% endif %}
             {% if testable %}<p class="sc-probe-status" id="test-status-{{ id }}" role="status"></p>{% endif %}
             <div class="sc-fields">
                 {% for key, label in fields %}
@@ -104,6 +114,7 @@
     <script src="{{ url_for('static', filename='design-refresh.js') }}" defer></script>
     <script src="{{ url_for('static', filename='auth-security.js') }}" defer></script>
     <script src="{{ url_for('static', filename='system-settings.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='global-task-bar.js') }}" defer></script>
 </head>
 <body class="sc-page bg-gray-50">
     <header class="sc-top">
@@ -152,22 +163,67 @@
                 <nav class="sc-card" aria-label="配置分组">
                     {{ nav_group(groups, 'AI 服务') }}
                     {{ nav_group(deployment_groups, '部署环境') }}
+                    <p class="sc-nav-caption">运维与审计</p>
+                    <a href="#section-diagnostics"><span class="sc-dot" style="background:var(--dr-accent);"></span><span>环境体检与备份</span><small id="navDiagCount">–</small></a>
+                    <a href="#section-llm-usage"><span class="sc-dot" style="background:#6366f1;"></span><span>Token 耗时审计</span><small id="navUsageCount">–</small></a>
                 </nav>
                 <div class="sc-card sc-progress">
                     <strong id="settingsProgressText">正在检查配置…</strong>
                     <progress id="settingsProgress" value="0" max="3" aria-label="对话模型配置进度"></progress>
                 </div>
             </aside>
-            <form id="systemModelSettings" autocomplete="off" data-can-edit="{{ 'true' if can_edit else 'false' }}">
-                <fieldset disabled aria-label="服务配置">
-                    {% for id, title, description, fields in groups %}
-                        {{ group_card(id, title, description, fields) }}
-                    {% endfor %}
-                    {% for id, title, description, fields in deployment_groups %}
-                        {{ group_card(id, title, description, fields, true) }}
-                    {% endfor %}
-                </fieldset>
-            </form>
+            <div class="sc-main-col">
+                <form id="systemModelSettings" autocomplete="off" data-can-edit="{{ 'true' if can_edit else 'false' }}">
+                    <fieldset disabled aria-label="服务配置">
+                        {% for id, title, description, fields in groups %}
+                            {{ group_card(id, title, description, fields) }}
+                        {% endfor %}
+                        {% for id, title, description, fields in deployment_groups %}
+                            {{ group_card(id, title, description, fields, true) }}
+                        {% endfor %}
+                    </fieldset>
+                </form>
+
+                <section class="sc-card sc-ops-card" id="section-diagnostics" aria-labelledby="diagTitle">
+                    <div class="sc-ops-head">
+                        <div class="sc-ops-head-left">
+                            <span class="sc-ops-tile sc-ops-tile-blue">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            </span>
+                            <div>
+                                <div class="sc-ops-title-row">
+                                    <h3 id="diagTitle">环境体检与数据备份</h3>
+                                    <span class="sc-ops-badge" id="diagSummaryPill">检测中…</span>
+                                </div>
+                                <p class="sc-ops-desc">检测模型通道、SQLite 在线快照备份、学术 PDF 字体引擎、本机 Chrome 桥接与本地隐私脱敏护盾。</p>
+                            </div>
+                        </div>
+                        <div class="sc-ops-actions">
+                            <button type="button" id="runBackupBtn" class="sc-ops-btn sc-ops-btn-ghost">立即备份</button>
+                            <button type="button" id="runDiagBtn" class="sc-ops-btn sc-ops-btn-dark">一键体检</button>
+                        </div>
+                    </div>
+                    <div id="diagList" class="sc-diag-grid">正在加载体检状态…</div>
+                </section>
+
+                <section class="sc-card sc-ops-card" id="section-llm-usage" aria-labelledby="usageTitle">
+                    <div class="sc-ops-head">
+                        <div class="sc-ops-head-left">
+                            <span class="sc-ops-tile sc-ops-tile-indigo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                            </span>
+                            <div>
+                                <div class="sc-ops-title-row">
+                                    <h3 id="usageTitle">LLM Token 与耗时审计</h3>
+                                    <span class="sc-ops-badge sc-ops-badge-indigo">本地 SQLite 实时统计</span>
+                                </div>
+                                <p class="sc-ops-desc">按功能模块记录每次模型调用的 Token 消耗与响应耗时，便于掌握各环节算力开销。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="usageSummary" class="sc-usage-wrap">正在统计调用记录…</div>
+                </section>
+            </div>
         </div>
     </main>
     {% include "partials/workspace_console.html" %}

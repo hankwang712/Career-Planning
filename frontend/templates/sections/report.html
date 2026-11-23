@@ -1,4 +1,4 @@
-<section id="report" class="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 hidden fade-in">
+<section id="report" class="w-full max-w-[1520px] mx-auto px-4 sm:px-5 lg:px-6 hidden fade-in">
     <div class="report-launch-page">
         <div class="report-launch-hero">
             <div>
@@ -116,7 +116,11 @@
                 </div>
                 <div class="report-setup-card-body">
                     <div class="report-setup-source">
-                        <div class="report-setup-source-meta"><span>使用的简历</span><span class="report-setup-badge is-ready">已就绪</span></div>
+                        <div class="report-setup-source-meta">
+                            <label for="reportResumeSourceSelect" class="report-setup-source-title">使用的简历</label>
+                            <span class="report-setup-badge is-ready">已就绪</span>
+                        </div>
+                        <select id="reportResumeSourceSelect" class="report-resume-select" aria-label="选择用于本次分析的简历" hidden></select>
                         <p id="reportResumeSourceLabel"></p>
                     </div>
                     <button id="reportStageStart" type="submit" class="report-launch-primary">启动多智能体 <span aria-hidden="true">↗</span></button>

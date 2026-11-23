@@ -106,9 +106,20 @@ def _validate_private_report_identifiers():
     return None
 
 
-def _report_resume_source(username, state):
+def _extract_resume_targets(source):
+    target = source.get("target") or read_source_target(source["path"], source["text"])
+    targets = dict.fromkeys(
+        part.strip()
+        for part in re.split(r"[\n、；;|｜]", target)
+        if 0 < len(part.strip()) <= 300 and part.strip() not in {"未定", "待定", "不限", "暂无", "无"}
+    )
+    return list(targets)[:5]
+
+
+def _report_resume_sources(username, state):
+    sources = []
     rows = db._get_conn().execute(
-        "SELECT title, document FROM resume_drafts WHERE owner=? ORDER BY updated_at DESC, id DESC",
+        "SELECT id, title, document FROM resume_drafts WHERE owner=? ORDER BY updated_at DESC, id DESC",
         (username,),
     )
     for row in rows:
@@ -119,30 +130,60 @@ def _report_resume_source(username, state):
             target = document["contact"].get("target")
             if target:
                 sections.insert(0, f"求职意向：{target}")
-            return {"kind": "draft", "title": row["title"], "target": target,
-                    "text": "\n\n".join(sections), "path": ""}
+            sources.append({
+                "id": f"draft:{row['id']}",
+                "draft_id": row["id"],
+                "kind": "draft",
+                "title": row["title"] or "未命名简历",
+                "target": target,
+                "text": "\n\n".join(sections),
+                "path": "",
+            })
 
     resume = state.get("resume_profile") or {}
     path = _owned_resume_storage_path(username, str(resume.get("storage_path") or ""))
     path = path if path and os.path.isfile(path) else ""
     content = str(resume.get("resume_source_text") or "").strip()
     if path or content:
-        return {"kind": "upload", "title": resume.get("original_file_name") or resume.get("file_name") or "已上传的简历",
-                "text": content, "path": path}
-    return None
+        sources.append({
+            "id": "upload",
+            "draft_id": None,
+            "kind": "upload",
+            "title": resume.get("original_file_name") or resume.get("file_name") or "已上传的简历",
+            "target": "",
+            "text": content,
+            "path": path,
+        })
+    return sources
+
+
+def _report_resume_source(username, state, selected_id=None):
+    sources = _report_resume_sources(username, state)
+    if not sources:
+        return None
+    sel = str(selected_id or "").strip()
+    if sel:
+        for item in sources:
+            if item["id"] == sel or (item["draft_id"] is not None and str(item["draft_id"]) == sel):
+                return item
+        return None
+    return sources[0]
 
 
 @blueprint.get("/api/career-report/resume-source")
 @_login_required
 def api_career_report_resume_source():
     username = _current_user()["username"]
-    source = _report_resume_source(username, _load_user_state(username))
-    if not source:
-        return jsonify(source=None)
-    target = source.get("target") or read_source_target(source["path"], source["text"])
-    targets = dict.fromkeys(part.strip() for part in re.split(r"[\n、；;|｜]", target)
-                            if 0 < len(part.strip()) <= 300 and part.strip() not in {"未定", "待定", "不限", "暂无", "无"})
-    return jsonify(source={"kind": source["kind"], "title": source["title"], "targets": list(targets)[:5]})
+    selected_id = str(request.args.get("source_id") or "").strip()
+    sources = _report_resume_sources(username, _load_user_state(username))
+    if not sources:
+        return jsonify(source=None, options=[])
+    options = [
+        {"id": item["id"], "kind": item["kind"], "title": item["title"], "targets": _extract_resume_targets(item)}
+        for item in sources
+    ]
+    active = next((opt for opt in options if selected_id and (opt["id"] == selected_id or opt["id"] == f"draft:{selected_id}")), options[0])
+    return jsonify(source=active, options=options)
 
 
 @blueprint.route("/api/career-report/generate/start", methods=["POST"])
@@ -198,9 +239,11 @@ def api_career_report_generate_start():
             continuation = {"checkpoint_id": checkpoint_id, "response": response}
         else:
             report_id = f"report-{uuid.uuid4().hex[:12]}"
-            source = _report_resume_source(username, state)
+            selected_source_id = str(payload.get("resume_source_id") or "").strip() or None
+            source = _report_resume_source(username, state, selected_id=selected_source_id)
             if not source:
-                return jsonify({"message": "请先到个人中心填写或导入简历并保存。"}), 400
+                msg = "所选简历不存在或已删除，请重新选择。" if selected_source_id else "请先到个人中心填写或导入简历并保存。"
+                return jsonify({"message": msg}), 400
             if source["kind"] == "draft":
                 profile_payload["agent_memory"]["resume_memory"] = {
                     "resume_source_text": source["text"],

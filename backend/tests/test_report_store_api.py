@@ -132,32 +132,49 @@ def test_generation_uses_latest_nonempty_resume_draft(make_account, monkeypatch)
     source_url = "/api/career-report/resume-source"
     start_url = "/api/career-report/generate/start"
     drafts_url = "/api/resume-editor/drafts"
-    assert account.get(source_url).get_json() == {"source": None}
+    assert account.get(source_url).get_json() == {"source": None, "options": []}
     assert "个人中心" in account.post(start_url, json={}).get_json()["message"]
 
     _save_user_state(account.email, {"resume_profile": {"file_name": "old.pdf", "resume_source_text": "求职意向\n测试工程师"}})
-    assert account.get(source_url).get_json() == {
-        "source": {"kind": "upload", "title": "old.pdf", "targets": ["测试工程师"]}
-    }
+    upload_resp = account.get(source_url).get_json()
+    assert upload_resp["source"] == {"id": "upload", "kind": "upload", "title": "old.pdf", "targets": ["测试工程师"]}
+    assert upload_resp["options"] == [upload_resp["source"]]
     section = {"title": "项目经历", "content": "开发简历分析工具"}
-    assert account.post(drafts_url, json={"title": "历史版本", "sections": [{**section, "content": "旧项目"}]}).status_code == 201
-    assert account.post(drafts_url, json={"title": "求职版", "sections": [section],
-                                          "contact": {"email": "private@example.com", "target": "AI 算法｜Agent 开发"}}).status_code == 201
+    older_draft = account.post(drafts_url, json={"title": "历史版本", "sections": [{**section, "content": "旧项目"}]})
+    assert older_draft.status_code == 201
+    older_id = f"draft:{older_draft.get_json()['id']}"
+    newer_draft = account.post(drafts_url, json={"title": "求职版", "sections": [section],
+                                                 "contact": {"email": "private@example.com", "target": "AI 算法｜Agent 开发"}})
+    assert newer_draft.status_code == 201
+    newer_id = f"draft:{newer_draft.get_json()['id']}"
     assert account.post(drafts_url, json={"title": "空白版"}).status_code == 201
-    assert account.get(source_url).get_json() == {
-        "source": {"kind": "draft", "title": "求职版", "targets": ["AI 算法", "Agent 开发"]}
+    draft_resp = account.get(source_url).get_json()
+    assert draft_resp["source"] == {
+        "id": newer_id, "kind": "draft", "title": "求职版", "targets": ["AI 算法", "Agent 开发"]
     }
-    assert other.get(source_url).get_json() == {"source": None}
+    assert [item["title"] for item in draft_resp["options"]] == ["求职版", "历史版本", "old.pdf"]
+    assert other.get(source_url).get_json() == {"source": None, "options": []}
+
+    seen_resumes = []
 
     def validate(_workflow, raw_resume, *, file_path):
-        assert raw_resume == "求职意向：AI 算法｜Agent 开发\n\n## 项目经历\n开发简历分析工具"
-        assert not file_path
+        seen_resumes.append((raw_resume, file_path))
         raise ValueError("validated")
 
     monkeypatch.setattr(api, "validate_report_request", validate)
     response = account.post(start_url, json={"workflow": {"targets": ["开发工程师"], "raw_resume": "客户端替代内容"}})
     assert response.status_code == 400
     assert response.get_json()["message"] == "validated"
+    assert seen_resumes[-1] == ("求职意向：AI 算法｜Agent 开发\n\n## 项目经历\n开发简历分析工具", "")
+
+    # 显式选择旧版本简历时，应使用所选草稿而非最新草稿
+    selected_resp = account.post(start_url, json={
+        "resume_source_id": older_id,
+        "workflow": {"targets": ["开发工程师"]},
+    })
+    assert selected_resp.status_code == 400
+    assert selected_resp.get_json()["message"] == "validated"
+    assert seen_resumes[-1] == ("## 项目经历\n旧项目", "")
 
 
 def test_deleting_the_current_version_promotes_the_archived_one(seeded):

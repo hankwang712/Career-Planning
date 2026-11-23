@@ -1,17 +1,18 @@
 (function () {
   "use strict";
   const TESTS = [
-    { id: "mbti", name: "MBTI 性格倾向", category: "性格偏好", count: "93 题", time: "约 12 分钟", color: "blue", icon: "M", description: "了解获取能量、处理信息与做出决定的偏好。" },
-    { id: "holland", name: "霍兰德职业兴趣", category: "职业兴趣", count: "90 题", time: "约 10 分钟", color: "teal", icon: "H", description: "从喜欢的活动出发，探索你的职业兴趣方向。" },
-    { id: "deep", name: "深层 MBTI", category: "性格探索", count: "52 题", time: "约 8 分钟", color: "indigo", icon: "D", description: "通过五档量表，进一步观察四个维度的性格倾向。" },
-    { id: "friends", name: "老友记角色", category: "趣味探索", count: "10 题", time: "约 2 分钟", color: "amber", icon: "F", description: "走进熟悉的生活情境，看看你更像哪位老友。" },
-    { id: "insideout", name: "情绪主导", category: "趣味探索", count: "14 题", time: "约 3 分钟", color: "rose", icon: "E", description: "通过日常情境，探索你当前的情感表达风格。" },
-    { id: "sbti", name: "SBTI 人格扩展", category: "人格探索", count: "30 题＋补充题", time: "约 5 分钟", color: "violet", icon: "S", description: "从更多生活偏好出发，认识你的人格表达方式。" }
+    { id: "mbti", group: "career", name: "MBTI 性格倾向", category: "性格偏好", total: 93, count: "93 题", time: "约 12 分钟", color: "blue", icon: "M", cover: "/static/brand/assessments/mbti.jpg", description: "了解获取能量、处理信息与做出决定的偏好。" },
+    { id: "holland", group: "career", name: "霍兰德职业兴趣", category: "职业兴趣", total: 90, count: "90 题", time: "约 10 分钟", color: "teal", icon: "H", cover: "/static/brand/assessments/holland.jpg", description: "从喜欢的活动出发，探索你的职业兴趣方向。" },
+    { id: "deep", group: "career", name: "深层 MBTI", category: "性格探索", total: 52, count: "52 题", time: "约 8 分钟", color: "indigo", icon: "D", cover: "/static/brand/assessments/deep.jpg", description: "通过五档量表，进一步观察四个维度的性格倾向。" },
+    { id: "friends", group: "fun", name: "老友记角色", category: "趣味探索", total: 10, count: "10 题", time: "约 2 分钟", color: "amber", icon: "F", cover: "/static/brand/assessments/friends.svg", description: "走进熟悉的生活情境，看看你更像哪位老友。" },
+    { id: "insideout", group: "fun", name: "情绪主导", category: "趣味探索", total: 14, count: "14 题", time: "约 3 分钟", color: "rose", icon: "E", cover: "/static/brand/assessments/insideout.svg", description: "通过日常情境，探索你当前的情感表达风格。" },
+    { id: "sbti", group: "fun", name: "SBTI 人格扩展", category: "人格探索", total: 30, count: "30 题+", time: "约 5 分钟", color: "violet", icon: "S", cover: "/static/brand/assessments/sbti.svg", description: "从更多生活偏好出发，认识你的人格表达方式。" }
   ];
   const IDS = new Set(TESTS.map(test => test.id));
   const HISTORY_PREFIX = "career_assessment_history_v1_";
   const HISTORY_LIMIT = 50;
   let filter = "all";
+  let categoryFilter = "all";
 
   function esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
@@ -113,29 +114,72 @@
     for (const test of ["deep", "friends", "insideout", "sbti"]) available[test] = Boolean(core?.getStoredResultByType(test));
     return available;
   }
+  function draftProgress(test) {
+    if (test.id === "mbti" || test.id === "holland") {
+      const snap = window.getAssessmentHubSnapshot?.();
+      if (snap?.owner === username()) {
+        const part = snap[test.id];
+        if (part && !part.completed && part.answered_count > 0) {
+          return Math.min(99, Math.round((part.answered_count / test.total) * 100));
+        }
+      }
+      return 0;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(`career_assessment_draft_v1_${username()}_${test.id}`) || "null");
+      const count = saved?.answers ? Object.keys(saved.answers).length : 0;
+      if (count > 0) return Math.min(99, Math.round((count / test.total) * 100));
+    } catch (_) {}
+    return 0;
+  }
+
   function render() {
     const grid = document.getElementById("assessmentTestGrid");
     if (!grid) return;
     const history = readHistory();
     const available = currentResults();
-    grid.innerHTML = TESTS.map((test, index) => {
+    const doneCount = TESTS.filter(t => available[t.id]).length;
+    const summaryEl = document.getElementById("assessmentCenterSummary");
+    if (summaryEl) summaryEl.textContent = `已完成 ${doneCount} / ${TESTS.length}`;
+    const visible = TESTS.filter(test => {
+      if (categoryFilter === "career") return test.group === "career";
+      if (categoryFilter === "fun") return test.group === "fun";
+      if (categoryFilter === "done") return Boolean(available[test.id]);
+      return true;
+    });
+    grid.innerHTML = visible.length ? visible.map((test) => {
       const latest = history.find(item => item.test === test.id);
+      const done = Boolean(available[test.id]);
+      const pct = done ? 100 : draftProgress(test);
+      const badge = done
+        ? `<span class="assessment-cover-status is-done">已完成</span>`
+        : pct > 0
+          ? `<span class="assessment-cover-status is-wip">进行中 ${pct}%</span>`
+          : "";
+      const ctaText = done ? "查看结果" : pct > 0 ? "继续答题" : "开始测评";
       return `<article class="assessment-center-card tone-${test.color}">
-        <div class="assessment-center-card-top"><span class="assessment-center-icon" aria-hidden="true">${test.icon}</span><span class="assessment-center-category">${test.category}</span><span class="assessment-center-index">0${index + 1}</span></div>
-        <h3>${test.name}</h3><p class="assessment-center-description">${test.description}</p>
-        <div class="assessment-center-meta"><span>${test.count}</span><span>${test.time}</span></div>
-        <div class="assessment-center-last">${latest ? `<span>最近结果</span><strong>${esc(latest.result)}</strong>` : '<span class="assessment-center-not-started">还没有完成记录</span>'}</div>
-        <div class="assessment-center-card-actions"><button type="button" class="assessment-center-primary" data-assessment-test="${test.id}" data-assessment-action="${available[test.id] ? "result" : "start"}">${available[test.id] ? "查看结果" : "开始测评"}<span aria-hidden="true">↗</span></button>
-        ${available[test.id] ? `<button type="button" class="assessment-center-restart" data-assessment-test="${test.id}" data-assessment-action="restart">重新测评</button>` : ""}</div>
+        <div class="assessment-card-cover">
+          <img src="${test.cover}" alt="${esc(test.name)}" loading="lazy">
+          <span class="assessment-cover-cat">${test.category}</span>
+          ${badge}
+        </div>
+        <div class="assessment-card-body">
+          <h3>${test.name}</h3>
+          <p class="assessment-center-description">${test.description}</p>
+          <div class="assessment-center-meta"><span>${test.count}</span><span>${test.time}</span></div>
+          <div class="assessment-center-last">${latest ? `<span>最近结果</span><strong>${esc(latest.result)}</strong>` : pct > 0 ? `<div class="assessment-mini-bar"><i style="width:${pct}%"></i></div><span>已保存 ${pct}%</span>` : '<span class="assessment-center-not-started">随时开始 · 自动存进度</span>'}</div>
+          <div class="assessment-center-card-actions"><button type="button" class="assessment-center-primary" data-assessment-test="${test.id}" data-assessment-action="${done ? "result" : "start"}">${ctaText}<span aria-hidden="true">→</span></button>
+          ${done ? `<button type="button" class="assessment-center-restart" data-assessment-test="${test.id}" data-assessment-action="restart">重测</button>` : ""}</div>
+        </div>
       </article>`;
-    }).join("");
+    }).join("") : `<div class="assessment-grid-empty">该分类下暂无测评记录</div>`;
     const rows = filter === "all" ? history : history.filter(item => item.test === filter);
     document.getElementById("assessmentHistoryCount").textContent = `${rows.length} 条`;
     document.getElementById("assessmentHistoryList").innerHTML = rows.length ? rows.map(item => {
-      const test = TESTS.find(test => test.id === item.test);
-      const time = new Date(item.completedAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-      return `<article class="assessment-center-record"><div><span class="assessment-center-record-dot tone-${test.color}"></span><strong>${test.name}</strong><time datetime="${new Date(item.completedAt).toISOString()}">${esc(time)}</time></div><p>${esc(item.result)}</p></article>`;
-    }).join("") : `<div class="assessment-center-empty"><span aria-hidden="true">◷</span><strong>${filter === "all" ? "还没有测评记录" : "这项测评还没有记录"}</strong><p>完成一项测评后，简要结果会显示在这里。</p></div>`;
+      const test = TESTS.find(t => t.id === item.test);
+      const time = new Date(item.completedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+      return `<article class="assessment-center-record" data-history-test="${item.test}" role="button" tabindex="0"><div><span class="assessment-center-record-dot tone-${test.color}"></span><strong>${test.name}</strong><time datetime="${new Date(item.completedAt).toISOString()}">${esc(time)}</time></div><p>${esc(item.result)}</p></article>`;
+    }).join("") : `<div class="assessment-center-empty"><span aria-hidden="true">◷</span><strong>${filter === "all" ? "还没有测评记录" : "这项测评还没有记录"}</strong></div>`;
   }
   function restore() {
     recordBasic(window.getAssessmentHubSnapshot?.());
@@ -160,6 +204,24 @@
       const select = document.getElementById("assessmentHistoryFilter");
       select.insertAdjacentHTML("beforeend", TESTS.map(test => `<option value="${test.id}">${test.name}</option>`).join(""));
       select.addEventListener("change", () => { filter = select.value; render(); });
+      document.getElementById("assessmentCategoryTabs")?.addEventListener("click", event => {
+        const tab = event.target.closest("[data-cat]");
+        if (!tab) return;
+        categoryFilter = tab.dataset.cat || "all";
+        document.querySelectorAll("#assessmentCategoryTabs .assessment-cat-tab").forEach(btn => {
+          const active = btn === tab;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-selected", String(active));
+        });
+        render();
+      });
+      document.getElementById("assessmentHistoryList")?.addEventListener("click", event => {
+        const row = event.target.closest("[data-history-test]");
+        if (!row) return;
+        const test = row.dataset.historyTest;
+        if (test === "mbti" || test === "holland") window.openAssessmentModal(test);
+        else window.openDeepTestResultPage(test);
+      });
     }
     restore();
     window.userWorkspaceState?.authReadyPromise?.then(restore);

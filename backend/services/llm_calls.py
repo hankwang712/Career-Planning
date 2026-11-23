@@ -94,9 +94,24 @@ def safe_create_chat_completion(
         kwargs["response_format"] = {"type": "json_object"}
 
     last_exc = None
+    t_start = time.perf_counter()
     for attempt in range(max_retries + 1):
         try:
-            return client.chat.completions.create(**kwargs)
+            resp = client.chat.completions.create(**kwargs)
+            usage = getattr(resp, "usage", None)
+            try:
+                from . import llm_audit
+                llm_audit.record_usage(
+                    model,
+                    prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
+                    completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+                    total_tokens=getattr(usage, "total_tokens", 0) if usage else 0,
+                    latency_ms=(time.perf_counter() - t_start) * 1000.0,
+                    ok=True,
+                )
+            except Exception:
+                pass
+            return resp
         except Exception as exc:
             last_exc = exc
             msg = str(exc).lower()
@@ -105,13 +120,35 @@ def safe_create_chat_completion(
             if force_json and ("response_format" in msg or "json_object" in msg):
                 kwargs.pop("response_format", None)
                 try:
-                    return client.chat.completions.create(**kwargs)
+                    resp = client.chat.completions.create(**kwargs)
+                    usage = getattr(resp, "usage", None)
+                    try:
+                        from . import llm_audit
+                        llm_audit.record_usage(
+                            model,
+                            prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
+                            completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+                            total_tokens=getattr(usage, "total_tokens", 0) if usage else 0,
+                            latency_ms=(time.perf_counter() - t_start) * 1000.0,
+                            ok=True,
+                        )
+                    except Exception:
+                        pass
+                    return resp
                 except Exception as exc2:
                     last_exc = exc2
                     msg = str(exc2).lower()
 
             # 非瞬态错误（如鉴权、模型不存在）直接抛出，不重试
             if not is_transient_error(last_exc):
+                try:
+                    from . import llm_audit
+                    llm_audit.record_usage(
+                        model, latency_ms=(time.perf_counter() - t_start) * 1000.0,
+                        ok=False, error_type=type(last_exc).__name__,
+                    )
+                except Exception:
+                    pass
                 raise
 
             # 最后一次也失败了
@@ -121,6 +158,14 @@ def safe_create_chat_completion(
             delay = base_delay * (2 ** attempt) + random.uniform(0.1, 0.8)
             time.sleep(delay)
 
+    try:
+        from . import llm_audit
+        llm_audit.record_usage(
+            model, latency_ms=(time.perf_counter() - t_start) * 1000.0,
+            ok=False, error_type=type(last_exc).__name__ if last_exc else "Unknown",
+        )
+    except Exception:
+        pass
     raise last_exc
 
 

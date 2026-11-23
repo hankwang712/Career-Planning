@@ -461,6 +461,16 @@
   }
   function renderRailNotice(missing, hasJobs) {
     const root = byId("rpRailNotice");
+    const readyPill = byId("rpRailReadyPill");
+    if (readyPill) {
+      if (!missing.length && hasJobs) {
+        readyPill.replaceChildren(icon("check-circle"), node("span", "全部阶段就绪"));
+        readyPill.hidden = false;
+      } else {
+        readyPill.replaceChildren();
+        readyPill.hidden = true;
+      }
+    }
     const bar = node("div", "", "rp-railnotice-bar");
     if (missing.length) {
       bar.dataset.tone = "warning";
@@ -473,9 +483,6 @@
         links.append(link);
       }
       bar.append(links);
-    } else if (hasJobs) {
-      bar.dataset.tone = "success";
-      bar.append(icon("check-circle"), node("span", "全部阶段就绪，可以启动本轮流水线。"));
     }
     root.replaceChildren(...(bar.childNodes.length ? [bar] : []));
   }
@@ -909,14 +916,27 @@
   }
   function materialButtons(job) {
     const wrap = node("div", "", "rp-job-materials");
-    const resume = node("button", "简历预览", "rp-material-btn");
+    const openRoom = () => {
+      if (typeof window.RP?.openCombatRoom === "function") window.RP.openCombatRoom(job);
+      else openDrawer("rewriting", { job });
+    };
+
+    const resume = node("button", "简历", "rp-mat-pill");
     resume.type = "button";
-    resume.prepend(icon("file-text"));
-    resume.addEventListener("click", () => openMaterials(job, "resume"));
-    const greeting = node("button", "欢迎语核验", "rp-material-btn");
+    resume.dataset.kind = "resume";
+    resume.dataset.ready = job.hasRewrite ? "1" : "0";
+    resume.title = job.hasRewrite ? "定制简历已就绪，点击进入作战室查看" : "尚未改写简历，点击进入作战室处理";
+    resume.prepend(icon(job.hasRewrite ? "check" : "file-text"));
+    resume.addEventListener("click", openRoom);
+
+    const greeting = node("button", "招呼", "rp-mat-pill");
     greeting.type = "button";
-    greeting.prepend(icon("message"));
-    greeting.addEventListener("click", () => openMaterials(job, "greeting"));
+    greeting.dataset.kind = "greeting";
+    greeting.dataset.ready = job.hasGreeting ? "1" : "0";
+    greeting.title = job.hasGreeting ? "打招呼语已就绪，点击进入作战室查看" : "尚未生成打招呼语，点击进入作战室处理";
+    greeting.prepend(icon(job.hasGreeting ? "check" : "message"));
+    greeting.addEventListener("click", openRoom);
+
     wrap.append(resume, greeting);
     return wrap;
   }
@@ -938,19 +958,17 @@
   }
   function jobActions(job) {
     const actions = node("div", "", "rp-job-actions");
-    // 已保存视图按当前阶段提供操作，保存开关始终在首位。
     const tab = job.tab === "saved" ? stageTabOf(job) : job.tab;
-    actions.append(saveButton(job), actionButton("定制", "rp-btn-ghost", () => openDrawer("rewriting", { job }), "sliders"));
     if (tab === "approval") {
       actions.append(
-        actionButton("拒绝", "rp-btn-danger", () => decide(job, "reject"), "x"),
+        actionButton("放行", "rp-btn-success", () => decide(job, "approve"), "check"),
         actionButton("重评", "rp-btn-ghost", () => decide(job, "reeval"), "rotate"),
-        actionButton("放行", "rp-btn-success", () => decide(job, "approve"), "check")
+        actionButton("淘汰", "rp-btn-danger", () => decide(job, "reject"), "x")
       );
     } else if (tab === "queued") {
       actions.append(
-        actionButton("终止", "rp-btn-ghost", () => abandonDelivery(job), "stop"),
-        actionButton("投递", "rp-btn-accent", () => deliverJobs([job]), "send")
+        actionButton("投递", "rp-btn-accent", () => deliverJobs([job]), "send"),
+        actionButton("终止", "rp-btn-ghost", () => abandonDelivery(job), "stop")
       );
     } else if (tab === "delivered") {
       actions.append(actionButton("详情", "rp-btn-ghost", () => openDrawer("delivering", { job }), "eye"));
@@ -958,14 +976,20 @@
       actions.append(actionButton("重评", "rp-btn-accent", () => runScreenBatch(), "rotate"));
     } else if (tab === "failed") {
       actions.append(
-        actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash"),
-        actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate")
+        actionButton("重试", "rp-btn-accent", () => retryJob(job), "rotate"),
+        actionButton("放弃", "rp-btn-danger", () => abandonJob(job), "trash")
       );
     } else if ((tab === "rejected" || tab === "review") && /^https?:/.test(job.url || "")) {
       actions.append(actionButton("放行", "rp-btn-success", () => releaseJob(job), "check"));
-    } else if (tab === "in_progress" && job.hasGreeting) {
-      actions.append(actionButton("补发招呼", "rp-btn-ghost", () => regreet(), "message"));
+    } else if (tab === "in_progress" && job.hasRewrite && job.hasGreeting) {
+      actions.append(
+        actionButton("作战室", "rp-btn-ghost", () => window.RP?.openCombatRoom ? window.RP.openCombatRoom(job) : openDrawer("rewriting", { job }), "sliders"),
+        actionButton("去审批", "rp-btn-success", () => openDrawer("review", { job }), "shield")
+      );
+    } else if (tab === "in_progress") {
+      actions.append(actionButton("作战室", "rp-btn-ghost", () => window.RP?.openCombatRoom ? window.RP.openCombatRoom(job) : openDrawer("rewriting", { job }), "sliders"));
     }
+    actions.append(saveButton(job));
     return actions;
   }
   const SHORT_SOURCE_LABELS = {
@@ -1004,6 +1028,104 @@
       (score != null ? `<span class="rp-ring-score">${score}</span>` : "");
     return wrap;
   }
+  /* ---------- 看板多选 + 底部悬浮批量操作栏 + 5秒淘汰撤销 ---------- */
+  const boardSelected = new Map();
+  let undoTimer = 0;
+  function showUndoEliminateToast(snapshots) {
+    if (!snapshots.length) return;
+    let bar = document.getElementById("rpUndoToast");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "rpUndoToast";
+      bar.className = "rp-undo-toast";
+      document.body.append(bar);
+    }
+    const label = node("span", `已淘汰 ${snapshots.length} 个岗位`);
+    const undoBtn = node("button", "撤销", "rp-undo-btn");
+    undoBtn.type = "button";
+    undoBtn.addEventListener("click", async () => {
+      clearTimeout(undoTimer);
+      undoBtn.disabled = true;
+      try {
+        await pipelineApi("/restore", { items: snapshots });
+        toast(`已撤销，恢复 ${snapshots.length} 个岗位。`, "success");
+        bar.remove();
+        void refresh({ silent: true });
+      } catch (err) {
+        toast(err.message || "撤销失败", "error");
+        undoBtn.disabled = false;
+      }
+    });
+    bar.replaceChildren(label, undoBtn);
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => { bar.remove(); }, 5500);
+  }
+
+  function renderBatchBar() {
+    let bar = document.getElementById("rpBatchBar");
+    if (!boardSelected.size) {
+      if (bar) bar.hidden = true;
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "rpBatchBar";
+      bar.className = "rp-batch-bar";
+      document.body.append(bar);
+    }
+    bar.hidden = false;
+    const picked = [...boardSelected.values()];
+    const ids = picked.map(j => ({ source: j.source, url_key: j.url_key }));
+    const count = node("strong", `已选 ${picked.length} 岗`, "rp-batch-count");
+
+    const runSse = async (stage, label) => {
+      if (!window.CareerTaskBar) { toast("后台任务组件尚未加载。", "warning"); return; }
+      try {
+        await window.CareerTaskBar.startTask({ stage, ids });
+        toast(`已启动「${label}」（${ids.length} 岗），底部任务条实时跟踪进度。`, "success");
+        boardSelected.clear();
+        renderBatchBar();
+        renderJobs();
+      } catch (err) { toast(err.message, "error"); }
+    };
+
+    const btnEval = actionButton("批量评估", "rp-btn-ghost", () => runSse("evaluate", "批量评估"), "sparkles");
+    const btnRw = actionButton("批量改写", "rp-btn-accent", () => runSse("rewrite", "批量简历微调"), "pen");
+    const btnGr = actionButton("批量招呼", "rp-btn-ghost", () => runSse("greet", "批量打招呼语"), "message");
+    const btnApprove = actionButton("批量放行", "rp-btn-success", async () => {
+      let ok = 0;
+      for (const j of picked) {
+        try {
+          await pipelineApi("/approve", { source: j.source, url_key: j.url_key, decision: "approve" });
+          ok += 1;
+        } catch { /* skip unready */ }
+      }
+      boardSelected.clear();
+      renderBatchBar();
+      toast(ok ? `已放行 ${ok} 个岗位进入待投递。` : "所选岗位暂未满足放行条件。", ok ? "success" : "warning");
+      void refresh({ silent: true });
+    }, "check");
+    const btnReject = actionButton("批量淘汰", "rp-btn-danger", async () => {
+      const snaps = [];
+      for (const j of picked) {
+        try {
+          await pipelineApi("/approve", { source: j.source, url_key: j.url_key, decision: "reject" });
+          snaps.push({ source: j.source, url_key: j.url_key, stage: j.stage, follow_status: j.followStatus });
+        } catch { /* skip terminal */ }
+      }
+      boardSelected.clear();
+      renderBatchBar();
+      if (snaps.length) showUndoEliminateToast(snaps);
+      void refresh({ silent: true });
+    }, "x");
+    const btnClear = actionButton("取消", "rp-btn-ghost", () => {
+      boardSelected.clear();
+      renderBatchBar();
+      renderJobs();
+    });
+    bar.replaceChildren(count, btnEval, btnRw, btnGr, btnApprove, btnReject, btnClear);
+  }
+
   function normalJobCard(job) {
     const card = node("article", "", "rp-job rp-job-row");
     const main = node("div", "", "rp-job-top rp-job-grid");
@@ -1011,10 +1133,23 @@
     /* 1. 岗位信息 */
     const info = node("div", "", "rp-job-info");
     const titleLine = node("div", "", "rp-job-title-line");
+    const pick = node("input", "", "rp-row-check");
+    pick.type = "checkbox";
+    const key = jobId(job);
+    pick.checked = boardSelected.has(key);
+    pick.setAttribute("aria-label", "选择 " + job.title);
+    pick.addEventListener("change", () => {
+      if (pick.checked) boardSelected.set(key, job);
+      else boardSelected.delete(key);
+      renderBatchBar();
+    });
     const title = node("button", job.title, "rp-job-title");
     title.type = "button";
-    title.addEventListener("click", () => openDrawer("rewriting", { job }));
-    titleLine.append(title);
+    title.addEventListener("click", () => {
+      if (typeof window.RP?.openCombatRoom === "function") window.RP.openCombatRoom(job);
+      else openDrawer("rewriting", { job });
+    });
+    titleLine.append(pick, title);
     if (job.salary) titleLine.append(node("span", job.salary, "rp-job-salary-inline"));
     const subLine = node("div", "", "rp-job-sub");
     const subParts = [job.company || "未知公司", job.experience, job.education].filter(Boolean);
@@ -1080,8 +1215,9 @@
 
     /* 7. 操作 */
     const foot = node("div", "", "rp-job-foot rp-col-actions");
-    const hasMaterials = job.hasRewrite || job.hasGreeting;
-    if (hasMaterials) foot.append(materialButtons(job));
+    const showMaterials = job.hasRewrite || job.hasGreeting ||
+      ["screened", "deep", "rewritten", "greeted", "approval", "queued", "delivered"].includes(job.stage);
+    if (showMaterials) foot.append(materialButtons(job));
     foot.append(jobActions(job));
 
     main.append(info, platformCol, cityCol, matchCol, statusCol, timeCol, foot);
@@ -1247,7 +1383,20 @@
     let tableHead = root.querySelector(":scope > .rp-table-head");
     if (!tableHead) {
       tableHead = node("div", "", "rp-table-head rp-job-grid");
-      for (const heading of ["岗位信息", "平台", "城市", "匹配度", "当前状态", "更新时间", "操作"]) {
+      const firstHead = node("span", "", "rp-head-check-wrap");
+      const allCheck = node("input", "", "rp-row-check");
+      allCheck.type = "checkbox";
+      allCheck.setAttribute("aria-label", "全选当前页岗位");
+      allCheck.addEventListener("change", () => {
+        const current = filteredJobs();
+        if (allCheck.checked) current.forEach(j => boardSelected.set(jobId(j), j));
+        else current.forEach(j => boardSelected.delete(jobId(j)));
+        renderBatchBar();
+        root.querySelectorAll(".rp-job-row .rp-row-check").forEach(cb => { cb.checked = allCheck.checked; });
+      });
+      firstHead.append(allCheck, document.createTextNode("岗位信息"));
+      tableHead.append(firstHead);
+      for (const heading of ["平台", "城市", "匹配度", "当前状态", "更新时间", "操作"]) {
         tableHead.append(node("span", heading));
       }
       root.prepend(tableHead);

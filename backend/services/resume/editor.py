@@ -20,6 +20,7 @@ from services import db, llm_env
 from services.user_state import _current_user, _load_user_state, _login_required, _owned_resume_storage_path
 from . import pipeline, rewrite
 from .editor_document import CONTACT, MAX_SECTIONS, MAX_TEXT, SECTIONS, choose_layout, clean_document, parse_resume, render_resume
+from .editor_docx import render_docx, render_html_to_docx
 from .editor_pdf import read_layout, read_page_target
 from .matcher import _extract_docx_text
 
@@ -97,17 +98,66 @@ def rewrite_skill_import():
     return rewrite_state(conn, owner)
 
 
+@blueprint.delete("/api/resume-editor/rewrite/skills/<skill_id>")
+@_login_required
+def rewrite_skill_delete(skill_id):
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    try:
+        with conn:
+            rewrite.delete_skill(conn, owner, skill_id)
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    return rewrite_state(conn, owner)
+
+
+@blueprint.post("/api/resume-editor/polish-entry")
+@_login_required
+def polish_entry():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(message="请求参数无效。"), 400
+    section = str(payload.get("section") or "").strip()[:60]
+    name = str(payload.get("name") or "").strip()[:120]
+    role = str(payload.get("role") or "").strip()[:120]
+    content = payload.get("content")
+    action = str(payload.get("action") or "star").strip()
+    if not isinstance(content, str) or not content.strip() or len(content) > 12000 or "\x00" in content:
+        return jsonify(message="请先填写该段经历的内容。"), 400
+    if not rewrite.SLOTS.acquire(blocking=False):
+        return jsonify(message="当前润色任务较多，请稍后重试。"), 429
+    try:
+        polished = rewrite.polish_entry(section, name, role, content, action=action)
+    except rewrite.RewriteInputError as error:
+        return jsonify(message=str(error)), 400
+    except Exception as error:
+        logger.warning("Resume entry polish failed", exc_info=True)
+        return jsonify(message=str(error) if isinstance(error, RuntimeError) else "局部润色失败，请检查模型配置后重试。"), 502
+    finally:
+        rewrite.SLOTS.release()
+    return jsonify(content=polished)
+
+
 @blueprint.post("/api/resume-editor/rewrite")
 @_login_required
 def rewrite_resume():
     payload = request.get_json(silent=True)
-    job = payload.get("job") if isinstance(payload, dict) else None
-    if not isinstance(job, dict) or not all(isinstance(job.get(key), str) and "\x00" not in job[key]
-                                          for key in ("title", "description")):
-        return jsonify(message="请填写目标岗位和岗位描述。"), 400
-    job_title, description = job["title"].strip(), job["description"].strip()
-    if not job_title or len(job_title) > 120 or not description or len(description) > 12000:
-        return jsonify(message="请填写目标岗位和岗位描述（最多 12,000 字符）。"), 400
+    if not isinstance(payload, dict):
+        return jsonify(message="请求参数无效。"), 400
+    mode = payload.get("mode") if payload.get("mode") in {"job", "skill"} else "job"
+    job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+    job_title = job.get("title", "") if isinstance(job.get("title"), str) else ""
+    description = job.get("description", "") if isinstance(job.get("description"), str) else ""
+    instruction = payload.get("instruction", "") if isinstance(payload.get("instruction"), str) else ""
+    if any("\x00" in text for text in (job_title, description, instruction)):
+        return jsonify(message="输入包含无效字符。"), 400
+    job_title, description, instruction = job_title.strip(), description.strip(), instruction.strip()
+    if mode == "job":
+        if not job_title or len(job_title) > 120 or not description or len(description) > 12000:
+            return jsonify(message="请填写目标岗位和岗位描述（最多 12,000 字符）。"), 400
+    else:
+        if len(job_title) > 120 or len(description) > 12000 or len(instruction) > 2000:
+            return jsonify(message="补充要求或岗位信息超出长度上限。"), 400
     owner = _current_user()["username"]
     conn = db._get_conn()
     settings = rewrite.options(conn, owner)
@@ -117,17 +167,23 @@ def rewrite_resume():
         return jsonify(message=str(error)), 400
     if not skill:
         return jsonify(message="请先选择有效的改写 Skill。"), 400
+    skill_meta = next((item for item in rewrite.skills(conn, owner) if item["id"] == settings["skill"]), None)
+    skill_name = skill_meta["name"] if skill_meta else ""
+    is_default = settings["skill"] == rewrite.DEFAULT_ID
     if not rewrite.SLOTS.acquire(blocking=False):
         return jsonify(message="当前改写任务较多，请稍后重试。"), 429
     try:
         document = clean_document(payload.get("document"))
         try:
-            result, changes = rewrite.generate(document, {"title": job_title, "description": description},
-                                               skill, full=settings["skill"] == rewrite.DEFAULT_ID)
+            job_payload = {"title": job_title, "description": description} if (job_title or description) else None
+            result, changes = rewrite.generate(
+                document, job_payload, skill,
+                full=True, strict_terms=is_default, skill_name=skill_name, instruction=instruction,
+            )
         except rewrite.RewriteInputError:
             raise
         except Exception:
-            logger.warning("Resume rewrite could not complete")
+            logger.warning("Resume rewrite could not complete", exc_info=True)
             return jsonify(message="模型调用或结果校验失败，请检查配置后重试。"), 502
     except ValueError as error:
         return jsonify(message=str(error)), 400
@@ -136,6 +192,67 @@ def rewrite_resume():
     response = jsonify(document=result, changes=changes)
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@blueprint.post("/api/resume-editor/render/skill-html")
+@_login_required
+def render_skill_html():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(message="请求参数无效。"), 400
+    instruction = payload.get("instruction", "") if isinstance(payload.get("instruction"), str) else ""
+    if "\x00" in instruction or len(instruction) > 2000:
+        return jsonify(message="补充要求无效或超出长度上限。"), 400
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    settings = rewrite.options(conn, owner)
+    skill_id = payload.get("skill") if isinstance(payload.get("skill"), str) and payload.get("skill") else settings["skill"]
+    try:
+        skill = rewrite.instructions(conn, owner, skill_id)
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    if not skill:
+        return jsonify(message="请先选择有效的 Skill。"), 400
+    if not rewrite.SLOTS.acquire(blocking=False):
+        return jsonify(message="当前生成任务较多，请稍后重试。"), 429
+    try:
+        document = clean_document(payload.get("document"))
+        try:
+            html = rewrite.generate_html(document, skill, instruction=instruction.strip())
+        except rewrite.RewriteInputError:
+            raise
+        except Exception:
+            logger.warning("Skill HTML resume generation failed", exc_info=True)
+            return jsonify(message="网页版简历生成失败，请检查模型配置后重试。"), 502
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    finally:
+        rewrite.SLOTS.release()
+    response = jsonify(html=html, title=document["title"])
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@blueprint.post("/api/resume-editor/render/skill-docx")
+@_login_required
+def render_skill_docx():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("html"), str) or not payload["html"].strip():
+        return jsonify(message="请先生成网页版简历后再导出 Word。"), 400
+    html = payload["html"]
+    if len(html) > 512_000 or "\x00" in html:
+        return jsonify(message="简历 HTML 内容超出限制。"), 400
+    try:
+        data = render_html_to_docx(rewrite.sanitize_resume_html(html))
+    except Exception:
+        logger.warning("Skill HTML to DOCX export failed", exc_info=True)
+        return jsonify(message="Word 转换失败，请稍后重试。"), 400
+    return send_file(
+        io.BytesIO(data),
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=True,
+        download_name="resume-skill.docx",
+    )
 
 
 @blueprint.route("/api/resume-editor/drafts", methods=["GET", "POST"])
@@ -197,6 +314,32 @@ def draft(identifier):
     if not result.rowcount:
         return jsonify(message="这份简历在其他页面修改过。请复制当前内容或重新打开后再保存。"), 409
     return jsonify(id=identifier, revision=revision + 1, document=document)
+
+
+@blueprint.post("/api/resume-editor/drafts/<identifier>/set-default")
+@_login_required
+def set_default_draft(identifier):
+    owner = _current_user()["username"]
+    conn = db._get_conn()
+    record = conn.execute("SELECT title FROM resume_drafts WHERE owner=? AND id=?", (owner, identifier)).fetchone()
+    if not record:
+        return jsonify(message="找不到这份简历。"), 404
+    now = time.time()
+    with conn:
+        conn.execute("UPDATE resume_drafts SET updated_at=? WHERE owner=? AND id=?", (now, owner, identifier))
+        try:
+            row = conn.execute("SELECT settings FROM recruitment_pipeline_config WHERE owner=?", (owner,)).fetchone()
+            if row and row["settings"]:
+                cfg = json.loads(row["settings"])
+                if isinstance(cfg, dict):
+                    cfg["baseline_resume_id"] = identifier
+                    conn.execute(
+                        "UPDATE recruitment_pipeline_config SET settings=?, updated_at=? WHERE owner=?",
+                        (json.dumps(cfg, ensure_ascii=False), now, owner),
+                    )
+        except Exception:
+            pass
+    return jsonify(id=identifier, title=record["title"], ok=True)
 
 
 def extract_source(path):
@@ -317,13 +460,21 @@ def import_source():
 @blueprint.post("/api/resume-editor/render/<mode>")
 @_login_required
 def render(mode):
-    if mode not in {"auto", "preview", "pdf", "image"}:
+    if mode not in {"auto", "preview", "pdf", "image", "docx"}:
         return jsonify(message="不支持的导出类型。"), 404
     try:
         document = clean_document(request.get_json(silent=True))
         if not (any(document["contact"].values()) or any(item["value"] for item in document.get("extras", []))
                 or any(part["content"] for part in document["sections"])):
             raise ValueError("请先填写或导入简历内容。")
+        if mode == "docx":
+            data = render_docx(document)
+            return send_file(
+                io.BytesIO(data),
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                as_attachment=True,
+                download_name="resume.docx",
+            )
         if mode == "auto":
             layout, pdf, count = choose_layout(document)
         else:
@@ -346,4 +497,53 @@ def render(mode):
             result.seek(0)
             return send_file(result, mimetype="application/zip", as_attachment=True, download_name="resume-images.zip")
         images = [base64.b64encode(page.get_pixmap(dpi=100).tobytes("png")).decode("ascii") for page in pages]
-    return jsonify(layout=layout, page_count=count, images=images)
+        first_blocks = [b for b in pages[0].get_text("blocks") if str(b[4]).strip()]
+        max_y = max((b[3] for b in first_blocks), default=0.0)
+        usable_h = max(1.0, pages[0].rect.height - 46.0)
+        fill_percent = min(100, max(0, int(round((max_y - 20.0) / usable_h * 100)))) if max_y else 0
+        overflow_lines = 0
+        if count > 1:
+            for extra_page in list(pages)[1:]:
+                overflow_lines += sum(1 for ln in extra_page.get_text("text").splitlines() if ln.strip())
+    return jsonify(layout=layout, font_scale=document.get("font_scale", 1.0), page_count=count,
+                   fill_percent=fill_percent, overflow_lines=overflow_lines, images=images)
+
+
+@blueprint.post("/api/resume-editor/grill")
+@_login_required
+def grill_resume_entry():
+    from . import insights
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(message="请求参数无效。"), 400
+    try:
+        result = insights.grill_entry(
+            section=str(payload.get("section") or "项目经历")[:60],
+            name=str(payload.get("name") or "")[:120],
+            role=str(payload.get("role") or "")[:120],
+            content=str(payload.get("content") or "")[:6000],
+            history=payload.get("history") or [],
+            synthesize=bool(payload.get("synthesize")),
+        )
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
+    return jsonify(result)
+
+
+@blueprint.post("/api/resume-editor/jd-report")
+@_login_required
+def resume_jd_report():
+    from . import insights
+    payload = request.get_json(silent=True) or {}
+    resume_text = ""
+    if isinstance(payload.get("document"), dict):
+        try:
+            doc = clean_document(payload["document"])
+            resume_text = "\n".join(
+                [doc["contact"].get("target", "")] + [s.get("content", "") for s in doc.get("sections", [])]
+            )
+        except ValueError:
+            pass
+    owner = _current_user()["username"]
+    report = insights.jd_heatmap_report(db._get_conn(), owner, resume_text)
+    return jsonify(report)

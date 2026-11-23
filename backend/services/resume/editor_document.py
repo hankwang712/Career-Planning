@@ -3,6 +3,7 @@ import base64
 import binascii
 import os
 import re
+import tempfile
 from functools import lru_cache
 from html import escape
 from io import BytesIO
@@ -82,6 +83,10 @@ def clean_document(payload):
         if not isinstance(payload["style"], str) or payload["style"] not in STYLES:
             raise ValueError("请选择有效的简历版式。")
         result["style"] = payload["style"]
+    if payload.get("show_photo") is False:
+        result["show_photo"] = False
+    if isinstance(payload.get("font_scale"), (int, float)) and 0.85 <= float(payload["font_scale"]) <= 1.18:
+        result["font_scale"] = round(float(payload["font_scale"]), 2)
     if extras:
         result["extras"] = [{"label": field(item.get("label", ""), 30), "value": field(item.get("value", ""), 180)}
                             for item in extras]
@@ -190,6 +195,17 @@ def text_markup(text):
     return "".join(parts)
 
 
+GITHUB_ICON_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">'
+    b'<path fill="#004a91" fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 '
+    b'0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 '
+    b'1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 '
+    b'0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 '
+    b'1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>'
+    b'</svg>'
+)
+
+
 def inline_markup(text):
     parts = []
     offset = 0
@@ -200,10 +216,13 @@ def inline_markup(text):
             try:
                 target = urlsplit(url)
                 allowed = target.hostname and not target.username and not target.password
+                is_github = bool(target.hostname and target.hostname.lower().endswith("github.com"))
             except ValueError:
                 allowed = False
+                is_github = False
             if allowed:
-                parts.append(f'<a href="{escape(url, quote=True)}">{text_markup(label)}</a>')
+                gh = '<img src="gh-icon.svg" style="width:8.8pt;height:8.8pt;vertical-align:-1.2pt">&#8201;' if is_github else ""
+                parts.append(f'<a href="{escape(url, quote=True)}" style="color:#004a91;text-decoration:none">{gh}{text_markup(label)}</a>')
             else:
                 parts.append(text_markup(match.group()))
         else:
@@ -232,7 +251,7 @@ def section_lines(section):
         columns = [cell.strip() for cell in re.split(r"[|｜]", line)]
         if section["title"] == "获奖情况" and len(columns) == 2 and all(col.startswith("- ") for col in columns):
             yield '<table class="awards"><tr>' + "".join(
-                f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt">•　{inline_markup(col[2:])}</td>'
+                f'<td style="width:{ENTRY_WIDTH * ratio:.1f}pt"><span class="dot">•</span> {inline_markup(col[2:])}</td>'
                 for ratio, col in zip((.52, .48), columns)
             ) + '</tr></table>'
         elif (project or work or education) and len(columns) == 3 and all(columns) and not re.match(r"^[-*•]|^\d+\.", line):
@@ -245,24 +264,71 @@ def section_lines(section):
         elif re.match(r"^#{1,6}\s+", line):
             yield separator + f'<h3>{inline_markup(line.lstrip("#").strip())}</h3>'
         elif re.match(r"^[-*•]\s+", line):
-            yield separator + f'<p class="bullet">•　{inline_markup(line[1:].lstrip())}</p>'
+            yield separator + f'<p class="bullet"><span class="dot">•</span> {inline_markup(line[1:].lstrip())}</p>'
         else:
             yield separator + f'<p>{inline_markup(line)}</p>'
+
+
+def _prepare_noto_serif_static(vf_path):
+    """Instantiate static Regular (400) & Bold (700) TTFs from NotoSerifSC-VF.ttf and strip CJK compat CMap aliases."""
+    if not vf_path.is_file():
+        return None
+    cache_dir = Path(tempfile.gettempdir()) / "career-agent-fonts"
+    reg_out = cache_dir / "NotoSerifSC-Regular-v1.ttf"
+    bold_out = cache_dir / "NotoSerifSC-Bold-v1.ttf"
+    if reg_out.is_file() and bold_out.is_file():
+        return cache_dir, reg_out.name, bold_out.name
+    try:
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib.instancer import instantiateVariableFont
+    except ImportError:
+        return None
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for weight, target in ((400, reg_out), (700, bold_out)):
+            if target.is_file():
+                continue
+            font = TTFont(str(vf_path))
+            inst = instantiateVariableFont(font, {"wght": weight}, inplace=True)
+            for table in inst["cmap"].tables:
+                if table.isUnicode():
+                    for cp in [c for c in table.cmap if 0xF900 <= c <= 0xFAFF]:
+                        del table.cmap[cp]
+            tmp = target.with_suffix(".tmp")
+            inst.save(str(tmp))
+            tmp.replace(target)
+        return cache_dir, reg_out.name, bold_out.name
+    except Exception:
+        return None
 
 
 @lru_cache(maxsize=1)
 def resume_fonts():
     archive = fitz.Archive()
+    archive.add(GITHUB_ICON_SVG, "gh-icon.svg")
     faces = []
     families = {}
     windows = Path(os.getenv("WINDIR", "C:/Windows")) / "Fonts"
+    serif_candidates = []
+    if prepared := _prepare_noto_serif_static(windows / "NotoSerifSC-VF.ttf"):
+        serif_candidates.append(prepared)
+    serif_candidates.extend([
+        (Path("/usr/share/fonts/opentype/noto"), "NotoSerifCJK-Regular.ttc", "NotoSerifCJK-Bold.ttc"),
+        (windows, "STSONG.TTF", "STSONG.TTF"),
+        (windows, "simsun.ttc", "simsunb.ttf"),
+        (windows, "Deng.ttf", "Dengb.ttf"),
+    ])
     fonts = {
-        "LatinResume": [(windows, "arial.ttf", "arialbd.ttf"),
-                        (Path("/usr/share/fonts/truetype/liberation2"), "LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf"),
-                        (Path("/usr/share/fonts/truetype/liberation"), "LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf")],
-        "ChineseResume": [(windows, "msyh.ttc", "msyhbd.ttc"),
-                          (Path("/usr/share/fonts/opentype/noto"), "NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc")],
+        "ChineseResume": serif_candidates,
+        "ChineseHeading": [(windows, "msyh.ttc", "msyhbd.ttc"),
+                           (Path("/usr/share/fonts/opentype/noto"), "NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc"),
+                           (windows, "Deng.ttf", "Dengb.ttf")],
+        "LatinResume": [(windows, "times.ttf", "timesbd.ttf"),
+                        (Path("/usr/share/fonts/truetype/liberation2"), "LiberationSerif-Regular.ttf", "LiberationSerif-Bold.ttf"),
+                        (Path("/usr/share/fonts/truetype/liberation"), "LiberationSerif-Regular.ttf", "LiberationSerif-Bold.ttf"),
+                        (windows, "calibri.ttf", "calibrib.ttf")],
     }
+    added_files = set()
     for family, candidates in fonts.items():
         families[family] = "sans-serif"
         for directory, regular, bold in candidates:
@@ -272,27 +338,32 @@ def resume_fonts():
                 path = directory / filename
                 if not path.is_file():
                     continue
-                archive.add(path.read_bytes(), filename)
+                if filename not in added_files:
+                    archive.add(path.read_bytes(), filename)
+                    added_files.add(filename)
                 faces.append(f"@font-face {{font-family:{family};font-weight:{weight};src:url({filename});}}")
             families[family] = family
             break
     return archive, "".join(faces), families
 
 
-def document_html(document, compact):
+def document_html(document, compact, scale=1.0):
     _, faces, families = resume_fonts()
-    accent = {"classic": "#20252b", "blue": "#254f77", "compact": "#283b60"}[document.get("style", "classic")]
+    s = max(0.86, min(1.16, float(scale or 1.0)))
+    accent = {"classic": "#1e2126", "blue": "#004a91", "compact": "#1e3a5f"}[document.get("style", "classic")]
+    rule_color = "#97a1ac" if document.get("style", "classic") == "classic" else accent
     body = []
     contact = document["contact"]
     schedule = next((item["value"] for item in document.get("extras", []) if item["label"] == "实习安排"), "")
     schedule_html = f'<p class="schedule">{text_markup(schedule)}</p>' if schedule else ""
-    if contact["target"] or document.get("photo"):
+    show_photo = document.get("show_photo", True) is not False
+    if contact["target"] or (document.get("photo") and show_photo):
         target_html = (f'<p class="target-label"><span class="cjk">求职意向</span></p><p class="target">{text_markup(contact["target"])}</p>{schedule_html}'
                        if contact["target"] else "")
-        reserve = ' style="height:54pt"' if document.get("photo") else ""
-        body.append(f'<table class="masthead"><tr><td style="width:30%">{target_html}</td>'
-                    f'<td style="width:40%"><h1>{text_markup(contact["name"] or document["title"])}</h1></td>'
-                    f'<td{reserve}></td></tr></table>')
+        reserve = ' style="height:54pt"' if (document.get("photo") and show_photo) else ""
+        body.append(f'<table class="masthead"><tr><td style="width:46%">{target_html}</td>'
+                    f'<td style="width:30%"><h1>{text_markup(contact["name"] or document["title"])}</h1></td>'
+                    f'<td style="width:24%"{reserve}></td></tr></table>')
     else:
         body.append(f'<h1>{text_markup(contact["name"] or document["title"])}</h1>')
     def metadata_item(item):
@@ -322,40 +393,48 @@ def document_html(document, compact):
         body.append(f'<div class="{klass}"><h2>{heading}</h2>')
         body.extend(section_lines(section))
         body.append("</div>")
+    body_pt = (9.0 if compact else 9.4) * s
+    proj_pt = (8.95 if compact else 9.35) * s
+    lh = (1.36 if compact else 1.42) * (1.0 + (s - 1.0) * 0.35)
     return f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><style>
     {faces}
-    body {{font-family: {families["LatinResume"]}; color: #1e2126; font-size: {9.8 if compact else 10.15}pt;
-           line-height: {1.34 if compact else 1.40}; margin: 0; overflow-wrap: break-word;}}
+    body {{font-family: {families["LatinResume"]}; color: #1e2126; font-size: {body_pt:.2f}pt;
+           line-height: {lh:.3f}; margin: 0; overflow-wrap: break-word;}}
     .cjk {{font-family: {families["ChineseResume"]};}}
     .literal-hyphen {{font-family: sans-serif;}}
-    h1 {{font-size: 23pt; margin: 0 0 5pt; color: {accent}; text-align: center;}}
-    h2 {{font-size: 11.6pt; color: {accent}; border-bottom: 0.6pt solid #a6acb3;
-         padding-bottom: 2pt; margin: {6 if compact else 9}pt 0 4pt; page-break-after: avoid;}}
-    h3 {{font-size: 10.65pt; margin: 3pt 0 1pt; page-break-after: avoid;}}
-    p {{margin: 0 0 {0.6 if compact else 1.15}pt;}}
-    a {{color: {accent};}}
-    .target-label {{font-weight: bold; color: {accent}; font-size: 10.2pt;}}
-    .target {{font-size: 9.5pt;}}
-    .schedule {{font-size: 8.8pt; color: #50545a;}}
-    .masthead {{margin-bottom: 7pt;}}
-    .contacts {{color: #3e4853; font-size: 9.1pt; margin: 6pt 0 7pt;}}
-    .contact {{color: #50545a; font-size: 9.1pt; margin: 3pt 0;}}
+    h1 {{font-size: {20 * s:.2f}pt; margin: 0 0 3pt; color: {accent}; text-align: center; letter-spacing: 0.8pt;}}
+    h2 {{font-size: {11.2 * s:.2f}pt; color: {accent}; border-bottom: 0.65pt solid {rule_color};
+         padding-bottom: 1.5pt; margin: {(6.5 if compact else 8.5) * s:.2f}pt 0 {3.5 * s:.2f}pt; page-break-after: avoid; letter-spacing: 0.3pt;}}
+    h2 .cjk {{font-family: {families["ChineseHeading"]};}}
+    h3 {{font-size: {9.8 * s:.2f}pt; color: #1e2126; margin: 3pt 0 1pt; page-break-after: avoid;}}
+    p {{margin: 0 0 {(1.0 if compact else 1.5) * s:.2f}pt;}}
+    a, a:link {{color: #004a91; text-decoration: none;}}
+    strong {{color: #1e2126;}}
+    .dot {{color: #1e2126; font-size: {8.5 * s:.2f}pt;}}
+    .target-label {{font-weight: bold; color: {accent}; font-size: {9.2 * s:.2f}pt; margin-bottom: 0.5pt;}}
+    .target {{font-size: {8.45 * s:.2f}pt; line-height: 1.32; color: #1e2126;}}
+    .schedule {{font-size: {8.2 * s:.2f}pt; color: #50545a;}}
+    .masthead {{margin-bottom: 5pt;}}
+    .contacts {{color: #1e2126; font-size: {8.7 * s:.2f}pt; margin: 4pt 0 5pt;}}
+    .contact {{color: #50545a; font-size: {8.7 * s:.2f}pt; margin: 2pt 0;}}
     table {{width: 100%; border-collapse: collapse;}}
-    td {{padding: 0 4pt 1pt 0; vertical-align: top;}}
-    .entry {{page-break-after: avoid;}}
-    .entry td {{font-size: 10.65pt;}}
-    .entry .role, .entry .date {{font-size: 9.1pt; color: #50545a;}}
+    td {{padding: 0 4pt 0.8pt 0; vertical-align: baseline;}}
+    .entry {{page-break-after: avoid; margin-bottom: 1.2pt;}}
+    .entry td {{font-size: {9.8 * s:.2f}pt; color: #1e2126;}}
+    .entry .role, .entry .date {{font-size: {8.8 * s:.2f}pt; color: #50545a;}}
     .project .entry .role {{text-align: center;}}
     .entry .date {{text-align: right; padding-right: 0;}}
-    .bullet {{padding-left: 13pt; text-indent: -13pt;}}
-    .compact-section p, .awards td {{font-size: 9.8pt; line-height: 1.27;}}
-    .project p, .work p {{font-size: 10.15pt; line-height: {1.32 if compact else 1.41}; margin-bottom: {1.2 if compact else 2}pt;}}
-    .project .project-gap, .work .project-gap {{line-height: .45; margin-bottom: 3pt;}}
+    .bullet {{padding-left: 8.5pt; text-indent: -8.5pt;}}
+    .compact-section p, .awards td {{font-size: {8.9 * s:.2f}pt; line-height: {1.32 * (1.0 + (s - 1.0) * 0.3):.3f};}}
+    .awards td {{padding-bottom: 1pt;}}
+    .project p, .work p {{font-size: {proj_pt:.2f}pt; line-height: {lh:.3f}; margin-bottom: {(1.4 if compact else 2.0) * s:.2f}pt;}}
+    .project .project-gap, .work .project-gap {{line-height: 0.35; margin-bottom: {(4.5 if compact else 6.0) * s:.2f}pt;}}
     </style></head><body>{''.join(body)}</body></html>"""
 
 
-def render_resume(document, layout=None):
+def render_resume(document, layout=None, scale=None):
     compact = (layout or document["layout"]) == "compact"
+    font_scale = float(scale) if scale is not None else float(document.get("font_scale") or 1.0)
     paper = fitz.paper_rect("a4")
     content = paper + (PAGE_INSET, 20 if compact else 22.1, -PAGE_INSET, -25.5)
 
@@ -364,19 +443,53 @@ def render_resume(document, layout=None):
             raise ValueError("简历内容过长或无法分页，请缩短后重试。")
         return paper, content, None
 
-    story = fitz.Story(html=document_html(document, compact), archive=resume_fonts()[0])
+    story = fitz.Story(html=document_html(document, compact, scale=font_scale), archive=resume_fonts()[0])
     with story.write_with_links(page_rect) as pdf:
-        if photo := document.get("photo"):
+        if (photo := document.get("photo")) and document.get("show_photo", True) is not False:
             pdf[0].insert_image(fitz.Rect(paper.width - PAGE_INSET - 47, 24, paper.width - PAGE_INSET, 85),
                                 stream=base64.b64decode(photo))
         pdf.subset_fonts()
         return pdf.tobytes(garbage=3, deflate=True), len(pdf)
 
 
+def _page_fill_ratio(pdf_bytes):
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as pages:
+        blocks = [b for b in pages[0].get_text("blocks") if str(b[4]).strip()]
+        max_y = max((b[3] for b in blocks), default=0.0)
+        usable = max(1.0, pages[0].rect.height - 46.0)
+        return (max_y - 20.0) / usable if max_y else 0.0
+
+
 def choose_layout(document):
-    regular, pages = render_resume(document, "standard")
-    if pages > 1:
-        compact, fewer = render_resume(document, "compact")
-        if fewer < pages:
-            return "compact", compact, fewer
+    regular, pages = render_resume(document, "standard", scale=1.0)
+    if pages == 1:
+        fill = _page_fill_ratio(regular)
+        if 0.25 < fill < 0.78:
+            best_pdf, best_scale = regular, 1.0
+            for candidate in (1.06, 1.12, 1.16):
+                trial, trial_pages = render_resume(document, "standard", scale=candidate)
+                if trial_pages == 1:
+                    best_pdf, best_scale = trial, candidate
+                    if _page_fill_ratio(trial) >= 0.86:
+                        break
+                else:
+                    break
+            document["font_scale"] = best_scale
+            return "standard", best_pdf, 1
+        document.pop("font_scale", None)
+        return "standard", regular, 1
+    compact, fewer = render_resume(document, "compact", scale=1.0)
+    if fewer == 1:
+        document.pop("font_scale", None)
+        return "compact", compact, 1
+    if fewer == 2:
+        for candidate in (0.95, 0.90):
+            trial, trial_pages = render_resume(document, "compact", scale=candidate)
+            if trial_pages == 1:
+                document["font_scale"] = candidate
+                return "compact", trial, 1
+    if fewer < pages:
+        document.pop("font_scale", None)
+        return "compact", compact, fewer
+    document.pop("font_scale", None)
     return "standard", regular, pages

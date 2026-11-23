@@ -78,8 +78,14 @@ def test_imported_resume_skill_is_account_scoped_and_selected(make_account, monk
                       environ_overrides={"REMOTE_ADDR": "192.0.2.30"}).status_code == 403
     response = owner.post(route + "/skills", data={"location": str(path.parent)})
     settings = response.get_json()
-    assert response.status_code == 200 and settings["skills"][1]["name"] == "精简条目"
-    assert settings["settings"]["skill"] == settings["skills"][1]["id"]
+    imported = next(skill for skill in settings["skills"] if skill["name"] == "精简条目")
+    assert response.status_code == 200 and imported["builtin"] is False
+    assert settings["settings"]["skill"] == imported["id"]
+    assert owner.delete(route + "/skills/preset_tech_dense").status_code == 400
+    after_del = owner.delete(route + "/skills/" + imported["id"])
+    assert after_del.status_code == 200 and after_del.get_json()["settings"]["skill"] == "resume_rewrite"
+    response = owner.post(route + "/skills", data={"location": str(path.parent)})
+    settings = response.get_json()
     assert other.post(route + "/settings", json=settings["settings"]).status_code == 400
     assert owner.post(route + "/skills", data={"location": "https://example.com/SKILL.md"}).status_code == 400
     assert rewrite.github_request("https://github.com/org/repo/tree/main/skills/resume") == (
@@ -184,6 +190,12 @@ def test_export_keeps_chinese_text_and_matches_preview_pages(make_account):
         assert "林晓" in pages[0].get_text()
         assert "负责自动化交付" in pages[0].get_text()
     assert user.post(root + "image", json=doc).mimetype == "image/png"
+    word = user.post(root + "docx", json=doc)
+    assert word.status_code == 200
+    assert word.mimetype == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    with ZipFile(BytesIO(word.data)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8")
+        assert "林晓" in xml and "负责自动化交付" in xml
 
     doc["sections"][0]["content"] = "\n".join(f"- 第 {index} 条工作记录" for index in range(125))
     preview = user.post(root + "auto", json=doc).get_json()
@@ -281,3 +293,160 @@ def test_pdf_import_uses_header_and_table_geometry_instead_of_flat_text(make_acc
     with fitz.open(stream=result.data, filetype="pdf") as pdf:
         assert len(pdf) == 1 and pdf[0].get_images()
         assert "resume@example.com" in pdf[0].get_text()
+
+
+def test_skill_html_render_sanitizes_scripts_and_injects_photo(make_account, monkeypatch, tmp_path):
+    from services.resume import rewrite
+
+    account = make_account("resume-skill-html")
+    skill_file = tmp_path / "SKILL.md"
+    skill_file.write_text("# 视觉风格\n使用蓝色标题与浅色经历条。", encoding="utf-8")
+    monkeypatch.setenv("RESUME_REWRITE_SKILL_PATH", str(skill_file))
+    monkeypatch.setattr(rewrite.llm_env, "chat_runtime", lambda: ("https://model.invalid", "k", "m"))
+    monkeypatch.setattr(
+        rewrite,
+        "call_markdown_chat",
+        lambda *a, **k: (
+            "```html\n<!doctype html><html><head><style>body{color:#111;}</style></head>"
+            "<body onclick=\"alert(1)\"><script>alert(1)</script>"
+            "<img src=\"{{PHOTO_DATA_URI}}\"><a href=\"javascript:evil()\">x</a>"
+            "<h1>林晓</h1></body></html>\n```"
+        ),
+    )
+    photo = BytesIO()
+    Image.new("RGB", (45, 65), "#336699").save(photo, "JPEG")
+    import base64
+    doc = {
+        "title": "技术履历",
+        "contact": {"name": "林晓"},
+        "photo": base64.b64encode(photo.getvalue()).decode("ascii"),
+        "sections": [{"title": "项目经历", "content": "Demo | Owner | 2026\n- 实现核心模块"}],
+    }
+    resp = account.post("/api/resume-editor/render/skill-html", json={"document": doc})
+    assert resp.status_code == 200
+    html = resp.get_json()["html"]
+    assert "<script" not in html.lower() and "onclick" not in html.lower() and "javascript:" not in html.lower()
+    assert "data:image/jpeg;base64," in html and "@media print" in html
+    docx_resp = account.post("/api/resume-editor/render/skill-docx", json={"html": html, "title": "技术履历"})
+    assert docx_resp.status_code == 200
+    assert docx_resp.mimetype == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    with ZipFile(BytesIO(docx_resp.data)) as archive:
+        assert "林晓" in archive.read("word/document.xml").decode("utf-8")
+
+
+def test_personalization_features_appearance_occupancy_polish_and_default(make_account, monkeypatch):
+    import base64
+    from services.resume import rewrite
+
+    account = make_account("resume-personalize")
+    photo = BytesIO()
+    Image.new("RGB", (45, 65), "#224466").save(photo, "JPEG")
+    photo_b64 = base64.b64encode(photo.getvalue()).decode("ascii")
+    doc1 = {
+        "title": "版本A", "style": "blue", "layout": "compact", "show_photo": False, "photo": photo_b64,
+        "contact": {"name": "林晓"},
+        "sections": [{"title": "项目经历", "content": "引擎 | 负责人 | 2025\n- 召回率提升 15%"}],
+    }
+    doc2 = {"title": "版本B", "contact": {"name": "林晓"}, "sections": [{"title": "专业技能", "content": "Python"}]}
+    d1 = account.post("/api/resume-editor/drafts", json=doc1).get_json()
+    d2 = account.post("/api/resume-editor/drafts", json=doc2).get_json()
+    assert d1["document"]["show_photo"] is False
+    # Hidden photo should not render in PDF
+    pdf_resp = account.post("/api/resume-editor/render/pdf", json=d1["document"])
+    with fitz.open(stream=pdf_resp.data, filetype="pdf") as pdf:
+        assert not pdf[0].get_images()
+    # Preview returns occupancy metrics
+    prev = account.post("/api/resume-editor/render/preview", json=d1["document"]).get_json()
+    assert prev["page_count"] == 1 and 0 < prev["fill_percent"] <= 100 and prev["overflow_lines"] == 0
+    # Set default moves d1 to top of drafts list
+    assert account.post(f"/api/resume-editor/drafts/{d1['id']}/set-default").status_code == 200
+    assert account.get("/api/resume-editor/drafts").get_json()["drafts"][0]["id"] == d1["id"]
+    # Polish entry works and guards against fabricated numbers
+    monkeypatch.setattr(rewrite.llm_env, "chat_runtime", lambda: ("https://model.invalid", "k", "m"))
+    monkeypatch.setattr(rewrite, "call_markdown_chat", lambda *a, **k: "- **核心模块：**优化检索链路，召回率提升 15%")
+    ok = account.post("/api/resume-editor/polish-entry", json={
+        "section": "项目经历", "name": "引擎", "role": "负责人", "content": "- 召回率提升 15%", "action": "star",
+    })
+    assert ok.status_code == 200 and "15%" in ok.get_json()["content"]
+    monkeypatch.setattr(rewrite, "call_markdown_chat", lambda *a, **k: "- 召回率提升 99%")
+    bad = account.post("/api/resume-editor/polish-entry", json={
+        "section": "项目经历", "name": "引擎", "role": "负责人", "content": "- 召回率提升 15%", "action": "shorten",
+    })
+    assert bad.status_code == 502
+
+
+def test_adaptive_font_scale_and_github_icon_links(make_account):
+    account = make_account("resume-scale-gh")
+    doc = {
+        "title": "精简简历",
+        "contact": {"name": "林晓", "target": "AI Agent 系统开发实习 | 多智能体与 RAG 开发"},
+        "extras": [{"label": "GitHub", "value": "https://github.com/hankwang712"}],
+        "sections": [
+            {"title": "教育经历", "content": "北京邮电大学 | 计算机技术 | 2027.09 入学\n- GPA 4.71/5.00"},
+            {"title": "项目经历", "content": "智航平台 [项目链接](https://github.com/hankwang712/Career-Planning) | 核心开发 | 2026.01–2026.06\n- 负责多智能体编排与混合检索落地。\n- 优化召回率提升 24%。"},
+            {"title": "专业技能", "content": "- Python、LangGraph、FastAPI、SQLite"},
+        ],
+    }
+    auto = account.post("/api/resume-editor/render/auto", json=doc).get_json()
+    assert auto["page_count"] == 1
+    assert auto["font_scale"] > 1.0
+    doc["font_scale"] = auto["font_scale"]
+    pdf_resp = account.post("/api/resume-editor/render/pdf", json=doc)
+    assert pdf_resp.status_code == 200
+    with fitz.open(stream=pdf_resp.data, filetype="pdf") as pdf:
+        assert len(pdf) == 1
+        uris = {link.get("uri") for link in pdf[0].get_links()}
+        assert "https://github.com/hankwang712" in uris
+        assert "https://github.com/hankwang712/Career-Planning" in uris
+        # Both GitHub links should embed the inline Octocat icon image
+        assert len(pdf[0].get_images()) >= 1
+    # Word export must explicitly write fixed tblLayout and proportional gridCol widths so WPS/Word don't split 33/33/33
+    docx_resp = account.post("/api/resume-editor/render/docx", json=doc)
+    assert docx_resp.status_code == 200
+    with ZipFile(BytesIO(docx_resp.data)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8")
+        assert 'w:tblLayout w:type="fixed"' in xml
+        assert "智航平台" in xml
+
+
+def test_privacy_shield_audit_backup_diagnostics_grill_and_jd_report(make_account):
+    from services import db_backup, llm_audit, privacy_shield
+
+    # 1. Privacy shield masks & restores phone/email/name
+    raw = "我是王帅，手机 13800138000，邮箱 demo@example.com。"
+    masked, pii_map = privacy_shield.mask_pii(raw, extra_names=("王帅",))
+    assert "13800138000" not in masked and "demo@example.com" not in masked and "王帅" not in masked
+    assert privacy_shield.unmask_pii(masked, pii_map) == raw
+
+    # 2. LLM audit ledger records and summarizes
+    llm_audit.record_usage("test-model", prompt_tokens=120, completion_tokens=80, latency_ms=420, ok=True, feature="unit_test")
+    summary = llm_audit.usage_summary(days=7)
+    assert summary["today"]["calls"] >= 1 and summary["today"]["total_tokens"] >= 200
+
+    # 3. Rolling SQLite backup works
+    bk = db_backup.create_rolling_backup(force=True, max_keep=3)
+    assert bk["ok"] is True and bk["count"] >= 1
+
+    # 4. System diagnostics + Grill-me + JD heatmap endpoints
+    account = make_account("resume-insights")
+    diag = account.get("/api/system-settings/diagnostics")
+    assert diag.status_code == 200
+    assert any(c["key"] == "privacy_shield" and c["ok"] for c in diag.get_json()["checks"])
+
+    g1 = account.post("/api/resume-editor/grill", json={
+        "section": "项目经历", "name": "智能体平台", "role": "负责人",
+        "content": "- 基于 LangGraph 实现多智能体协同，召回率提升 20%。",
+    })
+    assert g1.status_code == 200 and g1.get_json()["question"]
+    g2 = account.post("/api/resume-editor/grill", json={
+        "section": "项目经历", "name": "智能体平台", "role": "负责人",
+        "content": "- 基于 LangGraph 实现多智能体协同，召回率提升 20%。",
+        "history": [{"q": g1.get_json()["question"], "a": "我们在 500 条测试集上对比了单向量检索 Baseline。"}],
+        "synthesize": True,
+    })
+    assert g2.status_code == 200 and "500" in g2.get_json()["improved_content"]
+
+    jd_rep = account.post("/api/resume-editor/jd-report", json={
+        "document": {"contact": {"name": "林晓"}, "sections": [{"title": "专业技能", "content": "Python, LangGraph"}]}
+    })
+    assert jd_rep.status_code == 200 and "skills" in jd_rep.get_json()

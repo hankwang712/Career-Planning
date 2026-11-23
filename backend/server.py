@@ -172,27 +172,100 @@ app.register_blueprint(recruitment.blueprint)
 if os.environ.get("JOB_MARKET_SCHEDULER", "1").lower() not in {"0", "false", "no"}:
     _job_market_collector.start_scheduler()
 _load_users()
+try:
+    from services import db_backup
+    _backup_res = db_backup.create_rolling_backup()
+    if _backup_res.get("ok") and not _backup_res.get("skipped"):
+        logger.info("SQLite 自动备份完成：%s（共保留 %s 份）", _backup_res.get("latest"), _backup_res.get("count"))
+except Exception as _exc:
+    logger.warning("SQLite 启动备份跳过：%s", type(_exc).__name__)
 _prewarm_caches()
 
 # Uvicorn serves chat with FastAPI; the rest of the site remains in Flask.
-asgi_app = create_chat_app(app, service=_chat_blueprint.chat_service, current_user=_current_user)
+_raw_asgi_app = create_chat_app(app, service=_chat_blueprint.chat_service, current_user=_current_user)
+
+_QUIET_PREFIXES = ("/static/", "/assets/", "/favicon.ico")
+_SLOW_GET_MS = 800.0
+
+
+class _CleanAccessLogMiddleware:
+    """生产风格请求日志：静默高频只读 200 轮询与静态资源，保留写操作、慢请求与 4xx/5xx 异常。"""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            return await self.inner(scope, receive, send)
+        method = scope.get("method", "GET")
+        path = scope.get("path", "")
+        t0 = time.perf_counter()
+        status = 500
+
+        async def _send(message):
+            nonlocal status
+            if message.get("type") == "http.response.start":
+                status = int(message.get("status", 200))
+            await send(message)
+
+        try:
+            await self.inner(scope, receive, _send)
+        finally:
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            is_static = path.startswith(_QUIET_PREFIXES)
+            should_log = (
+                status >= 400
+                or (not is_static and method in ("POST", "PUT", "PATCH", "DELETE"))
+                or (not is_static and elapsed_ms >= _SLOW_GET_MS)
+            )
+            if should_log:
+                stamp = time.strftime("%H:%M:%S")
+                dur = f"{elapsed_ms / 1000:.2f}s" if elapsed_ms >= 1000 else f"{elapsed_ms:.0f}ms"
+                if status >= 500:
+                    tag = "ERROR"
+                elif status >= 400:
+                    tag = "WARN "
+                elif method == "GET" and elapsed_ms >= _SLOW_GET_MS:
+                    tag = "SLOW "
+                else:
+                    tag = "INFO "
+                line = f"{stamp} [{tag}] {method:<6} {path} -> {status} ({dur})"
+                print(line, flush=True)
+                try:
+                    from services import console_log
+                    console_log.append_log(tag.strip(), f"{method} {path} -> {status} ({dur})")
+                except Exception:
+                    pass
+
+
+asgi_app = _CleanAccessLogMiddleware(_raw_asgi_app)
 
 
 if __name__ == "__main__":
     import uvicorn
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)-5s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    from services import console_log
+    console_log.install_logging_handler()
     host = "0.0.0.0" if os.environ.get("CAREER_CONTAINER") == "1" else "127.0.0.1"
     port = int(os.environ.get("PORT", "8080"))
     auto_open_browser = os.environ.get("AUTO_OPEN_BROWSER", "").lower() in {"1", "true", "yes"}
+    _, _, active_model = llm_env.chat_runtime()
     print("=" * 50)
     print("  职业规划智能体 · FastAPI + Flask 服务")
     print(f"  访问地址：http://{host}:{port}")
+    print(f"  对话模型：{active_model or '未配置（启发式模式）'}")
     print("  数据目录：", DATA_DIR / "jobs")
     print("  用户数据目录：", APP_DATA_DIR)
     print("  PDF 导出引擎：", f"PyMuPDF {fitz.VersionBind}" if fitz is not None else "PyMuPDF 未安装，请安装 requirements.txt")
+    print("  日志模式：静默只读轮询，保留业务操作 / 慢请求 / 4xx-5xx")
     print("  按 Ctrl+C 停止")
-    print("=" * 50)
+    print("=" * 50, flush=True)
 
     if auto_open_browser:
         threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run(asgi_app, host=host, port=port, proxy_headers=False)
+    uvicorn.run(asgi_app, host=host, port=port, proxy_headers=False, access_log=False)

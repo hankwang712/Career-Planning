@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff1f2"/>
+      <stop offset="55%" stop-color="#ffe4e6"/>
+      <stop offset="100%" stop-color="#fce7f3"/>
+    </linearGradient>
+    <radialGradient id="o1" cx="35%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </radialGradient>
+    <radialGradient id="o2" cx="35%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </radialGradient>
+    <radialGradient id="o3" cx="35%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#fda4af"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </radialGradient>
+    <radialGradient id="o4" cx="35%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#86efac"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </radialGradient>
+    <radialGradient id="o5" cx="35%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#d8b4fe"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </radialGradient>
+    <filter id="sh" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#be123c" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <ellipse cx="320" cy="184" rx="220" ry="120" fill="#ffffff" fill-opacity="0.52"/>
+  <g filter="url(#sh)">
+    <circle cx="176" cy="196" r="46" fill="url(#o2)" opacity="0.92"/>
+    <circle cx="468" cy="198" r="44" fill="url(#o4)" opacity="0.92"/>
+    <circle cx="242" cy="128" r="38" fill="url(#o5)" opacity="0.9"/>
+    <circle cx="404" cy="124" r="40" fill="url(#o3)" opacity="0.92"/>
+    <circle cx="320" cy="184" r="64" fill="url(#o1)"/>
+    <ellipse cx="298" cy="154" rx="20" ry="11" transform="rotate(-24 298 154)" fill="#ffffff" fill-opacity="0.65"/>
+  </g>
+</svg>

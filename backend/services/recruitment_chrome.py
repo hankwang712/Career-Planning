@@ -268,6 +268,189 @@ def check_platform_login(source):
         return "unavailable"
 
 
+DRAFT_PLATFORM_CONFIG = {
+    "boss": {
+        "label": "BOSS 直聘",
+        "prefixes": ("https://www.zhipin.com/",),
+        "chat_btn_selectors": "a.btn-startchat, button.btn-startchat, .btn-startchat, .op-btn-chat, a[ka*='chat']",
+        "chat_btn_pattern": r"(立即沟通|继续沟通|去沟通)",
+        "input_selectors": [
+            "#chat-input",
+            ".chat-input[contenteditable=\"true\"]",
+            ".input-area [contenteditable=\"true\"]",
+            ".chat-conversation [contenteditable=\"true\"]",
+            "textarea.input-area",
+            "textarea.chat-input",
+        ],
+    },
+    "zhilian": {
+        "label": "智联招聘",
+        "prefixes": ("https://www.zhaopin.com/", "https://xiaoyuan.zhaopin.com/", "https://jobs.zhaopin.com/"),
+        "chat_btn_selectors": "button, a, [role='button']",
+        "chat_btn_pattern": r"^(立即沟通|和TA聊聊|聊一聊|在线沟通|继续沟通)$",
+        "input_selectors": [
+            ".im-input [contenteditable=\"true\"]",
+            ".chat-input [contenteditable=\"true\"]",
+            ".msg-input [contenteditable=\"true\"]",
+            "textarea[class*='chat']",
+            "textarea[class*='im-input']",
+            "textarea[placeholder*='输入']",
+            "textarea[placeholder*='沟通']",
+        ],
+    },
+    "51job": {
+        "label": "前程无忧",
+        "prefixes": ("https://jobs.51job.com/", "https://we.51job.com/", "https://search.51job.com/"),
+        "chat_btn_selectors": "button, a, [role='button']",
+        "chat_btn_pattern": r"^(立即沟通|聊一聊|和TA聊|在线沟通|继续沟通)$",
+        "input_selectors": [
+            ".chat-input [contenteditable=\"true\"]",
+            ".im-editor [contenteditable=\"true\"]",
+            "textarea.chat-input",
+            "textarea[class*='chat']",
+            "textarea[placeholder*='回复']",
+            "textarea[placeholder*='输入']",
+        ],
+    },
+}
+
+
+def open_platform_draft_chat(source, job_url, greeting_text):
+    """Open a BOSS/Zhilian/51job posting in local Chrome, enter chat, and fill greeting as a DRAFT (NEVER send)."""
+    cfg = DRAFT_PLATFORM_CONFIG.get(str(source or "").strip())
+    if not cfg:
+        return {"ok": False, "status": "unsupported_source", "message": "目前填入草稿仅支持 BOSS 直聘、智联招聘与前程无忧。"}
+    url = str(job_url or "").strip()
+    greeting = str(greeting_text or "").strip()
+    if not any(url.startswith(prefix) for prefix in cfg["prefixes"]):
+        return {"ok": False, "status": "invalid_url", "message": f"岗位链接不属于 {cfg['label']}。"}
+    if not greeting:
+        return {"ok": False, "status": "empty_greeting", "message": "该岗位尚未生成打招呼语，请先生成后再填入草稿。"}
+
+    input_selectors_json = json.dumps(cfg["input_selectors"], ensure_ascii=True)
+    btn_selectors_json = json.dumps(cfg["chat_btn_selectors"], ensure_ascii=True)
+    btn_pattern_json = json.dumps(cfg["chat_btn_pattern"], ensure_ascii=True)
+
+    click_chat_js = (
+        "JSON.stringify((() => {"
+        "const visible = el => Boolean(el && el.getClientRects && el.getClientRects().length);"
+        f"const inputSels = {input_selectors_json};"
+        "for (const sel of inputSels) { const el = document.querySelector(sel); if (visible(el)) return { state: 'chat_ready', url: location.href }; }"
+        f"const re = new RegExp({btn_pattern_json});"
+        f"const btns = Array.from(document.querySelectorAll({btn_selectors_json}));"
+        "const btn = btns.find(el => visible(el) && re.test((el.innerText || el.textContent || '').trim().replace(/\\s+/g, '')));"
+        "if (btn) {"
+        "  const label = (btn.innerText || btn.textContent || '').trim();"
+        "  btn.click();"
+        "  return { state: 'clicked_chat', label, url: location.href };"
+        "}"
+        "return { state: 'waiting', url: location.href };"
+        "})())"
+    )
+
+    fill_draft_js = (
+        "JSON.stringify((() => {"
+        f"const text = {json.dumps(greeting, ensure_ascii=True)};"
+        "const visible = el => Boolean(el && el.getClientRects && el.getClientRects().length);"
+        f"const selectors = {input_selectors_json};"
+        "let box = null;"
+        "for (const sel of selectors) { const el = document.querySelector(sel); if (visible(el)) { box = el; break; } }"
+        "if (!box) return { filled: false, url: location.href };"
+        "box.focus();"
+        "if (box.tagName === 'TEXTAREA' || box.tagName === 'INPUT') {"
+        "  box.value = text;"
+        "  box.dispatchEvent(new Event('input', { bubbles: true }));"
+        "  box.dispatchEvent(new Event('change', { bubbles: true }));"
+        "} else {"
+        "  const sel = window.getSelection();"
+        "  const range = document.createRange();"
+        "  range.selectNodeContents(box);"
+        "  sel.removeAllRanges();"
+        "  sel.addRange(range);"
+        "  const ok = document.execCommand && document.execCommand('insertText', false, text);"
+        "  if (!ok || !(box.innerText || '').trim()) { box.innerText = text; }"
+        "  box.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));"
+        "}"
+        "return { filled: true, length: (box.value || box.innerText || '').length, url: location.href };"
+        "})())"
+    )
+
+    label = cfg["label"]
+    try:
+        with httpx.Client(base_url=BRIDGE_URL, timeout=15, trust_env=False) as client:
+            health = client.get("/health", timeout=3)
+            health.raise_for_status()
+            connected = health.json().get("connected") is True
+            response = client.get("/new", params={"url": "about:blank"})
+            if response.status_code == 500 and not connected:
+                return {"ok": False, "status": "authorization_required",
+                        "message": "本机 Chrome 尚未授权远程调试，请先打开 chrome://inspect/#remote-debugging 允许调试。"}
+            response.raise_for_status()
+            identifier = str(response.json().get("targetId") or "")
+            if not TAB_ID.fullmatch(identifier):
+                return {"ok": False, "status": "unavailable", "message": "Chrome 桥接返回了无效标签页 ID。"}
+            tab = ChromeTab(client, identifier, source)
+            # Keep tab open intentionally so user can review & press Enter in Chrome!
+            try:
+                tab.navigate(url, timeout=20)
+            except httpx.TimeoutException:
+                pass
+
+            clicked = False
+            deadline = monotonic() + 14
+            while monotonic() < deadline:
+                try:
+                    snap = tab.read(SNAPSHOT, timeout=4)
+                except (httpx.HTTPError, ValueError):
+                    sleep(0.6)
+                    continue
+                if is_verification(snap):
+                    return {"ok": False, "status": "verification_required",
+                            "message": f"{label}触发了安全验证，请在打开的 Chrome 标签页手动完成验证后重试。",
+                            "url": snap.get("url") or url}
+                login_state = platform_session(source, snap)
+                if login_state == "not_logged_in":
+                    return {"ok": False, "status": "not_logged_in",
+                            "message": f"本机 Chrome 尚未登录{label}，请在打开的标签页登录后重试。",
+                            "url": snap.get("url") or url}
+                if not clicked:
+                    res = tab.read(click_chat_js, timeout=4)
+                    if res.get("state") == "chat_ready":
+                        clicked = True
+                    elif res.get("state") == "clicked_chat":
+                        clicked = True
+                        sleep(1.2)
+                        continue
+                    else:
+                        sleep(0.7)
+                        continue
+                fill_res = tab.read(fill_draft_js, timeout=4)
+                if fill_res.get("filled"):
+                    return {
+                        "ok": True,
+                        "status": "draft_filled",
+                        "message": f"已在{label}聊天框填入 {fill_res.get('length', len(greeting))} 字草稿（未发送）。请切换到 Chrome 核对并按 Enter 发送。",
+                        "url": fill_res.get("url") or url,
+                    }
+                sleep(0.7)
+
+            return {
+                "ok": False,
+                "status": "opened_chat_manual_paste",
+                "message": f"已在 Chrome 打开{label}岗位页面（未发送），未自动定位到聊天输入框；已保留标签页，可手动点开聊天框粘贴打招呼语。",
+                "url": url,
+            }
+    except (httpx.ConnectError, httpx.ConnectTimeout):
+        return {"ok": False, "status": "bridge_unavailable",
+                "message": "本机 Chrome 桥接服务未启动（127.0.0.1:3456），请确认已开启本地 Chrome 模式。"}
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        return {"ok": False, "status": "unavailable", "message": f"连接本机 Chrome 失败：{type(exc).__name__}"}
+
+
+def open_boss_draft_chat(job_url, greeting_text):
+    return open_platform_draft_chat("boss", job_url, greeting_text)
+
+
 def read_zhilian_detail(url):
     parsed = urlsplit(url)
     expected_origin = f"{parsed.scheme}://{parsed.netloc}"
