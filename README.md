@@ -191,44 +191,17 @@ flowchart LR
 
 截图取自本机个人工作区（敏感信息已脱敏），界面以实际运行版本为准。
 
-### 核心板块主界面
-
 | 🏛️ 职业工作台（总览台） | 🚀 岗位全链路流水线 |
 | :---: | :---: |
 | [![职业工作台：求职工具与行业快报](asserts/workspace.png)](asserts/workspace.png) | [![全链路看板：漏斗、执行导航与岗位状态](asserts/pipeline.png)](asserts/pipeline.png) |
 
-| 🗺️ 多智能体规划报告 | 📄 简历工坊与排版预览 |
+| 🗺️ 多智能体规划报告（简历自选） | 📄 简历工坊 |
 | :---: | :---: |
 | [![规划报告：目标岗位、求职偏好与简历自选](asserts/report-wizard.png)](asserts/report-wizard.png) | [![我的简历：表单化编辑与多版本管理](asserts/resume-editor.png)](asserts/resume-editor.png) |
 
-| 🧩 测评中心 | 📈 成长规划 |
+| 🧩 测评中心 | ⚙️ 系统配置（模型预设 · 体检 · 审计） |
 | :---: | :---: |
-| [![测评中心：六项测评与完成记录](asserts/assessments.png)](asserts/assessments.png) | [![成长规划：学习任务板、打卡与热力图](asserts/learning.png)](asserts/learning.png) |
-
-| 💬 AI 生涯助手 | ⚙️ 系统配置与体检审计 |
-| :---: | :---: |
-| [![AI 生涯助手：记忆与资料、无痕对话](asserts/assistant.png)](asserts/assistant.png) | [![系统配置：模型预设、体检与审计](asserts/settings.png)](asserts/settings.png) |
-
-<details>
-<summary>📂 展开查看岗位流水线各阶段抽屉与报告中心截图（8 张）</summary>
-
-| 平台采集 | 规则清洗 |
-| :---: | :---: |
-| [![平台采集：登录检查、关键词、城市与手动导入](asserts/pipeline-collect.png)](asserts/pipeline-collect.png) | [![规则清洗：硬规则与 AI 语义规则](asserts/pipeline-cleaning.png)](asserts/pipeline-cleaning.png) |
-
-| AI 评估 | 定向简历改写 |
-| :---: | :---: |
-| [![AI 评估：八维权重、批次执行与分流](asserts/pipeline-evaluation.png)](asserts/pipeline-evaluation.png) | [![简历改写：基准简历与定向稿对比](asserts/pipeline-rewrite.png)](asserts/pipeline-rewrite.png) |
-
-| 打招呼语 | 人工审批 |
-| :---: | :---: |
-| [![打招呼语：海投母本与批量生成](asserts/pipeline-greeting.png)](asserts/pipeline-greeting.png) | [![人工审批：投递闸与放行队列](asserts/pipeline-approval.png)](asserts/pipeline-approval.png) |
-
-| 投递队列 | 报告中心 |
-| :---: | :---: |
-| [![投递队列：dry-run、投递包与失败重试](asserts/pipeline-delivery.png)](asserts/pipeline-delivery.png) | [![报告中心：最新版本与历史版本](asserts/report-center.png)](asserts/report-center.png) |
-
-</details>
+| [![测评中心：六项测评与完成记录](asserts/assessments.png)](asserts/assessments.png) | [![系统配置：模型预设、体检与审计](asserts/settings.png)](asserts/settings.png) |
 
 ---
 
